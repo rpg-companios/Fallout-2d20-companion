@@ -1,0 +1,2480 @@
+From 6e25f82c9cc4dd0222e9fdf5dcb1ebd7e06e82e1 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 15 Sep 2026 19:20:44 +0000
+Subject: [PATCH] патч 250: данные крафта — закрытие дыр каталога (93 рецепта)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Содержимое патча 249 уже влито в main («Add recipes»), файла 249 в цепочке нет —
+этот патч накладывает только дельту закрытия по числам владельца (2026-09-15).
+
+- Дикоросы: таблица modules/fallout/data/loot/foraging.json (d20 → еда, 20 бросков
+  без пропусков) и три новые сырые еды (Светящийся гриб, Центроцвет, Кроволист).
+- Справочники: хлам data/junk.json (7 компонентов разбора; «Абраксо» — из
+  Household Items 1, прочее — оценка владельца) и материалы data/materials.json
+  (вес 1, цена 1/3/5); у обоих i18n-зеркала ru/en.
+- Дротики шприцера: 9 предметов в каталоге боеприпасов с инертным полем effect
+  (заготовка под «заряженный шприц») и текстами карточек; рецепты — из таблицы
+  с. 215, количество 1 (решение владельца).
+- 19 запертых рецептов (9 препаратов + 9 дротиков) переехали в данные: 93 рецепта.
+- BOOK_CORRECTIONS в генераторе: «Ментаты» = Необычные ×3, Редкие ×2, Мозговой
+  гриб ×2; осиротевшая правка роняет генератор. В обменнике — одна позиция
+  «Cooking Station».
+- Тест-предохранитель дополнен (22 проверки: дикоросы, исправление, дротики);
+  741 тест зелёный, tsc чистый.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/crafting/crafting-data.test.js      |  59 +-
+ docs/architecture/crafting-data.md            |  38 +-
+ docs/changelog.en.md                          |  13 +
+ docs/changelog.ru.md                          |  13 +
+ docs/reference-data/CRAFTING-MAPPING.md       |  47 +-
+ docs/reference-data/Missing_craft.json        | 595 +-----------------
+ docs/reference-data/README.md                 |   3 +-
+ docs/reference-data/_index.json               |   4 +-
+ docs/survival-system-design.md                |   9 +-
+ modules/fallout/data/consumables/food.json    |  84 +++
+ modules/fallout/data/crafting/ammo.json       | 252 ++++++++
+ modules/fallout/data/crafting/chems.json      | 282 +++++++++
+ modules/fallout/data/crafting/index.json      |   4 +-
+ modules/fallout/data/equipment/ammo.json      | 109 ++++
+ modules/fallout/data/junk.json                |  44 ++
+ modules/fallout/data/loot/foraging.json       |  82 +++
+ modules/fallout/data/materials.json           |  23 +
+ .../i18n/en-EN/data/consumables/food.json     |  18 +
+ .../en-EN/data/equipment/ammo/ammo_types.json |  45 ++
+ modules/fallout/i18n/en-EN/data/junk.json     |  30 +
+ .../fallout/i18n/en-EN/data/materials.json    |  20 +
+ .../i18n/ru-RU/data/consumables/food.json     |  18 +
+ .../ru-RU/data/equipment/ammo/ammo_types.json |  45 ++
+ modules/fallout/i18n/ru-RU/data/junk.json     |  30 +
+ .../fallout/i18n/ru-RU/data/materials.json    |  20 +
+ scripts/build-crafting-data.mjs               |  74 ++-
+ 26 files changed, 1304 insertions(+), 657 deletions(-)
+ create mode 100644 modules/fallout/data/junk.json
+ create mode 100644 modules/fallout/data/loot/foraging.json
+ create mode 100644 modules/fallout/data/materials.json
+ create mode 100644 modules/fallout/i18n/en-EN/data/junk.json
+ create mode 100644 modules/fallout/i18n/en-EN/data/materials.json
+ create mode 100644 modules/fallout/i18n/ru-RU/data/junk.json
+ create mode 100644 modules/fallout/i18n/ru-RU/data/materials.json
+
+diff --git a/__tests__/crafting/crafting-data.test.js b/__tests__/crafting/crafting-data.test.js
+index 643b19b..256906d 100644
+--- a/__tests__/crafting/crafting-data.test.js
++++ b/__tests__/crafting/crafting-data.test.js
+@@ -1,6 +1,6 @@
+ // __tests__/crafting/crafting-data.test.js
+ //
+-// Предохранитель ДАННЫХ крафта (патч 249).
++// Предохранитель ДАННЫХ крафта (патчи 249–250).
+ //
+ // Что охраняет:
+ //   1. файлы рецептов существуют и описаны в индексе категории;
+@@ -42,6 +42,9 @@ import clothesData from '../../modules/fallout/data/equipment/clothes.json';
+ import powerArmorData from '../../modules/fallout/data/equipment/powerArmor.json';
+ import weaponModsData from '../../modules/fallout/data/equipment/weapon_mods.json';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
++import junkData from '../../modules/fallout/data/junk.json';
++import materialsData from '../../modules/fallout/data/materials.json';
++import foragingTable from '../../modules/fallout/data/loot/foraging.json';
+ 
+ import craftingIndex from '../../modules/fallout/data/crafting/index.json';
+ 
+@@ -72,6 +75,8 @@ collectIds(odditiesData, 'misc', catalogIds);
+ collectIds(armorData, 'armor', catalogIds);
+ collectIds(clothesData, 'clothing', catalogIds);
+ collectIds(powerArmorData, 'powerArmor', catalogIds);
++collectIds(junkData, 'junk', catalogIds);
++collectIds(materialsData, 'misc', catalogIds);
+ 
+ const perkIds = new Set(perksData.map((p) => p.id));
+ 
+@@ -219,6 +224,9 @@ describe('данные крафта: количества', () => {
+     for (const { record } of allRecipes()) {
+       const { quantity } = record.output;
+       if (record.output.itemType === 'ammo') {
++        // Дротики шприцера штучные: их нет в таблице находки, объём не берётся
++        // откуда попало — единицу зафиксировал владелец (патч 250).
++        if (quantity === 1) continue;
+         expect(typeof quantity, `${record.id}: количество боеприпаса должно быть словарём`).toBe('object');
+         expect(Number.isInteger(quantity.base) && quantity.base >= 1, `${record.id}: base`).toBe(true);
+         if (quantity.cd !== undefined) expect(quantity.cd).toBeGreaterThanOrEqual(1);
+@@ -321,7 +329,13 @@ describe('данные крафта: файл-обменник незакрыт
+   it('структура: мета и ровно четыре договорные категории', () => {
+     expect(Object.keys(doc)).toEqual(['_meta', ...MISSING_CATEGORY_ORDER]);
+     const total = MISSING_CATEGORY_ORDER.reduce((n, c) => n + doc[c].length, 0);
+-    expect(total).toBeGreaterThan(10);
++    // Дыры прошлого среза закрыл владелец (патч 250): предметы добавлены в
++    // каталоги, в обменнике осталась одна позиция. Если файл однажды опустеет
++    // полностью — это подозрение, что генератор что-то потерял, а не что всё
++    // закрыто: одна честная дыра обязана оставаться видимой, пока верстак
++    // «Cooking Station» не описан предметом.
++    expect(total).toBeGreaterThanOrEqual(1);
++    expect(doc.loot.map((r) => r.sourceName)).toContain('Cooking Station');
+     expect(doc._meta.counts).toEqual(
+       Object.fromEntries(MISSING_CATEGORY_ORDER.map((c) => [c, doc[c].length])),
+     );
+@@ -368,3 +382,44 @@ describe('данные крафта: файл-обменник незакрыт
+     }
+   });
+ });
++
++describe('дикоросы и новые каталоги (закрытие дыр — патч 250)', () => {
++  it('таблица дикоросов: броски 1..20 без пропусков, ссылки — только на каталог еды', () => {
++    expect(foragingTable.map((row) => row.roll)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
++    for (const row of foragingTable) {
++      expect(catalogIds.get(row.id), `дикоросы: ${row.id}`).toBe('food');
++    }
++  });
++
++  it('исправление владельца: материалы «Ментат» — ровно печатные числа', () => {
++    const rec = allRecipes().find(({ record }) => record.id === 'chem_mentats');
++    expect(rec, 'рецепт chem_mentats в данных').toBeTruthy();
++    const counts = Object.fromEntries(rec.record.materials.map((m) => [m.itemId, m.count]));
++    expect(counts).toEqual({
++      food_brain_fungus: 2,
++      item_rare_materials: 2,
++      item_uncommon_materials: 3,
++    });
++  });
++
++  it('дротики шприцера выпущены: штучные, Наука, верстак «chemistry»', () => {
++    const want = [
++      'ammo_syringe_berserk', 'ammo_syringe_bloatfly_larva', 'ammo_syringe_bleed_out',
++      'ammo_syringe_endangerol', 'ammo_syringe_lock_joint', 'ammo_syringe_mind_cloud',
++      'ammo_syringe_pax', 'ammo_syringe_radscorpion_venom', 'ammo_syringe_yellow_belly',
++    ].sort();
++    const darts = allRecipes().filter(({ record }) => want.includes(record.id));
++    expect(darts.map(({ record }) => record.id).sort()).toEqual(want);
++    for (const { record } of darts) {
++      expect(record.output.quantity, `${record.id}: дротик штучный`).toBe(1);
++      expect(record.requires.skill, `${record.id}: навык`).toBe('SCIENCE');
++      expect(record.bench, `${record.id}: верстак`).toBe('chemistry');
++    }
++  });
++
++  it('«Berserk Syringe» из рецепта Fury ведёт на дротик, а не на выдуманный предмет', () => {
++    const fury = allRecipes().find(({ record }) => record.id === 'chem_fury');
++    expect(fury).toBeTruthy();
++    expect(fury.record.materials).toContainEqual({ itemId: 'ammo_syringe_berserk', count: 1 });
++  });
++});
+diff --git a/docs/architecture/crafting-data.md b/docs/architecture/crafting-data.md
+index fd3f92d..e0c0f3f 100644
+--- a/docs/architecture/crafting-data.md
++++ b/docs/architecture/crafting-data.md
+@@ -1,6 +1,6 @@
+ # Данные крафта: где лежат рецепты и что в них
+ 
+-**Статус:** патч 249. Движок крафта — следующий шаг; этот документ описывает только данные.
++**Статус:** патчи 249–250; данными срез закрыт (в обменнике одна позиция). Движок крафта — следующий шаг; документ описывает только данные.
+ **Связанные документы:** `docs/architecture/engine-dna.md`, `docs/architecture/engine-charter.md`,
+ `docs/reference-data/CRAFTING-MAPPING.md`, `setting-contract.md`.
+ 
+@@ -19,6 +19,8 @@
+ ```text
+ docs/reference-data/pipboyapp_crafting.json  (справочные данные, чужие имена и строки)
+         │  генератор: имя → id нашего каталога; перк → id перка; навык → ключ
++        │  таблицы правил: кривая «сложность → материалы», соответствия имён,
++        │  исправления владельца BOOK_CORRECTIONS (числа приоритетнее источника)
+         ▼
+ modules/fallout/data/crafting/*.json          (только id)
+         ▼
+@@ -27,6 +29,12 @@ modules/fallout/data/crafting/*.json          (только id)
+ docs/reference-data/Missing_craft.json        (обменник: где каталог молчит)
+ ```
+ 
++Ссылки рецептов разрешаются не только по снаряжению и расходникам: с патча 250
++в списке справочников каталога — хлам (`modules/fallout/data/junk.json`),
++материалы (`modules/fallout/data/materials.json`) и каталог боеприпасов, куда
++дописаны девять дротиков шприцера. Имена предметов для сверки берутся из
++i18n-зеркал этих же каталогов (`i18n/en-EN/data/junk.json` и др.).
++
+ ## 2. Формат
+ 
+ Индекс категории — `crafting/index.json`:
+@@ -82,17 +90,23 @@ docs/reference-data/Missing_craft.json        (обменник: где ката
+   У модов оружия и брони колонки сложности/перков/материалов уже проставлены в данных
+   (`equipment/weapon_mods.json`, `equipment/armor/armor_mods.json`), так что для их
+   ветки достаточно будет переложить их в тот же формат — отдельным патчем.
+-- **Дыры каталога.** Девять препаратов упираются в ингредиенты, которых у нас нет как
+-  предметов (части существ, довоенная бытовая химия); девять рецептов дротиков шприцера
+-  и «верстак-кухня» — в то, что самих этих предметов в каталоге нет. Такие рецепты
+-  генератор не выпускает (придумывать предмет, его вес или цену он права не имеет) и не
+-  выбрасывает молча: они выгружаются в `docs/reference-data/Missing_craft.json` —
+-  файл-обменник с той же структурой полей, что у рецептов, где неизвестное записано
+-  строкой `unknown`. Владелец дописывает недостающее по своим книгам и возвращает файл;
+-  закрытые позиции переезжают в данные через правила генератора (соответствие имён или
+-  явные ингредиенты), а не правкой JSON руками. Совпадение названий («Tato Juice» →
+-  «Potato Juice», «Mutant Hound Chops» → «Mutant Hound Ribs») — соответствия с причиной,
+-  они видны в отчёте `CRAFTING-MAPPING.md`.
++- **Дыры каталога (закрыты в патче 250).** Девять препаратов упрались в ингредиенты,
++  которых не было как предметов (части существ, довоенная бытовая химия), девять
++  рецептов дротиков шприцера и «верстак-кухня» — в отсутствие самих этих предметов.
++  Владелец дописал справочники (таблица дикоросов и три новые еды, каталоги хлама и
++  материалов, дротики в боеприпасах) — 19 позиций переехали в данные через правила
++  генератора, не правкой JSON. Механизм обмена живёт в
++  `docs/reference-data/Missing_craft.json`: та же структура полей, что у рецептов,
++  неизвестное записано строкой `unknown`; сейчас в обменнике одна позиция —
++  «Cooking Station» (предмет не описан). Исправления печатных чисел, которые диктует
++  владелец, — в `BOOK_CORRECTIONS` генератора: подмена видна в отчёте, осиротевшая
++  правка роняет генератор. Совпадения названий («Tato Juice» → «Potato Juice»,
++  «Mutant Hound Chops» → «Mutant Hound Ribs», «Berserk Syringe» → дротик «Berserk»)
++  — соответствия с причиной, они видны в отчёте `CRAFTING-MAPPING.md`.
++- **Разборка хлама.** Антисептик, асбест и прочий хлам — предметы с весом и ценой;
++  правило «достаётся разбором» (в книге — у перка «Мусорщик») — отдельная ветка,
++  в данных рецептов её нет. Таблицы компонентов (Household Items 1, Animal Products
++  and Food) создавались как пополняемые владельцем.
+ - **Верстак как предмет.** «Верстак» в данных — поле `bench`, а не вещь в сумке.
+   Нужен ли станок отдельным предметом в каталоге — решение владельца.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2a58811..31ad258 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Update — Crafting, part 2: closing the catalog holes (patch 250)
++
++> Patch 249 (its content is already merged into main) moved recipes into the data but hit missing items. The owner supplied their numbers, the gaps became reference catalogs, and the 19 locked recipes joined the data.
++
++- The category now holds **93 recipes**: 28 ammunition (9 syringer darts added), 21 chems (all nine "problem" ones, antibiotics through ultra jet), the rest unchanged.
++- The food catalog gained three raw forage plants (Glowing Fungus, Hubflower, Bloodleaf: weight 0.5, cost 4, +3 HP, +1d6 rads, raw-food risk); the gathering table `modules/fallout/data/loot/foraging.json` (d20 → food ids, 20 rolls, no gaps). The gathering rules themselves belong to a survival patch.
++- Two new reference catalogs: junk `modules/fallout/data/junk.json` (seven teardown components; Abraxo Cleaner comes from the Household Items 1 table (weight 1, cost 10), the rest are the owner's estimates by analogy; antiseptic and asbestos stay plain items — "obtained by tearing down" is a rules branch, not data) and materials `modules/fallout/data/materials.json` (weight 1, cost 1/3/5). Both have i18n mirrors; the engine will read them through the registry in its own patches.
++- Darts are written into the ammo catalog with card texts (ru — the owner's, en — per canon). The `effect` field is inert: groundwork for the "loaded syringe" mechanic; `mapsToQuality` is set only where the effect is a plain alias of an existing quality.
++- Darts craft one at a time: they are not in the found table, the owner fixed the quantity. Regular ammunition still follows the found-table volume.
++- A corrections table in the generator now carries numbers the owner dictates over the book: the first entry is Mentats = Uncommon ×3, Rare ×2, Brain Fungus ×2. A correction whose source row disappears makes the generator fail.
++- One position is left in the exchange file `docs/reference-data/Missing_craft.json`: "Cooking Station" — the station item is not specced yet.
++- There is no patch file for 249 in the chain: its content was merged into main ("Add recipes"), nothing to duplicate. 741 tests green, `tsc --noEmit` clean; the guard `__tests__/crafting/` runs 22 checks, including the foraging table and the owner's Mentats numbers.
++
+ ## Update — Crafting, part 1: recipes as data (patch 249)
+ 
+ > First step of the crafting system: recipes now live in the data as their own category. Nothing is visible to players yet — the next patch teaches the engine to check, spend and hand out.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index b90d0d8..589f2f4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Обновление — Крафт, часть 2: закрытие дыр каталога (патч 250)
++
++> Патч 249 (его содержимое уже в main) поселил рецепты в данные, но упёрся в отсутствующие предметы. Вы дописали их числа — недостающее встало в справочники, и 19 запертых рецептов переехали в данные.
++
++- Рецептов в категории теперь **93**: боеприпасы 28 (добавлены 9 дротиков шприцера), препараты 21 (все девять «проблемных»: от антибиотиков до ультра-джета), остальное без изменений.
++- Каталог еды пополнился тремя сырыми дикоросами (Светящийся гриб, Центроцвет, Кроволист: вес 0.5, цена 4, +3 HP, +1d6 радиации, риск сырой пищи); таблица сбора `modules/fallout/data/loot/foraging.json` (d20 → id еды, 20 бросков без пропусков). Правила самого сбора — за патчем выживания.
++- Заведены два новых справочника: хлам `modules/fallout/data/junk.json` (семь компонентов разбора; «Абраксо» — из таблицы Household Items 1 (вес 1, цена 10), остальные — оценка владельца по аналогии; антисептик и асбест остаются предметами: «достаётся разбором» — ветка правил, не данных) и материалы `modules/fallout/data/materials.json` (вес 1, цена 1/3/5). У обоих i18n-зеркала; движок увидит их через реестр в своих патчах.
++- Дротики записаны в каталог боеприпасов с текстами карточек (ru — ваши, en — по канону). Поле `effect` инертно: заготовка под «заряженный шприц», `mapsToQuality` проставлен только там, где эффект — прямой алиас существующего качества.
++- Дротики крафтятся по одному: их нет в таблице находки, единицу зафиксировал владелец. Обычные боеприпасы — как раньше, по объёму находки.
++- Для чисел, которые владелец диктует поверх книги, в генераторе завелась таблица исправлений: первое — «Ментаты» = Необычные ×3, Редкие ×2, Мозговой гриб ×2. Правка, не нашедшая свою строку в источнике, роняет генератор.
++- В файле-обменнике `docs/reference-data/Missing_craft.json` осталась одна позиция: «Cooking Station» — предмет верстака пока не описан.
++- Файла патча 249 в цепочке нет: его содержимое влито в main («Add recipes»), дублировать нечем. 741 тест зелёный, `tsc --noEmit` чистый; предохранитель `__tests__/crafting/` — 22 проверки, включая таблицу дикоросов и ваши числа «Ментат».
++
+ ## Обновление — Крафт, часть 1: рецепты как данные (патч 249)
+ 
+ > Первый шаг системы крафта: рецепты поселились в данных как отдельная категория. Игрок пока ничего не видит — скрафчивать начнёт следующий патч, когда движок научится их проверять, списывать и выдавать.
+diff --git a/docs/reference-data/CRAFTING-MAPPING.md b/docs/reference-data/CRAFTING-MAPPING.md
+index d685837..1272adb 100644
+--- a/docs/reference-data/CRAFTING-MAPPING.md
++++ b/docs/reference-data/CRAFTING-MAPPING.md
+@@ -21,9 +21,9 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ ## Покрытие
+ 
+ - рецептов в источнике: **356**
+-- выпущено в данные: **75** (ammo: 19, weapons: 9, chems: 12, food: 27, drinks: 8)
+-- не выпущено: **281**
+-- из них упирается в дыры каталога и выгружено в обменник: **19** (chem: 9, food: 0, loot: 1, ammo: 9)
++- выпущено в данные: **93** (ammo: 28, weapons: 9, chems: 21, food: 27, drinks: 8)
++- не выпущено: **263**
++- из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
+ 
+ ## Какие таблицы книги вошли
+ 
+@@ -47,20 +47,14 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ | Причина | Сколько |
+ |---|---|
+ | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена | 260 |
+-| в каталоге сеттинга нет такого предмета-результата | 10 |
+-| в каталоге нет предмета-ингредиента «Glowing Fungus» | 2 |
+-| в каталоге нет предмета-ингредиента «Hubflower» | 2 |
+ | рецепт помечен в источнике как самодеятельность приложения (в книге нет) | 2 |
+-| в каталоге нет предмета-ингредиента «Berserk Syringe» | 1 |
+-| в каталоге нет предмета-ингредиента «Abraxo Cleaner» | 1 |
+-| в каталоге нет предмета-ингредиента «Blood Sac» | 1 |
+-| в каталоге нет предмета-ингредиента «Antiseptic» | 1 |
+-| в каталоге нет предмета-ингредиента «Bloodleaf» | 1 |
++| в каталоге сеттинга нет такого предмета-результата | 1 |
+ 
+ ## Ручные соответствия (то же самое, названо иначе)
+ 
+ | В источнике | Наш id | Где применено | Почему считаем тем же предметом |
+ |---|---|---|---|
++| Berserk Syringe | `ammo_syringe_berserk` | ингредиент | ингредиент «Fury» — он же дротик шприцера «Berserk» (соответствие владельца) |
+ | Mongrel Dog Meat | `food_dog_meat` | ингредиент | то же сырьё: наше ru-имя — «Собачатина» |
+ | Queen Mirelurk Meat | `food_mirelurk_queen_meat` | ингредиент | тот же продукт: у нас имя по животному, потом по части |
+ | Baked Bloatfly | `food_grilled_bloatfly` | результат | то же блюдо: наше ru-имя — «Печёный дутень» |
+@@ -74,6 +68,15 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ | Stingwing Filet | `food_stingwing_fillet` | результат | разница написания: filet / fillet |
+ | Tato Juice | `drink_potato_juice` | результат | тот же напиток: книга зовёт «Tato Juice», у нас — «Potato Juice» |
+ 
++## Исправления владельца к печатным числам
++
++Где источник расходится с книгой (или ссылается на предметы, которых в
++игре нет), числа диктует владелец — они в `BOOK_CORRECTIONS` генератора.
++
++| Строка источника | Материалы по исправлению | Примечание |
++|---|---|---|
++| Mentats | Uncommon Materials ×3, Rare Materials ×2, Brain Fungus ×2 | владелец 2026-09-15: материалы «Mentats» — Необычные ×3, Редкие ×2 и Мозговой гриб ×2 (вместо книжного «Abraxo Cleaner») |
++
+ ## Незакрытые позиции: файл-обменник
+ 
+ Всё, что не выпустилось из-за дыр каталога (нет предмета-результата или
+@@ -82,10 +85,10 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ Генератор не решает за владельца, каких книг касаться: он только выгружает
+ позиции со всеми известными числами. Сейчас в обменнике:
+ 
+-- **chem** (9) — «Antibiotics», «Fury», «Grape Mentats», «Mentats», «Psycho», «RadAway», «Skeeto Spit», «Stimpak», «Ultra Jet»
++- **chem** (0) — пусто
+ - **food** (0) — пусто
+ - **loot** (1) — «Cooking Station»
+-- **ammo** (9) — «Berserk», «Bleed-Out», «Bloatfly Larva», «Endangerol», «Lock Joint», «Mind Cloud», «Pax», «Radscorpion Venom», «Yellow Belly»
++- **ammo** (0) — пусто
+ 
+ Файл перегенерируется: починить руками его можно как черновик, но в данные
+ позиции попадают только после того, как соответствия и числа переедут в
+@@ -360,24 +363,6 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ | Sensor Array | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+ | Stealth Field | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+ | Tesla Coils | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Antibiotics | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Glowing Fungus» |
+-| Fury | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Berserk Syringe» |
+-| Grape Mentats | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Hubflower» |
+-| Mentats | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Abraxo Cleaner» |
+-| Psycho | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Hubflower» |
+-| RadAway | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Glowing Fungus» |
+-| Skeeto Spit | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Blood Sac» |
+-| Stimpak | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Antiseptic» |
+-| Ultra Jet | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Bloodleaf» |
+-| Berserk | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Bleed-Out | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Bloatfly Larva | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Endangerol | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Lock Joint | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Mind Cloud | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Pax | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Radscorpion Venom | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+-| Yellow Belly | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
+ | Cooking Station | WORKBENCH | cooking | в каталоге сеттинга нет такого предмета-результата |
+ | Robot Repair Kit | REPAIR KITS | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
+ | Stealth Boy | UTILITY DEVICES | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
+diff --git a/docs/reference-data/Missing_craft.json b/docs/reference-data/Missing_craft.json
+index 3381a3a..979c026 100644
+--- a/docs/reference-data/Missing_craft.json
++++ b/docs/reference-data/Missing_craft.json
+@@ -11,324 +11,13 @@
+       "ammo": "боеприпасы, включая дротики"
+     },
+     "counts": {
+-      "chem": 9,
++      "chem": 0,
+       "food": 0,
+       "loot": 1,
+-      "ammo": 9
++      "ammo": 0
+     }
+   },
+-  "chem": [
+-    {
+-      "id": "chem_antibiotics",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4,
+-        "perks": [
+-          {
+-            "perkId": "chemist",
+-            "rank": 1
+-          }
+-        ]
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_stimpak",
+-          "count": 3
+-        },
+-        {
+-          "itemId": "drink_purified_water",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "item_rare_materials",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Glowing Fungus",
+-          "count": 3
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_antibiotics",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Antibiotics",
+-      "blockedBy": "нет предметов-ингредиентов: «Glowing Fungus»"
+-    },
+-    {
+-      "id": "chem_fury",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 2,
+-        "perks": [
+-          {
+-            "perkId": "chemist",
+-            "rank": 1
+-          }
+-        ]
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_buffout",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Berserk Syringe",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_fury",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Fury",
+-      "blockedBy": "нет предметов-ингредиентов: «Berserk Syringe»"
+-    },
+-    {
+-      "id": "chem_mentats_grape",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_mentats",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "drink_whiskey",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Hubflower",
+-          "count": 2
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_mentats_grape",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Grape Mentats",
+-      "blockedBy": "нет предметов-ингредиентов: «Hubflower»"
+-    },
+-    {
+-      "id": "chem_mentats",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "food_brain_fungus",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Abraxo Cleaner",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_mentats",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Mentats",
+-      "blockedBy": "нет предметов-ингредиентов: «Abraxo Cleaner»"
+-    },
+-    {
+-      "id": "chem_psycho",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_stimpak",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_rare_materials",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Hubflower",
+-          "count": 2
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_psycho",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Psycho",
+-      "blockedBy": "нет предметов-ингредиентов: «Hubflower»"
+-    },
+-    {
+-      "id": "chem_radaway",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_purified_water",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_rare_materials",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Glowing Fungus",
+-          "count": 3
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_radaway",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "RadAway",
+-      "blockedBy": "нет предметов-ингредиентов: «Glowing Fungus»"
+-    },
+-    {
+-      "id": "chem_skeeto_spit",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Blood Sac",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Bloodleaf",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_skeeto_spit",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Skeeto Spit",
+-      "blockedBy": "нет предметов-ингредиентов: «Blood Sac», «Bloodleaf»"
+-    },
+-    {
+-      "id": "chem_stimpak",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_blood_pack",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Antiseptic",
+-          "count": 2
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_stimpak",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Stimpak",
+-      "blockedBy": "нет предметов-ингредиентов: «Antiseptic»"
+-    },
+-    {
+-      "id": "chem_ultra_jet",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4,
+-        "perks": [
+-          {
+-            "perkId": "chemist",
+-            "rank": 1
+-          }
+-        ]
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_jet",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Bloodleaf",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "chem_ultra_jet",
+-        "itemType": "chem",
+-        "quantity": 1
+-      },
+-      "sourcePage": 213,
+-      "sourceName": "Ultra Jet",
+-      "blockedBy": "нет предметов-ингредиентов: «Bloodleaf»"
+-    }
+-  ],
++  "chem": [],
+   "food": [],
+   "loot": [
+     {
+@@ -355,281 +44,5 @@
+       "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+     }
+   ],
+-  "ammo": [
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_bourbon",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "drink_dirty_water",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Berserk",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 2
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Bleed-Out",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_psycho",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Bloatfly Gland",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Bloatfly Larva",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата; нет и ингредиентов: «Bloatfly Gland»"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "chem_med_x",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 3
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Endangerol",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 5
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_dirty_water",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "food_tarberry",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Stingwing Barb",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Lock Joint",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата; нет и ингредиентов: «Stingwing Barb»"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_purified_water",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Abraxo Cleaner",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Asbestos",
+-          "count": 2
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Mind Cloud",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата; нет и ингредиентов: «Abraxo Cleaner», «Asbestos»"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "drink_nuka_cola",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "food_mutfruit",
+-          "count": 2
+-        },
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Pax",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 3
+-      },
+-      "materials": [
+-        {
+-          "itemId": "item_common_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 1
+-        },
+-        {
+-          "itemId": "unknown",
+-          "sourceName": "Radscorpion Stinger",
+-          "count": 1
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Radscorpion Venom",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата; нет и ингредиентов: «Radscorpion Stinger»"
+-    },
+-    {
+-      "id": "unknown",
+-      "bench": "chemistry",
+-      "requires": {
+-        "skill": "SCIENCE",
+-        "complexity": 4
+-      },
+-      "materials": [
+-        {
+-          "itemId": "item_uncommon_materials",
+-          "count": 5
+-        }
+-      ],
+-      "output": {
+-        "itemId": "unknown",
+-        "itemType": "ammo",
+-        "quantity": "unknown"
+-      },
+-      "sourcePage": 215,
+-      "sourceName": "Yellow Belly",
+-      "blockedBy": "в каталоге сеттинга нет такого предмета-результата"
+-    }
+-  ]
++  "ammo": []
+ }
+diff --git a/docs/reference-data/README.md b/docs/reference-data/README.md
+index aa6e4d2..519711a 100644
+--- a/docs/reference-data/README.md
++++ b/docs/reference-data/README.md
+@@ -65,7 +65,8 @@ JSON по категориям, машино-читаемый, чтобы мож
+ - `Missing_craft.json` — файл-обменник (тоже порождается генератором, не источник):
+   рецепты, которые уперлись в дыры каталога, в тех же полях, что данные рецептов,
+   а где чисел нет — строка `unknown`. Владелец дописывает недостающее по книгам и
+-  возвращает файл для слияния; после переноса правил в генератор позиции закрываются.
++  возвращает файл для слияния; после переноса правил в генератор позиции закрываются
++  (патч 250: закрыто 18 из 19, осталась «Cooking Station» — предмет не описан).
+ 
+ Это **не** данные каталога: ссылки здесь — по имени. В id нашего каталога их перекладывает
+ `scripts/build-crafting-data.mjs`, а что он не смог привести и почему — расписано в
+diff --git a/docs/reference-data/_index.json b/docs/reference-data/_index.json
+index 9a51ef5..c9744ed 100644
+--- a/docs/reference-data/_index.json
++++ b/docs/reference-data/_index.json
+@@ -177,9 +177,9 @@
+       "note": "Сырой датасет рецептов стороннего приложения (имена-строки, не наши id). Перекладывается в данные сеттинга скриптом scripts/build-crafting-data.mjs; сверка и список неприведённых — docs/reference-data/CRAFTING-MAPPING.md"
+     },
+     "Missing_craft.json": {
+-      "records": 19,
++      "records": 1,
+       "source": [],
+-      "note": "Файл-обменник: рецепты, заблокированные дырами каталога (нет предмета-результата или ингредиента). Порождается scripts/build-crafting-data.mjs, содержит те же поля, что данные рецептов; неизвестное записано строкой \"unknown\", его дописывает владелец по книгам и возвращает для слияния. Ключи-категории: chem, food, loot, ammo."
++      "note": "Файл-обменник: рецепты, заблокированные дырами каталога (нет предмета-результата или ингредиента). Порождается scripts/build-crafting-data.mjs, содержит те же поля, что данные рецептов; неизвестное записано строкой \"unknown\", его дописывает владелец по книгам и возвращает для слияния. Ключи-категории: chem, food, loot, ammo. Патч 249: 18 из 19 позиций закрыты предметами владельца (дикоросы, хлам, материалы, дротики); осталась одна — «Cooking Station»."
+     }
+   }
+ }
+diff --git a/docs/survival-system-design.md b/docs/survival-system-design.md
+index 876eb21..b3c4a7a 100644
+--- a/docs/survival-system-design.md
++++ b/docs/survival-system-design.md
+@@ -372,10 +372,11 @@ v25) и означает:
+ `soup: true` (4 записи выше) и `purified: true` у `drink_purified_water`
+ (+2 секции воды; прочие напитки +1, грязная вода +1 с облучением).
+ 
+-Категория «дикоросы» из раннего ТЗ в данных отсутствует (все 75 записей
+-`itemType: "food"`); для правил выживания дикоросы ничем не отличаются от
+-остальной еды — отдельный признак не заводится, пока не понадобится фильтр
+-в модалке (открытый вопрос №2, §14).
++Таблица сбора «дикоросов» живёт в данных с патча 250:
++`modules/fallout/data/loot/foraging.json` (d20 → id каталога еды; Светящийся гриб,
++Центроцвет и Кроволист дописаны в еду). Правил сбора в движке пока нет — их принесёт
++отдельный шаг; для выживания дикоросы ничем не отличаются от остальной еды,
++отдельный признак не заводится (вопрос №2, §14, закрыт).
+ 
+ ---
+ 
+diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
+index 193c27f..22c31fd 100644
+--- a/modules/fallout/data/consumables/food.json
++++ b/modules/fallout/data/consumables/food.json
+@@ -1717,5 +1717,89 @@
+     "effectKey": "",
+     "state": "cooked",
+     "preserved": true
++  },
++    {
++    "id": "food_glowing_fungus",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
++  },
++    {
++    "id": "food_hubflower",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
++  },
++    {
++    "id": "food_bloodleaf",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   }
+ ]
+diff --git a/modules/fallout/data/crafting/ammo.json b/modules/fallout/data/crafting/ammo.json
+index 69d7a48..a297612 100644
+--- a/modules/fallout/data/crafting/ammo.json
++++ b/modules/fallout/data/crafting/ammo.json
+@@ -603,5 +603,257 @@
+       }
+     },
+     "sourcePage": 211
++  },
++  {
++    "id": "ammo_syringe_berserk",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "drink_bourbon",
++        "count": 1
++      },
++      {
++        "itemId": "drink_dirty_water",
++        "count": 1
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_berserk",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_bleed_out",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_bleed_out",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_bloatfly_larva",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "chem_psycho",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      },
++      {
++        "itemId": "junk_bloatfly_gland",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_bloatfly_larva",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_endangerol",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "chem_med_x",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_endangerol",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_lock_joint",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 5
++    },
++    "materials": [
++      {
++        "itemId": "drink_dirty_water",
++        "count": 1
++      },
++      {
++        "itemId": "food_tarberry",
++        "count": 2
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      },
++      {
++        "itemId": "junk_stingwing_barb",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_lock_joint",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_mind_cloud",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "drink_purified_water",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      },
++      {
++        "itemId": "junk_abraxo_cleaner",
++        "count": 1
++      },
++      {
++        "itemId": "junk_asbestos",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_mind_cloud",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_pax",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "drink_nuka_cola",
++        "count": 1
++      },
++      {
++        "itemId": "food_mutfruit",
++        "count": 2
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_pax",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_radscorpion_venom",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      },
++      {
++        "itemId": "junk_radscorpion_stinger",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_radscorpion_venom",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
++  },
++  {
++    "id": "ammo_syringe_yellow_belly",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      }
++    ],
++    "output": {
++      "itemId": "ammo_syringe_yellow_belly",
++      "itemType": "ammo",
++      "quantity": 1
++    },
++    "sourcePage": 215
+   }
+ ]
+diff --git a/modules/fallout/data/crafting/chems.json b/modules/fallout/data/crafting/chems.json
+index 685c9ce..71709d2 100644
+--- a/modules/fallout/data/crafting/chems.json
++++ b/modules/fallout/data/crafting/chems.json
+@@ -1,4 +1,42 @@
+ [
++  {
++    "id": "chem_antibiotics",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "chemist",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "chem_stimpak",
++        "count": 3
++      },
++      {
++        "itemId": "drink_purified_water",
++        "count": 2
++      },
++      {
++        "itemId": "food_glowing_fungus",
++        "count": 3
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "chem_antibiotics",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
+   {
+     "id": "chem_mentats_berry",
+     "bench": "chemistry",
+@@ -147,6 +185,64 @@
+     },
+     "sourcePage": 213
+   },
++  {
++    "id": "chem_fury",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "chemist",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "ammo_syringe_berserk",
++        "count": 1
++      },
++      {
++        "itemId": "chem_buffout",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "chem_fury",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
++  {
++    "id": "chem_mentats_grape",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "chem_mentats",
++        "count": 1
++      },
++      {
++        "itemId": "drink_whiskey",
++        "count": 1
++      },
++      {
++        "itemId": "food_hubflower",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "chem_mentats_grape",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
+   {
+     "id": "chem_jet",
+     "bench": "chemistry",
+@@ -201,6 +297,34 @@
+     },
+     "sourcePage": 213
+   },
++  {
++    "id": "chem_mentats",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "food_brain_fungus",
++        "count": 2
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "output": {
++      "itemId": "chem_mentats",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
+   {
+     "id": "chem_mentats_orange",
+     "bench": "chemistry",
+@@ -263,6 +387,34 @@
+     },
+     "sourcePage": 213
+   },
++  {
++    "id": "chem_psycho",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "chem_stimpak",
++        "count": 1
++      },
++      {
++        "itemId": "food_hubflower",
++        "count": 2
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "chem_psycho",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
+   {
+     "id": "chem_psycho_jet",
+     "bench": "chemistry",
+@@ -310,5 +462,135 @@
+       "quantity": 1
+     },
+     "sourcePage": 213
++  },
++  {
++    "id": "chem_radaway",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "drink_purified_water",
++        "count": 1
++      },
++      {
++        "itemId": "food_glowing_fungus",
++        "count": 3
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "chem_radaway",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
++  {
++    "id": "chem_skeeto_spit",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "food_bloodleaf",
++        "count": 1
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      },
++      {
++        "itemId": "junk_blood_sac",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "chem_skeeto_spit",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
++  {
++    "id": "chem_stimpak",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "drink_blood_pack",
++        "count": 1
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 1
++      },
++      {
++        "itemId": "junk_antiseptic",
++        "count": 2
++      }
++    ],
++    "output": {
++      "itemId": "chem_stimpak",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
++  },
++  {
++    "id": "chem_ultra_jet",
++    "bench": "chemistry",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "chemist",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "chem_jet",
++        "count": 1
++      },
++      {
++        "itemId": "food_bloodleaf",
++        "count": 1
++      },
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 1
++      }
++    ],
++    "output": {
++      "itemId": "chem_ultra_jet",
++      "itemType": "chem",
++      "quantity": 1
++    },
++    "sourcePage": 213
+   }
+ ]
+diff --git a/modules/fallout/data/crafting/index.json b/modules/fallout/data/crafting/index.json
+index 31d5a7f..2089234 100644
+--- a/modules/fallout/data/crafting/index.json
++++ b/modules/fallout/data/crafting/index.json
+@@ -9,12 +9,12 @@
+     {
+       "file": "ammo.json",
+       "bucket": "ammo",
+-      "count": 19
++      "count": 28
+     },
+     {
+       "file": "chems.json",
+       "bucket": "chems",
+-      "count": 12
++      "count": 21
+     },
+     {
+       "file": "drinks.json",
+diff --git a/modules/fallout/data/equipment/ammo.json b/modules/fallout/data/equipment/ammo.json
+index da9ef36..eabce26 100644
+--- a/modules/fallout/data/equipment/ammo.json
++++ b/modules/fallout/data/equipment/ammo.json
+@@ -231,5 +231,114 @@
+   {
+     "id": "ammo_grappling_hook",
+     "weight": 3.0
++  },
++    {
++    "id": "ammo_syringe_berserk",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 50,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_berserk",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeBerserk"
++    }
++  },
++    {
++    "id": "ammo_syringe_bleed_out",
++    "itemType": "ammo",
++    "rarity": 1,
++    "cost": 17,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_bleed_out",
++      "mapsToQuality": "effect_persistent",
++      "descriptionKey": "itemEffects.ammo.syringeBleedOut"
++    }
++  },
++    {
++    "id": "ammo_syringe_bloatfly_larva",
++    "itemType": "ammo",
++    "rarity": 1,
++    "cost": 10,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_bloatfly_larva",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeBloatflyLarva"
++    }
++  },
++    {
++    "id": "ammo_syringe_endangerol",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 60,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_endangerol",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeEndangerol"
++    }
++  },
++    {
++    "id": "ammo_syringe_lock_joint",
++    "itemType": "ammo",
++    "rarity": 2,
++    "cost": 40,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_lock_joint",
++      "mapsToQuality": "effect_stun",
++      "descriptionKey": "itemEffects.ammo.syringeLockJoint"
++    }
++  },
++    {
++    "id": "ammo_syringe_mind_cloud",
++    "itemType": "ammo",
++    "rarity": 4,
++    "cost": 73,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_mind_cloud",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeMindCloud"
++    }
++  },
++    {
++    "id": "ammo_syringe_pax",
++    "itemType": "ammo",
++    "rarity": 2,
++    "cost": 39,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_pax",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringePax"
++    }
++  },
++    {
++    "id": "ammo_syringe_radscorpion_venom",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 65,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_radscorpion_venom",
++      "mapsToQuality": null,
++      "note": "книга: +1 DC урон + «Стойкий (яд)» — составной эффект, требует новый вариант persistent с типом урона, не только алиас",
++      "descriptionKey": "itemEffects.ammo.syringeRadscorpionVenom"
++    }
++  },
++    {
++    "id": "ammo_syringe_yellow_belly",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 55,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_yellow_belly",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeYellowBelly"
++    }
+   }
+ ]
+diff --git a/modules/fallout/data/junk.json b/modules/fallout/data/junk.json
+new file mode 100644
+index 0000000..2e3bd3d
+--- /dev/null
++++ b/modules/fallout/data/junk.json
+@@ -0,0 +1,44 @@
++[
++  {
++    "id": "junk_antiseptic",
++    "itemType": "junk",
++    "weight": 0.2,
++    "cost": 4
++  },
++  {
++    "id": "junk_abraxo_cleaner",
++    "itemType": "junk",
++    "weight": 1,
++    "cost": 10
++  },
++  {
++    "id": "junk_blood_sac",
++    "itemType": "junk",
++    "weight": 0.2,
++    "cost": 4
++  },
++  {
++    "id": "junk_asbestos",
++    "itemType": "junk",
++    "weight": 1,
++    "cost": 5
++  },
++  {
++    "id": "junk_bloatfly_gland",
++    "itemType": "junk",
++    "weight": 0.3,
++    "cost": 6
++  },
++  {
++    "id": "junk_stingwing_barb",
++    "itemType": "junk",
++    "weight": 0.2,
++    "cost": 5
++  },
++  {
++    "id": "junk_radscorpion_stinger",
++    "itemType": "junk",
++    "weight": 0.2,
++    "cost": 5
++  }
++]
+diff --git a/modules/fallout/data/loot/foraging.json b/modules/fallout/data/loot/foraging.json
+new file mode 100644
+index 0000000..70352b4
+--- /dev/null
++++ b/modules/fallout/data/loot/foraging.json
+@@ -0,0 +1,82 @@
++[
++  {
++    "roll": 1,
++    "id": "food_brain_fungus"
++  },
++  {
++    "roll": 2,
++    "id": "food_glowing_fungus"
++  },
++  {
++    "roll": 3,
++    "id": "food_carrot"
++  },
++  {
++    "roll": 4,
++    "id": "food_carrot"
++  },
++  {
++    "roll": 5,
++    "id": "food_corn"
++  },
++  {
++    "roll": 6,
++    "id": "food_corn"
++  },
++  {
++    "roll": 7,
++    "id": "food_gourd"
++  },
++  {
++    "roll": 8,
++    "id": "food_gourd"
++  },
++  {
++    "roll": 9,
++    "id": "food_melon"
++  },
++  {
++    "roll": 10,
++    "id": "food_melon"
++  },
++  {
++    "roll": 11,
++    "id": "food_mutfruit"
++  },
++  {
++    "roll": 12,
++    "id": "food_mutfruit"
++  },
++  {
++    "roll": 13,
++    "id": "food_razorgrain"
++  },
++  {
++    "roll": 14,
++    "id": "food_razorgrain"
++  },
++  {
++    "roll": 15,
++    "id": "food_silt_bean"
++  },
++  {
++    "roll": 16,
++    "id": "food_silt_bean"
++  },
++  {
++    "roll": 17,
++    "id": "food_tato"
++  },
++  {
++    "roll": 18,
++    "id": "food_tato"
++  },
++  {
++    "roll": 19,
++    "id": "food_hubflower"
++  },
++  {
++    "roll": 20,
++    "id": "food_bloodleaf"
++  }
++]
+diff --git a/modules/fallout/data/materials.json b/modules/fallout/data/materials.json
+new file mode 100644
+index 0000000..0083ec4
+--- /dev/null
++++ b/modules/fallout/data/materials.json
+@@ -0,0 +1,23 @@
++[
++  {
++    "id": "item_common_materials",
++    "itemType": "misc",
++    "weight": 1,
++    "cost": 1,
++    "rarity": 0
++  },
++  {
++    "id": "item_uncommon_materials",
++    "itemType": "misc",
++    "weight": 1,
++    "cost": 3,
++    "rarity": 1
++  },
++  {
++    "id": "item_rare_materials",
++    "itemType": "misc",
++    "weight": 1,
++    "cost": 5,
++    "rarity": 2
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/consumables/food.json b/modules/fallout/i18n/en-EN/data/consumables/food.json
+index 2ee2c9d..1bcaa69 100644
+--- a/modules/fallout/i18n/en-EN/data/consumables/food.json
++++ b/modules/fallout/i18n/en-EN/data/consumables/food.json
+@@ -448,5 +448,23 @@
+     "name": "Yum Yum Deviled Eggs",
+     "effectLabel": "",
+     "description": ""
++  },
++    {
++    "id": "food_glowing_fungus",
++    "name": "Glowing Fungus",
++    "effectLabel": "",
++    "description": ""
++  },
++    {
++    "id": "food_hubflower",
++    "name": "Hubflower",
++    "effectLabel": "",
++    "description": ""
++  },
++    {
++    "id": "food_bloodleaf",
++    "name": "Bloodleaf",
++    "effectLabel": "",
++    "description": ""
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json b/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
+index 59e4423..c65d4a0 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
+@@ -166,5 +166,50 @@
+   {
+     "id": "ammo_grappling_hook",
+     "name": "Grappling Hook"
++  },
++    {
++    "id": "ammo_syringe_berserk",
++    "name": "Berserk",
++    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target flies into a rage and attacks the nearest living creature (friend or foe) until the end of the scene."
++  },
++    {
++    "id": "ammo_syringe_bleed_out",
++    "name": "Bleed-Out",
++    "effectLabel": "The weapon gains the Persistent Damage quality."
++  },
++    {
++    "id": "ammo_syringe_bloatfly_larva",
++    "name": "Bloatfly Larva",
++    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, a Bloatfly emerges from the target's remains when it dies."
++  },
++    {
++    "id": "ammo_syringe_endangerol",
++    "name": "Endangerol",
++    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target's Physical Damage resistance is reduced by 2 until the end of the scene."
++  },
++    {
++    "id": "ammo_syringe_lock_joint",
++    "name": "Lock Joint",
++    "effectLabel": "The weapon gains the Stun quality."
++  },
++    {
++    "id": "ammo_syringe_mind_cloud",
++    "name": "Mind Cloud",
++    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target is confused: +2 difficulty to all END tests for a number of rounds equal to the number of Effects rolled."
++  },
++    {
++    "id": "ammo_syringe_pax",
++    "name": "Pax",
++    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target cannot take hostile or aggressive actions for a number of rounds equal to the number of Effects rolled."
++  },
++    {
++    "id": "ammo_syringe_radscorpion_venom",
++    "name": "Radscorpion Venom",
++    "effectLabel": "The weapon deals +1 CD damage and gains the Persistent (Poison) quality."
++  },
++    {
++    "id": "ammo_syringe_yellow_belly",
++    "name": "Yellow Belly",
++    "effectLabel": "If one or more Effects are rolled, the target must spend at least one action each turn moving away from all enemies by the shortest route, for a number of rounds equal to the number of Effects rolled."
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/junk.json b/modules/fallout/i18n/en-EN/data/junk.json
+new file mode 100644
+index 0000000..83d5e40
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/junk.json
+@@ -0,0 +1,30 @@
++[
++  {
++    "id": "junk_antiseptic",
++    "name": "Antiseptic"
++  },
++  {
++    "id": "junk_abraxo_cleaner",
++    "name": "Abraxo Cleaner"
++  },
++  {
++    "id": "junk_blood_sac",
++    "name": "Blood Sac"
++  },
++  {
++    "id": "junk_asbestos",
++    "name": "Asbestos"
++  },
++  {
++    "id": "junk_bloatfly_gland",
++    "name": "Bloatfly Gland"
++  },
++  {
++    "id": "junk_stingwing_barb",
++    "name": "Stingwing Barb"
++  },
++  {
++    "id": "junk_radscorpion_stinger",
++    "name": "Radscorpion Stinger"
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/materials.json b/modules/fallout/i18n/en-EN/data/materials.json
+new file mode 100644
+index 0000000..b6b9db8
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/materials.json
+@@ -0,0 +1,20 @@
++[
++  {
++    "id": "item_common_materials",
++    "name": "Common Materials",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "item_uncommon_materials",
++    "name": "Uncommon Materials",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "item_rare_materials",
++    "name": "Rare Materials",
++    "effectLabel": "",
++    "description": ""
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/consumables/food.json b/modules/fallout/i18n/ru-RU/data/consumables/food.json
+index f369bfd..40be6bc 100644
+--- a/modules/fallout/i18n/ru-RU/data/consumables/food.json
++++ b/modules/fallout/i18n/ru-RU/data/consumables/food.json
+@@ -448,5 +448,23 @@
+     "name": "Фаршированные яйца «НямНям»",
+     "effectLabel": "",
+     "description": ""
++  },
++    {
++    "id": "food_glowing_fungus",
++    "name": "Светящийся гриб",
++    "effectLabel": "",
++    "description": ""
++  },
++    {
++    "id": "food_hubflower",
++    "name": "Центроцвет",
++    "effectLabel": "",
++    "description": ""
++  },
++    {
++    "id": "food_bloodleaf",
++    "name": "Кроволист",
++    "effectLabel": "",
++    "description": ""
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json b/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
+index fa0a1c4..5a022da 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
+@@ -166,5 +166,50 @@
+   {
+     "id": "ammo_grappling_hook",
+     "name": "Крюк-кошка"
++  },
++    {
++    "id": "ammo_syringe_berserk",
++    "name": "Берсерк",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель впадает в ярость и атакует ближайшее живое существо (друга или врага) до конца сцены."
++  },
++    {
++    "id": "ammo_syringe_bleed_out",
++    "name": "Кровопуск",
++    "effectLabel": "Оружие получает эффект «Стойкий урон»."
++  },
++    {
++    "id": "ammo_syringe_bloatfly_larva",
++    "name": "Личинка дутня",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, после смерти цели из её останков появляется Дутень."
++  },
++    {
++    "id": "ammo_syringe_endangerol",
++    "name": "Опасностин",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, сопротивление физическому урону цели снижается на 2 до конца сцены."
++  },
++    {
++    "id": "ammo_syringe_lock_joint",
++    "name": "Стопор",
++    "effectLabel": "Оружие получает эффект «Оглушение»."
++  },
++    {
++    "id": "ammo_syringe_mind_cloud",
++    "name": "Затуманенное сознание",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель впадает в замешательство: +2 к сложности всех проверок на ВОС на количество раундов, равное числу выпавших Эффектов."
++  },
++    {
++    "id": "ammo_syringe_pax",
++    "name": "Умиротворение",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель не может предпринимать враждебные/агрессивные действия на количество раундов, равное числу выпавших Эффектов."
++  },
++    {
++    "id": "ammo_syringe_radscorpion_venom",
++    "name": "Яд Радскорпиона",
++    "effectLabel": "Оружие получает +1 DC урона и эффект «Стойкий (яд)»."
++  },
++    {
++    "id": "ammo_syringe_yellow_belly",
++    "name": "Трусишка",
++    "effectLabel": "Если выпал один или несколько Эффектов, цель обязана использовать хотя бы одно действие за ход, чтобы отойти от всех врагов по кратчайшему пути. Длится количество раундов, равное числу выпавших Эффектов."
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/junk.json b/modules/fallout/i18n/ru-RU/data/junk.json
+new file mode 100644
+index 0000000..ce73bef
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/junk.json
+@@ -0,0 +1,30 @@
++[
++  {
++    "id": "junk_antiseptic",
++    "name": "Антисептик"
++  },
++  {
++    "id": "junk_abraxo_cleaner",
++    "name": "Чистящее средство Абраксо"
++  },
++  {
++    "id": "junk_blood_sac",
++    "name": "Кровяной мешок"
++  },
++  {
++    "id": "junk_asbestos",
++    "name": "Асбест"
++  },
++  {
++    "id": "junk_bloatfly_gland",
++    "name": "Железа дутня"
++  },
++  {
++    "id": "junk_stingwing_barb",
++    "name": "Шип жалокрыла"
++  },
++  {
++    "id": "junk_radscorpion_stinger",
++    "name": "Жало радскорпиона"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/materials.json b/modules/fallout/i18n/ru-RU/data/materials.json
+new file mode 100644
+index 0000000..2882bac
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/materials.json
+@@ -0,0 +1,20 @@
++[
++  {
++    "id": "item_common_materials",
++    "name": "Обычные материалы",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "item_uncommon_materials",
++    "name": "Необычные материалы",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "item_rare_materials",
++    "name": "Редкие материалы",
++    "effectLabel": "",
++    "description": ""
++  }
++]
+diff --git a/scripts/build-crafting-data.mjs b/scripts/build-crafting-data.mjs
+index a40e19a..f717e85 100644
+--- a/scripts/build-crafting-data.mjs
++++ b/scripts/build-crafting-data.mjs
+@@ -1,6 +1,6 @@
+ // scripts/build-crafting-data.mjs
+ //
+-// Генератор ДАННЫХ крафта (патч 249).
++// Генератор ДАННЫХ крафта (патчи 249–250).
+ //
+ // Что делает: берёт сырой датасет рецептов (docs/reference-data/pipboyapp_crafting.json
+ // — справочные данные стороннего приложения, где всё названо человеческими именами) и
+@@ -22,6 +22,8 @@
+ //     теряются — они уходят в файл-обменник docs/reference-data/Missing_craft.json:
+ //     та же форма рецепта, а где данных нет — строка "unknown". Владелец дописывает
+ //     недостающее по своим книгам и возвращает файл для слияния.
++//   - печатные числа, которые владелец диктует поверх источника: таблица
++//     BOOK_CORRECTIONS ниже; каждая подмена видна в отчёте, мёртвая правка — ошибка.
+ //
+ // Запуск:
+ //   node scripts/build-crafting-data.mjs          — перегенерировать данные и отчёт
+@@ -58,6 +60,10 @@ const CATALOG_SOURCES = [
+   { file: 'i18n/en-EN/data/equipment/armor/armor_mods.json', itemType: 'armorMod', bucket: 'mod' },
+   { file: 'i18n/en-EN/data/equipment/armor/uniq_armor_mods.json', itemType: 'armorMod', bucket: 'mod' },
+   { file: 'i18n/en-EN/data/equipment/weapon_mods.json', itemType: 'weaponMod', bucket: 'mod' },
++  // Хлам и материалы — справочники владельца (патч 250): их добавили, чтобы закрыть
++  // дыры каталога в ингредиентах («Антисептик», «Кровяной мешок», «Абраксо»…).
++  { file: 'i18n/en-EN/data/junk.json', itemType: 'junk', bucket: 'items' },
++  { file: 'i18n/en-EN/data/materials.json', itemType: 'misc', bucket: 'items' },
+ ];
+ 
+ const PERKS_FILE = 'i18n/en-EN/data/perks/perks.json';
+@@ -114,17 +120,30 @@ export const ITEM_NAME_ALIASES = {
+   'fusion cell': { itemId: 'ammo_energy_cell', reason: 'книжная графа «Fusion Cell» = наша «Energy Cell» (см. AMMO-FOUND-TABLE.md)' },
+   'tato juice': { itemId: 'drink_potato_juice', reason: 'тот же напиток: книга зовёт «Tato Juice», у нас — «Potato Juice»' },
+   'mutant hound chops': { itemId: 'food_mutant_hound_ribs', reason: 'то же блюдо: эффект совпадает («Heals 2 Radiation damage»), у нас имя — «Mutant Hound Ribs»' },
++  'berserk syringe': { itemId: 'ammo_syringe_berserk', reason: 'ингредиент «Fury» — он же дротик шприцера «Berserk» (соответствие владельца)' },
+ };
+ 
+ // Ингредиенты, названные в книге именами предметов, которых у нас в каталоге нет.
+ // Список держим явно: генератор обязан объяснить «нет предмета», а не молча
+-// заменить его материалом.
+-export const MISSING_INGREDIENT_ITEMS = [
+-  'glowing fungus', 'hubflower', 'abraxo cleaner', 'bloodleaf', 'blood sac', 'antiseptic',
+-  'bloatfly gland', 'stingwing barb', 'asbestos', 'radscorpion stinger', 'berserk syringe',
+-];
++// заменить его материалом. Пуст сейчас: все дыры прошлого среза владелец закрыл
++// предметами (дикоросы в еде, хлам и материалы в отдельных каталогах, патч 250).
++export const MISSING_INGREDIENT_ITEMS = [];
+ const MISSING_INGREDIENTS = new Set(MISSING_INGREDIENT_ITEMS);
+ 
++/**
++ * Исправления печатных чисел книги. Ключ — «группа_источника|имя строки».
++ * Числа диктует владелец (он же сверяет с книгами); генератор подменяет ими
++ * сырую строку источника ДО разрешения имён и показывает подмену в отчёте.
++ * Ключ без сработавшей строки — ошибка: исправление не имеет права тихо
++ * протухнуть, когда источник обновится.
++ */
++export const BOOK_CORRECTIONS = {
++  'chems|mentats': {
++    reason: 'владелец 2026-09-15: материалы «Mentats» — Необычные ×3, Редкие ×2 и Мозговой гриб ×2 (вместо книжного «Abraxo Cleaner»)',
++    materials: { 'Uncommon Materials': 3, 'Rare Materials': 2, 'Brain Fungus': 2 },
++  },
++};
++
+ /**
+  * Печатные таблицы рецептов, которые входят в этот срез: они описывают
+  * ИЗГОТОВЛЕНИЕ ПРЕДМЕТОВ. Всё остальное в источнике — таблицы модификаций,
+@@ -384,6 +403,8 @@ export function buildCraftingData() {
+   const dropped = [];
+   const holes = [];
+   const aliases = [];
++  const corrections = [];
++  const correctionsUsed = new Set();
+   const ids = new Set();
+ 
+   for (const source of raw.records) {
+@@ -412,7 +433,15 @@ export function buildCraftingData() {
+ 
+     const complexity = Math.min(7, Math.max(1, Number(source.complexity) || 1));
+     const requires = { skill, complexity, ...(parsed.perks.length ? { perks: parsed.perks } : {}) };
+-    const hasSourceMaterials = Boolean(source.materials && typeof source.materials === 'object');
++    // Исправления владельца подменяют материалы сырой строки (см. BOOK_CORRECTIONS).
++    const correctionKey = `${group.toLowerCase()}|${norm(source.name)}`;
++    const correction = BOOK_CORRECTIONS[correctionKey];
++    if (correction) {
++      correctionsUsed.add(correctionKey);
++      corrections.push({ name: outputName, reason: correction.reason, materials: correction.materials });
++    }
++    const materialsSource = correction ? correction.materials : source.materials;
++    const hasSourceMaterials = Boolean(materialsSource && typeof materialsSource === 'object');
+ 
+     let output = null;
+     const alias = ITEM_NAME_ALIASES[key];
+@@ -463,7 +492,7 @@ export function buildCraftingData() {
+ 
+     if (!output) {
+       const lenient = hasSourceMaterials
+-        ? resolveMaterialsLenient(source.materials, ctx, aliases)
++        ? resolveMaterialsLenient(materialsSource, ctx, aliases)
+         : { materials: materialsFromComplexity(complexity), unknown: [], derived: true };
+       holes.push({
+         category: MISSING_CATEGORY_BY_GROUP[group] || 'loot',
+@@ -484,12 +513,12 @@ export function buildCraftingData() {
+     let materials;
+     let derivedMaterials = false;
+     if (hasSourceMaterials) {
+-      const resolved = resolveMaterials(source.materials, ctx, aliases);
++      const resolved = resolveMaterials(materialsSource, ctx, aliases);
+       if (resolved.error) {
+         // Рецепт упирается в дыру каталога: в данные он не идёт, но отправляется
+         // в обменник со всеми разрешимыми ингредиентами — владельцу останется
+         // подставить недостающее, а не переписывать рецепт с нуля.
+-        const lenient = resolveMaterialsLenient(source.materials, ctx, aliases);
++        const lenient = resolveMaterialsLenient(materialsSource, ctx, aliases);
+         holes.push({
+           category: MISSING_CATEGORY_BY_GROUP[group] || 'loot',
+           record: holeRecord(
+@@ -545,6 +574,13 @@ export function buildCraftingData() {
+     });
+   }
+ 
++  // Исправление без сработавшей строки — подозрение, что источник обновился,
++  // а правку забыли: пусть генератор падает, чем тихо потеряет число владельца.
++  const deadFixes = Object.keys(BOOK_CORRECTIONS).filter((key) => !correctionsUsed.has(key));
++  if (deadFixes.length) {
++    throw new Error(`BOOK_CORRECTIONS: для ключей ${deadFixes.join(', ')} нет строки в источнике — исправление мертво`);
++  }
++
+   const byBucket = {};
+   for (const bucket of BUCKET_ORDER) {
+     const list = entries.filter((e) => e.bucket === bucket).map((e) => e.record);
+@@ -587,7 +623,7 @@ export function buildCraftingData() {
+     holesByCategory,
+     stats,
+     missingContent: renderMissing(holesByCategory),
+-    report: renderReport(stats, dropped, dedupeAliases(aliases), holesByCategory),
++    report: renderReport(stats, dropped, dedupeAliases(aliases), holesByCategory, corrections),
+   };
+ }
+ 
+@@ -640,7 +676,7 @@ const GROUP_MEANING = {
+   WORKBENCH: 'сам верстак (кухня)',
+ };
+ 
+-const renderReport = (stats, dropped, aliases, holesByCategory) => {
++const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []) => {
+   const byReason = new Map();
+   for (const d of dropped) byReason.set(d.reason, (byReason.get(d.reason) || 0) + 1);
+   const L = [];
+@@ -694,6 +730,20 @@ const renderReport = (stats, dropped, aliases, holesByCategory) => {
+   L.push('|---|---|---|---|');
+   for (const a of aliases) L.push(`| ${a.name} | \`${a.itemId}\` | ${a.stage} | ${a.reason} |`);
+   L.push('');
++  if (corrections.length) {
++    L.push('## Исправления владельца к печатным числам');
++    L.push('');
++    L.push('Где источник расходится с книгой (или ссылается на предметы, которых в');
++    L.push('игре нет), числа диктует владелец — они в `BOOK_CORRECTIONS` генератора.');
++    L.push('');
++    L.push('| Строка источника | Материалы по исправлению | Примечание |');
++    L.push('|---|---|---|');
++    for (const c of corrections) {
++      const mats = Object.entries(c.materials).map(([name, qty]) => `${name} ×${qty}`).join(', ');
++      L.push(`| ${c.name} | ${mats} | ${c.reason} |`);
++    }
++    L.push('');
++  }
+   L.push('## Незакрытые позиции: файл-обменник');
+   L.push('');
+   L.push('Всё, что не выпустилось из-за дыр каталога (нет предмета-результата или');
