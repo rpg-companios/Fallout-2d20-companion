@@ -2,6 +2,19 @@
 
 ---
 
+## Update — Crafting, part 2: closing the catalog holes (patch 250)
+
+> Patch 249 (its content is already merged into main) moved recipes into the data but hit missing items. The owner supplied their numbers, the gaps became reference catalogs, and the 19 locked recipes joined the data.
+
+- The category now holds **93 recipes**: 28 ammunition (9 syringer darts added), 21 chems (all nine "problem" ones, antibiotics through ultra jet), the rest unchanged.
+- The food catalog gained three raw forage plants (Glowing Fungus, Hubflower, Bloodleaf: weight 0.5, cost 4, +3 HP, +1d6 rads, raw-food risk); the gathering table `modules/fallout/data/loot/foraging.json` (d20 → food ids, 20 rolls, no gaps). The gathering rules themselves belong to a survival patch.
+- Two new reference catalogs: junk `modules/fallout/data/junk.json` (seven teardown components; Abraxo Cleaner comes from the Household Items 1 table (weight 1, cost 10), the rest are the owner's estimates by analogy; antiseptic and asbestos stay plain items — "obtained by tearing down" is a rules branch, not data) and materials `modules/fallout/data/materials.json` (weight 1, cost 1/3/5). Both have i18n mirrors; the engine will read them through the registry in its own patches.
+- Darts are written into the ammo catalog with card texts (ru — the owner's, en — per canon). The `effect` field is inert: groundwork for the "loaded syringe" mechanic; `mapsToQuality` is set only where the effect is a plain alias of an existing quality.
+- Darts craft one at a time: they are not in the found table, the owner fixed the quantity. Regular ammunition still follows the found-table volume.
+- A corrections table in the generator now carries numbers the owner dictates over the book: the first entry is Mentats = Uncommon ×3, Rare ×2, Brain Fungus ×2. A correction whose source row disappears makes the generator fail.
+- One position is left in the exchange file `docs/reference-data/Missing_craft.json`: "Cooking Station" — the station item is not specced yet.
+- There is no patch file for 249 in the chain: its content was merged into main ("Add recipes"), nothing to duplicate. 741 tests green, `tsc --noEmit` clean; the guard `__tests__/crafting/` runs 22 checks, including the foraging table and the owner's Mentats numbers.
+
 ## Update — Crafting, part 1: recipes as data (patch 249)
 
 > First step of the crafting system: recipes now live in the data as their own category. Nothing is visible to players yet — the next patch teaches the engine to check, spend and hand out.

@@ -1,5 +1,43 @@
 [
   {
+    "id": "chem_antibiotics",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "chemist",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "chem_stimpak",
+        "count": 3
+      },
+      {
+        "itemId": "drink_purified_water",
+        "count": 2
+      },
+      {
+        "itemId": "food_glowing_fungus",
+        "count": 3
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "chem_antibiotics",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
     "id": "chem_mentats_berry",
     "bench": "chemistry",
     "requires": {
@@ -148,6 +186,64 @@
     "sourcePage": 213
   },
   {
+    "id": "chem_fury",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "chemist",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "ammo_syringe_berserk",
+        "count": 1
+      },
+      {
+        "itemId": "chem_buffout",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "chem_fury",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_mentats_grape",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "chem_mentats",
+        "count": 1
+      },
+      {
+        "itemId": "drink_whiskey",
+        "count": 1
+      },
+      {
+        "itemId": "food_hubflower",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "chem_mentats_grape",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
     "id": "chem_jet",
     "bench": "chemistry",
     "requires": {
@@ -196,6 +292,34 @@
     ],
     "output": {
       "itemId": "chem_jet_fuel",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_mentats",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "food_brain_fungus",
+        "count": 2
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "chem_mentats",
       "itemType": "chem",
       "quantity": 1
     },
@@ -264,6 +388,34 @@
     "sourcePage": 213
   },
   {
+    "id": "chem_psycho",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "chem_stimpak",
+        "count": 1
+      },
+      {
+        "itemId": "food_hubflower",
+        "count": 2
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "chem_psycho",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
     "id": "chem_psycho_jet",
     "bench": "chemistry",
     "requires": {
@@ -306,6 +458,136 @@
     ],
     "output": {
       "itemId": "chem_psychobuff",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_radaway",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_glowing_fungus",
+        "count": 3
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "chem_radaway",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_skeeto_spit",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "food_bloodleaf",
+        "count": 1
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      },
+      {
+        "itemId": "junk_blood_sac",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "chem_skeeto_spit",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_stimpak",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "drink_blood_pack",
+        "count": 1
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "junk_antiseptic",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "chem_stimpak",
+      "itemType": "chem",
+      "quantity": 1
+    },
+    "sourcePage": 213
+  },
+  {
+    "id": "chem_ultra_jet",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "chemist",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "chem_jet",
+        "count": 1
+      },
+      {
+        "itemId": "food_bloodleaf",
+        "count": 1
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "chem_ultra_jet",
       "itemType": "chem",
       "quantity": 1
     },

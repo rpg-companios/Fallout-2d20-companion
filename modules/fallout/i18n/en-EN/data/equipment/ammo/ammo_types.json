@@ -166,5 +166,50 @@
   {
     "id": "ammo_grappling_hook",
     "name": "Grappling Hook"
+  },
+    {
+    "id": "ammo_syringe_berserk",
+    "name": "Berserk",
+    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target flies into a rage and attacks the nearest living creature (friend or foe) until the end of the scene."
+  },
+    {
+    "id": "ammo_syringe_bleed_out",
+    "name": "Bleed-Out",
+    "effectLabel": "The weapon gains the Persistent Damage quality."
+  },
+    {
+    "id": "ammo_syringe_bloatfly_larva",
+    "name": "Bloatfly Larva",
+    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, a Bloatfly emerges from the target's remains when it dies."
+  },
+    {
+    "id": "ammo_syringe_endangerol",
+    "name": "Endangerol",
+    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target's Physical Damage resistance is reduced by 2 until the end of the scene."
+  },
+    {
+    "id": "ammo_syringe_lock_joint",
+    "name": "Lock Joint",
+    "effectLabel": "The weapon gains the Stun quality."
+  },
+    {
+    "id": "ammo_syringe_mind_cloud",
+    "name": "Mind Cloud",
+    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target is confused: +2 difficulty to all END tests for a number of rounds equal to the number of Effects rolled."
+  },
+    {
+    "id": "ammo_syringe_pax",
+    "name": "Pax",
+    "effectLabel": "If one or more Effects are rolled when the weapon deals damage, the target cannot take hostile or aggressive actions for a number of rounds equal to the number of Effects rolled."
+  },
+    {
+    "id": "ammo_syringe_radscorpion_venom",
+    "name": "Radscorpion Venom",
+    "effectLabel": "The weapon deals +1 CD damage and gains the Persistent (Poison) quality."
+  },
+    {
+    "id": "ammo_syringe_yellow_belly",
+    "name": "Yellow Belly",
+    "effectLabel": "If one or more Effects are rolled, the target must spend at least one action each turn moving away from all enemies by the shortest route, for a number of rounds equal to the number of Effects rolled."
   }
 ]

@@ -21,9 +21,9 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 ## Покрытие
 
 - рецептов в источнике: **356**
-- выпущено в данные: **75** (ammo: 19, weapons: 9, chems: 12, food: 27, drinks: 8)
-- не выпущено: **281**
-- из них упирается в дыры каталога и выгружено в обменник: **19** (chem: 9, food: 0, loot: 1, ammo: 9)
+- выпущено в данные: **93** (ammo: 28, weapons: 9, chems: 21, food: 27, drinks: 8)
+- не выпущено: **263**
+- из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
 
 ## Какие таблицы книги вошли
 
@@ -47,20 +47,14 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 | Причина | Сколько |
 |---|---|
 | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена | 260 |
-| в каталоге сеттинга нет такого предмета-результата | 10 |
-| в каталоге нет предмета-ингредиента «Glowing Fungus» | 2 |
-| в каталоге нет предмета-ингредиента «Hubflower» | 2 |
 | рецепт помечен в источнике как самодеятельность приложения (в книге нет) | 2 |
-| в каталоге нет предмета-ингредиента «Berserk Syringe» | 1 |
-| в каталоге нет предмета-ингредиента «Abraxo Cleaner» | 1 |
-| в каталоге нет предмета-ингредиента «Blood Sac» | 1 |
-| в каталоге нет предмета-ингредиента «Antiseptic» | 1 |
-| в каталоге нет предмета-ингредиента «Bloodleaf» | 1 |
+| в каталоге сеттинга нет такого предмета-результата | 1 |
 
 ## Ручные соответствия (то же самое, названо иначе)
 
 | В источнике | Наш id | Где применено | Почему считаем тем же предметом |
 |---|---|---|---|
+| Berserk Syringe | `ammo_syringe_berserk` | ингредиент | ингредиент «Fury» — он же дротик шприцера «Berserk» (соответствие владельца) |
 | Mongrel Dog Meat | `food_dog_meat` | ингредиент | то же сырьё: наше ru-имя — «Собачатина» |
 | Queen Mirelurk Meat | `food_mirelurk_queen_meat` | ингредиент | тот же продукт: у нас имя по животному, потом по части |
 | Baked Bloatfly | `food_grilled_bloatfly` | результат | то же блюдо: наше ru-имя — «Печёный дутень» |
@@ -74,6 +68,15 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 | Stingwing Filet | `food_stingwing_fillet` | результат | разница написания: filet / fillet |
 | Tato Juice | `drink_potato_juice` | результат | тот же напиток: книга зовёт «Tato Juice», у нас — «Potato Juice» |
 
+## Исправления владельца к печатным числам
+
+Где источник расходится с книгой (или ссылается на предметы, которых в
+игре нет), числа диктует владелец — они в `BOOK_CORRECTIONS` генератора.
+
+| Строка источника | Материалы по исправлению | Примечание |
+|---|---|---|
+| Mentats | Uncommon Materials ×3, Rare Materials ×2, Brain Fungus ×2 | владелец 2026-09-15: материалы «Mentats» — Необычные ×3, Редкие ×2 и Мозговой гриб ×2 (вместо книжного «Abraxo Cleaner») |
+
 ## Незакрытые позиции: файл-обменник
 
 Всё, что не выпустилось из-за дыр каталога (нет предмета-результата или
@@ -82,10 +85,10 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 Генератор не решает за владельца, каких книг касаться: он только выгружает
 позиции со всеми известными числами. Сейчас в обменнике:
 
-- **chem** (9) — «Antibiotics», «Fury», «Grape Mentats», «Mentats», «Psycho», «RadAway», «Skeeto Spit», «Stimpak», «Ultra Jet»
+- **chem** (0) — пусто
 - **food** (0) — пусто
 - **loot** (1) — «Cooking Station»
-- **ammo** (9) — «Berserk», «Bleed-Out», «Bloatfly Larva», «Endangerol», «Lock Joint», «Mind Cloud», «Pax», «Radscorpion Venom», «Yellow Belly»
+- **ammo** (0) — пусто
 
 Файл перегенерируется: починить руками его можно как черновик, но в данные
 позиции попадают только после того, как соответствия и числа переедут в
@@ -360,24 +363,6 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 | Sensor Array | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
 | Stealth Field | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
 | Tesla Coils | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
-| Antibiotics | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Glowing Fungus» |
-| Fury | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Berserk Syringe» |
-| Grape Mentats | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Hubflower» |
-| Mentats | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Abraxo Cleaner» |
-| Psycho | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Hubflower» |
-| RadAway | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Glowing Fungus» |
-| Skeeto Spit | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Blood Sac» |
-| Stimpak | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Antiseptic» |
-| Ultra Jet | CHEMS | chemistry | в каталоге нет предмета-ингредиента «Bloodleaf» |
-| Berserk | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Bleed-Out | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Bloatfly Larva | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Endangerol | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Lock Joint | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Mind Cloud | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Pax | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Radscorpion Venom | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
-| Yellow Belly | SYRINGER AMMUNITION | chemistry | в каталоге сеттинга нет такого предмета-результата |
 | Cooking Station | WORKBENCH | cooking | в каталоге сеттинга нет такого предмета-результата |
 | Robot Repair Kit | REPAIR KITS | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
 | Stealth Boy | UTILITY DEVICES | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
