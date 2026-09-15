@@ -1,0 +1,56 @@
+diff --git a/domain/registry.js b/domain/registry.js
+index 3c5f1ae..7e29628 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -50,6 +50,8 @@ import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/foo
+ import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+ import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+ import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
++import moduleRuJunkI18n from '../modules/fallout/i18n/ru-RU/data/junk.json';
++import moduleEnJunkI18n from '../modules/fallout/i18n/en-EN/data/junk.json';
+ import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
+ import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
+ 
+@@ -201,6 +203,7 @@ export function getModuleI18n(locale) {
+     weaponMods: isEn ? moduleEnWeaponModsI18n : moduleRuWeaponModsI18n,
+     food: isEn ? moduleEnFoodI18n : moduleRuFoodI18n,
+     drinks: isEn ? moduleEnDrinksI18n : moduleRuDrinksI18n,
++    junk: isEn ? moduleEnJunkI18n : moduleRuJunkI18n,
+     settings: isEn ? moduleEnSettingsI18n : moduleRuSettingsI18n,
+   };
+ }
+@@ -247,3 +250,34 @@ export function getConditionCatalog(conditionType, locale = getCurrentModuleLoca
+   if (conditionType === 'disease') return getDiseasesCatalog(locale);
+   throw new Error(`[registry] Неизвестный тип состояния "${conditionType}"`);
+ }
++
++/**
++ * Рецепты крафта сеттинга: набор правил и ингредиентов для создания
++ * предметов. Каждая секция — массив рецептов: id, output (itemId + quantity),
++ * materials (itemId + quantity). Секции: chem, ammo, food, drinks.
++ * Движок крафта читает рецепты только через эту функцию.
++ */
++export function getCraftRecipes() {
++  return moduleCraftRecipes;
++}
++
++/**
++ * Хлам (junk) сеттинга: ингредиенты крафта с id, весом и стоимостью.
++ * Имена — из i18n модуля для текущей локали.
++ */
++export function getJunk(locale = getCurrentModuleLocale()) {
++  const i18n = requireModuleLocale(locale) === 'en-EN' ? moduleEnJunkI18n : moduleRuJunkI18n;
++  const i18nMap = new Map((i18n || []).map((item) => [item.id, item]));
++  return (moduleJunk || []).map((dataItem) => {
++    const loc = i18nMap.get(dataItem.id);
++    return { ...dataItem, name: loc?.name || dataItem.id };
++  });
++}
++
++/**
++ * Таблица сбора (foraging) сеттинга: массив { roll, id } для броска d20.
++ * Система случайного лута читает эту таблицу по тегу «foraging».
++ */
++export function getForagingTable() {
++  return moduleForagingTable;
++}
