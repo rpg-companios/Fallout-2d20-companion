@@ -1,0 +1,127 @@
+From 221b9e9260b2cbe8c267c4ea4d3addf6fae692fd Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Tue, 15 Sep 2026 05:03:17 +0000
+Subject: [PATCH] =?UTF-8?q?249=20(hotfix):=20=D0=B3=D0=BB=D1=83=D0=B1?=
+ =?UTF-8?q?=D0=B8=D0=BD=D0=B0=20=D0=BF=D1=83=D1=82=D0=B5=D0=B9=20HomeScree?=
+ =?UTF-8?q?n=20+=20=D0=BF=D1=80=D0=B5=D0=B4=D0=BE=D1=85=D1=80=D0=B0=D0=BD?=
+ =?UTF-8?q?=D0=B8=D1=82=D0=B5=D0=BB=D1=8C=20=D1=80=D0=B5=D0=B7=D0=BE=D0=BB?=
+ =?UTF-8?q?=D1=8E=D1=86=D0=B8=D0=B8=20=D0=B8=D0=BC=D0=BF=D0=BE=D1=80=D1=82?=
+ =?UTF-8?q?=D0=BE=D0=B2?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ФИКС (ломал бандл Metro после 242):
+- components/screens/HomeScreen/HomeScreen.js: import '../../src/store/
+  characterStore' и '../../src/saves/characterSaves' → '../../../…'
+  (файл лежит на три уровня ниже корня; AST-тесты vitest импорты не
+  резолвят, поэтому контракт 242 прошёл тесты и упал только в Metro).
+
+ПРЕДОХРАНИТЕЛЬ (__tests__/saves/relative-imports-resolvable.test.js):
+обход components/modules/src/App.js/index.js — каждый относительный
+import/export обязан разрешаться на файловой системе (расширения
+js/jsx/ts/tsx/json + индексы каталогов; ассеты пропускаются).
+Такой тест поймал бы 242-й дефект до сдачи.
+
+vitest 719/719 (71 файл), tsc чист.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ .../saves/relative-imports-resolvable.test.js | 68 +++++++++++++++++++
+ components/screens/HomeScreen/HomeScreen.js   |  4 +-
+ 2 files changed, 70 insertions(+), 2 deletions(-)
+ create mode 100644 __tests__/saves/relative-imports-resolvable.test.js
+
+diff --git a/__tests__/saves/relative-imports-resolvable.test.js b/__tests__/saves/relative-imports-resolvable.test.js
+new file mode 100644
+index 0000000..e7ea560
+--- /dev/null
++++ b/__tests__/saves/relative-imports-resolvable.test.js
+@@ -0,0 +1,68 @@
++// Предохранитель «каждый относительный импорт обязан существовать на диске»
++// (после горячего фикса 249: Metro падает «Unable to resolve» на неверной
++// глубине пути, а AST-тесты vitest импорты НЕ резолвят — контракт 242
++// прошёл тесты и сломал бандл).
++//
++// Обход components/, modules/, src/, App.js, index.js: для каждого ES-импорта
++// (import … from / export … from) с относительным спецификатором проверяем
++// разрешение на файловой системе (с расширениями .js/.jsx/.ts/.tsx/.json и
++// индексами каталогов). Ассеты (png/shrift и т.п.) пропускаются — их Metro
++// раздаёт своими лоадерами.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ROOT = path.resolve(__dirname, '../..');
++const SCAN_TARGETS = [
++  path.join(ROOT, 'components'),
++  path.join(ROOT, 'modules'),
++  path.join(ROOT, 'src'),
++  path.join(ROOT, 'App.js'),
++  path.join(ROOT, 'index.js'),
++];
++const FILE_RE = /\.(js|jsx|ts|tsx)$/;
++const ASSET_RE = /\.(png|jpe?g|gif|webp|svg|ico|ttf|otf|woff2?|mp3|wav|m4a)$/i;
++const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s[^;'"]*?from\s*['"](\.[^'"]+)['"]/g;
++
++const collectFiles = (target, acc = []) => {
++  if (!fs.existsSync(target)) return acc;
++  const stat = fs.statSync(target);
++  if (stat.isFile()) {
++    if (FILE_RE.test(target)) acc.push(target);
++    return acc;
++  }
++  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
++    if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
++    collectFiles(path.join(target, entry.name), acc);
++  }
++  return acc;
++};
++
++const resolvable = (fromFile, spec) => {
++  const base = path.resolve(path.dirname(fromFile), spec);
++  const candidates = [
++    base,
++    `${base}.js`, `${base}.jsx`, `${base}.ts`, `${base}.tsx`, `${base}.json`,
++    path.join(base, 'index.js'), path.join(base, 'index.ts'), path.join(base, 'index.tsx'),
++  ];
++  return candidates.some((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
++};
++
++describe('предохранитель: относительные импорты разрешаются на диске', () => {
++  it('каждый относительный import/export указывает на существующий файл', () => {
++    const files = SCAN_TARGETS.flatMap((target) => collectFiles(target));
++    const broken = [];
++    for (const file of files) {
++      const source = fs.readFileSync(file, 'utf8');
++      for (const match of source.matchAll(IMPORT_RE)) {
++        const spec = match[1];
++        if (ASSET_RE.test(spec)) continue;
++        if (!resolvable(file, spec)) {
++          broken.push(`${path.relative(ROOT, file)} → ${spec}`);
++        }
++      }
++    }
++    expect(broken).toEqual([]);
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 5056750..31b36c9 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -18,9 +18,9 @@ import {
+ } from 'react-native';
+ import { MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+-import useCharacterStore from '../../src/store/characterStore';
++import useCharacterStore from '../../../src/store/characterStore';
+ // Шаг 8б (патч 242): сохранения — обычный модуль без React.
+-import * as savesModule from '../../src/saves/characterSaves';
++import * as savesModule from '../../../src/saves/characterSaves';
+ import { findEnrichedOrigin } from '../../../domain/origins';
+ import {
+   SUPPORTED_LOCALES,
+-- 
+2.39.5
+
