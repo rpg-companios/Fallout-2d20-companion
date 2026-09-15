@@ -1,0 +1,1851 @@
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ed6618d..1564409 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## 255 — Crafting system data: plants, junk, syringes, recipes, foraging table
++
++> Data preparation for the upcoming crafting mechanic. New items appear in the catalog (the "Add Item" modal), and the foraging table is wired into the random loot system. There is no crafting screen yet — recipes are ready for future wiring.
++
++### New items (data + ru/en translations)
++- **Three plants** added to the food catalog: Glowing Fungus, Hubflower, Bloodleaf. All are raw, weakly healing (3 HP), mildly irradiated (1 CD radiation), and carry infection risk (like any raw food). They appear in the "Add Item" modal under food.
++- **Seven junk items** as a dedicated catalog category: Antiseptic, Abraxo Cleaner, Blood Sac, Asbestos, Bloatfly Gland, Stingwing Barb, Radscorpion Stinger. These are future recipe ingredients; currently inventory items with weight and cost.
++- **Nine syringe ammo variants** with new effects: Berserk, Bleed-Out, Bloatfly Larva, Endangerol, Lock Joint, Mind Cloud, Pax, Radscorpion Venom, Yellow Belly. Each syringe carries an effect field with a description and quality key (where applicable); Russian effect texts are complete, English — names only (descriptions to come). The "syringe transmits effect to weapon" mechanic is not yet connected — data is ready.
++
++### Foraging loot table
++- New random loot table `d20<foraging>` for foraging rolls: 20 entries (brain fungus, glowing fungus, carrot ×2, corn ×2, gourd ×2, melon ×2, mutfruit ×2, razorgrain ×2, silt bean ×2, tato ×2, hubflower, bloodleaf). Wired into the random loot system — any loot source tagged `foraging` now works.
++
++### Crafting recipes (real data from bekhram/fallout-pipboy-app)
++- File `modules/fallout/data/craft/recipes.json` contains **65 real recipes** from the Fallout 2d20 book (pp. 211–216): 23 chem recipes (stimpaks, radaway, mentats, psycho, jet and their combinations), 9 syringe recipes (Berserk, Bleed-Out, Bloatfly Larva, Endangerol, Lock Joint, Mind Cloud, Pax, Radscorpion Venom, Yellow Belly), 27 cooking recipes (meat, soups, omelettes) and 6 beverage recipes (juices, purified water). Each recipe lists ingredients with quantities, referencing existing catalog items (no "unknown" ids). Recipes are available through the catalog (`craftRecipes`).
++
++### Materials (common/uncommon/rare)
++- Left in the general goods catalog (`general_goods.json`) — they already lived there with the same ids. The standalone `materials.json` was removed to avoid two sources of truth for the same items.
++
++---
++
+ ## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
+ 
+ > Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index aef0413..325bc2c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## 255 — Данные системы крафта: растения, хлам, шприцы, рецепты, таблица сбора
++
++> Подготовка данных для будущей механики крафта. Новые предметы появляются в каталоге (модалка «Добавить предмет»), а таблица сбора — в системе случайного лута. Экрана крафта пока нет — рецепты лежат готовыми к подключению.
++
++### Новые предметы (данные + переводы ru/en)
++- **Три растения** добавлены в каталог еды: Светящийся гриб, Центроцвет, Кроволист. Все — сырые, слабо лечат (3 ОЗ), слегка фонят (1 CD радиации), несут риск заражения (как любая сырая еда). Появляются в модалке «Добавить предмет» в разделе еды.
++- **Семь единиц хлама** как отдельная категория каталога: Антисептик, Чистящее средство Абраксо, Кровяной мешок, Асбест, Железа дутня, Шип жалокрыла, Жало радскорпиона. Это ингредиенты будущих рецептов; сейчас — предметы инвентаря с весом и ценой.
++- **Девять шприцев для шприцемёта** с новыми эффектами: Берсерк, Кровопуск, Личинка дутня, Опасностин, Стопор, Затуманенное сознание, Умиротворение, Яд Радскорпиона, Трусишка. Каждый шприц несёт поле эффекта с описанием и ключом качества (где применимо); русские тексты эффектов — полные, английские — только имена (описания — на будущее). Механика «шприц передаёт эффект оружию» пока не подключена — данные готовы.
++
++### Таблица сбора (foraging)
++- Новая таблица случайного лута `d20<foraging>` для бросков собирательства: 20 позиций (мозговой гриб, светящийся гриб, морковь ×2, кукуруза ×2, тыква ×2, дыня ×2, мутафрукт ×2, бритвозлак ×2, илофасоль ×2, тошка ×2, центроцвет, кроволист). Подключена к системе случайного лута — любой источник лута с тегом `foraging` теперь работает.
++
++### Рецепты крафта (реальные данные из bekhram/fallout-pipboy-app)
++- Файл `modules/fallout/data/craft/recipes.json` содержит **65 реальных рецептов** из книги Fallout 2d20 (стр. 211–216): 23 рецепта химии (стимуляторы, антирадин, ментаты, психо, винт и их комбинации), 9 рецептов шприцев (Берсерк, Кровопуск, Личинка дутня, Опасностин, Стопор, Затуманенное сознание, Умиротворение, Яд Радскорпиона, Трусишка), 27 рецептов готовки (мясо, супы, омлеты) и 6 рецептов напитков (соки, очищенная вода). Каждый рецепт — список ингредиентов с количеством, ссылающийся на существующие предметы каталога (никаких «неизвестных» id). Рецепты доступны через каталог (`craftRecipes`).
++
++### Материалы (обычные/необычные/редкие)
++- Оставлены в общем каталоге товаров (`general_goods.json`) — там они уже жили с теми же id. Отдельный файл `materials.json` удалён, чтобы не было двух источников правды на одни и те же предметы.
++
++---
++
+ ## Обновление — Переустройство «сердца» игры: единое хранилище, сохранения, паспорта данных (патчи 219–247)
+ 
+ > Большая закулисная работа: всё, что игра помнит о персонаже, переехало в единое хранилище, сохранения стали самостоятельным модулем, у данных и операций появились машинные «описи». Игроку — тише, надёжнее и несколько игровых фиксов; формат сейвов не менялся (старые сейвы загружаются).
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index ab5a0dd..d8fdc5b 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -70,6 +70,8 @@ import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/ch
+ import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
+ import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
+ import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
++import moduleRuJunkI18n from '../modules/fallout/i18n/ru-RU/data/junk.json';
++import moduleEnJunkI18n from '../modules/fallout/i18n/en-EN/data/junk.json';
+ // Locale-independent technical data (stats, ids, game mechanics)
+ import moduleArmor from '../modules/fallout/data/equipment/armor.json';
+ import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+@@ -83,6 +85,8 @@ import moduleFood from '../modules/fallout/data/consumables/food.json';
+ import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
+ import moduleChems from '../modules/fallout/data/consumables/chems.json';
+ import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
++import moduleJunk from '../modules/fallout/data/junk.json';
++import moduleCraftRecipes from '../modules/fallout/data/craft/recipes.json';
+ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+ import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
+ import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+@@ -125,6 +129,7 @@ const moduleRuI18n = {
+   drinks: moduleRuDrinksI18n,
+   chems: moduleRuChemsI18n,
+   magazines: moduleRuMagazinesI18n,
++  junk: moduleRuJunkI18n,
+ };
+ 
+ const moduleEnI18n = {
+@@ -150,6 +155,7 @@ const moduleEnI18n = {
+   drinks: moduleEnDrinksI18n,
+   chems: moduleEnChemsI18n,
+   magazines: moduleEnMagazinesI18n,
++  junk: moduleEnJunkI18n,
+ };
+ 
+ const ALL_KIT_DATA = {
+@@ -395,6 +401,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const mergedDrinks = mergeById(moduleDrinks, moduleI18n.drinks);
+   const mergedFood = mergeById(moduleFood, moduleI18n.food);
+   const mergedMagazines = mergeById(moduleMagazines, moduleI18n.magazines);
++  const mergedJunk = mergeById(moduleJunk, moduleI18n.junk);
+   const moduleGeneralGoodsLocalized = mergeById(moduleGeneralGoods || [], moduleI18n.generalGoods || []);
+   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
+ 
+@@ -449,6 +456,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+     drinks: mergedDrinks,
+     food: mergedFood,
+     magazines: mergedMagazines,
++    junk: mergedJunk,
++    craftRecipes: moduleCraftRecipes,
+     generalGoods: mergedGeneralGoods,
+     oddities: mergedOddities,
+     weaponMods: mergedWeaponMods,
+diff --git a/modules/fallout/data/consumables/food.json b/modules/fallout/data/consumables/food.json
+index 193c27f..f44da13 100644
+--- a/modules/fallout/data/consumables/food.json
++++ b/modules/fallout/data/consumables/food.json
+@@ -1717,5 +1717,89 @@
+     "effectKey": "",
+     "state": "cooked",
+     "preserved": true
++  },
++  {
++    "id": "food_glowing_fungus",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
++  },
++  {
++    "id": "food_hubflower",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
++  },
++  {
++    "id": "food_bloodleaf",
++    "itemType": "food",
++    "weight": 0.5,
++    "cost": 4,
++    "rarity": 1,
++    "positiveEffect": {
++      "hpModifier": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "irradiated": true,
++    "radiationModifier": {
++      "op": "+",
++      "rollType": "rollCD",
++      "rollValue": 1
++    },
++    "effectKey": "",
++    "state": "raw",
++    "preserved": false,
++    "sceneRiskEvents": [
++      {
++        "ruleId": "diseaseExposure",
++        "eventId": "rawFood"
++      }
++    ]
+   }
+ ]
+diff --git a/modules/fallout/data/craft/recipes.json b/modules/fallout/data/craft/recipes.json
+new file mode 100644
+index 0000000..ba43935
+--- /dev/null
++++ b/modules/fallout/data/craft/recipes.json
+@@ -0,0 +1,1256 @@
++{
++  "chem": [
++    {
++      "id": "craft_chem_antibiotics",
++      "output": {
++        "itemId": "chem_antibiotics",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "food_glowing_fungus",
++          "quantity": 3
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 2
++        },
++        {
++          "itemId": "chem_stimpak",
++          "quantity": 3
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_mentats_berry",
++      "output": {
++        "itemId": "chem_mentats_berry",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_mentats",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tarberry",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_buffjet",
++      "output": {
++        "itemId": "chem_buffjet",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_buffout",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_jet",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_bufftats",
++      "output": {
++        "itemId": "chem_bufftats",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_buffout",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_mentats",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_radaway_diluted",
++      "output": {
++        "itemId": "chem_radaway_diluted",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_radaway",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_rad_x_diluted",
++      "output": {
++        "itemId": "chem_rad_x_diluted",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_rad_x",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_stimpak_diluted",
++      "output": {
++        "itemId": "chem_stimpak_diluted",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_stimpak",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_fury",
++      "output": {
++        "itemId": "chem_fury",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "ammo_syringe",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_buffout",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_glowing_blood_pack",
++      "output": {
++        "itemId": "drink_glowing_blood_pack",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_blood_pack",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_irradiated_blood",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_mentats_grape",
++      "output": {
++        "itemId": "chem_mentats_grape",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "food_hubflower",
++          "quantity": 2
++        },
++        {
++          "itemId": "chem_mentats",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_whiskey",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_jet",
++      "output": {
++        "itemId": "chem_jet",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_jet_fuel",
++      "output": {
++        "itemId": "chem_jet_fuel",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "ammo_flamer_fuel",
++          "quantity": 5
++        },
++        {
++          "itemId": "chem_jet",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_mentats",
++      "output": {
++        "itemId": "chem_mentats",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "junk_abraxo_cleaner",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_brain_fungus",
++          "quantity": 2
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_mentats_orange",
++      "output": {
++        "itemId": "chem_mentats_orange",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_carrot",
++          "quantity": 3
++        },
++        {
++          "itemId": "chem_mentats",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_overdrive",
++      "output": {
++        "itemId": "chem_overdrive",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "drink_nuka_cola",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_psycho",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_psycho",
++      "output": {
++        "itemId": "chem_psycho",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "food_hubflower",
++          "quantity": 2
++        },
++        {
++          "itemId": "chem_stimpak",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_psycho_jet",
++      "output": {
++        "itemId": "chem_psycho_jet",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_jet",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_psycho",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_psychobuff",
++      "output": {
++        "itemId": "chem_psychobuff",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "chem_buffout",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_psycho",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_radaway",
++      "output": {
++        "itemId": "chem_radaway",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "food_glowing_fungus",
++          "quantity": 3
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_refreshing_beverage",
++      "output": {
++        "itemId": "drink_refreshing_beverage",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "item_rare_materials",
++          "quantity": 3
++        },
++        {
++          "itemId": "drink_blood_pack",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 2
++        },
++        {
++          "itemId": "chem_radaway",
++          "quantity": 2
++        },
++        {
++          "itemId": "chem_stimpak",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_skeeto_spit",
++      "output": {
++        "itemId": "chem_skeeto_spit",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "junk_blood_sac",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_bloodleaf",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_stimpak",
++      "output": {
++        "itemId": "chem_stimpak",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "junk_antiseptic",
++          "quantity": 2
++        },
++        {
++          "itemId": "drink_blood_pack",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_chem_ultra_jet",
++      "output": {
++        "itemId": "chem_ultra_jet",
++        "quantity": 1,
++        "itemType": "chem"
++      },
++      "materials": [
++        {
++          "itemId": "food_bloodleaf",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_jet",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 2
++        }
++      ]
++    }
++  ],
++  "ammo": [
++    {
++      "id": "craft_ammo_syringe_berserk",
++      "output": {
++        "itemId": "ammo_syringe_berserk",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_bourbon",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_bleed_out",
++      "output": {
++        "itemId": "ammo_syringe_bleed_out",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_bloatfly_larva",
++      "output": {
++        "itemId": "ammo_syringe_bloatfly_larva",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "junk_bloatfly_gland",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "chem_psycho",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_endangerol",
++      "output": {
++        "itemId": "ammo_syringe_endangerol",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 3
++        },
++        {
++          "itemId": "chem_med_x",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_lock_joint",
++      "output": {
++        "itemId": "ammo_syringe_lock_joint",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 2
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "junk_stingwing_barb",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tarberry",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_mind_cloud",
++      "output": {
++        "itemId": "ammo_syringe_mind_cloud",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "junk_abraxo_cleaner",
++          "quantity": 1
++        },
++        {
++          "itemId": "junk_asbestos",
++          "quantity": 2
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_pax",
++      "output": {
++        "itemId": "ammo_syringe_pax",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "food_mutfruit",
++          "quantity": 2
++        },
++        {
++          "itemId": "drink_nuka_cola",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_radscorpion_venom",
++      "output": {
++        "itemId": "ammo_syringe_radscorpion_venom",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "junk_radscorpion_stinger",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_ammo_syringe_yellow_belly",
++      "output": {
++        "itemId": "ammo_syringe_yellow_belly",
++        "quantity": 1,
++        "itemType": "ammo"
++      },
++      "materials": [
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 5
++        }
++      ]
++    }
++  ],
++  "food": [
++    {
++      "id": "craft_food_grilled_bloatfly",
++      "output": {
++        "itemId": "food_grilled_bloatfly",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_bloatfly_meat",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_food_bloodbug_steak",
++      "output": {
++        "itemId": "food_bloodbug_steak",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_bloodbug_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_cooked_softshell_mirelurk",
++      "output": {
++        "itemId": "food_cooked_softshell_mirelurk",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_softshell_mirelurk_meat",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_food_crispy_squirrel_bits",
++      "output": {
++        "itemId": "food_crispy_squirrel_bits",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_squirrel_bits",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_deathclaw_omelette",
++      "output": {
++        "itemId": "food_deathclaw_omelette",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "drink_blood_pack",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_deathclaw_egg",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_deathclaw_steak",
++      "output": {
++        "itemId": "food_deathclaw_steak",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_deathclaw_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_grilled_radroach",
++      "output": {
++        "itemId": "food_grilled_radroach",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_radroach_meat",
++          "quantity": 3
++        }
++      ]
++    },
++    {
++      "id": "craft_food_grilled_radstag",
++      "output": {
++        "itemId": "food_grilled_radstag",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_radstag_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_iguana_on_a_stick",
++      "output": {
++        "itemId": "food_iguana_on_a_stick",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_iguana_bits",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_iguana_stew",
++      "output": {
++        "itemId": "food_iguana_stew",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_carrot",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_iguana_bits",
++          "quantity": 3
++        }
++      ]
++    },
++    {
++      "id": "craft_food_mirelurk_cake",
++      "output": {
++        "itemId": "food_mirelurk_cake",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_mirelurk_egg",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_mirelurk_meat",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_uncommon_materials",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_razorgrain",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_mirelurk_egg_omelette",
++      "output": {
++        "itemId": "food_mirelurk_egg_omelette",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_mirelurk_egg",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_mirelurk_queen_steak",
++      "output": {
++        "itemId": "food_mirelurk_queen_steak",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_mirelurk_queen_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_mole_rat_chops",
++      "output": {
++        "itemId": "food_mole_rat_chops",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_mole_rat_meat",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_food_mutant_hound_ribs",
++      "output": {
++        "itemId": "food_mutant_hound_ribs",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_mutant_hound_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_dog_chops",
++      "output": {
++        "itemId": "food_dog_chops",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_dog_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_noodle_bowl",
++      "output": {
++        "itemId": "food_noodle_bowl",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_razorgrain",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_radscorpion_egg_omelette",
++      "output": {
++        "itemId": "food_radscorpion_egg_omelette",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_radscorpion_egg",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_radscorpion_steak",
++      "output": {
++        "itemId": "food_radscorpion_steak",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_radscorpion_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_radstag_stew",
++      "output": {
++        "itemId": "food_radstag_stew",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_gourd",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_radstag_meat",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_silt_bean",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_vodka",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_ribeye_steak",
++      "output": {
++        "itemId": "food_ribeye_steak",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_brahmin_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_roasted_mirelurk_meat",
++      "output": {
++        "itemId": "food_roasted_mirelurk_meat",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_mirelurk_meat",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_food_squirrel_on_a_stick",
++      "output": {
++        "itemId": "food_squirrel_on_a_stick",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_squirrel_bits",
++          "quantity": 1
++        },
++        {
++          "itemId": "item_common_materials",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_stingwing_fillet",
++      "output": {
++        "itemId": "food_stingwing_fillet",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_stingwing_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_vegetable_soup",
++      "output": {
++        "itemId": "food_vegetable_soup",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_carrot",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tato",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_yao_guai_ribs",
++      "output": {
++        "itemId": "food_yao_guai_ribs",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_yao_guai_meat",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_food_yao_guai_roast",
++      "output": {
++        "itemId": "food_yao_guai_roast",
++        "quantity": 1,
++        "itemType": "food"
++      },
++      "materials": [
++        {
++          "itemId": "food_carrot",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tato",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_yao_guai_meat",
++          "quantity": 1
++        }
++      ]
++    }
++  ],
++  "drinks": [
++    {
++      "id": "craft_drink_dirty_wastelander",
++      "output": {
++        "itemId": "drink_dirty_wastelander",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "food_mutfruit",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_nuka_cola",
++          "quantity": 1
++        },
++        {
++          "itemId": "drink_whiskey",
++          "quantity": 2
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_purified_water",
++      "output": {
++        "itemId": "drink_purified_water",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "drink_dirty_water",
++          "quantity": 3
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_melon_juice",
++      "output": {
++        "itemId": "drink_melon_juice",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_melon",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_mutfruit_juice",
++      "output": {
++        "itemId": "drink_mutfruit_juice",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_mutfruit",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_tarberry_juice",
++      "output": {
++        "itemId": "drink_tarberry_juice",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tarberry",
++          "quantity": 1
++        }
++      ]
++    },
++    {
++      "id": "craft_drink_potato_juice",
++      "output": {
++        "itemId": "drink_potato_juice",
++        "quantity": 1,
++        "itemType": "drinks"
++      },
++      "materials": [
++        {
++          "itemId": "drink_purified_water",
++          "quantity": 1
++        },
++        {
++          "itemId": "food_tato",
++          "quantity": 1
++        }
++      ]
++    }
++  ]
++}
+\ No newline at end of file
+diff --git a/modules/fallout/data/equipment/ammo.json b/modules/fallout/data/equipment/ammo.json
+index da9ef36..b052756 100644
+--- a/modules/fallout/data/equipment/ammo.json
++++ b/modules/fallout/data/equipment/ammo.json
+@@ -231,5 +231,114 @@
+   {
+     "id": "ammo_grappling_hook",
+     "weight": 3.0
++  },
++  {
++    "id": "ammo_syringe_berserk",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 50,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_berserk",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeBerserk"
++    }
++  },
++  {
++    "id": "ammo_syringe_bleed_out",
++    "itemType": "ammo",
++    "rarity": 1,
++    "cost": 17,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_bleed_out",
++      "mapsToQuality": "effect_persistent",
++      "descriptionKey": "itemEffects.ammo.syringeBleedOut"
++    }
++  },
++  {
++    "id": "ammo_syringe_bloatfly_larva",
++    "itemType": "ammo",
++    "rarity": 1,
++    "cost": 10,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_bloatfly_larva",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeBloatflyLarva"
++    }
++  },
++  {
++    "id": "ammo_syringe_endangerol",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 60,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_endangerol",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeEndangerol"
++    }
++  },
++  {
++    "id": "ammo_syringe_lock_joint",
++    "itemType": "ammo",
++    "rarity": 2,
++    "cost": 40,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_lock_joint",
++      "mapsToQuality": "effect_stun",
++      "descriptionKey": "itemEffects.ammo.syringeLockJoint"
++    }
++  },
++  {
++    "id": "ammo_syringe_mind_cloud",
++    "itemType": "ammo",
++    "rarity": 4,
++    "cost": 73,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_mind_cloud",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeMindCloud"
++    }
++  },
++  {
++    "id": "ammo_syringe_pax",
++    "itemType": "ammo",
++    "rarity": 2,
++    "cost": 39,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_pax",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringePax"
++    }
++  },
++  {
++    "id": "ammo_syringe_radscorpion_venom",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 65,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_radscorpion_venom",
++      "mapsToQuality": null,
++      "note": "книга: +1 DC урон + Стойкий (яд) — составной эффект, требует новый вариант persistent с типом урона, не только алиас",
++      "descriptionKey": "itemEffects.ammo.syringeRadscorpionVenom"
++    }
++  },
++  {
++    "id": "ammo_syringe_yellow_belly",
++    "itemType": "ammo",
++    "rarity": 3,
++    "cost": 55,
++    "weight": 0.1,
++    "effect": {
++      "id": "effect_syringe_yellow_belly",
++      "mapsToQuality": null,
++      "descriptionKey": "itemEffects.ammo.syringeYellowBelly"
++    }
+   }
+ ]
+diff --git a/modules/fallout/data/junk.json b/modules/fallout/data/junk.json
+new file mode 100644
+index 0000000..c854c45
+--- /dev/null
++++ b/modules/fallout/data/junk.json
+@@ -0,0 +1,9 @@
++[
++  { "id": "junk_antiseptic", "itemType": "junk", "weight": 0.2, "cost": 4 },
++  { "id": "junk_abraxo_cleaner", "itemType": "junk", "weight": 1, "cost": 10 },
++  { "id": "junk_blood_sac", "itemType": "junk", "weight": 0.2, "cost": 4 },
++  { "id": "junk_asbestos", "itemType": "junk", "weight": 1, "cost": 5 },
++  { "id": "junk_bloatfly_gland", "itemType": "junk", "weight": 0.3, "cost": 6 },
++  { "id": "junk_stingwing_barb", "itemType": "junk", "weight": 0.2, "cost": 5 },
++  { "id": "junk_radscorpion_stinger", "itemType": "junk", "weight": 0.2, "cost": 5 }
++]
+diff --git a/modules/fallout/data/loot/foraging.json b/modules/fallout/data/loot/foraging.json
+new file mode 100644
+index 0000000..35e6a3a
+--- /dev/null
++++ b/modules/fallout/data/loot/foraging.json
+@@ -0,0 +1,22 @@
++[
++  { "roll": 1, "id": "food_brain_fungus" },
++  { "roll": 2, "id": "food_glowing_fungus" },
++  { "roll": 3, "id": "food_carrot" },
++  { "roll": 4, "id": "food_carrot" },
++  { "roll": 5, "id": "food_corn" },
++  { "roll": 6, "id": "food_corn" },
++  { "roll": 7, "id": "food_gourd" },
++  { "roll": 8, "id": "food_gourd" },
++  { "roll": 9, "id": "food_melon" },
++  { "roll": 10, "id": "food_melon" },
++  { "roll": 11, "id": "food_mutfruit" },
++  { "roll": 12, "id": "food_mutfruit" },
++  { "roll": 13, "id": "food_razorgrain" },
++  { "roll": 14, "id": "food_razorgrain" },
++  { "roll": 15, "id": "food_silt_bean" },
++  { "roll": 16, "id": "food_silt_bean" },
++  { "roll": 17, "id": "food_tato" },
++  { "roll": 18, "id": "food_tato" },
++  { "roll": 19, "id": "food_hubflower" },
++  { "roll": 20, "id": "food_bloodleaf" }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/consumables/food.json b/modules/fallout/i18n/en-EN/data/consumables/food.json
+index 2ee2c9d..8511f5f 100644
+--- a/modules/fallout/i18n/en-EN/data/consumables/food.json
++++ b/modules/fallout/i18n/en-EN/data/consumables/food.json
+@@ -448,5 +448,23 @@
+     "name": "Yum Yum Deviled Eggs",
+     "effectLabel": "",
+     "description": ""
++  },
++  {
++    "id": "food_glowing_fungus",
++    "name": "Glowing Fungus",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "food_hubflower",
++    "name": "Hubflower",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "food_bloodleaf",
++    "name": "Bloodleaf",
++    "effectLabel": "",
++    "description": ""
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json b/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
+index 59e4423..f36498c 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json
+@@ -166,5 +166,41 @@
+   {
+     "id": "ammo_grappling_hook",
+     "name": "Grappling Hook"
++  },
++  {
++    "id": "ammo_syringe_berserk",
++    "name": "Berserk"
++  },
++  {
++    "id": "ammo_syringe_bleed_out",
++    "name": "Bleed-Out"
++  },
++  {
++    "id": "ammo_syringe_bloatfly_larva",
++    "name": "Bloatfly Larva"
++  },
++  {
++    "id": "ammo_syringe_endangerol",
++    "name": "Endangerol"
++  },
++  {
++    "id": "ammo_syringe_lock_joint",
++    "name": "Lock Joint"
++  },
++  {
++    "id": "ammo_syringe_mind_cloud",
++    "name": "Mind Cloud"
++  },
++  {
++    "id": "ammo_syringe_pax",
++    "name": "Pax"
++  },
++  {
++    "id": "ammo_syringe_radscorpion_venom",
++    "name": "Radscorpion Venom"
++  },
++  {
++    "id": "ammo_syringe_yellow_belly",
++    "name": "Yellow Belly"
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/junk.json b/modules/fallout/i18n/en-EN/data/junk.json
+new file mode 100644
+index 0000000..c96e0eb
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/junk.json
+@@ -0,0 +1,9 @@
++[
++  { "id": "junk_antiseptic", "name": "Antiseptic" },
++  { "id": "junk_abraxo_cleaner", "name": "Abraxo Cleaner" },
++  { "id": "junk_blood_sac", "name": "Blood Sac" },
++  { "id": "junk_asbestos", "name": "Asbestos" },
++  { "id": "junk_bloatfly_gland", "name": "Bloatfly Gland" },
++  { "id": "junk_stingwing_barb", "name": "Stingwing Barb" },
++  { "id": "junk_radscorpion_stinger", "name": "Radscorpion Stinger" }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/consumables/food.json b/modules/fallout/i18n/ru-RU/data/consumables/food.json
+index f369bfd..8ac0878 100644
+--- a/modules/fallout/i18n/ru-RU/data/consumables/food.json
++++ b/modules/fallout/i18n/ru-RU/data/consumables/food.json
+@@ -448,5 +448,23 @@
+     "name": "Фаршированные яйца «НямНям»",
+     "effectLabel": "",
+     "description": ""
++  },
++  {
++    "id": "food_glowing_fungus",
++    "name": "Светящийся гриб",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "food_hubflower",
++    "name": "Центроцвет",
++    "effectLabel": "",
++    "description": ""
++  },
++  {
++    "id": "food_bloodleaf",
++    "name": "Кроволист",
++    "effectLabel": "",
++    "description": ""
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json b/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
+index fa0a1c4..c00d63a 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json
+@@ -166,5 +166,50 @@
+   {
+     "id": "ammo_grappling_hook",
+     "name": "Крюк-кошка"
++  },
++  {
++    "id": "ammo_syringe_berserk",
++    "name": "Берсерк",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель впадает в ярость и атакует ближайшее живое существо (друга или врага) до конца сцены."
++  },
++  {
++    "id": "ammo_syringe_bleed_out",
++    "name": "Кровопуск",
++    "effectLabel": "Оружие получает эффект «Стойкий урон»."
++  },
++  {
++    "id": "ammo_syringe_bloatfly_larva",
++    "name": "Личинка дутня",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, после смерти цели из её останков появляется Дутень."
++  },
++  {
++    "id": "ammo_syringe_endangerol",
++    "name": "Опасностин",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, сопротивление физическому урону цели снижается на 2 до конца сцены."
++  },
++  {
++    "id": "ammo_syringe_lock_joint",
++    "name": "Стопор",
++    "effectLabel": "Оружие получает эффект «Оглушение»."
++  },
++  {
++    "id": "ammo_syringe_mind_cloud",
++    "name": "Затуманенное сознание",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель впадает в замешательство: +2 к сложности всех проверок на ВОС на количество раундов, равное числу выпавших Эффектов."
++  },
++  {
++    "id": "ammo_syringe_pax",
++    "name": "Умиротворение",
++    "effectLabel": "Если при нанесении урона оружием выпадает один или несколько Эффектов, цель не может предпринимать враждебные/агрессивные действия на количество раундов, равное числу выпавших Эффектов."
++  },
++  {
++    "id": "ammo_syringe_radscorpion_venom",
++    "name": "Яд Радскорпиона",
++    "effectLabel": "Оружие получает +1 DC урона и эффект «Стойкий (яд)»."
++  },
++  {
++    "id": "ammo_syringe_yellow_belly",
++    "name": "Трусишка",
++    "effectLabel": "Если выпал один или несколько Эффектов, цель обязана использовать хотя бы одно действие за ход, чтобы отойти от всех врагов по кратчайшему пути. Длится количество раундов, равное числу выпавших Эффектов."
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/junk.json b/modules/fallout/i18n/ru-RU/data/junk.json
+new file mode 100644
+index 0000000..aace39e
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/junk.json
+@@ -0,0 +1,9 @@
++[
++  { "id": "junk_antiseptic", "name": "Антисептик" },
++  { "id": "junk_abraxo_cleaner", "name": "Чистящее средство Абраксо" },
++  { "id": "junk_blood_sac", "name": "Кровяной мешок" },
++  { "id": "junk_asbestos", "name": "Асбест" },
++  { "id": "junk_bloatfly_gland", "name": "Железа дутня" },
++  { "id": "junk_stingwing_barb", "name": "Шип жалокрыла" },
++  { "id": "junk_radscorpion_stinger", "name": "Жало радскорпиона" }
++]
+diff --git a/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js b/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
+index d493350..9f35e4e 100644
+--- a/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
++++ b/modules/fallout/screens/CharacterScreen/logic/RandomLootLogic.js
+@@ -7,6 +7,7 @@ import outcast from '../../../data/loot/outcast.json';
+ import weaponsMelee from '../../../data/loot/weapons_melee.json';
+ import ammo from '../../../data/loot/ammo.json';
+ import junk from '../../../data/loot/junk.json';
++import foraging from '../../../data/loot/foraging.json';
+ import lootStubs from '../../../data/loot/_stubs.json';
+ import ruLootStubs from '../../../i18n/ru-RU/data/loot/stubs.json';
+ import enLootStubs from '../../../i18n/en-EN/data/loot/stubs.json';
+@@ -28,6 +29,7 @@ const lootTables = {
+   weapons_melee: weaponsMelee,
+   ammo: ammo,
+   junk: junk,
++  foraging: foraging,
+ };
+ 
+ export const supportedLootTags = Object.keys(lootTables);
+@@ -65,6 +67,7 @@ function buildCatalogIndex() {
+     addAll(catalog.chems, 'chem');
+     addAll(catalog.drinks, 'drinks');
+     addAll(catalog.food, 'food');
++    addAll(catalog.junk, 'junk');
+     addAll(catalog.weapons, 'weapon');
+     addAll(catalog.generalGoods, 'misc');
+     addAll(catalog.oddities, 'misc');

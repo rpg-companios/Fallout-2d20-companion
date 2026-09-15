@@ -231,5 +231,114 @@
   {
     "id": "ammo_grappling_hook",
     "weight": 3.0
+  },
+  {
+    "id": "ammo_syringe_berserk",
+    "itemType": "ammo",
+    "rarity": 3,
+    "cost": 50,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_berserk",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringeBerserk"
+    }
+  },
+  {
+    "id": "ammo_syringe_bleed_out",
+    "itemType": "ammo",
+    "rarity": 1,
+    "cost": 17,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_bleed_out",
+      "mapsToQuality": "effect_persistent",
+      "descriptionKey": "itemEffects.ammo.syringeBleedOut"
+    }
+  },
+  {
+    "id": "ammo_syringe_bloatfly_larva",
+    "itemType": "ammo",
+    "rarity": 1,
+    "cost": 10,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_bloatfly_larva",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringeBloatflyLarva"
+    }
+  },
+  {
+    "id": "ammo_syringe_endangerol",
+    "itemType": "ammo",
+    "rarity": 3,
+    "cost": 60,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_endangerol",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringeEndangerol"
+    }
+  },
+  {
+    "id": "ammo_syringe_lock_joint",
+    "itemType": "ammo",
+    "rarity": 2,
+    "cost": 40,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_lock_joint",
+      "mapsToQuality": "effect_stun",
+      "descriptionKey": "itemEffects.ammo.syringeLockJoint"
+    }
+  },
+  {
+    "id": "ammo_syringe_mind_cloud",
+    "itemType": "ammo",
+    "rarity": 4,
+    "cost": 73,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_mind_cloud",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringeMindCloud"
+    }
+  },
+  {
+    "id": "ammo_syringe_pax",
+    "itemType": "ammo",
+    "rarity": 2,
+    "cost": 39,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_pax",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringePax"
+    }
+  },
+  {
+    "id": "ammo_syringe_radscorpion_venom",
+    "itemType": "ammo",
+    "rarity": 3,
+    "cost": 65,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_radscorpion_venom",
+      "mapsToQuality": null,
+      "note": "книга: +1 DC урон + Стойкий (яд) — составной эффект, требует новый вариант persistent с типом урона, не только алиас",
+      "descriptionKey": "itemEffects.ammo.syringeRadscorpionVenom"
+    }
+  },
+  {
+    "id": "ammo_syringe_yellow_belly",
+    "itemType": "ammo",
+    "rarity": 3,
+    "cost": 55,
+    "weight": 0.1,
+    "effect": {
+      "id": "effect_syringe_yellow_belly",
+      "mapsToQuality": null,
+      "descriptionKey": "itemEffects.ammo.syringeYellowBelly"
+    }
   }
 ]

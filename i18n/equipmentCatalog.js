@@ -70,6 +70,8 @@ import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/ch
 import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
 import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
 import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
+import moduleRuJunkI18n from '../modules/fallout/i18n/ru-RU/data/junk.json';
+import moduleEnJunkI18n from '../modules/fallout/i18n/en-EN/data/junk.json';
 // Locale-independent technical data (stats, ids, game mechanics)
 import moduleArmor from '../modules/fallout/data/equipment/armor.json';
 import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
@@ -83,6 +85,8 @@ import moduleFood from '../modules/fallout/data/consumables/food.json';
 import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
 import moduleChems from '../modules/fallout/data/consumables/chems.json';
 import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
+import moduleJunk from '../modules/fallout/data/junk.json';
+import moduleCraftRecipes from '../modules/fallout/data/craft/recipes.json';
 import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
 import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
 import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
@@ -125,6 +129,7 @@ const moduleRuI18n = {
   drinks: moduleRuDrinksI18n,
   chems: moduleRuChemsI18n,
   magazines: moduleRuMagazinesI18n,
+  junk: moduleRuJunkI18n,
 };
 
 const moduleEnI18n = {
@@ -150,6 +155,7 @@ const moduleEnI18n = {
   drinks: moduleEnDrinksI18n,
   chems: moduleEnChemsI18n,
   magazines: moduleEnMagazinesI18n,
+  junk: moduleEnJunkI18n,
 };
 
 const ALL_KIT_DATA = {
@@ -395,6 +401,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedDrinks = mergeById(moduleDrinks, moduleI18n.drinks);
   const mergedFood = mergeById(moduleFood, moduleI18n.food);
   const mergedMagazines = mergeById(moduleMagazines, moduleI18n.magazines);
+  const mergedJunk = mergeById(moduleJunk, moduleI18n.junk);
   const moduleGeneralGoodsLocalized = mergeById(moduleGeneralGoods || [], moduleI18n.generalGoods || []);
   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
 
@@ -449,6 +456,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     drinks: mergedDrinks,
     food: mergedFood,
     magazines: mergedMagazines,
+    junk: mergedJunk,
+    craftRecipes: moduleCraftRecipes,
     generalGoods: mergedGeneralGoods,
     oddities: mergedOddities,
     weaponMods: mergedWeaponMods,

@@ -1717,5 +1717,89 @@
     "effectKey": "",
     "state": "cooked",
     "preserved": true
+  },
+  {
+    "id": "food_glowing_fungus",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 4,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_hubflower",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 4,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
+  },
+  {
+    "id": "food_bloodleaf",
+    "itemType": "food",
+    "weight": 0.5,
+    "cost": 4,
+    "rarity": 1,
+    "positiveEffect": {
+      "hpModifier": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "irradiated": true,
+    "radiationModifier": {
+      "op": "+",
+      "rollType": "rollCD",
+      "rollValue": 1
+    },
+    "effectKey": "",
+    "state": "raw",
+    "preserved": false,
+    "sceneRiskEvents": [
+      {
+        "ruleId": "diseaseExposure",
+        "eventId": "rawFood"
+      }
+    ]
   }
 ]

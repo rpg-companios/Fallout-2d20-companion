@@ -7,6 +7,7 @@ import outcast from '../../../data/loot/outcast.json';
 import weaponsMelee from '../../../data/loot/weapons_melee.json';
 import ammo from '../../../data/loot/ammo.json';
 import junk from '../../../data/loot/junk.json';
+import foraging from '../../../data/loot/foraging.json';
 import lootStubs from '../../../data/loot/_stubs.json';
 import ruLootStubs from '../../../i18n/ru-RU/data/loot/stubs.json';
 import enLootStubs from '../../../i18n/en-EN/data/loot/stubs.json';
@@ -28,6 +29,7 @@ const lootTables = {
   weapons_melee: weaponsMelee,
   ammo: ammo,
   junk: junk,
+  foraging: foraging,
 };
 
 export const supportedLootTags = Object.keys(lootTables);
@@ -65,6 +67,7 @@ function buildCatalogIndex() {
     addAll(catalog.chems, 'chem');
     addAll(catalog.drinks, 'drinks');
     addAll(catalog.food, 'food');
+    addAll(catalog.junk, 'junk');
     addAll(catalog.weapons, 'weapon');
     addAll(catalog.generalGoods, 'misc');
     addAll(catalog.oddities, 'misc');

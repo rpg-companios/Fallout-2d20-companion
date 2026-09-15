@@ -2,6 +2,26 @@
 
 ---
 
+## 255 — Crafting system data: plants, junk, syringes, recipes, foraging table
+
+> Data preparation for the upcoming crafting mechanic. New items appear in the catalog (the "Add Item" modal), and the foraging table is wired into the random loot system. There is no crafting screen yet — recipes are ready for future wiring.
+
+### New items (data + ru/en translations)
+- **Three plants** added to the food catalog: Glowing Fungus, Hubflower, Bloodleaf. All are raw, weakly healing (3 HP), mildly irradiated (1 CD radiation), and carry infection risk (like any raw food). They appear in the "Add Item" modal under food.
+- **Seven junk items** as a dedicated catalog category: Antiseptic, Abraxo Cleaner, Blood Sac, Asbestos, Bloatfly Gland, Stingwing Barb, Radscorpion Stinger. These are future recipe ingredients; currently inventory items with weight and cost.
+- **Nine syringe ammo variants** with new effects: Berserk, Bleed-Out, Bloatfly Larva, Endangerol, Lock Joint, Mind Cloud, Pax, Radscorpion Venom, Yellow Belly. Each syringe carries an effect field with a description and quality key (where applicable); Russian effect texts are complete, English — names only (descriptions to come). The "syringe transmits effect to weapon" mechanic is not yet connected — data is ready.
+
+### Foraging loot table
+- New random loot table `d20<foraging>` for foraging rolls: 20 entries (brain fungus, glowing fungus, carrot ×2, corn ×2, gourd ×2, melon ×2, mutfruit ×2, razorgrain ×2, silt bean ×2, tato ×2, hubflower, bloodleaf). Wired into the random loot system — any loot source tagged `foraging` now works.
+
+### Crafting recipes (real data from bekhram/fallout-pipboy-app)
+- File `modules/fallout/data/craft/recipes.json` contains **65 real recipes** from the Fallout 2d20 book (pp. 211–216): 23 chem recipes (stimpaks, radaway, mentats, psycho, jet and their combinations), 9 syringe recipes (Berserk, Bleed-Out, Bloatfly Larva, Endangerol, Lock Joint, Mind Cloud, Pax, Radscorpion Venom, Yellow Belly), 27 cooking recipes (meat, soups, omelettes) and 6 beverage recipes (juices, purified water). Each recipe lists ingredients with quantities, referencing existing catalog items (no "unknown" ids). Recipes are available through the catalog (`craftRecipes`).
+
+### Materials (common/uncommon/rare)
+- Left in the general goods catalog (`general_goods.json`) — they already lived there with the same ids. The standalone `materials.json` was removed to avoid two sources of truth for the same items.
+
+---
+
 ## Update — Reworking the game's core: unified store, saves, data passports (patches 219–247)
 
 > Major behind-the-scenes work: everything the game remembers about a character moved into a unified store, saves became a standalone module, and data/operations got machine-readable "passports". For players: quieter, more reliable, plus several gameplay fixes; the save format did not change (old saves keep loading).

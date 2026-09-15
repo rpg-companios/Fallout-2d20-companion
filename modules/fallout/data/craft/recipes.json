@@ -1,0 +1,1256 @@
+{
+  "chem": [
+    {
+      "id": "craft_chem_antibiotics",
+      "output": {
+        "itemId": "chem_antibiotics",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "food_glowing_fungus",
+          "quantity": 3
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 2
+        },
+        {
+          "itemId": "chem_stimpak",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_mentats_berry",
+      "output": {
+        "itemId": "chem_mentats_berry",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_mentats",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tarberry",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_buffjet",
+      "output": {
+        "itemId": "chem_buffjet",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_buffout",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_jet",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_bufftats",
+      "output": {
+        "itemId": "chem_bufftats",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_buffout",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_mentats",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_radaway_diluted",
+      "output": {
+        "itemId": "chem_radaway_diluted",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_radaway",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_rad_x_diluted",
+      "output": {
+        "itemId": "chem_rad_x_diluted",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_rad_x",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_stimpak_diluted",
+      "output": {
+        "itemId": "chem_stimpak_diluted",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_stimpak",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_fury",
+      "output": {
+        "itemId": "chem_fury",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "ammo_syringe",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_buffout",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_glowing_blood_pack",
+      "output": {
+        "itemId": "drink_glowing_blood_pack",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_blood_pack",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_irradiated_blood",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_mentats_grape",
+      "output": {
+        "itemId": "chem_mentats_grape",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "food_hubflower",
+          "quantity": 2
+        },
+        {
+          "itemId": "chem_mentats",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_whiskey",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_jet",
+      "output": {
+        "itemId": "chem_jet",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_jet_fuel",
+      "output": {
+        "itemId": "chem_jet_fuel",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "ammo_flamer_fuel",
+          "quantity": 5
+        },
+        {
+          "itemId": "chem_jet",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_mentats",
+      "output": {
+        "itemId": "chem_mentats",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "junk_abraxo_cleaner",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_brain_fungus",
+          "quantity": 2
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_mentats_orange",
+      "output": {
+        "itemId": "chem_mentats_orange",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_carrot",
+          "quantity": 3
+        },
+        {
+          "itemId": "chem_mentats",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_overdrive",
+      "output": {
+        "itemId": "chem_overdrive",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "drink_nuka_cola",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_psycho",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_psycho",
+      "output": {
+        "itemId": "chem_psycho",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "food_hubflower",
+          "quantity": 2
+        },
+        {
+          "itemId": "chem_stimpak",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_psycho_jet",
+      "output": {
+        "itemId": "chem_psycho_jet",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_jet",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_psycho",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_psychobuff",
+      "output": {
+        "itemId": "chem_psychobuff",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "chem_buffout",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_psycho",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_radaway",
+      "output": {
+        "itemId": "chem_radaway",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "food_glowing_fungus",
+          "quantity": 3
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_refreshing_beverage",
+      "output": {
+        "itemId": "drink_refreshing_beverage",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "item_rare_materials",
+          "quantity": 3
+        },
+        {
+          "itemId": "drink_blood_pack",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 2
+        },
+        {
+          "itemId": "chem_radaway",
+          "quantity": 2
+        },
+        {
+          "itemId": "chem_stimpak",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_skeeto_spit",
+      "output": {
+        "itemId": "chem_skeeto_spit",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "junk_blood_sac",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_bloodleaf",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_stimpak",
+      "output": {
+        "itemId": "chem_stimpak",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "junk_antiseptic",
+          "quantity": 2
+        },
+        {
+          "itemId": "drink_blood_pack",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_chem_ultra_jet",
+      "output": {
+        "itemId": "chem_ultra_jet",
+        "quantity": 1,
+        "itemType": "chem"
+      },
+      "materials": [
+        {
+          "itemId": "food_bloodleaf",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_jet",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 2
+        }
+      ]
+    }
+  ],
+  "ammo": [
+    {
+      "id": "craft_ammo_syringe_berserk",
+      "output": {
+        "itemId": "ammo_syringe_berserk",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_bourbon",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_bleed_out",
+      "output": {
+        "itemId": "ammo_syringe_bleed_out",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_bloatfly_larva",
+      "output": {
+        "itemId": "ammo_syringe_bloatfly_larva",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "junk_bloatfly_gland",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "chem_psycho",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_endangerol",
+      "output": {
+        "itemId": "ammo_syringe_endangerol",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 3
+        },
+        {
+          "itemId": "chem_med_x",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_lock_joint",
+      "output": {
+        "itemId": "ammo_syringe_lock_joint",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 2
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "junk_stingwing_barb",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tarberry",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_mind_cloud",
+      "output": {
+        "itemId": "ammo_syringe_mind_cloud",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "junk_abraxo_cleaner",
+          "quantity": 1
+        },
+        {
+          "itemId": "junk_asbestos",
+          "quantity": 2
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_pax",
+      "output": {
+        "itemId": "ammo_syringe_pax",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "food_mutfruit",
+          "quantity": 2
+        },
+        {
+          "itemId": "drink_nuka_cola",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_radscorpion_venom",
+      "output": {
+        "itemId": "ammo_syringe_radscorpion_venom",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "junk_radscorpion_stinger",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_ammo_syringe_yellow_belly",
+      "output": {
+        "itemId": "ammo_syringe_yellow_belly",
+        "quantity": 1,
+        "itemType": "ammo"
+      },
+      "materials": [
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 5
+        }
+      ]
+    }
+  ],
+  "food": [
+    {
+      "id": "craft_food_grilled_bloatfly",
+      "output": {
+        "itemId": "food_grilled_bloatfly",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_bloatfly_meat",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_food_bloodbug_steak",
+      "output": {
+        "itemId": "food_bloodbug_steak",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_bloodbug_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_cooked_softshell_mirelurk",
+      "output": {
+        "itemId": "food_cooked_softshell_mirelurk",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_softshell_mirelurk_meat",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_food_crispy_squirrel_bits",
+      "output": {
+        "itemId": "food_crispy_squirrel_bits",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_squirrel_bits",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_deathclaw_omelette",
+      "output": {
+        "itemId": "food_deathclaw_omelette",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "drink_blood_pack",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_deathclaw_egg",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_deathclaw_steak",
+      "output": {
+        "itemId": "food_deathclaw_steak",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_deathclaw_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_grilled_radroach",
+      "output": {
+        "itemId": "food_grilled_radroach",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_radroach_meat",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "id": "craft_food_grilled_radstag",
+      "output": {
+        "itemId": "food_grilled_radstag",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_radstag_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_iguana_on_a_stick",
+      "output": {
+        "itemId": "food_iguana_on_a_stick",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_iguana_bits",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_iguana_stew",
+      "output": {
+        "itemId": "food_iguana_stew",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_carrot",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_iguana_bits",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "id": "craft_food_mirelurk_cake",
+      "output": {
+        "itemId": "food_mirelurk_cake",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_mirelurk_egg",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_mirelurk_meat",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_uncommon_materials",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_razorgrain",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_mirelurk_egg_omelette",
+      "output": {
+        "itemId": "food_mirelurk_egg_omelette",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_mirelurk_egg",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_mirelurk_queen_steak",
+      "output": {
+        "itemId": "food_mirelurk_queen_steak",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_mirelurk_queen_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_mole_rat_chops",
+      "output": {
+        "itemId": "food_mole_rat_chops",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_mole_rat_meat",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_food_mutant_hound_ribs",
+      "output": {
+        "itemId": "food_mutant_hound_ribs",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_mutant_hound_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_dog_chops",
+      "output": {
+        "itemId": "food_dog_chops",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_dog_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_noodle_bowl",
+      "output": {
+        "itemId": "food_noodle_bowl",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_razorgrain",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_radscorpion_egg_omelette",
+      "output": {
+        "itemId": "food_radscorpion_egg_omelette",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_radscorpion_egg",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_radscorpion_steak",
+      "output": {
+        "itemId": "food_radscorpion_steak",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_radscorpion_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_radstag_stew",
+      "output": {
+        "itemId": "food_radstag_stew",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_gourd",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_radstag_meat",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_silt_bean",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_vodka",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_ribeye_steak",
+      "output": {
+        "itemId": "food_ribeye_steak",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_brahmin_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_roasted_mirelurk_meat",
+      "output": {
+        "itemId": "food_roasted_mirelurk_meat",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_mirelurk_meat",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_food_squirrel_on_a_stick",
+      "output": {
+        "itemId": "food_squirrel_on_a_stick",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_squirrel_bits",
+          "quantity": 1
+        },
+        {
+          "itemId": "item_common_materials",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_stingwing_fillet",
+      "output": {
+        "itemId": "food_stingwing_fillet",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_stingwing_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_vegetable_soup",
+      "output": {
+        "itemId": "food_vegetable_soup",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_carrot",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tato",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_yao_guai_ribs",
+      "output": {
+        "itemId": "food_yao_guai_ribs",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_yao_guai_meat",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_food_yao_guai_roast",
+      "output": {
+        "itemId": "food_yao_guai_roast",
+        "quantity": 1,
+        "itemType": "food"
+      },
+      "materials": [
+        {
+          "itemId": "food_carrot",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tato",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_yao_guai_meat",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "drinks": [
+    {
+      "id": "craft_drink_dirty_wastelander",
+      "output": {
+        "itemId": "drink_dirty_wastelander",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "food_mutfruit",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_nuka_cola",
+          "quantity": 1
+        },
+        {
+          "itemId": "drink_whiskey",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_purified_water",
+      "output": {
+        "itemId": "drink_purified_water",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "drink_dirty_water",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_melon_juice",
+      "output": {
+        "itemId": "drink_melon_juice",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_melon",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_mutfruit_juice",
+      "output": {
+        "itemId": "drink_mutfruit_juice",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_mutfruit",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_tarberry_juice",
+      "output": {
+        "itemId": "drink_tarberry_juice",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tarberry",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "id": "craft_drink_potato_juice",
+      "output": {
+        "itemId": "drink_potato_juice",
+        "quantity": 1,
+        "itemType": "drinks"
+      },
+      "materials": [
+        {
+          "itemId": "drink_purified_water",
+          "quantity": 1
+        },
+        {
+          "itemId": "food_tato",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}
