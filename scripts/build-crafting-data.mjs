@@ -1,6 +1,6 @@
 // scripts/build-crafting-data.mjs
 //
-// Генератор ДАННЫХ крафта (патч 249).
+// Генератор ДАННЫХ крафта (патчи 249–250).
 //
 // Что делает: берёт сырой датасет рецептов (docs/reference-data/pipboyapp_crafting.json
 // — справочные данные стороннего приложения, где всё названо человеческими именами) и
@@ -22,6 +22,8 @@
 //     теряются — они уходят в файл-обменник docs/reference-data/Missing_craft.json:
 //     та же форма рецепта, а где данных нет — строка "unknown". Владелец дописывает
 //     недостающее по своим книгам и возвращает файл для слияния.
+//   - печатные числа, которые владелец диктует поверх источника: таблица
+//     BOOK_CORRECTIONS ниже; каждая подмена видна в отчёте, мёртвая правка — ошибка.
 //
 // Запуск:
 //   node scripts/build-crafting-data.mjs          — перегенерировать данные и отчёт
@@ -58,6 +60,10 @@ const CATALOG_SOURCES = [
   { file: 'i18n/en-EN/data/equipment/armor/armor_mods.json', itemType: 'armorMod', bucket: 'mod' },
   { file: 'i18n/en-EN/data/equipment/armor/uniq_armor_mods.json', itemType: 'armorMod', bucket: 'mod' },
   { file: 'i18n/en-EN/data/equipment/weapon_mods.json', itemType: 'weaponMod', bucket: 'mod' },
+  // Хлам и материалы — справочники владельца (патч 250): их добавили, чтобы закрыть
+  // дыры каталога в ингредиентах («Антисептик», «Кровяной мешок», «Абраксо»…).
+  { file: 'i18n/en-EN/data/junk.json', itemType: 'junk', bucket: 'items' },
+  { file: 'i18n/en-EN/data/materials.json', itemType: 'misc', bucket: 'items' },
 ];
 
 const PERKS_FILE = 'i18n/en-EN/data/perks/perks.json';
@@ -114,16 +120,29 @@ export const ITEM_NAME_ALIASES = {
   'fusion cell': { itemId: 'ammo_energy_cell', reason: 'книжная графа «Fusion Cell» = наша «Energy Cell» (см. AMMO-FOUND-TABLE.md)' },
   'tato juice': { itemId: 'drink_potato_juice', reason: 'тот же напиток: книга зовёт «Tato Juice», у нас — «Potato Juice»' },
   'mutant hound chops': { itemId: 'food_mutant_hound_ribs', reason: 'то же блюдо: эффект совпадает («Heals 2 Radiation damage»), у нас имя — «Mutant Hound Ribs»' },
+  'berserk syringe': { itemId: 'ammo_syringe_berserk', reason: 'ингредиент «Fury» — он же дротик шприцера «Berserk» (соответствие владельца)' },
 };
 
 // Ингредиенты, названные в книге именами предметов, которых у нас в каталоге нет.
 // Список держим явно: генератор обязан объяснить «нет предмета», а не молча
-// заменить его материалом.
-export const MISSING_INGREDIENT_ITEMS = [
-  'glowing fungus', 'hubflower', 'abraxo cleaner', 'bloodleaf', 'blood sac', 'antiseptic',
-  'bloatfly gland', 'stingwing barb', 'asbestos', 'radscorpion stinger', 'berserk syringe',
-];
+// заменить его материалом. Пуст сейчас: все дыры прошлого среза владелец закрыл
+// предметами (дикоросы в еде, хлам и материалы в отдельных каталогах, патч 250).
+export const MISSING_INGREDIENT_ITEMS = [];
 const MISSING_INGREDIENTS = new Set(MISSING_INGREDIENT_ITEMS);
+
+/**
+ * Исправления печатных чисел книги. Ключ — «группа_источника|имя строки».
+ * Числа диктует владелец (он же сверяет с книгами); генератор подменяет ими
+ * сырую строку источника ДО разрешения имён и показывает подмену в отчёте.
+ * Ключ без сработавшей строки — ошибка: исправление не имеет права тихо
+ * протухнуть, когда источник обновится.
+ */
+export const BOOK_CORRECTIONS = {
+  'chems|mentats': {
+    reason: 'владелец 2026-09-15: материалы «Mentats» — Необычные ×3, Редкие ×2 и Мозговой гриб ×2 (вместо книжного «Abraxo Cleaner»)',
+    materials: { 'Uncommon Materials': 3, 'Rare Materials': 2, 'Brain Fungus': 2 },
+  },
+};
 
 /**
  * Печатные таблицы рецептов, которые входят в этот срез: они описывают
@@ -384,6 +403,8 @@ export function buildCraftingData() {
   const dropped = [];
   const holes = [];
   const aliases = [];
+  const corrections = [];
+  const correctionsUsed = new Set();
   const ids = new Set();
 
   for (const source of raw.records) {
@@ -412,7 +433,15 @@ export function buildCraftingData() {
 
     const complexity = Math.min(7, Math.max(1, Number(source.complexity) || 1));
     const requires = { skill, complexity, ...(parsed.perks.length ? { perks: parsed.perks } : {}) };
-    const hasSourceMaterials = Boolean(source.materials && typeof source.materials === 'object');
+    // Исправления владельца подменяют материалы сырой строки (см. BOOK_CORRECTIONS).
+    const correctionKey = `${group.toLowerCase()}|${norm(source.name)}`;
+    const correction = BOOK_CORRECTIONS[correctionKey];
+    if (correction) {
+      correctionsUsed.add(correctionKey);
+      corrections.push({ name: outputName, reason: correction.reason, materials: correction.materials });
+    }
+    const materialsSource = correction ? correction.materials : source.materials;
+    const hasSourceMaterials = Boolean(materialsSource && typeof materialsSource === 'object');
 
     let output = null;
     const alias = ITEM_NAME_ALIASES[key];
@@ -463,7 +492,7 @@ export function buildCraftingData() {
 
     if (!output) {
       const lenient = hasSourceMaterials
-        ? resolveMaterialsLenient(source.materials, ctx, aliases)
+        ? resolveMaterialsLenient(materialsSource, ctx, aliases)
         : { materials: materialsFromComplexity(complexity), unknown: [], derived: true };
       holes.push({
         category: MISSING_CATEGORY_BY_GROUP[group] || 'loot',
@@ -484,12 +513,12 @@ export function buildCraftingData() {
     let materials;
     let derivedMaterials = false;
     if (hasSourceMaterials) {
-      const resolved = resolveMaterials(source.materials, ctx, aliases);
+      const resolved = resolveMaterials(materialsSource, ctx, aliases);
       if (resolved.error) {
         // Рецепт упирается в дыру каталога: в данные он не идёт, но отправляется
         // в обменник со всеми разрешимыми ингредиентами — владельцу останется
         // подставить недостающее, а не переписывать рецепт с нуля.
-        const lenient = resolveMaterialsLenient(source.materials, ctx, aliases);
+        const lenient = resolveMaterialsLenient(materialsSource, ctx, aliases);
         holes.push({
           category: MISSING_CATEGORY_BY_GROUP[group] || 'loot',
           record: holeRecord(
@@ -545,6 +574,13 @@ export function buildCraftingData() {
     });
   }
 
+  // Исправление без сработавшей строки — подозрение, что источник обновился,
+  // а правку забыли: пусть генератор падает, чем тихо потеряет число владельца.
+  const deadFixes = Object.keys(BOOK_CORRECTIONS).filter((key) => !correctionsUsed.has(key));
+  if (deadFixes.length) {
+    throw new Error(`BOOK_CORRECTIONS: для ключей ${deadFixes.join(', ')} нет строки в источнике — исправление мертво`);
+  }
+
   const byBucket = {};
   for (const bucket of BUCKET_ORDER) {
     const list = entries.filter((e) => e.bucket === bucket).map((e) => e.record);
@@ -587,7 +623,7 @@ export function buildCraftingData() {
     holesByCategory,
     stats,
     missingContent: renderMissing(holesByCategory),
-    report: renderReport(stats, dropped, dedupeAliases(aliases), holesByCategory),
+    report: renderReport(stats, dropped, dedupeAliases(aliases), holesByCategory, corrections),
   };
 }
 
@@ -640,7 +676,7 @@ const GROUP_MEANING = {
   WORKBENCH: 'сам верстак (кухня)',
 };
 
-const renderReport = (stats, dropped, aliases, holesByCategory) => {
+const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []) => {
   const byReason = new Map();
   for (const d of dropped) byReason.set(d.reason, (byReason.get(d.reason) || 0) + 1);
   const L = [];
@@ -694,6 +730,20 @@ const renderReport = (stats, dropped, aliases, holesByCategory) => {
   L.push('|---|---|---|---|');
   for (const a of aliases) L.push(`| ${a.name} | \`${a.itemId}\` | ${a.stage} | ${a.reason} |`);
   L.push('');
+  if (corrections.length) {
+    L.push('## Исправления владельца к печатным числам');
+    L.push('');
+    L.push('Где источник расходится с книгой (или ссылается на предметы, которых в');
+    L.push('игре нет), числа диктует владелец — они в `BOOK_CORRECTIONS` генератора.');
+    L.push('');
+    L.push('| Строка источника | Материалы по исправлению | Примечание |');
+    L.push('|---|---|---|');
+    for (const c of corrections) {
+      const mats = Object.entries(c.materials).map(([name, qty]) => `${name} ×${qty}`).join(', ');
+      L.push(`| ${c.name} | ${mats} | ${c.reason} |`);
+    }
+    L.push('');
+  }
   L.push('## Незакрытые позиции: файл-обменник');
   L.push('');
   L.push('Всё, что не выпустилось из-за дыр каталога (нет предмета-результата или');

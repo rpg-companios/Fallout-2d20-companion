@@ -1,6 +1,6 @@
 // __tests__/crafting/crafting-data.test.js
 //
-// Предохранитель ДАННЫХ крафта (патч 249).
+// Предохранитель ДАННЫХ крафта (патчи 249–250).
 //
 // Что охраняет:
 //   1. файлы рецептов существуют и описаны в индексе категории;
@@ -42,6 +42,9 @@ import clothesData from '../../modules/fallout/data/equipment/clothes.json';
 import powerArmorData from '../../modules/fallout/data/equipment/powerArmor.json';
 import weaponModsData from '../../modules/fallout/data/equipment/weapon_mods.json';
 import perksData from '../../modules/fallout/data/perks/perks.json';
+import junkData from '../../modules/fallout/data/junk.json';
+import materialsData from '../../modules/fallout/data/materials.json';
+import foragingTable from '../../modules/fallout/data/loot/foraging.json';
 
 import craftingIndex from '../../modules/fallout/data/crafting/index.json';
 
@@ -72,6 +75,8 @@ collectIds(odditiesData, 'misc', catalogIds);
 collectIds(armorData, 'armor', catalogIds);
 collectIds(clothesData, 'clothing', catalogIds);
 collectIds(powerArmorData, 'powerArmor', catalogIds);
+collectIds(junkData, 'junk', catalogIds);
+collectIds(materialsData, 'misc', catalogIds);
 
 const perkIds = new Set(perksData.map((p) => p.id));
 
@@ -219,6 +224,9 @@ describe('данные крафта: количества', () => {
     for (const { record } of allRecipes()) {
       const { quantity } = record.output;
       if (record.output.itemType === 'ammo') {
+        // Дротики шприцера штучные: их нет в таблице находки, объём не берётся
+        // откуда попало — единицу зафиксировал владелец (патч 250).
+        if (quantity === 1) continue;
         expect(typeof quantity, `${record.id}: количество боеприпаса должно быть словарём`).toBe('object');
         expect(Number.isInteger(quantity.base) && quantity.base >= 1, `${record.id}: base`).toBe(true);
         if (quantity.cd !== undefined) expect(quantity.cd).toBeGreaterThanOrEqual(1);
@@ -321,7 +329,13 @@ describe('данные крафта: файл-обменник незакрыт�
   it('структура: мета и ровно четыре договорные категории', () => {
     expect(Object.keys(doc)).toEqual(['_meta', ...MISSING_CATEGORY_ORDER]);
     const total = MISSING_CATEGORY_ORDER.reduce((n, c) => n + doc[c].length, 0);
-    expect(total).toBeGreaterThan(10);
+    // Дыры прошлого среза закрыл владелец (патч 250): предметы добавлены в
+    // каталоги, в обменнике осталась одна позиция. Если файл однажды опустеет
+    // полностью — это подозрение, что генератор что-то потерял, а не что всё
+    // закрыто: одна честная дыра обязана оставаться видимой, пока верстак
+    // «Cooking Station» не описан предметом.
+    expect(total).toBeGreaterThanOrEqual(1);
+    expect(doc.loot.map((r) => r.sourceName)).toContain('Cooking Station');
     expect(doc._meta.counts).toEqual(
       Object.fromEntries(MISSING_CATEGORY_ORDER.map((c) => [c, doc[c].length])),
     );
@@ -366,5 +380,46 @@ describe('данные крафта: файл-обменник незакрыт�
         expect(report, `отчёт молчит о «${record.sourceName}»`).toContain(`| ${record.sourceName} |`);
       }
     }
+  });
+});
+
+describe('дикоросы и новые каталоги (закрытие дыр — патч 250)', () => {
+  it('таблица дикоросов: броски 1..20 без пропусков, ссылки — только на каталог еды', () => {
+    expect(foragingTable.map((row) => row.roll)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    for (const row of foragingTable) {
+      expect(catalogIds.get(row.id), `дикоросы: ${row.id}`).toBe('food');
+    }
+  });
+
+  it('исправление владельца: материалы «Ментат» — ровно печатные числа', () => {
+    const rec = allRecipes().find(({ record }) => record.id === 'chem_mentats');
+    expect(rec, 'рецепт chem_mentats в данных').toBeTruthy();
+    const counts = Object.fromEntries(rec.record.materials.map((m) => [m.itemId, m.count]));
+    expect(counts).toEqual({
+      food_brain_fungus: 2,
+      item_rare_materials: 2,
+      item_uncommon_materials: 3,
+    });
+  });
+
+  it('дротики шприцера выпущены: штучные, Наука, верстак «chemistry»', () => {
+    const want = [
+      'ammo_syringe_berserk', 'ammo_syringe_bloatfly_larva', 'ammo_syringe_bleed_out',
+      'ammo_syringe_endangerol', 'ammo_syringe_lock_joint', 'ammo_syringe_mind_cloud',
+      'ammo_syringe_pax', 'ammo_syringe_radscorpion_venom', 'ammo_syringe_yellow_belly',
+    ].sort();
+    const darts = allRecipes().filter(({ record }) => want.includes(record.id));
+    expect(darts.map(({ record }) => record.id).sort()).toEqual(want);
+    for (const { record } of darts) {
+      expect(record.output.quantity, `${record.id}: дротик штучный`).toBe(1);
+      expect(record.requires.skill, `${record.id}: навык`).toBe('SCIENCE');
+      expect(record.bench, `${record.id}: верстак`).toBe('chemistry');
+    }
+  });
+
+  it('«Berserk Syringe» из рецепта Fury ведёт на дротик, а не на выдуманный предмет', () => {
+    const fury = allRecipes().find(({ record }) => record.id === 'chem_fury');
+    expect(fury).toBeTruthy();
+    expect(fury.record.materials).toContainEqual({ itemId: 'ammo_syringe_berserk', count: 1 });
   });
 });

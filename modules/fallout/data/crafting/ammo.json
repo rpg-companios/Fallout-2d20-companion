@@ -603,5 +603,257 @@
       }
     },
     "sourcePage": 211
+  },
+  {
+    "id": "ammo_syringe_berserk",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "drink_bourbon",
+        "count": 1
+      },
+      {
+        "itemId": "drink_dirty_water",
+        "count": 1
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_berserk",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_bleed_out",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_bleed_out",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_bloatfly_larva",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "chem_psycho",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      },
+      {
+        "itemId": "junk_bloatfly_gland",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_bloatfly_larva",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_endangerol",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "chem_med_x",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_endangerol",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_lock_joint",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 5
+    },
+    "materials": [
+      {
+        "itemId": "drink_dirty_water",
+        "count": 1
+      },
+      {
+        "itemId": "food_tarberry",
+        "count": 2
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      },
+      {
+        "itemId": "junk_stingwing_barb",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_lock_joint",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_mind_cloud",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "drink_purified_water",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      },
+      {
+        "itemId": "junk_abraxo_cleaner",
+        "count": 1
+      },
+      {
+        "itemId": "junk_asbestos",
+        "count": 2
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_mind_cloud",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_pax",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "drink_nuka_cola",
+        "count": 1
+      },
+      {
+        "itemId": "food_mutfruit",
+        "count": 2
+      },
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_pax",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_radscorpion_venom",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 1
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 1
+      },
+      {
+        "itemId": "junk_radscorpion_stinger",
+        "count": 1
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_radscorpion_venom",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
+  },
+  {
+    "id": "ammo_syringe_yellow_belly",
+    "bench": "chemistry",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      }
+    ],
+    "output": {
+      "itemId": "ammo_syringe_yellow_belly",
+      "itemType": "ammo",
+      "quantity": 1
+    },
+    "sourcePage": 215
   }
 ]
