@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, Image, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
@@ -61,15 +62,25 @@ const flattenItemParams = (item) => {
   return flat;
 };
 
-const CapsSection = ({ caps, onAdd, onSubtract }) => (
-  <View style={styles.capsContainer}>
-    <Text style={styles.capsLabel}>{tInventory('screen.caps.title')}</Text>
-    <TouchableOpacity style={styles.capsButton} onPress={onSubtract}>
-      <Text style={styles.capsButtonText}>{tInventory('screen.caps.subtract')}</Text>
-    </TouchableOpacity>
-    <Text style={styles.capsValue}>{caps}</Text>
-    <TouchableOpacity style={styles.capsButton} onPress={onAdd}>
-      <Text style={styles.capsButtonText}>{tInventory('screen.caps.add')}</Text>
+const CurrencySection = ({ amount, onAdd, onSubtract, onCraft }) => (
+  <View style={styles.currencyRow}>
+    <View style={styles.currencyContainer}>
+      <Image
+        source={require('../../../modules/fallout/assets/backgrounds/caps.png')}
+        style={styles.currencyIcon}
+        resizeMode="contain"
+      />
+      <TouchableOpacity style={styles.currencyButton} onPress={onSubtract}>
+        <Text style={styles.currencyButtonText}>{tInventory('screen.currency.subtract')}</Text>
+      </TouchableOpacity>
+      <Text style={styles.currencyValue}>{amount}</Text>
+      <TouchableOpacity style={styles.currencyButton} onPress={onAdd}>
+        <Text style={styles.currencyButtonText}>{tInventory('screen.currency.add')}</Text>
+      </TouchableOpacity>
+    </View>
+    <TouchableOpacity style={styles.craftButton} onPress={onCraft}>
+      <MaterialCommunityIcons name="wrench" size={14} color="#fff" />
+      <Text style={styles.craftButtonText}>{tInventory('screen.craft.label')}</Text>
     </TouchableOpacity>
   </View>
 );
@@ -351,6 +362,10 @@ const InventoryScreen = () => {
     setCapsOperationType(type);
     setIsCapsModalVisible(true);
   };
+
+  // Экрана крафта ещё нет (движок готов, патч 251) — кнопка честно это сообщает.
+  const handleCraftPress = () =>
+    showAlert(tInventory('screen.craft.label'), tInventory('screen.craft.placeholder'));
 
   const showFoundItemBonusAlerts = (events) => {
     (events || []).forEach((event) => {
@@ -1768,10 +1783,11 @@ const InventoryScreen = () => {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
-          <CapsSection 
-            caps={currency}
+          <CurrencySection 
+            amount={currency}
             onAdd={() => handleOpenCapsModal('add')}
             onSubtract={() => handleOpenCapsModal('subtract')}
+            onCraft={handleCraftPress}
           />
           <View style={styles.tableContainer}>
             {renderTableHeader()}

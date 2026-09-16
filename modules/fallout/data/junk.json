@@ -1,42 +1,780 @@
 [
   {
-    "id": "junk_antiseptic",
+    "id": "animal_hide",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6
+  },
+  {
+    "id": "mutated_viscera",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "blood_sac",
     "itemType": "junk",
     "weight": 0.2,
     "cost": 4
   },
   {
-    "id": "junk_abraxo_cleaner",
+    "id": "stinger_or_proboscis",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 10
+  },
+  {
+    "id": "bones_and_teeth",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3
+  },
+  {
+    "id": "radscorpion_stinger",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 30
+  },
+  {
+    "id": "abraxo_cleaner",
     "itemType": "junk",
     "weight": 1,
     "cost": 10
   },
   {
-    "id": "junk_blood_sac",
+    "id": "alarm_clock",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 10
+  },
+  {
+    "id": "ashtray",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "bread_box",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "broom",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2
+  },
+  {
+    "id": "bucket",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2
+  },
+  {
+    "id": "camera",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15
+  },
+  {
+    "id": "can",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "chalk",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "chessboard",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "cigar_or_cigarettes",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "cigar_box",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 40
+  },
+  {
+    "id": "cigarette_carton",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 50
+  },
+  {
+    "id": "clothes_hanger",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "clothing_iron",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3
+  },
+  {
+    "id": "cooking_oil",
     "itemType": "junk",
     "weight": 0.2,
     "cost": 4
   },
   {
-    "id": "junk_asbestos",
+    "id": "cookware",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "cotton_yarn",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "crockery_and_tableware",
     "itemType": "junk",
     "weight": 1,
     "cost": 5
   },
   {
-    "id": "junk_bloatfly_gland",
+    "id": "crystal_decanter",
     "itemType": "junk",
-    "weight": 0.3,
+    "weight": 2,
     "cost": 6
   },
   {
-    "id": "junk_stingwing_barb",
+    "id": "cutlery",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "cutting_board",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "dishrag",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "dog_bowl",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "extinguisher",
+    "itemType": "junk",
+    "weight": 6,
+    "cost": 6
+  },
+  {
+    "id": "feather_duster",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "flag",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3
+  },
+  {
+    "id": "giddyup_buttercup_parts",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 50
+  },
+  {
+    "id": "glass_bottle",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "glassware",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6
+  },
+  {
+    "id": "globe",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2
+  },
+  {
+    "id": "hairbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20
+  },
+  {
+    "id": "hot_plate",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 7
+  },
+  {
+    "id": "kitchen_scale",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6
+  },
+  {
+    "id": "ladle",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "lamp",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15
+  },
+  {
+    "id": "light_bulb",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3
+  },
+  {
+    "id": "mop",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 1
+  },
+  {
+    "id": "newspaper",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "oven_mitt",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "paint",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 10
+  },
+  {
+    "id": "paintbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "pen",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "pencil",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "picture_frame",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 4
+  },
+  {
+    "id": "pillow",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3
+  },
+  {
+    "id": "plastic_decorations",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "plunger",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "pool_ball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "rat_poison",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 6
+  },
+  {
+    "id": "scissors",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3
+  },
+  {
+    "id": "shopping_basket",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "soap",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4
+  },
+  {
+    "id": "spatula",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "stuffed_toy",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3
+  },
+  {
+    "id": "tea_or_coffee_cup",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "tea_or_coffee_pot",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "toaster",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3
+  },
+  {
+    "id": "toothbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "toothpaste",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3
+  },
+  {
+    "id": "toy_alien",
     "itemType": "junk",
     "weight": 0.2,
     "cost": 5
   },
   {
-    "id": "junk_radscorpion_stinger",
+    "id": "toy_vehicle",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 8
+  },
+  {
+    "id": "tray",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5
+  },
+  {
+    "id": "umbrella",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 3
+  },
+  {
+    "id": "vase",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 25
+  },
+  {
+    "id": "wooden_spoon",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "wooden_toy",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "watch",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 25
+  },
+  {
+    "id": "baseball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4
+  },
+  {
+    "id": "baseball_base",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4
+  },
+  {
+    "id": "baseball_glove",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 4
+  },
+  {
+    "id": "basketball",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "bowling_ball",
+    "itemType": "junk",
+    "weight": 8,
+    "cost": 5
+  },
+  {
+    "id": "bowling_pin",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3
+  },
+  {
+    "id": "dumbbells_barbells_weights",
+    "itemType": "junk",
+    "weight": 25,
+    "cost": 4
+  },
+  {
+    "id": "kickball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "life_preserver",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 6
+  },
+  {
+    "id": "battery",
+    "itemType": "junk",
+    "weight": 6,
+    "cost": 20
+  },
+  {
+    "id": "circuit_board",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 25
+  },
+  {
+    "id": "coolant",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 7
+  },
+  {
+    "id": "cutting_fluid",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 7
+  },
+  {
+    "id": "duct_tape",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 12
+  },
+  {
+    "id": "electrical_cable",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 15
+  },
+  {
+    "id": "fuse",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5
+  },
+  {
+    "id": "high_powered_magnet",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 13
+  },
+  {
+    "id": "high_powered_microscope",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 22
+  },
+  {
+    "id": "high_tech_gadget",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 150
+  },
+  {
+    "id": "lab_equipment",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 15
+  },
+  {
+    "id": "lab_glassware",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "metal_ingot",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 300
+  },
+  {
+    "id": "microscope",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 22
+  },
+  {
+    "id": "sensor",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20
+  },
+  {
+    "id": "solvent",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 15
+  },
+  {
+    "id": "suprathaw_antifreeze",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 8
+  },
+  {
+    "id": "turpentine",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 10
+  },
+  {
+    "id": "vacuum_tube",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3
+  },
+  {
+    "id": "bandages",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2
+  },
+  {
+    "id": "bone_saw",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 5
+  },
+  {
+    "id": "empty_blood_pack_iv_bag",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1
+  },
+  {
+    "id": "scalpel",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5
+  },
+  {
+    "id": "tweezers",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 8
+  },
+  {
+    "id": "bag_of_cement",
+    "itemType": "junk",
+    "weight": 8,
+    "cost": 15
+  },
+  {
+    "id": "bag_of_fertilizer",
+    "itemType": "junk",
+    "weight": 4,
+    "cost": 25
+  },
+  {
+    "id": "blowtorch",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15
+  },
+  {
+    "id": "clipboard",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2
+  },
+  {
+    "id": "desk_fan",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4
+  },
+  {
+    "id": "magnifying_glass",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 8
+  },
+  {
+    "id": "military_ammo_bag",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4
+  },
+  {
+    "id": "oil_can",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 15
+  },
+  {
+    "id": "shovel",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 3
+  },
+  {
+    "id": "typewriter",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 11
+  },
+  {
+    "id": "wonderglue",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20
+  },
+  {
+    "id": "hubcap",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 5
+  },
+  {
+    "id": "auto_parts",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2
+  },
+  {
+    "id": "metal_tools",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "telephone",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 5
+  },
+  {
+    "id": "aluminum_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3
+  },
+  {
+    "id": "copper_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3
+  },
+  {
+    "id": "gold_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5
+  },
+  {
+    "id": "iron_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1
+  },
+  {
+    "id": "silver_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3
+  },
+  {
+    "id": "uranium_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5
+  },
+  {
+    "id": "bloatfly_gland",
+    "itemType": "junk",
+    "weight": 0.3,
+    "cost": 6
+  },
+  {
+    "id": "stingwing_barb",
     "itemType": "junk",
     "weight": 0.2,
     "cost": 5

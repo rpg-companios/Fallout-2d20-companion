@@ -59,7 +59,7 @@ import {
 const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
 import { useLocale, useModuleLocale } from "../../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
-import styles from "../../../../styles/CharacterScreen.styles";
+import styles from '../../styles/CharacterScreen.styles';
 import { getTimedAttributeModifiers } from "../../../../domain/effects";
 import { createEmptyEquippedArmor } from "../../../../domain/equippedArmor";
 import { resolveSkillRewards } from "../../../../domain/skillRewards";

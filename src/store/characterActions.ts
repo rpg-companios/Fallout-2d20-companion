@@ -199,6 +199,14 @@ export interface CharacterActions {
     durabilityEnabled: boolean;
     baseLossPer10Shots: number;
   }) => OkReason;
+  /**
+   * Атомарное списание стоков по каноническим id каталога (патч 251, движок
+   * крафта; разборка хлама встанет на него же). Отказ НЕ трогает состояние —
+   * контракт как у spendCurrency. Надетое и locked-комплекты не расходуются.
+   */
+  spendItemStacks: (args: { spend: Array<{ itemId: string; count: number }> }) =>
+    | { ok: true; spent: Array<{ itemId: string; count: number; instanceId: string }> }
+    | { ok: false; reason: string; itemId?: string };
   addEffect: (effect: TimedEffectRecord) => void;
   updateEffect: (effectId: string, patch: Partial<TimedEffectRecord>) => void;
   expireEffect: (effectId: string) => void;
@@ -366,6 +374,7 @@ export const CRUD_OP_KEYS = [
   'resolveCoreChoice',
   'setRobotArmorLayer',
   'spendAmmoForWeapon',
+  'spendItemStacks',
   'triggerDependentCalculations',
   'unequipHeldWeapon',
   'unequipItem',

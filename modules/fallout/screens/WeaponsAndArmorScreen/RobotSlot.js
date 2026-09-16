@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import globalStyles from '../../../../styles/CharacterScreen.styles';
-import localStyles from '../../../../styles/WeaponsAndArmorScreen.styles';
+import globalStyles from '../../styles/CharacterScreen.styles';
+import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { buildRobotSlotStats } from '../../../../domain/robotSlotLogic';
 
 // ---------------------------------------------------------------------------

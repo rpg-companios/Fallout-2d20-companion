@@ -669,15 +669,15 @@
     },
     "materials": [
       {
+        "itemId": "bloatfly_gland",
+        "count": 1
+      },
+      {
         "itemId": "chem_psycho",
         "count": 1
       },
       {
         "itemId": "item_uncommon_materials",
-        "count": 1
-      },
-      {
-        "itemId": "junk_bloatfly_gland",
         "count": 1
       }
     ],
@@ -737,7 +737,7 @@
         "count": 2
       },
       {
-        "itemId": "junk_stingwing_barb",
+        "itemId": "stingwing_barb",
         "count": 1
       }
     ],
@@ -757,20 +757,20 @@
     },
     "materials": [
       {
+        "itemId": "abraxo_cleaner",
+        "count": 1
+      },
+      {
+        "itemId": "asbestos",
+        "count": 2
+      },
+      {
         "itemId": "drink_purified_water",
         "count": 1
       },
       {
         "itemId": "item_uncommon_materials",
         "count": 1
-      },
-      {
-        "itemId": "junk_abraxo_cleaner",
-        "count": 1
-      },
-      {
-        "itemId": "junk_asbestos",
-        "count": 2
       }
     ],
     "output": {
@@ -825,7 +825,7 @@
         "count": 1
       },
       {
-        "itemId": "junk_radscorpion_stinger",
+        "itemId": "radscorpion_stinger",
         "count": 1
       }
     ],

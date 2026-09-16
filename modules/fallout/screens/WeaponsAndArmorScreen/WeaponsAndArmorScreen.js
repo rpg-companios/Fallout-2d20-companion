@@ -19,8 +19,8 @@ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../doma
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot } from '../../../../domain/robotSlots';
-import styles from '../../../../styles/CharacterScreen.styles';
-import localStyles from '../../../../styles/WeaponsAndArmorScreen.styles';
+import styles from '../../styles/CharacterScreen.styles';
+import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';

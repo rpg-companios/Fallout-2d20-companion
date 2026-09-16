@@ -1,30 +1,522 @@
 [
   {
-    "id": "junk_antiseptic",
-    "name": "Antiseptic"
+    "id": "animal_hide",
+    "name": "Animal Hide"
   },
   {
-    "id": "junk_abraxo_cleaner",
-    "name": "Abraxo Cleaner"
+    "id": "mutated_viscera",
+    "name": "Mutated Viscera"
   },
   {
-    "id": "junk_blood_sac",
+    "id": "blood_sac",
     "name": "Blood Sac"
   },
   {
-    "id": "junk_asbestos",
-    "name": "Asbestos"
+    "id": "stinger_or_proboscis",
+    "name": "Stinger or Proboscis"
   },
   {
-    "id": "junk_bloatfly_gland",
+    "id": "bones_and_teeth",
+    "name": "Bones and Teeth"
+  },
+  {
+    "id": "radscorpion_stinger",
+    "name": "Radscorpion Stinger"
+  },
+  {
+    "id": "abraxo_cleaner",
+    "name": "Abraxo Cleaner"
+  },
+  {
+    "id": "alarm_clock",
+    "name": "Alarm Clock"
+  },
+  {
+    "id": "ashtray",
+    "name": "Ashtray"
+  },
+  {
+    "id": "bread_box",
+    "name": "Bread Box"
+  },
+  {
+    "id": "broom",
+    "name": "Broom"
+  },
+  {
+    "id": "bucket",
+    "name": "Bucket"
+  },
+  {
+    "id": "camera",
+    "name": "Camera"
+  },
+  {
+    "id": "can",
+    "name": "Can"
+  },
+  {
+    "id": "chalk",
+    "name": "Chalk"
+  },
+  {
+    "id": "chessboard",
+    "name": "Chessboard"
+  },
+  {
+    "id": "cigar_or_cigarettes",
+    "name": "Cigar or Cigarettes"
+  },
+  {
+    "id": "cigar_box",
+    "name": "Cigar Box"
+  },
+  {
+    "id": "cigarette_carton",
+    "name": "Cigarette Carton"
+  },
+  {
+    "id": "clothes_hanger",
+    "name": "Clothes Hanger"
+  },
+  {
+    "id": "clothing_iron",
+    "name": "Clothing Iron"
+  },
+  {
+    "id": "cooking_oil",
+    "name": "Cooking Oil"
+  },
+  {
+    "id": "cookware",
+    "name": "Cookware (Pots and Pans)"
+  },
+  {
+    "id": "cotton_yarn",
+    "name": "Cotton Yarn"
+  },
+  {
+    "id": "crockery_and_tableware",
+    "name": "Crockery and Tableware (Bowls and Plates)"
+  },
+  {
+    "id": "crystal_decanter",
+    "name": "Crystal Decanter"
+  },
+  {
+    "id": "cutlery",
+    "name": "Cutlery (Knives, Forks, Spoons, and Sporks)"
+  },
+  {
+    "id": "cutting_board",
+    "name": "Cutting Board"
+  },
+  {
+    "id": "dishrag",
+    "name": "Dishrag"
+  },
+  {
+    "id": "dog_bowl",
+    "name": "Dog Bowl"
+  },
+  {
+    "id": "extinguisher",
+    "name": "Extinguisher"
+  },
+  {
+    "id": "feather_duster",
+    "name": "Feather Duster"
+  },
+  {
+    "id": "flag",
+    "name": "Flag"
+  },
+  {
+    "id": "giddyup_buttercup_parts",
+    "name": "Giddyup Buttercup Parts"
+  },
+  {
+    "id": "glass_bottle",
+    "name": "Glass Bottle"
+  },
+  {
+    "id": "glassware",
+    "name": "Glassware (Decanters, Glass Vases, Drinking Glasses)"
+  },
+  {
+    "id": "globe",
+    "name": "Globe"
+  },
+  {
+    "id": "hairbrush",
+    "name": "Hairbrush"
+  },
+  {
+    "id": "hot_plate",
+    "name": "Hot Plate"
+  },
+  {
+    "id": "kitchen_scale",
+    "name": "Kitchen Scale"
+  },
+  {
+    "id": "ladle",
+    "name": "Ladle"
+  },
+  {
+    "id": "lamp",
+    "name": "Lamp"
+  },
+  {
+    "id": "light_bulb",
+    "name": "Light Bulb"
+  },
+  {
+    "id": "mop",
+    "name": "Mop"
+  },
+  {
+    "id": "newspaper",
+    "name": "Newspaper"
+  },
+  {
+    "id": "oven_mitt",
+    "name": "Oven Mitt"
+  },
+  {
+    "id": "paint",
+    "name": "Paint"
+  },
+  {
+    "id": "paintbrush",
+    "name": "Paintbrush"
+  },
+  {
+    "id": "pen",
+    "name": "Pen"
+  },
+  {
+    "id": "pencil",
+    "name": "Pencil"
+  },
+  {
+    "id": "picture_frame",
+    "name": "Picture Frame"
+  },
+  {
+    "id": "pillow",
+    "name": "Pillow"
+  },
+  {
+    "id": "plastic_decorations",
+    "name": "Plastic Decorations"
+  },
+  {
+    "id": "plunger",
+    "name": "Plunger"
+  },
+  {
+    "id": "pool_ball",
+    "name": "Pool Ball"
+  },
+  {
+    "id": "rat_poison",
+    "name": "Rat Poison"
+  },
+  {
+    "id": "scissors",
+    "name": "Scissors"
+  },
+  {
+    "id": "shopping_basket",
+    "name": "Shopping Basket"
+  },
+  {
+    "id": "soap",
+    "name": "Soap"
+  },
+  {
+    "id": "spatula",
+    "name": "Spatula"
+  },
+  {
+    "id": "stuffed_toy",
+    "name": "Stuffed Toy"
+  },
+  {
+    "id": "tea_or_coffee_cup",
+    "name": "Tea or Coffee Cup"
+  },
+  {
+    "id": "tea_or_coffee_pot",
+    "name": "Tea or Coffee Pot"
+  },
+  {
+    "id": "toaster",
+    "name": "Toaster"
+  },
+  {
+    "id": "toothbrush",
+    "name": "Toothbrush"
+  },
+  {
+    "id": "toothpaste",
+    "name": "Toothpaste"
+  },
+  {
+    "id": "toy_alien",
+    "name": "Toy Alien"
+  },
+  {
+    "id": "toy_vehicle",
+    "name": "Toy Vehicle (Car, Plane, Spaceship, etc)"
+  },
+  {
+    "id": "tray",
+    "name": "Tray"
+  },
+  {
+    "id": "umbrella",
+    "name": "Umbrella"
+  },
+  {
+    "id": "vase",
+    "name": "Vase"
+  },
+  {
+    "id": "wooden_spoon",
+    "name": "Wooden Spoon"
+  },
+  {
+    "id": "wooden_toy",
+    "name": "Wooden Toy"
+  },
+  {
+    "id": "watch",
+    "name": "Watch (Pocket Watch or Wristwatch)"
+  },
+  {
+    "id": "baseball",
+    "name": "Baseball"
+  },
+  {
+    "id": "baseball_base",
+    "name": "Baseball Base"
+  },
+  {
+    "id": "baseball_glove",
+    "name": "Baseball Glove"
+  },
+  {
+    "id": "basketball",
+    "name": "Basketball"
+  },
+  {
+    "id": "bowling_ball",
+    "name": "Bowling Ball"
+  },
+  {
+    "id": "bowling_pin",
+    "name": "Bowling Pin"
+  },
+  {
+    "id": "dumbbells_barbells_weights",
+    "name": "Dumbbells, Barbells, and Weights"
+  },
+  {
+    "id": "kickball",
+    "name": "Kickball"
+  },
+  {
+    "id": "life_preserver",
+    "name": "Life Preserver"
+  },
+  {
+    "id": "battery",
+    "name": "Battery"
+  },
+  {
+    "id": "circuit_board",
+    "name": "Circuit Board"
+  },
+  {
+    "id": "coolant",
+    "name": "Coolant"
+  },
+  {
+    "id": "cutting_fluid",
+    "name": "Cutting Fluid"
+  },
+  {
+    "id": "duct_tape",
+    "name": "Duct Tape"
+  },
+  {
+    "id": "electrical_cable",
+    "name": "Electrical Cable"
+  },
+  {
+    "id": "fuse",
+    "name": "Fuse"
+  },
+  {
+    "id": "high_powered_magnet",
+    "name": "High-Powered Magnet"
+  },
+  {
+    "id": "high_powered_microscope",
+    "name": "High-Powered Microscope"
+  },
+  {
+    "id": "high_tech_gadget",
+    "name": "High-Tech Gadget"
+  },
+  {
+    "id": "lab_equipment",
+    "name": "Lab Equipment (Racks, Stands, Containers, etc.)"
+  },
+  {
+    "id": "lab_glassware",
+    "name": "Lab Glassware (Beakers, Test Tubes, etc.)"
+  },
+  {
+    "id": "metal_ingot",
+    "name": "Metal Ingot"
+  },
+  {
+    "id": "microscope",
+    "name": "Microscope"
+  },
+  {
+    "id": "sensor",
+    "name": "Sensor"
+  },
+  {
+    "id": "solvent",
+    "name": "Solvent"
+  },
+  {
+    "id": "suprathaw_antifreeze",
+    "name": "Suprathaw Antifreeze"
+  },
+  {
+    "id": "turpentine",
+    "name": "Turpentine"
+  },
+  {
+    "id": "vacuum_tube",
+    "name": "Vacuum Tube"
+  },
+  {
+    "id": "bandages",
+    "name": "Bandages"
+  },
+  {
+    "id": "bone_saw",
+    "name": "Bone Saw"
+  },
+  {
+    "id": "empty_blood_pack_iv_bag",
+    "name": "Empty Blood Pack/IV Bag"
+  },
+  {
+    "id": "scalpel",
+    "name": "Scalpel"
+  },
+  {
+    "id": "tweezers",
+    "name": "Tweezers"
+  },
+  {
+    "id": "bag_of_cement",
+    "name": "Bag of Cement"
+  },
+  {
+    "id": "bag_of_fertilizer",
+    "name": "Bag of Fertilizer"
+  },
+  {
+    "id": "blowtorch",
+    "name": "Blowtorch"
+  },
+  {
+    "id": "clipboard",
+    "name": "Clipboard"
+  },
+  {
+    "id": "desk_fan",
+    "name": "Desk Fan"
+  },
+  {
+    "id": "magnifying_glass",
+    "name": "Magnifying Glass"
+  },
+  {
+    "id": "military_ammo_bag",
+    "name": "Military Ammo Bag"
+  },
+  {
+    "id": "oil_can",
+    "name": "Oil Can"
+  },
+  {
+    "id": "shovel",
+    "name": "Shovel"
+  },
+  {
+    "id": "typewriter",
+    "name": "Typewriter"
+  },
+  {
+    "id": "wonderglue",
+    "name": "Wonderglue"
+  },
+  {
+    "id": "hubcap",
+    "name": "Hubcap"
+  },
+  {
+    "id": "auto_parts",
+    "name": "Auto Parts"
+  },
+  {
+    "id": "metal_tools",
+    "name": "Metal Tools (Hammers, Screwdrivers, Spanners)"
+  },
+  {
+    "id": "telephone",
+    "name": "Telephone"
+  },
+  {
+    "id": "aluminum_ore",
+    "name": "Aluminum Ore"
+  },
+  {
+    "id": "copper_ore",
+    "name": "Copper Ore"
+  },
+  {
+    "id": "gold_ore",
+    "name": "Gold Ore"
+  },
+  {
+    "id": "iron_ore",
+    "name": "Iron Ore"
+  },
+  {
+    "id": "silver_ore",
+    "name": "Silver Ore"
+  },
+  {
+    "id": "uranium_ore",
+    "name": "Uranium Ore"
+  },
+  {
+    "id": "bloatfly_gland",
     "name": "Bloatfly Gland"
   },
   {
-    "id": "junk_stingwing_barb",
+    "id": "stingwing_barb",
     "name": "Stingwing Barb"
-  },
-  {
-    "id": "junk_radscorpion_stinger",
-    "name": "Radscorpion Stinger"
   }
 ]

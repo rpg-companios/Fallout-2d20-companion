@@ -17,7 +17,7 @@ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import perksData from '../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';
-import styles from '../../../../styles/PerksAndTraitsScreen.styles';
+import styles from '../../styles/PerksAndTraitsScreen.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
 import { getPerkDisplay, getPerkSheetDisplay } from './perksDisplay';
 

@@ -2,6 +2,78 @@
 
 ---
 
+## Fix — Salvage identifiers: item name instead of type in id (patch 257)
+
+> Per owner's note: only the registry knows an item is junk or material; the id carries no type. One item — one id: recipe id = catalog id, no "junk_something" twins of plain items.
+
+- All junk items and ores renamed from `junk_*` to the name slug (abraxo_cleaner, blood_sac, iron_ore…); named materials from `mat_*` to bare ids (steel, wood, nuclear_material…); antiseptic/asbestos become antiseptic/asbestos. Recipe, salvage-composition and d20-table references regenerated in lockstep; display names kept.
+- Radio and other links to real catalog items unchanged (item_radio stays item_radio — it is the catalog item, not a junk twin).
+- The generator gained a collision guard: a new id already owned by the main catalog fails the build and demands a link, not a duplicate.
+- No save migration needed: salvage ids were never granted to players (the registry doesn't expose them yet). Pooled materials (item_common_materials etc.) untouched — they are sold in shops and live in saves.
+- Tests: 781 green, `tsc --noEmit` clean; generator determinism (`--check`) confirmed.
+
+## Update — Salvage, part 1: junk, materials and GM tables as data (patch 256)
+
+> The big step opens with a data slice: the owner's salvage tables (2026-09-16) transcribed verbatim into catalogs. No behavior changed yet.
+
+- Named materials reference: 33 entries. The nine pooled-material crafting recipes stay untouched; the four the book's salvage list lacks (crystal, gold, coal, iron) follow the rarity rule (1/3/5 caps, weight 1). Others: printed per-unit cost, weight = book "per 10 units" ÷ 10 (steel 0.2, concrete 3, bone 1).
+- Antiseptic and asbestos moved from junk to materials with ids kept — recipe links intact; antiseptic repriced to the book's 3 caps, weight 0.1.
+- Junk catalog: 130 entries — every item of the nine book tables (items under 1 weight get 0.2 by the established convention), six ores (weight 1, cost by yield rarity) and two legacy owner items unchanged. Radio synced to its table: weight 3, cost 10 (owner: table numbers win).
+- Salvage compositions: alternatives ("or"), fixed amounts, DC components (custom d6 rolls via the single dice module), effect-face bonuses, one-shot "any" effects (High-Tech Gadget). Ores yield one unit per ore; iron is random (2 DC).
+- GM tables: d20 category roll, all nine category tables, mining with quantity formulas in the shared dice parser's language. Two book redirects preserved explicitly: animal faces 12–20 roll our food catalog; household4 19–20 reroll workplace.
+- Tooling: source of truth `scripts/scrap-source.json`, generator `scripts/build-scrap-data.mjs` with `--check`; ru/en i18n mirrors; 17 new tests (face coverage 1..20, reference resolution, catalog/mirror invariants). Suite: 781 green, `tsc --noEmit` clean.
+- Out of this patch (per plan): registry accessors, the salvage operation with the INT+Repair test, inventory composition subtitles, rarity colors, "complication spoils ingredients" rule — next patches.
+
+## Update — Screen styles moved into the setting module (patch 255)
+
+> Owner-requested unification: Fallout styling no longer lives in engine folders.
+
+- The module grew its own styles folder: the ten looks of screens that already belong to the setting (character, perks, weapons-armor and their modals) moved there, and the inventory, currency row and add-item modal looks were copied in — when those screens migrate too, their look can be tuned without touching the engine.
+- The screens that stayed in the engine (home, inventory, add-item modal) keep a copy of the current styles at their old path: engine files unchanged to the pixel, no "whose style is this" confusion — the engine has its own, the setting has its own; divergence after this patch is normal, not breakage.
+- The single test that read the weapons-armor look file directly now points into the setting folder.
+- Your manual tuning from patch 254 (48px cap, 14pt text) is inside the copies, nothing lost; the `./apply-patch.sh` chain applies 254 then 255 in order.
+- Tests: 764 green, `tsc --noEmit` clean; a path-resolution guard test watches every import.
+
+## Update — Inventory: final sizes for the currency row (patch 254)
+
+> The owner picked the numbers by hand in his checkout — rolled into the branch so the tuning isn't lost.
+
+- The bottle cap renders at 48×48 (source 64×64); "−"/"+" and the "Craft" caption grew from 12 to 14 — small text was drowning next to the bigger icon.
+- Nothing else moved: the 40% cap, paddings and dictionary keys stay as in patches 252–253. The wrench stays at 14, now matching the text height.
+- If a 48px cap with 14pt text feels cramped under the 40% cap — raise `maxWidth` on `currencyContainer` (or drop it).
+
+## Update — Inventory: currency row gets neutral names (patch 253)
+
+> Unification continues: what Fallout calls caps is no longer called caps in the shared layer.
+
+- The inventory row, its style block and the dictionary keys were renamed to neutral "currency": other settings (or multiple currencies) won't need to rename shared code — it already says currency, not caps.
+- Players see nothing changed: naming the currency and picking its icon remains the setting module's job — Fallout still shows "Caps" and the same bottle cap.
+- The "Craft" button moved out of the currency block into its own: crafting is not about money, it now has its own captions in both locales.
+- Numbers (32px, 40%) untouched — keep tuning them by hand in the styles; renaming only changed the line's name.
+- Tests: 764 green, `tsc --noEmit` clean.
+
+## Update — Inventory: compact caps row and Craft button (patch 252)
+
+> Quick edit per owner's request: the caps row no longer eats screen space.
+
+- Caps area shrunk to 40%: the block now takes at most 40% of the row width; paddings and font sizes trimmed to fit the new neighbor.
+- The word "Caps" is replaced with an icon: the same bottle cap from the module assets (64×64) is rendered at 32×32, as agreed.
+- "↓ Spend" / "↑ Add" buttons became "−" and "+"; order and behavior unchanged, word labels dropped in both locales.
+- A "Craft" button with a vector wrench icon (from the already installed icon set) now sits to the right of the caps area. The craft screen does not exist yet, so the button reports it is the next step; wiring belongs to that screen.
+- Tests: 764 green, `tsc --noEmit` clean.
+
+## Update — Crafting, part 3: the universal crafting mechanic (patch 251)
+
+> The game can really craft now: the universal engine checks a recipe, spends materials atomically and hands the item out. There is no screen yet — the verdict and its reasons are ready for one; the screen is the next step.
+
+- The mechanic lives in the engine and knows only the SHAPE of a recipe: item, perk and bench identifiers are opaque to it. The setting tells it where to look for recipes (the data registry), which dice to roll, and what "spend" and "grant" mean. A guard test watches that the engine never learns about setting files.
+- The verdict contract: done (what was spent, what was handed out, the check — or an automatic success) or refused with a reason (what is missing and by how much; the bag untouched). Same trick as cap purchases: a refusal never changes the balance. Spending stacks is a new all-or-nothing store action; equipped and kit-locked items are never consumed, and the action passport was updated in this very patch.
+- The test follows the book (p. 210–211): difficulty = recipe Complexity minus skill rank, floor 0; zero means automatic success, no dice; otherwise the standard 2d20 engine check (a die succeeds at or under attribute + skill, 20 is a complication, two complications fail automatically). Which attribute is used is the GM's call in the book: we default to INT, and that is a module rules number, not a recipe field or a save field.
+- Output quantity: 1, or base + combat dice through the rollCD port. The quantity shape is validated BEFORE spending — broken data can no longer wipe the bag halfway.
+- On a failed check, materials burn at the kitchen and chemistry stations (the printed rule); elsewhere a failure only wastes the attempt. The "burning" bench list is another module rules number.
+- Deliberately absent here: the clock and AP (duration, halving for 2 AP, complication minutes) — that is survival-clock integration, a separate step; also inventory visibility for junk and materials, which is the owner's call.
+- 741→764 tests green (12 new on the setting-free engine, 11 on the adapter with real recipes), `tsc --noEmit` clean. Contract doc: `docs/architecture/crafting-engine.md`.
+
 ## Update — Crafting, part 2: closing the catalog holes (patch 250)
 
 > Patch 249 (its content is already merged into main) moved recipes into the data but hit missing items. The owner supplied their numbers, the gaps became reference catalogs, and the 19 locked recipes joined the data.

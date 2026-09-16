@@ -1,0 +1,256 @@
+{
+  "_comment": "Канон-транскрипт: таблицы разбора из raw-02/raw-03 владельца (2026-09-16). Генератор build-scrap-data.mjs читает этот файл; --check сверяет. Компоненты: {material, count?} фикс, {material, base?, dc?} кости, effect у компоненты; options на уровне salvage = альтернативы «или».",
+  "categories": {
+    "ru": "Категории хлама (d20)",
+    "en": "Junk Categories (d20)",
+    "d20": [
+      { "f": "1-4", "table": "animal" },
+      { "f": "5", "table": "household1" },
+      { "f": "6", "table": "household2" },
+      { "f": "7", "table": "household3" },
+      { "f": "8", "table": "household4" },
+      { "f": "9-12", "table": "sporting" },
+      { "f": "13-14", "table": "science" },
+      { "f": "15-16", "table": "medical" },
+      { "f": "17-20", "table": "workplace" }
+    ]
+  },
+  "weightLessThan1": 0.2,
+  "legacyJunk": [
+    { "id": "bloatfly_gland", "oldId": "junk_bloatfly_gland", "keep": true },
+    { "id": "stingwing_barb", "oldId": "junk_stingwing_barb", "keep": true }
+  ],
+  "materials": [
+    { "key": "acid", "ru": "Кислота", "en": "Acid", "cost": 2, "weight10": 1, "rarity": 2 },
+    { "key": "adhesive", "ru": "Клей", "en": "Adhesive", "cost": 8, "weight10": 1, "rarity": 1 },
+    { "key": "aluminum", "ru": "Алюминий", "en": "Aluminum", "cost": 3, "weight10": 1, "rarity": 1 },
+    { "key": "antiseptic", "ru": "Антисептик", "en": "Antiseptic", "cost": 3, "weight10": 1, "rarity": 2 },
+    { "key": "asbestos", "ru": "Асбест", "en": "Asbestos", "cost": 6, "weight10": 1, "rarity": 2 },
+    { "key": "ballistic_fiber", "ru": "Баллистическое волокно", "en": "Ballistic Fiber", "cost": 5, "weight10": 1, "rarity": 2 },
+    { "key": "bone", "ru": "Кость", "en": "Bone", "cost": 1, "weight10": 10, "rarity": 0 },
+    { "key": "ceramic", "ru": "Керамика", "en": "Ceramic", "cost": 1, "weight10": 1, "rarity": 0 },
+    { "key": "circuitry", "ru": "Электросхемы", "en": "Circuitry", "cost": 5, "weight10": 3, "rarity": 2 },
+    { "key": "cloth", "ru": "Ткань", "en": "Cloth", "cost": 1, "weight10": 1, "rarity": 0 },
+    { "key": "concrete", "ru": "Бетон", "en": "Concrete", "cost": 1, "weight10": 30, "rarity": 0 },
+    { "key": "copper", "ru": "Медь", "en": "Copper", "cost": 4, "weight10": 1, "rarity": 1 },
+    { "key": "cork", "ru": "Пробка", "en": "Cork", "cost": 1, "weight10": 1, "rarity": 1 },
+    { "key": "fertilizer", "ru": "Удобрения", "en": "Fertilizer", "cost": 1, "weight10": 1, "rarity": 1 },
+    { "key": "fiber_optics", "ru": "Оптоволокно", "en": "Fiber Optics", "cost": 6, "weight10": 1, "rarity": 2 },
+    { "key": "fiberglass", "ru": "Стекловолокно", "en": "Fiberglass", "cost": 5, "weight10": 1, "rarity": 1 },
+    { "key": "gears", "ru": "Шестерёнки", "en": "Gears", "cost": 3, "weight10": 2, "rarity": 1 },
+    { "key": "glass", "ru": "Стекло", "en": "Glass", "cost": 2, "weight10": 1, "rarity": 1 },
+    { "key": "lead", "ru": "Свинец", "en": "Lead", "cost": 1, "weight10": 3, "rarity": 1 },
+    { "key": "leather", "ru": "Кожа", "en": "Leather", "cost": 2, "weight10": 1, "rarity": 0 },
+    { "key": "nuclear_material", "ru": "Ядерные материалы", "en": "Nuclear Material", "cost": 10, "weight10": 1, "rarity": 2 },
+    { "key": "oil", "ru": "Масло", "en": "Oil", "cost": 4, "weight10": 1, "rarity": 1 },
+    { "key": "plastic", "ru": "Пластик", "en": "Plastic", "cost": 1, "weight10": 1, "rarity": 0 },
+    { "key": "rubber", "ru": "Резина", "en": "Rubber", "cost": 2, "weight10": 1, "rarity": 0 },
+    { "key": "screw", "ru": "Винт", "en": "Screw", "cost": 2, "weight10": 1, "rarity": 1 },
+    { "key": "silver", "ru": "Серебро", "en": "Silver", "cost": 6, "weight10": 1, "rarity": 1 },
+    { "key": "spring", "ru": "Пружина", "en": "Spring", "cost": 3, "weight10": 1, "rarity": 1 },
+    { "key": "steel", "ru": "Сталь", "en": "Steel", "cost": 1, "weight10": 2, "rarity": 0 },
+    { "key": "wood", "ru": "Дерево", "en": "Wood", "cost": 1, "weight10": 2, "rarity": 0 },
+    { "key": "crystal", "ru": "Кристалл", "en": "Crystal", "cost": 5, "weight": 1, "rarity": 2, "byRule": true },
+    { "key": "gold", "ru": "Золото", "en": "Gold", "cost": 5, "weight": 1, "rarity": 2, "byRule": true },
+    { "key": "coal", "ru": "Уголь", "en": "Coal", "cost": 1, "weight": 1, "rarity": 0, "byRule": true },
+    { "key": "iron", "ru": "Железо", "en": "Iron", "cost": 1, "weight": 1, "rarity": 0, "byRule": true }
+  ],
+  "rarityCostByRule": { "0": 1, "1": 3, "2": 5 },
+  "tables": {
+    "animal": {
+      "ru": "Продукты животного происхождения и еда", "en": "Animal Products and Food",
+      "faces": [
+        { "f": "1-4", "item": { "key": "animal_hide", "ru": "Шкура животного", "en": "Animal Hide", "w": 2, "c": 6, "salv": [[{ "m": "leather", "dc": 3 }]] } },
+        { "f": "5-6", "item": { "key": "mutated_viscera", "ru": "Мутировавшие внутренности", "en": "Mutated Viscera", "w": "<1", "c": 2, "salv": [[{ "m": "acid", "dc": 1, "effect": { "m": "nuclear_material", "count": 1 } }]] } },
+        { "f": "7", "item": { "key": "blood_sac", "ru": "Кровяной мешок", "en": "Blood Sac", "w": "<1", "c": 4, "salv": [[{ "m": "antiseptic", "dc": 1, "effect": { "m": "fiberglass", "count": 1 } }]] } },
+        { "f": "8", "item": { "key": "stinger_or_proboscis", "ru": "Жало или хоботок", "en": "Stinger or Proboscis", "w": "<1", "c": 10, "salv": [[{ "m": "acid", "count": 1 }]] } },
+        { "f": "9-10", "item": { "key": "bones_and_teeth", "ru": "Кости и зубы", "en": "Bones and Teeth", "w": 3, "c": 3, "salv": [[{ "m": "bone", "dc": 3 }]] } },
+        { "f": "11", "item": { "key": "radscorpion_stinger", "ru": "Жало скорпиона", "en": "Radscorpion Stinger", "w": "<1", "c": 30, "salv": [[{ "m": "nuclear_material", "dc": 1 }]] } },
+        { "f": "12-20", "action": "rollFood" }
+      ]
+    },
+    "household1": {
+      "ru": "Бытовые предметы 1", "en": "Household Items 1",
+      "faces": [
+        { "f": "1", "item": { "key": "abraxo_cleaner", "ru": "Чистящее средство Абраксо", "en": "Abraxo Cleaner", "w": 1, "c": 10, "salv": [[{ "m": "acid", "count": 1 }, { "m": "antiseptic", "count": 2 }, { "m": "fiberglass", "count": 1 }]] } },
+        { "f": "2", "item": { "key": "alarm_clock", "ru": "Будильник", "en": "Alarm Clock", "w": 1, "c": 10, "salv": [[{ "m": "aluminum", "count": 2 }, { "m": "glass", "count": 1 }, { "m": "nuclear_material", "count": 1 }, { "m": "spring", "count": 1 }]] } },
+        { "f": "3", "item": { "key": "ashtray", "ru": "Пепельница", "en": "Ashtray", "w": "<1", "c": 1, "salv": [[{ "m": "ceramic", "count": 1 }]] } },
+        { "f": "4", "item": { "key": "bread_box", "ru": "Хлебница", "en": "Bread Box", "w": 1, "c": 2, "salv": [[{ "m": "plastic", "count": 3 }]] } },
+        { "f": "5", "item": { "key": "broom", "ru": "Метла", "en": "Broom", "w": 3, "c": 2, "salv": [[{ "m": "plastic", "count": 1 }, { "m": "wood", "count": 2 }]] } },
+        { "f": "6", "item": { "key": "bucket", "ru": "Ведро", "en": "Bucket", "w": 3, "c": 2, "salv": [[{ "m": "steel", "count": 2 }]] } },
+        { "f": "7", "item": { "key": "camera", "ru": "Фотоаппарат", "en": "Camera", "w": 3, "c": 15, "salv": [[{ "m": "gears", "count": 2 }, { "m": "spring", "count": 2 }, { "m": "crystal", "count": 2 }]] } },
+        { "f": "8", "item": { "key": "can", "ru": "Банка", "en": "Can", "w": "<1", "c": 1, "salvOptions": [[{ "m": "aluminum", "count": 2 }], [{ "m": "steel", "count": 2 }]] } },
+        { "f": "9", "item": { "key": "chalk", "ru": "Мел", "en": "Chalk", "w": "<1", "c": 2, "salv": [[{ "m": "asbestos", "count": 2 }]] } },
+        { "f": "10", "item": { "key": "chessboard", "ru": "Шахматная доска", "en": "Chessboard", "w": 1, "c": 2, "salv": [[{ "m": "wood", "count": 2 }]] } },
+        { "f": "11", "item": { "key": "cigar_or_cigarettes", "ru": "Сигара или сигареты", "en": "Cigar or Cigarettes", "w": "<1", "c": 1, "salv": [[{ "m": "cloth", "count": 1 }]] } },
+        { "f": "12", "item": { "key": "cigar_box", "ru": "Сигарная коробка", "en": "Cigar Box", "w": "<1", "c": 40, "salv": [[{ "m": "cloth", "count": 3 }, { "m": "fiberglass", "count": 1 }, { "m": "wood", "count": 2 }]] } },
+        { "f": "13", "item": { "key": "cigarette_carton", "ru": "Блок сигарет", "en": "Cigarette Carton", "w": 1, "c": 50, "salv": [[{ "m": "plastic", "count": 2 }, { "m": "cloth", "count": 4 }, { "m": "asbestos", "count": 2 }]] } },
+        { "f": "14", "item": { "key": "clothes_hanger", "ru": "Вешалка", "en": "Clothes Hanger", "w": "<1", "c": 1, "salv": [[{ "m": "spring", "count": 2 }, { "m": "wood", "count": 1 }]] } },
+        { "f": "15", "item": { "key": "clothing_iron", "ru": "Утюг", "en": "Clothing Iron", "w": 3, "c": 3, "salv": [[{ "m": "steel", "count": 2 }, { "m": "plastic", "count": 1 }]] } },
+        { "f": "16", "item": { "key": "cooking_oil", "ru": "Растительное масло", "en": "Cooking Oil", "w": "<1", "c": 4, "salv": [[{ "m": "plastic", "count": 1 }, { "m": "oil", "count": 3 }]] } },
+        { "f": "17", "item": { "key": "cookware", "ru": "Кухонная утварь", "en": "Cookware (Pots and Pans)", "w": 1, "c": 2, "salv": [[{ "m": "steel", "count": 2 }]] } },
+        { "f": "18", "item": { "key": "cotton_yarn", "ru": "Хлопковая пряжа", "en": "Cotton Yarn", "w": "<1", "c": 1, "salv": [[{ "m": "cloth", "count": 1 }]] } },
+        { "f": "19", "item": { "key": "crockery_and_tableware", "ru": "Посуда", "en": "Crockery and Tableware (Bowls and Plates)", "w": 1, "c": 5, "salvOptions": [[{ "m": "ceramic", "dc": 2 }], [{ "m": "plastic", "dc": 2 }], [{ "m": "silver", "dc": 1 }]] } },
+        { "f": "20", "item": { "key": "crystal_decanter", "ru": "Хрустальный графин", "en": "Crystal Decanter", "w": 2, "c": 6, "salv": [[{ "m": "cork", "count": 1 }, { "m": "crystal", "count": 4 }]] } }
+      ]
+    },
+    "household2": {
+      "ru": "Бытовые предметы 2", "en": "Household Items 2",
+      "faces": [
+        { "f": "1", "item": { "key": "cutlery", "ru": "Столовые приборы", "en": "Cutlery (Knives, Forks, Spoons, and Sporks)", "w": "<1", "c": 1, "salvOptions": [[{ "m": "plastic", "count": 1 }], [{ "m": "steel", "count": 1 }], [{ "m": "silver", "count": 1 }]] } },
+        { "f": "2", "item": { "key": "cutting_board", "ru": "Разделочная доска", "en": "Cutting Board", "w": "<1", "c": 2, "salv": [[{ "m": "wood", "count": 2 }]] } },
+        { "f": "3", "item": { "key": "dishrag", "ru": "Мочалка для посуды", "en": "Dishrag", "w": "<1", "c": 1, "salv": [[{ "m": "cloth", "count": 1 }]] } },
+        { "f": "4", "item": { "key": "dog_bowl", "ru": "Миска для собаки", "en": "Dog Bowl", "w": "<1", "c": 1, "salv": [[{ "m": "plastic", "count": 2 }]] } },
+        { "f": "5", "item": { "key": "extinguisher", "ru": "Огнетушитель", "en": "Extinguisher", "w": 6, "c": 6, "salv": [[{ "m": "asbestos", "count": 2 }, { "m": "rubber", "count": 2 }, { "m": "steel", "count": 4 }]] } },
+        { "f": "6", "item": { "key": "feather_duster", "ru": "Метёлка для пыли", "en": "Feather Duster", "w": 1, "c": 1, "salv": [[{ "m": "plastic", "count": 2 }, { "m": "cloth", "count": 1 }]] } },
+        { "f": "7", "item": { "key": "flag", "ru": "Флаг", "en": "Flag", "w": 3, "c": 3, "salv": [[{ "m": "cloth", "count": 4 }, { "m": "wood", "count": 2 }]] } },
+        { "f": "8", "item": { "key": "giddyup_buttercup_parts", "ru": "Детали «Гади-Апу Баттеркап»", "en": "Giddyup Buttercup Parts", "w": 2, "c": 50, "salv": [[{ "m": "spring", "dc": 2 }, { "m": "steel", "dc": 1 }, { "m": "gears", "dc": 2 }, { "m": "screw", "dc": 1 }]] } },
+        { "f": "9", "item": { "key": "glass_bottle", "ru": "Стеклянная бутылка", "en": "Glass Bottle", "w": 1, "c": 2, "salv": [[{ "m": "glass", "dc": 3 }]] } },
+        { "f": "10", "item": { "key": "glassware", "ru": "Стеклянная посуда", "en": "Glassware (Decanters, Glass Vases, Drinking Glasses)", "w": 2, "c": 6, "salv": [[{ "m": "glass", "dc": 4 }]] } },
+        { "f": "11", "item": { "key": "globe", "ru": "Глобус", "en": "Globe", "w": 3, "c": 2, "salv": [[{ "m": "screw", "count": 1 }, { "m": "cork", "count": 2 }, { "m": "plastic", "count": 2 }]] } },
+        { "f": "12", "item": { "key": "hairbrush", "ru": "Расчёска", "en": "Hairbrush", "w": "<1", "c": 20, "salvOptions": [[{ "m": "plastic", "count": 2 }], [{ "m": "plastic", "count": 1 }, { "m": "silver", "count": 1 }]] } },
+        { "f": "13", "item": { "key": "hot_plate", "ru": "Электронагрев", "en": "Hot Plate", "w": 3, "c": 7, "salv": [[{ "m": "circuitry", "count": 2 }, { "m": "copper", "count": 1 }, { "m": "screw", "count": 1 }]] } },
+        { "f": "14", "item": { "key": "kitchen_scale", "ru": "Кухонные весы", "en": "Kitchen Scale", "w": 2, "c": 6, "salv": [[{ "m": "steel", "count": 3 }, { "m": "spring", "count": 3 }]] } },
+        { "f": "15", "item": { "key": "ladle", "ru": "Половник", "en": "Ladle", "w": "<1", "c": 2, "salv": [[{ "m": "steel", "count": 2 }]] } },
+        { "f": "16", "item": { "key": "lamp", "ru": "Настольная лампа", "en": "Lamp", "w": 3, "c": 15, "salv": [[{ "m": "copper", "dc": 1 }, { "m": "glass", "dc": 2 }]] } },
+        { "f": "17", "item": { "key": "light_bulb", "ru": "Лампочка", "en": "Light Bulb", "w": "<1", "c": 3, "salv": [[{ "m": "copper", "count": 1 }, { "m": "glass", "count": 1 }]] } },
+        { "f": "18", "item": { "key": "mop", "ru": "Швабра", "en": "Mop", "w": 2, "c": 1, "salv": [[{ "m": "wood", "count": 2 }, { "m": "cloth", "count": 2 }]] } },
+        { "f": "19", "item": { "key": "newspaper", "ru": "Газета", "en": "Newspaper", "w": "<1", "c": 2, "salv": [[{ "m": "cloth", "count": 2 }]] } },
+        { "f": "20", "item": { "key": "oven_mitt", "ru": "Прихватка", "en": "Oven Mitt", "w": 1, "c": 1, "salv": [[{ "m": "asbestos", "count": 1 }, { "m": "cloth", "count": 2 }]] } }
+      ]
+    },
+    "household3": {
+      "ru": "Бытовые предметы 3", "en": "Household Items 3",
+      "faces": [
+        { "f": "1", "item": { "key": "paint", "ru": "Краска", "en": "Paint", "w": 5, "c": 10, "salv": [[{ "m": "oil", "count": 2 }, { "m": "steel", "count": 2 }]] } },
+        { "f": "2", "item": { "key": "paintbrush", "ru": "Кисть", "en": "Paintbrush", "w": "<1", "c": 2, "salv": [[{ "m": "cloth", "count": 1 }, { "m": "wood", "count": 1 }]] } },
+        { "f": "3", "item": { "key": "pen", "ru": "Ручка", "en": "Pen", "w": "<1", "c": 1, "salv": [[{ "m": "plastic", "count": 1 }]] } },
+        { "f": "4", "item": { "key": "pencil", "ru": "Карандаш", "en": "Pencil", "w": "<1", "c": 1, "salv": [[{ "m": "lead", "count": 1 }, { "m": "wood", "count": 1 }]] } },
+        { "f": "5", "item": { "key": "picture_frame", "ru": "Фоторамка", "en": "Picture Frame", "w": 1, "c": 4, "salv": [[{ "m": "wood", "count": 2 }]] } },
+        { "f": "6", "item": { "key": "pillow", "ru": "Подушка", "en": "Pillow", "w": 1, "c": 3, "salv": [[{ "m": "cloth", "dc": 2 }]] } },
+        { "f": "7", "item": { "key": "plastic_decorations", "ru": "Пластиковые украшения", "en": "Plastic Decorations", "w": 1, "c": 2, "salv": [[{ "m": "plastic", "dc": 1 }]] } },
+        { "f": "8", "item": { "key": "plunger", "ru": "Вантуз", "en": "Plunger", "w": 1, "c": 1, "salv": [[{ "m": "rubber", "count": 2 }, { "m": "wood", "count": 1 }]] } },
+        { "f": "9", "item": { "key": "pool_ball", "ru": "Бильярдный шар", "en": "Pool Ball", "w": "<1", "c": 2, "salv": [[{ "m": "plastic", "count": 2 }]] } },
+        { "f": "10", "link": "item_radio", "salv": [[{ "m": "circuitry", "count": 1 }, { "m": "copper", "count": 1 }, { "m": "plastic", "count": 2 }, { "m": "rubber", "count": 2 }]] },
+        { "f": "11", "item": { "key": "rat_poison", "ru": "Крысиный яд", "en": "Rat Poison", "w": "<1", "c": 6, "salv": [[{ "m": "steel", "count": 1 }, { "m": "asbestos", "count": 1 }, { "m": "fiberglass", "count": 2 }]] } },
+        { "f": "12", "item": { "key": "scissors", "ru": "Ножницы", "en": "Scissors", "w": "<1", "c": 3, "salv": [[{ "m": "plastic", "count": 1 }, { "m": "steel", "count": 2 }]] } },
+        { "f": "13", "item": { "key": "shopping_basket", "ru": "Покупательская корзинка", "en": "Shopping Basket", "w": 1, "c": 1, "salv": [[{ "m": "steel", "count": 3 }, { "m": "plastic", "count": 1 }]] } },
+        { "f": "14", "item": { "key": "soap", "ru": "Мыло", "en": "Soap", "w": "<1", "c": 4, "salv": [[{ "m": "oil", "count": 1 }]] } },
+        { "f": "15", "item": { "key": "spatula", "ru": "Лопатка", "en": "Spatula", "w": "<1", "c": 1, "salv": [[{ "m": "rubber", "count": 1 }, { "m": "steel", "count": 1 }]] } },
+        { "f": "16", "item": { "key": "stuffed_toy", "ru": "Плюшевая игрушка", "en": "Stuffed Toy", "w": 1, "c": 3, "salv": [[{ "m": "leather", "count": 1 }, { "m": "cloth", "dc": 2, "effect": { "m": "fiberglass", "count": 1 } }]] } },
+        { "f": "17", "item": { "key": "tea_or_coffee_cup", "ru": "Чашка", "en": "Tea or Coffee Cup", "w": "<1", "c": 1, "salv": [[{ "m": "ceramic", "count": 2 }]] } },
+        { "f": "18", "item": { "key": "tea_or_coffee_pot", "ru": "Чайник", "en": "Tea or Coffee Pot", "w": 1, "c": 2, "salvOptions": [[{ "m": "plastic", "count": 2 }, { "m": "steel", "count": 2 }, { "m": "asbestos", "count": 1 }], [{ "m": "ceramic", "count": 5 }, { "m": "asbestos", "count": 1 }]] } },
+        { "f": "19", "item": { "key": "toaster", "ru": "Тостер", "en": "Toaster", "w": 3, "c": 3, "salv": [[{ "m": "spring", "count": 2 }, { "m": "steel", "count": 2 }]] } },
+        { "f": "20", "item": { "key": "toothbrush", "ru": "Зубная щётка", "en": "Toothbrush", "w": "<1", "c": 1, "salv": [[{ "m": "plastic", "count": 1 }]] } }
+      ]
+    },
+    "household4": {
+      "ru": "Бытовые предметы 4", "en": "Household Items 4",
+      "faces": [
+        { "f": "1-2", "item": { "key": "toothpaste", "ru": "Зубная паста", "en": "Toothpaste", "w": "<1", "c": 3, "salv": [[{ "m": "plastic", "count": 1 }, { "m": "antiseptic", "count": 2 }]] } },
+        { "f": "3-4", "item": { "key": "toy_alien", "ru": "Игрушечный пришелец", "en": "Toy Alien", "w": "<1", "c": 5, "salv": [[{ "m": "plastic", "count": 2 }, { "m": "rubber", "count": 1 }]] } },
+        { "f": "5-6", "item": { "key": "toy_vehicle", "ru": "Игрушечный транспорт", "en": "Toy Vehicle (Car, Plane, Spaceship, etc)", "w": 1, "c": 8, "salvOptions": [[{ "m": "screw", "count": 1 }, { "m": "aluminum", "dc": 2, "effect": { "m": "plastic", "count": 1 } }], [{ "m": "screw", "count": 1 }, { "m": "wood", "dc": 2, "effect": { "m": "plastic", "count": 1 } }]] } },
+        { "f": "7-8", "item": { "key": "tray", "ru": "Поднос", "en": "Tray", "w": 1, "c": 5, "salvOptions": [[{ "m": "wood", "dc": 1 }], [{ "m": "aluminum", "dc": 1 }], [{ "m": "plastic", "dc": 1 }]] } },
+        { "f": "9-10", "item": { "key": "umbrella", "ru": "Зонт", "en": "Umbrella", "w": 2, "c": 3, "salv": [[{ "m": "plastic", "count": 2 }, { "m": "spring", "count": 2 }]] } },
+        { "f": "11-12", "item": { "key": "vase", "ru": "Ваза", "en": "Vase", "w": 3, "c": 25, "salvOptions": [[{ "m": "ceramic", "count": 2 }], [{ "m": "glass", "count": 2 }]] } },
+        { "f": "13-14", "item": { "key": "wooden_spoon", "ru": "Деревянная ложка", "en": "Wooden Spoon", "w": "<1", "c": 1, "salv": [[{ "m": "wood", "count": 2 }]] } },
+        { "f": "15-16", "item": { "key": "wooden_toy", "ru": "Деревянная игрушка", "en": "Wooden Toy", "w": 1, "c": 2, "salv": [[{ "m": "wood", "dc": 1 }]] } },
+        { "f": "17-18", "item": { "key": "watch", "ru": "Часы", "en": "Watch (Pocket Watch or Wristwatch)", "w": "<1", "c": 25, "salvOptions": [[{ "m": "gears", "count": 2 }, { "m": "silver", "count": 2 }, { "m": "spring", "count": 1 }], [{ "m": "gears", "count": 2 }, { "m": "gold", "count": 2 }, { "m": "spring", "count": 1 }]] } },
+        { "f": "19-20", "action": "reroll", "to": "workplace" }
+      ]
+    },
+    "sporting": {
+      "ru": "Спортивный инвентарь", "en": "Sporting Equipment",
+      "faces": [
+        { "f": "1-2", "item": { "key": "baseball", "ru": "Бейсбольный мяч", "en": "Baseball", "w": "<1", "c": 4, "salv": [[{ "m": "cork", "count": 2 }, { "m": "leather", "count": 1 }]] } },
+        { "f": "3-4", "item": { "key": "baseball_base", "ru": "Бейсбольная база", "en": "Baseball Base", "w": 3, "c": 4, "salv": [[{ "m": "cloth", "count": 2 }, { "m": "plastic", "count": 2 }]] } },
+        { "f": "5-6", "item": { "key": "baseball_glove", "ru": "Бейсбольная перчатка", "en": "Baseball Glove", "w": 1, "c": 4, "salv": [[{ "m": "leather", "count": 3 }]] } },
+        { "f": "7-8", "link": "weapon_baseball_bat", "noSalvage": true },
+        { "f": "9-10", "item": { "key": "basketball", "ru": "Баскетбольный мяч", "en": "Basketball", "w": 1, "c": 2, "salv": [[{ "m": "rubber", "count": 3 }]] } },
+        { "f": "11-12", "item": { "key": "bowling_ball", "ru": "Боулинг-шар", "en": "Bowling Ball", "w": 8, "c": 5, "salv": [[{ "m": "plastic", "count": 7 }]] } },
+        { "f": "13-14", "item": { "key": "bowling_pin", "ru": "Буля (кегля)", "en": "Bowling Pin", "w": 3, "c": 3, "salv": [[{ "m": "plastic", "count": 2 }, { "m": "wood", "count": 2 }]] } },
+        { "f": "15-16", "item": { "key": "dumbbells_barbells_weights", "ru": "Гантели, штанги и гири", "en": "Dumbbells, Barbells, and Weights", "w": 25, "c": 4, "salv": [[{ "m": "lead", "dc": 5 }]] } },
+        { "f": "17-18", "item": { "key": "kickball", "ru": "Кикбас-бол", "en": "Kickball", "w": "<1", "c": 1, "salv": [[{ "m": "rubber", "count": 3 }]] } },
+        { "f": "19-20", "item": { "key": "life_preserver", "ru": "Спасательный жилет", "en": "Life Preserver", "w": 3, "c": 6, "salv": [[{ "m": "plastic", "count": 3 }, { "m": "spring", "count": 1 }]] } }
+      ]
+    },
+    "science": {
+      "ru": "Наука и техника", "en": "Science and Technology",
+      "faces": [
+        { "f": "1", "item": { "key": "battery", "ru": "Батарея", "en": "Battery", "w": 6, "c": 20, "salv": [[{ "m": "lead", "count": 3 }, { "m": "acid", "count": 3 }, { "m": "plastic", "count": 1 }]] } },
+        { "f": "2", "item": { "key": "circuit_board", "ru": "Плата", "en": "Circuit Board", "w": 2, "c": 25, "salv": [[{ "m": "circuitry", "dc": 4 }, { "m": "plastic", "dc": 1 }]] } },
+        { "f": "3", "item": { "key": "coolant", "ru": "Охлаждающая жидкость", "en": "Coolant", "w": 1, "c": 7, "salv": [[{ "m": "acid", "count": 2 }, { "m": "plastic", "count": 1 }]] } },
+        { "f": "4", "item": { "key": "cutting_fluid", "ru": "Смазочно-охлаждающая жидкость", "en": "Cutting Fluid", "w": 1, "c": 7, "salv": [[{ "m": "oil", "count": 3 }, { "m": "steel", "count": 1 }]] } },
+        { "f": "5", "item": { "key": "duct_tape", "ru": "Армированный скотч", "en": "Duct Tape", "w": "<1", "c": 12, "salvOptions": [[{ "m": "adhesive", "count": 1 }, { "m": "cloth", "count": 1 }], [{ "m": "ballistic_fiber", "count": 1 }, { "m": "adhesive", "count": 1 }]] } },
+        { "f": "6", "item": { "key": "electrical_cable", "ru": "Электрокабель", "en": "Electrical Cable", "w": 1, "c": 15, "salv": [[{ "m": "copper", "count": 2 }, { "m": "steel", "count": 3 }]] } },
+        { "f": "7", "item": { "key": "fuse", "ru": "Предохранитель", "en": "Fuse", "w": "<1", "c": 5, "salv": [[{ "m": "copper", "count": 1 }, { "m": "glass", "count": 1 }]] } },
+        { "f": "8", "item": { "key": "high_powered_magnet", "ru": "Мощный магнит", "en": "High-Powered Magnet", "w": 5, "c": 13, "salv": [[{ "m": "copper", "count": 3 }, { "m": "ceramic", "count": 1 }, { "m": "nuclear_material", "count": 1 }]] } },
+        { "f": "9", "item": { "key": "high_powered_microscope", "ru": "Мощный микроскоп", "en": "High-Powered Microscope", "w": 5, "c": 22, "salv": [[{ "m": "crystal", "count": 2 }, { "m": "fiber_optics", "count": 1 }, { "m": "gears", "count": 2 }, { "m": "glass", "count": 2 }]] } },
+        { "f": "10", "item": { "key": "high_tech_gadget", "ru": "Высокотехнологичное устройство", "en": "High-Tech Gadget", "w": 2, "c": 150, "salv": [[{ "m": "fiber_optics", "dc": 1 }, { "m": "asbestos", "dc": 1 }, { "m": "glass", "count": 1 }, { "m": "circuitry", "count": 2, "effect": { "m": "nuclear_material", "count": 1, "anyOnce": true } }]] } },
+        { "f": "11", "item": { "key": "lab_equipment", "ru": "Лабораторное оборудование", "en": "Lab Equipment (Racks, Stands, Containers, etc.)", "w": 5, "c": 15, "salvOptions": [[{ "m": "aluminum", "count": 2 }], [{ "m": "wood", "count": 2 }], [{ "m": "copper", "count": 2 }], [{ "m": "steel", "count": 2 }]] } },
+        { "f": "12", "item": { "key": "lab_glassware", "ru": "Лабораторная посуда", "en": "Lab Glassware (Beakers, Test Tubes, etc.)", "w": "<1", "c": 2, "salv": [[{ "m": "glass", "count": 1 }]] } },
+        { "f": "13", "item": { "key": "metal_ingot", "ru": "Металлический слиток", "en": "Metal Ingot", "w": 2, "c": 300, "salvOptions": [[{ "m": "copper", "count": 10 }], [{ "m": "gold", "count": 10 }], [{ "m": "silver", "count": 10 }]] } },
+        { "f": "14", "item": { "key": "microscope", "ru": "Микроскоп", "en": "Microscope", "w": 5, "c": 22, "salv": [[{ "m": "gears", "count": 2 }, { "m": "glass", "count": 2 }, { "m": "crystal", "count": 2 }, { "m": "fiber_optics", "count": 1 }]] } },
+        { "f": "15", "link": "item_radio" },
+        { "f": "16", "item": { "key": "sensor", "ru": "Датчик", "en": "Sensor", "w": "<1", "c": 20, "salv": [[{ "m": "aluminum", "count": 1 }, { "m": "nuclear_material", "count": 1 }]] } },
+        { "f": "17", "item": { "key": "solvent", "ru": "Растворитель", "en": "Solvent", "w": 1, "c": 15, "salv": [[{ "m": "steel", "count": 3 }, { "m": "antiseptic", "count": 4 }]] } },
+        { "f": "18", "item": { "key": "suprathaw_antifreeze", "ru": "Suprathaw (антифриз)", "en": "Suprathaw Antifreeze", "w": 2, "c": 8, "salv": [[{ "m": "acid", "count": 4 }, { "m": "plastic", "count": 3 }]] } },
+        { "f": "19", "item": { "key": "turpentine", "ru": "Скипидар", "en": "Turpentine", "w": 1, "c": 10, "salv": [[{ "m": "steel", "count": 2 }, { "m": "antiseptic", "count": 2 }]] } },
+        { "f": "20", "item": { "key": "vacuum_tube", "ru": "Радиолампа", "en": "Vacuum Tube", "w": "<1", "c": 3, "salv": [[{ "m": "copper", "count": 1 }, { "m": "glass", "count": 2 }]] } }
+      ]
+    },
+    "medical": {
+      "ru": "Медицинское оборудование", "en": "Medical Equipment",
+      "faces": [
+        { "f": "1-2", "item": { "key": "bandages", "ru": "Бинты", "en": "Bandages", "w": 1, "c": 2, "salv": [[{ "m": "cloth", "count": 2 }]] } },
+        { "f": "3", "link": "drink_blood_pack", "noSalvage": true },
+        { "f": "4", "item": { "key": "bone_saw", "ru": "Костная пила", "en": "Bone Saw", "w": 2, "c": 5, "salv": [[{ "m": "rubber", "count": 1 }, { "m": "steel", "count": 2 }]] } },
+        { "f": "5-6", "link": "drink_dirty_water", "noSalvage": true },
+        { "f": "7-8", "item": { "key": "empty_blood_pack_iv_bag", "ru": "Пустой пакет крови / система", "en": "Empty Blood Pack/IV Bag", "w": "<1", "c": 1, "salv": [[{ "m": "plastic", "count": 1 }]] } },
+        { "f": "9", "link": "high_powered_microscope" },
+        { "f": "10", "link": "lab_equipment" },
+        { "f": "11", "link": "lab_glassware" },
+        { "f": "12", "link": "drink_purified_water", "noSalvage": true },
+        { "f": "13", "link": "chem_radaway_diluted", "noSalvage": true },
+        { "f": "14-15", "item": { "key": "scalpel", "ru": "Скальпель", "en": "Scalpel", "w": "<1", "c": 5, "salv": [[{ "m": "steel", "count": 1 }]] } },
+        { "f": "16", "link": "chem_stimpak", "noSalvage": true },
+        { "f": "17-18", "link": "chem_stimpak_diluted", "noSalvage": true },
+        { "f": "19-20", "item": { "key": "tweezers", "ru": "Пинцет", "en": "Tweezers", "w": "<1", "c": 8, "salv": [[{ "m": "aluminum", "count": 1 }]] } }
+      ]
+    },
+    "workplace": {
+      "ru": "Предметы с рабочего места", "en": "Workplace Items",
+      "faces": [
+        { "f": "1", "item": { "key": "bag_of_cement", "ru": "Мешок цемента", "en": "Bag of Cement", "w": 8, "c": 15, "salv": [[{ "m": "concrete", "count": 5 }]] } },
+        { "f": "2", "item": { "key": "bag_of_fertilizer", "ru": "Мешок удобрений", "en": "Bag of Fertilizer", "w": 4, "c": 25, "salv": [[{ "m": "acid", "count": 1 }, { "m": "fertilizer", "count": 4 }]] } },
+        { "f": "3", "item": { "key": "blowtorch", "ru": "Паяльная лампа", "en": "Blowtorch", "w": 3, "c": 15, "salv": [[{ "m": "steel", "count": 2 }, { "m": "oil", "count": 1 }]] } },
+        { "f": "4-6", "item": { "key": "clipboard", "ru": "Планшет", "en": "Clipboard", "w": "<1", "c": 2, "salv": [[{ "m": "spring", "count": 1 }, { "m": "wood", "count": 1 }]] } },
+        { "f": "7", "item": { "key": "desk_fan", "ru": "Настольный вентилятор", "en": "Desk Fan", "w": 3, "c": 4, "salv": [[{ "m": "gears", "count": 2 }, { "m": "screw", "count": 2 }, { "m": "steel", "count": 2 }]] } },
+        { "f": "8", "link": "duct_tape" },
+        { "f": "9", "item": { "key": "magnifying_glass", "ru": "Лупа", "en": "Magnifying Glass", "w": "<1", "c": 8, "salv": [[{ "m": "glass", "count": 2 }, { "m": "copper", "count": 1 }, { "m": "crystal", "count": 2 }]] } },
+        { "f": "10", "item": { "key": "military_ammo_bag", "ru": "Армейская сумка для боеприпасов", "en": "Military Ammo Bag", "w": 3, "c": 4, "salv": [[{ "m": "ballistic_fiber", "count": 2 }]] } },
+        { "f": "11-12", "item": { "key": "oil_can", "ru": "Масленка", "en": "Oil Can", "w": "<1", "c": 15, "salv": [[{ "m": "aluminum", "count": 1 }, { "m": "oil", "count": 4 }]] } },
+        { "f": "13", "item": { "key": "shovel", "ru": "Лопата", "en": "Shovel", "w": 5, "c": 3, "salv": [[{ "m": "steel", "count": 3 }, { "m": "wood", "count": 3 }]] } },
+        { "f": "14", "item": { "key": "typewriter", "ru": "Печатная машинка", "en": "Typewriter", "w": 5, "c": 11, "salv": [[{ "m": "gears", "count": 3 }, { "m": "screw", "count": 2 }, { "m": "spring", "count": 3 }]] } },
+        { "f": "15", "item": { "key": "wonderglue", "ru": "Wonderglue", "en": "Wonderglue", "w": "<1", "c": 20, "salv": [[{ "m": "adhesive", "count": 2 }]] } },
+        { "f": "16", "item": { "key": "hubcap", "ru": "Колпак колеса", "en": "Hubcap", "w": 3, "c": 5, "salv": [[{ "m": "screw", "count": 2 }, { "m": "aluminum", "count": 2 }]] } },
+        { "f": "17", "item": { "key": "auto_parts", "ru": "Автозапчасти", "en": "Auto Parts", "w": 3, "c": 2, "salv": [[{ "m": "steel", "dc": 2 }]] } },
+        { "f": "18-19", "item": { "key": "metal_tools", "ru": "Металлический инструмент", "en": "Metal Tools (Hammers, Screwdrivers, Spanners)", "w": 1, "c": 1, "salv": [[{ "m": "steel", "base": 1, "dc": 1, "effect": { "options": [{ "m": "wood", "count": 1 }, { "m": "gears", "count": 1 }] } }]] } },
+        { "f": "20", "item": { "key": "telephone", "ru": "Телефон", "en": "Telephone", "w": 3, "c": 5, "salv": [[{ "m": "circuitry", "count": 2 }, { "m": "copper", "count": 1 }, { "m": "fiberglass", "count": 2 }]] } }
+      ]
+    }
+  },
+  "mining": {
+    "ru": "Шахты и раскопки", "en": "Mining and Excavation",
+    "faces": [
+      { "f": "1-3", "ore": { "key": "aluminum_ore", "ru": "Алюминиевая руда", "en": "Aluminum Ore", "qty": "2+3<cd>", "rarity": 1, "salv": [{ "m": "aluminum", "count": 1 }] } },
+      { "f": "4-7", "ore": { "key": "coal", "directMaterial": "coal", "qty": "1+2<cd>" } },
+      { "f": "8-10", "ore": { "key": "copper_ore", "ru": "Медная руда", "en": "Copper Ore", "qty": "2+3<cd>", "rarity": 1, "salv": [{ "m": "copper", "count": 1 }] } },
+      { "f": "11", "ore": { "key": "crystal_raw", "directMaterial": "crystal", "qty": "2+3<cd>" } },
+      { "f": "12", "ore": { "key": "gold_ore", "ru": "Золотая руда", "en": "Gold Ore", "qty": "1+2<cd>", "rarity": 2, "salv": [{ "m": "gold", "count": 1 }] } },
+      { "f": "13-16", "ore": { "key": "iron_ore", "ru": "Железная руда", "en": "Iron Ore", "qty": "3+4<cd>", "rarity": 0, "salv": [{ "m": "iron", "dc": 2 }] } },
+      { "f": "17-19", "ore": { "key": "silver_ore", "ru": "Серебряная руда", "en": "Silver Ore", "qty": "1+2<cd>", "rarity": 1, "salv": [{ "m": "silver", "count": 1 }] } },
+      { "f": "20", "ore": { "key": "uranium_ore", "ru": "Урановая руда", "en": "Uranium Ore", "qty": "1+1<cd>", "rarity": 2, "salv": [{ "m": "nuclear_material", "count": 1 }] } }
+    ]
+  }
+}

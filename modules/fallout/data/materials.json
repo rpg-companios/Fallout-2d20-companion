@@ -19,5 +19,269 @@
     "weight": 1,
     "cost": 5,
     "rarity": 2
+  },
+  {
+    "id": "acid",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 2,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "adhesive",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 8,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "aluminum",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 3,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "antiseptic",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 3,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "asbestos",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 6,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "ballistic_fiber",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 5,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "bone",
+    "itemType": "misc",
+    "weight": 1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "ceramic",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "circuitry",
+    "itemType": "misc",
+    "weight": 0.3,
+    "cost": 5,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "cloth",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "concrete",
+    "itemType": "misc",
+    "weight": 3,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "copper",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 4,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "cork",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 1,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "fertilizer",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 1,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "fiber_optics",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 6,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "fiberglass",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 5,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "gears",
+    "itemType": "misc",
+    "weight": 0.2,
+    "cost": 3,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "glass",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 2,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "lead",
+    "itemType": "misc",
+    "weight": 0.3,
+    "cost": 1,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "leather",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 2,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "nuclear_material",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 10,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "oil",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 4,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "plastic",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "rubber",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 2,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "screw",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 2,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "silver",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 6,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "spring",
+    "itemType": "misc",
+    "weight": 0.1,
+    "cost": 3,
+    "rarity": 1,
+    "namedMaterial": true
+  },
+  {
+    "id": "steel",
+    "itemType": "misc",
+    "weight": 0.2,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "wood",
+    "itemType": "misc",
+    "weight": 0.2,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "crystal",
+    "itemType": "misc",
+    "weight": 1,
+    "cost": 5,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "gold",
+    "itemType": "misc",
+    "weight": 1,
+    "cost": 5,
+    "rarity": 2,
+    "namedMaterial": true
+  },
+  {
+    "id": "coal",
+    "itemType": "misc",
+    "weight": 1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
+  },
+  {
+    "id": "iron",
+    "itemType": "misc",
+    "weight": 1,
+    "cost": 1,
+    "rarity": 0,
+    "namedMaterial": true
   }
 ]

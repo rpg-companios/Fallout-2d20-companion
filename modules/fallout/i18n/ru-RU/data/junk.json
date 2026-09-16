@@ -1,30 +1,522 @@
 [
   {
-    "id": "junk_antiseptic",
-    "name": "Антисептик"
+    "id": "animal_hide",
+    "name": "Шкура животного"
   },
   {
-    "id": "junk_abraxo_cleaner",
-    "name": "Чистящее средство Абраксо"
+    "id": "mutated_viscera",
+    "name": "Мутировавшие внутренности"
   },
   {
-    "id": "junk_blood_sac",
+    "id": "blood_sac",
     "name": "Кровяной мешок"
   },
   {
-    "id": "junk_asbestos",
-    "name": "Асбест"
+    "id": "stinger_or_proboscis",
+    "name": "Жало или хоботок"
   },
   {
-    "id": "junk_bloatfly_gland",
+    "id": "bones_and_teeth",
+    "name": "Кости и зубы"
+  },
+  {
+    "id": "radscorpion_stinger",
+    "name": "Жало радскорпиона"
+  },
+  {
+    "id": "abraxo_cleaner",
+    "name": "Чистящее средство Абраксо"
+  },
+  {
+    "id": "alarm_clock",
+    "name": "Будильник"
+  },
+  {
+    "id": "ashtray",
+    "name": "Пепельница"
+  },
+  {
+    "id": "bread_box",
+    "name": "Хлебница"
+  },
+  {
+    "id": "broom",
+    "name": "Метла"
+  },
+  {
+    "id": "bucket",
+    "name": "Ведро"
+  },
+  {
+    "id": "camera",
+    "name": "Фотоаппарат"
+  },
+  {
+    "id": "can",
+    "name": "Банка"
+  },
+  {
+    "id": "chalk",
+    "name": "Мел"
+  },
+  {
+    "id": "chessboard",
+    "name": "Шахматная доска"
+  },
+  {
+    "id": "cigar_or_cigarettes",
+    "name": "Сигара или сигареты"
+  },
+  {
+    "id": "cigar_box",
+    "name": "Сигарная коробка"
+  },
+  {
+    "id": "cigarette_carton",
+    "name": "Блок сигарет"
+  },
+  {
+    "id": "clothes_hanger",
+    "name": "Вешалка"
+  },
+  {
+    "id": "clothing_iron",
+    "name": "Утюг"
+  },
+  {
+    "id": "cooking_oil",
+    "name": "Растительное масло"
+  },
+  {
+    "id": "cookware",
+    "name": "Кухонная утварь"
+  },
+  {
+    "id": "cotton_yarn",
+    "name": "Хлопковая пряжа"
+  },
+  {
+    "id": "crockery_and_tableware",
+    "name": "Посуда"
+  },
+  {
+    "id": "crystal_decanter",
+    "name": "Хрустальный графин"
+  },
+  {
+    "id": "cutlery",
+    "name": "Столовые приборы"
+  },
+  {
+    "id": "cutting_board",
+    "name": "Разделочная доска"
+  },
+  {
+    "id": "dishrag",
+    "name": "Мочалка для посуды"
+  },
+  {
+    "id": "dog_bowl",
+    "name": "Миска для собаки"
+  },
+  {
+    "id": "extinguisher",
+    "name": "Огнетушитель"
+  },
+  {
+    "id": "feather_duster",
+    "name": "Метёлка для пыли"
+  },
+  {
+    "id": "flag",
+    "name": "Флаг"
+  },
+  {
+    "id": "giddyup_buttercup_parts",
+    "name": "Детали «Гади-Апу Баттеркап»"
+  },
+  {
+    "id": "glass_bottle",
+    "name": "Стеклянная бутылка"
+  },
+  {
+    "id": "glassware",
+    "name": "Стеклянная посуда"
+  },
+  {
+    "id": "globe",
+    "name": "Глобус"
+  },
+  {
+    "id": "hairbrush",
+    "name": "Расчёска"
+  },
+  {
+    "id": "hot_plate",
+    "name": "Электронагрев"
+  },
+  {
+    "id": "kitchen_scale",
+    "name": "Кухонные весы"
+  },
+  {
+    "id": "ladle",
+    "name": "Половник"
+  },
+  {
+    "id": "lamp",
+    "name": "Настольная лампа"
+  },
+  {
+    "id": "light_bulb",
+    "name": "Лампочка"
+  },
+  {
+    "id": "mop",
+    "name": "Швабра"
+  },
+  {
+    "id": "newspaper",
+    "name": "Газета"
+  },
+  {
+    "id": "oven_mitt",
+    "name": "Прихватка"
+  },
+  {
+    "id": "paint",
+    "name": "Краска"
+  },
+  {
+    "id": "paintbrush",
+    "name": "Кисть"
+  },
+  {
+    "id": "pen",
+    "name": "Ручка"
+  },
+  {
+    "id": "pencil",
+    "name": "Карандаш"
+  },
+  {
+    "id": "picture_frame",
+    "name": "Фоторамка"
+  },
+  {
+    "id": "pillow",
+    "name": "Подушка"
+  },
+  {
+    "id": "plastic_decorations",
+    "name": "Пластиковые украшения"
+  },
+  {
+    "id": "plunger",
+    "name": "Вантуз"
+  },
+  {
+    "id": "pool_ball",
+    "name": "Бильярдный шар"
+  },
+  {
+    "id": "rat_poison",
+    "name": "Крысиный яд"
+  },
+  {
+    "id": "scissors",
+    "name": "Ножницы"
+  },
+  {
+    "id": "shopping_basket",
+    "name": "Покупательская корзинка"
+  },
+  {
+    "id": "soap",
+    "name": "Мыло"
+  },
+  {
+    "id": "spatula",
+    "name": "Лопатка"
+  },
+  {
+    "id": "stuffed_toy",
+    "name": "Плюшевая игрушка"
+  },
+  {
+    "id": "tea_or_coffee_cup",
+    "name": "Чашка"
+  },
+  {
+    "id": "tea_or_coffee_pot",
+    "name": "Чайник"
+  },
+  {
+    "id": "toaster",
+    "name": "Тостер"
+  },
+  {
+    "id": "toothbrush",
+    "name": "Зубная щётка"
+  },
+  {
+    "id": "toothpaste",
+    "name": "Зубная паста"
+  },
+  {
+    "id": "toy_alien",
+    "name": "Игрушечный пришелец"
+  },
+  {
+    "id": "toy_vehicle",
+    "name": "Игрушечный транспорт"
+  },
+  {
+    "id": "tray",
+    "name": "Поднос"
+  },
+  {
+    "id": "umbrella",
+    "name": "Зонт"
+  },
+  {
+    "id": "vase",
+    "name": "Ваза"
+  },
+  {
+    "id": "wooden_spoon",
+    "name": "Деревянная ложка"
+  },
+  {
+    "id": "wooden_toy",
+    "name": "Деревянная игрушка"
+  },
+  {
+    "id": "watch",
+    "name": "Часы"
+  },
+  {
+    "id": "baseball",
+    "name": "Бейсбольный мяч"
+  },
+  {
+    "id": "baseball_base",
+    "name": "Бейсбольная база"
+  },
+  {
+    "id": "baseball_glove",
+    "name": "Бейсбольная перчатка"
+  },
+  {
+    "id": "basketball",
+    "name": "Баскетбольный мяч"
+  },
+  {
+    "id": "bowling_ball",
+    "name": "Боулинг-шар"
+  },
+  {
+    "id": "bowling_pin",
+    "name": "Буля (кегля)"
+  },
+  {
+    "id": "dumbbells_barbells_weights",
+    "name": "Гантели, штанги и гири"
+  },
+  {
+    "id": "kickball",
+    "name": "Кикбас-бол"
+  },
+  {
+    "id": "life_preserver",
+    "name": "Спасательный жилет"
+  },
+  {
+    "id": "battery",
+    "name": "Батарея"
+  },
+  {
+    "id": "circuit_board",
+    "name": "Плата"
+  },
+  {
+    "id": "coolant",
+    "name": "Охлаждающая жидкость"
+  },
+  {
+    "id": "cutting_fluid",
+    "name": "Смазочно-охлаждающая жидкость"
+  },
+  {
+    "id": "duct_tape",
+    "name": "Армированный скотч"
+  },
+  {
+    "id": "electrical_cable",
+    "name": "Электрокабель"
+  },
+  {
+    "id": "fuse",
+    "name": "Предохранитель"
+  },
+  {
+    "id": "high_powered_magnet",
+    "name": "Мощный магнит"
+  },
+  {
+    "id": "high_powered_microscope",
+    "name": "Мощный микроскоп"
+  },
+  {
+    "id": "high_tech_gadget",
+    "name": "Высокотехнологичное устройство"
+  },
+  {
+    "id": "lab_equipment",
+    "name": "Лабораторное оборудование"
+  },
+  {
+    "id": "lab_glassware",
+    "name": "Лабораторная посуда"
+  },
+  {
+    "id": "metal_ingot",
+    "name": "Металлический слиток"
+  },
+  {
+    "id": "microscope",
+    "name": "Микроскоп"
+  },
+  {
+    "id": "sensor",
+    "name": "Датчик"
+  },
+  {
+    "id": "solvent",
+    "name": "Растворитель"
+  },
+  {
+    "id": "suprathaw_antifreeze",
+    "name": "Suprathaw (антифриз)"
+  },
+  {
+    "id": "turpentine",
+    "name": "Скипидар"
+  },
+  {
+    "id": "vacuum_tube",
+    "name": "Радиолампа"
+  },
+  {
+    "id": "bandages",
+    "name": "Бинты"
+  },
+  {
+    "id": "bone_saw",
+    "name": "Костная пила"
+  },
+  {
+    "id": "empty_blood_pack_iv_bag",
+    "name": "Пустой пакет крови / система"
+  },
+  {
+    "id": "scalpel",
+    "name": "Скальпель"
+  },
+  {
+    "id": "tweezers",
+    "name": "Пинцет"
+  },
+  {
+    "id": "bag_of_cement",
+    "name": "Мешок цемента"
+  },
+  {
+    "id": "bag_of_fertilizer",
+    "name": "Мешок удобрений"
+  },
+  {
+    "id": "blowtorch",
+    "name": "Паяльная лампа"
+  },
+  {
+    "id": "clipboard",
+    "name": "Планшет"
+  },
+  {
+    "id": "desk_fan",
+    "name": "Настольный вентилятор"
+  },
+  {
+    "id": "magnifying_glass",
+    "name": "Лупа"
+  },
+  {
+    "id": "military_ammo_bag",
+    "name": "Армейская сумка для боеприпасов"
+  },
+  {
+    "id": "oil_can",
+    "name": "Масленка"
+  },
+  {
+    "id": "shovel",
+    "name": "Лопата"
+  },
+  {
+    "id": "typewriter",
+    "name": "Печатная машинка"
+  },
+  {
+    "id": "wonderglue",
+    "name": "Wonderglue"
+  },
+  {
+    "id": "hubcap",
+    "name": "Колпак колеса"
+  },
+  {
+    "id": "auto_parts",
+    "name": "Автозапчасти"
+  },
+  {
+    "id": "metal_tools",
+    "name": "Металлический инструмент"
+  },
+  {
+    "id": "telephone",
+    "name": "Телефон"
+  },
+  {
+    "id": "aluminum_ore",
+    "name": "Алюминиевая руда"
+  },
+  {
+    "id": "copper_ore",
+    "name": "Медная руда"
+  },
+  {
+    "id": "gold_ore",
+    "name": "Золотая руда"
+  },
+  {
+    "id": "iron_ore",
+    "name": "Железная руда"
+  },
+  {
+    "id": "silver_ore",
+    "name": "Серебряная руда"
+  },
+  {
+    "id": "uranium_ore",
+    "name": "Урановая руда"
+  },
+  {
+    "id": "bloatfly_gland",
     "name": "Железа дутня"
   },
   {
-    "id": "junk_stingwing_barb",
+    "id": "stingwing_barb",
     "name": "Шип жалокрыла"
-  },
-  {
-    "id": "junk_radscorpion_stinger",
-    "name": "Жало радскорпиона"
   }
 ]

@@ -4,7 +4,7 @@ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
-import styles from '../../../../../styles/ArmorModificationModal.styles';
+import styles from '../../../styles/ArmorModificationModal.styles';
 
 const findCatalogArmorById = (catalog, id) => {
   if (!id) return null;

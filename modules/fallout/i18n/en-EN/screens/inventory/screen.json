@@ -1,8 +1,12 @@
 {
-  "caps": {
+  "currency": {
     "title": "Caps",
-    "subtract": "↓ Spend",
-    "add": "↑ Add"
+    "subtract": "−",
+    "add": "+"
+  },
+  "craft": {
+    "label": "Craft",
+    "placeholder": "The craft screen is not wired up yet — next step."
   },
   "alerts": {
     "radiationTitle": "Radiation",

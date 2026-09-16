@@ -504,6 +504,10 @@
     },
     "materials": [
       {
+        "itemId": "blood_sac",
+        "count": 1
+      },
+      {
         "itemId": "food_bloodleaf",
         "count": 1
       },
@@ -513,10 +517,6 @@
       },
       {
         "itemId": "item_uncommon_materials",
-        "count": 1
-      },
-      {
-        "itemId": "junk_blood_sac",
         "count": 1
       }
     ],
@@ -536,16 +536,16 @@
     },
     "materials": [
       {
+        "itemId": "antiseptic",
+        "count": 2
+      },
+      {
         "itemId": "drink_blood_pack",
         "count": 1
       },
       {
         "itemId": "item_common_materials",
         "count": 1
-      },
-      {
-        "itemId": "junk_antiseptic",
-        "count": 2
       }
     ],
     "output": {

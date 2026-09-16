@@ -5,7 +5,7 @@ import {
   getItemPrice, getCartTotal, getRemaining,
   addToCart, changeQuantity, finishPurchase,
 } from '../../../../../domain/startingPurchase';
-import styles from '../../../../../styles/StartingPurchaseModal.styles';
+import styles from '../../../styles/StartingPurchaseModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 /**

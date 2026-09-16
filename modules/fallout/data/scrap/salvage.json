@@ -1,0 +1,1850 @@
+{
+  "animal_hide": {
+    "options": [
+      [
+        {
+          "material": "leather",
+          "dc": 3
+        }
+      ]
+    ]
+  },
+  "mutated_viscera": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "dc": 1,
+          "effect": {
+            "material": "nuclear_material",
+            "count": 1
+          }
+        }
+      ]
+    ]
+  },
+  "blood_sac": {
+    "options": [
+      [
+        {
+          "material": "antiseptic",
+          "dc": 1,
+          "effect": {
+            "material": "fiberglass",
+            "count": 1
+          }
+        }
+      ]
+    ]
+  },
+  "stinger_or_proboscis": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "bones_and_teeth": {
+    "options": [
+      [
+        {
+          "material": "bone",
+          "dc": 3
+        }
+      ]
+    ]
+  },
+  "radscorpion_stinger": {
+    "options": [
+      [
+        {
+          "material": "nuclear_material",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "abraxo_cleaner": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "count": 1
+        },
+        {
+          "material": "antiseptic",
+          "count": 2
+        },
+        {
+          "material": "fiberglass",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "alarm_clock": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 2
+        },
+        {
+          "material": "glass",
+          "count": 1
+        },
+        {
+          "material": "nuclear_material",
+          "count": 1
+        },
+        {
+          "material": "spring",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "ashtray": {
+    "options": [
+      [
+        {
+          "material": "ceramic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "bread_box": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "broom": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "bucket": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "camera": {
+    "options": [
+      [
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "spring",
+          "count": 2
+        },
+        {
+          "material": "crystal",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "can": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "chalk": {
+    "options": [
+      [
+        {
+          "material": "asbestos",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "chessboard": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "cigar_or_cigarettes": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "cigar_box": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 3
+        },
+        {
+          "material": "fiberglass",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "cigarette_carton": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "cloth",
+          "count": 4
+        },
+        {
+          "material": "asbestos",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "clothes_hanger": {
+    "options": [
+      [
+        {
+          "material": "spring",
+          "count": 2
+        },
+        {
+          "material": "wood",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "clothing_iron": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        },
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "cooking_oil": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        },
+        {
+          "material": "oil",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "cookware": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "cotton_yarn": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "crockery_and_tableware": {
+    "options": [
+      [
+        {
+          "material": "ceramic",
+          "dc": 2
+        }
+      ],
+      [
+        {
+          "material": "plastic",
+          "dc": 2
+        }
+      ],
+      [
+        {
+          "material": "silver",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "crystal_decanter": {
+    "options": [
+      [
+        {
+          "material": "cork",
+          "count": 1
+        },
+        {
+          "material": "crystal",
+          "count": 4
+        }
+      ]
+    ]
+  },
+  "cutlery": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "material": "steel",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "material": "silver",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "cutting_board": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "dishrag": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "dog_bowl": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "extinguisher": {
+    "options": [
+      [
+        {
+          "material": "asbestos",
+          "count": 2
+        },
+        {
+          "material": "rubber",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 4
+        }
+      ]
+    ]
+  },
+  "feather_duster": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "cloth",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "flag": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 4
+        },
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "giddyup_buttercup_parts": {
+    "options": [
+      [
+        {
+          "material": "spring",
+          "dc": 2
+        },
+        {
+          "material": "steel",
+          "dc": 1
+        },
+        {
+          "material": "gears",
+          "dc": 2
+        },
+        {
+          "material": "screw",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "glass_bottle": {
+    "options": [
+      [
+        {
+          "material": "glass",
+          "dc": 3
+        }
+      ]
+    ]
+  },
+  "glassware": {
+    "options": [
+      [
+        {
+          "material": "glass",
+          "dc": 4
+        }
+      ]
+    ]
+  },
+  "globe": {
+    "options": [
+      [
+        {
+          "material": "screw",
+          "count": 1
+        },
+        {
+          "material": "cork",
+          "count": 2
+        },
+        {
+          "material": "plastic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "hairbrush": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        },
+        {
+          "material": "silver",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "hot_plate": {
+    "options": [
+      [
+        {
+          "material": "circuitry",
+          "count": 2
+        },
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "screw",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "kitchen_scale": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 3
+        },
+        {
+          "material": "spring",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "ladle": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "lamp": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "dc": 1
+        },
+        {
+          "material": "glass",
+          "dc": 2
+        }
+      ]
+    ]
+  },
+  "light_bulb": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "glass",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "mop": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "count": 2
+        },
+        {
+          "material": "cloth",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "newspaper": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "oven_mitt": {
+    "options": [
+      [
+        {
+          "material": "asbestos",
+          "count": 1
+        },
+        {
+          "material": "cloth",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "paint": {
+    "options": [
+      [
+        {
+          "material": "oil",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "paintbrush": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "pen": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "pencil": {
+    "options": [
+      [
+        {
+          "material": "lead",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "picture_frame": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "pillow": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "dc": 2
+        }
+      ]
+    ]
+  },
+  "plastic_decorations": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "plunger": {
+    "options": [
+      [
+        {
+          "material": "rubber",
+          "count": 2
+        },
+        {
+          "material": "wood",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "pool_ball": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "item_radio": {
+    "options": [
+      [
+        {
+          "material": "circuitry",
+          "count": 1
+        },
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "rubber",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "rat_poison": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 1
+        },
+        {
+          "material": "asbestos",
+          "count": 1
+        },
+        {
+          "material": "fiberglass",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "scissors": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        },
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "shopping_basket": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 3
+        },
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "soap": {
+    "options": [
+      [
+        {
+          "material": "oil",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "spatula": {
+    "options": [
+      [
+        {
+          "material": "rubber",
+          "count": 1
+        },
+        {
+          "material": "steel",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "stuffed_toy": {
+    "options": [
+      [
+        {
+          "material": "leather",
+          "count": 1
+        },
+        {
+          "material": "cloth",
+          "dc": 2,
+          "effect": {
+            "material": "fiberglass",
+            "count": 1
+          }
+        }
+      ]
+    ]
+  },
+  "tea_or_coffee_cup": {
+    "options": [
+      [
+        {
+          "material": "ceramic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "tea_or_coffee_pot": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 2
+        },
+        {
+          "material": "asbestos",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "material": "ceramic",
+          "count": 5
+        },
+        {
+          "material": "asbestos",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "toaster": {
+    "options": [
+      [
+        {
+          "material": "spring",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "toothbrush": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "toothpaste": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        },
+        {
+          "material": "antiseptic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "toy_alien": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "rubber",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "toy_vehicle": {
+    "options": [
+      [
+        {
+          "material": "screw",
+          "count": 1
+        },
+        {
+          "material": "aluminum",
+          "dc": 2,
+          "effect": {
+            "material": "plastic",
+            "count": 1
+          }
+        }
+      ],
+      [
+        {
+          "material": "screw",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "dc": 2,
+          "effect": {
+            "material": "plastic",
+            "count": 1
+          }
+        }
+      ]
+    ]
+  },
+  "tray": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "dc": 1
+        }
+      ],
+      [
+        {
+          "material": "aluminum",
+          "dc": 1
+        }
+      ],
+      [
+        {
+          "material": "plastic",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "umbrella": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "spring",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "vase": {
+    "options": [
+      [
+        {
+          "material": "ceramic",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "glass",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "wooden_spoon": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "wooden_toy": {
+    "options": [
+      [
+        {
+          "material": "wood",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "watch": {
+    "options": [
+      [
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "silver",
+          "count": 2
+        },
+        {
+          "material": "spring",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "gold",
+          "count": 2
+        },
+        {
+          "material": "spring",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "baseball": {
+    "options": [
+      [
+        {
+          "material": "cork",
+          "count": 2
+        },
+        {
+          "material": "leather",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "baseball_base": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 2
+        },
+        {
+          "material": "plastic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "baseball_glove": {
+    "options": [
+      [
+        {
+          "material": "leather",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "basketball": {
+    "options": [
+      [
+        {
+          "material": "rubber",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "bowling_ball": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 7
+        }
+      ]
+    ]
+  },
+  "bowling_pin": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "dumbbells_barbells_weights": {
+    "options": [
+      [
+        {
+          "material": "lead",
+          "dc": 5
+        }
+      ]
+    ]
+  },
+  "kickball": {
+    "options": [
+      [
+        {
+          "material": "rubber",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "life_preserver": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 3
+        },
+        {
+          "material": "spring",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "battery": {
+    "options": [
+      [
+        {
+          "material": "lead",
+          "count": 3
+        },
+        {
+          "material": "acid",
+          "count": 3
+        },
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "circuit_board": {
+    "options": [
+      [
+        {
+          "material": "circuitry",
+          "dc": 4
+        },
+        {
+          "material": "plastic",
+          "dc": 1
+        }
+      ]
+    ]
+  },
+  "coolant": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "count": 2
+        },
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "cutting_fluid": {
+    "options": [
+      [
+        {
+          "material": "oil",
+          "count": 3
+        },
+        {
+          "material": "steel",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "duct_tape": {
+    "options": [
+      [
+        {
+          "material": "adhesive",
+          "count": 1
+        },
+        {
+          "material": "cloth",
+          "count": 1
+        }
+      ],
+      [
+        {
+          "material": "ballistic_fiber",
+          "count": 1
+        },
+        {
+          "material": "adhesive",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "electrical_cable": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "fuse": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "glass",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "high_powered_magnet": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 3
+        },
+        {
+          "material": "ceramic",
+          "count": 1
+        },
+        {
+          "material": "nuclear_material",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "high_powered_microscope": {
+    "options": [
+      [
+        {
+          "material": "crystal",
+          "count": 2
+        },
+        {
+          "material": "fiber_optics",
+          "count": 1
+        },
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "glass",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "high_tech_gadget": {
+    "options": [
+      [
+        {
+          "material": "fiber_optics",
+          "dc": 1
+        },
+        {
+          "material": "asbestos",
+          "dc": 1
+        },
+        {
+          "material": "glass",
+          "count": 1
+        },
+        {
+          "material": "circuitry",
+          "count": 2,
+          "effect": {
+            "material": "nuclear_material",
+            "count": 1,
+            "anyOnce": true
+          }
+        }
+      ]
+    ]
+  },
+  "lab_equipment": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "wood",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "copper",
+          "count": 2
+        }
+      ],
+      [
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "lab_glassware": {
+    "options": [
+      [
+        {
+          "material": "glass",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "metal_ingot": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 10
+        }
+      ],
+      [
+        {
+          "material": "gold",
+          "count": 10
+        }
+      ],
+      [
+        {
+          "material": "silver",
+          "count": 10
+        }
+      ]
+    ]
+  },
+  "microscope": {
+    "options": [
+      [
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "glass",
+          "count": 2
+        },
+        {
+          "material": "crystal",
+          "count": 2
+        },
+        {
+          "material": "fiber_optics",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "sensor": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 1
+        },
+        {
+          "material": "nuclear_material",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "solvent": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 3
+        },
+        {
+          "material": "antiseptic",
+          "count": 4
+        }
+      ]
+    ]
+  },
+  "suprathaw_antifreeze": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "count": 4
+        },
+        {
+          "material": "plastic",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "turpentine": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        },
+        {
+          "material": "antiseptic",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "vacuum_tube": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "glass",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "bandages": {
+    "options": [
+      [
+        {
+          "material": "cloth",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "bone_saw": {
+    "options": [
+      [
+        {
+          "material": "rubber",
+          "count": 1
+        },
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "empty_blood_pack_iv_bag": {
+    "options": [
+      [
+        {
+          "material": "plastic",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "scalpel": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "tweezers": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "bag_of_cement": {
+    "options": [
+      [
+        {
+          "material": "concrete",
+          "count": 5
+        }
+      ]
+    ]
+  },
+  "bag_of_fertilizer": {
+    "options": [
+      [
+        {
+          "material": "acid",
+          "count": 1
+        },
+        {
+          "material": "fertilizer",
+          "count": 4
+        }
+      ]
+    ]
+  },
+  "blowtorch": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 2
+        },
+        {
+          "material": "oil",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "clipboard": {
+    "options": [
+      [
+        {
+          "material": "spring",
+          "count": 1
+        },
+        {
+          "material": "wood",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "desk_fan": {
+    "options": [
+      [
+        {
+          "material": "gears",
+          "count": 2
+        },
+        {
+          "material": "screw",
+          "count": 2
+        },
+        {
+          "material": "steel",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "magnifying_glass": {
+    "options": [
+      [
+        {
+          "material": "glass",
+          "count": 2
+        },
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "crystal",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "military_ammo_bag": {
+    "options": [
+      [
+        {
+          "material": "ballistic_fiber",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "oil_can": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 1
+        },
+        {
+          "material": "oil",
+          "count": 4
+        }
+      ]
+    ]
+  },
+  "shovel": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "count": 3
+        },
+        {
+          "material": "wood",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "typewriter": {
+    "options": [
+      [
+        {
+          "material": "gears",
+          "count": 3
+        },
+        {
+          "material": "screw",
+          "count": 2
+        },
+        {
+          "material": "spring",
+          "count": 3
+        }
+      ]
+    ]
+  },
+  "wonderglue": {
+    "options": [
+      [
+        {
+          "material": "adhesive",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "hubcap": {
+    "options": [
+      [
+        {
+          "material": "screw",
+          "count": 2
+        },
+        {
+          "material": "aluminum",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "auto_parts": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "dc": 2
+        }
+      ]
+    ]
+  },
+  "metal_tools": {
+    "options": [
+      [
+        {
+          "material": "steel",
+          "base": 1,
+          "dc": 1,
+          "effect": {
+            "options": [
+              {
+                "material": "wood",
+                "count": 1
+              },
+              {
+                "material": "gears",
+                "count": 1
+              }
+            ]
+          }
+        }
+      ]
+    ]
+  },
+  "telephone": {
+    "options": [
+      [
+        {
+          "material": "circuitry",
+          "count": 2
+        },
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "fiberglass",
+          "count": 2
+        }
+      ]
+    ]
+  },
+  "aluminum_ore": {
+    "options": [
+      [
+        {
+          "material": "aluminum",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "copper_ore": {
+    "options": [
+      [
+        {
+          "material": "copper",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "gold_ore": {
+    "options": [
+      [
+        {
+          "material": "gold",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "iron_ore": {
+    "options": [
+      [
+        {
+          "material": "iron",
+          "dc": 2
+        }
+      ]
+    ]
+  },
+  "silver_ore": {
+    "options": [
+      [
+        {
+          "material": "silver",
+          "count": 1
+        }
+      ]
+    ]
+  },
+  "uranium_ore": {
+    "options": [
+      [
+        {
+          "material": "nuclear_material",
+          "count": 1
+        }
+      ]
+    ]
+  }
+}

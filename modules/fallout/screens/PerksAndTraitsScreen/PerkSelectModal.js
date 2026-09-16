@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import styles from '../../../../styles/PerkSelectModal.styles';
+import styles from '../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
 import { getPerkModalDisplay } from './perksDisplay';
 import { PERK_ATTRIBUTE_FILTER_CODES, perkMatchesAttributeFilters } from '../../../../domain/perks';

@@ -1,8 +1,12 @@
 {
-  "caps": {
+  "currency": {
     "title": "Крышки",
-    "subtract": "↓ Списать",
-    "add": "↑ Внести"
+    "subtract": "−",
+    "add": "+"
+  },
+  "craft": {
+    "label": "Крафт",
+    "placeholder": "Экран крафта ещё не подключён — это следующий шаг."
   },
   "alerts": {
     "radiationTitle": "Радиация",

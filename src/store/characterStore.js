@@ -64,7 +64,7 @@ import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
-import { generateItemId, generateStackKey } from '../../domain/itemIdentity';
+import { generateItemId, generateStackKey, getItemId } from '../../domain/itemIdentity';
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
@@ -572,6 +572,68 @@ const useCharacterStore = create(devtools(
         }
         set({ items });
         return { ok: true };
+      },
+
+      /**
+       * Атомарное списание стоков по КАНОНИЧЕСКИМ id каталога (патч 251, для
+       * универсального движка крафта; разборка хлама потом встанет на него же).
+       *
+       * `{ ok: true, spent }` или `{ ok: false, reason, itemId }`; при отказе
+       * состояние не трогается вообще — тот же контракт, что у spendCurrency
+       * («нельзя купить на больше, чем есть»). Списание ищет экземпляры по
+       * цепочке getItemId (канон предмета), quantity||1, и не трогает надетое
+       * и запертое комплектом (equipped/locked — их нельзя «разобрать» молча).
+       */
+      spendItemStacks: ({ spend = [] }) => {
+        const needs = new Map();
+        for (const entry of spend) {
+          const catalogId = String(entry?.itemId ?? '').trim();
+          const count = Math.floor(Number(entry?.count));
+          if (!catalogId || !Number.isInteger(count) || count <= 0) {
+            throw new Error('[store.spendItemStacks] spend entries must be { itemId, count > 0 }');
+          }
+          needs.set(catalogId, (needs.get(catalogId) || 0) + count);
+        }
+        if (needs.size === 0) return { ok: true, spent: [] };
+
+        const state = get();
+        const items = { ...state.items };
+
+        // Сначала всё посчитали — и только потом пишем. Первая же нехватка —
+        // отказ без единой мутации.
+        const plan = [];
+        for (const [catalogId, need] of needs) {
+          const keys = Object.entries(items)
+            .filter(([, item]) => item && !item.equipped && !item.locked && getItemId(item) === catalogId)
+            .map(([key]) => key);
+          const available = keys.reduce((sum, key) => sum + (Number(items[key].quantity) || 1), 0);
+          if (available < need) {
+            return { ok: false, reason: 'not-enough-items', itemId: catalogId };
+          }
+          plan.push({ catalogId, need, keys });
+        }
+
+        const spent = [];
+        for (const { catalogId, need, keys } of plan) {
+          let remaining = need;
+          for (const key of keys) {
+            if (remaining <= 0) break;
+            const quantity = Number(items[key].quantity) || 1;
+            if (quantity <= remaining) {
+              delete items[key];
+              remaining -= quantity;
+              spent.push({ itemId: catalogId, count: quantity, instanceId: key });
+            } else {
+              items[key] = { ...items[key], quantity: quantity - remaining };
+              spent.push({ itemId: catalogId, count: remaining, instanceId: key });
+              remaining = 0;
+            }
+          }
+        }
+
+        set({ items });
+        get().recalculateDerivedStats();
+        return { ok: true, spent };
       },
 
       repairWeapon: (itemId) => {

@@ -1,0 +1,752 @@
+{
+  "categories": {
+    "ru": "Категории хлама (d20)",
+    "en": "Junk Categories (d20)",
+    "faces": {
+      "1": {
+        "table": "animal"
+      },
+      "2": {
+        "table": "animal"
+      },
+      "3": {
+        "table": "animal"
+      },
+      "4": {
+        "table": "animal"
+      },
+      "5": {
+        "table": "household1"
+      },
+      "6": {
+        "table": "household2"
+      },
+      "7": {
+        "table": "household3"
+      },
+      "8": {
+        "table": "household4"
+      },
+      "9": {
+        "table": "sporting"
+      },
+      "10": {
+        "table": "sporting"
+      },
+      "11": {
+        "table": "sporting"
+      },
+      "12": {
+        "table": "sporting"
+      },
+      "13": {
+        "table": "science"
+      },
+      "14": {
+        "table": "science"
+      },
+      "15": {
+        "table": "medical"
+      },
+      "16": {
+        "table": "medical"
+      },
+      "17": {
+        "table": "workplace"
+      },
+      "18": {
+        "table": "workplace"
+      },
+      "19": {
+        "table": "workplace"
+      },
+      "20": {
+        "table": "workplace"
+      }
+    }
+  },
+  "tables": {
+    "animal": {
+      "ru": "Продукты животного происхождения и еда",
+      "en": "Animal Products and Food",
+      "faces": {
+        "1": {
+          "item": "animal_hide"
+        },
+        "2": {
+          "item": "animal_hide"
+        },
+        "3": {
+          "item": "animal_hide"
+        },
+        "4": {
+          "item": "animal_hide"
+        },
+        "5": {
+          "item": "mutated_viscera"
+        },
+        "6": {
+          "item": "mutated_viscera"
+        },
+        "7": {
+          "item": "blood_sac"
+        },
+        "8": {
+          "item": "stinger_or_proboscis"
+        },
+        "9": {
+          "item": "bones_and_teeth"
+        },
+        "10": {
+          "item": "bones_and_teeth"
+        },
+        "11": {
+          "item": "radscorpion_stinger"
+        },
+        "12": {
+          "action": "rollFood"
+        },
+        "13": {
+          "action": "rollFood"
+        },
+        "14": {
+          "action": "rollFood"
+        },
+        "15": {
+          "action": "rollFood"
+        },
+        "16": {
+          "action": "rollFood"
+        },
+        "17": {
+          "action": "rollFood"
+        },
+        "18": {
+          "action": "rollFood"
+        },
+        "19": {
+          "action": "rollFood"
+        },
+        "20": {
+          "action": "rollFood"
+        }
+      }
+    },
+    "household1": {
+      "ru": "Бытовые предметы 1",
+      "en": "Household Items 1",
+      "faces": {
+        "1": {
+          "item": "abraxo_cleaner"
+        },
+        "2": {
+          "item": "alarm_clock"
+        },
+        "3": {
+          "item": "ashtray"
+        },
+        "4": {
+          "item": "bread_box"
+        },
+        "5": {
+          "item": "broom"
+        },
+        "6": {
+          "item": "bucket"
+        },
+        "7": {
+          "item": "camera"
+        },
+        "8": {
+          "item": "can"
+        },
+        "9": {
+          "item": "chalk"
+        },
+        "10": {
+          "item": "chessboard"
+        },
+        "11": {
+          "item": "cigar_or_cigarettes"
+        },
+        "12": {
+          "item": "cigar_box"
+        },
+        "13": {
+          "item": "cigarette_carton"
+        },
+        "14": {
+          "item": "clothes_hanger"
+        },
+        "15": {
+          "item": "clothing_iron"
+        },
+        "16": {
+          "item": "cooking_oil"
+        },
+        "17": {
+          "item": "cookware"
+        },
+        "18": {
+          "item": "cotton_yarn"
+        },
+        "19": {
+          "item": "crockery_and_tableware"
+        },
+        "20": {
+          "item": "crystal_decanter"
+        }
+      }
+    },
+    "household2": {
+      "ru": "Бытовые предметы 2",
+      "en": "Household Items 2",
+      "faces": {
+        "1": {
+          "item": "cutlery"
+        },
+        "2": {
+          "item": "cutting_board"
+        },
+        "3": {
+          "item": "dishrag"
+        },
+        "4": {
+          "item": "dog_bowl"
+        },
+        "5": {
+          "item": "extinguisher"
+        },
+        "6": {
+          "item": "feather_duster"
+        },
+        "7": {
+          "item": "flag"
+        },
+        "8": {
+          "item": "giddyup_buttercup_parts"
+        },
+        "9": {
+          "item": "glass_bottle"
+        },
+        "10": {
+          "item": "glassware"
+        },
+        "11": {
+          "item": "globe"
+        },
+        "12": {
+          "item": "hairbrush"
+        },
+        "13": {
+          "item": "hot_plate"
+        },
+        "14": {
+          "item": "kitchen_scale"
+        },
+        "15": {
+          "item": "ladle"
+        },
+        "16": {
+          "item": "lamp"
+        },
+        "17": {
+          "item": "light_bulb"
+        },
+        "18": {
+          "item": "mop"
+        },
+        "19": {
+          "item": "newspaper"
+        },
+        "20": {
+          "item": "oven_mitt"
+        }
+      }
+    },
+    "household3": {
+      "ru": "Бытовые предметы 3",
+      "en": "Household Items 3",
+      "faces": {
+        "1": {
+          "item": "paint"
+        },
+        "2": {
+          "item": "paintbrush"
+        },
+        "3": {
+          "item": "pen"
+        },
+        "4": {
+          "item": "pencil"
+        },
+        "5": {
+          "item": "picture_frame"
+        },
+        "6": {
+          "item": "pillow"
+        },
+        "7": {
+          "item": "plastic_decorations"
+        },
+        "8": {
+          "item": "plunger"
+        },
+        "9": {
+          "item": "pool_ball"
+        },
+        "10": {
+          "item": "item_radio"
+        },
+        "11": {
+          "item": "rat_poison"
+        },
+        "12": {
+          "item": "scissors"
+        },
+        "13": {
+          "item": "shopping_basket"
+        },
+        "14": {
+          "item": "soap"
+        },
+        "15": {
+          "item": "spatula"
+        },
+        "16": {
+          "item": "stuffed_toy"
+        },
+        "17": {
+          "item": "tea_or_coffee_cup"
+        },
+        "18": {
+          "item": "tea_or_coffee_pot"
+        },
+        "19": {
+          "item": "toaster"
+        },
+        "20": {
+          "item": "toothbrush"
+        }
+      }
+    },
+    "household4": {
+      "ru": "Бытовые предметы 4",
+      "en": "Household Items 4",
+      "faces": {
+        "1": {
+          "item": "toothpaste"
+        },
+        "2": {
+          "item": "toothpaste"
+        },
+        "3": {
+          "item": "toy_alien"
+        },
+        "4": {
+          "item": "toy_alien"
+        },
+        "5": {
+          "item": "toy_vehicle"
+        },
+        "6": {
+          "item": "toy_vehicle"
+        },
+        "7": {
+          "item": "tray"
+        },
+        "8": {
+          "item": "tray"
+        },
+        "9": {
+          "item": "umbrella"
+        },
+        "10": {
+          "item": "umbrella"
+        },
+        "11": {
+          "item": "vase"
+        },
+        "12": {
+          "item": "vase"
+        },
+        "13": {
+          "item": "wooden_spoon"
+        },
+        "14": {
+          "item": "wooden_spoon"
+        },
+        "15": {
+          "item": "wooden_toy"
+        },
+        "16": {
+          "item": "wooden_toy"
+        },
+        "17": {
+          "item": "watch"
+        },
+        "18": {
+          "item": "watch"
+        },
+        "19": {
+          "action": "reroll",
+          "table": "workplace"
+        },
+        "20": {
+          "action": "reroll",
+          "table": "workplace"
+        }
+      }
+    },
+    "sporting": {
+      "ru": "Спортивный инвентарь",
+      "en": "Sporting Equipment",
+      "faces": {
+        "1": {
+          "item": "baseball"
+        },
+        "2": {
+          "item": "baseball"
+        },
+        "3": {
+          "item": "baseball_base"
+        },
+        "4": {
+          "item": "baseball_base"
+        },
+        "5": {
+          "item": "baseball_glove"
+        },
+        "6": {
+          "item": "baseball_glove"
+        },
+        "7": {
+          "item": "weapon_baseball_bat"
+        },
+        "8": {
+          "item": "weapon_baseball_bat"
+        },
+        "9": {
+          "item": "basketball"
+        },
+        "10": {
+          "item": "basketball"
+        },
+        "11": {
+          "item": "bowling_ball"
+        },
+        "12": {
+          "item": "bowling_ball"
+        },
+        "13": {
+          "item": "bowling_pin"
+        },
+        "14": {
+          "item": "bowling_pin"
+        },
+        "15": {
+          "item": "dumbbells_barbells_weights"
+        },
+        "16": {
+          "item": "dumbbells_barbells_weights"
+        },
+        "17": {
+          "item": "kickball"
+        },
+        "18": {
+          "item": "kickball"
+        },
+        "19": {
+          "item": "life_preserver"
+        },
+        "20": {
+          "item": "life_preserver"
+        }
+      }
+    },
+    "science": {
+      "ru": "Наука и техника",
+      "en": "Science and Technology",
+      "faces": {
+        "1": {
+          "item": "battery"
+        },
+        "2": {
+          "item": "circuit_board"
+        },
+        "3": {
+          "item": "coolant"
+        },
+        "4": {
+          "item": "cutting_fluid"
+        },
+        "5": {
+          "item": "duct_tape"
+        },
+        "6": {
+          "item": "electrical_cable"
+        },
+        "7": {
+          "item": "fuse"
+        },
+        "8": {
+          "item": "high_powered_magnet"
+        },
+        "9": {
+          "item": "high_powered_microscope"
+        },
+        "10": {
+          "item": "high_tech_gadget"
+        },
+        "11": {
+          "item": "lab_equipment"
+        },
+        "12": {
+          "item": "lab_glassware"
+        },
+        "13": {
+          "item": "metal_ingot"
+        },
+        "14": {
+          "item": "microscope"
+        },
+        "15": {
+          "item": "item_radio"
+        },
+        "16": {
+          "item": "sensor"
+        },
+        "17": {
+          "item": "solvent"
+        },
+        "18": {
+          "item": "suprathaw_antifreeze"
+        },
+        "19": {
+          "item": "turpentine"
+        },
+        "20": {
+          "item": "vacuum_tube"
+        }
+      }
+    },
+    "medical": {
+      "ru": "Медицинское оборудование",
+      "en": "Medical Equipment",
+      "faces": {
+        "1": {
+          "item": "bandages"
+        },
+        "2": {
+          "item": "bandages"
+        },
+        "3": {
+          "item": "drink_blood_pack"
+        },
+        "4": {
+          "item": "bone_saw"
+        },
+        "5": {
+          "item": "drink_dirty_water"
+        },
+        "6": {
+          "item": "drink_dirty_water"
+        },
+        "7": {
+          "item": "empty_blood_pack_iv_bag"
+        },
+        "8": {
+          "item": "empty_blood_pack_iv_bag"
+        },
+        "9": {
+          "item": "high_powered_microscope"
+        },
+        "10": {
+          "item": "lab_equipment"
+        },
+        "11": {
+          "item": "lab_glassware"
+        },
+        "12": {
+          "item": "drink_purified_water"
+        },
+        "13": {
+          "item": "chem_radaway_diluted"
+        },
+        "14": {
+          "item": "scalpel"
+        },
+        "15": {
+          "item": "scalpel"
+        },
+        "16": {
+          "item": "chem_stimpak"
+        },
+        "17": {
+          "item": "chem_stimpak_diluted"
+        },
+        "18": {
+          "item": "chem_stimpak_diluted"
+        },
+        "19": {
+          "item": "tweezers"
+        },
+        "20": {
+          "item": "tweezers"
+        }
+      }
+    },
+    "workplace": {
+      "ru": "Предметы с рабочего места",
+      "en": "Workplace Items",
+      "faces": {
+        "1": {
+          "item": "bag_of_cement"
+        },
+        "2": {
+          "item": "bag_of_fertilizer"
+        },
+        "3": {
+          "item": "blowtorch"
+        },
+        "4": {
+          "item": "clipboard"
+        },
+        "5": {
+          "item": "clipboard"
+        },
+        "6": {
+          "item": "clipboard"
+        },
+        "7": {
+          "item": "desk_fan"
+        },
+        "8": {
+          "item": "duct_tape"
+        },
+        "9": {
+          "item": "magnifying_glass"
+        },
+        "10": {
+          "item": "military_ammo_bag"
+        },
+        "11": {
+          "item": "oil_can"
+        },
+        "12": {
+          "item": "oil_can"
+        },
+        "13": {
+          "item": "shovel"
+        },
+        "14": {
+          "item": "typewriter"
+        },
+        "15": {
+          "item": "wonderglue"
+        },
+        "16": {
+          "item": "hubcap"
+        },
+        "17": {
+          "item": "auto_parts"
+        },
+        "18": {
+          "item": "metal_tools"
+        },
+        "19": {
+          "item": "metal_tools"
+        },
+        "20": {
+          "item": "telephone"
+        }
+      }
+    }
+  },
+  "mining": {
+    "ru": "Шахты и раскопки",
+    "en": "Mining and Excavation",
+    "faces": {
+      "1": {
+        "item": "aluminum_ore",
+        "qty": "2+3<cd>"
+      },
+      "2": {
+        "item": "aluminum_ore",
+        "qty": "2+3<cd>"
+      },
+      "3": {
+        "item": "aluminum_ore",
+        "qty": "2+3<cd>"
+      },
+      "4": {
+        "material": "coal",
+        "qty": "1+2<cd>"
+      },
+      "5": {
+        "material": "coal",
+        "qty": "1+2<cd>"
+      },
+      "6": {
+        "material": "coal",
+        "qty": "1+2<cd>"
+      },
+      "7": {
+        "material": "coal",
+        "qty": "1+2<cd>"
+      },
+      "8": {
+        "item": "copper_ore",
+        "qty": "2+3<cd>"
+      },
+      "9": {
+        "item": "copper_ore",
+        "qty": "2+3<cd>"
+      },
+      "10": {
+        "item": "copper_ore",
+        "qty": "2+3<cd>"
+      },
+      "11": {
+        "material": "crystal",
+        "qty": "2+3<cd>"
+      },
+      "12": {
+        "item": "gold_ore",
+        "qty": "1+2<cd>"
+      },
+      "13": {
+        "item": "iron_ore",
+        "qty": "3+4<cd>"
+      },
+      "14": {
+        "item": "iron_ore",
+        "qty": "3+4<cd>"
+      },
+      "15": {
+        "item": "iron_ore",
+        "qty": "3+4<cd>"
+      },
+      "16": {
+        "item": "iron_ore",
+        "qty": "3+4<cd>"
+      },
+      "17": {
+        "item": "silver_ore",
+        "qty": "1+2<cd>"
+      },
+      "18": {
+        "item": "silver_ore",
+        "qty": "1+2<cd>"
+      },
+      "19": {
+        "item": "silver_ore",
+        "qty": "1+2<cd>"
+      },
+      "20": {
+        "item": "uranium_ore",
+        "qty": "1+1<cd>"
+      }
+    }
+  }
+}

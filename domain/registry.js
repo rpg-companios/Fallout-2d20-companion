@@ -29,6 +29,24 @@ import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.
 import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
 import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
 
+// Данные крафта (патч 249–251): категория «рецепты» пакета сеттинга. Реестр —
+// единственная точка, которая знает, что их шесть файлов и как их собрать;
+// движок механики (domain/craftingEngine.js) получает только сами рецепты.
+import moduleCraftingIndex from '../modules/fallout/data/crafting/index.json';
+import moduleCraftingAmmo from '../modules/fallout/data/crafting/ammo.json';
+import moduleCraftingWeapons from '../modules/fallout/data/crafting/weapons.json';
+import moduleCraftingChems from '../modules/fallout/data/crafting/chems.json';
+import moduleCraftingFood from '../modules/fallout/data/crafting/food.json';
+import moduleCraftingDrinks from '../modules/fallout/data/crafting/drinks.json';
+
+const CRAFTING_FILES = {
+  'ammo.json': moduleCraftingAmmo,
+  'weapons.json': moduleCraftingWeapons,
+  'chems.json': moduleCraftingChems,
+  'food.json': moduleCraftingFood,
+  'drinks.json': moduleCraftingDrinks,
+};
+
 // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
 import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
 import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
@@ -181,6 +199,43 @@ export function getModuleGeneralGoods() {
  */
 export function getModuleEquipmentKits() {
   return moduleEquipmentKits;
+}
+
+/**
+ * Рецепты крафта, собранные из файлов категории по индексу (порядок — как в
+ * index.json). Собирается один раз; consumers обязаны относиться к записи как
+ * к неизменяемой (движок механики ничего не пишет в данные).
+ */
+const CRAFTING_RECIPES = (() => {
+  const byId = new Map();
+  const list = [];
+  for (const entry of moduleCraftingIndex.recipes ?? []) {
+    const rows = CRAFTING_FILES[entry.file] ?? [];
+    for (const recipe of rows) {
+      if (byId.has(recipe.id)) {
+        throw new Error(`[registry] Дубликат id рецепта крафта: ${recipe.id}`);
+      }
+      byId.set(recipe.id, recipe);
+      list.push(recipe);
+    }
+    if (rows.length !== entry.count) {
+      throw new Error(`[registry] Индекс крафта не совпадает с файлом ${entry.file}: ${entry.count} vs ${rows.length}`);
+    }
+  }
+  return Object.freeze({ list: Object.freeze(list), byId });
+})();
+
+export function getCraftingRecipes() {
+  return CRAFTING_RECIPES.list;
+}
+
+export function getCraftingRecipeById(recipeId) {
+  return CRAFTING_RECIPES.byId.get(recipeId) ?? null;
+}
+
+/** Верстаки категории (из индекса) — движок их не интерпретирует, это имена сеттинга. */
+export function getCraftingBenches() {
+  return moduleCraftingIndex.benches ?? [];
 }
 
 /**

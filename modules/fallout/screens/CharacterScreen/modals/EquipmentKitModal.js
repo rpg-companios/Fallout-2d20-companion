@@ -7,7 +7,7 @@ import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../..
 import { getBodyPlan as getBodyPlanData } from '../../../../../domain/bodyplan';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
-import styles from '../../../../../styles/EquipmentKitModal.styles';
+import styles from '../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 // Lazy-load robot catalog data — на основании данных, без обогатителя

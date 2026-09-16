@@ -8,7 +8,7 @@ import {
   ScrollView, 
   Image
 } from 'react-native';
-import styles from '../../../../../styles/OriginModal.styles';
+import styles from '../../../styles/OriginModal.styles';
 
 const OriginModal = ({ 
   isVisible, 

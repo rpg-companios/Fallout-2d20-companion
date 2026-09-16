@@ -12,7 +12,7 @@ import { shiftRange } from '../../../../../domain/range';
 import { applyQualityGain } from '../../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
-import styles from '../../../../../styles/WeaponModificationModal.styles';
+import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
 
 

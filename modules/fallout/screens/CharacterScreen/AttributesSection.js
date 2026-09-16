@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { MIN_ATTRIBUTE, MAX_ATTRIBUTE, getAttributeLimits } from '../../../../domain/characterCreation';
 import { getAttributeLabel } from './logic/attributeKeyUtils';
 import { tCharacterScreen } from './logic/characterScreenI18n';
-import styles from '../../../../styles/AttributesSection.styles';
+import styles from '../../styles/AttributesSection.styles';
 
 const AttributeRow = ({ name, value, onIncrease, onDecrease, disabled, remainingPoints, trait, isPerkMode, baseValue }) => {
   const { min, max } = getAttributeLimits(trait, name);

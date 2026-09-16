@@ -42,7 +42,7 @@ describe('экран: окраска значений и строка устал
     'utf8',
   );
   const stylesSource = fs.readFileSync(
-    path.resolve(__dirname, '../../styles/WeaponsAndArmorScreen.styles.js'),
+    path.resolve(__dirname, '../../modules/fallout/styles/WeaponsAndArmorScreen.styles.js'),
     'utf8',
   );
 
