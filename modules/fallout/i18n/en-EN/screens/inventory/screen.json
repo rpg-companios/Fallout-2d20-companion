@@ -6,7 +6,7 @@
   },
   "craft": {
     "label": "Craft",
-    "placeholder": "The craft screen is not wired up yet — next step."
+    "placeholder": "Crafting is being reworked: windows will be by product type (food & drinks, weapons, explosives, armor, power armor, chems, robots), not by bench. This is the next patch."
   },
   "alerts": {
     "radiationTitle": "Radiation",
@@ -72,5 +72,23 @@
       "leftLeg": "left leg",
       "rightLeg": "right leg"
     }
+  },
+  "salvage": {
+    "action": "Salvage",
+    "label": "Salvage",
+    "unavailable": "unavailable without Scrapper",
+    "hidden": "+{n} unavailable",
+    "doneTitle": "Salvage",
+    "failTitle": "Salvage failed",
+    "emptyTitle": "Salvage",
+    "notStartedTitle": "Salvage not started",
+    "done": "Gained: {items}.",
+    "empty": "The item came apart, but the dice stayed silent — no materials.",
+    "fail": "The job fell through — junk intact, not spent.",
+    "timeLine": "Time spent: {minutes} min.",
+    "complicationNote": "A complication doubled the time.",
+    "noMaterials": "Nothing here you can extract — you need Scrapper (or a higher rank).",
+    "notStarted": "Salvage did not start ({reason}).",
+    "material": "Materials are not salvaged: they are already the end parts."
   }
 }

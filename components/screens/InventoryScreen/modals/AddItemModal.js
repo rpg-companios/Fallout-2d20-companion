@@ -17,6 +17,7 @@ const CATEGORY_ICONS = {
   chems: '💊',
   items: '🔧',
   materials: '🧰',
+  junk: '🗑️',
   robotEquipment: '🤖',
   robotWeapons: '⚙️',
   robotPlating: '🔩',
@@ -154,7 +155,10 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
         [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.generalGoods || [],
       },
       [tInventory('modals.addItemModal.categories.materials')]: {
-        [tInventory('modals.addItemModal.categories.all')]: [],
+        [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.materials || [],
+      },
+      [tInventory('modals.addItemModal.categories.junk')]: {
+        [tInventory('modals.addItemModal.categories.all')]: equipmentCatalog.junk || [],
       },
       [tInventory('modals.addItemModal.categories.robotEquipment')]: {
         [tInventory('modals.addItemModal.categories.robotWeapons')]: equipmentCatalog.robotWeaponsOnly || [],
@@ -214,6 +218,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (itemType === 'drinks') return tInventory('modals.addItemModal.itemTypes.drinks');
     if (itemType === 'ammo') return tInventory('modals.addItemModal.itemTypes.ammo');
     if (itemType === 'plating') return tInventory('modals.addItemModal.itemTypes.plating');
+    if (itemType === 'junk') return tInventory('modals.addItemModal.itemTypes.junk');
     if (itemType === 'robotArmor') return tInventory('modals.addItemModal.itemTypes.robotArmor');
     if (itemType === 'robotFrame') return tInventory('modals.addItemModal.itemTypes.robotFrame');
     return '';
@@ -265,7 +270,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       Object.values(allData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       Object.values(allData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       const allLabel = tInventory('modals.addItemModal.categories.all');
-      const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
+      const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
       categoryKeys.forEach((category) => {
         if (allData[category]?.[allLabel]) {
           allItems.push(...allData[category][allLabel]);

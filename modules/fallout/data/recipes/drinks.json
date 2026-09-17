@@ -1,7 +1,6 @@
 [
   {
     "id": "drink_glowing_blood_pack",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -20,16 +19,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_glowing_blood_pack",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "drink_refreshing_beverage",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 5
@@ -56,16 +49,10 @@
         "count": 3
       }
     ],
-    "output": {
-      "itemId": "drink_refreshing_beverage",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "drink_dirty_wastelander",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 3
@@ -84,16 +71,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_dirty_wastelander",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "drink_purified_water",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -104,16 +85,10 @@
         "count": 3
       }
     ],
-    "output": {
-      "itemId": "drink_purified_water",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "drink_melon_juice",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -128,16 +103,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_melon_juice",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "drink_mutfruit_juice",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -152,16 +121,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_mutfruit_juice",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "drink_tarberry_juice",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -176,16 +139,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_tarberry_juice",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "drink_potato_juice",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -200,11 +157,6 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "drink_potato_juice",
-      "itemType": "drinks",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   }
 ]

@@ -1,0 +1,45 @@
+{
+  "categoryNames": {
+    "ammo": "Ammo",
+    "weapons": "Weapons",
+    "chems": "Chems",
+    "food": "Food",
+    "drinks": "Drinks"
+  },
+  "ui": {
+    "title": "Crafting",
+    "back": "← Back",
+    "craft": "Craft",
+    "craftN": "Craft ×{n}",
+    "complexity": "Complexity {n}",
+    "rowMeta": "{skill} · {time}",
+    "timeMinutes": "{n} min",
+    "timeHours": "{n} hr",
+    "timeDays": "{n} d",
+    "needPerk": "Needs perk \"{perk}\" rank {rank}",
+    "shortMaterials": "Missing materials",
+    "ready": "Ready",
+    "materialsTitle": "Materials",
+    "haveNeed": "have {have} · need {need}",
+    "quantity": "Attempts",
+    "resultTitle": "Crafting",
+    "stopped": "Stopped: bag ran out of materials, {n} attempts never started",
+    "checkLine": "{attribute} + {skill} = {target}",
+    "rollsSuccess": "Rolled {rolls}. Successes {n}",
+    "rollsFail": "Rolled {rolls}. Failed",
+    "autoNote": "Automatic success (skill covers the complexity)",
+    "burnNote": "Materials burned",
+    "intactNote": "Nothing was spent",
+    "granted": "Gained: {items}",
+    "nothing": "Nothing gained",
+    "spent": "Spent: {items}",
+    "timeSpent": "Time: {time}",
+    "complicationNote": "A complication doubled the time",
+    "craftTitle": "Crafting",
+    "notAvailable": "Not available",
+    "done": "Done"
+  },
+  "attributes": {
+    "INT": "Intelligence"
+  }
+}

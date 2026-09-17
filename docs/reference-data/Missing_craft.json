@@ -2,7 +2,7 @@
   "_meta": {
     "generated": "scripts/build-crafting-data.mjs",
     "purpose": "Рецепты, которые упираются в дыры каталога: результат или ингредиент названы в источнике, но предмета с таким id у нас нет.",
-    "format": "Поля — как у рецептов данных (modules/fallout/data/crafting): id, bench, requires, materials, output, sourcePage. Где данных нет — строка \"unknown\"; для неизвестных ингредиентов id неизвестен, но напечатанное имя и количество сохранены (sourceName, count), чтобы было что сличить с книгами.",
+    "format": "Поля — как у рецептов данных (modules/fallout/data/recipes): id (=предмет результата), requires, materials, outputQuantity. Где данных нет — строка \"unknown\"; для неизвестных ингредиентов id неизвестен, но напечатанное имя и количество сохранены (sourceName, count), чтобы было что сличить с книгами.",
     "howToMerge": "Дописать недостающее (предмет в каталог либо замену слота), убрать \"unknown\" и вернуть файл; затем правила переезжают в генератор (соответствия/числа), а данные перегенерируются. Генератор перезаписывает этот файл — руками его чинить можно только как черновик.",
     "categories": {
       "chem": "препараты",
@@ -22,7 +22,6 @@
   "loot": [
     {
       "id": "unknown",
-      "bench": "cooking",
       "requires": {
         "skill": "SURVIVAL",
         "complexity": 2
@@ -34,11 +33,8 @@
         }
       ],
       "derivedMaterials": true,
-      "output": {
-        "itemId": "unknown",
-        "itemType": "misc",
-        "quantity": "unknown"
-      },
+      "outputQuantity": "unknown",
+      "outputType": "misc",
       "sourcePage": 216,
       "sourceName": "Cooking Station",
       "blockedBy": "в каталоге сеттинга нет такого предмета-результата"

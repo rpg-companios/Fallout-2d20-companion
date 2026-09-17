@@ -16,10 +16,9 @@ import {
 
 const recipe = (over = {}) => ({
   id: 'x_out',
-  bench: 'somewhere',
   requires: { skill: 'CRAFT', complexity: 2 },
   materials: [{ itemId: 'in_a', count: 2 }],
-  output: { itemId: 'x_out', itemType: 'misc', quantity: 1 },
+  outputQuantity: 1,
   ...over,
 });
 
@@ -107,10 +106,20 @@ describe('движок крафта: количество результата',
     expect(() => resolveOutputQuantity({ base: 10, cd: 5 })).toThrow('rollCD');
   });
 
+  it('сгорание в записи рецепта запрещено — это правило модуля (270)', () => {
+    expect(() => runCraft({
+      recipe: recipe({ failBurnsMaterials: true }),
+      skillRank: 9,
+      inventoryCounts: { in_a: 2 },
+      spend: vi.fn(),
+      grant: vi.fn(),
+    })).toThrow('module rule');
+  });
+
   it('испорченная форма количества — исключение до любых списаний', () => {
     const spend = vi.fn();
     expect(() => runCraft({
-      recipe: recipe({ output: { itemId: 'x_out', quantity: -2 } }),
+      recipe: recipe({ outputQuantity: -2 }),
       skillRank: 9,
       inventoryCounts: { in_a: 2 },
       spend,

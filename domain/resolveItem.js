@@ -69,6 +69,8 @@ export const findCatalogEntry = (catalog, id, itemType) => {
       return search(catalog.food);
     case 'magazine':
       return search(catalog.magazines);
+    case 'junk':
+      return search(catalog.junk);
     case 'powerArmor':
       // Силовая броня: каркас, части, ядерный блок — плоский список.
       return search(catalog.powerArmorList);
@@ -102,6 +104,8 @@ export const findCatalogEntry = (catalog, id, itemType) => {
       const misc = flattenMisc(catalog.miscellaneous);
       return search(misc)
         || search(catalog.generalGoods)
+        || search(catalog.materials)
+        || search(catalog.junk)
         || search(catalog.oddities)
         || search(catalog.robotModules)
         || search(catalog.robotItems);

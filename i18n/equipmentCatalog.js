@@ -67,6 +67,7 @@ import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/foo
 import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
 import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
 import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
+import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
 import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
 import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
 import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
@@ -81,6 +82,8 @@ import moduleArmorEffects from '../modules/fallout/data/equipment/armor_effects.
 import moduleClothesData from '../modules/fallout/data/equipment/clothes.json';
 import moduleFood from '../modules/fallout/data/consumables/food.json';
 import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
+// Разбор (260, лист группы 270): хлам и материалы — из JUNK_DATASET;
+// пути к файлам описаны один раз (modules/fallout/data/junk/index.js).
 import moduleChems from '../modules/fallout/data/consumables/chems.json';
 import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
 import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
@@ -125,6 +128,8 @@ const moduleRuI18n = {
   drinks: moduleRuDrinksI18n,
   chems: moduleRuChemsI18n,
   magazines: moduleRuMagazinesI18n,
+  junk: JUNK_DATASET.names['ru-RU'].junk,
+  materials: JUNK_DATASET.names['ru-RU'].materials,
 };
 
 const moduleEnI18n = {
@@ -150,6 +155,8 @@ const moduleEnI18n = {
   drinks: moduleEnDrinksI18n,
   chems: moduleEnChemsI18n,
   magazines: moduleEnMagazinesI18n,
+  junk: JUNK_DATASET.names['en-EN'].junk,
+  materials: JUNK_DATASET.names['en-EN'].materials,
 };
 
 const ALL_KIT_DATA = {
@@ -397,6 +404,10 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedMagazines = mergeById(moduleMagazines, moduleI18n.magazines);
   const moduleGeneralGoodsLocalized = mergeById(moduleGeneralGoods || [], moduleI18n.generalGoods || []);
   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
+  // Разбор (260): хлам и материалы — те же правила сборки, что у остальных
+  // каталогов: данные задают механику, i18n — имя; отсутствие имени — падение.
+  const mergedJunk = mergeById(JUNK_DATASET.junk, moduleI18n.junk);
+  const mergedScrapMaterials = mergeById(JUNK_DATASET.materials, moduleI18n.materials);
 
   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
   const mergedRobotBody = limbsOfType('body');
@@ -450,6 +461,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     food: mergedFood,
     magazines: mergedMagazines,
     generalGoods: mergedGeneralGoods,
+    junk: mergedJunk,
+    materials: mergedScrapMaterials,
     oddities: mergedOddities,
     weaponMods: mergedWeaponMods,
     armorMods: mergedArmorMods,

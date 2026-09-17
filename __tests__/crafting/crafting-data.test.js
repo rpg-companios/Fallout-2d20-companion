@@ -21,7 +21,6 @@ import {
   buildCraftingData,
   MATERIALS_BY_COMPLEXITY,
   FILE_BY_BUCKET,
-  BENCHES,
   OUT_DIR,
   MISSING_FILE,
   MISSING_CATEGORY_ORDER,
@@ -42,11 +41,11 @@ import clothesData from '../../modules/fallout/data/equipment/clothes.json';
 import powerArmorData from '../../modules/fallout/data/equipment/powerArmor.json';
 import weaponModsData from '../../modules/fallout/data/equipment/weapon_mods.json';
 import perksData from '../../modules/fallout/data/perks/perks.json';
-import junkData from '../../modules/fallout/data/junk.json';
-import materialsData from '../../modules/fallout/data/materials.json';
+import junkData from '../../modules/fallout/data/junk/junk.json';
+import materialsData from '../../modules/fallout/data/junk/material.json';
 import foragingTable from '../../modules/fallout/data/loot/foraging.json';
 
-import craftingIndex from '../../modules/fallout/data/crafting/index.json';
+import craftingIndex from '../../modules/fallout/data/recipes/index.json';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 
@@ -87,9 +86,21 @@ const loadRecipeFile = (file) => JSON.parse(readRepo(`${OUT_DIR}/${file}`));
 const allRecipes = () => {
   const list = [];
   for (const entry of craftingIndex.recipes) {
-    for (const record of loadRecipeFile(entry.file)) list.push({ bucket: entry.bucket, record });
+    for (const record of loadRecipeFile(entry.file)) list.push({ category: entry.category, record });
   }
   return list;
+};
+
+// Реформа 269: результат рецепта — это его id; варианты (несколько рецептов на
+// один предмет) различаются суффиксом. Каталог сверяется по базе id.
+const resolveOutput = (id) => {
+  if (catalogIds.has(id)) return id;
+  const parts = id.split('_');
+  for (let n = parts.length - 1; n >= 2; n -= 1) {
+    const base = parts.slice(0, n).join('_');
+    if (catalogIds.has(base)) return base;
+  }
+  return null;
 };
 
 /** Рекурсивно: какие строковые значения вообще есть в данных рецептов. */
@@ -109,11 +120,18 @@ describe('данные крафта: файлы категории', () => {
   it('индекс объявляет только существующие файлы и честное число рецептов', () => {
     expect(craftingIndex.id).toBe('crafting');
     for (const entry of craftingIndex.recipes) {
-      expect(FILE_BY_BUCKET[entry.bucket], `верстак-файл для ${entry.bucket}`).toBeTruthy();
+      expect(FILE_BY_BUCKET[entry.category], `категория-файл для ${entry.category}`).toBe(entry.file);
       const records = loadRecipeFile(entry.file);
       expect(records.length, `записей в ${entry.file}`).toBe(entry.count);
     }
-    expect(craftingIndex.recipes.length).toBeGreaterThan(0);
+    // Порядок и состав манифеста — он же порядок вкладок окна (269).
+    expect(craftingIndex.recipes).toEqual([
+      { file: 'ammo.json', category: 'ammo', count: 28 },
+      { file: 'chems.json', category: 'chems', count: 21 },
+      { file: 'drinks.json', category: 'drinks', count: 8 },
+      { file: 'food.json', category: 'food', count: 27 },
+      { file: 'weapons.json', category: 'weapons', count: 9 },
+    ]);
   });
 
   it('файлов больше, чем объявлено в индексе, нет', () => {
@@ -143,13 +161,30 @@ describe('данные крафта: ссылки', () => {
     expect(allRecipes().length).toBeGreaterThanOrEqual(60);
   });
 
-  it('результат и каждый ингредиент — id из каталога сеттинга', () => {
-    for (const { record } of allRecipes()) {
-      expect(catalogIds.has(record.output.itemId), `${record.id}: результат ${record.output.itemId}`).toBe(true);
-      expect(record.output.itemType, `${record.id}: тип результата`).toBe(catalogIds.get(record.output.itemId));
+  it('результат (он же id) и каждый ингредиент — id из каталога сеттинга', () => {
+    for (const { category, record } of allRecipes()) {
+      const base = resolveOutput(record.id);
+      expect(base, `${record.id}: результат не найден в каталоге`).toBeTruthy();
       for (const material of record.materials) {
         expect(catalogIds.has(material.itemId), `${record.id}: ингредиент ${material.itemId}`).toBe(true);
       }
+    }
+  });
+
+  it('количество результата и флаг сгорания — честная форма (269)', () => {
+    for (const { record } of allRecipes()) {
+      const q = record.outputQuantity;
+      expect(
+        (Number.isInteger(q) && q >= 1) || (q && typeof q === 'object'),
+        `${record.id}: outputQuantity = int >= 1 или {base,cd}`,
+      ).toBe(true);
+      // 270: сгорание — правило реестра (навык), в 74 записях не дублируется.
+      expect(record.failBurnsMaterials, `${record.id}: поля сгорания в данных нет`).toBeUndefined();
+      // Верстака и «output» в данных больше нет (реформа 269).
+      expect(record.bench, `${record.id}: bench удалён из данных`).toBeUndefined();
+      expect(record.output, `${record.id}: output удалён из данных`).toBeUndefined();
+      expect(record.sourcePage, `${record.id}: sourcePage удалён из данных`).toBeUndefined();
+      expect(record.derivedMaterials, `${record.id}: derivedMaterials — только в обменнике`).toBeUndefined();
     }
   });
 
@@ -162,10 +197,10 @@ describe('данные крафта: ссылки', () => {
     }
   });
 
-  it('навык — канонический ключ, верстак — из объявленного списка', () => {
-    for (const { record } of allRecipes()) {
+  it('навык — канонический ключ, категория — из манифеста', () => {
+    for (const { category, record } of allRecipes()) {
       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
-      expect(BENCHES, `${record.id}: верстак ${record.bench}`).toContain(record.bench);
+      expect(['ammo', 'weapons', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
       expect(Number.isInteger(record.requires.complexity)).toBe(true);
       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
       expect(record.requires.complexity).toBeLessThanOrEqual(7);
@@ -179,15 +214,12 @@ describe('данные крафта: ссылки', () => {
     // второй резолвер по имени в движке.
     const recipes = allRecipes();
     const recipeIds = new Set(recipes.map(({ record }) => record.id));
-    const itemTypes = new Set(catalogIds.values());
     for (const { record } of recipes) {
       for (const { key, value } of stringValues(record)) {
         if (key === 'id') { expect(recipeIds.has(value), `${record.id}: id «${value}»`).toBe(true); continue; }
-        if (key === 'bench') { expect(BENCHES, `${record.id}: верстак «${value}»`).toContain(value); continue; }
         if (key === 'skill') { expect(ALL_SKILL_KEYS, `${record.id}: навык «${value}»`).toContain(value); continue; }
         if (key === 'itemId') { expect(catalogIds.has(value), `${record.id}: ссылка «${value}» не из каталога`).toBe(true); continue; }
         if (key === 'perkId') { expect(perkIds.has(value), `${record.id}: перк «${value}»`).toBe(true); continue; }
-        if (key === 'itemType') { expect(itemTypes.has(value), `${record.id}: тип «${value}»`).toBe(true); continue; }
         expect(false, `${record.id}: ключ «${key}»=${value} — в данных крафта текстов быть не должно`).toBe(true);
       }
     }
@@ -202,11 +234,12 @@ describe('данные крафта: ссылки', () => {
     expect(new Set(ids).size, 'id рецептов уникальны во всех файлах категории').toBe(ids.length);
     const byItem = new Map();
     for (const { record } of recipes) {
+      const base = resolveOutput(record.id);
       expect(
-        record.id === record.output.itemId || record.id.startsWith(`${record.output.itemId}_`),
-        `${record.id}: id рецепта обязан начинаться с id результата ${record.output.itemId}`,
+        base && (record.id === base || record.id.startsWith(`${base}_`)),
+        `${record.id}: id рецепта обязан начинаться с id результата`,
       ).toBe(true);
-      byItem.set(record.output.itemId, [...(byItem.get(record.output.itemId) || []), record.id]);
+      byItem.set(base, [...(byItem.get(base) || []), record.id]);
     }
     for (const [itemId, list] of byItem) {
       if (list.length < 2) expect(list[0], `${itemId}: один рецепт — id равен id предмета`).toBe(itemId);
@@ -221,9 +254,9 @@ describe('данные крафта: ссылки', () => {
 
 describe('данные крафта: количества', () => {
   it('боеприпас — число с боевыми кубиками, всё остальное — одна штука', () => {
-    for (const { record } of allRecipes()) {
-      const { quantity } = record.output;
-      if (record.output.itemType === 'ammo') {
+    for (const { category, record } of allRecipes()) {
+      const quantity = record.outputQuantity;
+      if (category === 'ammo') {
         // Дротики шприцера штучные: их нет в таблице находки, объём не берётся
         // откуда попало — единицу зафиксировал владелец (патч 250).
         if (quantity === 1) continue;
@@ -271,56 +304,6 @@ describe('правило «сложность → материалы» свер�
         .toEqual({ common: curve.common, uncommon: curve.uncommon, rare: curve.rare });
     }
   });
-
-  it('пометка «материалы по сложности» честно описывает данные', () => {
-    // Если у рецепта только три базовых материала и стоит пометка derivedMaterials —
-    // это печатное правило «материалы определяются сложностью рецепта» (с. 210),
-    // и оно обязано совпадать с кривой. Если пометки нет — список выписан рецептом.
-    const RAW = {
-      common: 'item_common_materials',
-      uncommon: 'item_uncommon_materials',
-      rare: 'item_rare_materials',
-    };
-    const rawIds = new Set(Object.values(RAW));
-    for (const { record } of allRecipes()) {
-      const onlyRaw = record.materials.every((m) => rawIds.has(m.itemId));
-      if (!record.derivedMaterials) continue;
-      expect(onlyRaw, `${record.id}: пометка derivedMaterials при чужих ингредиентах`).toBe(true);
-      const counts = { common: 0, uncommon: 0, rare: 0 };
-      for (const material of record.materials) {
-        const tier = Object.keys(RAW).find((k) => RAW[k] === material.itemId);
-        counts[tier] = material.count;
-      }
-      const curve = MATERIALS_BY_COMPLEXITY[record.requires.complexity];
-      expect(curve, `${record.id}: сложности ${record.requires.complexity} нет в кривой`).toBeTruthy();
-      expect(counts, `${record.id}: материалы не по кривой сложности`).toEqual(curve);
-    }
-  });
-
-  it('рецепты с явными ингредиентами не выглядят как «по умолчанию»', () => {
-    const rawOnly = (record) => {
-      const rawIds = new Set(['item_common_materials', 'item_uncommon_materials', 'item_rare_materials']);
-      return record.materials.every((m) => rawIds.has(m.itemId));
-    };
-    for (const { record } of allRecipes()) {
-      if (record.derivedMaterials) continue;
-      // Явный список, совпадающий с кривой до единицы, — признак того, что
-      // генератор потерял источник; такое решение должно быть видимым.
-      const curve = MATERIALS_BY_COMPLEXITY[record.requires.complexity];
-      const counts = { common: 0, uncommon: 0, rare: 0 };
-      for (const m of record.materials) {
-        if (m.itemId === 'item_common_materials') counts.common = m.count;
-        if (m.itemId === 'item_uncommon_materials') counts.uncommon = m.count;
-        if (m.itemId === 'item_rare_materials') counts.rare = m.count;
-      }
-      if (rawOnly(record)) {
-        expect(
-          counts.common === curve.common && counts.uncommon === curve.uncommon && counts.rare === curve.rare,
-          `${record.id}: список материалов равен кривой, но пометки нет`,
-        ).toBe(false);
-      }
-    }
-  });
 });
 
 describe('данные крафта: файл-обменник незакрытых рецептов', () => {
@@ -349,13 +332,11 @@ describe('данные крафта: файл-обменник незакрыт�
         // Идентификатор — id предмета, как в данных: если результат известен,
         // его id обязан существовать в каталоге; если неизвестен — unknown всюду.
         if (record.id === 'unknown') {
-          expect(record.output.itemId, `${label}: неизвестный id обязан сопровождаться неизвестным результатом`).toBe('unknown');
+          expect(record.outputQuantity, `${label}: неизвестный id обязан сопровождаться неизвестным результатом`).toBe('unknown');
         } else {
-          expect(record.id, `${label}: id = id результата`).toBe(record.output.itemId);
           expect(catalogIds.has(record.id), `${label}: результат ${record.id} есть в каталоге`).toBe(true);
         }
         expect(published.has(record.id), `${label}: закрытая позиция не должна оставаться в обменнике`).toBe(false);
-        expect(BENCHES, `${label}: верстак`).toContain(record.bench);
         expect(ALL_SKILL_KEYS, `${label}: навык`).toContain(record.requires.skill);
         expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
         expect(typeof record.blockedBy, `${label}: позиция без объяснения недопустима`).toBe('string');
@@ -402,7 +383,7 @@ describe('дикоросы и новые каталоги (закрытие ды
     });
   });
 
-  it('дротики шприцера выпущены: штучные, Наука, верстак «chemistry»', () => {
+  it('дротики шприцера выпущены: штучные, Наука, категория боеприпасов', () => {
     const want = [
       'ammo_syringe_berserk', 'ammo_syringe_bloatfly_larva', 'ammo_syringe_bleed_out',
       'ammo_syringe_endangerol', 'ammo_syringe_lock_joint', 'ammo_syringe_mind_cloud',
@@ -410,10 +391,10 @@ describe('дикоросы и новые каталоги (закрытие ды
     ].sort();
     const darts = allRecipes().filter(({ record }) => want.includes(record.id));
     expect(darts.map(({ record }) => record.id).sort()).toEqual(want);
-    for (const { record } of darts) {
-      expect(record.output.quantity, `${record.id}: дротик штучный`).toBe(1);
+    for (const { category, record } of darts) {
+      expect(record.outputQuantity, `${record.id}: дротик штучный`).toBe(1);
       expect(record.requires.skill, `${record.id}: навык`).toBe('SCIENCE');
-      expect(record.bench, `${record.id}: верстак`).toBe('chemistry');
+      expect(category, `${record.id}: категория`).toBe('ammo');
     }
   });
 

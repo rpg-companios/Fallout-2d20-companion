@@ -21,17 +21,17 @@
  * Грани: 1→1, 2→2, 3→0, 4→0, 5→1, 6→1
  * @returns {number}
  */
+// Грань → значение Combat Dice (1→1, 2→2, 3/4→0, 5/6→1, эффект — 5 и 6).
+export const COMBAT_DIE_FACE_VALUES = { 1: 1, 2: 2, 3: 0, 4: 0, 5: 1, 6: 1 };
+export const COMBAT_DIE_EFFECT_FACES = [5, 6];
+
+/** Сумма значений по выпавшим граням (1..6) — тот же пересчёт, что у rollCombatDice. */
+export function facesToCombatUnits(faces) {
+  return (faces || []).reduce((sum, face) => sum + (COMBAT_DIE_FACE_VALUES[face] ?? 0), 0);
+}
+
 export function rollCombatDice() {
-  const roll = Math.floor(Math.random() * 6) + 1;
-  switch (roll) {
-    case 1: return 1;
-    case 2: return 2;
-    case 3: return 0;
-    case 4: return 0;
-    case 5: return 1;
-    case 6: return 1;
-    default: return 0;
-  }
+  return COMBAT_DIE_FACE_VALUES[Math.floor(Math.random() * 6) + 1] ?? 0;
 }
 
 /**

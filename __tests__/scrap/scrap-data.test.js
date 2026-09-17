@@ -1,20 +1,24 @@
-// Данные разбора (патч 256): каталог хлама, именованные материалы, составы
-// разбора, d20-таблицы для ГМ-секции. Источник истины — scripts/scrap-source.json
-// (таблицы владельца от 2026-09-16), файлы генерирует scripts/build-scrap-data.mjs.
-// Тесты следят за инвариантами, не за содержательными числами (числа — за генератором).
+// Данные разбора (патч 256, реформа 269): единый каталог хлама junk/ junk.json
+// — карточки с печатным составом разбора прямо в строке; справочник материалов
+// material.json; d20-таблицы без подписей (подписи — слой i18n). Источник
+// истины — scripts/scrap-source.json (таблицы владельца от 2026-09-16), файлы
+// генерирует scripts/build-scrap-data.mjs. Тесты следят за инвариантами, не за
+// содержательными числами (числа — за генератором).
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import junkData from '../../modules/fallout/data/junk.json';
-import materialsData from '../../modules/fallout/data/materials.json';
-import salvage from '../../modules/fallout/data/scrap/salvage.json';
-import tables from '../../modules/fallout/data/scrap/tables.json';
-import i18nJunkRu from '../../modules/fallout/i18n/ru-RU/data/junk.json';
-import i18nJunkEn from '../../modules/fallout/i18n/en-EN/data/junk.json';
-import i18nMatsRu from '../../modules/fallout/i18n/ru-RU/data/materials.json';
-import i18nMatsEn from '../../modules/fallout/i18n/en-EN/data/materials.json';
+import junkData from '../../modules/fallout/data/junk/junk.json';
+import materialsData from '../../modules/fallout/data/junk/material.json';
+import tables from '../../modules/fallout/data/junk/tables.json';
+import generalGoods from '../../modules/fallout/data/equipment/general_goods.json';
+import i18nJunkRu from '../../modules/fallout/i18n/ru-RU/data/junk/junk.json';
+import i18nJunkEn from '../../modules/fallout/i18n/en-EN/data/junk/junk.json';
+import i18nMatsRu from '../../modules/fallout/i18n/ru-RU/data/junk/material.json';
+import i18nMatsEn from '../../modules/fallout/i18n/en-EN/data/junk/material.json';
+import i18nTablesRu from '../../modules/fallout/i18n/ru-RU/data/junk/tables.json';
+import i18nTablesEn from '../../modules/fallout/i18n/en-EN/data/junk/tables.json';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const readJson = (rel) => JSON.parse(readFileSync(ROOT + rel, 'utf8'));
@@ -22,28 +26,50 @@ const readJson = (rel) => JSON.parse(readFileSync(ROOT + rel, 'utf8'));
 const junkById = new Map(junkData.map((x) => [x.id, x]));
 const matsById = new Map(materialsData.map((x) => [x.id, x]));
 const PACK_IDS = ['item_common_materials', 'item_uncommon_materials', 'item_rare_materials'];
-const namedMaterials = materialsData.filter((m) => m.namedMaterial);
+const namedMaterials = materialsData.filter((m) => !PACK_IDS.includes(m.id));
 
-// ── каталог ───────────────────────────────────────────────────────────────────
+// все составы разбора: строки хлама + карточки каталога (реформа: отдельного
+// файла salvage.json нет — состав носит карточка предмета)
+const collectCompositions = () => {
+  const out = [];
+  for (const row of junkData) if (row.composition) out.push([row.id, row.composition]);
+  const walk = (node) => {
+    if (Array.isArray(node)) { node.forEach(walk); return; }
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.id === 'string' && Array.isArray(node.composition)) out.push([node.id, node.composition]);
+    Object.values(node).forEach(walk);
+  };
+  walk(generalGoods);
+  return out;
+};
 
-describe('каталоги разбора', () => {
+// ── каталоги ───────────────────────────────────────────────────────────────────
+
+describe('каталоги разбора (269: все материалы равны)', () => {
   it('пачковые материалы остались ровно тремя и не изменены', () => {
-    const packs = materialsData.filter((m) => !m.namedMaterial);
+    const packs = materialsData.filter((m) => PACK_IDS.includes(m.id));
     expect(packs.map((m) => m.id).sort()).toEqual([...PACK_IDS].sort());
     for (const p of packs) {
-      expect(p).toMatchObject({ itemType: 'misc', weight: 1 });
+      expect(p.weight).toBe(1);
       expect([1, 3, 5]).toContain(p.cost);
+      expect(p.materialType).toBe(['common', 'uncommon', 'rare'][p.rarity]);
     }
   });
 
   it('именованных материалов 33, у каждого корректные rarity/цена/вес', () => {
     expect(namedMaterials).toHaveLength(33);
     for (const m of namedMaterials) {
-      expect(m.itemType).toBe('misc');
       expect([0, 1, 2]).toContain(m.rarity);
       expect(m.cost).toBeGreaterThan(0);
       expect(m.weight).toBeGreaterThan(0);
       expect(Math.abs(Math.round(m.weight * 10) - m.weight * 10)).toBeLessThan(1e-6); // вес кратен 0.1
+    }
+  });
+
+  it('служебных флагов в данных нет (269): ни itemType, ни namedMaterial', () => {
+    for (const m of materialsData) {
+      expect(m.itemType, m.id).toBeUndefined();
+      expect(m.namedMaterial, m.id).toBeUndefined();
     }
   });
 
@@ -77,19 +103,7 @@ describe('каталоги разбора', () => {
   });
 });
 
-// ── ссылки и таблицы ────────────────────────────────────────────────────────────
-
-const collectCatalogIds = (rel, acc = new Set()) => {
-  const walk = (node) => {
-    if (Array.isArray(node)) node.forEach(walk);
-    else if (node && typeof node === 'object') {
-      if (typeof node.id === 'string') acc.add(node.id);
-      Object.values(node).forEach(walk);
-    }
-  };
-  walk(readJson(rel));
-  return acc;
-};
+// ── таблицы и их подписи ─────────────────────────────────────────────────────
 
 const allTableFaces = () => {
   const refs = [];
@@ -114,7 +128,7 @@ describe('d20-таблицы', () => {
     for (const f of ['modules/fallout/data/equipment/weapons.json', 'modules/fallout/data/equipment/general_goods.json',
       'modules/fallout/data/equipment/ammo.json', 'modules/fallout/data/consumables/chems.json',
       'modules/fallout/data/consumables/food.json', 'modules/fallout/data/consumables/drinks.json']) {
-      collectCatalogIds(f, catalog);
+      collectIdsInto(f, catalog);
     }
     for (const [table, face, ref] of allTableFaces()) {
       if (ref.action) {
@@ -140,12 +154,50 @@ describe('d20-таблицы', () => {
       expect(known, `mining:${face}`).toBe(true);
     }
   });
+
+  it('данные таблиц молчат на человеческом (269): подписей в данных нет', () => {
+    expect(tables.categories.ru).toBeUndefined();
+    expect(tables.categories.en).toBeUndefined();
+    expect(tables.mining.ru).toBeUndefined();
+    expect(tables.mining.en).toBeUndefined();
+    for (const [key, t] of Object.entries(tables.tables)) {
+      expect(t.ru, key).toBeUndefined();
+      expect(t.en, key).toBeUndefined();
+    }
+  });
+
+  it('подписи таблиц — словарь i18n: наборы ключей совпадают, ru/en зеркальны', () => {
+    expect(Object.keys(i18nTablesRu.tables).sort()).toEqual(Object.keys(tables.tables).sort());
+    expect(Object.keys(i18nTablesEn.tables).sort()).toEqual(Object.keys(tables.tables).sort());
+    for (const loc of [i18nTablesRu, i18nTablesEn]) {
+      expect(typeof loc.categories).toBe('string');
+      expect(loc.categories.trim().length).toBeGreaterThan(0);
+      expect(typeof loc.mining).toBe('string');
+      for (const [key, label] of Object.entries(loc.tables)) {
+        expect(typeof label, key).toBe('string');
+        expect(label.trim().length, key).toBeGreaterThan(0);
+      }
+    }
+    expect(i18nTablesRu.mining).toBe('Шахты и раскопки');
+  });
 });
 
-// ── составы разбора ─────────────────────────────────────────────────────────────
+// ── составы разбора ────────────────────────────────────────────────────────────
 
-describe('составы разбора', () => {
-  it('каждый материал состава — существующий именованный материал', () => {
+const collectIdsInto = (rel, acc = new Set()) => {
+  const walk = (node) => {
+    if (Array.isArray(node)) node.forEach(walk);
+    else if (node && typeof node === 'object') {
+      if (typeof node.id === 'string') acc.add(node.id);
+      Object.values(node).forEach(walk);
+    }
+  };
+  walk(readJson(rel));
+  return acc;
+};
+
+describe('составы разбора (в карточках предметов, 269)', () => {
+  it('каждый материал состава — существующий материал справочника', () => {
     const walkComp = (c) => {
       expect(matsById.has(c.material), c.material).toBe(true);
       if (c.effect) {
@@ -153,9 +205,11 @@ describe('составы разбора', () => {
         else expect(matsById.has(c.effect.material), c.effect.material).toBe(true);
       }
     };
-    for (const [id, entry] of Object.entries(salvage)) {
-      expect(entry.options.length, id).toBeGreaterThan(0);
-      for (const alt of entry.options) {
+    const compositions = collectCompositions();
+    expect(compositions.length).toBeGreaterThanOrEqual(120);
+    for (const [id, options] of compositions) {
+      expect(options.length, id).toBeGreaterThan(0);
+      for (const alt of options) {
         expect(alt.length, id).toBeGreaterThan(0);
         for (const c of alt) {
           walkComp(c);
@@ -172,22 +226,34 @@ describe('составы разбора', () => {
     }
   });
 
-  it('ссылки salvage живут только на реальные предметы (хлам или линк-каталог)', () => {
-    const catalog = new Set();
-    for (const f of ['modules/fallout/data/equipment/weapons.json', 'modules/fallout/data/equipment/general_goods.json',
-      'modules/fallout/data/consumables/chems.json', 'modules/fallout/data/consumables/drinks.json']) {
-      collectCatalogIds(f, catalog);
-    }
-    for (const id of Object.keys(salvage)) {
-      expect(junkById.has(id) || catalog.has(id), id).toBe(true);
-    }
+  it('состав носит карточка: у хлама — строка junk.json, у линка — запись каталога', () => {
+    const glass = junkById.get('magnifying_glass');
+    expect(glass.composition[0].map((r) => [r.material, r.count])).toEqual([
+      ['glass', 2], ['copper', 1], ['crystal', 2],
+    ]);
+    const found = [];
+    const walk = (node) => {
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (!node || typeof node !== 'object') return;
+      if (node.id === 'item_radio' && node.composition) found.push(node);
+      Object.values(node).forEach(walk);
+    };
+    walk(generalGoods);
+    expect(found.length, 'радио: одна карточка с составом').toBe(1);
+    expect(found[0].composition[0].some((r) => matsById.has(r.material))).toBe(true);
   });
 
   it('расходники и оружие из чужих каталогов состава не имеют (булка, стимпак, кита — не разбираются)', () => {
     for (const id of ['drink_blood_pack', 'chem_stimpak', 'weapon_baseball_bat', 'drink_purified_water']) {
-      expect(salvage[id], id).toBeUndefined();
+      expect(junkById.has(id), id).toBe(false);
     }
-    expect(salvage.item_radio).toBeTruthy(); // а радио — разбирается, состав с таблицы
+    const walk = (node) => {
+      if (Array.isArray(node)) return node.some(walk);
+      if (!node || typeof node !== 'object') return false;
+      if (node.id && node.composition && ['drink_blood_pack', 'chem_stimpak', 'weapon_baseball_bat', 'drink_purified_water'].includes(node.id)) return true;
+      return Object.values(node).some(walk);
+    };
+    expect(walk(generalGoods), 'ни один расходник не притворился разбираемым').toBe(false);
   });
 
   it('каждый предмет хлама либо покрыт таблицей, либо рудой, либо легаси без таблицы', () => {
@@ -201,13 +267,13 @@ describe('составы разбора', () => {
   });
 
   it('железная руда сдаёт случайное количество (2 DC), прочая руда — по одной единице', () => {
-    expect(salvage.iron_ore.options[0][0]).toMatchObject({ material: 'iron', dc: 2 });
+    expect(junkById.get('iron_ore').composition[0][0]).toMatchObject({ material: 'iron', dc: 2 });
     for (const id of ['aluminum_ore', 'copper_ore', 'gold_ore', 'silver_ore', 'uranium_ore']) {
-      const comp = salvage[id].options[0][0];
+      const comp = junkById.get(id).composition[0][0];
       expect(comp.count, id).toBe(1);
       expect(comp.dc, id).toBeUndefined();
     }
-    expect(salvage.uranium_ore.options[0][0].material).toBe('nuclear_material');
+    expect(junkById.get('uranium_ore').composition[0][0].material).toBe('nuclear_material');
   });
 });
 

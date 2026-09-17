@@ -2,6 +2,128 @@
 
 ---
 
+## Update — Data reform: salvage in item cards, benchless recipes, unified junk catalog (patch 269)
+
+> Owner's word (2026-09-17): junk and its salvage recipes are one file; material.json and junk.json live in `data/junk/`; a material row is `{id, materialType, weight, cost, rarity}` — no itemType, no "named" marking; the engine knows neither recipes nor materials, only "recipes live in the registry, the registry points at files"; a recipe is `{id, requires, materials}` and its id IS the output item; quantity is a single `outputQuantity` field (integer or dice), "same shape everywhere"; packs vs other materials — no distinction, one common pool; `bench` and `sourcePage` out of recipes — failing burns materials exactly where the record itself says so; d20 table labels inside data were wrong — labels live in i18n.
+
+- `data/junk/`: junk.json (130 cards; the printed salvage composition lives right in the row — the magnifier composition reads straight from junk.json without a second file; 129 composition owners, two legacy items without one), material.json (36 rows; materialType common/uncommon/rare guarded against rarity 0/1/2), tables.json (faces and links only; category/table/mining labels moved to `i18n/{loc}/data/junk/tables.json`). No standalone salvage.json anymore; the radio stays a catalog link and carries its composition in its own general_goods.json card — the generator writes and verifies it there.
+- Recipes — `data/recipes/` (ammo 28, weapons 9, chems 21, food 27, drinks 8); the manifest knows only "file → category → count". Records dropped bench, output, pages and the "derivedMaterials" service note — its semantics is checked directly: a raws-only material list must equal the printed complexity curve. Quantity — `outputQuantity: 1 | {base, cd}`; "burn on failure" — the `failBurnsMaterials` flag per record, set by the generator from the printed rule (kitchen and chemistry burn): 74 flags, the per-file distribution matches the former bench split exactly.
+- Engine: quantity-shape validation decoupled from rolling (data checks never roll), grant is `{itemId: recipe.id, quantity}`; "packs" are three ids in `CRAFT_RULES.packMaterialIds` — no such distinction in data or the material reference; salvaging composition-less junk draws from one common pool up to the rarity ceiling inclusive of packs ("all materials are equal"), a pack never closes itself.
+- Window: tabs are manifest categories (Ammo/Weapons/Chems/Food/Drinks, `categoryNames` in both locales); `benchView` and the bench→skills/perks/burn maps were removed from rules; activity label — `craft:<category>`.
+- Results: both generators clean under `--check`; tests migrated to the new layout (new guards: no labels in table data, no service flags, manifest vs files, honest flag shape, i18n mirrors at new paths); 893 green (85 files), tsc --noEmit clean.
+
+## Micro-patch — Burn collapses into a rule; group paths live in dataset leaves (patch 270)
+
+> Owner's remarks (2026-09-17): "why 74 records with a flag when 2 lines in the registry will do"; "the registry exists precisely because the grouping of what lives where is written there — as categories grow, the import must be one: the registry, not import-import-import across every document".
+
+- `failBurnsMaterials` removed from 74 recipe records: in the printed set, burn-on-failure coincides with the test skill (cooking — Survival, chemistry — Science, explosives — Demolition), so the rule now lives as one line `CRAFT_RULES.failBurnsMaterialsSkills`. The engine treats the field in data as foreign and refuses it; while emitting, the generator cross-checks skill against the source workbench and fails on mismatch — the printed 21+27+8+9+9 split is preserved by a guard test.
+- Data-group leaves: `modules/fallout/data/junk/index.js` (junk cards, material reference, tables, per-locale name mirrors and table labels) and `modules/fallout/data/recipes/index.js` (manifest + files). domain/registry.js and i18n/equipmentCatalog.js import the leaves, not JSON: moving or growing a category is a single edit in the leaf. A guard test forbids the registry and the catalog from fetching junk paths directly; table labels are served via `getScrapTableLabels(locale)`.
+- On composition uniformity: all 250 rows in junk.json/radio were verified — one shape (`{material, count}` or `{material, base, dc[, effect]}`), zero mismatches; the discrepancy existed only in the abbreviation of my message. 3 new tests (rule vs print, field forbidden in records, leaves vs direct imports). 896 green (85 files), tsc --noEmit clean, both generators clean under --check.
+
+## Micro-patch — Materials are never salvaged; the magnifier composition is pinned by a test (patch 268)
+
+> Owner's canon (2026-09-17): junk is everything that breaks down into final materials; materials are crafting ingredients and simultaneously the constituent parts of junk (materials.json is literally the content of junk.json); materials have rarity; they may live apart from junk or inside it; materials are not salvaged.
+
+- Clause five became a hard gate in salvage operations: isScrapMaterial is checked before the junk type and before the printed composition — even if future data hands a material a composition or files it as junk, salvage stays impossible (reason 'material'), and the item row gets neither a subline nor a button, not even a dim one. For direct calls (GM, debug) the report shows a human line: "Materials are not salvaged: they are already the end parts."
+- Owner's magnifier check: the data was already correct — a single composition variant glass ×2 + copper ×1 + crystal ×2; copper/glass are uncommon, crystal is rare; in game, without Scrapper the magnifier can't be broken down (+3 hidden), rank 1 yields glass and copper, rank 2 adds the crystals. This is now pinned by a test: a drift from the book won't pass silently through any data regeneration.
+- Data guards: materials ∩ junk file — empty; materials owning compositions — zero; every material's rarity within 0..2. 9 new tests. Suite: 890 green, tsc --noEmit clean.
+
+## Micro-patch — Salvage button on all junk; dimmed when conditions unmet (patch 267)
+
+> Owner's decision: the "Salvage" button belongs to junk as a whole, not only to items with a printed composition. It works when the teardown conditions are met; otherwise the button stays in place, dimmed and unresponsive.
+
+- Junk without a printed composition (glands, stingers…) now gets the button too: its teardown runs on the common pool (261 rules) — the mechanic already supported it, the button did not. The composition subline stays reserved for items with a printed composition (264) and hides while equipped.
+- Enabled state comes from the same shared availability calculation (salvagePreview): equipped or stowed in a PA frame, composition fully cut by the Scrapper ceiling, nothing to draw from the pool — the button dims (opacity) and does not respond; silence instead of a refusal alert (owner's call). It always matches the real salvageItem gate — no eyeballed logic.
+- Non-junk without a printed composition: still no button, as before. 4 new state tests (junk w/o composition, ceiling-cut composition, equipped, non-junk). Suite: 881 green, tsc --noEmit clean.
+
+## Micro-patch — Craft button inactive until the window is reworked (patch 266)
+
+> Owner's decision: "benches" are the wrong axis. The 265 craft window will be reworked by product type: food/drinks, weapons, explosives, armor, power armor, chems, robots (the data actually holds five benches). Until that big patch, crafting stays closed.
+
+- The inventory "Craft" button no longer opens the window: a press honestly says crafting is being reworked (both locales updated). The window, model and all 265 tests stay in the repo — the next patch wires the same mechanics to the new tabs; the engine (251/262/263) is untouched.
+- The wiring guard test is flipped to the new state: `setCraftModalVisible(true)` on the button is forbidden, the modal wiring must remain in the screen. 877 green, tsc --noEmit clean.
+
+## Update — Craft window: benches, materials, batch (patch 265)
+
+> Plan step 3: crafting behind the inventory "Craft" button. Design confirmed by the owner (2026-09-17): unlearned recipes shown grayed with a reason; the recipe window knows only what it demands — no substitution hints; report is exactly three lines; batching allowed, a failed attempt burns only its own materials.
+
+- The "Craft" button opens a window with bench tabs (gunsmith / chemistry / kitchen — as the data says; a guard test keeps every recipe on a tab). Row: what you get, "Complexity N · skill · time"; if unavailable — gray row with the honest reason: "Needs perk "Chemist" rank 1" or "Missing materials" (decision B: hidden knowledge is shown, not hidden away).
+- Recipe window: one line per material "have N · need M" (the numbers already count what the bag can cover), attempts stepper capped by the scarcest material, run button. Substitutions: not a word — a recipe only knows what it asks; covering is the bag's business.
+- Batch: N attempts in a row, each with its own check on real dice; a failed one (say, third of five) burns only its own materials, the rest keep going; when the bag runs dry the attempts stop and the report shows "Stopped: … N attempts never started".
+- Report in the owner's format: "Intelligence + Repair = 8" / "Rolled 12, 3. Successes 1" (or "Failed" with an honest burned/intact note) / "Gained: … ×n. Spent: … Time: …". A complication is marked in the dice line and doubles time in the total. For batches: line 1 shared, one line per attempt, one collapsed total.
+- Rename by the owner's word: no "packs" anywhere — common/uncommon/rare materials are now "обычный материал / необычный материал / редкий материал" (Common/Uncommon/Rare material) in the bag, shops and lists; technical ids untouched. The crafting-data generator maps the book's "Common Materials" to these ids via explicit aliases — regenerated recipe files match byte for byte.
+- New model modules/fallout/crafting/windowModel.js (no React — lists, batch, report), modal modules/fallout/screens/InventoryScreen/modals/CraftingModal.js, 15 tests. Suite: 877 green, tsc --noEmit clean.
+
+## Update — Crafting and salvage time now runs on the survival clock (patch 262)
+
+> Owner's reordering: time binding goes first, inventory colors and UI later. The "keep time in the contract, don't count it" hold is lifted: the minutes in crafting and salvage answers now spend survival time.
+
+- New module operation applyActivityMinutes(minutes) drives the ladders through the same hourly ticks as the real-time contour (the fraction accumulates in timeCarried: six 10-minute salvage jobs add up to exactly one game hour), advances timed-effect timers and applies fatigue HP loss — exactly what the clock tick does (232). Shared gates with survival: disabled by setting — frozen (applied:false with the reason kept in the answer), a character without ladders has nothing to move; crafting/salvage themselves keep working regardless.
+- Salvage: the 10 minutes per item are spent after any attempt that reached the dice — success or failed check (a botched evening counts); a gate refusal never rolled, never spends. A complication multiplies before the clock is written (20 minutes on a double-complication failure).
+- Crafting: base time by the recipe's printed Complexity (book p. 210, GM discretion fixed as a table here): 0–1 — 10 minutes, 2–3 — an hour, 4+ — a day (the owner's 259 tiers), in CRAFT_RULES.craftTimeTiers, tunable without touching data. Time is spent on success (auto-success carries multiplier 1) and on a failed check (wasted hours; in kitchen/chemistry also burned materials); gate or store refusal spends nothing. The craft answer now carries time:{minutes,durationMultiplier} — the same contract salvage introduced in 260.
+- Two numeric guards the fractions required: the hour carry in advanceHours gets a 1e-9 tolerance (six steps of 1/6 in float give 0.9999999999999999 — without it an hour made of minutes would never tick), and the effect bridge rounds scenes to integers (1/6 h × 12 = 1.999… and the domain threw on non-integer; whole sleep hours compute as before).
+- 14 new tests (ladders, fraction carry, gates, effect bridge, craft auto-success/failure/gate/frozen, salvage success/complication failure/gate, six salvages = one hour). Suite 837 green, tsc --noEmit clean. The "+1 per AP" bonus stays contract-only: there is no AP counter and connecting the clock did not create one (owner decision).
+
+## Update — Salvage in inventory: composition subline and the button (patch 264)
+
+> From the owner's plan, items 1 and 2. Of the two highlight options (rarity colors vs hiding the unobtainable) hiding won as cheaper and honest — colors will ride the shared palette layer later.
+
+- Any item row with a printed salvage composition gained a "Salvage: …" subline — which materials and how many this hero can extract right now. Materials above the Scrapper ceiling are removed from the list (263); in place of their names only a "+N unavailable" counter stays — the hint without leaking tables into the UI. Items without a composition get no subline; "or"-alternatives show the union of options without promising counts.
+- Next to the sell button a "Salvage" button appeared: one item from the stack, real INT+Repair check and rolls, all through the finished package operations (260–263) with their spend, grant and survival clock (262). The button hides when there is nothing to extract (no perk) and on equipped items — the attempt would be refused anyway.
+- The result arrives as an inline alert: what was gained (localized material names and quantities), time spent, a "complication doubled the time" note (when ×2), an honest story about the botched job (junk intact, evening gone) and about the no-Scrapper refusal. Strings live in the Fallout screen locale layer (ru/en); the screen only prints them.
+- The module gained a pure salvageSublineForItem helper (for list rows) and exports the filter/ceiling — modal preview, subline and the salvage gate compute obtainability in one function and cannot diverge. 11 tests (subline per rank, "or", the report for every result branch, screen wiring via source guard and both locales' keys). Suite 862 green, tsc --noEmit clean. Plan item 3 (craft windows) follows as a design, next message.
+
+## Update — Scrapper ceiling on compositions, crafting pack duality (patch 263)
+
+> The owner closed stage 4 and fixed one more rule: material rarity of salvage output is capped by Scrapper for printed compositions as well.
+
+- Salvage: without Scrapper only common materials come out of junk, rank 1 opens uncommon, rank 2 — rare. Composition rows above the ceiling are not rolled and not granted; if no obtainable rows remain, salvage refuses with no-materials — the item and the 10 minutes are not spent. Nothing is added on top of the composition: junk holding only common+uncommon yields exactly that at rank 2. A row whose main material is cut but whose effect is obtainable survives and rolls its dice for the effect. Composition-link items (the radio) fall under the same ceiling.
+- Salvage preview carries rarityCeiling and the number of cut rows (gatedRows) — the base for modal highlighting once UI time comes.
+- Crafting duality: named materials now fill the recipe's pooled-pack slots (item_common/uncommon/rare_materials) of their own rarity — tiers never mix. Spending order: the packs themselves first, then substitutes in ascending catalog cost (the cheap ones burn in work first); the spent/burned contract carries actual store deductions, not the engine plan. Exact recipe rows reserve their quantities before substitution (the printed 93 recipes have no overlaps — a guard test asserts it; the reservation protects homebrew recipes). CRAFT_RULES.packSubstitutionByRarity=false restores pack-only behavior. The preview's pack have includes coverage, so "what is missing" stays honest.
+- Tests: 7 on the composition ceiling (the battery ladder across ranks, refusal with an intact item, the radio as a link exception, effect rows, preview), 7 on duality (substitution, packs-first order, price order, flag off, preview, data guard); 5 existing printed-composition tests moved to Scrapper 2 — otherwise they would fail exactly the way the game now must. Suite 851 green, tsc --noEmit clean.
+
+## Fix — Only junk is salvageable unless stated otherwise (patch 261)
+
+> The owner locked in the root salvage rule. The implementation carried a deny-list (consumables, ammo, armour, mods) and silently allowed everything else; refusal is now the default.
+
+- Non-junk salvage works only when a composition is printed in scrap/salvage.json (e.g. the radio) — then the table branch runs with its checks and yield weight. Anything else that is not junk gets a not-salvageable refusal and is not spent.
+- The generic yield (1 common material, weight cap, Scrapper raising the ceiling to uncommon/rare, never glue or oil) applies only to junk without a printed composition — legacy entries like bloatfly glands or stingwing barbs stay salvageable as junk.
+- The adapter no longer guesses types from id prefixes (the old ammo-prefix crutch) — the registry knows types; rules.js swaps the deny-list for salvageableItemType: 'junk'.
+- Tests moved to the new meaning: the bat is refused and not spent, the rarity ceiling is checked on composition-less junk. Suite 823 green, tsc --noEmit clean.
+
+## Update — Salvage: registry, operation, catalog visibility (patch 260)
+
+> Salvage data (256–257) joined the game: the registry knows the items, characters can take their bag apart, and the new junk and materials show up in the loot and buy windows.
+
+- The setting registry gained salvage getters: junk list, materials list, printed salvage composition by item id, and the d20 GM tables (categories, nine tables, mining).
+- The equipment catalog (source for item windows) returns two new lists: "Junk" — 130 items with printed weights and costs, "Materials" — 36 entries (three pooled packs + named). Add/Buy modals treat them like any items: search covers both, the sell modal prices by cost.
+- AddItemModal: the "Junk" category joined the tree and both locales' labels; the previously empty "Materials" placeholder is filled from the reference.
+- The salvage operation is a new setting module shaped like crafting: a universal engine (composition form: fixed units, DC dice with legal zeros, effect faces, "or" alternatives, non-junk pool mode) plus the setting adapter (registry, store, dice, Scrapper).
+- Salvage rules (setting numbers): INT + Repair test at difficulty 0 (it can only fall to complications); 10 minutes per item; a complication does not cancel success but doubles time (the same rule 259 introduced for crafting); on failure the item is not spent and no yield dice roll; consumables and ammo cannot be salvaged; adhesive and oil never drop from non-junk salvage; Scrapper raises the rarity ceiling (rank 1 uncommons, rank 2 rares); the "+1 per AP" bonus stays in the contract but is not counted until AP/time integration.
+- Spending and granting reuse the store's atomic channel from crafting (spendItemStacks/addNewItem): a refusal at any step leaves the balance untouched. Items without a catalog entry are not salvageable (unknown-item gate).
+- 31 new tests (engine on stubs, operations on the real store with real data, catalog and modal wiring visibility). Suite: 822 green, tsc clean.
+- Out of scope (next): composition/rarity sublines in the inventory list, rarity colors, GM mining rolls, survival-clock integration.
+
+## Fix — A complication does not cancel success: it doubles time (patch 259)
+
+> Revert of patch 258's "complication spoils the work": it contradicted the core system — when successes and complications occur together, the success stands. Owner's correction (2026-09-16) accepted.
+
+- New rule (for every timed check in the setting): any complication on the check multiplies its duration by two — 10 minutes of crafting become 20, an hour becomes two, a day becomes two. The same applies to the duration of negative effects.
+- Implementation: the universal crafting engine returns `durationMultiplier` (2 with a complication, otherwise 1); where to apply it is the setting's call. The factor is a setting number (`complicationDurationMultiplier`); recipe data untouched. Until survival clocks count crafting minutes the multiplier is computed but unused — the rule is introduced ahead, as agreed.
+- Material burn on outright FAILURE at cooking/chemistry stays as of patch 251 — that is failure, not "success with complication". Success with complication: the item is crafted, materials are spent, time is doubled.
+- The bench skills/perks map from 258 is unchanged — only its tests were rewritten.
+- 10 tests rebuilt for the new semantics. Suite: 791 green, `tsc --noEmit` clean.
+
+## Update — Crafting: bench skill map and complication spoilage (patch 258)
+
+> Per the owner's text (2026-09-16, book pp. 210–212): which skills each bench tests and which perks "apply", plus the hardened rule: on cooking and the chemistry lab any complication spoils the work — ingredients are gone, no "may".
+
+- The "bench → skills/perks" map joined the crafting rules: armor — Repair (+Armorer); chemistry lab — Science (+Chemist), explosives — Demolitions (+Demolitions Expert) — the split lives on recipes, the map pins it; cooking — Survival; power-armor servicing — Repair+Science (+Armorer, Science!); robots — Repair+Science (+Robotics Expert); weapons — Repair+Science (+Gunslinger, Science!, Blacksmith). Armor/servicing/robots lines are forward-looking: such recipes don't exist in the catalog yet. A test invariant: every recipe's skill must belong to its bench list.
+- The perk half of the text is already what perks are in our data: recipe gates (Chemist/Demolitions Expert where the book requires them) and modification-rank access. The map introduces no bonus dice.
+- Spoilage rule: on cooking and chemistry any complication ruins the item even with enough successes — materials are spent, nothing is granted (new result reason complication-spoiled). Plain failure still burns materials; double complication is still an automatic failure. Auto-success (skill rank covers complexity) rolls no check and cannot spoil.
+- The recipe preview gained benchView: bench skills, related perks, burn/spoil flags — screens can display this without touching rules.
+- 10 new tests (engine behavior on stub ports + map-vs-data consistency). Suite: 791 green, tsc clean.
+
 ## Fix — Salvage identifiers: item name instead of type in id (patch 257)
 
 > Per owner's note: only the registry knows an item is junk or material; the id carries no type. One item — one id: recipe id = catalog id, no "junk_something" twins of plain items.

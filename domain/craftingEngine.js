@@ -3,7 +3,9 @@
 // Универсальный движок механики «крафт» (патч 251).
 //
 // Что он знает: ТОЛЬКО форму рецепта — { requires: { skill, complexity, perks[] },
-// materials: [{ itemId, count }], output: { itemId, quantity }, bench }.
+// materials: [{ itemId, count }], outputQuantity: number | {base,cd};
+// id рецепта = id предмета результата. Сгорание при провале — настройка
+// модуля (CRAFT_RULES), не поле данных (270).
 // Идентификаторы предметов, перков, верстаков для него непрозрачны: движок не
 // заглядывает в каталоги, не читает стор и не знает, что такое Fallout.
 //
@@ -26,6 +28,10 @@
 //   { done: false, stage: 'gate',  reasons: [{code, ...}], spent: [], granted: null }
 //   { done: false, stage: 'store', reason: 'spend-refused', ... }   // адаптер отказал
 //   { done: false, stage: 'check', reason: 'check-failed', burned: [...], ... }
+// Все ответы с проверкой несут durationMultiplier: множитель времени работы
+// (или негативного эффекта), который вызывающий применяет, когда время
+// где-то учтено. Осложнение успех не отменяет — при любом осложнении
+// множитель берётся из правила вызывающего (1 = удвоения нет).
 
 import { resolveD20Check } from './d20Checks';
 
@@ -33,7 +39,7 @@ const assertRecipeShape = (recipe) => {
   if (!recipe || typeof recipe !== 'object') {
     throw new Error('[craftingEngine] recipe is required');
   }
-  const { requires, materials, output } = recipe;
+  const { requires, materials } = recipe;
   if (!requires || typeof requires.skill !== 'string' || !requires.skill) {
     throw new Error('[craftingEngine] recipe.requires.skill is required');
   }
@@ -49,8 +55,16 @@ const assertRecipeShape = (recipe) => {
       throw new Error('[craftingEngine] recipe.materials entries must be { itemId, count > 0 }');
     }
   }
-  if (!output || typeof output.itemId !== 'string' || !output.itemId) {
-    throw new Error('[craftingEngine] recipe.output.itemId is required');
+  // Результат рецепта — это предмет с его id (реформа 2026-09-17): отдельного
+  // «output.itemId» в данных нет, количество — outputQuantity (целое или {base,cd}).
+  if (typeof recipe.id !== 'string' || !recipe.id) {
+    throw new Error('[craftingEngine] recipe.id (он же id предмета результата) is required');
+  }
+  if (recipe.outputQuantity !== undefined) {
+    assertQuantityShape(recipe.outputQuantity); // форма проверяется без броска
+  }
+  if (recipe.failBurnsMaterials !== undefined) {
+    throw new Error('[craftingEngine] failBurnsMaterials is a module rule (270), not recipe data');
   }
 };
 
@@ -65,33 +79,40 @@ export const craftDifficulty = ({ complexity, skillRank = 0 }) =>
  * Количество результата: число или { base, cd } — база плюс боевые кубики.
  * Кубики кидает порт rollCD (движок не знает, чьи это кубики и зачем).
  */
-export const resolveOutputQuantity = (quantity, rollCD) => {
+// Форма количества результата: целое ≥1 или {base ≥1, cd ≥0}. Отдельно от
+// резолвера: сверка данных не имеет права бросать кубики (269).
+const assertQuantityShape = (quantity) => {
   if (Number.isInteger(quantity)) {
-    if (quantity < 1) {
-      throw new Error('[craftingEngine] output.quantity must be >= 1');
-    }
-    return quantity;
+    if (quantity < 1) throw new Error('[craftingEngine] recipe.outputQuantity must be >= 1');
+    return;
   }
-  if (quantity && typeof quantity === 'object') {
-    const base = Number(quantity.base);
-    const cd = Number(quantity.cd ?? 0);
-    if (!Number.isInteger(base) || base < 1) {
-      throw new Error('[craftingEngine] output.quantity.base must be an integer >= 1');
-    }
-    if (!Number.isInteger(cd) || cd < 0) {
-      throw new Error('[craftingEngine] output.quantity.cd must be an integer >= 0');
-    }
-    if (cd === 0) return base;
-    if (typeof rollCD !== 'function') {
-      throw new Error('[craftingEngine] rollCD port is required for CD quantities');
-    }
-    const rolled = Number(rollCD(cd));
-    if (!Number.isInteger(rolled) || rolled < 0) {
-      throw new Error('[craftingEngine] rollCD must return a non-negative integer');
-    }
-    return base + rolled;
+  if (!quantity || typeof quantity !== 'object' || Array.isArray(quantity)) {
+    throw new Error('[craftingEngine] recipe.outputQuantity must be an integer or { base, cd }');
   }
-  throw new Error('[craftingEngine] unknown output.quantity shape');
+  const base = Number(quantity.base);
+  const cd = Number(quantity.cd ?? 0);
+  if (!Number.isInteger(base) || base < 1) {
+    throw new Error('[craftingEngine] outputQuantity.base must be an integer >= 1');
+  }
+  if (!Number.isInteger(cd) || cd < 0) {
+    throw new Error('[craftingEngine] outputQuantity.cd must be an integer >= 0');
+  }
+};
+
+export const resolveOutputQuantity = (quantity, rollCD) => {
+  assertQuantityShape(quantity);
+  if (Number.isInteger(quantity)) return quantity;
+  const base = Number(quantity.base);
+  const cd = Number(quantity.cd ?? 0);
+  if (cd === 0) return base;
+  if (typeof rollCD !== 'function') {
+    throw new Error('[craftingEngine] rollCD port is required for CD quantities');
+  }
+  const rolled = Number(rollCD(cd));
+  if (!Number.isInteger(rolled) || rolled < 0) {
+    throw new Error('[craftingEngine] rollCD must return a non-negative integer');
+  }
+  return base + rolled;
 };
 
 /**
@@ -142,6 +163,9 @@ export const evaluateCraft = ({
  * проверки поведение задаёт вызывающий: failBurnsMaterials=true — материалы
  * сгорают (списываются), false — остаются в сумке (книга: горят на кухне и в
  * химии, не горят за верстаком; список верстаков — число настройки сеттинга).
+ * complicationDurationMultiplier=N: осложнение не отменяет успех, а
+ * помножает время на N (правило владельца 2026-09-16; ответ несёт
+ * durationMultiplier — куда его приложить, решает вызывающий).
  */
 export const runCraft = ({
   recipe,
@@ -151,6 +175,7 @@ export const runCraft = ({
   perkRanks = {},
   inventoryCounts = {},
   failBurnsMaterials = false,
+  complicationDurationMultiplier = 1,
   rollD20,
   rollCD,
   spend,
@@ -167,7 +192,7 @@ export const runCraft = ({
 
   // Количество считаем ДО списания: кривая форма output.quantity — дефект данных,
   // он не должен застирать сумку на полуслове.
-  const quantity = resolveOutputQuantity(recipe.output.quantity, rollCD);
+  const quantity = resolveOutputQuantity(recipe.outputQuantity ?? 1, rollCD);
 
   let check = null;
   if (!evaluation.auto) {
@@ -183,6 +208,13 @@ export const runCraft = ({
   const passed = evaluation.auto || check.passed;
   const plan = evaluation.materials.map(({ itemId, need }) => ({ itemId, count: need }));
 
+  // Осложнение не отменяет успех (корневая система 2d20): оно помножает
+  // время — множитель едет в ответе, куда его приложить, решает вызывающий,
+  // когда время учтено. Автоуспех без броска множителя не получает.
+  const durationMultiplier = check && check.complicationCount > 0
+    ? complicationDurationMultiplier
+    : 1;
+
   if (passed) {
     const spendResult = spend(plan);
     if (!spendResult || spendResult.ok !== true) {
@@ -196,17 +228,14 @@ export const runCraft = ({
         check,
       };
     }
-    const grantResult = grant({
-      itemId: recipe.output.itemId,
-      itemType: recipe.output.itemType ?? null,
-      quantity,
-    });
+    const grantResult = grant({ itemId: recipe.id, quantity });
     return {
       done: true,
       auto: evaluation.auto,
+      durationMultiplier,
       spent: plan,
       granted: {
-        itemId: recipe.output.itemId,
+        itemId: recipe.id,
         quantity,
         ...(grantResult && typeof grantResult === 'object' && grantResult.instanceId
           ? { instanceId: grantResult.instanceId } : {}),
@@ -232,8 +261,8 @@ export const runCraft = ({
         check,
       };
     }
-    return { done: false, stage: 'check', reason: 'check-failed', spent: plan, burned: plan, granted: null, check };
+    return { done: false, stage: 'check', reason: 'check-failed', durationMultiplier, spent: plan, burned: plan, granted: null, check };
   }
 
-  return { done: false, stage: 'check', reason: 'check-failed', spent: [], burned: [], granted: null, check };
+  return { done: false, stage: 'check', reason: 'check-failed', durationMultiplier, spent: [], burned: [], granted: null, check };
 };

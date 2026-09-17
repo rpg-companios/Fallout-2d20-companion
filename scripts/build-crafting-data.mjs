@@ -31,7 +31,7 @@
 //                                                   совпадают с генерацией (предохранитель
 //                                                   __tests__/crafting/crafting-data.test.js)
 
-import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -39,7 +39,7 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const RAW_FILE = 'docs/reference-data/pipboyapp_crafting.json';
 const AMMO_BRIDGE_FILE = 'docs/reference-data/AMMO-FOUND-TABLE.md';
-export const OUT_DIR = 'modules/fallout/data/crafting';
+export const OUT_DIR = 'modules/fallout/data/recipes';
 export const REPORT_FILE = 'docs/reference-data/CRAFTING-MAPPING.md';
 export const MISSING_FILE = 'docs/reference-data/Missing_craft.json';
 
@@ -62,8 +62,8 @@ const CATALOG_SOURCES = [
   { file: 'i18n/en-EN/data/equipment/weapon_mods.json', itemType: 'weaponMod', bucket: 'mod' },
   // Хлам и материалы — справочники владельца (патч 250): их добавили, чтобы закрыть
   // дыры каталога в ингредиентах («Антисептик», «Кровяной мешок», «Абраксо»…).
-  { file: 'i18n/en-EN/data/junk.json', itemType: 'junk', bucket: 'items' },
-  { file: 'i18n/en-EN/data/materials.json', itemType: 'misc', bucket: 'items' },
+  { file: 'i18n/en-EN/data/junk/junk.json', itemType: 'junk', bucket: 'items' },
+  { file: 'i18n/en-EN/data/junk/material.json', itemType: 'misc', bucket: 'items' },
 ];
 
 const PERKS_FILE = 'i18n/en-EN/data/perks/perks.json';
@@ -88,6 +88,10 @@ const MATERIAL_ITEM_IDS = {
 };
 
 export const BENCHES = ['weapons', 'armor', 'powerArmor', 'robot', 'chemistry', 'cooking'];
+const BENCH_BURNS = { cooking: true, chemistry: true };
+// Навыки-носители того же правила (270): сверка в генераторе обязывает
+// совпадать, дублировать флаг в 74 записи больше нечего.
+const BURN_SKILLS = new Set(['SCIENCE', 'SURVIVAL', 'EXPLOSIVES']);
 const BENCH_BY_SOURCE = {
   weapons: 'weapons',
   armor: 'armor',
@@ -108,6 +112,12 @@ const SKILL_BY_SOURCE = {
 // Ручные соответствия: то же самый предмет, записанный в источнике иначе, чем у
 // нас. Причина по каждому — в отчёт, чтобы владелец мог проверить решение.
 export const ITEM_NAME_ALIASES = {
+  // Материалы редкостей (переименование владельца 2026-09-17): источник печатает
+  // «Common/Uncommon/Rare Materials», в UI с 265 — «обычный/необычный/редкий
+  // материал». Id не менялись: связь имени с item_*_materials держим здесь.
+  'common materials': { itemId: 'item_common_materials', reason: 'переименование владельца 2026-09-17: «Common Materials» = наш «Common material»' },
+  'uncommon materials': { itemId: 'item_uncommon_materials', reason: 'переименование владельца 2026-09-17: «Uncommon Materials» = наш «Uncommon material»' },
+  'rare materials': { itemId: 'item_rare_materials', reason: 'переименование владельца 2026-09-17: «Rare Materials» = наш «Rare material»' },
   'baked bloatfly': { itemId: 'food_grilled_bloatfly', reason: 'то же блюдо: наше ru-имя — «Печёный дутень»' },
   'cooked softshell meat': { itemId: 'food_cooked_softshell_mirelurk', reason: 'то же блюдо: у нас названо по животному' },
   'iguana soup': { itemId: 'food_iguana_stew', reason: 'то же блюдо: ru-имя у обеих записей «Кусочки игуаны»' },
@@ -473,17 +483,11 @@ export function buildCraftingData() {
     // ни этот файл: их дописывает владелец по своим книгам.
     const holeRecord = (materials, derived, blockedBy) => ({
       id: output ? output.itemId : 'unknown',
-      bench: BENCH_BY_SOURCE[source.workbench] || 'unknown',
       requires,
       materials,
       ...(derived ? { derivedMaterials: true } : {}),
-      output: output
-        ? { itemId: output.itemId, itemType: output.itemType, quantity }
-        : {
-          itemId: 'unknown',
-          itemType: MISSING_TYPE_BY_SOURCE_OUTPUT[norm(source.outputCategory)] || 'unknown',
-          quantity: 'unknown',
-        },
+      outputQuantity: output ? quantity : 'unknown',
+      ...(output ? {} : { outputType: MISSING_TYPE_BY_SOURCE_OUTPUT[norm(source.outputCategory)] || 'unknown' }),
       ...(Number.isFinite(Number(source.sourcePage)) ? { sourcePage: Number(source.sourcePage) } : {}),
       sourceName: outputName,
       blockedBy,
@@ -552,24 +556,29 @@ export function buildCraftingData() {
     }
     ids.add(id);
 
+    // Форма записи (реформа владельца 2026-09-17): предмет результата — это id
+    // рецепта; отдельного «output.itemId» нет. Количество — outputQuantity:
+    // целое или {base, cd} (боевые кубики). Верстака и страниц в данных нет.
+    // Сгорание при провале в записи тоже не дублируется (микропатч 270):
+    // печатное правило «кухня и химия жгут» в наших данных совпадает с проверочным
+    // навыком — правило живёт одной строкой в CRAFT_RULES (реестр модуля).
+    // Генератор лишь сверяет: навык recipes обязан давать ровно тот же разрез,
+    // что печатный верстак источника, — иначе молча потеряем число.
+    const bench = BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[output.bucket];
+    if (Boolean(BENCH_BURNS[bench]) !== (BURN_SKILLS.has(skill))) {
+      throw new Error(`${outputName}: верстак «${bench}» и навык «${skill}» расходятся в правиле сгорания — реши явно`);
+    }
     entries.push({
       bucket: output.bucket,
       record: {
         id,
-        bench: BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[output.bucket],
         requires: {
           skill,
           complexity,
           ...(parsed.perks.length ? { perks: parsed.perks } : {}),
         },
         materials,
-        ...(derivedMaterials ? { derivedMaterials: true } : {}),
-        output: {
-          itemId: output.itemId,
-          itemType: output.itemType,
-          quantity,
-        },
-        ...(Number.isFinite(Number(source.sourcePage)) ? { sourcePage: Number(source.sourcePage) } : {}),
+        outputQuantity: quantity,
       },
     });
   }
@@ -582,6 +591,7 @@ export function buildCraftingData() {
   }
 
   const byBucket = {};
+  // (BENCH_BURNS — печатное правило сгорания; объявлено рядом с картой верстаков.)
   for (const bucket of BUCKET_ORDER) {
     const list = entries.filter((e) => e.bucket === bucket).map((e) => e.record);
     if (list.length) byBucket[bucket] = list;
@@ -595,10 +605,9 @@ export function buildCraftingData() {
 
   const index = {
     id: 'crafting',
-    benches: [...new Set(entries.map((e) => e.record.bench))].sort(),
     recipes: Object.keys(byBucket).sort().map((bucket) => ({
       file: FILE_BY_BUCKET[bucket],
-      bucket,
+      category: bucket,
       count: byBucket[bucket].length,
     })),
   };
@@ -629,7 +638,7 @@ export function buildCraftingData() {
 
 const MISSING_INTRO = {
   purpose: 'Рецепты, которые упираются в дыры каталога: результат или ингредиент названы в источнике, но предмета с таким id у нас нет.',
-  format: 'Поля — как у рецептов данных (modules/fallout/data/crafting): id, bench, requires, materials, output, sourcePage. Где данных нет — строка "unknown"; для неизвестных ингредиентов id неизвестен, но напечатанное имя и количество сохранены (sourceName, count), чтобы было что сличить с книгами.',
+  format: 'Поля — как у рецептов данных (modules/fallout/data/recipes): id (=предмет результата), requires, materials, outputQuantity. Где данных нет — строка "unknown"; для неизвестных ингредиентов id неизвестен, но напечатанное имя и количество сохранены (sourceName, count), чтобы было что сличить с книгами.',
   howToMerge: 'Дописать недостающее (предмет в каталог либо замену слота), убрать "unknown" и вернуть файл; затем правила переезжают в генератор (соответствия/числа), а данные перегенерируются. Генератор перезаписывает этот файл — руками его чинить можно только как черновик.',
   categories: { chem: 'препараты', food: 'еда и напитки', loot: 'вещи (станки, взрывчатка, ремкомплекты)', ammo: 'боеприпасы, включая дротики' },
 };
@@ -818,6 +827,7 @@ if (isMain) {
     }
   } else {
     for (const item of wanted) {
+      mkdirSync(join(REPO, OUT_DIR), { recursive: true });
       writeFileSync(join(REPO, OUT_DIR, item.file), item.content);
       console.log(`→ ${OUT_DIR}/${item.file}`);
     }

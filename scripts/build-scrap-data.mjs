@@ -48,9 +48,9 @@ const catalogIdScan = (dir) => {
   const scan = (d) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const f = path.join(d, e.name);
-      if (e.isDirectory()) { if (e.name !== 'scrap') scan(f); continue; }
-      if (!e.name.endsWith('.json')) continue;
-      if (['junk.json', 'materials.json'].includes(e.name) && d.endsWith(`${path.sep}data`)) continue;
+      // junk/ — каталог генератора (карточки хлама, материалы, таблицы); скан
+      // сверяет чужие id, свои — не считает занятыми.
+      if (e.isDirectory()) { if (e.name !== 'scrap' && e.name !== 'junk') scan(f); continue; }
       try { walk(JSON.parse(fs.readFileSync(f, 'utf8'))); } catch {}
     }
   };
@@ -61,10 +61,14 @@ const CATALOG_IDS = catalogIdScan(DATA);
 const assertFreshId = (id) => { if (CATALOG_IDS.has(id)) fail(`id ${id} уже занят предметом основного каталога — линкуй, не дублируй`); };
 
 // ─── материалы ────────────────────────────────────────────────────────────────
+// Все материалы равны (решение владельца 2026-09-17): и «обычный материал»,
+// и кислота — записи одного справочника с редкостью. Никаких пометок
+// «именованный»: код различает пачки только по id из CRAFT_RULES/SALVAGE_RULES.
+const RARITY_NAME = { 0: 'common', 1: 'uncommon', 2: 'rare' };
 const PACKS = [
-  { id: 'item_common_materials', itemType: 'misc', weight: 1, cost: 1, rarity: 0 },
-  { id: 'item_uncommon_materials', itemType: 'misc', weight: 1, cost: 3, rarity: 1 },
-  { id: 'item_rare_materials', itemType: 'misc', weight: 1, cost: 5, rarity: 2 },
+  { id: 'item_common_materials', materialType: 'common', weight: 1, cost: 1, rarity: 0 },
+  { id: 'item_uncommon_materials', materialType: 'uncommon', weight: 1, cost: 3, rarity: 1 },
+  { id: 'item_rare_materials', materialType: 'rare', weight: 1, cost: 5, rarity: 2 },
 ];
 
 const round1 = (x) => Math.round(x * 10) / 10;
@@ -76,11 +80,10 @@ for (const m of SRC.materials) {
   matById.set(id, { id, key: m.key, ru: m.ru, en: m.en, byRule: !!m.byRule });
   matById.get(id).entry = {
     id,
-    itemType: 'misc',
+    materialType: RARITY_NAME[m.rarity] ?? 'common',
     weight,
     cost: m.cost,
     rarity: m.rarity,
-    namedMaterial: true,
   };
 }
 for (const id of matById.keys()) assertFreshId(id);
@@ -92,7 +95,8 @@ const resolveMat = (m) => {
 
 // ─── хлам ─────────────────────────────────────────────────────────────────────
 const junk = new Map(); // id -> entry
-const salvage = {}; // itemId -> { options: [[comp]] }
+const salvage = {}; // itemId -> { options: [[comp]] } (промежуточно; пишется в карточку)
+const GENERAL_GOODS_PATH = path.join(DATA, 'equipment', 'general_goods.json');
 const addJunk = (id, weight, cost) => {
   if (junk.has(id)) fail(`дубль хлам-id ${id}`);
   assertFreshId(id);
@@ -129,6 +133,34 @@ const addSalvage = (id, salv, salvOptions) => {
   salvage[id] = { options: opts };
 };
 
+// раскладка составов по карточкам: хлам — в junk.json, линки каталога (радио) —
+// в свою запись general_goods.json. Единый источник: состав видит тот, кто
+// открывает карточку предмета (решение владельца 2026-09-17).
+const applyCompositions = () => {
+  const generalGoods = fs.existsSync(GENERAL_GOODS_PATH)
+    ? JSON.parse(fs.readFileSync(GENERAL_GOODS_PATH, 'utf8'))
+    : null;
+  const goodsById = new Map();
+  const scan = (x) => {
+    if (Array.isArray(x)) x.forEach(scan);
+    else if (x && typeof x === 'object') {
+      if (typeof x.id === 'string' && ('composition' in x || 'name' in x)) goodsById.set(x.id, x);
+      Object.values(x).forEach(scan);
+    }
+  };
+  if (generalGoods) scan(generalGoods);
+  for (const [id, comp] of Object.entries(salvage)) {
+    const row = junk.get(id);
+    if (row) { row.composition = comp.options; continue; }
+    const card = goodsById.get(id);
+    if (!card) { fail(`состав ${id}: ни хлам, ни карточка каталога — некуда записать`); continue; }
+    if (!card.composition) { fail(`состав ${id}: карточка каталога не несёт composition`); continue; }
+    if (JSON.stringify(card.composition) !== JSON.stringify(comp.options)) {
+      fail(`состав ${id}: карточка каталога разошлась с источником — перегенерируй карточку`);
+    }
+  }
+};
+
 // ─── обход таблиц ─────────────────────────────────────────────────────────────
 const tablesOut = {};
 for (const [tKey, t] of Object.entries(SRC.tables)) {
@@ -155,7 +187,7 @@ for (const [tKey, t] of Object.entries(SRC.tables)) {
   }
   // полнота 1..20
   for (let f = 1; f <= 20; f++) if (!faces[f]) fail(`таблица ${tKey}: грань ${f} не описана`);
-  tablesOut[tKey] = { ru: t.ru, en: t.en, faces };
+  tablesOut[tKey] = { faces };
 }
 
 // руды
@@ -195,7 +227,8 @@ for (const row of SRC.categories.d20) {
 for (let f = 1; f <= 20; f++) if (!catFaces[f]) fail(`категории: грань ${f} не описана`);
 
 // legacy-хлам (из текущего junk.json — не в книжных таблицах)
-const OLD_JUNK_PATH = path.join(DATA, 'junk.json');
+const OLD_JUNK_PATH = [path.join(DATA, 'junk', 'junk.json'), path.join(DATA, 'junk.json')]
+  .find((x) => fs.existsSync(x)) ?? path.join(DATA, 'junk', 'junk.json');
 const oldJunk = fs.existsSync(OLD_JUNK_PATH) ? JSON.parse(fs.readFileSync(OLD_JUNK_PATH, 'utf8')) : [];
 for (const legacy of SRC.legacyJunk) {
   const entry = oldJunk.find((x) => x.id === legacy.id || x.id === legacy.oldId || x.id === `junk_${legacy.id}`);
@@ -204,14 +237,17 @@ for (const legacy of SRC.legacyJunk) {
 }
 
 // сохранение существующих имён i18n для id, которые уже были в зеркалах
-const readI18n = (loc, file) => {
-  const p = path.join(I18N, loc, 'data', file);
-  return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : [];
+const readI18n = (loc, file, newFile) => {
+  for (const rel of newFile ? [newFile, file] : [file]) {
+    const p = path.join(I18N, loc, 'data', rel);
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  }
+  return [];
 };
 const names = { 'ru-RU': new Map(), 'en-EN': new Map() };
 for (const loc of Object.keys(names)) {
-  for (const srcFile of ['junk.json', 'materials.json']) {
-    for (const it of readI18n(loc, srcFile)) {
+  for (const [srcFile, newFile] of [['junk.json', 'junk/junk.json'], ['materials.json', 'junk/material.json']]) {
+    for (const it of readI18n(loc, srcFile, newFile)) {
     if (!it?.id) continue;
     if (!names[loc].has(it.id)) names[loc].set(it.id, it);
     const bare = it.id.replace(/^junk_/, ''); // старые junk_-id отдают имена новым bare-id
@@ -220,6 +256,7 @@ for (const loc of Object.keys(names)) {
   }
 }
 
+applyCompositions();
 const junkList = [...junk.values()];
 const materialsList = [...PACKS, ...[...matById.values()].map((m) => m.entry)];
 const junkI18n = {};
@@ -251,18 +288,25 @@ for (const [loc, lang] of [['ru-RU', 'ru'], ['en-EN', 'en']]) {
 const outputs = new Map();
 const put = (p, content) => outputs.set(path.join(ROOT, p), content);
 
-put('modules/fallout/data/materials.json', j(materialsList));
-put('modules/fallout/data/junk.json', j(junkList));
-put('modules/fallout/data/scrap/salvage.json', j(salvage));
-put('modules/fallout/data/scrap/tables.json', j({
-  categories: { ru: SRC.categories.ru, en: SRC.categories.en, faces: catFaces },
+put('modules/fallout/data/junk/junk.json', j(junkList));
+put('modules/fallout/data/junk/material.json', j(materialsList));
+put('modules/fallout/data/junk/tables.json', j({
+  categories: { faces: catFaces },
   tables: tablesOut,
-  mining: { ru: SRC.mining.ru, en: SRC.mining.en, faces: miningFaces },
+  mining: { faces: miningFaces },
 }));
-put('modules/fallout/i18n/ru-RU/data/junk.json', j(junkI18n['ru-RU']));
-put('modules/fallout/i18n/en-EN/data/junk.json', j(junkI18n['en-EN']));
-put('modules/fallout/i18n/ru-RU/data/materials.json', j([...matI18n['ru-RU']]));
-put('modules/fallout/i18n/en-EN/data/materials.json', j([...matI18n['en-EN']]));
+put('modules/fallout/i18n/ru-RU/data/junk/junk.json', j(junkI18n['ru-RU']));
+put('modules/fallout/i18n/en-EN/data/junk/junk.json', j(junkI18n['en-EN']));
+put('modules/fallout/i18n/ru-RU/data/junk/material.json', j([...matI18n['ru-RU']]));
+put('modules/fallout/i18n/en-EN/data/junk/material.json', j([...matI18n['en-EN']]));
+// подписи таблиц — слой i18n (данные молчат на человеческом)
+for (const [loc, lang] of [['ru-RU', 'ru'], ['en-EN', 'en']]) {
+  put(`modules/fallout/i18n/${loc}/data/junk/tables.json`, j({
+    categories: SRC.categories[lang],
+    tables: Object.fromEntries(Object.entries(SRC.tables).map(([k, t]) => [k, t[lang]])),
+    mining: SRC.mining[lang],
+  }));
+}
 
 if (errors.length) {
   console.error('Ошибки источника:\n' + errors.map((e) => ' - ' + e).join('\n'));
@@ -285,5 +329,5 @@ if (CHECK) {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content);
   }
-  console.log(`Записано файлов: ${outputs.size}; хлам: ${junkList.length}; материалы: ${materialsList.length}; salvage-записей: ${Object.keys(salvage).length}`);
+  console.log(`Записано файлов: ${outputs.size}; хлам: ${junkList.length}; материалы: ${materialsList.length}; составов в карточках: ${Object.keys(salvage).length}`);
 }

@@ -1,6 +1,10 @@
-{
-  "animal_hide": {
-    "options": [
+[
+  {
+    "id": "animal_hide",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "leather",
@@ -9,8 +13,12 @@
       ]
     ]
   },
-  "mutated_viscera": {
-    "options": [
+  {
+    "id": "mutated_viscera",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "acid",
@@ -23,8 +31,12 @@
       ]
     ]
   },
-  "blood_sac": {
-    "options": [
+  {
+    "id": "blood_sac",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "antiseptic",
@@ -37,8 +49,12 @@
       ]
     ]
   },
-  "stinger_or_proboscis": {
-    "options": [
+  {
+    "id": "stinger_or_proboscis",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 10,
+    "composition": [
       [
         {
           "material": "acid",
@@ -47,8 +63,12 @@
       ]
     ]
   },
-  "bones_and_teeth": {
-    "options": [
+  {
+    "id": "bones_and_teeth",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "bone",
@@ -57,8 +77,12 @@
       ]
     ]
   },
-  "radscorpion_stinger": {
-    "options": [
+  {
+    "id": "radscorpion_stinger",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 30,
+    "composition": [
       [
         {
           "material": "nuclear_material",
@@ -67,8 +91,12 @@
       ]
     ]
   },
-  "abraxo_cleaner": {
-    "options": [
+  {
+    "id": "abraxo_cleaner",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 10,
+    "composition": [
       [
         {
           "material": "acid",
@@ -85,8 +113,12 @@
       ]
     ]
   },
-  "alarm_clock": {
-    "options": [
+  {
+    "id": "alarm_clock",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 10,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -107,8 +139,12 @@
       ]
     ]
   },
-  "ashtray": {
-    "options": [
+  {
+    "id": "ashtray",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "ceramic",
@@ -117,8 +153,12 @@
       ]
     ]
   },
-  "bread_box": {
-    "options": [
+  {
+    "id": "bread_box",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -127,8 +167,12 @@
       ]
     ]
   },
-  "broom": {
-    "options": [
+  {
+    "id": "broom",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -141,8 +185,12 @@
       ]
     ]
   },
-  "bucket": {
-    "options": [
+  {
+    "id": "bucket",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "steel",
@@ -151,8 +199,12 @@
       ]
     ]
   },
-  "camera": {
-    "options": [
+  {
+    "id": "camera",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "gears",
@@ -169,8 +221,12 @@
       ]
     ]
   },
-  "can": {
-    "options": [
+  {
+    "id": "can",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -185,8 +241,12 @@
       ]
     ]
   },
-  "chalk": {
-    "options": [
+  {
+    "id": "chalk",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "asbestos",
@@ -195,8 +255,12 @@
       ]
     ]
   },
-  "chessboard": {
-    "options": [
+  {
+    "id": "chessboard",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "wood",
@@ -205,8 +269,12 @@
       ]
     ]
   },
-  "cigar_or_cigarettes": {
-    "options": [
+  {
+    "id": "cigar_or_cigarettes",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -215,8 +283,12 @@
       ]
     ]
   },
-  "cigar_box": {
-    "options": [
+  {
+    "id": "cigar_box",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 40,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -233,8 +305,12 @@
       ]
     ]
   },
-  "cigarette_carton": {
-    "options": [
+  {
+    "id": "cigarette_carton",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 50,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -251,8 +327,12 @@
       ]
     ]
   },
-  "clothes_hanger": {
-    "options": [
+  {
+    "id": "clothes_hanger",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "spring",
@@ -265,8 +345,12 @@
       ]
     ]
   },
-  "clothing_iron": {
-    "options": [
+  {
+    "id": "clothing_iron",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "steel",
@@ -279,8 +363,12 @@
       ]
     ]
   },
-  "cooking_oil": {
-    "options": [
+  {
+    "id": "cooking_oil",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -293,8 +381,12 @@
       ]
     ]
   },
-  "cookware": {
-    "options": [
+  {
+    "id": "cookware",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "steel",
@@ -303,8 +395,12 @@
       ]
     ]
   },
-  "cotton_yarn": {
-    "options": [
+  {
+    "id": "cotton_yarn",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -313,8 +409,12 @@
       ]
     ]
   },
-  "crockery_and_tableware": {
-    "options": [
+  {
+    "id": "crockery_and_tableware",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "ceramic",
@@ -335,8 +435,12 @@
       ]
     ]
   },
-  "crystal_decanter": {
-    "options": [
+  {
+    "id": "crystal_decanter",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "cork",
@@ -349,8 +453,12 @@
       ]
     ]
   },
-  "cutlery": {
-    "options": [
+  {
+    "id": "cutlery",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -371,8 +479,12 @@
       ]
     ]
   },
-  "cutting_board": {
-    "options": [
+  {
+    "id": "cutting_board",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "wood",
@@ -381,8 +493,12 @@
       ]
     ]
   },
-  "dishrag": {
-    "options": [
+  {
+    "id": "dishrag",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -391,8 +507,12 @@
       ]
     ]
   },
-  "dog_bowl": {
-    "options": [
+  {
+    "id": "dog_bowl",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -401,8 +521,12 @@
       ]
     ]
   },
-  "extinguisher": {
-    "options": [
+  {
+    "id": "extinguisher",
+    "itemType": "junk",
+    "weight": 6,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "asbestos",
@@ -419,8 +543,12 @@
       ]
     ]
   },
-  "feather_duster": {
-    "options": [
+  {
+    "id": "feather_duster",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -433,8 +561,12 @@
       ]
     ]
   },
-  "flag": {
-    "options": [
+  {
+    "id": "flag",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -447,8 +579,12 @@
       ]
     ]
   },
-  "giddyup_buttercup_parts": {
-    "options": [
+  {
+    "id": "giddyup_buttercup_parts",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 50,
+    "composition": [
       [
         {
           "material": "spring",
@@ -469,8 +605,12 @@
       ]
     ]
   },
-  "glass_bottle": {
-    "options": [
+  {
+    "id": "glass_bottle",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "glass",
@@ -479,8 +619,12 @@
       ]
     ]
   },
-  "glassware": {
-    "options": [
+  {
+    "id": "glassware",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "glass",
@@ -489,8 +633,12 @@
       ]
     ]
   },
-  "globe": {
-    "options": [
+  {
+    "id": "globe",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "screw",
@@ -507,8 +655,12 @@
       ]
     ]
   },
-  "hairbrush": {
-    "options": [
+  {
+    "id": "hairbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -527,8 +679,12 @@
       ]
     ]
   },
-  "hot_plate": {
-    "options": [
+  {
+    "id": "hot_plate",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 7,
+    "composition": [
       [
         {
           "material": "circuitry",
@@ -545,8 +701,12 @@
       ]
     ]
   },
-  "kitchen_scale": {
-    "options": [
+  {
+    "id": "kitchen_scale",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "steel",
@@ -559,8 +719,12 @@
       ]
     ]
   },
-  "ladle": {
-    "options": [
+  {
+    "id": "ladle",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "steel",
@@ -569,8 +733,12 @@
       ]
     ]
   },
-  "lamp": {
-    "options": [
+  {
+    "id": "lamp",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "copper",
@@ -583,8 +751,12 @@
       ]
     ]
   },
-  "light_bulb": {
-    "options": [
+  {
+    "id": "light_bulb",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "copper",
@@ -597,8 +769,12 @@
       ]
     ]
   },
-  "mop": {
-    "options": [
+  {
+    "id": "mop",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "wood",
@@ -611,8 +787,12 @@
       ]
     ]
   },
-  "newspaper": {
-    "options": [
+  {
+    "id": "newspaper",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -621,8 +801,12 @@
       ]
     ]
   },
-  "oven_mitt": {
-    "options": [
+  {
+    "id": "oven_mitt",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "asbestos",
@@ -635,8 +819,12 @@
       ]
     ]
   },
-  "paint": {
-    "options": [
+  {
+    "id": "paint",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 10,
+    "composition": [
       [
         {
           "material": "oil",
@@ -649,8 +837,12 @@
       ]
     ]
   },
-  "paintbrush": {
-    "options": [
+  {
+    "id": "paintbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -663,8 +855,12 @@
       ]
     ]
   },
-  "pen": {
-    "options": [
+  {
+    "id": "pen",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -673,8 +869,12 @@
       ]
     ]
   },
-  "pencil": {
-    "options": [
+  {
+    "id": "pencil",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "lead",
@@ -687,8 +887,12 @@
       ]
     ]
   },
-  "picture_frame": {
-    "options": [
+  {
+    "id": "picture_frame",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "wood",
@@ -697,8 +901,12 @@
       ]
     ]
   },
-  "pillow": {
-    "options": [
+  {
+    "id": "pillow",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -707,8 +915,12 @@
       ]
     ]
   },
-  "plastic_decorations": {
-    "options": [
+  {
+    "id": "plastic_decorations",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -717,8 +929,12 @@
       ]
     ]
   },
-  "plunger": {
-    "options": [
+  {
+    "id": "plunger",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "rubber",
@@ -731,8 +947,12 @@
       ]
     ]
   },
-  "pool_ball": {
-    "options": [
+  {
+    "id": "pool_ball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -741,30 +961,12 @@
       ]
     ]
   },
-  "item_radio": {
-    "options": [
-      [
-        {
-          "material": "circuitry",
-          "count": 1
-        },
-        {
-          "material": "copper",
-          "count": 1
-        },
-        {
-          "material": "plastic",
-          "count": 2
-        },
-        {
-          "material": "rubber",
-          "count": 2
-        }
-      ]
-    ]
-  },
-  "rat_poison": {
-    "options": [
+  {
+    "id": "rat_poison",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "steel",
@@ -781,8 +983,12 @@
       ]
     ]
   },
-  "scissors": {
-    "options": [
+  {
+    "id": "scissors",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -795,8 +1001,12 @@
       ]
     ]
   },
-  "shopping_basket": {
-    "options": [
+  {
+    "id": "shopping_basket",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "steel",
@@ -809,8 +1019,12 @@
       ]
     ]
   },
-  "soap": {
-    "options": [
+  {
+    "id": "soap",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "oil",
@@ -819,8 +1033,12 @@
       ]
     ]
   },
-  "spatula": {
-    "options": [
+  {
+    "id": "spatula",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "rubber",
@@ -833,8 +1051,12 @@
       ]
     ]
   },
-  "stuffed_toy": {
-    "options": [
+  {
+    "id": "stuffed_toy",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "leather",
@@ -851,8 +1073,12 @@
       ]
     ]
   },
-  "tea_or_coffee_cup": {
-    "options": [
+  {
+    "id": "tea_or_coffee_cup",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "ceramic",
@@ -861,8 +1087,12 @@
       ]
     ]
   },
-  "tea_or_coffee_pot": {
-    "options": [
+  {
+    "id": "tea_or_coffee_pot",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -889,8 +1119,12 @@
       ]
     ]
   },
-  "toaster": {
-    "options": [
+  {
+    "id": "toaster",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "spring",
@@ -903,8 +1137,12 @@
       ]
     ]
   },
-  "toothbrush": {
-    "options": [
+  {
+    "id": "toothbrush",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -913,8 +1151,12 @@
       ]
     ]
   },
-  "toothpaste": {
-    "options": [
+  {
+    "id": "toothpaste",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -927,8 +1169,12 @@
       ]
     ]
   },
-  "toy_alien": {
-    "options": [
+  {
+    "id": "toy_alien",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -941,8 +1187,12 @@
       ]
     ]
   },
-  "toy_vehicle": {
-    "options": [
+  {
+    "id": "toy_vehicle",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 8,
+    "composition": [
       [
         {
           "material": "screw",
@@ -973,8 +1223,12 @@
       ]
     ]
   },
-  "tray": {
-    "options": [
+  {
+    "id": "tray",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "wood",
@@ -995,8 +1249,12 @@
       ]
     ]
   },
-  "umbrella": {
-    "options": [
+  {
+    "id": "umbrella",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -1009,8 +1267,12 @@
       ]
     ]
   },
-  "vase": {
-    "options": [
+  {
+    "id": "vase",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 25,
+    "composition": [
       [
         {
           "material": "ceramic",
@@ -1025,8 +1287,12 @@
       ]
     ]
   },
-  "wooden_spoon": {
-    "options": [
+  {
+    "id": "wooden_spoon",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "wood",
@@ -1035,8 +1301,12 @@
       ]
     ]
   },
-  "wooden_toy": {
-    "options": [
+  {
+    "id": "wooden_toy",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "wood",
@@ -1045,8 +1315,12 @@
       ]
     ]
   },
-  "watch": {
-    "options": [
+  {
+    "id": "watch",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 25,
+    "composition": [
       [
         {
           "material": "gears",
@@ -1077,8 +1351,12 @@
       ]
     ]
   },
-  "baseball": {
-    "options": [
+  {
+    "id": "baseball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "cork",
@@ -1091,8 +1369,12 @@
       ]
     ]
   },
-  "baseball_base": {
-    "options": [
+  {
+    "id": "baseball_base",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -1105,8 +1387,12 @@
       ]
     ]
   },
-  "baseball_glove": {
-    "options": [
+  {
+    "id": "baseball_glove",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "leather",
@@ -1115,8 +1401,12 @@
       ]
     ]
   },
-  "basketball": {
-    "options": [
+  {
+    "id": "basketball",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "rubber",
@@ -1125,8 +1415,12 @@
       ]
     ]
   },
-  "bowling_ball": {
-    "options": [
+  {
+    "id": "bowling_ball",
+    "itemType": "junk",
+    "weight": 8,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -1135,8 +1429,12 @@
       ]
     ]
   },
-  "bowling_pin": {
-    "options": [
+  {
+    "id": "bowling_pin",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -1149,8 +1447,12 @@
       ]
     ]
   },
-  "dumbbells_barbells_weights": {
-    "options": [
+  {
+    "id": "dumbbells_barbells_weights",
+    "itemType": "junk",
+    "weight": 25,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "lead",
@@ -1159,8 +1461,12 @@
       ]
     ]
   },
-  "kickball": {
-    "options": [
+  {
+    "id": "kickball",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "rubber",
@@ -1169,8 +1475,12 @@
       ]
     ]
   },
-  "life_preserver": {
-    "options": [
+  {
+    "id": "life_preserver",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 6,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -1183,8 +1493,12 @@
       ]
     ]
   },
-  "battery": {
-    "options": [
+  {
+    "id": "battery",
+    "itemType": "junk",
+    "weight": 6,
+    "cost": 20,
+    "composition": [
       [
         {
           "material": "lead",
@@ -1201,8 +1515,12 @@
       ]
     ]
   },
-  "circuit_board": {
-    "options": [
+  {
+    "id": "circuit_board",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 25,
+    "composition": [
       [
         {
           "material": "circuitry",
@@ -1215,8 +1533,12 @@
       ]
     ]
   },
-  "coolant": {
-    "options": [
+  {
+    "id": "coolant",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 7,
+    "composition": [
       [
         {
           "material": "acid",
@@ -1229,8 +1551,12 @@
       ]
     ]
   },
-  "cutting_fluid": {
-    "options": [
+  {
+    "id": "cutting_fluid",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 7,
+    "composition": [
       [
         {
           "material": "oil",
@@ -1243,8 +1569,12 @@
       ]
     ]
   },
-  "duct_tape": {
-    "options": [
+  {
+    "id": "duct_tape",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 12,
+    "composition": [
       [
         {
           "material": "adhesive",
@@ -1267,8 +1597,12 @@
       ]
     ]
   },
-  "electrical_cable": {
-    "options": [
+  {
+    "id": "electrical_cable",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1281,8 +1615,12 @@
       ]
     ]
   },
-  "fuse": {
-    "options": [
+  {
+    "id": "fuse",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1295,8 +1633,12 @@
       ]
     ]
   },
-  "high_powered_magnet": {
-    "options": [
+  {
+    "id": "high_powered_magnet",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 13,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1313,8 +1655,12 @@
       ]
     ]
   },
-  "high_powered_microscope": {
-    "options": [
+  {
+    "id": "high_powered_microscope",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 22,
+    "composition": [
       [
         {
           "material": "crystal",
@@ -1335,8 +1681,12 @@
       ]
     ]
   },
-  "high_tech_gadget": {
-    "options": [
+  {
+    "id": "high_tech_gadget",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 150,
+    "composition": [
       [
         {
           "material": "fiber_optics",
@@ -1362,8 +1712,12 @@
       ]
     ]
   },
-  "lab_equipment": {
-    "options": [
+  {
+    "id": "lab_equipment",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -1390,8 +1744,12 @@
       ]
     ]
   },
-  "lab_glassware": {
-    "options": [
+  {
+    "id": "lab_glassware",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "glass",
@@ -1400,8 +1758,12 @@
       ]
     ]
   },
-  "metal_ingot": {
-    "options": [
+  {
+    "id": "metal_ingot",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 300,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1422,8 +1784,12 @@
       ]
     ]
   },
-  "microscope": {
-    "options": [
+  {
+    "id": "microscope",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 22,
+    "composition": [
       [
         {
           "material": "gears",
@@ -1444,8 +1810,12 @@
       ]
     ]
   },
-  "sensor": {
-    "options": [
+  {
+    "id": "sensor",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -1458,8 +1828,12 @@
       ]
     ]
   },
-  "solvent": {
-    "options": [
+  {
+    "id": "solvent",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1472,8 +1846,12 @@
       ]
     ]
   },
-  "suprathaw_antifreeze": {
-    "options": [
+  {
+    "id": "suprathaw_antifreeze",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 8,
+    "composition": [
       [
         {
           "material": "acid",
@@ -1486,8 +1864,12 @@
       ]
     ]
   },
-  "turpentine": {
-    "options": [
+  {
+    "id": "turpentine",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 10,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1500,8 +1882,12 @@
       ]
     ]
   },
-  "vacuum_tube": {
-    "options": [
+  {
+    "id": "vacuum_tube",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1514,8 +1900,12 @@
       ]
     ]
   },
-  "bandages": {
-    "options": [
+  {
+    "id": "bandages",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "cloth",
@@ -1524,8 +1914,12 @@
       ]
     ]
   },
-  "bone_saw": {
-    "options": [
+  {
+    "id": "bone_saw",
+    "itemType": "junk",
+    "weight": 2,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "rubber",
@@ -1538,8 +1932,12 @@
       ]
     ]
   },
-  "empty_blood_pack_iv_bag": {
-    "options": [
+  {
+    "id": "empty_blood_pack_iv_bag",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "plastic",
@@ -1548,8 +1946,12 @@
       ]
     ]
   },
-  "scalpel": {
-    "options": [
+  {
+    "id": "scalpel",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1558,8 +1960,12 @@
       ]
     ]
   },
-  "tweezers": {
-    "options": [
+  {
+    "id": "tweezers",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 8,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -1568,8 +1974,12 @@
       ]
     ]
   },
-  "bag_of_cement": {
-    "options": [
+  {
+    "id": "bag_of_cement",
+    "itemType": "junk",
+    "weight": 8,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "concrete",
@@ -1578,8 +1988,12 @@
       ]
     ]
   },
-  "bag_of_fertilizer": {
-    "options": [
+  {
+    "id": "bag_of_fertilizer",
+    "itemType": "junk",
+    "weight": 4,
+    "cost": 25,
+    "composition": [
       [
         {
           "material": "acid",
@@ -1592,8 +2006,12 @@
       ]
     ]
   },
-  "blowtorch": {
-    "options": [
+  {
+    "id": "blowtorch",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1606,8 +2024,12 @@
       ]
     ]
   },
-  "clipboard": {
-    "options": [
+  {
+    "id": "clipboard",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "spring",
@@ -1620,8 +2042,12 @@
       ]
     ]
   },
-  "desk_fan": {
-    "options": [
+  {
+    "id": "desk_fan",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "gears",
@@ -1638,8 +2064,12 @@
       ]
     ]
   },
-  "magnifying_glass": {
-    "options": [
+  {
+    "id": "magnifying_glass",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 8,
+    "composition": [
       [
         {
           "material": "glass",
@@ -1656,8 +2086,12 @@
       ]
     ]
   },
-  "military_ammo_bag": {
-    "options": [
+  {
+    "id": "military_ammo_bag",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 4,
+    "composition": [
       [
         {
           "material": "ballistic_fiber",
@@ -1666,8 +2100,12 @@
       ]
     ]
   },
-  "oil_can": {
-    "options": [
+  {
+    "id": "oil_can",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 15,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -1680,8 +2118,12 @@
       ]
     ]
   },
-  "shovel": {
-    "options": [
+  {
+    "id": "shovel",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1694,8 +2136,12 @@
       ]
     ]
   },
-  "typewriter": {
-    "options": [
+  {
+    "id": "typewriter",
+    "itemType": "junk",
+    "weight": 5,
+    "cost": 11,
+    "composition": [
       [
         {
           "material": "gears",
@@ -1712,8 +2158,12 @@
       ]
     ]
   },
-  "wonderglue": {
-    "options": [
+  {
+    "id": "wonderglue",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 20,
+    "composition": [
       [
         {
           "material": "adhesive",
@@ -1722,8 +2172,12 @@
       ]
     ]
   },
-  "hubcap": {
-    "options": [
+  {
+    "id": "hubcap",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "screw",
@@ -1736,8 +2190,12 @@
       ]
     ]
   },
-  "auto_parts": {
-    "options": [
+  {
+    "id": "auto_parts",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 2,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1746,8 +2204,12 @@
       ]
     ]
   },
-  "metal_tools": {
-    "options": [
+  {
+    "id": "metal_tools",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "steel",
@@ -1769,8 +2231,12 @@
       ]
     ]
   },
-  "telephone": {
-    "options": [
+  {
+    "id": "telephone",
+    "itemType": "junk",
+    "weight": 3,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "circuitry",
@@ -1787,8 +2253,12 @@
       ]
     ]
   },
-  "aluminum_ore": {
-    "options": [
+  {
+    "id": "aluminum_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "aluminum",
@@ -1797,8 +2267,12 @@
       ]
     ]
   },
-  "copper_ore": {
-    "options": [
+  {
+    "id": "copper_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "copper",
@@ -1807,8 +2281,12 @@
       ]
     ]
   },
-  "gold_ore": {
-    "options": [
+  {
+    "id": "gold_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "gold",
@@ -1817,8 +2295,12 @@
       ]
     ]
   },
-  "iron_ore": {
-    "options": [
+  {
+    "id": "iron_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 1,
+    "composition": [
       [
         {
           "material": "iron",
@@ -1827,8 +2309,12 @@
       ]
     ]
   },
-  "silver_ore": {
-    "options": [
+  {
+    "id": "silver_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 3,
+    "composition": [
       [
         {
           "material": "silver",
@@ -1837,8 +2323,12 @@
       ]
     ]
   },
-  "uranium_ore": {
-    "options": [
+  {
+    "id": "uranium_ore",
+    "itemType": "junk",
+    "weight": 1,
+    "cost": 5,
+    "composition": [
       [
         {
           "material": "nuclear_material",
@@ -1846,5 +2336,17 @@
         }
       ]
     ]
+  },
+  {
+    "id": "bloatfly_gland",
+    "itemType": "junk",
+    "weight": 0.3,
+    "cost": 6
+  },
+  {
+    "id": "stingwing_barb",
+    "itemType": "junk",
+    "weight": 0.2,
+    "cost": 5
   }
-}
+]

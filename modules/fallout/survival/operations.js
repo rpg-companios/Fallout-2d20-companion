@@ -15,7 +15,7 @@
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { debugLog } from '../../../src/debug/falloutDebug';
-import { consumeDrink, consumeFood, rest } from './survival';
+import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest } from './survival';
 
 // Хранилище выживания — слайс stateExtensions стора (патч 209). Операции
 // читают СВЕЖЕЕ состояние прямо из стора (не из замыканий рендеров), а
@@ -110,4 +110,49 @@ export const sleepSurvival = ({ place, hours }) => {
     diseaseRiskResult,
     effectsExpired: expired,
   };
+};
+
+/**
+ * «Работа идёт время» (патч 262, переоткрыто владельцем): длительность разбора
+ * и крафта привязана к часам выживания. Операция получает ИГРОВЫЕ минуты,
+ * прогоняет лестницы через те же часовые тики, что и реальный часовой контур
+ * (дробь копится в timeCarried: шесть разборов по 10 минут складываются в
+ * час), двигает таймеры временных эффектов и фиксирует потерю ОЗ от усталости
+ * — ровно как тик часов. Осложнение (×2) в минуты уже домножен вызывающим.
+ *
+ * Гейты общие с часами: выключенное настройкой выживание — заморожено, у
+ * персонажа без шкал (робот/киборг) — нечего двигать; в обоих случаях
+ * applied:false и ответ контракта несёт время «как есть» — экран решает сам.
+ */
+export const applyActivityMinutes = (minutes, cause = 'activity') => {
+  const skip = (reason) => ({ applied: false, reason, gameHours: 0, events: [] });
+  if (!Number.isFinite(minutes) || minutes <= 0) return skip('nothing-to-spend');
+  if (!survivalEnabled()) return skip('disabled');
+  const survival = currentSurvival();
+  if (!survival) return skip('notCapable');
+
+  const store = useCharacterStore.getState();
+  const gameHours = minutes / 60;
+  const result = advanceHours(survival, gameHours);
+  store.setStateExtension('survival', result.state);
+
+  // Потеря текущих ОЗ за истёкшие рабочие часы (то же, что тик часов, патч 232).
+  const hpLoss = fatigueHpLossFromEvents(result.events);
+  if (hpLoss > 0) useCharacterStore.getState().applySurvivalHpLoss(hpLoss);
+
+  // Мост контуров: эффект-таймеры идут вместе с часами (целое число сцен
+  // обеспечивает округление в сторе, патч 262).
+  let expired = [];
+  if (typeof store.advanceEffectsByGameHours === 'function') {
+    ({ expired } = store.advanceEffectsByGameHours(gameHours));
+  }
+
+  debugLog('survival.activity.minutes', {
+    cause,
+    minutes,
+    gameHours,
+    hpLoss,
+    expiredEffects: expired.length,
+  });
+  return { applied: true, cause, minutes, gameHours, events: result.events, hpLoss, expired };
 };

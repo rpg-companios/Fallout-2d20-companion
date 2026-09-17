@@ -11,7 +11,7 @@
 docs/reference-data/pipboyapp_crafting.json   — чужие имена и строки (справочные данные)
         │  генератор: имя → id нашего каталога (perк, предмет, ингредиент)
         ▼
-modules/fallout/data/crafting/*.json — только id: результат, материалы, перки, ключ навыка
+modules/fallout/data/recipes/*.json — только id: результат, материалы, перки, ключ навыка
         ▼
 реестр данных сеттинга → движок крафта (следующий патч)
 
@@ -55,8 +55,11 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 | В источнике | Наш id | Где применено | Почему считаем тем же предметом |
 |---|---|---|---|
 | Berserk Syringe | `ammo_syringe_berserk` | ингредиент | ингредиент «Fury» — он же дротик шприцера «Berserk» (соответствие владельца) |
+| Common Materials | `item_common_materials` | ингредиент | переименование владельца 2026-09-17: «Common Materials» = наш «Common material» |
 | Mongrel Dog Meat | `food_dog_meat` | ингредиент | то же сырьё: наше ru-имя — «Собачатина» |
 | Queen Mirelurk Meat | `food_mirelurk_queen_meat` | ингредиент | тот же продукт: у нас имя по животному, потом по части |
+| Rare Materials | `item_rare_materials` | ингредиент | переименование владельца 2026-09-17: «Rare Materials» = наш «Rare material» |
+| Uncommon Materials | `item_uncommon_materials` | ингредиент | переименование владельца 2026-09-17: «Uncommon Materials» = наш «Uncommon material» |
 | Baked Bloatfly | `food_grilled_bloatfly` | результат | то же блюдо: наше ru-имя — «Печёный дутень» |
 | Cooked Softshell Meat | `food_cooked_softshell_mirelurk` | результат | то же блюдо: у нас названо по животному |
 | Fusion Cell | `ammo_energy_cell` | результат | книжная графа «Fusion Cell» = наша «Energy Cell» (см. AMMO-FOUND-TABLE.md) |

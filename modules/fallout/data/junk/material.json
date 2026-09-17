@@ -1,287 +1,254 @@
 [
   {
     "id": "item_common_materials",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 1,
     "cost": 1,
     "rarity": 0
   },
   {
     "id": "item_uncommon_materials",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 1,
     "cost": 3,
     "rarity": 1
   },
   {
     "id": "item_rare_materials",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 1,
     "cost": 5,
     "rarity": 2
   },
   {
     "id": "acid",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 2,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "adhesive",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 8,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "aluminum",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 3,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "antiseptic",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 3,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "asbestos",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 6,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "ballistic_fiber",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 5,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "bone",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "ceramic",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "circuitry",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.3,
     "cost": 5,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "cloth",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "concrete",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 3,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "copper",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 4,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "cork",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 1,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "fertilizer",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 1,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "fiber_optics",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 6,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "fiberglass",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 5,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "gears",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.2,
     "cost": 3,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "glass",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 2,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "lead",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.3,
     "cost": 1,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "leather",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.1,
     "cost": 2,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "nuclear_material",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 0.1,
     "cost": 10,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "oil",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 4,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "plastic",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "rubber",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.1,
     "cost": 2,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "screw",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 2,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "silver",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 6,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "spring",
-    "itemType": "misc",
+    "materialType": "uncommon",
     "weight": 0.1,
     "cost": 3,
-    "rarity": 1,
-    "namedMaterial": true
+    "rarity": 1
   },
   {
     "id": "steel",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.2,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "wood",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 0.2,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "crystal",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 1,
     "cost": 5,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "gold",
-    "itemType": "misc",
+    "materialType": "rare",
     "weight": 1,
     "cost": 5,
-    "rarity": 2,
-    "namedMaterial": true
+    "rarity": 2
   },
   {
     "id": "coal",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   },
   {
     "id": "iron",
-    "itemType": "misc",
+    "materialType": "common",
     "weight": 1,
     "cost": 1,
-    "rarity": 0,
-    "namedMaterial": true
+    "rarity": 0
   }
 ]

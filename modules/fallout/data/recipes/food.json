@@ -1,7 +1,6 @@
 [
   {
     "id": "food_grilled_bloatfly",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -12,16 +11,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "food_grilled_bloatfly",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_bloodbug_steak",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -32,16 +25,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_bloodbug_steak",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_cooked_softshell_mirelurk",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -52,16 +39,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "food_cooked_softshell_mirelurk",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_crispy_squirrel_bits",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -72,16 +53,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_crispy_squirrel_bits",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_deathclaw_omelette",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -96,16 +71,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_deathclaw_omelette",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_deathclaw_steak",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -116,16 +85,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_deathclaw_steak",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_grilled_radroach",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -136,16 +99,10 @@
         "count": 3
       }
     ],
-    "output": {
-      "itemId": "food_grilled_radroach",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_grilled_radstag",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -156,16 +113,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_grilled_radstag",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_iguana_on_a_stick",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -180,16 +131,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_iguana_on_a_stick",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_iguana_stew",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 3
@@ -208,16 +153,10 @@
         "count": 3
       }
     ],
-    "output": {
-      "itemId": "food_iguana_stew",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_mirelurk_cake",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 4
@@ -240,16 +179,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_mirelurk_cake",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_mirelurk_egg_omelette",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -264,16 +197,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_mirelurk_egg_omelette",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_mirelurk_queen_steak",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -284,16 +211,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_mirelurk_queen_steak",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_mole_rat_chops",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -304,16 +225,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "food_mole_rat_chops",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_mutant_hound_ribs",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -324,16 +239,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_mutant_hound_ribs",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_dog_chops",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -344,16 +253,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_dog_chops",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_noodle_bowl",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -368,16 +271,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_noodle_bowl",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_radscorpion_egg_omelette",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -392,16 +289,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_radscorpion_egg_omelette",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_radscorpion_steak",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -412,16 +303,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_radscorpion_steak",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_radstag_stew",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 4
@@ -444,16 +329,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_radstag_stew",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_ribeye_steak",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -464,16 +343,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_ribeye_steak",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_roasted_mirelurk_meat",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -484,16 +357,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "food_roasted_mirelurk_meat",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_squirrel_on_a_stick",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 2
@@ -508,16 +375,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_squirrel_on_a_stick",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_stingwing_fillet",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -528,16 +389,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_stingwing_fillet",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_vegetable_soup",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 3
@@ -556,16 +411,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_vegetable_soup",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_yao_guai_ribs",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 1
@@ -576,16 +425,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_yao_guai_ribs",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   },
   {
     "id": "food_yao_guai_roast",
-    "bench": "cooking",
     "requires": {
       "skill": "SURVIVAL",
       "complexity": 3
@@ -604,11 +447,6 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "food_yao_guai_roast",
-      "itemType": "food",
-      "quantity": 1
-    },
-    "sourcePage": 216
+    "outputQuantity": 1
   }
 ]

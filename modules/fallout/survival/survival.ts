@@ -341,8 +341,10 @@ export function advanceHours(state: SurvivalState, hours: number, options: TickO
     }
     const wk = cloneState(state);
     const carried = wk.timeCarried + hours;
-    const whole = Math.floor(carried);
-    wk.timeCarried = carried - whole;
+    // Патч 262: допуск на дробный хвост — шесть шагов по 1/6 часа в float
+    // дают 0.9999999999999999, и без допуска «час из минут» никогда не тикает.
+    const whole = Math.floor(carried + 1e-9);
+    wk.timeCarried = Math.max(0, carried - whole);
     const events: SurvivalEvent[] = [];
     for (let i = 0; i < whole; i += 1) {
         const hourEvents = tickHour(wk, options);

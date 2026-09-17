@@ -9,6 +9,7 @@ import CapsModal from './modals/CapsModal';
 import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
+import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import {
@@ -41,6 +42,9 @@ import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, is
 import styles from '../../../styles/InventoryScreen.styles';
 import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled, selectRobotArmPartsStrictReplace } from '../../../src/store/appSettingsStore';
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
+import { salvageItem } from '../../../modules/fallout/salvage/operations';
+import { salvageButtonForItem } from '../../../modules/fallout/salvage/subline';
+import { buildSalvageReport } from './logic/salvageResultReport';
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -225,6 +229,7 @@ const InventoryScreen = () => {
   const [isSellModalVisible, setIsSellModalVisible] = useState(false);
   const [selectedItemForSale, setSelectedItemForSale] = useState(null);
   const [isAddItemModalVisible, setAddItemModalVisible] = useState(false);
+  const [isCraftModalVisible, setCraftModalVisible] = useState(false);
   const [itemSelectionMode, setItemSelectionMode] = useState('loot');
   const [isBuyItemModalVisible, setIsBuyItemModalVisible] = useState(false);
   const [selectedItemForBuy, setSelectedItemForBuy] = useState(null);
@@ -363,7 +368,12 @@ const InventoryScreen = () => {
     setIsCapsModalVisible(true);
   };
 
-  // Экрана крафта ещё нет (движок готов, патч 251) — кнопка честно это сообщает.
+  // Кнопка крафта снова неактивна (патч 266, решение владельца): окно 265
+  // строилось на «верстаках», а деление будет по типу изготавливаемого (еда и
+  // напитки, оружие, взрывчатка, броня, силовая броня, препараты, роботы).
+  // До перестройки (следующий крупный патч) крафт не открываем; модалка и
+  // модель на месте — 267 подключит их к новым вкладкам. Механика движка
+  // (251/262/263) от этого не менялась.
   const handleCraftPress = () =>
     showAlert(tInventory('screen.craft.label'), tInventory('screen.craft.placeholder'));
 
@@ -1400,6 +1410,14 @@ const InventoryScreen = () => {
     );
   };
 
+  // Разбор из строки инвентаря (264): один предмет из стека, настоящие кости,
+  // результат — в алерте. Кнопку показываем только там, где есть что вынуть
+  // при текущем «Мусорщике» (263): недоступное в подстроке спрятано за счётчиком.
+  const handleSalvagePress = (rowItem) => {
+    const report = buildSalvageReport(salvageItem(rowItem.id));
+    showAlert(report.title, report.message);
+  };
+
   const renderItem = ({ item }) => {
     // ── Контейнер «Силовая броня» и его содержимое (аккордеон — ПРАВИЛО владельца):
     // свои строки, общий пайплайн имён/модов обходят (имена уже собраны из каталога).
@@ -1599,6 +1617,12 @@ const InventoryScreen = () => {
     const weaponAmmoNames = weaponAmmoIds
       .map((ammoId) => (equipmentCatalog?.ammoTypes || []).find((ammo) => ammo.id === ammoId)?.name)
       .filter(Boolean);
+    // Кнопка разбора (267): у хлама — есть всегда; работает, когда соблюдены
+    // условия (общий расчёт salvagePreview), иначе затемнена и молчит.
+    // Подстрока состава — только при печатном составе и если предмет не надет.
+    const salvage = !item.paContainer
+      ? salvageButtonForItem(item, useCharacterStore.getState())
+      : null;
 
     return (
       <View style={styles.tableRow}>
@@ -1636,6 +1660,14 @@ const InventoryScreen = () => {
               </TouchableOpacity>
           )}
 
+          {salvage && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !salvage.enabled && styles.applyButtonDisabled]}
+                  disabled={!salvage.enabled}
+                  onPress={() => handleSalvagePress(item)}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.salvage.action')}</Text>
+              </TouchableOpacity>
+          )}
           {isConsumable && !item.isEquipped
             && (canConsumeOnSelf(localizedDisplayItem, fitCharacter)
                 || canConsumeOnOther(localizedDisplayItem, fitCharacter)) && (
@@ -1673,6 +1705,13 @@ const InventoryScreen = () => {
           <Text style={styles.itemSubText}>{tInventory('screen.labels.weight')}: {item.isEquipped ? Number(weight.toFixed(3)) : Number((weight * item.quantity).toFixed(3))}</Text>
           {weaponAmmoNames.length > 0 && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
+          )}
+          {salvage?.hasComposition && !item.isEquipped && (
+            <Text style={styles.itemSubText}>
+              {tInventory('screen.salvage.label')}: {salvage.parts.length
+                ? salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ')
+                : tInventory('screen.salvage.unavailable')}{salvage.hidden > 0 ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}` : ''}
+            </Text>
           )}
         </View>
       </View>
@@ -1826,6 +1865,10 @@ const InventoryScreen = () => {
           selectionMode={itemSelectionMode}
           maxRarity={itemSelectionMode === 'buy' ? (equipment?.purchaseMaxRarity ?? null) : null}
           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
+        />
+        <CraftingModal
+          visible={isCraftModalVisible}
+          onClose={() => setCraftModalVisible(false)}
         />
         <BuyItemModal
           visible={isBuyItemModalVisible}

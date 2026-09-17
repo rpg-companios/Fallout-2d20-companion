@@ -101,7 +101,27 @@
     "subtype": "tool",
     "value": 10,
     "rarity": 2,
-    "weight": 3
+    "weight": 3,
+    "composition": [
+      [
+        {
+          "material": "circuitry",
+          "count": 1
+        },
+        {
+          "material": "copper",
+          "count": 1
+        },
+        {
+          "material": "plastic",
+          "count": 2
+        },
+        {
+          "material": "rubber",
+          "count": 2
+        }
+      ]
+    ]
   },
   {
     "id": "item_uncommon_materials",

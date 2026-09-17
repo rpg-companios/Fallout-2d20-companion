@@ -1,7 +1,6 @@
 [
   {
     "id": "chem_antibiotics",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 4,
@@ -30,16 +29,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_antibiotics",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_mentats_berry",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -58,16 +51,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_mentats_berry",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_buffjet",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -82,16 +69,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_buffjet",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_bufftats",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -106,16 +87,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_bufftats",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_radaway_diluted",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -130,16 +105,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_radaway_diluted",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_rad_x_diluted",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -154,16 +123,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_rad_x_diluted",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_stimpak_diluted",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -178,16 +141,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_stimpak_diluted",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_fury",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2,
@@ -208,16 +165,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_fury",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_mentats_grape",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -236,16 +187,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_mentats_grape",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_jet",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -260,16 +205,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_jet",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_jet_fuel",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2,
@@ -290,16 +229,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_jet_fuel",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_mentats",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -318,16 +251,10 @@
         "count": 3
       }
     ],
-    "output": {
-      "itemId": "chem_mentats",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_mentats_orange",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -346,16 +273,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_mentats_orange",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_overdrive",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3,
@@ -380,16 +301,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_overdrive",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_psycho",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 4
@@ -408,16 +323,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_psycho",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_psycho_jet",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -432,16 +341,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_psycho_jet",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_psychobuff",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 2
@@ -456,16 +359,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_psychobuff",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_radaway",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 4
@@ -488,16 +385,10 @@
         "count": 2
       }
     ],
-    "output": {
-      "itemId": "chem_radaway",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_skeeto_spit",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 4
@@ -520,16 +411,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_skeeto_spit",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_stimpak",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 3
@@ -548,16 +433,10 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_stimpak",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   },
   {
     "id": "chem_ultra_jet",
-    "bench": "chemistry",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 4,
@@ -586,11 +465,6 @@
         "count": 1
       }
     ],
-    "output": {
-      "itemId": "chem_ultra_jet",
-      "itemType": "chem",
-      "quantity": 1
-    },
-    "sourcePage": 213
+    "outputQuantity": 1
   }
 ]

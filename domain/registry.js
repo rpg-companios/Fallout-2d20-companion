@@ -29,24 +29,18 @@ import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.
 import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
 import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
 
-// Данные крафта (патч 249–251): категория «рецепты» пакета сеттинга. Реестр —
-// единственная точка, которая знает, что их шесть файлов и как их собрать;
-// движок механики (domain/craftingEngine.js) получает только сами рецепты.
-import moduleCraftingIndex from '../modules/fallout/data/crafting/index.json';
-import moduleCraftingAmmo from '../modules/fallout/data/crafting/ammo.json';
-import moduleCraftingWeapons from '../modules/fallout/data/crafting/weapons.json';
-import moduleCraftingChems from '../modules/fallout/data/crafting/chems.json';
-import moduleCraftingFood from '../modules/fallout/data/crafting/food.json';
-import moduleCraftingDrinks from '../modules/fallout/data/crafting/drinks.json';
-
-const CRAFTING_FILES = {
-  'ammo.json': moduleCraftingAmmo,
-  'weapons.json': moduleCraftingWeapons,
-  'chems.json': moduleCraftingChems,
-  'food.json': moduleCraftingFood,
-  'drinks.json': moduleCraftingDrinks,
-};
-
+// Данные разбора (260, реформа 269) и рецептов (249–269): где лежат файлы —
+// знают листы групп (modules/fallout/data/junk, .../recipes), а не каждый
+// потребитель: «импорт, импорт, импорт» по документам не размножаем (270).
+// Реестр — единственная точка, куда смотрят движок, окно и операции.
+import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
+import {
+  RECIPE_FILES as CRAFTING_FILES,
+  RECIPE_MANIFEST as moduleCraftingIndex,
+} from '../modules/fallout/data/recipes/index.js';
+const moduleScrapJunk = JUNK_DATASET.junk;
+const moduleScrapMaterials = JUNK_DATASET.materials;
+const moduleScrapTables = JUNK_DATASET.tables;
 // i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
 import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
 import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
@@ -215,8 +209,11 @@ const CRAFTING_RECIPES = (() => {
       if (byId.has(recipe.id)) {
         throw new Error(`[registry] Дубликат id рецепта крафта: ${recipe.id}`);
       }
-      byId.set(recipe.id, recipe);
-      list.push(recipe);
+      // Категория (еда, препараты, …) — свойство раздела, в которомrecipe лежит
+      // (реестр знает файлы; сам рецепт о категориях не сообщает).
+      const augmented = Object.freeze({ ...recipe, category: entry.category });
+      byId.set(recipe.id, augmented);
+      list.push(augmented);
     }
     if (rows.length !== entry.count) {
       throw new Error(`[registry] Индекс крафта не совпадает с файлом ${entry.file}: ${entry.count} vs ${rows.length}`);
@@ -233,9 +230,57 @@ export function getCraftingRecipeById(recipeId) {
   return CRAFTING_RECIPES.byId.get(recipeId) ?? null;
 }
 
-/** Верстаки категории (из индекса) — движок их не интерпретирует, это имена сеттинга. */
-export function getCraftingBenches() {
-  return moduleCraftingIndex.benches ?? [];
+/** Категории рецептов — порядок и состав манифеста (file → category). */
+export function getCraftingCategories() {
+  return (moduleCraftingIndex.recipes ?? []).map((entry) => entry.category);
+}
+
+/** Каталог хлама (предметы разбора; составы — отдельным справочником). */
+export function getScrapJunkItems() {
+  return moduleScrapJunk;
+}
+
+/** Справочник материалов: пачковые + именованные (id = слаг имени). */
+export function getScrapMaterials() {
+  return moduleScrapMaterials;
+}
+
+/** Подписи d20-таблиц разбора — словарь i18n (269: данные молчат). */
+export function getScrapTableLabels(locale) {
+  return (JUNK_DATASET.names[locale] ?? JUNK_DATASET.names['ru-RU']).tableLabels;
+}
+
+/**
+ * Печатный состав разбора предмета. Единый источник (реформа 2026-09-17):
+ * карточка предмета и есть носитель состава — у хлама это запись junk.json,
+ * у линкованных предметов каталога (радио) — их собственная запись. Реестр
+ * собирает индекс обходом карточек; отдельного файла составов нет.
+ */
+const SALVAGE_COMPOSITIONS = (() => {
+  const byId = new Map();
+  const collect = (node) => {
+    if (Array.isArray(node)) { node.forEach(collect); return; }
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.id === 'string' && Array.isArray(node.composition)) {
+      if (byId.has(node.id)) {
+        throw new Error(`[registry] Двойной состав разбора для ${node.id}`);
+      }
+      byId.set(node.id, { options: node.composition });
+    }
+    Object.values(node).forEach(collect);
+  };
+  collect(moduleScrapJunk);
+  collect(moduleGeneralGoods);
+  return byId;
+})();
+
+export function getSalvageComposition(itemId) {
+  return SALVAGE_COMPOSITIONS.get(itemId) ?? null;
+}
+
+/** Таблицы разбора для ГМ-секции: d20 категорий, девять таблиц, добыча. */
+export function getScrapTables() {
+  return moduleScrapTables;
 }
 
 /**

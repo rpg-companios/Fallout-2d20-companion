@@ -9,12 +9,12 @@ import useCharacterStore from '../../src/store/characterStore';
 import { craftRecipe, craftingPreview } from '../../modules/fallout/crafting/operations';
 import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
 import { getCraftingRecipeById, getCraftingRecipes } from '../../domain/registry';
-import craftingIndex from '../../modules/fallout/data/crafting/index.json';
-import ammoFile from '../../modules/fallout/data/crafting/ammo.json';
-import chemsFile from '../../modules/fallout/data/crafting/chems.json';
-import foodFile from '../../modules/fallout/data/crafting/food.json';
-import weaponsFile from '../../modules/fallout/data/crafting/weapons.json';
-import drinksFile from '../../modules/fallout/data/crafting/drinks.json';
+import craftingIndex from '../../modules/fallout/data/recipes/index.json';
+import ammoFile from '../../modules/fallout/data/recipes/ammo.json';
+import chemsFile from '../../modules/fallout/data/recipes/chems.json';
+import foodFile from '../../modules/fallout/data/recipes/food.json';
+import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
+import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
 
 const state = () => useCharacterStore.getState();
 
@@ -62,7 +62,8 @@ describe('реестр — точка, откуда движок крафта в
   it('рецепт находится по id и это тот же объект, что в файле', () => {
     const viaRegistry = getCraftingRecipeById('chem_mentats');
     expect(viaRegistry).toBeTruthy();
-    expect(viaRegistry).toBe(chemsFile.find((r) => r.id === 'chem_mentats'));
+    // Реестр дополняет запись категорией из манифеста (269); поля рецепта — нетронуты.
+    expect(viaRegistry).toEqual({ ...chemsFile.find((r) => r.id === 'chem_mentats'), category: 'chems' });
     // Числа владельца доехали до движка нетронутыми.
     expect(viaRegistry.materials).toEqual([
       { itemId: 'food_brain_fungus', count: 2 },
@@ -121,12 +122,12 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
   });
 });
 
-describe('craftRecipe: провал проверки и правила верстаков', () => {
+describe('craftRecipe: провал проверки и цена проверки', () => {
   const bothDiceComplicate = () => 20; // обе кости «20» → осложнения → автопровал
 
-  it('кухня: провал сжигает материалы (правило сеттинга)', () => {
+  it('кухня: провал сжигает материалы — правило навыка в реестре (270)', () => {
     const soup = getCraftingRecipeById('food_vegetable_soup');
-    expect(CRAFT_RULES.failBurnsMaterialsByBench[soup.bench]).toBe(true);
+    expect(craftingPreview('food_vegetable_soup').rulesView.failBurnsMaterials).toBe(true);
     seedStack('food_carrot', 1);
     seedStack('drink_dirty_water', 1);
     seedStack('food_tato', 1);
@@ -139,12 +140,12 @@ describe('craftRecipe: провал проверки и правила верс�
     expect(countStack('food_vegetable_soup')).toBe(0);
   });
 
-  it('оружейный верстак (не «горячий»): провал не сжигает ничего', () => {
+  it('рецепт без флага сгорания: провал не сжигает ничего', () => {
     // «Молотов» — не годится как пример: по книге взрывчатка делается в химии и
-    // там провал жжёт. Берём .45: верстак weapons, гореть нечему по правилу.
+    // там провал жжёт. Берём .45: проверочный станок не «горячий», права сжигать нет.
     const shell = getCraftingRecipeById('ammo_45');
-    expect(shell.bench).toBe('weapons');
-    expect(CRAFT_RULES.failBurnsMaterialsByBench[shell.bench] ?? false).toBe(false);
+    expect(shell.category).toBe('ammo');
+    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'станок не горит').toBe(false);
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }, { perkId: 'ammosmith' }] }); // ранг 2
     for (const material of shell.materials) seedStack(material.itemId, material.count);
     const before = state().items;

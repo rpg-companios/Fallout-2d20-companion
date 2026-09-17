@@ -1,7 +1,5 @@
 {
   "categories": {
-    "ru": "Категории хлама (d20)",
-    "en": "Junk Categories (d20)",
     "faces": {
       "1": {
         "table": "animal"
@@ -67,8 +65,6 @@
   },
   "tables": {
     "animal": {
-      "ru": "Продукты животного происхождения и еда",
-      "en": "Animal Products and Food",
       "faces": {
         "1": {
           "item": "animal_hide"
@@ -133,8 +129,6 @@
       }
     },
     "household1": {
-      "ru": "Бытовые предметы 1",
-      "en": "Household Items 1",
       "faces": {
         "1": {
           "item": "abraxo_cleaner"
@@ -199,8 +193,6 @@
       }
     },
     "household2": {
-      "ru": "Бытовые предметы 2",
-      "en": "Household Items 2",
       "faces": {
         "1": {
           "item": "cutlery"
@@ -265,8 +257,6 @@
       }
     },
     "household3": {
-      "ru": "Бытовые предметы 3",
-      "en": "Household Items 3",
       "faces": {
         "1": {
           "item": "paint"
@@ -331,8 +321,6 @@
       }
     },
     "household4": {
-      "ru": "Бытовые предметы 4",
-      "en": "Household Items 4",
       "faces": {
         "1": {
           "item": "toothpaste"
@@ -399,8 +387,6 @@
       }
     },
     "sporting": {
-      "ru": "Спортивный инвентарь",
-      "en": "Sporting Equipment",
       "faces": {
         "1": {
           "item": "baseball"
@@ -465,8 +451,6 @@
       }
     },
     "science": {
-      "ru": "Наука и техника",
-      "en": "Science and Technology",
       "faces": {
         "1": {
           "item": "battery"
@@ -531,8 +515,6 @@
       }
     },
     "medical": {
-      "ru": "Медицинское оборудование",
-      "en": "Medical Equipment",
       "faces": {
         "1": {
           "item": "bandages"
@@ -597,8 +579,6 @@
       }
     },
     "workplace": {
-      "ru": "Предметы с рабочего места",
-      "en": "Workplace Items",
       "faces": {
         "1": {
           "item": "bag_of_cement"
@@ -664,8 +644,6 @@
     }
   },
   "mining": {
-    "ru": "Шахты и раскопки",
-    "en": "Mining and Excavation",
     "faces": {
       "1": {
         "item": "aluminum_ore",

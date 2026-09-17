@@ -76,6 +76,7 @@ const styles = StyleSheet.create({
   },
   sellButton: { backgroundColor: '#DC3545' },
   applyButton: { backgroundColor: '#28a745' },
+  applyButtonDisabled: { opacity: 0.4 },
   unequipButton: { backgroundColor: '#ffc107' },
   actionButtonText: { color: '#fff', fontSize: 12 },
   summaryContainer: {

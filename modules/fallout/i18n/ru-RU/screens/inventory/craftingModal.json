@@ -1,0 +1,45 @@
+{
+  "categoryNames": {
+    "ammo": "Боеприпасы",
+    "weapons": "Оружие",
+    "chems": "Препараты",
+    "food": "Еда",
+    "drinks": "Напитки"
+  },
+  "ui": {
+    "title": "Крафт",
+    "back": "← Назад",
+    "craft": "Скрафтить",
+    "craftN": "Скрафтить ×{n}",
+    "complexity": "Сложность {n}",
+    "rowMeta": "{skill} · {time}",
+    "timeMinutes": "{n} мин",
+    "timeHours": "{n} ч",
+    "timeDays": "{n} сут",
+    "needPerk": "Нужен перк «{perk}», ранг {rank}",
+    "shortMaterials": "Не хватает материалов",
+    "ready": "Можно крафтить",
+    "materialsTitle": "Материалы",
+    "haveNeed": "есть {have} · нужно {need}",
+    "quantity": "Сколько раз",
+    "resultTitle": "Крафт",
+    "stopped": "Остановлено: материалов в сумке кончились, {n} попыток не началось",
+    "checkLine": "{attribute} + {skill} = {target}",
+    "rollsSuccess": "Выпало {rolls}. Успехов {n}",
+    "rollsFail": "Выпало {rolls}. Неудача",
+    "autoNote": "Автоуспех (сложность снята навыком)",
+    "burnNote": "Материалы сгорели",
+    "intactNote": "Ничего не потрачено",
+    "granted": "Получено: {items}",
+    "nothing": "Не получено ничего",
+    "spent": "Потрачено: {items}",
+    "timeSpent": "Время: {time}",
+    "complicationNote": "Осложнение удвоило время",
+    "craftTitle": "Крафт",
+    "notAvailable": "Недоступно",
+    "done": "Готово"
+  },
+  "attributes": {
+    "INT": "Интеллект"
+  }
+}

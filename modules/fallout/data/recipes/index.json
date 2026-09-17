@@ -1,34 +1,29 @@
 {
   "id": "crafting",
-  "benches": [
-    "chemistry",
-    "cooking",
-    "weapons"
-  ],
   "recipes": [
     {
       "file": "ammo.json",
-      "bucket": "ammo",
+      "category": "ammo",
       "count": 28
     },
     {
       "file": "chems.json",
-      "bucket": "chems",
+      "category": "chems",
       "count": 21
     },
     {
       "file": "drinks.json",
-      "bucket": "drinks",
+      "category": "drinks",
       "count": 8
     },
     {
       "file": "food.json",
-      "bucket": "food",
+      "category": "food",
       "count": 27
     },
     {
       "file": "weapons.json",
-      "bucket": "weapons",
+      "category": "weapons",
       "count": 9
     }
   ]

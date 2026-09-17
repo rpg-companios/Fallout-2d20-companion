@@ -490,7 +490,10 @@ export const createOrchestrationActions = (set, get) => {
     normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
     const { effects: nextEffects, expired } = advanceEffectsByScenes(
       normalizedCurrent.effects,
-      hours * SCENE_RULES.SCENES_PER_GAME_HOUR,
+      // Патч 262: дробные часы (10 минут работы = 1/6 ч) в float дают
+      // 1.9999999999999998 сцен и домен бросает на нецелом — округляем
+      // до ближайшей сцены (целые часы сна считаются точно как раньше).
+      Math.round(hours * SCENE_RULES.SCENES_PER_GAME_HOUR),
     );
     syncTimedEffectsToStore(nextEffects, store);
     return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
