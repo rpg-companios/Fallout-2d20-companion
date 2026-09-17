@@ -15,7 +15,7 @@ import { getSalvageComposition, getScrapMaterials } from '../../../domain/regist
 import { runSalvage } from '../../../domain/salvageEngine';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { getPerkSelectionCount } from '../../../domain/perks';
-import { getItemId } from '../../../domain/itemIdentity';
+import { getCanonicalItemId } from '../../../domain/itemIdentity';
 import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
 import { rollCombatDiceEffects, facesToCombatUnits } from '../../../domain/diceRollsLogic';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -32,7 +32,7 @@ const fail = (stage, reason, extra = {}) => ({
 const effectiveItemType = (entry, stack) => entry?.itemType ?? inferItemType(stack);
 
 const entryOf = (stack) => {
-  const canonical = getItemId(stack);
+  const canonical = getCanonicalItemId(stack);
   if (!canonical) return null;
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
   return { canonical, entry: findCatalogEntry(catalog, canonical, inferItemType(stack)) ?? null };

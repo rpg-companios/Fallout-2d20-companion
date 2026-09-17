@@ -9,7 +9,7 @@
 // правилам 261, в подстроке он не нуждается. Цвета редкостей — отдельный
 // слой UI, здесь их нет намеренно.
 
-import { getItemId } from '../../../domain/itemIdentity';
+import { getCanonicalItemId } from '../../../domain/itemIdentity';
 import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
 import { getSalvageComposition } from '../../../domain/registry';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -33,7 +33,7 @@ const nameIndex = () => {
  * сколько строк срезан потолок.
  */
 export const salvageSublineForItem = (item, store) => {
-  const canonical = item ? getItemId(item) : null;
+  const canonical = item ? getCanonicalItemId(item) : null;
   if (!canonical) return null;
   if (isScrapMaterial(canonical)) return null; // п.5 владельца: материалы не разбираются
   const printed = getSalvageComposition(canonical);
@@ -70,7 +70,7 @@ export const salvageSublineForItem = (item, store) => {
  * Возвращает null, если предмет не хлам и состава не имеет (кнопки нет).
  */
 export const salvageButtonForItem = (item, store) => {
-  const canonical = item ? getItemId(item) : null;
+  const canonical = item ? getCanonicalItemId(item) : null;
   if (!canonical || !item?.id) return null;
   if (isScrapMaterial(canonical)) return null; // материал — не хлам ни при каких данных (п.5)
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());

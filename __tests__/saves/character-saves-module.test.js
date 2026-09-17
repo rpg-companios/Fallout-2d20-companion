@@ -185,6 +185,18 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
   });
 
+  it('save/load: сохраняет предметы, добавленные после выбора комплекта', async () => {
+    seedStore();
+    const bucketId = state().addNewItem({ itemId: 'bucket' });
+
+    const id = await saveCharacter('Минутмен');
+    const saved = db.saveCharacter.mock.calls.at(-1)[4];
+    expect(saved.equipment?.items?.some((item) => item.weaponId === 'bucket')).toBe(true);
+
+    await loadCharacter(id);
+    expect(state().items[bucketId]?.weaponId).toBe('bucket');
+  });
+
   it('формат-v2, мост: картотека старого сейва переносится на предметы при загрузке', async () => {
     // Готовим «старый» сейв руками: худой предмет в комплекте + полная
     // копия в картотеке (как до патча 237).

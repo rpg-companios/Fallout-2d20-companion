@@ -31,6 +31,19 @@ export const getItemId = (item = {}) => {
   return item.weaponId || item.code || item.id || item.Name;
 };
 
+/**
+ * Канонический код каталога, в отличие от идентификатора экземпляра/строки.
+ *
+ * `getItemId` намеренно сохраняет исторический приоритет `uniqueId`: он нужен
+ * там, где ключом является конкретный экземпляр (например, старый альбом
+ * модификаций). В UI инвентаря `uniqueId` может быть синтетическим ключом
+ * отображаемого стека (`inv-stack-…`), поэтому для поиска предмета в каталоге
+ * его использовать нельзя. Этот резолвер предназначен именно для правил,
+ * привязанных к каталожной записи (разбор, состав материалов и т. п.).
+ */
+export const getCanonicalItemId = (item = {}) =>
+  item.weaponId || item.itemId || item.armorId || item.clothingId || item.code || item.id || item.Name;
+
 /** slug для имени в ключе: читаемый, без пробелов/спецсимволов. */
 export const slugifyBaseName = (baseName = '') => String(baseName)
   .toLowerCase()

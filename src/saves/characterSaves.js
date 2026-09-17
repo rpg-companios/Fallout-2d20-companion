@@ -215,6 +215,21 @@ const mergeSnapshotWithStoreData = (snapshot) => {
     ...snapshot,
     attributes: preferFilled(legacyData.attributes, snapshot.attributes),
     skills: preferFilled(legacyData.skills, snapshot.skills),
+    // `snapshot.equipment` содержит метаданные выбранного комплекта, но его
+    // items — только исходный комплект. Нормализованный стор является живым
+    // инвентарём: в нём есть также купленные, найденные и добавленные предметы.
+    // Сохраняем именно его, не теряя id/name комплекта, иначе всё вне комплекта
+    // исчезает после перехода между экранами, экспорта или загрузки персонажа.
+    equipment: {
+      ...(snapshot.equipment || {}),
+      ...(legacyData.equipment || {}),
+      // Старые вызовы, ещё задающие комплект напрямую без наполнения стора,
+      // сохраняют прежнее поведение. В обычном потоке даже пустая сумка уже
+      // представлена нормализованным инвентарём после загрузки/выбора комплекта.
+      items: legacyData.equipment?.items?.length
+        ? legacyData.equipment.items
+        : (snapshot.equipment?.items || []),
+    },
     equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),
     rewardedSkills: legacyData.rewardedSkills,
