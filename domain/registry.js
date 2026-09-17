@@ -35,6 +35,7 @@ import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js'
 // Реестр — единственная точка, куда смотрят движок, окно и операции.
 import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
 import {
+  RECIPE_CATEGORY_RULES as moduleCraftingCategoryRules,
   RECIPE_FILES as CRAFTING_FILES,
   RECIPE_MANIFEST as moduleCraftingIndex,
 } from '../modules/fallout/data/recipes/index.js';
@@ -233,6 +234,26 @@ export function getCraftingRecipeById(recipeId) {
 /** Категории рецептов — порядок и состав манифеста (file → category). */
 export function getCraftingCategories() {
   return (moduleCraftingIndex.recipes ?? []).map((entry) => entry.category);
+}
+
+/**
+ * Параметры категории крафта из единого манифеста рецептов. Здесь живут
+ * правила раздела, а не в отдельных рецептах: например, при каких навыках
+ * материалы сгорают после неудачной проверки. Возвращаем неизменяемую копию,
+ * чтобы механика не могла испортить данные реестра.
+ */
+export function getCraftingCategoryRules(category) {
+  const entry = (moduleCraftingIndex.recipes ?? []).find((item) => item.category === category);
+  if (!entry) return null;
+  return Object.freeze({ ...(moduleCraftingCategoryRules[entry.category] ?? {}) });
+}
+
+/** Все правила категорий для проверок целостности и будущего UI. */
+export function getCraftingCategoryRuleRegistry() {
+  return Object.freeze(Object.fromEntries((moduleCraftingIndex.recipes ?? []).map((entry) => [
+    entry.category,
+    getCraftingCategoryRules(entry.category),
+  ])));
 }
 
 /** Каталог хлама (предметы разбора; составы — отдельным справочником). */

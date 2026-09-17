@@ -7,6 +7,7 @@ import { getActiveModuleId } from '../../domain/moduleLocale';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
 import { validateAvatarDataUrl } from '../../domain/characterAvatar';
 import * as avatarCache from '../../db/avatarCache';
+import { getCurrentCatalogEntry } from '../../src/saves/characterSaves';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
@@ -438,7 +439,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
     report('upload', uploadIndex, uploads.length);
     const full = await db.loadCharacterById(character.id);
     if (!full) continue;
-    const payload = JSON.stringify(createCharacterExportPayload(full));
+    const payload = JSON.stringify(createCharacterExportPayload(full, { getEntry: getCurrentCatalogEntry }));
     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
   }
 
@@ -532,7 +533,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
     const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${characterId}__`));
     const character = await db.loadCharacterById(characterId);
     if (!character) return;
-    const payload = JSON.stringify(createCharacterExportPayload(character));
+    const payload = JSON.stringify(createCharacterExportPayload(character, { getEntry: getCurrentCatalogEntry }));
 
     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
     debugLog('sync.auto:done', { characterId });
