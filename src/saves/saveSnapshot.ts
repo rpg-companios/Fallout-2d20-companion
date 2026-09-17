@@ -68,11 +68,11 @@ export type CharacterSaveData = {
   activeTimedEffects: TimedEffectRecord[];
   sceneCounter: number;
   equippedWeapons: StoreItem[];
-  /** Пустой словарь слотов пишется как null («робота нет»). */
-  equippedRobotSlots: Record<string, Record<string, unknown>> | null;
-  equippedRobotModules: StoreItem[];
-  /** ОС Mk II (Секьюритрон) обязана переживать сейв/загрузку. */
-  mk2Installed: boolean;
+  /** Робо-поля присутствуют только у персонажа с робо-состоянием. */
+  equippedRobotSlots?: Record<string, Record<string, unknown>>;
+  equippedRobotModules?: StoreItem[];
+  /** ОС Mk II присутствует только у Секьюритрона. */
+  mk2Installed?: boolean;
   equippedArmor: EquippedArmor;
   equippedPowerArmor: EquippedPowerArmor;
   powerArmorRuntime: PowerArmorRuntime;
@@ -116,9 +116,6 @@ export const CHARACTER_SAVE_KEYS = [
   'activeTimedEffects',
   'sceneCounter',
   'equippedWeapons',
-  'equippedRobotSlots',
-  'equippedRobotModules',
-  'mk2Installed',
   'equippedArmor',
   'equippedPowerArmor',
   'powerArmorRuntime',

@@ -2,6 +2,7 @@
 // Реестр домена читает отсюда и порядок категорий, и строки: новый файл
 // рецептуры = импорт здесь + строка в index.json, движок и окно не трогаем.
 import recipeIndex from './index.json';
+import categoryRules from './categoryRules.json';
 import ammo from './ammo.json';
 import weapons from './weapons.json';
 import chems from './chems.json';
@@ -17,3 +18,7 @@ export const RECIPE_FILES = {
 };
 
 export const RECIPE_MANIFEST = recipeIndex;
+
+// Параметры категорий — рядом с манифестом, поэтому потребители группы
+// рецептов знают единственную точку входа (этот файл), а не пути JSON.
+export const RECIPE_CATEGORY_RULES = categoryRules;

@@ -12,7 +12,7 @@
 
 import useCharacterStore from '../../../src/store/characterStore';
 import { debugLog } from '../../../src/debug/falloutDebug';
-import { getCraftingRecipeById, getScrapMaterials } from '../../../domain/registry';
+import { getCraftingCategoryRules, getCraftingRecipeById, getScrapMaterials } from '../../../domain/registry';
 import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { getPerkSelectionCount } from '../../../domain/perks';
@@ -63,9 +63,11 @@ const packIndex = () => {
 
 const dualityEnabled = () => CRAFT_RULES.packSubstitutionByRarity === true;
 
-// Цена провала — правило навыка (270): данные рецептов о сгорании молчат.
+// Цена провала — параметр категории из единого реестра. Рецепты остаются
+// чистыми строками материалов: правила раздела не размножаются по записям.
 const burnsOnFail = (recipe) =>
-  (CRAFT_RULES.failBurnsMaterialsSkills ?? []).includes(recipe?.requires?.skill);
+  (getCraftingCategoryRules(recipe?.category)?.failBurnsMaterialsSkills ?? [])
+    .includes(recipe?.requires?.skill);
 
 // «Есть в наличии» для движка с учётом дуальности: к счётчику пачки прибавляется
 // остаток именованных материалов той же редкости. Точные строки рецепта

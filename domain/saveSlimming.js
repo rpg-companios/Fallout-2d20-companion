@@ -42,7 +42,10 @@ export const SAVE_STATE_FIELDS = new Set([
   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
   'equipInstanceId', 'uniqueId', 'charges', 'hpCurrent',
   // мета отображения / роботов
-  'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped',
+  'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', 'installedWeapons',
+  // Legacy robot slots must be split into own and installed weapons before
+  // serialization; retain this transient list until serializeSlot() consumes it.
+  'builtinWeapons', 'builtinWeaponId', 'attackId', 'itemCategory',
 ]);
 
 /**
@@ -57,18 +60,13 @@ export const slimItem = (instance, entry) => {
   // чтобы не потерять «локальные» имя/вес/цену.
   if (!entry || typeof entry !== 'object') return { ...instance };
 
-  const out = {};
-  for (const key of Object.keys(instance)) {
-    if (SAVE_STATE_FIELDS.has(key)) {
-      out[key] = instance[key];
-      continue;
-    }
-    // Поле «владеет» каталог → выводимо через resolveItem → вырезаем.
-    // Иначе (каталог не знает такого поля) оставляем как fallback.
-    const catalogOwns = Object.prototype.hasOwnProperty.call(entry, key);
-    if (!catalogOwns) out[key] = instance[key];
-  }
-  return out;
+  // Для известного каталогу предмета файл содержит исключительно состояние
+  // экземпляра. Локальные displayName/baseWeaponName и произвольные поля не
+  // являются состоянием: они либо восстанавливаются из каталога, либо были
+  // устаревшей копией UI. Неизвестные (кастомные) предметы по-прежнему
+  // сохраняются целиком в раннем return выше.
+  return Object.fromEntries(Object.entries(instance)
+    .filter(([key]) => SAVE_STATE_FIELDS.has(key)));
 };
 
 /**

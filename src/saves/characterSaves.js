@@ -136,10 +136,19 @@ const resolveItemInCatalog = (item, catalog) => {
 };
 
 const findCatalogEntryInCatalog = (id, itemType, catalog) => {
-  try { return findCatalogEntry(id, itemType, catalog); }
+  // findCatalogEntry принимает каталог первым. Неверный порядок аргументов
+  // превращал каждую запись в «неизвестную» при сохранении и обходил
+  // нормальный контракт каталога для хлама и материалов.
+  try { return findCatalogEntry(catalog, id, itemType); }
   catch (e) {
     return null;
   }
+};
+
+/** Единственный резолвер каталога для записи в БД, файл и облако. */
+export const getCurrentCatalogEntry = (id, itemType) => {
+  const catalog = catalogForCurrentLocale();
+  return catalog ? findCatalogEntryInCatalog(id, itemType, catalog) : null;
 };
 
 const deserializeState = (data) => {
@@ -224,6 +233,11 @@ const mergeSnapshotWithStoreData = (snapshot) => {
 export const buildSnapshot = () => {
   const state = useCharacterStore.getState();
   const slots = state.robot?.slots ?? null;
+  const hasRobotState = Boolean(
+    (slots && Object.keys(slots).length > 0)
+    || (state.robot?.modules?.length > 0)
+    || state.robot?.mk2Installed,
+  );
   return {
     characterName: state.characterName,
     level: state.level,
@@ -241,12 +255,13 @@ export const buildSnapshot = () => {
     activeTimedEffects: denormalizeEffects(state.effects || {}),
     sceneCounter: state.sceneCounter,
     equippedWeapons: state.equippedWeapons,
-    // Слоты робота: пустой словарь («робота нет») пишется как null —
-    // прежний формат сейва не меняется.
-    equippedRobotSlots: (slots && Object.keys(slots).length > 0) ? slots : null,
-    equippedRobotModules: state.robot?.modules ?? [],
-    // ОС Mk II (Секьюритрон) — часть robot-состояния, обязана переживать сейв/загрузку.
-    mk2Installed: state.robot?.mk2Installed ?? false,
+    // Робо-поля не описывают органического персонажа и не засоряют его файл.
+    // При загрузке отсутствие полей означает стандартное пустое robot-состояние.
+    ...(hasRobotState ? {
+      equippedRobotSlots: slots,
+      equippedRobotModules: state.robot?.modules ?? [],
+      mk2Installed: state.robot?.mk2Installed ?? false,
+    } : {}),
     equippedArmor: state.equippedArmor,
     equippedPowerArmor: state.equippedPowerArmor,
     powerArmorRuntime: state.powerArmorRuntime,

@@ -154,11 +154,11 @@ describe('slimItem', () => {
     expect(slim).toEqual(custom);
   });
 
-  it('сохраняет fallback-поля, которых нет в каталоге', () => {
-    const item = { ...makeAmmo(), proprietaryField: 'x' };
-    // аммо в каталоге есть, но proprietaryField каталог не знает
+  it('вырезает UI- и произвольные поля известного каталогу предмета', () => {
+    const item = { ...makeAmmo(), proprietaryField: 'x', displayName: 'Старое имя' };
     const slim = slimItem(item, CATALOG.ammo_shotgun_shell);
-    expect(slim.proprietaryField).toBe('x');
+    expect(slim.proprietaryField).toBeUndefined();
+    expect(slim.displayName).toBeUndefined();
     expect('name' in slim).toBe(false);
   });
 });
