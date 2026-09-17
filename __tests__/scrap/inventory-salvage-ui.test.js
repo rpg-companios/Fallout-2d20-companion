@@ -74,6 +74,17 @@ describe('подстрока состава в строке инвентаря',
     expect(salvageSublineForItem({ id: 'x', weaponId: 'not_a_real_item' }, state())).toBeNull();
     expect(salvageSublineForItem(null, state())).toBeNull();
   });
+
+  it('строка UI с синтетическим uniqueId всё равно находит состав по коду каталога', () => {
+    const bucket = stackOf('bucket');
+    const displayRow = { ...bucket, uniqueId: `inv-stack-${bucket.stackKey}` };
+
+    expect(salvageSublineForItem(displayRow, state())).toMatchObject({
+      salvageable: true,
+      parts: [{ itemId: 'steel', count: 2 }],
+    });
+    expect(salvageButtonForItem(displayRow, state())?.enabled).toBe(true);
+  });
 });
 
 describe('отчёт о разборе для алерта', () => {
