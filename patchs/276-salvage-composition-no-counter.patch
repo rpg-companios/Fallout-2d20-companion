@@ -1,0 +1,182 @@
+From b3e736776adcd8d46d8a4c278aaa80ebd9368225 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Thu, 17 Sep 2026 11:53:36 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=9F=D0=B0=D1=82=D1=87=20276:=20=D0=BF=D0=BE?=
+ =?UTF-8?q?=D0=B4=D1=81=D1=82=D1=80=D0=BE=D0=BA=D0=B0=20=D1=81=D0=BE=D1=81?=
+ =?UTF-8?q?=D1=82=D0=B0=D0=B2=D0=B0=20=D0=B1=D0=B5=D0=B7=20=D1=81=D1=87?=
+ =?UTF-8?q?=D1=91=D1=82=D1=87=D0=B8=D0=BA=D0=B0=20=C2=AB+N=20=D0=BD=D0=B5?=
+ =?UTF-8?q?=D0=B4=D0=BE=D1=81=D1=82=D1=83=D0=BF=D0=BD=D0=BE=C2=BB?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Слово владельца: недоступные материалы просто не показываются, разбор
+идёт с отсечением где возможен (движок умел с 263). Снят хвост-счётчик
+с экрана, ключ salvage.hidden вычищен из локалей, hidden остался полем
+данных для превью/модалки. Гард: магазин/выдача/продажа не знают про
+потолок — лут и покупка от ранга не зависят.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/scrap/inventory-salvage-ui.test.js  | 46 ++++++++++++++++++-
+ .../InventoryScreen/InventoryScreen.js        |  2 +-
+ docs/changelog.en.md                          |  9 ++++
+ docs/changelog.ru.md                          |  9 ++++
+ .../i18n/en-EN/screens/inventory/screen.json  |  1 -
+ .../i18n/ru-RU/screens/inventory/screen.json  |  1 -
+ 6 files changed, 63 insertions(+), 5 deletions(-)
+
+diff --git a/__tests__/scrap/inventory-salvage-ui.test.js b/__tests__/scrap/inventory-salvage-ui.test.js
+index b60c713..8849762 100644
+--- a/__tests__/scrap/inventory-salvage-ui.test.js
++++ b/__tests__/scrap/inventory-salvage-ui.test.js
+@@ -36,7 +36,7 @@ afterEach(async () => {
+ });
+ 
+ describe('подстрока состава в строке инвентаря', () => {
+-  it('battery без «Мусорщика»: виден только пластик, +2 спрятано', () => {
++  it('battery без «Мусорщика»: виден только пластик (263, список — достижимое)', () => {
+     const subline = salvageSublineForItem(stackOf('battery'), state());
+     expect(subline).toMatchObject({ salvageable: true, hidden: 2, ceiling: 0 });
+     expect(subline.parts).toEqual([{ itemId: 'plastic', name: expect.any(String), count: 1 }]);
+@@ -149,13 +149,16 @@ describe('обвязка экрана и строки локалей (по ис
+     expect(src).toContain("salvage.gate === 'rank'");
+     expect(src).toContain("tInventory('screen.salvage.requiresRank')");
+     expect(src).not.toContain('salvage?.salvageable &&');
++    // 276 (слово владельца): счётчик «+N недоступно» снят — недоступные
++    // материалы состава просто не показываются; разбор идёт с отсечением.
++    expect(src).not.toContain('screen.salvage.hidden');
+     expect(readText('styles/InventoryScreen.styles.js')).toContain('applyButtonDisabled');
+   });
+ 
+   it('секция salvage есть в обеих локалях слоя Fallout', () => {
+     for (const locale of ['ru-RU', 'en-EN']) {
+       const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
+-      const need = ['action', 'label', 'unavailable', 'requiresRank', 'hidden', 'doneTitle', 'failTitle',
++      const need = ['action', 'label', 'unavailable', 'requiresRank', 'doneTitle', 'failTitle',
+         'emptyTitle', 'notStartedTitle', 'done', 'empty', 'fail', 'timeLine',
+         'complicationNote', 'noMaterials', 'notStarted', 'material'];
+       for (const key of need) {
+@@ -246,3 +249,42 @@ describe('гейт по рангу «Мусорщика» (275): нехватк
+     expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false, hidden: 1 });
+   });
+ });
++
++describe('276 (слово владельца): состава-списка без счётчика, лут и покупка вне потолка', () => {
++  it('экран больше не печатает «+N недоступно»; ключ вычист из обеих локалей', () => {
++    expect(readText('components/screens/InventoryScreen/InventoryScreen.js'))
++      .not.toContain('screen.salvage.hidden');
++    for (const locale of ['ru-RU', 'en-EN']) {
++      const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
++      expect(dict.salvage.hidden).toBeUndefined();
++    }
++  });
++
++  it('магазин и выдача предметов ничего не знают о «Мусорщике»: потолок — только разбор', () => {
++    for (const rel of [
++      'components/screens/InventoryScreen/modals/BuyItemModal.js',
++      'components/screens/InventoryScreen/modals/AddItemModal.js',
++      'components/screens/InventoryScreen/modals/SellItemModal.js',
++    ]) {
++      const src = readText(rel);
++      expect(src, rel).not.toContain('scrapperCeiling');
++      expect(src, rel).not.toContain('salvage/');
++    }
++  });
++
++  it('мел с рангом 1: подстрока — ровно гейт «требуется ранг 2»; hidden жив как данные', () => {
++    scrapper(1);
++    const subline = salvageSublineForItem(stackOf('chalk'), state());
++    expect(subline).toMatchObject({ salvageable: false, gate: 'rank', requiredRank: 2, hidden: 1 });
++    // 276: hidden остался полем данных (превью/будущая модалка), но экран его
++    // не печатает — проверка обвязкой выше (not.toContain('screen.salvage.hidden')).
++    const button = salvageButtonForItem(stackOf('chalk'), state());
++    expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false });
++  });
++
++  it('battery без перка: список — только пластик, без всяких «+2» в данных строки', () => {
++    const subline = salvageSublineForItem(stackOf('battery'), state());
++    expect(subline.parts.map((p) => p.itemId)).toEqual(['plastic']);
++    expect(subline.gate).toBeNull();
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 3f1de64..206f453 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1712,7 +1712,7 @@ const InventoryScreen = () => {
+                 ? salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ')
+                 : salvage.gate === 'rank'
+                   ? formatInventoryText(tInventory('screen.salvage.requiresRank'), { rank: salvage.requiredRank })
+-                  : tInventory('screen.salvage.unavailable')}{salvage.gate === 'rank' ? '' : salvage.hidden > 0 ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}` : ''}
++                  : tInventory('screen.salvage.unavailable')}
+             </Text>
+           )}
+         </View>
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 627f561..9e19532 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,15 @@
+ 
+ ---
+ 
++## Micro-patch — Junk composition without the «+N unavailable» counter (patch 276)
++
++> Owner's word (2026-09-17): «+1 unavailable» carries no information at all. The rule: salvage runs clipped wherever it is possible — common + uncommon with no perk yields the common one, rank 1 yields up to uncommon, rank 2 yields everything. Unreachable materials are simply not shown in the subline; loot and purchase do not depend on the Scrapper rank.
++
++- The engine could do this since 263 (rarity ceiling over the composition, honest stack spend) — only the storefront changed: the screen dropped the «, +N unavailable» tail and the `salvage.hidden` key was purged from both locales. When nothing is reachable the line keeps the 275 gates («requires Scrapper perk rank N» / «unavailable without…»): the reason is named there, no counter needed.
++- `hidden` survives as a number in subline/preview data (future modal) but never reaches the row. A scope-guard test pins that shop/grant/sell modals import no salvage ceiling — the Scrapper can only clip salvage. 910 green, tsc clean.
++
++---
++
+ ## Micro-patch — Missing Scrapper rank is named directly (patch 275)
+ 
+ > Owner's word (2026-09-17): with Scrapper rank 1 on chalk the subline lied — «unavailable without Scrapper, +1 unavailable» — while the perk was present and rank 2 was what's missing. The 264 agreement («what cannot be obtained is not shown») stands: names of clipped materials stay hidden.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2009baf..06dfcf0 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,15 @@
+ 
+ ---
+ 
++## Микропатч — Состав хлама без счётчика «+N недоступно» (патч 276)
++
++> Слово владельца (2026-09-17): «+1 недоступно» не информативно совсем. Правило: разбор идёт с отсечением, где возможен — обычный + необычный в составе без перка выдаёт обычный, с рангом 1 — вплоть до необычного, с рангом 2 — всё. Недоступные материалы в подстроке просто не показываются; лут и покупка от ранга «Мусорщика» не зависят.
++
++- Движок это умел с 263 (фильтр по потолку в composition, честное списание хлама) — правка коснулась только витрины: экран снял хвост «, +N недоступно», ключ `salvage.hidden` вычищен из обеих локалей. Когда недоступно всё — строка остаётся на гейтах 275 («требуется перк «Мусорщик» ранг N» / «недоступно без…»): там названа причина, счётчик не нужен.
++- `hidden` в данных подстроки/превью сохранён как число (будущая модалка), в строке экрана его нет. Скоуп-гард тестом: магазин/выдача/продажа не импортируют salvage-потолок — резать редкость «Мусорщик» может только разбор. 910 зелёные, tsc чисто.
++
++---
++
+ ## Микропатч — Нехватка ранга «Мусорщика» называется прямо (патч 275)
+ 
+ > Слово владельца (2026-09-17): на меле с «Мусорщиком» 1 ранга подстрока врала — «недоступно без «Мусорщика», +1 недоступно», хотя перк был и нужен был ранг 2. Уговор 264 («не видно то, что нельзя получить») остаётся в силе: имена срезанных материалов по-прежнему не показываются.
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index 5b81f29..703aac6 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -78,7 +78,6 @@
+     "label": "Salvage",
+     "unavailable": "unavailable without Scrapper",
+     "requiresRank": "requires Scrapper perk rank {rank}",
+-    "hidden": "+{n} unavailable",
+     "doneTitle": "Salvage",
+     "failTitle": "Salvage failed",
+     "emptyTitle": "Salvage",
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index c490a0a..c036dd7 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -78,7 +78,6 @@
+     "label": "Разбор",
+     "unavailable": "недоступно без «Мусорщика»",
+     "requiresRank": "требуется перк «Мусорщик» ранг {rank}",
+-    "hidden": "+{n} недоступно",
+     "doneTitle": "Разбор",
+     "failTitle": "Разбор не удался",
+     "emptyTitle": "Разбор",
+-- 
+2.39.5
+
