@@ -14,7 +14,7 @@ import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
 import { getSalvageComposition } from '../../../domain/registry';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
-import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling } from './operations';
+import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling, scrapperRankForRarity } from './operations';
 
 const nameIndex = () => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
@@ -39,7 +39,7 @@ export const salvageSublineForItem = (item, store) => {
   const printed = getSalvageComposition(canonical);
   if (!printed) return null;
   const ceiling = scrapperCeiling(store);
-  const { composition, dropped } = filterCompositionByCeiling(printed, ceiling);
+  const { composition, dropped, blockedRarity } = filterCompositionByCeiling(printed, ceiling);
   const options = composition?.options ?? [];
   const names = nameIndex();
   const seen = new Map();
@@ -57,7 +57,25 @@ export const salvageSublineForItem = (item, store) => {
     name: names.get(id) ?? id,
     count,
   }));
-  return { parts, hidden: dropped, ceiling, salvageable: parts.length > 0 };
+  // Гейт недостижимого разбора (275): если доступно ничего и причины —
+  // отрезанные редкостью строки, то при «Мусорщике» это нехватка РАНГА
+  // (есть 1, нужен 2), а не отсутствие перка. Без перка текстом правит
+  // прежняя формулировка «недоступно без…» — уговор 264. Имена срезанных
+  // материалов не раскрываются нигде: только счётчик hidden.
+  const rankRequired = parts.length === 0 && dropped > 0 && blockedRarity != null
+    ? scrapperRankForRarity(blockedRarity)
+    : null;
+  return {
+    parts,
+    hidden: dropped,
+    ceiling,
+    salvageable: parts.length > 0,
+    // null | 'no-perk' | 'rank' — экран печатает, не рассуждает.
+    gate: !rankRequired || rankRequired <= ceiling
+      ? null
+      : ceiling >= 1 ? 'rank' : 'no-perk',
+    requiredRank: rankRequired,
+  };
 };
 
 /**

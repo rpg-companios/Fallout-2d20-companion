@@ -77,7 +77,7 @@
     "action": "Salvage",
     "label": "Salvage",
     "unavailable": "unavailable without Scrapper",
-    "hidden": "+{n} unavailable",
+    "requiresRank": "requires Scrapper perk rank {rank}",
     "doneTitle": "Salvage",
     "failTitle": "Salvage failed",
     "emptyTitle": "Salvage",
