@@ -9,6 +9,7 @@ import useCharacterStore from '../../src/store/characterStore';
 import { salvageButtonForItem, salvageSublineForItem } from '../../modules/fallout/salvage/subline';
 import { buildSalvageReport } from '../../components/screens/InventoryScreen/logic/salvageResultReport';
 import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
+import { formatInventoryText as formatText } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../i18n/locale';
 
@@ -144,6 +145,9 @@ describe('обвязка экрана и строки локалей (по ис�
     expect(src).toContain('salvageButtonForItem(item, useCharacterStore.getState())');
     expect(src).toContain('!salvage.enabled && styles.applyButtonDisabled');
     expect(src).toContain('disabled={!salvage.enabled}');
+    // 275: нехватка ранга называется прямо — «требуется перк … ранг N».
+    expect(src).toContain("salvage.gate === 'rank'");
+    expect(src).toContain("tInventory('screen.salvage.requiresRank')");
     expect(src).not.toContain('salvage?.salvageable &&');
     expect(readText('styles/InventoryScreen.styles.js')).toContain('applyButtonDisabled');
   });
@@ -151,7 +155,7 @@ describe('обвязка экрана и строки локалей (по ис�
   it('секция salvage есть в обеих локалях слоя Fallout', () => {
     for (const locale of ['ru-RU', 'en-EN']) {
       const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
-      const need = ['action', 'label', 'unavailable', 'hidden', 'doneTitle', 'failTitle',
+      const need = ['action', 'label', 'unavailable', 'requiresRank', 'hidden', 'doneTitle', 'failTitle',
         'emptyTitle', 'notStartedTitle', 'done', 'empty', 'fail', 'timeLine',
         'complicationNote', 'noMaterials', 'notStarted', 'material'];
       for (const key of need) {
@@ -199,5 +203,46 @@ describe('кнопка «Разобрать» у хлама (267): есть вс
     expect(salvageButtonForItem(pistol, state())).toBeNull();
     expect(salvageButtonForItem({ id: 'x', weaponId: 'not_a_real_item' }, state())).toBeNull();
     expect(salvageButtonForItem(null, state())).toBeNull();
+  });
+});
+
+describe('гейт по рангу «Мусорщика» (275): нехватка ранга называется прямо', () => {
+  it('мел с рангом 1: не «недоступно без Мусорщика», а «требуется ранг 2»', () => {
+    scrapper(1);
+    const subline = salvageSublineForItem(stackOf('chalk'), state());
+    expect(subline).toMatchObject({
+      salvageable: false, hidden: 1, ceiling: 1, gate: 'rank', requiredRank: 2,
+    });
+    const line = formatText(tInventory('screen.salvage.requiresRank'), { rank: subline.requiredRank });
+    // Локаль теста может быть любой — проверяем подстановку ранга и имя перка
+    // в обеих формах словаря (ключ есть в обеих локалях — ниже по «обвязке»).
+    expect(line).toContain('2');
+    expect(/Мусорщик|Scrapper/.test(line)).toBe(true);
+    expect(line).not.toContain('{rank}');
+  });
+
+  it('мел без перка: прежняя формулировка причины (уговор 264), гейт — no-perk', () => {
+    const subline = salvageSublineForItem(stackOf('chalk'), state());
+    expect(subline).toMatchObject({ salvageable: false, gate: 'no-perk' });
+  });
+
+  it('мел с рангом 2: состав доступен — гейта нет, счётчик скрытых пуст', () => {
+    scrapper(2);
+    const subline = salvageSublineForItem(stackOf('chalk'), state());
+    expect(subline).toMatchObject({ salvageable: true, gate: null, hidden: 0 });
+    expect(subline.requiredRank).toBeNull();
+  });
+
+  it('battery без перка: часть доступна — ранговый гейт не вставляется, счётчик остаётся', () => {
+    const subline = salvageSublineForItem(stackOf('battery'), state());
+    expect(subline).toMatchObject({ salvageable: true, gate: null, hidden: 2 });
+  });
+
+  it('строка экрана (с uniqueId) на мелу ранга 1: гейт доживает до кнопки, она серая', () => {
+    scrapper(1);
+    const chalk = stackOf('chalk');
+    const displayRow = { ...chalk, uniqueId: `inv-stack-${chalk.stackKey}` };
+    const button = salvageButtonForItem(displayRow, state());
+    expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false, hidden: 1 });
   });
 });

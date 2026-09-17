@@ -2,6 +2,16 @@
 
 ---
 
+## Micro-patch — Missing Scrapper rank is named directly (patch 275)
+
+> Owner's word (2026-09-17): with Scrapper rank 1 on chalk the subline lied — «unavailable without Scrapper, +1 unavailable» — while the perk was present and rank 2 was what's missing. The 264 agreement («what cannot be obtained is not shown») stands: names of clipped materials stay hidden.
+
+- The module now distinguishes causes: `filterCompositionByCeiling` returns the minimum clipped rarity, the subline exposes `gate: 'rank' | 'no-perk'` and `requiredRank`. On `'rank'` the screen prints «Salvage: requires Scrapper perk rank N» and drops the «+N unavailable» tail (with the composition fully clipped the counter is noise). Without the perk — the agreed wording is kept.
+- Rank numbers come from module rules (`scrapperUncommonRank`/`scrapperRareRank`), not from prose: a future rarity scale changes rules, not screens. 5 regression tests (screen row with `uniqueId` included); locale names are not asserted, both-locale dictionary test covers them. 906 green, tsc clean.
+- Patch ledger: 273/274 were merged separately by the owner (PR #20); their files are dropped from the ledger, which now holds `patchs/275-salvage-rank-gate-message.patch`.
+
+---
+
 ## Update — Data reform: salvage in item cards, benchless recipes, unified junk catalog (patch 269)
 
 > Owner's word (2026-09-17): junk and its salvage recipes are one file; material.json and junk.json live in `data/junk/`; a material row is `{id, materialType, weight, cost, rarity}` — no itemType, no "named" marking; the engine knows neither recipes nor materials, only "recipes live in the registry, the registry points at files"; a recipe is `{id, requires, materials}` and its id IS the output item; quantity is a single `outputQuantity` field (integer or dice), "same shape everywhere"; packs vs other materials — no distinction, one common pool; `bench` and `sourcePage` out of recipes — failing burns materials exactly where the record itself says so; d20 table labels inside data were wrong — labels live in i18n.

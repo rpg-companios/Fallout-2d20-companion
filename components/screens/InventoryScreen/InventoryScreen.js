@@ -1710,7 +1710,9 @@ const InventoryScreen = () => {
             <Text style={styles.itemSubText}>
               {tInventory('screen.salvage.label')}: {salvage.parts.length
                 ? salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ')
-                : tInventory('screen.salvage.unavailable')}{salvage.hidden > 0 ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}` : ''}
+                : salvage.gate === 'rank'
+                  ? formatInventoryText(tInventory('screen.salvage.requiresRank'), { rank: salvage.requiredRank })
+                  : tInventory('screen.salvage.unavailable')}{salvage.gate === 'rank' ? '' : salvage.hidden > 0 ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}` : ''}
             </Text>
           )}
         </View>
