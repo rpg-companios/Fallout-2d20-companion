@@ -223,12 +223,10 @@ const mergeSnapshotWithStoreData = (snapshot) => {
     equipment: {
       ...(snapshot.equipment || {}),
       ...(legacyData.equipment || {}),
-      // Старые вызовы, ещё задающие комплект напрямую без наполнения стора,
-      // сохраняют прежнее поведение. В обычном потоке даже пустая сумка уже
-      // представлена нормализованным инвентарём после загрузки/выбора комплекта.
-      items: legacyData.equipment?.items?.length
-        ? legacyData.equipment.items
-        : (snapshot.equipment?.items || []),
+      // Пустой массив тоже значим: если герой продал или разобрал последнюю
+      // вещь, исходные предметы комплекта не должны «воскреснуть» из snapshot
+      // при следующем save/load.
+      items: legacyData.equipment?.items || [],
     },
     equippedWeapons: mergeEquippedWeapons(snapshot.equippedWeapons, legacyData.equippedWeapons),
     activeTimedEffects: preferFilled(legacyData.activeTimedEffects, snapshot.activeTimedEffects),

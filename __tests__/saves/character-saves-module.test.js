@@ -140,6 +140,7 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
 
   it('saveCharacter: пишет строку db, ставит isSaved + currentCharacterId', async () => {
     seedStore();
+    state().addNewItem({ itemId: 'weapon_x_01_22', name: 'Винтовка' });
     const id = await saveCharacter('Минутмен');
 
     expect(id).toBeTruthy();
@@ -156,8 +157,8 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     expect(parsed.characterName).toBe('Минутмен');
     // Формат-v2: картотека в запись не идёт.
     expect(parsed.modifiedItems).toBeUndefined();
-    // Зато предмет-основа едет в комплекте (мосту есть с чем работать).
-    const savedItem = parsed.equipment?.items?.find((it) => it.id === 'weapon_x_01_22');
+    // В сейв попадает предмет из живого нормализованного инвентаря.
+    const savedItem = parsed.equipment?.items?.find((it) => it.weaponId === 'weapon_x_01_22');
     expect(savedItem?.name).toBe('Винтовка');
   });
 
@@ -195,6 +196,17 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
 
     await loadCharacter(id);
     expect(state().items[bucketId]?.weaponId).toBe('bucket');
+  });
+
+  it('save/load: пустой живой инвентарь не возвращает предметы из комплекта', async () => {
+    seedStore();
+
+    const id = await saveCharacter('Минутмен');
+    const saved = db.saveCharacter.mock.calls.at(-1)[4];
+    expect(saved.equipment?.items).toEqual([]);
+
+    await loadCharacter(id);
+    expect(state().items).toEqual({});
   });
 
   it('формат-v2, мост: картотека старого сейва переносится на предметы при загрузке', async () => {
