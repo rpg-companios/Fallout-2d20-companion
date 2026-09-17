@@ -76,8 +76,9 @@
   "salvage": {
     "action": "Разобрать",
     "label": "Разбор",
-    "unavailable": "недоступно без «Мусорщика»",
-    "hidden": "+{n} недоступно",
+    "hidden": "+{n} нужно «Мусорщика» выше рангом",
+    "requiresPerkRank": "Требуется перк «{perk}», ранг {rank}",
+    "effectOnly": "что выпадет — решат кости эффекта",
     "doneTitle": "Разбор",
     "failTitle": "Разбор не удался",
     "emptyTitle": "Разбор",

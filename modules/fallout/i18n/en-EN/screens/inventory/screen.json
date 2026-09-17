@@ -76,8 +76,9 @@
   "salvage": {
     "action": "Salvage",
     "label": "Salvage",
-    "unavailable": "unavailable without Scrapper",
-    "hidden": "+{n} unavailable",
+    "hidden": "+{n} need a higher Scrapper rank",
+    "requiresPerkRank": "Requires perk \"{perk}\" rank {rank}",
+    "effectOnly": "the effect dice will decide what comes out",
     "doneTitle": "Salvage",
     "failTitle": "Salvage failed",
     "emptyTitle": "Salvage",

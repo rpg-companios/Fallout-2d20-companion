@@ -44,6 +44,7 @@ import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDura
 import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
 import { salvageItem } from '../../../modules/fallout/salvage/operations';
 import { salvageButtonForItem } from '../../../modules/fallout/salvage/subline';
+import { SALVAGE_RULES } from '../../../modules/fallout/salvage/rules';
 import { buildSalvageReport } from './logic/salvageResultReport';
 
 const PARAM_FIELDS = [
@@ -1418,6 +1419,33 @@ const InventoryScreen = () => {
     showAlert(report.title, report.message);
   };
 
+  // Подстрока «Разбор: …» (патч 264). Состав целиком за потолком «Мусорщика»
+  // раньше рисовался парой «недоступно без «Мусорщика», +N недоступно», из
+  // которой не понять, чего не хватает. Теперь такой предмет честно называет
+  // требование: «Требуется перк «Мусорщик», ранг 2» — тот же язык, что у крафта.
+  const salvageSublineText = (salvage) => {
+    const label = tInventory('screen.salvage.label');
+    if (salvage.parts.length) {
+      const parts = salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ');
+      return `${label}: ${parts}${salvage.hidden > 0
+        ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}`
+        : ''}`;
+    }
+    if (salvage.requiredRank != null) {
+      return `${label}: ${formatInventoryText(tInventory('screen.salvage.requiresPerkRank'), {
+        perk: getPerkDisplay({ id: SALVAGE_RULES.scrapperPerkId }).name,
+        rank: salvage.requiredRank,
+      })}`;
+    }
+    // Кнопка активна, но печатный основной материал срезан — остался только
+    // костный эффект (одна строка с effect и без main, редкий случай): не
+    // выдаём результат за печатный материал, честно указываем на кости.
+    if (salvage.enabled) {
+      return `${label}: ${tInventory('screen.salvage.effectOnly')}`;
+    }
+    return label;
+  };
+
   const renderItem = ({ item }) => {
     // ── Контейнер «Силовая броня» и его содержимое (аккордеон — ПРАВИЛО владельца):
     // свои строки, общий пайплайн имён/модов обходят (имена уже собраны из каталога).
@@ -1708,9 +1736,7 @@ const InventoryScreen = () => {
           )}
           {salvage?.hasComposition && !item.isEquipped && (
             <Text style={styles.itemSubText}>
-              {tInventory('screen.salvage.label')}: {salvage.parts.length
-                ? salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ')
-                : tInventory('screen.salvage.unavailable')}{salvage.hidden > 0 ? `, ${formatInventoryText(tInventory('screen.salvage.hidden'), { n: salvage.hidden })}` : ''}
+              {salvageSublineText(salvage)}
             </Text>
           )}
         </View>

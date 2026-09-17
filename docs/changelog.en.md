@@ -2,6 +2,13 @@
 
 ---
 
+## Micro-patch — The salvage subline honestly names the required Scrapper rank (patch 271)
+
+> Owner's note (2026-09-17): chalk (composition — a single asbestos, rare) with rank-1 Scrapper showed "Salvage: unavailable without Scrapper, +1 unavailable" — from that pair you can't tell what's missing: the perk, the second rank, or what the "+1" even is. The earlier agreement stands: what can't be obtained must not be seen — the "+1 unavailable" hid asbestos, and it must not be visible.
+
+- Fixed: when the composition is entirely cut by the Scrapper ceiling, the subline states the requirement directly — "Salvage: Requires perk "Scrapper" rank 2" (the same language crafting uses: "Needs perk … rank N"). The "+N unavailable" counter is gone for that case; it remains only for a partially cut composition (battery — plastic visible, lead and acid stay behind the counter, their names never revealed). Separately, the dead-end where the button was active but the printed material was cut and only an effect die remained now honestly reads "the effect dice will decide what comes out" instead of silence.
+- Mechanics: the minimum rank is computed by a new pure helper `scrapperRankToSalvage(composition, ceiling)` in operations.js — exactly the criterion the 'no-materials' gate uses to refuse salvage. `salvageSublineForItem` now returns `requiredRank`, and the screen renders `screen.salvage.requiresPerkRank`. 2 new tests (chalk without the perk and at rank 1 → "requires rank 2"; alarm clock without the perk → "requires rank 1"; a reachable composition adds no requirement). Suite: 903 green (86 files), tsc --noEmit clean.
+
 ## Update — Data reform: salvage in item cards, benchless recipes, unified junk catalog (patch 269)
 
 > Owner's word (2026-09-17): junk and its salvage recipes are one file; material.json and junk.json live in `data/junk/`; a material row is `{id, materialType, weight, cost, rarity}` — no itemType, no "named" marking; the engine knows neither recipes nor materials, only "recipes live in the registry, the registry points at files"; a recipe is `{id, requires, materials}` and its id IS the output item; quantity is a single `outputQuantity` field (integer or dice), "same shape everywhere"; packs vs other materials — no distinction, one common pool; `bench` and `sourcePage` out of recipes — failing burns materials exactly where the record itself says so; d20 table labels inside data were wrong — labels live in i18n.

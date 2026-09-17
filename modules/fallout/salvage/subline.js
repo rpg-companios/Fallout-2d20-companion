@@ -14,7 +14,7 @@ import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
 import { getSalvageComposition } from '../../../domain/registry';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
-import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling } from './operations';
+import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling, scrapperRankToSalvage } from './operations';
 
 const nameIndex = () => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
@@ -57,7 +57,11 @@ export const salvageSublineForItem = (item, store) => {
     name: names.get(id) ?? id,
     count,
   }));
-  return { parts, hidden: dropped, ceiling, salvageable: parts.length > 0 };
+  // Состав целиком за потолком (parts пуст, salvageable:false): честно скажем,
+  // какой ранг «Мусорщика» откроет предмет, — «недоступно без Мусорщика,
+  // +N недоступно» лишь путало (что перк режет, писало туманно).
+  const requiredRank = parts.length === 0 ? scrapperRankToSalvage(printed, ceiling) : null;
+  return { parts, hidden: dropped, ceiling, requiredRank, salvageable: parts.length > 0 };
 };
 
 /**

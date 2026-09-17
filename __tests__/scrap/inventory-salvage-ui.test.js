@@ -58,6 +58,30 @@ describe('подстрока состава в строке инвентаря',
     expect(subline.parts).toEqual([]);
   });
 
+  it('состав целиком за потолком: подстрока честно называет ранг «Мусорщика»', () => {
+    // alarm_clock: три unusual + одна rare — без перка крыть нечем; нужен ранг 1.
+    expect(salvageSublineForItem(stackOf('alarm_clock'), state()))
+      .toMatchObject({ parts: [], salvageable: false, requiredRank: 1 });
+    // chalk: единственная строка — асбест (rare), ранг 1 не поможет — нужен ранг 2.
+    expect(salvageSublineForItem(stackOf('chalk'), state()))
+      .toMatchObject({ parts: [], salvageable: false, requiredRank: 2 });
+    scrapper(1);
+    expect(salvageSublineForItem(stackOf('chalk'), state()))
+      .toMatchObject({ parts: [], salvageable: false, requiredRank: 2 });
+    scrapper(2);
+    const reachable = salvageSublineForItem(stackOf('chalk'), state());
+    expect(reachable).toMatchObject({ salvageable: true, ceiling: 2 });
+    expect(reachable.parts.map((p) => p.itemId)).toEqual(['asbestos']);
+    expect(reachable.requiredRank).toBeNull();
+  });
+
+  it('достижимый состав не приписывает требование ранга', () => {
+    // battery без перка: пластик (common) достижим — требования нет.
+    expect(salvageSublineForItem(stackOf('battery'), state())).toMatchObject({
+      salvageable: true, requiredRank: null,
+    });
+  });
+
   it('альтернатива «или»: список — объединение, количество не обещаем', () => {
     scrapper(2);
     const subline = salvageSublineForItem(stackOf('can'), state());
@@ -139,6 +163,10 @@ describe('обвязка экрана и строки локалей (по ис�
     expect(src).toContain('const handleSalvagePress = (rowItem) => {');
     expect(src).toContain("tInventory('screen.salvage.action')");
     expect(src).toContain("tInventory('screen.salvage.label')");
+    // 264→273: при составе, целиком срезанном потолком, экран пишет требование
+    // ранга перка, а не пару «недоступно без ... +N недоступно».
+    expect(src).toContain("tInventory('screen.salvage.requiresPerkRank')");
+    expect(src).not.toContain("tInventory('screen.salvage.unavailable')}{salvage.hidden > 0");
     // 267: кнопка у хлама есть всегда, активность — по общему превью;
     // при несоблюдённых условиях — затемнена и не срабатывает.
     expect(src).toContain('salvageButtonForItem(item, useCharacterStore.getState())');
@@ -151,9 +179,9 @@ describe('обвязка экрана и строки локалей (по ис�
   it('секция salvage есть в обеих локалях слоя Fallout', () => {
     for (const locale of ['ru-RU', 'en-EN']) {
       const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
-      const need = ['action', 'label', 'unavailable', 'hidden', 'doneTitle', 'failTitle',
-        'emptyTitle', 'notStartedTitle', 'done', 'empty', 'fail', 'timeLine',
-        'complicationNote', 'noMaterials', 'notStarted', 'material'];
+      const need = ['action', 'label', 'hidden', 'requiresPerkRank', 'effectOnly',
+        'doneTitle', 'failTitle', 'emptyTitle', 'notStartedTitle', 'done', 'empty',
+        'fail', 'timeLine', 'complicationNote', 'noMaterials', 'notStarted', 'material'];
       for (const key of need) {
         expect(typeof dict.salvage?.[key], `${locale}/${key}`).toBe('string');
         expect(dict.salvage[key].length, `${locale}/${key}`).toBeGreaterThan(0);

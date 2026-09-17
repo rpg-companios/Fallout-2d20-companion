@@ -59,10 +59,50 @@ export const isScrapMaterial = (canonical) => {
 
 // Потолок редкости по «Мусорщику» (общий для обеих веток, патч 263):
 // без перка — только common, ранг 1 — и unusual, ранг 2 — и rare.
+export const scrapperCeilingByRank = (rank) => (rank >= SALVAGE_RULES.scrapperRareRank ? 2
+  : rank >= SALVAGE_RULES.scrapperUncommonRank ? 1 : 0);
+
 export const scrapperCeiling = (store) => {
   const rank = getPerkSelectionCount(store.selectedPerks ?? [], SALVAGE_RULES.scrapperPerkId);
-  return rank >= SALVAGE_RULES.scrapperRareRank ? 2
-    : rank >= SALVAGE_RULES.scrapperUncommonRank ? 1 : 0;
+  return scrapperCeilingByRank(rank);
+};
+
+/**
+ * Минимальный ранг «Мусорщика», при котором из печатного состава можно вынуть
+ * хоть одну строку (тот же критерий, по которому гейт 'no-materials' отказывает
+ * в разборе). Позволяет подстроке честно написать, ЧЕГО именно не хватает, когда
+ * состав целиком срезан потолком: «Требуется перк … ранг N» вместо туманного
+ * «недоступно без Мусорщика, +N недоступно». null — если какой-то материал
+ * достижим уже сейчас.
+ */
+export const scrapperRankToSalvage = (composition, ceiling) => {
+  const index = materialRarityIndex();
+  const obtainableAt = (id) => {
+    if (id == null || !index.has(id)) return 0; // без редкости — достижимо без перка
+    return index.get(id);
+  };
+  let required = null;
+  for (const option of composition?.options ?? []) {
+    for (const row of option) {
+      // Строка достижима, если достижим её основной материал или хоть один
+      // материал любого костного эффекта. Эффект без основного материала
+      // держит строку живой (грани кости бросаются теми же костями).
+      const candidates = [row.material];
+      if (row.effect) {
+        if (Array.isArray(row.effect.options)) {
+          candidates.push(...row.effect.options.map((t) => t?.material));
+        } else {
+          candidates.push(row.effect.material);
+        }
+      }
+      const minRank = Math.min(...candidates.filter((id) => id != null).map(obtainableAt));
+      if (minRank <= ceiling) return null; // уже доступно — требования нет
+      if (minRank > ceiling && (required == null || minRank < required)) {
+        required = minRank;
+      }
+    }
+  }
+  return required;
 };
 
 const materialRarityIndex = () => {
