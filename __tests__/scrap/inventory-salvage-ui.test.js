@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 describe('подстрока состава в строке инвентаря', () => {
-  it('battery без «Мусорщика»: виден только пластик, +2 спрятано', () => {
+  it('battery без «Мусорщика»: виден только пластик (263, список — достижимое)', () => {
     const subline = salvageSublineForItem(stackOf('battery'), state());
     expect(subline).toMatchObject({ salvageable: true, hidden: 2, ceiling: 0 });
     expect(subline.parts).toEqual([{ itemId: 'plastic', name: expect.any(String), count: 1 }]);
@@ -149,13 +149,16 @@ describe('обвязка экрана и строки локалей (по ис�
     expect(src).toContain("salvage.gate === 'rank'");
     expect(src).toContain("tInventory('screen.salvage.requiresRank')");
     expect(src).not.toContain('salvage?.salvageable &&');
+    // 276 (слово владельца): счётчик «+N недоступно» снят — недоступные
+    // материалы состава просто не показываются; разбор идёт с отсечением.
+    expect(src).not.toContain('screen.salvage.hidden');
     expect(readText('styles/InventoryScreen.styles.js')).toContain('applyButtonDisabled');
   });
 
   it('секция salvage есть в обеих локалях слоя Fallout', () => {
     for (const locale of ['ru-RU', 'en-EN']) {
       const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
-      const need = ['action', 'label', 'unavailable', 'requiresRank', 'hidden', 'doneTitle', 'failTitle',
+      const need = ['action', 'label', 'unavailable', 'requiresRank', 'doneTitle', 'failTitle',
         'emptyTitle', 'notStartedTitle', 'done', 'empty', 'fail', 'timeLine',
         'complicationNote', 'noMaterials', 'notStarted', 'material'];
       for (const key of need) {
@@ -244,5 +247,44 @@ describe('гейт по рангу «Мусорщика» (275): нехватк�
     const displayRow = { ...chalk, uniqueId: `inv-stack-${chalk.stackKey}` };
     const button = salvageButtonForItem(displayRow, state());
     expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false, hidden: 1 });
+  });
+});
+
+describe('276 (слово владельца): состава-списка без счётчика, лут и покупка вне потолка', () => {
+  it('экран больше не печатает «+N недоступно»; ключ вычист из обеих локалей', () => {
+    expect(readText('components/screens/InventoryScreen/InventoryScreen.js'))
+      .not.toContain('screen.salvage.hidden');
+    for (const locale of ['ru-RU', 'en-EN']) {
+      const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
+      expect(dict.salvage.hidden).toBeUndefined();
+    }
+  });
+
+  it('магазин и выдача предметов ничего не знают о «Мусорщике»: потолок — только разбор', () => {
+    for (const rel of [
+      'components/screens/InventoryScreen/modals/BuyItemModal.js',
+      'components/screens/InventoryScreen/modals/AddItemModal.js',
+      'components/screens/InventoryScreen/modals/SellItemModal.js',
+    ]) {
+      const src = readText(rel);
+      expect(src, rel).not.toContain('scrapperCeiling');
+      expect(src, rel).not.toContain('salvage/');
+    }
+  });
+
+  it('мел с рангом 1: подстрока — ровно гейт «требуется ранг 2»; hidden жив как данные', () => {
+    scrapper(1);
+    const subline = salvageSublineForItem(stackOf('chalk'), state());
+    expect(subline).toMatchObject({ salvageable: false, gate: 'rank', requiredRank: 2, hidden: 1 });
+    // 276: hidden остался полем данных (превью/будущая модалка), но экран его
+    // не печатает — проверка обвязкой выше (not.toContain('screen.salvage.hidden')).
+    const button = salvageButtonForItem(stackOf('chalk'), state());
+    expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false });
+  });
+
+  it('battery без перка: список — только пластик, без всяких «+2» в данных строки', () => {
+    const subline = salvageSublineForItem(stackOf('battery'), state());
+    expect(subline.parts.map((p) => p.itemId)).toEqual(['plastic']);
+    expect(subline.gate).toBeNull();
   });
 });

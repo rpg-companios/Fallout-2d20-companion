@@ -2,6 +2,15 @@
 
 ---
 
+## Micro-patch — Junk composition without the «+N unavailable» counter (patch 276)
+
+> Owner's word (2026-09-17): «+1 unavailable» carries no information at all. The rule: salvage runs clipped wherever it is possible — common + uncommon with no perk yields the common one, rank 1 yields up to uncommon, rank 2 yields everything. Unreachable materials are simply not shown in the subline; loot and purchase do not depend on the Scrapper rank.
+
+- The engine could do this since 263 (rarity ceiling over the composition, honest stack spend) — only the storefront changed: the screen dropped the «, +N unavailable» tail and the `salvage.hidden` key was purged from both locales. When nothing is reachable the line keeps the 275 gates («requires Scrapper perk rank N» / «unavailable without…»): the reason is named there, no counter needed.
+- `hidden` survives as a number in subline/preview data (future modal) but never reaches the row. A scope-guard test pins that shop/grant/sell modals import no salvage ceiling — the Scrapper can only clip salvage. 910 green, tsc clean.
+
+---
+
 ## Micro-patch — Missing Scrapper rank is named directly (patch 275)
 
 > Owner's word (2026-09-17): with Scrapper rank 1 on chalk the subline lied — «unavailable without Scrapper, +1 unavailable» — while the perk was present and rank 2 was what's missing. The 264 agreement («what cannot be obtained is not shown») stands: names of clipped materials stay hidden.
