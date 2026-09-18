@@ -2,6 +2,17 @@
 
 ---
 
+## Series pivot — The derivation contract: the engine's typed vocabulary (patch 281)
+
+> Owner's word (2026-09-17): the engine is meant to be universal. The setting declares parameters, derived values, counters, requirements and reactions — the engine executes and cascades them. The contract and the engine are TypeScript; the setting stays living JavaScript behind a typed «door».
+
+- The first piece of the typed engine appeared: `src/engine/contracts/` (parameters, derived values, counters, rank ceilings, requirements, reactions, the setting assembly) and `src/engine/derivations/registry.ts` — a registry with validation, topological ordering (a cycle is a registration error) and a pure `evaluate` cascade. The modifier order is agreed: set replaces the base, then additives, then the summed percentage, rounding at the end.
+- The registry does NOT replace anything in the running program yet — only the acceptance test imports it. The contract settles in without risk to the Fallout module; wiring it into the store and the death of the 24 manual recomputes are patches 283+.
+- The acceptance test describes the mini-setting per the owner's spec (5 attributes, 7 skills, 5 derived values, mana = attribute + skill, skill rank ceiling from an attribute, +5/10/15% bonuses): 16 checks green — the criterion «a setting is described by declaration without engine changes» holds today.
+- Contract document: `docs/architecture/derivation-contract.md`; the tsconfig include now covers `src/engine` (the patch-280 fuse enforces the coverage).
+
+---
+
 ## Infrastructure — TypeScript fuses: tsconfig coverage and a .js/.ts duplicate ban (patch 280)
 
 > Owner's word (2026-09-17): the series gets reordered — first the cascade map (279), then fuses (280), then the derivation contract (281), then the test setting (282) and the cascade implementation (283+).
