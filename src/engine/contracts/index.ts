@@ -1,4 +1,4 @@
-// Бочка контрактов выводимости (МК-1, патч 281).
+// Бочка контрактов выводимости (МК-1, патчи 281–283).
 // Единственный типизированный вход движка для сеттингов. Ничего не исполняется —
 // только типы и чистые функции; реестр живёт в src/engine/derivations/registry.ts.
 
@@ -19,12 +19,18 @@ export type {
   RankBands,
 } from './bands';
 export {
-  applyModifiers,
   applyPercent,
+  applyPipeline,
+  applyWithinPhase,
+  DEFAULT_PHASES,
+  defaultPhaseFor,
+  resolvePhases,
 } from './parameter';
 export type {
+  DerivationContext as ModifierContext,
   ModifierBag,
   ModifierOperation,
+  ModifierPhase,
   ParameterDefinition,
   ParameterModifier,
   ParameterValueKind,

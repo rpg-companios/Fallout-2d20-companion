@@ -1,4 +1,4 @@
-// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патч 281).
+// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–283).
 //
 // КРИТЕРИЙ УСПЕХА (карта каскада §8, слово владельца): мини-сеттинг
 // описывается ДЕКЛАРАЦИЕЙ без правок движка — 5 атрибутов, 7 навыков,
@@ -6,20 +6,30 @@
 // 5 заклинаний с требованием ранга 4, бонусы +5/10/15%, потолок ранга
 // навыка — от атрибута, манна = атрибут + навык.
 //
+// СЛОВО ВЛАДЕЛЬЦА (2026-09-18, патч 283): «как в правилах напишут, так %
+// и будут рассчитываться. [...] Базовая скорострельность будет зависеть от
+// установленных модов, % от черты будет влиять на неё, а перк уже после
+// удваивать. Но может быть и случай, когда черта вместо базовой
+// скорострельности будет увеличивать итоговую [...] А может вообще
+// примениться, если скорострельность будет меньше или равна определённому
+// значению. И это хрен угадаешь.» Движок исполняет объявленный порядок.
+//
 // Реестр пока никуда не подключён (изоляция МК-1→МК-3): этот тест —
-// единственный потребитель. При подключении (патч 283+) тест остаётся
+// единственный потребитель. При подключении (патчи 285+) тест остаётся
 // эквивалентностью контракта.
 
 import { describe, expect, it } from 'vitest';
 import {
-  applyModifiers,
   applyPercent,
+  applyPipeline,
   ceilingFor,
   changedParams,
   checkRequirements,
   validateSettingExtension,
 } from '../../src/engine/contracts/index';
 import { createDerivationRegistry } from '../../src/engine/derivations/registry';
+
+const emptyCtx = { values: {}, modifiers: {} };
 
 // --- декларация мини-сеттинга по спеке владельца (§8) ------------------------
 
@@ -41,6 +51,21 @@ const miniSetting = () => ({
   parameters: [
     ...ATTRIBUTES.map((name) => ({ id: attr(name), kind: 'number', label: name })),
     ...SKILLS.map((name) => ({ id: skill(name), kind: 'number', label: name })),
+    // Скорострельность — по примеру владельца: фазы объявляет правило.
+    {
+      id: 'test.attr.fireRate',
+      kind: 'number',
+      label: 'скорострельность',
+      modifierPhases: ['mods', 'traitPercent', 'perkMult'],
+    },
+    {
+      // Второй вариант из слова владельца: «черта вместо базовой скорострельности
+      // увеличивает итоговую — уже после расчёта базы + влияния перка».
+      id: 'test.attr.fireRateFinisher',
+      kind: 'number',
+      label: 'скорострельность (черта итоговой)',
+      modifierPhases: ['mods', 'perkMult', 'traitPercent'],
+    },
   ],
   derived: [
     {
@@ -106,25 +131,36 @@ const miniSetting = () => ({
       on: () => {},
       description: 'подрезка текущей манны при падении потолка',
     },
+    {
+      // Ярость ботаника — по примеру владельца: срабатывает, когда текущие ОЗ
+      // меньше 30% от МАКСИМУМА, а максимум сам движется (химия +50%).
+      id: 'test.reaction.nerdRage',
+      watch: ['test.derived.maxHealth'],
+      on: () => {},
+      description: 'Ярость ботаника: текущие ОЗ < 30% макс. ОЗ',
+    },
   ],
 });
 
-// --- модификаторы: договорный порядок ---------------------------------------
+// --- модификаторы: конвейер по объявлению ------------------------------------
 
 describe('МК-1: контракт выводимости — модификаторы', () => {
-  it('параметры: set заменяет базу, аддитивы складываются; проценты в цепочке запрещены', () => {
-    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана
+  it('дефолтный конвейер: set → аддитивы → суммарный процент → множители', () => {
+    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана, +10% и +5%, ×2
     const mods = [
       { source: 'perk.bruiser', operation: '+', value: 2 },
       { source: 'armor.pa', operation: 'set', value: 11 },
       { source: 'wound.arm', operation: '-', value: 2 },
+      { source: 'perk.tough', operation: '%', value: 10 },
+      { source: 'spell.bless', operation: '%', value: 5 },
+      { source: 'perk.double', operation: '×', value: 2 },
     ];
-    // set 11 → +2 −2 = 11
-    expect(applyModifiers(5, mods)).toBe(11);
+    // set 11 → +2 −2 = 11; ×1.15 = 12.65; ×2 = 25.3 → 25
+    expect(applyPipeline(5, mods, ['add', 'percent', 'mult'], emptyCtx)).toBe(25);
   });
 
   it('без модификаторов значение возвращается как есть', () => {
-    expect(applyModifiers(7, [])).toBe(7);
+    expect(applyPipeline(7, [], ['add', 'percent', 'mult'], emptyCtx)).toBe(7);
   });
 
   it('несколько set: берётся последний (переопределение сильнее дополнения)', () => {
@@ -132,16 +168,19 @@ describe('МК-1: контракт выводимости — модификат
       { source: 'armor.pa', operation: 'set', value: 11 },
       { source: 'armor.advanced', operation: 'set', value: 13 },
     ];
-    expect(applyModifiers(5, mods)).toBe(13);
+    expect(applyPipeline(5, mods, ['add'], emptyCtx)).toBe(13);
+  });
+
+  it('модификатор в необъявленную фазу — ошибка с перечислением объявленных', () => {
+    const mods = [{ source: 'trait.x', operation: '%', value: 10, phase: 'finalPercent' }];
+    expect(() => applyPipeline(5, mods, ['add', 'percent'], emptyCtx)).toThrow(/finalPercent/);
   });
 });
 
-// --- проценты: всегда от объявленной базы (слово владельца, 2026-09-18) ------
+// --- проценты: всегда от объявленной базы ------------------------------------
 
-describe('МК-1: проценты — от объявленной базы', () => {
+describe('МК-1: проценты — от базы, которую объявило правило', () => {
   it('слово владельца: +15% жизней = база ОЗ × 1.15, округлённая математически', () => {
-    // applyPercent(база, проценты): чистая функция и для производных, и для
-    // будущих каналов урона
     expect(applyPercent(26, [15])).toBe(30); // 26 × 1.15 = 29.9 → 30
   });
 
@@ -152,35 +191,182 @@ describe('МК-1: проценты — от объявленной базы', ()
   it('несколько процентов суммируются и применяются одним множителем', () => {
     expect(applyPercent(40, [10, 5])).toBe(46); // 40 × 1.15 = 46
   });
+});
 
-  it('реестр: процент на id производного применяется к его базе при каскаде', () => {
-    const registry = createDerivationRegistry();
-    registry.register(miniSetting());
-    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
-    // ОЗ = 10 + СИЛ×2 = 26; +15% → 29.9 → 30
-    const { values } = registry.evaluate(baseState, {
-      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+// --- фазы-якоря: пример владельца «скорострельность» -------------------------
+
+describe('МК-1: фазы — скорострельность (пример владельца)', () => {
+  const registry = createDerivationRegistry();
+  registry.register(miniSetting());
+  // test.attr.fireRate объявлен с фазами: mods → traitPercent → perkMult
+
+  const FIRE = 'test.attr.fireRate';
+
+  it('база 5, моды +1/−2, черта +10% базы, перк ×2 → 9', () => {
+    // «Базовая скорострельность будет зависеть от установленных модов,
+    //  % от черты будет влиять на неё, а перк уже после удваивать»
+    const { values } = registry.evaluate({ [FIRE]: 5 }, {
+      [FIRE]: [
+        { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
+        { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
+        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
+        { source: 'perk.doubletap', operation: '×', value: 2, phase: 'perkMult' },
+      ],
     });
+    // 5 +1 −2 = 4; ×1.1 = 4.4; ×2 = 8.8 → 9
+    expect(values[FIRE]).toBe(9);
+  });
+
+  it('черта даёт +10% ИТОГОВОЙ (после перка): порядок фаз объявлен правилом', () => {
+    const FINISH = 'test.attr.fireRateFinisher';
+    const mods = [
+      { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
+      { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
+      { source: 'trait.finisher', operation: '%', value: 10, phase: 'traitPercent' },
+      { source: 'perk.doubletap', operation: '×', value: 2, phase: 'perkMult' },
+    ];
+    const { values } = registry.evaluate({ [FINISH]: 5 }, { [FINISH]: mods });
+    // fireRateFinisher объявлен mods → perkMult → traitPercent:
+    // 4 → ×2 = 8 → ×1.1 = 8.8 → 9. Проценты и множители коммутируют,
+    // поэтому без промежуточных округлений итог совпадает с первым вариантом;
+    // наблюдаемая разница якорей — в следующем тесте (округление по фазам).
+    expect(values[FINISH]).toBe(9);
+  });
+
+  it('якорь наблюдаем через пофазное округление: % базы против % итоговой', () => {
+    // Одни и те же модификаторы, но порядок фаз (якорь %) разный — и правила
+    // с промежуточным округлением дают РАЗНЫЕ числа: 8 против 9.
+    const mods = [
+      { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
+      { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
+      { source: 'trait', operation: '%', value: 10, phase: 'percentPhase' },
+      { source: 'perk', operation: '×', value: 2, phase: 'perkPhase' },
+    ];
+    // % базы с модами, округлить, потом перк: 4 ×1.1 = 4.4 → 4 → ×2 = 8
+    const baseAnchored = applyPipeline(5, mods, ['mods', { id: 'percentPhase', round: true }, 'perkPhase'], emptyCtx);
+    // перк, округлить, потом % итоговой: 4 ×2 = 8 → 8 ×1.1 = 8.8 → 9
+    const finalAnchored = applyPipeline(5, mods, ['mods', { id: 'perkPhase', round: true }, 'percentPhase'], emptyCtx);
+    expect(baseAnchored).toBe(8);
+    expect(finalAnchored).toBe(9);
+  });
+
+  it('якорь наблюдаем: % базы с модами против % сырой базы — разные числа', () => {
+    // Порядок фаз решает: mods → percent (по умолчанию) даёт 4×1.1 = 4.4 → 4,
+    // а percent → mods даёт 5×1.1 = 5.5 → +1 −2 = 4.5 → 5 (математически).
+    const after = applyPipeline(
+      5,
+      [
+        { source: 'mod.trigger', operation: '+', value: 1 },
+        { source: 'mod.heavy', operation: '-', value: 2 },
+        { source: 'trait.gunner', operation: '%', value: 10 },
+      ],
+      ['add', 'percent'],
+      emptyCtx,
+    );
+    const before = applyPipeline(
+      5,
+      [
+        { source: 'mod.trigger', operation: '+', value: 1 },
+        { source: 'mod.heavy', operation: '-', value: 2 },
+        { source: 'trait.gunner', operation: '%', value: 10 },
+      ],
+      ['percent', 'add'],
+      emptyCtx,
+    );
+    expect(after).toBe(4); // (5+1−2) × 1.1 = 4.4 → 4
+    expect(before).toBe(5); // (5×1.1) +1 −2 = 4.5 → 5
+  });
+
+  it('условный модификатор: перк ×2 действует, только если скорострельность ≤ 5', () => {
+    // «А может вообще примениться, если скорострельность будет меньше
+    //  или равна определённому значению» — условие видит вход фазы.
+    const when = (value) => value <= 5;
+    const heavy = registry.evaluate({ [FIRE]: 5 }, {
+      [FIRE]: [
+        { source: 'mod.heavy', operation: '-', value: 1, phase: 'mods' },
+        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
+        { source: 'perk.conditional', operation: '×', value: 2, phase: 'perkMult', when },
+      ],
+    });
+    // 5−1 = 4; ×1.1 = 4.4 ≤ 5 → ×2 = 8.8 → 9
+    expect(heavy.values[FIRE]).toBe(9);
+
+    const fast = registry.evaluate({ [FIRE]: 8 }, {
+      [FIRE]: [
+        { source: 'mod.heavy', operation: '-', value: 1, phase: 'mods' },
+        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
+        { source: 'perk.conditional', operation: '×', value: 2, phase: 'perkMult', when },
+      ],
+    });
+    // 8−1 = 7; ×1.1 = 7.7 > 5 → перк не действует → 7.7 → 8
+    expect(fast.values[FIRE]).toBe(8);
+  });
+
+  it('промежуточное округление фазой: round:true на выходе фазы', () => {
+    const phased = applyPipeline(
+      5,
+      [
+        { source: 'mod.trigger', operation: '+', value: 1 },
+        { source: 'trait.gunner', operation: '%', value: 10 },
+        { source: 'perk.doubletap', operation: '×', value: 2 },
+      ],
+      [{ id: 'add' }, { id: 'percent', round: true }, { id: 'mult' }],
+      emptyCtx,
+    );
+    // 6 × 1.1 = 6.6 → округлили в фазе → 7; ×2 = 14
+    expect(phased).toBe(14);
+    const unphased = applyPipeline(
+      5,
+      [
+        { source: 'mod.trigger', operation: '+', value: 1 },
+        { source: 'trait.gunner', operation: '%', value: 10 },
+        { source: 'perk.doubletap', operation: '×', value: 2 },
+      ],
+      ['add', 'percent', 'mult'],
+      emptyCtx,
+    );
+    // 6.6 × 2 = 13.2 → 13
+    expect(unphased).toBe(13);
+  });
+});
+
+// --- Ярость ботаника: порог от динамического максимума ------------------------
+
+describe('МК-1: Ярость ботаника — порог смещается вместе с максимумом ОЗ', () => {
+  const registry = createDerivationRegistry();
+  registry.register(miniSetting());
+
+  const state = { [attr('strength')]: 10 }; // ОЗ = 10 + 10×2 = 30
+
+  /** Логика перка: текущие ОЗ < 30% максимальных. */
+  const nerdRageActive = (values, currentHp) => currentHp < 0.3 * values['test.derived.maxHealth'];
+
+  it('без химии: 12 из 30 = 40% — перк молчит', () => {
+    const { values } = registry.evaluate(state);
     expect(values['test.derived.maxHealth']).toBe(30);
-    // потолок счётчика тянет производное с процентом
-    expect(registry.evaluate(baseState, {
-      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
-    }).ceilings['test.counter.health']).toBe(30);
+    expect(nerdRageActive(values, 12)).toBe(false);
   });
 
-  it('процент в аддитивной цепочке параметра отклоняется', () => {
-    expect(() => applyModifiers(8, [{ source: 'x', operation: '%', value: 15 }])).toThrow(/процент всегда привязан к базе/);
+  it('химия +50% максимума: 12 из 45 = 27% — перк сработал, планка сместилась', () => {
+    // «Временно макс ОЗ будет на 50% больше — и тогда планка менее 30%
+    //  текущих ОЗ от максимума сместится»
+    const { values, ceilings } = registry.evaluate(state, {
+      'test.derived.maxHealth': [{ source: 'chem.superStimpak', operation: '%', value: 50 }],
+    });
+    expect(values['test.derived.maxHealth']).toBe(45);
+    expect(ceilings['test.counter.health']).toBe(45);
+    expect(nerdRageActive(values, 12)).toBe(true);
   });
 
-  it('аддитив на id производного отклоняется: смешивание запрещено', () => {
-    const registry = createDerivationRegistry();
-    registry.register(miniSetting());
-    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
-    expect(() =>
-      registry.evaluate(baseState, {
-        'test.derived.maxHealth': [{ source: 'x', operation: '+', value: 5 }],
-      }),
-    ).toThrow(/только проценты/);
+  it('реакция слушает изменение максимума — каскад её находит', () => {
+    const before = registry.evaluate(state).values;
+    const after = registry.evaluate(state, {
+      'test.derived.maxHealth': [{ source: 'chem.superStimpak', operation: '%', value: 50 }],
+    }).values;
+    const changed = changedParams(['test.derived.maxHealth'], before, after);
+    expect(changed).toEqual(['test.derived.maxHealth']);
+    const fired = registry.reactionsFor(changed).map((r) => r.id);
+    expect(fired).toContain('test.reaction.nerdRage');
   });
 });
 
@@ -208,8 +394,6 @@ describe('МК-1: реестр — валидация деклараций', () 
   it('повторная регистрация того же id отклоняется', () => {
     const registry = createDerivationRegistry();
     registry.register(miniSetting());
-    // префиксы исключают коллизии МЕЖДУ сеттингами; дубль возможен только
-    // при повторной регистрации того же сеттинга — её и ловим
     expect(() => registry.register(miniSetting())).toThrow(/уже зарегистрирован/);
   });
 
@@ -255,6 +439,26 @@ describe('МК-1: реестр — валидация деклараций', () 
         ],
       }),
     ).toThrow(/цикл/);
+  });
+
+  it('пустой или кривой список фаз отклоняется', () => {
+    const registry = createDerivationRegistry();
+    expect(() =>
+      registry.register({
+        id: 'test',
+        parameters: [
+          { id: 'test.attr.a', kind: 'number', label: 'a', modifierPhases: [] },
+        ],
+      }),
+    ).toThrow(/modifierPhases/);
+    expect(() =>
+      registry.register({
+        id: 'test',
+        parameters: [
+          { id: 'test.attr.a', kind: 'number', label: 'a', modifierPhases: [{ id: 'x' }, { id: 'x' }] },
+        ],
+      }),
+    ).toThrow(/дважды/);
   });
 
   it('форма SettingExtension проверяется отдельно (дверь JS→TS)', () => {
@@ -306,6 +510,15 @@ describe('МК-1: реестр — каскад по мини-сеттингу (
     const { ceilings } = registry.evaluate(baseState);
     expect(ceilings['test.counter.health']).toBe(26);
     expect(ceilings['test.counter.mana']).toBe(11);
+  });
+
+  it('процент на производном: база формулы × 1.15 (слово владельца про +15% жизней)', () => {
+    const { values, ceilings } = registry.evaluate(baseState, {
+      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+    });
+    // ОЗ = 26 × 1.15 = 29.9 → 30
+    expect(values['test.derived.maxHealth']).toBe(30);
+    expect(ceilings['test.counter.health']).toBe(30);
   });
 
   it('модификаторы каскадируются: аддитив на атрибуте, процент на производном', () => {
@@ -365,6 +578,6 @@ describe('МК-1: требования и реакции', () => {
     const changed = changedParams(['test.derived.maxMana', 'test.derived.maxHealth'], before, after);
     expect(changed).toEqual(['test.derived.maxMana']);
     expect(registry.reactionsFor(changed).map((r) => r.id)).toEqual(['test.reaction.clampMana']);
-    expect(registry.reactionsFor(['test.derived.maxHealth'])).toEqual([]);
+    expect(registry.reactionsFor(['test.derived.maxHealth']).map((r) => r.id)).toEqual(['test.reaction.nerdRage']);
   });
 });

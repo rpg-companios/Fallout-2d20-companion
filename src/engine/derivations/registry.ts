@@ -1,23 +1,24 @@
-// РЕЕСТР ВЫВОДИМОСТИ (МК-1, патч 281).
+// РЕЕСТР ВЫВОДИМОСТИ (МК-1, патчи 281–283).
 //
 // Исполняемая часть контракта: сеттинг регистрирует декларации, движок
 // валидирует их, строит топологический порядок и вычисляет каскадом.
 //
-// ИЗОЛЯЦИЯ (важно): в этом патче реестр НИЧЕГО не подменяет в работающей
-// программе — его импортируют только тесты контракта. Подключение к стору
-// и смерть 24 ручных вызовов — МК-3 (патчи 283+), после тестового сеттинга
-// (282). Так контракт приживается без риска для Fallout-модуля.
+// ИЗОЛЯЦИЯ (важно): реестр НИЧЕГО не подменяет в работающей программе —
+// его импортируют только тесты контракта. Подключение к стору и смерть
+// 24 ручных вызовов — МК-3 (патчи 285+), после тестового сеттинга (284).
 //
 // ПРАВИЛА:
 //   - id уникальны глобально и обязаны начинаться с префикса сеттинга
 //     ('fallout.maxHealth') — коллизии между сеттингами исключены;
 //   - deps непусты и ссылаются только на известные параметры/производные;
 //   - цикл в графе зависимостей — ошибка регистрации, а не вечный цикл;
+//   - порядок модификаторов объявляет СЕТТИНГ (фазы-якоря), движок исполняет;
 //   - evaluate чистая: снимок на входе, новый снимок на выходе.
 
-import { applyModifiers, applyPercent } from '../contracts/parameter';
-import type { ModifierBag } from '../contracts/parameter';
-import type { DerivationContext, DerivedDefinition } from '../contracts/derived';
+import { applyPipeline, DEFAULT_PHASES } from '../contracts/parameter';
+import type { DerivationContext, ModifierBag } from '../contracts/parameter';
+import type { DerivedDefinition } from '../contracts/derived';
+import type { ParameterDefinition } from '../contracts/parameter';
 import type { CounterDefinition } from '../contracts/counter';
 import type { RankBands } from '../contracts/bands';
 import type { ReactionDefinition } from '../contracts/reactions';
@@ -47,7 +48,7 @@ export interface DerivationRegistry {
 const KNOWN_KINDS: ReadonlySet<string> = new Set(['derived', 'max', 'rankCeiling']);
 
 export const createDerivationRegistry = (): DerivationRegistry => {
-  const parameters = new Map<string, { setting: string }>();
+  const parameters = new Map<string, ParameterDefinition & { setting: string }>();
   const derived = new Map<string, DerivedDefinition & { setting: string }>();
   const counters = new Map<string, CounterDefinition & { setting: string }>();
   const rankBands: (RankBands & { setting: string })[] = [];
@@ -61,6 +62,23 @@ export const createDerivationRegistry = (): DerivationRegistry => {
   const assertPrefixed = (id: string, setting: string, what: string) => {
     if (!id.startsWith(`${setting}.`)) {
       fail(`${what} "${id}" обязан начинаться с префикса сеттинга "${setting}."`);
+    }
+  };
+
+  /** Фазы модификаторов: если объявлены — непустой список с уникальными id. */
+  const validatePhases = (def: { id: string; modifierPhases?: unknown }) => {
+    if (def.modifierPhases === undefined) return;
+    if (!Array.isArray(def.modifierPhases) || def.modifierPhases.length === 0) {
+      fail(`"${def.id}": modifierPhases, если объявлены, — непустой список фаз`);
+    }
+    const seen = new Set<string>();
+    for (const phase of def.modifierPhases as Array<string | { id?: string }>) {
+      const id: string = typeof phase === 'string' ? phase : (phase?.id ?? '');
+      if (id === '') {
+        fail(`"${def.id}": каждая фаза — строка или { id, round? }`);
+      }
+      if (seen.has(id)) fail(`"${def.id}": фаза "${id}" объявлена дважды`);
+      seen.add(id);
     }
   };
 
@@ -131,7 +149,8 @@ export const createDerivationRegistry = (): DerivationRegistry => {
       if (param.kind !== 'number') {
         fail(`параметр "${param.id}": v1 поддерживает только kind 'number'`);
       }
-      parameters.set(param.id, { setting: prefix });
+      validatePhases(param);
+      parameters.set(param.id, { ...param, setting: prefix });
     }
     put(derived, setting.derived, 'производное');
     for (const def of setting.derived ?? []) {
@@ -144,6 +163,7 @@ export const createDerivationRegistry = (): DerivationRegistry => {
       if (typeof def.compute !== 'function') {
         fail(`производное "${def.id}" обязано иметь compute`);
       }
+      validatePhases(def);
     }
     put(counters, setting.counters, 'счётчик');
     for (const bands of setting.rankBands ?? []) {
@@ -169,32 +189,27 @@ export const createDerivationRegistry = (): DerivationRegistry => {
     modifiers: Readonly<ModifierBag> = {},
   ) => {
     const values: Record<string, number> = {};
-    for (const id of parameters.keys()) {
-      const base = state[id];
-      if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
-      values[id] = applyModifiers(base, modifiers[id] ?? []);
-    }
     const ctx: DerivationContext = {
       values: values as Readonly<Record<string, number>>,
       modifiers,
     };
+    // Параметры: база из состояния → конвейер модификаторов (фазы — по объявлению).
+    // Условия видят значения, вычисленные к их моменту (объявляйте deps честно).
+    for (const [id, def] of parameters) {
+      const base = state[id];
+      if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
+      try {
+        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
+      } catch (err) {
+        fail(`параметр "${id}" упал при вычислении: ${(err as Error).message}`);
+      }
+    }
+    // Производные: база = compute(ctx) → конвейер модификаторов поверх базы.
     for (const id of topo) {
       const def = derived.get(id)!;
       try {
-        let value = def.compute(ctx);
-        // Проценты — к базе производного (слово владельца: «+15% жизней =
-        // базовое значение ОЗ × 1.15, округлённое математически до целого»).
-        // К производному применяются ТОЛЬКО проценты: аддитивы живут
-        // на параметрах, смешивание запрещено.
-        const percents: number[] = [];
-        for (const mod of modifiers[id] ?? []) {
-          if (mod.operation !== '%') {
-            fail(`модификатор "${mod.operation}" на производном "${id}": к базе производного применяются только проценты (аддитивы — на параметрах)`);
-          }
-          percents.push(mod.value);
-        }
-        if (percents.length > 0) value = applyPercent(value, percents);
-        values[id] = value;
+        const base = def.compute(ctx);
+        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
       } catch (err) {
         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
       }
