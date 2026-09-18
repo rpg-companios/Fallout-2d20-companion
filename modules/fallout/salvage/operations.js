@@ -84,6 +84,11 @@ export const filterCompositionByCeiling = (composition, ceiling) => {
   const index = materialRarityIndex();
   const obtainable = (id) => id == null || !index.has(id) || index.get(id) <= ceiling;
   let dropped = 0;
+  // (275) Минимальная редкость среди отрезанных строк: по ней экран честно
+  // называет ранг, который открыл бы разбор. Незнакомые id в obtainable
+  // проходимы всегда, так что сюда попадает только материал с известной
+  // редкостью выше потолка.
+  let blockedRarity = null;
   const options = [];
   for (const option of composition?.options ?? []) {
     const rows = [];
@@ -99,7 +104,13 @@ export const filterCompositionByCeiling = (composition, ceiling) => {
       }
       const keepMain = row.material ? obtainable(row.material) : false;
       if (!keepMain && !effect) {
-        if (row.material) dropped += 1;
+        if (row.material) {
+          dropped += 1;
+          const rarity = index.get(row.material);
+          if (rarity != null && (blockedRarity == null || rarity < blockedRarity)) {
+            blockedRarity = rarity;
+          }
+        }
         continue;
       }
       const next = { ...row, ...(effect ? { effect } : {}) };
@@ -114,8 +125,23 @@ export const filterCompositionByCeiling = (composition, ceiling) => {
     }
     if (rows.length) options.push(rows);
   }
-  return { composition: options.length ? { ...composition, options } : null, dropped };
+  return {
+    composition: options.length ? { ...composition, options } : null,
+    dropped,
+    blockedRarity,
+  };
 };
+
+/**
+ * Наименьший ранг «Мусорщика», при котором материал заданной редкости
+ * попадает под потолок (260: ранг 1 поднимает потолок до unusual, ранг 2 —
+ * до rare). 0 — доступно без перка.
+ */
+export const scrapperRankForRarity = (rarity) => (
+  rarity >= 2 ? SALVAGE_RULES.scrapperRareRank
+    : rarity >= 1 ? SALVAGE_RULES.scrapperUncommonRank
+    : 0
+);
 
 /**
  * Пул материалов-кандидатов для общего правила. Клей и Масло исключены
