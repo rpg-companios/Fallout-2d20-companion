@@ -25,6 +25,7 @@ export {
   DEFAULT_PHASES,
   defaultPhaseFor,
   resolvePhases,
+  roundValue,
 } from './parameter';
 export type {
   DerivationContext as ModifierContext,
@@ -34,6 +35,7 @@ export type {
   ParameterDefinition,
   ParameterModifier,
   ParameterValueKind,
+  RoundingMode,
 } from './parameter';
 export {
   checkRequirements,

@@ -2,6 +2,17 @@
 
 ---
 
+## Series pivot — Rounding mode: the setting dictates the direction (patch 284)
+
+> Owner's word (2026-09-18): «(10+18)×1.15 = 32.2 → 32 is not a mandatory state either. The setting can dictate which way the rounding goes. It can be 32 or 33. And for example at 32.01 a rule may force rounding up or down to a whole number.»
+
+- The rounding mode is part of the vocabulary, not an engine constant. Declared per value: `math` (mathematical, 0.5 up — the default), `up` (always up: 32.01 → 33), `down` (always down: 32.99 → 32), `none` (no rounding — 32.2 stays 32.2).
+- A pipeline phase can round at its own step with the same mode (`round: true`) or its own (`round: 'up'`) — a rule whose step and total round differently is expressible.
+- The owner's examples are in the tests verbatim: (10+18)×1.15 = 32.2 yields 32 (math), 32 (down), 33 (up) and 32.2 (none) on the same base; 32.01 becomes 33 or 32 per the rule. The pure applyPercent takes the mode too: 26×1.15 = 29.9 → 29 down, 30 mathematically.
+- An unknown mode is a registration error listing the available ones. The contract test grew to 36 checks; the contract remains isolated — nothing changed in the running program.
+
+---
+
 ## Series pivot — Modifier phases: the rules declare the order (patch 283)
 
 > Owner's word (2026-09-18): «This is an RPG program. There are rules, and percentages are calculated the way the rules say. [...] The base fire rate depends on installed mods, the trait's % applies to that, and the perk doubles afterwards. But there can also be a case where the trait boosts the final rate instead of the base one [...] And it might only apply if the fire rate is below or equal to a certain value. You can't guess that.»

@@ -46,6 +46,7 @@ export interface DerivationRegistry {
 }
 
 const KNOWN_KINDS: ReadonlySet<string> = new Set(['derived', 'max', 'rankCeiling']);
+const ROUNDING_MODES: ReadonlySet<string> = new Set(['math', 'up', 'down', 'none']);
 
 export const createDerivationRegistry = (): DerivationRegistry => {
   const parameters = new Map<string, ParameterDefinition & { setting: string }>();
@@ -65,17 +66,28 @@ export const createDerivationRegistry = (): DerivationRegistry => {
     }
   };
 
-  /** Фазы модификаторов: если объявлены — непустой список с уникальными id. */
-  const validatePhases = (def: { id: string; modifierPhases?: unknown }) => {
+  /** Фазы модификаторов: если объявлены — непустой список с уникальными id;
+   *  round фазы — boolean или режим округления; rounding итога — режим. */
+  const validatePhases = (def: { id: string; modifierPhases?: unknown; rounding?: unknown }) => {
+    if (def.rounding !== undefined && !ROUNDING_MODES.has(def.rounding as string)) {
+      fail(`"${def.id}": неизвестный режим округления "${String(def.rounding)}" (доступны: math, up, down, none)`);
+    }
     if (def.modifierPhases === undefined) return;
     if (!Array.isArray(def.modifierPhases) || def.modifierPhases.length === 0) {
       fail(`"${def.id}": modifierPhases, если объявлены, — непустой список фаз`);
     }
     const seen = new Set<string>();
-    for (const phase of def.modifierPhases as Array<string | { id?: string }>) {
+    for (const phase of def.modifierPhases as Array<string | { id?: string; round?: unknown }>) {
       const id: string = typeof phase === 'string' ? phase : (phase?.id ?? '');
       if (id === '') {
         fail(`"${def.id}": каждая фаза — строка или { id, round? }`);
+      }
+      if (typeof phase !== 'string') {
+        const round = phase.round;
+        const valid = round === undefined || round === true || round === false || ROUNDING_MODES.has(round as string);
+        if (!valid) {
+          fail(`"${def.id}": round фазы "${id}" — boolean или режим округления (math, up, down, none)`);
+        }
       }
       if (seen.has(id)) fail(`"${def.id}": фаза "${id}" объявлена дважды`);
       seen.add(id);
@@ -193,13 +205,20 @@ export const createDerivationRegistry = (): DerivationRegistry => {
       values: values as Readonly<Record<string, number>>,
       modifiers,
     };
-    // Параметры: база из состояния → конвейер модификаторов (фазы — по объявлению).
-    // Условия видят значения, вычисленные к их моменту (объявляйте deps честно).
+    // Параметры: база из состояния → конвейер модификаторов (фазы и режим
+    // округления — по объявлению). Условия видят значения, вычисленные
+    // к их моменту (объявляйте deps честно).
     for (const [id, def] of parameters) {
       const base = state[id];
       if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
       try {
-        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
+        values[id] = applyPipeline(
+          base,
+          modifiers[id] ?? [],
+          def.modifierPhases ?? DEFAULT_PHASES,
+          ctx,
+          def.rounding ?? 'math',
+        );
       } catch (err) {
         fail(`параметр "${id}" упал при вычислении: ${(err as Error).message}`);
       }
@@ -209,7 +228,13 @@ export const createDerivationRegistry = (): DerivationRegistry => {
       const def = derived.get(id)!;
       try {
         const base = def.compute(ctx);
-        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
+        values[id] = applyPipeline(
+          base,
+          modifiers[id] ?? [],
+          def.modifierPhases ?? DEFAULT_PHASES,
+          ctx,
+          def.rounding ?? 'math',
+        );
       } catch (err) {
         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
       }

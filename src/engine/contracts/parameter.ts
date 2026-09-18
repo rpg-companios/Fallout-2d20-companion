@@ -50,8 +50,30 @@ export interface ParameterModifier {
 /** Kind значения параметра. v1 — только 'number'. */
 export type ParameterValueKind = 'number' | 'track' | 'list';
 
-/** Фаза конвейера: имя ИЛИ объект с промежуточным округлением. */
-export type ModifierPhase = string | { id: string; round?: boolean };
+/** Фаза конвейера: имя ИЛИ объект с промежуточным округлением.
+ *  round: true — округлить режимом, объявленным для значения; round: режим —
+ *  округлить именно так на выходе фазы (правило может округлять шаг иначе,
+ *  чем итог). */
+export type ModifierPhase = string | { id: string; round?: boolean | RoundingMode };
+
+/** Режим округления — диктует сеттинг (слово владельца, 2026-09-18):
+ *  «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может
+ *  диктовать, в какую сторону должно быть округление. И может быть и 32 и 33.
+ *  И например при 32.01 правило будет заставлять округлить в большую или
+ *  меньшую сторону до целого».
+ *  - 'math' — математическое (0.5 вверх), по умолчанию;
+ *  - 'up'   — всегда в большую сторону (потолок): 32.01 → 33;
+ *  - 'down' — всегда в меньшую сторону (пол): 32.99 → 32;
+ *  - 'none' — не округлять (значение остаётся дробным). */
+export type RoundingMode = 'math' | 'up' | 'down' | 'none';
+
+/** Округлить число в объявленном режиме. Чистая функция. */
+export const roundValue = (value: number, mode: RoundingMode): number => {
+  if (mode === 'up') return Math.ceil(value);
+  if (mode === 'down') return Math.floor(value);
+  if (mode === 'none') return value;
+  return Math.round(value);
+};
 
 /** Объявление параметра. Значение живёт в состоянии; объявление — в сеттинге. */
 export interface ParameterDefinition {
@@ -65,6 +87,8 @@ export interface ParameterDefinition {
   /** Конвейер модификаторов: фазы в порядке исполнения. Отсутствует — дефолт
    *  ['add', 'percent', 'mult'] (аддитивы → суммарный процент → множители). */
   modifierPhases?: readonly ModifierPhase[];
+  /** Режим округления итога — диктует сеттинг (патч 284). По умолчанию 'math'. */
+  rounding?: RoundingMode;
 }
 
 /** Модификаторы, сгруппированные по параметру. */
@@ -80,11 +104,14 @@ export const defaultPhaseFor = (operation: ModifierOperation): string => {
   return 'mult';
 };
 
-/** Разрешить объявление фаз в список { id, round? }. */
+/** Разрешить объявление фаз в список { id, round }. */
 export const resolvePhases = (
   phases: readonly ModifierPhase[],
-): { id: string; round: boolean }[] =>
-  phases.map((p) => (typeof p === 'string' ? { id: p, round: false } : { id: p.id, round: p.round === true }));
+): { id: string; round: boolean | RoundingMode }[] =>
+  phases.map((p) => {
+    if (typeof p === 'string') return { id: p, round: false as const };
+    return { id: p.id, round: p.round ?? false };
+  });
 
 /**
  * Исполнить ОДНУ фазу: условия проверяются на входе фазы, затем в фазе
@@ -120,14 +147,16 @@ export const applyWithinPhase = (
  * Исполнить КОНВЕЙЕР значения: база → фазы в объявленном порядке.
  * Порядок фаз — это и есть якорь: где «+10% базовой», а где «+10% итоговой» —
  * решает правило сеттинга (слово владельца: «как в правилах напишут»).
- * Округление: математическое, в конце конвейера; фаза с round:true округляет
- * и на своём выходе. Модификатор в необъявленную фазу — ошибка.
+ * Округление: режим тоже диктует сеттинг (final, по умолчанию 'math');
+ * фаза с round:true округляет тем же режимом, с round:<режим> — своим.
+ * Модификатор в необъявленную фазу — ошибка.
  */
 export const applyPipeline = (
   base: number,
   modifiers: readonly ParameterModifier[],
   phases: readonly ModifierPhase[],
   ctx: DerivationContext,
+  final: RoundingMode = 'math',
 ): number => {
   const declared = new Set(resolvePhases(phases).map((p) => p.id));
   const byPhase = new Map<string, ParameterModifier[]>();
@@ -144,9 +173,12 @@ export const applyPipeline = (
   let value = base;
   for (const phase of resolvePhases(phases)) {
     value = applyWithinPhase(value, byPhase.get(phase.id) ?? [], ctx);
-    if (phase.round) value = Math.round(value);
+    if (phase.round !== false) {
+      const mode: RoundingMode = phase.round === true ? final : phase.round;
+      value = roundValue(value, mode);
+    }
   }
-  return Math.round(value);
+  return roundValue(value, final);
 };
 
 /**
@@ -155,10 +187,15 @@ export const applyPipeline = (
  * атр1+атр2) × 1.15, округлённое математически до целого»; «+15% к защите
  * от магии огня рассчитываются как −15% входящего урона от атаки со
  * свойством стихии огня». Проценты суммируются и применяются к базе одним
- * множителем, округление — одно, в конце. Чистая функция: база → итог.
+ * множителем. Режим округления — аргумент (по умолчанию математическое);
+ * с патча 284 сеттинг диктует и направление. Чистая функция: база → итог.
  */
-export const applyPercent = (base: number, percents: readonly number[]): number => {
-  if (percents.length === 0) return base;
+export const applyPercent = (
+  base: number,
+  percents: readonly number[],
+  mode: RoundingMode = 'math',
+): number => {
+  if (percents.length === 0) return roundValue(base, mode);
   const sum = percents.reduce((acc, p) => acc + p, 0);
-  return Math.round(base * (1 + sum / 100));
+  return roundValue(base * (1 + sum / 100), mode);
 };

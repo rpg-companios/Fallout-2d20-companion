@@ -1,4 +1,4 @@
-// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–283).
+// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–284).
 //
 // КРИТЕРИЙ УСПЕХА (карта каскада §8, слово владельца): мини-сеттинг
 // описывается ДЕКЛАРАЦИЕЙ без правок движка — 5 атрибутов, 7 навыков,
@@ -367,6 +367,135 @@ describe('МК-1: Ярость ботаника — порог смещаетс�
     expect(changed).toEqual(['test.derived.maxHealth']);
     const fired = registry.reactionsFor(changed).map((r) => r.id);
     expect(fired).toContain('test.reaction.nerdRage');
+  });
+});
+
+// --- округление: направление диктует сеттинг (слово владельца, 284) ---------
+
+describe('МК-1: округление — направление диктует сеттинг', () => {
+  // «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может
+  //  диктовать, в какую сторону должно быть округление. И может быть и 32
+  //  и 33. И например при 32.01 правило будет заставлять округлить в большую
+  //  или меньшую сторону до целого.»
+  const roundSetting = () => ({
+    id: 'round',
+    parameters: [{ id: 'round.attr.str', kind: 'number', label: 'СИЛ' }],
+    derived: [
+      {
+        id: 'round.derived.hpMath',
+        kind: 'max',
+        deps: ['round.attr.str'],
+        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
+        description: 'ОЗ, округление по умолчанию (математическое)',
+      },
+      {
+        id: 'round.derived.hpDown',
+        kind: 'max',
+        deps: ['round.attr.str'],
+        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
+        description: 'ОЗ, округление в меньшую',
+        rounding: 'down',
+      },
+      {
+        id: 'round.derived.hpUp',
+        kind: 'max',
+        deps: ['round.attr.str'],
+        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
+        description: 'ОЗ, округление в большую',
+        rounding: 'up',
+      },
+      {
+        id: 'round.derived.hpExact',
+        kind: 'max',
+        deps: ['round.attr.str'],
+        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
+        description: 'ОЗ, без округления',
+        rounding: 'none',
+      },
+      {
+        id: 'round.derived.penny',
+        kind: 'derived',
+        deps: ['round.attr.str'],
+        compute: () => 32.01,
+        description: 'значение 32.01 — правило решает, куда округлить',
+        rounding: 'up',
+      },
+      {
+        id: 'round.derived.pennyDown',
+        kind: 'derived',
+        deps: ['round.attr.str'],
+        compute: () => 32.01,
+        description: 'значение 32.01 — вниз',
+        rounding: 'down',
+      },
+    ],
+  });
+
+  const registry = createDerivationRegistry();
+  registry.register(roundSetting());
+
+  const modifiers = {
+    'round.derived.hpMath': [{ source: 'spell', operation: '%', value: 15 }],
+    'round.derived.hpDown': [{ source: 'spell', operation: '%', value: 15 }],
+    'round.derived.hpUp': [{ source: 'spell', operation: '%', value: 15 }],
+    'round.derived.hpExact': [{ source: 'spell', operation: '%', value: 15 }],
+  };
+
+  it('(10+18)×1.15 = 32.2: математическое → 32, в меньшую → 32, в большую → 33', () => {
+    const { values } = registry.evaluate({ 'round.attr.str': 9 }, modifiers);
+    expect(values['round.derived.hpMath']).toBe(32); // Math.round(32.2)
+    expect(values['round.derived.hpDown']).toBe(32); // пол
+    expect(values['round.derived.hpUp']).toBe(33); // потолок
+    expect(values['round.derived.hpExact']).toBeCloseTo(32.2, 10); // не округляем
+  });
+
+  it('при 32.01 правило заставляет: в большую → 33, в меньшую → 32', () => {
+    const { values } = registry.evaluate({ 'round.attr.str': 9 });
+    expect(values['round.derived.penny']).toBe(33);
+    expect(values['round.derived.pennyDown']).toBe(32);
+  });
+
+  it('applyPercent тоже подчиняется режиму: 26×1.15 = 29.9 → вниз 29, math 30', () => {
+    expect(applyPercent(26, [15], 'down')).toBe(29);
+    expect(applyPercent(26, [15])).toBe(30);
+    expect(applyPercent(26, [15], 'up')).toBe(30);
+  });
+
+  it('фаза может округлять своим режимом, не как итог', () => {
+    // конвейер: 4 ×1.1 = 4.4 — фаза округляет вверх → 5; итог не дробится
+    const up = applyPipeline(
+      4,
+      [{ source: 'trait', operation: '%', value: 10 }],
+      [{ id: 'percent', round: 'up' }],
+      emptyCtx,
+    );
+    expect(up).toBe(5);
+    // та же фаза вниз → 4
+    const down = applyPipeline(
+      4,
+      [{ source: 'trait', operation: '%', value: 10 }],
+      [{ id: 'percent', round: 'down' }],
+      emptyCtx,
+    );
+    expect(down).toBe(4);
+  });
+
+  it('неизвестный режим округления отклоняется при регистрации', () => {
+    const bad = createDerivationRegistry();
+    expect(() =>
+      bad.register({
+        id: 'round',
+        parameters: [{ id: 'round.attr.str', kind: 'number', label: 'СИЛ', rounding: 'кверх' }],
+      }),
+    ).toThrow(/режим округления/);
+    expect(() =>
+      bad.register({
+        id: 'round',
+        parameters: [
+          { id: 'round.attr.str', kind: 'number', label: 'СИЛ', modifierPhases: [{ id: 'x', round: 'боком' }] },
+        ],
+      }),
+    ).toThrow(/режим округления/);
   });
 });
 

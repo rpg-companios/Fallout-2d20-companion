@@ -6,7 +6,7 @@
 // МК-3 производные будут вычисляться каскадом реестра при любом изменении
 // входа. Контракт ниже — то, что сеттинг объявляет, а движок исполняет.
 
-import type { DerivationContext, ModifierPhase, ParameterModifier } from './parameter';
+import type { DerivationContext, ModifierPhase, ParameterModifier, RoundingMode } from './parameter';
 
 // Контекст вычислений живёт в parameter.ts (общий для условий и формул);
 // реэкспортируем, чтобы потребитель брал всё из бочки contracts.
@@ -28,6 +28,8 @@ export interface DerivedDefinition {
    *  Отсутствует — дефолт ['add', 'percent', 'mult']. Порядок объявляет
    *  правило сеттинга (слово владельца: «как в правилах напишут»). */
   modifierPhases?: readonly ModifierPhase[];
+  /** Режим округления итога — диктует сеттинг (патч 284). По умолчанию 'math'. */
+  rounding?: RoundingMode;
 }
 
 /** Модификатор, привязанный к параметру-цели (для реестра). */
