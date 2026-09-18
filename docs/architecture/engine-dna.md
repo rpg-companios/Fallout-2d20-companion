@@ -3,8 +3,9 @@
 **Статус:** обязательный архитектурный контракт проекта  
 **Дата:** 2026-09-08  
 **Владелец решения:** проект Positronium  
-**Связанные документы:** `setting-contract.md`, `docs/architecture/setting-pack.md`,
-`docs/architecture/save-migrations.md`, `docs/architecture/save-slimming.md`
+**Связанные документы:** `setting-contract.md`,
+`docs/architecture/save-migrations.md`, `docs/architecture/save-slimming.md`,
+`docs/architecture/typescript-migration-plan.md`
 
 Этот документ отвечает на вопрос: **что это за приложение, где проходит граница
 между движком и сеттингом и как продолжать разработку без размножения логики**.

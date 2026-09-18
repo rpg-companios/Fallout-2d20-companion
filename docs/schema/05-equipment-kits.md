@@ -36,7 +36,7 @@ Kit JSON → `resolveKitItems` (domain/kitResolver) → разрешение и�
 ❓ K-1: нужны ли НЕ-fixed записи (выбор/рандом)? сейчас только `type:"fixed"`.
    (в EquipmentKitModal есть flattenKitItems с выбором — проверить, какие type бывают).
 ❓ K-2: унифицировать идентификатор предмета (itemId vs weaponId vs armorId) → один `id`?
-   (перекликается с canonical-id из normalized-store.md).
+   (перекликается с canonical-id из `domain/kitItemCanonical.js`).
 ❓ K-3: валюта — всегда `itemType:"currency"`? стандартизировать поле количества.
 
 ## Что НЕ делаем сейчас

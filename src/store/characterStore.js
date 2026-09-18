@@ -833,7 +833,7 @@ const useCharacterStore = create(devtools(
           // range / damageType are descriptive values (e.g. "Medium", "Physical"),
           // NOT numeric stats. Keeping them as plain values avoids (a) corrupting
           // string values into {base:0} and (b) React error #31 when a screen renders
-          // the value directly. See docs/architecture/zustand-diagnosis.md (range/damageType fix).
+          // the value directly (исторический фикс переноса стора, патчи 219+).
           range: sourceItem.range,
           damageType: sourceItem.damageType,
 

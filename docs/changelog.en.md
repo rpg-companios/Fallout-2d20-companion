@@ -2,6 +2,17 @@
 
 ---
 
+## Cleanup — Documentation: implemented designs removed, deferred ideas honestly labeled (patch 277)
+
+> Owner's word (2026-09-18): docs piled up descriptions of things already built — the source of truth is now the program itself and the changelogs. Keep only the acting contracts and clearly marked «not implemented» ideas.
+
+- 16 documents deleted: everything describing what is already built into the program — the unified state store, the item-name pipeline, the armor protection model, robot slots, character folders, robot part translations, the old numbered changelog and more. The rules of those decisions live in the code and in the paired changelogs.
+- Deferred ideas stay with honest status labels: perk influence (94 perks, awaiting the owner's decisions), trait debts, the unified modifier system, «Effects/Radiation», weapon difficulty, premium/avatar, PWA updates, robot limb management. The «Effects and Radiation» doc got its stale paths fixed (the screen moved into the setting module long ago).
+- The approved TypeScript migration plan was added (`docs/architecture/typescript-migration-plan.md`): the engine moves to TS via a series of small patches — the goal is catching errors before the app ever launches; the setting stays living JavaScript behind a typed «door» (adapter + package data checks on load). The charter was updated for the series.
+- Dead links to the deleted documents were cleaned out of the code and the surviving documents.
+
+---
+
 ## Micro-patch — Junk composition without the «+N unavailable» counter (patch 276)
 
 > Owner's word (2026-09-17): «+1 unavailable» carries no information at all. The rule: salvage runs clipped wherever it is possible — common + uncommon with no perk yields the common one, rank 1 yields up to uncommon, rank 2 yields everything. Unreachable materials are simply not shown in the subline; loot and purchase do not depend on the Scrapper rank.
