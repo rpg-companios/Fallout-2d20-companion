@@ -48,4 +48,4 @@ characterStore.js). Это фактически фундамент будуще�
 3. Привести источники (черты→modifiers[], перки→, эффекты→, экипировка→) к единому виду.
 4. Миграция данных + тесты + трассировка источников.
 
-Связано с: normalized-store.md (Parameter), weapon-difficulty-plan.md (модификаторы оружия).
+Связано с: паспорта стора `src/store/characterState.ts` (форма `Parameter`), weapon-difficulty-plan.md (модификаторы оружия).

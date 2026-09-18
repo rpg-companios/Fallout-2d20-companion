@@ -30,6 +30,7 @@
  */
 
 import { ALERTS } from './catalog';
+import { debugLog } from '../../src/debug/falloutDebug';
 
 let hostHandler = null;
 // Очередь запросов, пришедших до монтирования хоста (например, ранняя ошибка
@@ -60,8 +61,10 @@ export const registerAlertHost = (handler) => {
 export const showAlert = (alertId, params = {}) => {
   const entry = ALERTS[alertId];
   if (!entry) {
-    // Промах ключа — дефект данных. Не роняем приложение, но и не молчим.
-    console.error(`[alertService] Неизвестный алерт: ${alertId}`);
+    // Промах ключа — дефект данных. Не роняем приложение; след оставляем
+    // в трассе (включается из консоли, см. docs/debug-tracing.md) — плоские
+    // console.* в рантайме запрещены инвариантом __tests__/debug/console-trace.test.js.
+    debugLog('alerts.unknown:id', { alertId });
     return Promise.resolve(entry?.kind === 'confirm' ? false : null);
   }
 

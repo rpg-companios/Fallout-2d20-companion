@@ -17,7 +17,7 @@
 - Рендерится через компонент `StatBox`
 - Показывает только `activeTimedEffects` (временные эффекты с обратным отсчётом сцен)
 - Отображает список меток `label + timeRemaining`
-- Файл: `components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js`, строки ~618–637
+- Файл: `modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js` (экран переехал в модуль сеттинга; номера строк — на момент написания доки)
 
 ---
 
@@ -189,9 +189,9 @@ const safeNewHP = currentHP >= healingCap ? currentHP : newHP;
 
 | Файл | Что изменить |
 |---|---|
-| `components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js` | Убрать `StatBox` с Эффектами из сетки; поставить `StatBox` «Радиация» на его место; добавить `<EffectsPanel>` под блоком характеристик |
-| `components/screens/WeaponsAndArmorScreen/` | Создать `EffectsPanel.js` — новый компонент спойлера |
-| `components/screens/WeaponsAndArmorScreen/` | Создать `RadiationCounter.js` — счётчик (+/−) по образцу `HealthCounter` |
+|  `modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js` | Убрать `StatBox` с Эффектами из сетки; поставить `StatBox` «Радиация» на его место; добавить `<EffectsPanel>` под блоком характеристик |
+|  `modules/fallout/screens/WeaponsAndArmorScreen/` | Создать `EffectsPanel.js` — новый компонент спойлера |
+|  `modules/fallout/screens/WeaponsAndArmorScreen/` | Создать `RadiationCounter.js` — счётчик (+/−) по образцу `HealthCounter` |
 | `styles/WeaponsAndArmorScreen.styles.js` | Добавить стили для `EffectsPanel` и `RadiationCounter` |
 | `domain/effects.js` | Расширить агрегатор — собирать эффекты из всех источников |
 | `domain/characterCreation.js` | Добавить `getEffectiveMaxHP(character)` — вычитает уровень радиации из базового maxHP |
