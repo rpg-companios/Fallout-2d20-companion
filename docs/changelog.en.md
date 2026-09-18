@@ -2,6 +2,16 @@
 
 ---
 
+## Infrastructure — TypeScript fuses: tsconfig coverage and a .js/.ts duplicate ban (patch 280)
+
+> Owner's word (2026-09-17): the series gets reordered — first the cascade map (279), then fuses (280), then the derivation contract (281), then the test setting (282) and the cascade implementation (283+).
+
+- Two ratchets for the TS series. First: every `.ts`/`.tsx` in the repository must be inside the tsconfig `include` — a new TS file outside the type-checking scope fails the test, and so does a stale include entry (include only grows). Second: stacks of `foo.js` + `foo.ts`/`foo.tsx` in one folder are banned — the Metro resolver picks `.js` first, so the TS file would be dead code that is «type-checked» but never executed.
+- The vitest plugin from patch 274 now covers `.ts`/`.tsx` too: replacing `require('<asset>')` with `{}` works there as well; TypeScript itself is transformed by vite/esbuild, no babel involved. TS modules enter the test run without separate infrastructure.
+- A conversion rule was added to the charter: a conversion patch does not change behavior; whatever typing uncovers (a possible null, a shape mismatch) goes into a separate fix patch with its own number and test — never «changed it while I was at it».
+
+---
+
 ## Series pivot — The derived-values cascade map: diagnosis and plan (patch 279)
 
 > Owner's word (2026-09-18): I want changing one parameter to change everything — not «one piece of state updated and nothing else moves until you fix all the call sites by hand». The engine is meant to be universal — next come Heroes of Might and Magic 2d20, Disciples, Vampire: The Masquerade or my own setting.

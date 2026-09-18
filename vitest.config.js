@@ -17,10 +17,24 @@ const jsxInJs = {
   name: 'transform-jsx-in-js',
   enforce: 'pre',
   transform(code, id) {
-    if (!id.endsWith('.js') || id.includes('node_modules')) return;
+    if (id.includes('node_modules')) return undefined;
+    const isJs = id.endsWith('.js');
+    const isTsLike = id.endsWith('.ts') || id.endsWith('.tsx');
+    if (!isJs && !isTsLike) return undefined;
+
+    // require('<ассет>') в node уходит в нативный лоадер (мимо плагинов vite)
+    // и падает «Invalid or unexpected token» при парсинге PNG как JS. Заменяем
+    // такие require на {} — для рендер-смоков картинки не нужны. С патча 280
+    // замена работает и в .ts/.tsx (саму трансформацию TS делает vite/esbuild).
     const stripped = code.replace(ASSET_REQUIRE_RE, '{}');
+    const changed = stripped !== code;
+
+    if (isTsLike) {
+      return changed ? { code: stripped, map: null } : undefined;
+    }
+
     if (!JSX_LIKE.test(stripped)) {
-      return stripped !== code ? { code: stripped, map: null } : undefined;
+      return changed ? { code: stripped, map: null } : undefined;
     }
     const out = babel.transformSync(stripped, {
       filename: id,
