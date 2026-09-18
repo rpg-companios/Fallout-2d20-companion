@@ -2,6 +2,16 @@
 
 ---
 
+## Cleanup — The sandbox screen removed: the setting is virtual, no UI needed (patch 288)
+
+> Owner's word (2026-09-18): «do I even need this screen if the setting is virtual, unconnected to reality, and I'm not going to wire it?» No — removed.
+
+- The sandbox screen (patches 286–287) was removed wholesale: the screen itself, the view model, the lazy registry, their test and the App.js wiring. The screen's only job — showing the cascade with your own eyes — is done more reliably by the acceptance tests, while the screen would have needed maintenance on every contract change.
+- The test setting's declaration and its acceptance test remain: that is not UI but the proof of the contract's universality (the §8 criterion — «a setting is described without engine edits»). The program never imports the module, it costs nothing; if a future contract change breaks the describability of a second setting, the test falls.
+- Verified: the publication build is clean (zero traces of the screen), 76 files / 781 tests green, tsc clean.
+
+---
+
 ## Micro-patch — The sandbox no longer ships into the production build at all (patch 287)
 
 > Owner's word (2026-09-18): «So in the Replit preview I'll see 5 tabs, but when I publish the app I won't see it?» Yes: preview — 5 tabs, publication — 4. A nuance was found by inspecting a live build and fixed.

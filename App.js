@@ -38,16 +38,6 @@ import './modules/fallout/survival';
 // патч 215) — та же точка регистрации, см. modules/fallout/diseases/migration.js.
 import './modules/fallout/diseases/migration';
 import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
-// Песочница правил — тестовый сеттинг на контракте выводимости (патч 286).
-// Слово владельца: в основной программе не показывать вообще — вкладка
-// монтируется ТОЛЬКО в среде разработки (__DEV__); продакшн её не видит.
-// Патч 287: условный require вместо статического импорта — продакшн-сборка
-// (expo export) выкидывает ветку целиком, и кода песочницы в публикуемых
-// файлах нет вообще (проверено grep по собранному бандлу).
-let SandboxScreen = null;
-if (__DEV__) {
-  SandboxScreen = require('./modules/test-setting/screens/SandboxScreen').default;
-}
 import useAppSettingsStore, {
   selectBootScreenEnabled,
   selectSettingsHydrated,
@@ -230,8 +220,6 @@ function App() {
                           iconName = focused ? 'briefcase' : 'briefcase-outline';
                         } else if (route.name === TAB_ROUTES.PERKS) {
                           iconName = focused ? 'star' : 'star-outline';
-                        } else if (__DEV__ && route.name === 'SandboxTab') {
-                          iconName = focused ? 'flask' : 'flask-outline';
                         }
                         return <Ionicons name={iconName} size={16} color={color} />;
                       },
@@ -297,18 +285,6 @@ function App() {
                         />
                       </>
                         ) : null}
-                    {__DEV__ && SandboxScreen ? (
-                      <Tab.Screen
-                        name="SandboxTab"
-                        component={SandboxScreen}
-                        options={{
-                          // Dev-only вкладка: локаль не нужна, подпись фиксирована.
-                          tabBarLabel: ({ focused, color }) => (
-                            <Text style={{ color, fontSize: 11, textAlign: 'center' }}>Песочница</Text>
-                          ),
-                        }}
-                      />
-                    ) : null}
                   </Tab.Navigator>
                 </SafeAreaView>
               </ImageBackground>
