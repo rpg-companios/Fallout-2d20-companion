@@ -2,6 +2,16 @@
 
 ---
 
+## Cleanup — Tests: settled ones removed, the «tests do not pile up» rule written into the charter (patch 278)
+
+> Owner's word (2026-09-18): every feature wrote its own test, and after settling in the test was never deleted — they just piled up. Tests are a development-time checking tool, not part of the program.
+
+- 15 acceptance tests of settled features were deleted (survival UI labels and colors, modals, the crafting window, the salvage messages from patches 275–276, the «acceptance» of the finished robot rework). Rule checking is unharmed: the fuses (store and save passports, catalog data integrity) were not touched; the repository now holds 72 test files instead of 86.
+- The lost fuse «no direct console calls in the program» was restored: all logging goes through the diagnostics journal that is off by default. The single violation found (the unknown-alert message) now goes through that journal; the `alerts` category is documented in the tracing doc.
+- The test policy is written into the charter: fuses stay forever; acceptance tests live in the sandbox during development and do not ship; a settled feature loses its right to a test — the next patch touching that area removes it.
+
+---
+
 ## Cleanup — Documentation: implemented designs removed, deferred ideas honestly labeled (patch 277)
 
 > Owner's word (2026-09-18): docs piled up descriptions of things already built — the source of truth is now the program itself and the changelogs. Keep only the acting contracts and clearly marked «not implemented» ideas.
