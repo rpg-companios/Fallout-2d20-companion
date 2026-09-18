@@ -1,0 +1,237 @@
+diff --git a/__tests__/typescript/no-js-ts-duplicates.test.js b/__tests__/typescript/no-js-ts-duplicates.test.js
+new file mode 100644
+index 0000000..489ae74
+--- /dev/null
++++ b/__tests__/typescript/no-js-ts-duplicates.test.js
+@@ -0,0 +1,54 @@
++// Предохранитель №12 (устав §3): в одной папке нет дублей вида foo.js + foo.ts
++// (или foo.js + foo.tsx, foo.jsx + foo.tsx, foo.ts + foo.tsx).
++//
++// Зачем: резолвер Metro подбирает расширения в порядке js, jsx, json, ts, tsx —
++// при дубле всегда выигрывает .js, и TS-файл оказывается мёртвым: компилятор его
++// проверяет, а программа исполняет другой файл. Это худший вид «тихой» миграции.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ROOT = path.resolve(__dirname, '../..');
++const EXCLUDED_DIRS = new Set(['node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local', '.expo']);
++// Пары «маскирующих» друг друга расширений: левый выигрывает у правого при дубле.
++const CONFLICTING_PAIRS = [
++  ['.js', '.ts'],
++  ['.js', '.tsx'],
++  ['.jsx', '.ts'],
++  ['.jsx', '.tsx'],
++  ['.ts', '.tsx'],
++];
++
++const collectDuplicates = (dir, acc = []) => {
++  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
++    if (entry.isDirectory()) {
++      if (EXCLUDED_DIRS.has(entry.name)) continue;
++      collectDuplicates(path.join(dir, entry.name), acc);
++      continue;
++    }
++  }
++  const byBasename = new Map();
++  for (const file of fs.readdirSync(dir)) {
++    const ext = path.extname(file);
++    if (!['.js', '.jsx', '.ts', '.tsx'].includes(ext)) continue;
++    const base = file.slice(0, -ext.length);
++    if (!byBasename.has(base)) byBasename.set(base, []);
++    byBasename.get(base).push(ext);
++  }
++  for (const [base, exts] of byBasename) {
++    for (const [winner, dead] of CONFLICTING_PAIRS) {
++      if (exts.includes(winner) && exts.includes(dead)) {
++        acc.push(`${path.relative(ROOT, dir)}/${base}: ${winner} перекрывает ${dead}`);
++      }
++    }
++  }
++  return acc;
++};
++
++describe('предохранитель: дублей .js/.ts нет', () => {
++  it('ни в одной папке .js-файл не маскирует .ts/.tsx', () => {
++    const duplicates = collectDuplicates(ROOT);
++    expect(duplicates).toEqual([]);
++  });
++});
+diff --git a/__tests__/typescript/tsconfig-coverage.test.js b/__tests__/typescript/tsconfig-coverage.test.js
+new file mode 100644
+index 0000000..9a08230
+--- /dev/null
++++ b/__tests__/typescript/tsconfig-coverage.test.js
+@@ -0,0 +1,74 @@
++// Предохранитель №11 (устав §3): каждый .ts/.tsx движка и модулей ОБЯЗАН
++// входить в include tsconfig.json — «тихая» миграция мимо компилятора
++// невозможна. include — храповик: только растёт (план миграции, М1).
++//
++// Обратное тоже проверяем: протухшая запись include (файл удалили/переименовали)
++// падает тестом, а не висит мёртвым грузом.
++//
++// Тесты сами остаются на JS (политика тестов устава §2а) — __tests__ из
++// проверки исключён. .d.ts не проверяем: декларации подключаются импортами.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ROOT = path.resolve(__dirname, '../..');
++const TSCONFIG_PATH = path.join(ROOT, 'tsconfig.json');
++
++const EXCLUDED_DIRS = new Set([
++  'node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local',
++  'public', 'assets', '__tests__', '.expo',
++]);
++const TS_FILE_RE = /\.(ts|tsx)$/;
++
++const collectTsFiles = (dir, acc = []) => {
++  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
++    const full = path.join(dir, entry.name);
++    if (entry.isDirectory()) {
++      if (EXCLUDED_DIRS.has(entry.name)) continue;
++      collectTsFiles(full, acc);
++    } else if (TS_FILE_RE.test(entry.name) && !entry.name.endsWith('.d.ts')) {
++      acc.push(full);
++    }
++  }
++  return acc;
++};
++
++const readInclude = () => {
++  const raw = JSON.parse(fs.readFileSync(TSCONFIG_PATH, 'utf8'));
++  const include = Array.isArray(raw?.include) ? raw.include : [];
++  if (include.length === 0) throw new Error('tsconfig.json: пустой include — серия TS не начата?');
++  return include;
++};
++
++const expandIncludeEntry = (entry) => {
++  const full = path.join(ROOT, entry);
++  if (!fs.existsSync(full)) return [];
++  const stat = fs.statSync(full);
++  if (stat.isFile()) {
++    return (TS_FILE_RE.test(full) && !full.endsWith('.d.ts')) ? [full] : [];
++  }
++  return collectTsFiles(full, []);
++};
++
++describe('предохранитель: tsconfig покрывает все .ts/.tsx', () => {
++  it('каждый .ts/.tsx на диске входит в include', () => {
++    const onDisk = collectTsFiles(ROOT);
++    expect(onDisk.length).toBeGreaterThan(0); // серия TS начата — файлов быть должно
++
++    const covered = new Set();
++    for (const entry of readInclude()) {
++      for (const file of expandIncludeEntry(entry)) covered.add(file);
++    }
++
++    const uncovered = onDisk
++      .filter((file) => !covered.has(file))
++      .map((file) => path.relative(ROOT, file));
++    expect(uncovered).toEqual([]);
++  });
++
++  it('каждая запись include существует на диске (протухших записей нет)', () => {
++    const stale = readInclude().filter((entry) => !fs.existsSync(path.join(ROOT, entry)));
++    expect(stale).toEqual([]);
++  });
++});
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index a22d933..8780a1d 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -51,6 +51,10 @@
+    в репо с пометкой `// ПРИЁМОЧНЫЙ (патч N): удалить при конверсии/приживании` —
+    они служат базой эквивалентности для TypeScript-серии
+    (`docs/architecture/typescript-migration-plan.md`, раздел 5).
++2б. **Патч-конверсия не меняет поведение.** Всё, что типизация вскрыла
++   (возможный `null`, расхождение форм), оформляется отдельным патчем-фиксом
++   со своим номером, тестом и описанием владельцу; смешение «переписал и заодно
++   поменял» в одном патче запрещено.
+ 3. Коммит в ветку `arena/01a08a17-fallout-2d20-companion` → файл патча в `patchs/` → коммит файла → push.
+ 4. Владелец применяет `./apply-patch.sh <номер>` (скрипт сам ставит недостающую цепочку).
+    **Ручной перенос файлов запрещён** (инцидент с потерей правок при ручном копировании).
+@@ -82,6 +86,8 @@
+ | 7 | Потолок удачи (`maxLuckPoints`) не персистится и в сейв не пишется | Правило 1 `docs/architecture/counters-storage.md` + ассерты в контрактных тестах |
+ | 8 | TS-слой компилируется | `tsc --noEmit` (strict; tsconfig include — точечный) |
+ | 9 | migrations.js не трогать; миграции только добавляются в конец | код-ревью + тесты загрузки старых сейвов; владелец подтверждает |
++| 10 | Каждый `.ts`/`.tsx` репозитория входит в `include` tsconfig — типизация не «забывает» файлы; протухших записей в include нет | `__tests__/typescript/tsconfig-coverage.test.js` (патч 280) |
++| 11 | Нет дублей `foo.js` + `foo.ts`/`foo.tsx` в одной папке — резолвер Metro берёт `.js` первым, TS-файл был бы мёртвым кодом | `__tests__/typescript/no-js-ts-duplicates.test.js` (патч 280) |
+ 
+ **Следствие (главный урок серии 219–249):** новое поле/действие/ключ сейва = обновление паспорта
+ В ТОМ ЖЕ ПАТЧЕ — иначе контрактный тест падает. Горячие фиксы «по времени и силам» исчезают:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fd3564b..4c1c123 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Infrastructure — TypeScript fuses: tsconfig coverage and a .js/.ts duplicate ban (patch 280)
++
++> Owner's word (2026-09-17): the series gets reordered — first the cascade map (279), then fuses (280), then the derivation contract (281), then the test setting (282) and the cascade implementation (283+).
++
++- Two ratchets for the TS series. First: every `.ts`/`.tsx` in the repository must be inside the tsconfig `include` — a new TS file outside the type-checking scope fails the test, and so does a stale include entry (include only grows). Second: stacks of `foo.js` + `foo.ts`/`foo.tsx` in one folder are banned — the Metro resolver picks `.js` first, so the TS file would be dead code that is «type-checked» but never executed.
++- The vitest plugin from patch 274 now covers `.ts`/`.tsx` too: replacing `require('<asset>')` with `{}` works there as well; TypeScript itself is transformed by vite/esbuild, no babel involved. TS modules enter the test run without separate infrastructure.
++- A conversion rule was added to the charter: a conversion patch does not change behavior; whatever typing uncovers (a possible null, a shape mismatch) goes into a separate fix patch with its own number and test — never «changed it while I was at it».
++
++---
++
+ ## Series pivot — The derived-values cascade map: diagnosis and plan (patch 279)
+ 
+ > Owner's word (2026-09-18): I want changing one parameter to change everything — not «one piece of state updated and nothing else moves until you fix all the call sites by hand». The engine is meant to be universal — next come Heroes of Might and Magic 2d20, Disciples, Vampire: The Masquerade or my own setting.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4dc1e82..e9095a2 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Инфраструктура — Предохранители TypeScript: покрытие tsconfig и запрет дублей .js/.ts (патч 280)
++
++> Слово владельца (2026-09-17): серию разворачиваем — сначала карта каскада (279), потом предохранители (280), потом контракт выводимости (281), потом тестовый сеттинг (282) и реализация каскада (283+).
++
++- Два храповика на время TS-серии. Первый: каждый `.ts`/`.tsx` репозитория обязан входить в `include` tsconfig — новый TS-файл вне поля типизации роняет тест, как и протухшая запись в include (include только растёт). Второй: запрещены стопки `foo.js` + `foo.ts`/`foo.tsx` в одной папке — сборщик Metro резолвит `.js` первым, и TS-файл оказался бы мёртвым кодом, который «типизирован», но не исполняется.
++- Vitest-плагин из патча 274 продлён на `.ts`/`.tsx`: замена `require('<ассет>')` на `{}` работает и там; сам TypeScript трансформирует vite/esbuild, babel не привлекается. Модули на TS заходят в тестовый прогон без отдельной инфраструктуры.
++- В устав добавлено правило конверсии: патч-конверсия не меняет поведение; всё, что типизация вскрыла (возможный null, расхождение форм), — отдельный патч-фикс со своим номером и тестом, а не «заодно поменял».
++
++---
++
+ ## Разворот серии — Карта каскада производных: диагноз и план (патч 279)
+ 
+ > Слово владельца (2026-09-18): хочу, чтобы при изменении одного параметра менялось всё, а не «одно состояние обновилось, а дальше никуда не двинулось, пока руками все вызовы не поправишь». Движок задуман универсальным — дальше Герои Меча и Магии, Disciples, Вампиры: Маскарад или свой сеттинг.
+diff --git a/vitest.config.js b/vitest.config.js
+index ab74da7..49ac171 100644
+--- a/vitest.config.js
++++ b/vitest.config.js
+@@ -17,10 +17,24 @@ const jsxInJs = {
+   name: 'transform-jsx-in-js',
+   enforce: 'pre',
+   transform(code, id) {
+-    if (!id.endsWith('.js') || id.includes('node_modules')) return;
++    if (id.includes('node_modules')) return undefined;
++    const isJs = id.endsWith('.js');
++    const isTsLike = id.endsWith('.ts') || id.endsWith('.tsx');
++    if (!isJs && !isTsLike) return undefined;
++
++    // require('<ассет>') в node уходит в нативный лоадер (мимо плагинов vite)
++    // и падает «Invalid or unexpected token» при парсинге PNG как JS. Заменяем
++    // такие require на {} — для рендер-смоков картинки не нужны. С патча 280
++    // замена работает и в .ts/.tsx (саму трансформацию TS делает vite/esbuild).
+     const stripped = code.replace(ASSET_REQUIRE_RE, '{}');
++    const changed = stripped !== code;
++
++    if (isTsLike) {
++      return changed ? { code: stripped, map: null } : undefined;
++    }
++
+     if (!JSX_LIKE.test(stripped)) {
+-      return stripped !== code ? { code: stripped, map: null } : undefined;
++      return changed ? { code: stripped, map: null } : undefined;
+     }
+     const out = babel.transformSync(stripped, {
+       filename: id,
