@@ -41,7 +41,13 @@ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 // Песочница правил — тестовый сеттинг на контракте выводимости (патч 286).
 // Слово владельца: в основной программе не показывать вообще — вкладка
 // монтируется ТОЛЬКО в среде разработки (__DEV__); продакшн её не видит.
-import SandboxScreen from './modules/test-setting/screens/SandboxScreen';
+// Патч 287: условный require вместо статического импорта — продакшн-сборка
+// (expo export) выкидывает ветку целиком, и кода песочницы в публикуемых
+// файлах нет вообще (проверено grep по собранному бандлу).
+let SandboxScreen = null;
+if (__DEV__) {
+  SandboxScreen = require('./modules/test-setting/screens/SandboxScreen').default;
+}
 import useAppSettingsStore, {
   selectBootScreenEnabled,
   selectSettingsHydrated,
@@ -224,7 +230,7 @@ function App() {
                           iconName = focused ? 'briefcase' : 'briefcase-outline';
                         } else if (route.name === TAB_ROUTES.PERKS) {
                           iconName = focused ? 'star' : 'star-outline';
-                        } else if (route.name === 'SandboxTab') {
+                        } else if (__DEV__ && route.name === 'SandboxTab') {
                           iconName = focused ? 'flask' : 'flask-outline';
                         }
                         return <Ionicons name={iconName} size={16} color={color} />;
@@ -291,7 +297,7 @@ function App() {
                         />
                       </>
                         ) : null}
-                    {__DEV__ ? (
+                    {__DEV__ && SandboxScreen ? (
                       <Tab.Screen
                         name="SandboxTab"
                         component={SandboxScreen}

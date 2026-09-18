@@ -2,6 +2,16 @@
 
 ---
 
+## Micro-patch — The sandbox no longer ships into the production build at all (patch 287)
+
+> Owner's word (2026-09-18): «So in the Replit preview I'll see 5 tabs, but when I publish the app I won't see it?» Yes: preview — 5 tabs, publication — 4. A nuance was found by inspecting a live build and fixed.
+
+- How the gate works: `__DEV__` is a build-time constant. The dev server (`expo start` — the Replit preview) builds with `__DEV__ = true` → the «Sandbox» tab mounts. Publication (`npm run build` → expo export) builds with `__DEV__ = false` → no tab.
+- Found by grepping the bundle: with a static import, the screen's code rode into the publication as dead weight (the tab never mounted, but the kilobytes of code and strings sat in the files). Fixed with a conditional require behind `__DEV__`: the export drops the whole branch.
+- Verified by grepping the built publication: no screen strings, view model, sandbox registry or tab name in the bundle — zero occurrences (control: HomeTab/Positronium are found).
+
+---
+
 ## Series pivot — The rules sandbox: the test-setting screen, dev-only (patch 286)
 
 > Owner's word (2026-09-18): the sandbox lives only in the development environment — «don't show it in the main program at all»; a build for checking the contract.
