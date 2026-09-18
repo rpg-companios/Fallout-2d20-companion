@@ -2,6 +2,17 @@
 
 ---
 
+## Series pivot — The derived-values cascade map: diagnosis and plan (patch 279)
+
+> Owner's word (2026-09-18): I want changing one parameter to change everything — not «one piece of state updated and nothing else moves until you fix all the call sites by hand». The engine is meant to be universal — next come Heroes of Might and Magic 2d20, Disciples, Vampire: The Masquerade or my own setting.
+
+- The cascade map was added (`docs/architecture/cascade-map.md`) — an inventory of every derived value in the program. The diagnosis is confirmed: totals are stored in the state store and recomputed by 24 manual calls scattered across actions; the automatic watcher only tracks equipment and profile; the Weapons & Armor and Character screens keep their own recomputations — three copies of the same truth. Meanwhile derived values are never written into saves — the cascade can be fixed without any save migrations.
+- A live engine/setting boundary violation was found: the engine's derived-stats code contains Fallout formulas and reads the power armor catalog straight from the setting module. Moving the formulas into the module is part of the series plan.
+- The series plan pivoted: the centerpiece is a typed derivation mechanism. The setting declares parameters, derived values, counters, rank ceilings, requirements and reactions — the engine executes and cascades them. TypeScript rides along (contract and engine in TS; the setting stays living JavaScript). Changing the programming language and swapping the reactive core were ruled unnecessary: the program has only a handful of true «rules on change» today.
+- The test setting for proving universality — per the owner's word: 5 attributes, 7 skills, 5 derived values (health, mana, magic power, defense, attack), 5 spells; mana = attribute + skill; +5/10/15% bonuses; spells gated by skill rank 4; skill rank ceiling from an attribute. Success criterion: both Fallout and the mini-setting are describable without engine changes.
+
+---
+
 ## Cleanup — Tests: settled ones removed, the «tests do not pile up» rule written into the charter (patch 278)
 
 > Owner's word (2026-09-18): every feature wrote its own test, and after settling in the test was never deleted — they just piled up. Tests are a development-time checking tool, not part of the program.
