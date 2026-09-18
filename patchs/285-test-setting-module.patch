@@ -1,0 +1,512 @@
+diff --git a/__tests__/settings/test-setting.test.js b/__tests__/settings/test-setting.test.js
+new file mode 100644
+index 0000000..11e71ea
+--- /dev/null
++++ b/__tests__/settings/test-setting.test.js
+@@ -0,0 +1,152 @@
++// ПРИЁМОЧНЫЙ (патч 285): удалить при приживании мини-сеттинга (МК-3, проводка).
++// База эквивалентности серии: пока каскад не подключён к хранилищу, этот тест
++// доказывает критерий контракта — «сеттинг описывается регистрацией без правок
++// движка» (docs/architecture/cascade-map.md §8, слово владельца).
++
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { checkRequirements } from '../../src/engine/contracts';
++import { createDerivationRegistry } from '../../src/engine/derivations/registry';
++import {
++  ATTRIBUTES,
++  RANK_BANDS,
++  SKILLS,
++  SPELLS,
++  TEST_SETTING,
++  rankCeilingId,
++  registerTestSetting,
++} from '../../modules/test-setting';
++
++const registry = createDerivationRegistry();
++registerTestSetting(registry);
++
++const hero = {
++  'test.attr.strength': 8,
++  'test.attr.agility': 6,
++  'test.attr.intellect': 9,
++  'test.attr.spirit': 7,
++  'test.attr.luck': 5,
++  'test.skill.blade': 3,
++  'test.skill.bladeDefense': 2,
++  'test.skill.sorcery': 2,
++  'test.skill.magicDefense': 2,
++  'test.skill.aim': 1,
++  'test.skill.stealth': 0,
++  'test.skill.survival': 0,
++};
++
++describe('МК-2: тестовый сеттинг — спека владельца §8', () => {
++  it('состав: 5 атрибутов, 7 навыков, 5 производных, 5 заклинаний', () => {
++    expect(ATTRIBUTES).toHaveLength(5);
++    expect(SKILLS).toHaveLength(7);
++    const named = TEST_SETTING.derived.filter((d) => d.kind !== 'rankCeiling');
++    expect(named.map((d) => d.id).sort()).toEqual(
++      [
++        'test.derived.attack',
++        'test.derived.defense',
++        'test.derived.magicPower',
++        'test.derived.maxHealth',
++        'test.derived.maxMana',
++      ].sort(),
++    );
++    expect(SPELLS).toHaveLength(5);
++  });
++
++  it('атрибуты влияют на производные: каскад без ручных пересчётов', () => {
++    const { values } = registry.evaluate(hero);
++    expect(values['test.derived.maxHealth']).toBe(26); // 10 + 8×2
++    expect(values['test.derived.maxMana']).toBe(11); // 9 + 2
++    expect(values['test.derived.magicPower']).toBe(8); // 7 + ⌊2/2⌋
++    expect(values['test.derived.defense']).toBe(8); // 6 + ⌊(2+2)/2⌋
++    expect(values['test.derived.attack']).toBe(10); // 8 + ⌊(3+1)/2⌋
++  });
++
++  it('мана = атрибут + навык (дословно): Колдовство подросло — манна выросла', () => {
++    const grown = { ...hero, 'test.skill.sorcery': 4 };
++    expect(registry.evaluate(grown).values['test.derived.maxMana']).toBe(13);
++  });
++
++  it('+5/10/15% к силе магии / защите от магии — модификаторами производных', () => {
++    const { values } = registry.evaluate(hero, {
++      'test.derived.magicPower': [
++        { source: 'item.amulet', operation: '%', value: 5 },
++        { source: 'item.artifact', operation: '%', value: 10 },
++      ],
++      'test.derived.defense': [{ source: 'item.mantle', operation: '%', value: 15 }],
++    });
++    // сила магии: 8 × (1 + 5% + 10%) = 9.2 → 9
++    expect(values['test.derived.magicPower']).toBe(9);
++    // защита: 8 × 1.15 = 9.2 → 9
++    expect(values['test.derived.defense']).toBe(9);
++  });
++
++  it('потолки счётчиков тянут производные', () => {
++    const { ceilings } = registry.evaluate(hero);
++    expect(ceilings['test.counter.health']).toBe(26);
++    expect(ceilings['test.counter.mana']).toBe(11);
++  });
++});
++
++describe('МК-2: потолки рангов и гейты', () => {
++  it('число рангов навыка зависит от атрибута (ступени)', () => {
++    const { values } = registry.evaluate(hero);
++    // Интеллект 9 → потолок Колдовства 3; Сила 8 → потолок Клинков 3
++    expect(values[rankCeilingId('test.skill.sorcery')]).toBe(3);
++    expect(values[rankCeilingId('test.skill.blade')]).toBe(3);
++    const novice = { ...hero, 'test.attr.intellect': 3 };
++    expect(registry.evaluate(novice).values[rankCeilingId('test.skill.sorcery')]).toBe(1);
++    const master = { ...hero, 'test.attr.intellect': 10 };
++    expect(registry.evaluate(master).values[rankCeilingId('test.skill.sorcery')]).toBe(4);
++  });
++
++  it('гейт «навык ранга 4»: все заклинания за ним', () => {
++    expect(SPELLS.every((s) => s.requirement.minRank === 4)).toBe(true);
++    // Колдовство 3 — гейт закрыт
++    expect(checkRequirements([SPELLS[0].requirement], { 'test.skill.sorcery': 3 }).ok).toBe(false);
++    // Колдовство 4 — открыт
++    expect(checkRequirements([SPELLS[0].requirement], { 'test.skill.sorcery': 4 }).ok).toBe(true);
++  });
++
++  it('правило в правиле: ранг 4 недостижим, пока атрибут не даёт потолок 4', () => {
++    // Интеллект 9 → потолок Колдовства 3 → гейт ранга 4 закрыт «железно»
++    expect(registry.evaluate(hero).values[rankCeilingId('test.skill.sorcery')]).toBeLessThan(4);
++    const master = { ...hero, 'test.attr.intellect': 10 };
++    expect(registry.evaluate(master).values[rankCeilingId('test.skill.sorcery')]).toBe(4);
++  });
++
++  it('заклинания тратят манну: стоимость укладывается в потолок', () => {
++    // Колдовство 4 и Интеллект 9 → манна 13: стрела(3) + щит(2) + молния(4) = 9 ≤ 13
++    const grown = { ...hero, 'test.skill.sorcery': 4 };
++    const { ceilings } = registry.evaluate(grown);
++    const spend = SPELLS.slice(0, 3).reduce((acc, s) => acc + s.manaCost, 0);
++    expect(spend).toBeLessThanOrEqual(ceilings['test.counter.mana']);
++    // и отдельно: самое дорогое заклинание по карману мастеру
++    const costliest = Math.max(...SPELLS.map((s) => s.manaCost));
++    expect(costliest).toBeLessThanOrEqual(ceilings['test.counter.mana']);
++  });
++});
++
++describe('МК-2: критерий «без правок движка»', () => {
++  it('модуль импортирует только контракт движка и свои файлы', () => {
++    const here = fileURLToPath(new URL('.', import.meta.url));
++    const files = [
++      `${here}../../modules/test-setting/index.js`,
++      `${here}../../modules/test-setting/spells.js`,
++    ];
++    const allowed = /from\s+'(\.\.\/)+src\/engine\/|from\s+'\.\/spells'/;
++    for (const file of files) {
++      const source = readFileSync(file, 'utf8');
++      const imports = source.match(/from\s+'[^']+'/g) ?? [];
++      for (const line of imports) {
++        expect(allowed.test(line), `${file}: посторонний импорт ${line}`).toBe(true);
++      }
++    }
++  });
++
++  it('декларация проходит дверь JS→TS (validateSettingExtension)', () => {
++    // registerTestSetting уже вызван наверху и не бросил — форма валидна;
++    // двойная регистрация отклоняется (защита от повторного импорта-регистрации)
++    expect(() => registerTestSetting(registry)).toThrow(/уже зарегистрирован/);
++  });
++});
+diff --git a/docs/architecture/derivation-contract.md b/docs/architecture/derivation-contract.md
+index 8d40eb6..1b2a785 100644
+--- a/docs/architecture/derivation-contract.md
++++ b/docs/architecture/derivation-contract.md
+@@ -118,8 +118,10 @@
+ 
+ ## Что дальше (по плану v3)
+ 
+-- **285 (МК-2)** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
+-  на этом контракте (не в тесте, а в поставке) + проводка экранов-песочниц.
+-- **286+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
++- **286 (МК-2, часть 2)** — мини-экран-кирпич: песочница, читающая значения из
++  реестра (атрибуты → производные → заклинания с гейтами). Декларация сеттинга
++  (285) сдана; вопрос владельцу — как показывать тестовый сеттинг в приложении
++  (скрытый раздел, dev-флаг, отдельный вход).
++- **287+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
+   пересчёта, Fallout-формулы переезжают из движка в `modules/fallout`,
+   починка границы движок/сеттинг.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 5a08969..b93d91e 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -31,8 +31,9 @@
+   вторые сеттинги планируются, тестовый мини-сеттинг — второй клиент контракта.
+   Прогресс серии: 279 (карта каскада) → 280 (TS-предохранители) → 281 (контракт
+   выводимости, изолирован) → 282 (семантика процентов) → 283 (фазы
+-  модификаторов: порядок объявляют правила) → 284 (режим округления:
+-  направление диктует сеттинг) — сданы; следующий — 285 (тестовый сеттинг).
++  модификаторов) → 284 (режим округления) → 285 (тестовый сеттинг в
++  поставке, без единой правки движка) — сданы; следующий — 286 (мини-экран
++  песочницы; вопрос о способе показа — владельцу).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+   отдельная фича, с конверсией не смешивать. Цель — ловить ошибки до старта
+diff --git a/docs/architecture/test-setting.md b/docs/architecture/test-setting.md
+new file mode 100644
+index 0000000..47b6c98
+--- /dev/null
++++ b/docs/architecture/test-setting.md
+@@ -0,0 +1,46 @@
++# Тестовый сеттинг (МК-2, патч 285)
++
++> Второй клиент контракта выводимости. Спека владельца — дословно в
++> `docs/architecture/cascade-map.md` §8. Критерий: сеттинг описывается
++> **регистрацией без правок движка** — патч 285 не трогает `src/` вообще,
++> это видно в диффе.
++
++## Состав (спека → реализация)
++
++| Спека владельца | Где живёт |
++|---|---|
++| 5 атрибутов | `modules/test-setting/index.js`: `ATTRIBUTES` (сила, ловкость, интеллект, дух, удача) |
++| 7 навыков | `SKILLS`, каждый с атрибутом-покровителем |
++| 5 производных (здоровье, манна, сила магии, защита, нападение) | `TEST_SETTING.derived`, `kind: 'max'/'derived'` |
++| манна = атрибут + навык | `maxMana = Интеллект + Колдовство` — формула сеттинга, дословно по спеке |
++| +5/10/15% к силе магии / защите от магии | модификаторы `'%'` на `test.derived.magicPower` / `test.derived.defense` (применяются к базе формулы, режим округления — по объявлению значения) |
++| заклинания тратят манну | `spells.js`: 5 заклинаний со стоимостью (`manaCost`) |
++| гейт «навык ранга 4» | `SPELL_REQUIREMENT` + `checkRequirements` |
++| число рангов навыка зависит от атрибута | `kind: 'rankCeiling'` для каждого навыка, ступени `RANK_BANDS` от атрибута-покровителя |
++
++Числовые правила (здоровье = 10 + Сила×2, ступени 1/4/7/10 → потолки 1/2/3/4) —
++выбор мини-сеттинга: контракту всё равно, какие формулы объявляет сеттинг.
++
++## Дверь JS→TS
++
++Сеттинг — живой JavaScript (по плану серии TS-конверсия не трогает сеттинги).
++Форма декларации проверяется при регистрации: `registerTestSetting(registry)`
++сначала зовёт `validateSettingExtension`, потом регистрирует. Кривая декларация
++падает на регистрации, а не посреди игры.
++
++## Изоляция
++
++Модуль **не импортируется работающей программой** — ни один экран, действие
++или оркестратор. Его импортирует только приёмочный тест
++`__tests__/settings/test-setting.test.js` (помечен «удалить при приживании»,
++МК-3). Тест также проверяет, что модуль не импортирует ничего из движка,
++кроме контракта и реестра, — самодостаточность декларации.
++
++## Что дальше
++
++- **286 (МК-2, часть 2)** — мини-экран-кирпич: экран песочницы, читающий
++  значения из реестра (атрибуты → производные → заклинания с гейтами);
++  вопрос владельцу — как показывать тестовый сеттинг в приложении
++  (скрытый раздел? dev-флаг? отдельный вход?).
++- **287+ (МК-3)** — подключение реестра к хранилищу: смерть 24 ручных
++  пересчётов, Fallout-формулы переезжают из движка в `modules/fallout`.
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index a763d8b..d75c315 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -85,9 +85,13 @@
+ 284  МК-1  Режим округления по слову владельца: сеттинг диктует
+            направление (math/up/down/none) — «(10+18)×1.15 может
+            стать и 32, и 33»; на значении и на фазе            (1)
+-285+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
+-           мини-экран-кирпич; критерий — без правок движка    (2–3)
+-286+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++285  МК-2  Тестовый сеттинг — декларация в поставке: modules/test-setting/
++           (живой JS на контракте), 5 атрибутов / 7 навыков / 5 производных /
++           5 заклинаний, потолки рангов, гейт ранга 4; НИ ОДНОЙ правки
++           движка (критерий виден в диффе) — сдан                   (1)
++286  МК-2  Мини-экран-кирпич песочницы: значения из реестра на экране;
++           вопрос владельцу о способе показа (dev-флаг?)            (1–2)
++287+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -158,10 +162,9 @@
+ TS — язык контракта и движка; сеттинг — живой JS.
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+-282 семантика процентов → 283 фазы модификаторов (порядок объявляют
+-правила) → 284 режим округления (направление диктует сеттинг) →
+-285 тестовый сеттинг → 286+ реализация и переезд
+-Fallout-формул в модуль → М3–М8 конверсия и экраны.
++282 семантика процентов → 283 фазы модификаторов → 284 режим округления →
++285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран →
++287+ реализация и переезд Fallout-формул в модуль → М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+ ```
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e91ae85..fc562f3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Series pivot — The test setting: the contract's second client, zero engine edits (patch 285)
++
++> Owner's word (spec verbatim, cascade map §8): «5 attributes; 5 derived values (health, mana, magic power, defense, attack); 7 skills; 5 spells. Attributes feed the derived values; spells spend mana (mana = attribute + skill); +5/10/15% to magic power / magic defense; spells gated by "skill rank 4"; the number of skill ranks depends on an attribute.»
++
++- The mini-setting became a real shipped module: `modules/test-setting/` — living JavaScript on the typed contract. Five attributes (strength, agility, intellect, spirit, luck), seven skills each with a governing attribute, five derived values, five spells with mana costs and the «Sorcery rank 4» gate, rank ceilings in bands from the governing attribute.
++- The contract's success criterion holds and is visible in the patch diff: **not a single line changed under `src/`** — the setting fit entirely onto the vocabulary sharpened by patches 282–284 (percentages from a declared base, anchor phases, rounding modes). The acceptance test (11 checks) drives the cascade: mana = Intellect + Sorcery, +5%/+10% bonuses to magic power sum into one multiplier, rank 4 is unreachable until the attribute grants ceiling 4.
++- The module is not imported by the running program — the wiring (a sandbox mini-screen) is the next patch; how to surface it (dev flag, hidden section) is a question for the owner.
++
++---
++
+ ## Series pivot — Rounding mode: the setting dictates the direction (patch 284)
+ 
+ > Owner's word (2026-09-18): «(10+18)×1.15 = 32.2 → 32 is not a mandatory state either. The setting can dictate which way the rounding goes. It can be 32 or 33. And for example at 32.01 a rule may force rounding up or down to a whole number.»
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 85e5af1..9d99f1e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Разворот серии — Тестовый сеттинг: второй клиент контракта, без правок движка (патч 285)
++
++> Слово владельца (спека дословно, карта каскада §8): «5 атрибутов; 5 производных (здоровье, манна, сила магии, защита, нападение); 7 навыков; 5 заклинаний. Атрибуты влияют на производные; заклинания тратят манну (мана = атрибут + навык); +5/10/15% к силе магии / защите от магии; заклинания с гейтом "навык ранга 4"; число рангов навыка зависит от атрибута.»
++
++- Мини-сеттинг стал настоящим модулем поставки: `modules/test-setting/` — живой JavaScript на типизированном контракте. Пять атрибутов (сила, ловкость, интеллект, дух, удача), семь навыков с атрибутами-покровителями, пять производных, пять заклинаний со стоимостью манны и гейтом «Колдовство ранга 4», потолки рангов по ступеням от атрибута.
++- Критерий контракта выдержан и виден в диффе патча: **ни одной строки правок в `src/`** — сеттинг лёг целиком на словарь, отточенный патчами 282–284 (проценты от объявленной базы, фазы-якоря, режимы округления). Приёмочный тест (11 проверок) гоняет каскад: манна = Интеллект + Колдовство, бонусы +5%/+10% к силе магии суммируются одним множителем, ранг 4 недостижим, пока атрибут не даст потолок 4.
++- Модуль не импортируется работающей программой — проводка (мини-экран песочницы) следующий патч; вопрос о способе показа (dev-флаг, скрытый раздел) — владельцу.
++
++---
++
+ ## Разворот серии — Режим округления: направление диктует сеттинг (патч 284)
+ 
+ > Слово владельца (2026-09-18): «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может диктовать, в какую сторону должно быть округление. И может быть и 32 и 33. И например при 32.01 правило будет заставлять округлить в большую или меньшую сторону до целого.»
+diff --git a/modules/test-setting/index.js b/modules/test-setting/index.js
+new file mode 100644
+index 0000000..fd47999
+--- /dev/null
++++ b/modules/test-setting/index.js
+@@ -0,0 +1,133 @@
++// ТЕСТОВЫЙ СЕТТИНГ — второй клиент контракта выводимости (МК-2, патч 285).
++//
++// Спека владельца (docs/architecture/cascade-map.md, §8 — дословно):
++//   «5 атрибутов; 5 производных (здоровье, манна, сила магии, защита,
++//    нападение); 7 навыков; 5 заклинаний. Атрибуты влияют на производные;
++//    заклинания тратят манну (мана = атрибут + навык); +5/10/15% к силе
++//    магии / защите от магии; заклинания с гейтом "навык ранга 4"; число
++//    рангов навыка зависит от атрибута.»
++//
++// КРИТЕРИЙ УСПЕХА КОНТРАКТА: сеттинг описывается РЕГИСТРАЦИЕЙ без правок
++// движка. Этот модуль — живой JavaScript (сеттинги не переписываются на TS),
++// «дверь» — типы контракта + validateSettingExtension при регистрации.
++// Модуль НЕ импортируется работающей программой: проводка (мини-экран,
++// хранилище) — патч 286 и МК-3. Патч 285 не трогает src/ вообще — критерий
++// виден в диффе патча.
++//
++// Числовые правила (здоровье = 10 + СИЛ×2 и т.п.) — выбор мини-сеттинга:
++// контракту всё равно, какие формулы пишет сеттинг.
++
++import { ceilingFor, validateSettingExtension } from '../../src/engine/contracts';
++import { SPELLS } from './spells';
++
++// --- словарь мини-мира --------------------------------------------------------
++
++export const ATTRIBUTES = [
++  { id: 'test.attr.strength', label: 'Сила' },
++  { id: 'test.attr.agility', label: 'Ловкость' },
++  { id: 'test.attr.intellect', label: 'Интеллект' },
++  { id: 'test.attr.spirit', label: 'Дух' },
++  { id: 'test.attr.luck', label: 'Удача' },
++];
++
++export const SKILLS = [
++  { id: 'test.skill.blade', label: 'Клинки', governing: 'test.attr.strength' },
++  { id: 'test.skill.bladeDefense', label: 'Защита клинком', governing: 'test.attr.agility' },
++  { id: 'test.skill.sorcery', label: 'Колдовство', governing: 'test.attr.intellect' },
++  { id: 'test.skill.magicDefense', label: 'Магическая защита', governing: 'test.attr.spirit' },
++  { id: 'test.skill.aim', label: 'Прицеливание', governing: 'test.attr.agility' },
++  { id: 'test.skill.stealth', label: 'Скрытность', governing: 'test.attr.luck' },
++  { id: 'test.skill.survival', label: 'Выживание', governing: 'test.attr.strength' },
++];
++
++/** Ступени потолка ранга от атрибута-покровителя: атрибут ≥ порога → потолок. */
++export const RANK_BANDS = [
++  { threshold: 1, ceiling: 1 },
++  { threshold: 4, ceiling: 2 },
++  { threshold: 7, ceiling: 3 },
++  { threshold: 10, ceiling: 4 },
++];
++
++export const rankCeilingId = (skillId) => `test.ceiling.${skillId.replace('test.skill.', '')}`;
++
++// --- объявление сеттинга (SettingExtension, живой JS) ------------------------
++
++export const TEST_SETTING = {
++  id: 'test',
++  parameters: [
++    ...ATTRIBUTES.map((a) => ({ id: a.id, kind: 'number', label: a.label })),
++    ...SKILLS.map((s) => ({ id: s.id, kind: 'number', label: s.label })),
++  ],
++  derived: [
++    {
++      id: 'test.derived.maxHealth',
++      kind: 'max',
++      deps: ['test.attr.strength'],
++      compute: (ctx) => 10 + ctx.values['test.attr.strength'] * 2,
++      description: 'здоровье = 10 + Сила×2',
++    },
++    {
++      id: 'test.derived.maxMana',
++      kind: 'max',
++      deps: ['test.attr.intellect', 'test.skill.sorcery'],
++      // спека дословно: «мана = атрибут + навык»
++      compute: (ctx) => ctx.values['test.attr.intellect'] + ctx.values['test.skill.sorcery'],
++      description: 'манна = Интеллект + Колдовство',
++    },
++    {
++      id: 'test.derived.magicPower',
++      kind: 'derived',
++      deps: ['test.attr.spirit', 'test.skill.sorcery'],
++      compute: (ctx) =>
++        ctx.values['test.attr.spirit'] + Math.floor(ctx.values['test.skill.sorcery'] / 2),
++      description: 'сила магии = Дух + Колдовство/2; бонусы +5/10/15% — модификаторами',
++    },
++    {
++      id: 'test.derived.defense',
++      kind: 'derived',
++      deps: ['test.attr.agility', 'test.skill.bladeDefense', 'test.skill.magicDefense'],
++      compute: (ctx) =>
++        ctx.values['test.attr.agility'] +
++        Math.floor(
++          (ctx.values['test.skill.bladeDefense'] + ctx.values['test.skill.magicDefense']) / 2,
++        ),
++      description: 'защита (от магии) = Ловкость + (Защита клинком + Магическая защита)/2',
++    },
++    {
++      id: 'test.derived.attack',
++      kind: 'derived',
++      deps: ['test.attr.strength', 'test.skill.blade', 'test.skill.aim'],
++      compute: (ctx) =>
++        ctx.values['test.attr.strength'] +
++        Math.floor((ctx.values['test.skill.blade'] + ctx.values['test.skill.aim']) / 2),
++      description: 'нападение = Сила + (Клинки + Прицеливание)/2',
++    },
++    // «число рангов навыка зависит от атрибута» — потолок ранга каждого
++    // навыка от его атрибута-покровителя (ступени RANK_BANDS)
++    ...SKILLS.map((s) => ({
++      id: rankCeilingId(s.id),
++      kind: 'rankCeiling',
++      deps: [s.governing],
++      compute: (ctx) => ceilingFor(RANK_BANDS, ctx.values[s.governing]),
++      description: `потолок ранга «${s.label}» — от ${s.governing.replace('test.attr.', '')}`,
++    })),
++  ],
++  counters: [
++    { id: 'test.counter.health', max: 'test.derived.maxHealth', label: 'здоровье' },
++    { id: 'test.counter.mana', max: 'test.derived.maxMana', label: 'манна' },
++  ],
++  requirements: SPELLS.map((spell) => spell.requirement),
++  initialModifiers: [],
++};
++
++/** Зарегистрировать мини-сеттинг в реестр движка (пакет-регистрация).
++ *  Форма проверяется ДО регистрации — дверь JS→TS. */
++export const registerTestSetting = (registry) => {
++  const errors = validateSettingExtension(TEST_SETTING);
++  if (errors.length > 0) {
++    throw new Error(`[test-setting] Декларация невалидна: ${errors.join('; ')}`);
++  }
++  registry.register(TEST_SETTING);
++};
++
++export { SPELLS };
+diff --git a/modules/test-setting/spells.js b/modules/test-setting/spells.js
+new file mode 100644
+index 0000000..572fe9f
+--- /dev/null
++++ b/modules/test-setting/spells.js
+@@ -0,0 +1,46 @@
++// ТЕСТОВЫЙ СЕТТИНГ — 5 заклинаний (данные, МК-2, патч 285).
++//
++// Заклинание тратит манну (спека: «заклинания тратят манну») и открывается
++// гейтом «навык ранга 4» (спека: «заклинания с гейтом "навык ранга 4"»).
++// Эффекты (урон, щиты) — следующий слой (мини-экран, патч 286); здесь —
++// контрактные данные: стоимость и требование.
++
++export const SPELL_REQUIREMENT = { paramId: 'test.skill.sorcery', minRank: 4 };
++
++export const SPELLS = [
++  {
++    id: 'test.spell.fireArrow',
++    name: 'Огненная стрела',
++    manaCost: 3,
++    requirement: SPELL_REQUIREMENT,
++    description: 'Выстрел сгустком огня по одной цели.',
++  },
++  {
++    id: 'test.spell.iceShield',
++    name: 'Ледяной щит',
++    manaCost: 2,
++    requirement: SPELL_REQUIREMENT,
++    description: 'Щит изо льда, гасящий входящий урон.',
++  },
++  {
++    id: 'test.spell.lightning',
++    name: 'Молния',
++    manaCost: 4,
++    requirement: SPELL_REQUIREMENT,
++    description: 'Разряд молнии по одной цели.',
++  },
++  {
++    id: 'test.spell.healing',
++    name: 'Исцеление',
++    manaCost: 3,
++    requirement: SPELL_REQUIREMENT,
++    description: 'Возвращает несколько очков здоровья.',
++  },
++  {
++    id: 'test.spell.voidStep',
++    name: 'Пустотный шаг',
++    manaCost: 5,
++    requirement: SPELL_REQUIREMENT,
++    description: 'Мгновенный перенос на короткую дистанцию.',
++  },
++];
