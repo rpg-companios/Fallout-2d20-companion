@@ -2,6 +2,16 @@
 
 ---
 
+## Series pivot — The rules sandbox: the test-setting screen, dev-only (patch 286)
+
+> Owner's word (2026-09-18): the sandbox lives only in the development environment — «don't show it in the main program at all»; a build for checking the contract.
+
+- A «Песочница» (Sandbox) tab was added (App.js, behind the `__DEV__` gate): production builds never see it; in development it runs the test setting on the derivation contract. The sandbox does not touch the character store — the tab's state is local.
+- On the screen: attributes (0–12), skills with a rank ceiling from the governing attribute (the «+» button dims at the ceiling — a rule inside a rule), +5%/+10% magic-power and +15% defense bonus toggles, derived values and counter ceilings — everything is recomputed by the registry cascade without a single manual call. Spells show why they are locked: «needs rank 4» or «not enough mana».
+- The screen's logic lives in a pure view model (`modules/test-setting/viewModel.js`) — an acceptance test (6 checks) drives it without react-native: the screen stays thin, the checkable part is separate.
+
+---
+
 ## Series pivot — The test setting: the contract's second client, zero engine edits (patch 285)
 
 > Owner's word (spec verbatim, cascade map §8): «5 attributes; 5 derived values (health, mana, magic power, defense, attack); 7 skills; 5 spells. Attributes feed the derived values; spells spend mana (mana = attribute + skill); +5/10/15% to magic power / magic defense; spells gated by "skill rank 4"; the number of skill ranks depends on an attribute.»
