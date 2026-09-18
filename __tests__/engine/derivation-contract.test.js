@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyModifiers,
+  applyPercent,
   ceilingFor,
   changedParams,
   checkRequirements,
@@ -111,17 +112,15 @@ const miniSetting = () => ({
 // --- модификаторы: договорный порядок ---------------------------------------
 
 describe('МК-1: контракт выводимости — модификаторы', () => {
-  it('порядок: set заменяет базу, потом +/-, потом суммарный %, округление в конце', () => {
-    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана, +10% и +5%
+  it('параметры: set заменяет базу, аддитивы складываются; проценты в цепочке запрещены', () => {
+    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана
     const mods = [
       { source: 'perk.bruiser', operation: '+', value: 2 },
       { source: 'armor.pa', operation: 'set', value: 11 },
       { source: 'wound.arm', operation: '-', value: 2 },
-      { source: 'perk.tough', operation: '%', value: 10 },
-      { source: 'spell.bless', operation: '%', value: 5 },
     ];
-    // set 11 → +2 −2 = 11; ×(1 + 15%) = 12.65 → 13
-    expect(applyModifiers(5, mods)).toBe(13);
+    // set 11 → +2 −2 = 11
+    expect(applyModifiers(5, mods)).toBe(11);
   });
 
   it('без модификаторов значение возвращается как есть', () => {
@@ -134,6 +133,54 @@ describe('МК-1: контракт выводимости — модификат
       { source: 'armor.advanced', operation: 'set', value: 13 },
     ];
     expect(applyModifiers(5, mods)).toBe(13);
+  });
+});
+
+// --- проценты: всегда от объявленной базы (слово владельца, 2026-09-18) ------
+
+describe('МК-1: проценты — от объявленной базы', () => {
+  it('слово владельца: +15% жизней = база ОЗ × 1.15, округлённая математически', () => {
+    // applyPercent(база, проценты): чистая функция и для производных, и для
+    // будущих каналов урона
+    expect(applyPercent(26, [15])).toBe(30); // 26 × 1.15 = 29.9 → 30
+  });
+
+  it('слово владельца: +15% защиты от магии огня = −15% входящего урона огня', () => {
+    expect(applyPercent(100, [-15])).toBe(85);
+  });
+
+  it('несколько процентов суммируются и применяются одним множителем', () => {
+    expect(applyPercent(40, [10, 5])).toBe(46); // 40 × 1.15 = 46
+  });
+
+  it('реестр: процент на id производного применяется к его базе при каскаде', () => {
+    const registry = createDerivationRegistry();
+    registry.register(miniSetting());
+    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
+    // ОЗ = 10 + СИЛ×2 = 26; +15% → 29.9 → 30
+    const { values } = registry.evaluate(baseState, {
+      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+    });
+    expect(values['test.derived.maxHealth']).toBe(30);
+    // потолок счётчика тянет производное с процентом
+    expect(registry.evaluate(baseState, {
+      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+    }).ceilings['test.counter.health']).toBe(30);
+  });
+
+  it('процент в аддитивной цепочке параметра отклоняется', () => {
+    expect(() => applyModifiers(8, [{ source: 'x', operation: '%', value: 15 }])).toThrow(/процент всегда привязан к базе/);
+  });
+
+  it('аддитив на id производного отклоняется: смешивание запрещено', () => {
+    const registry = createDerivationRegistry();
+    registry.register(miniSetting());
+    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
+    expect(() =>
+      registry.evaluate(baseState, {
+        'test.derived.maxHealth': [{ source: 'x', operation: '+', value: 5 }],
+      }),
+    ).toThrow(/только проценты/);
   });
 });
 
@@ -261,17 +308,18 @@ describe('МК-1: реестр — каскад по мини-сеттингу (
     expect(ceilings['test.counter.mana']).toBe(11);
   });
 
-  it('модификаторы каскадируются: атрибут с бонусом тянет производные', () => {
+  it('модификаторы каскадируются: аддитив на атрибуте, процент на производном', () => {
     const modifiers = {
       [attr('strength')]: [
-        { source: 'spell.might', operation: '%', value: 15 },
+        { source: 'spell.might', operation: '+', value: 2 },
         { source: 'wound.arm', operation: '-', value: 1 },
       ],
+      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
     };
     const { values } = registry.evaluate(baseState, modifiers);
-    // СИЛ: (8 − 1) × 1.15 = 8.05 → 8
-    expect(values[attr('strength')]).toBe(8);
-    expect(values['test.derived.maxHealth']).toBe(10 + values[attr('strength')] * 2);
+    // СИЛ: 8 + 2 − 1 = 9; ОЗ = (10 + 9×2) × 1.15 = 32.2 → 32
+    expect(values[attr('strength')]).toBe(9);
+    expect(values['test.derived.maxHealth']).toBe(32);
   });
 
   it('топологический порядок: все производные входят в порядок', () => {

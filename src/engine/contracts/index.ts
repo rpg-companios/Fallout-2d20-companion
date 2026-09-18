@@ -20,6 +20,7 @@ export type {
 } from './bands';
 export {
   applyModifiers,
+  applyPercent,
 } from './parameter';
 export type {
   ModifierBag,

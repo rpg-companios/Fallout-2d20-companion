@@ -15,7 +15,7 @@
 //   - цикл в графе зависимостей — ошибка регистрации, а не вечный цикл;
 //   - evaluate чистая: снимок на входе, новый снимок на выходе.
 
-import { applyModifiers } from '../contracts/parameter';
+import { applyModifiers, applyPercent } from '../contracts/parameter';
 import type { ModifierBag } from '../contracts/parameter';
 import type { DerivationContext, DerivedDefinition } from '../contracts/derived';
 import type { CounterDefinition } from '../contracts/counter';
@@ -181,7 +181,20 @@ export const createDerivationRegistry = (): DerivationRegistry => {
     for (const id of topo) {
       const def = derived.get(id)!;
       try {
-        values[id] = def.compute(ctx);
+        let value = def.compute(ctx);
+        // Проценты — к базе производного (слово владельца: «+15% жизней =
+        // базовое значение ОЗ × 1.15, округлённое математически до целого»).
+        // К производному применяются ТОЛЬКО проценты: аддитивы живут
+        // на параметрах, смешивание запрещено.
+        const percents: number[] = [];
+        for (const mod of modifiers[id] ?? []) {
+          if (mod.operation !== '%') {
+            fail(`модификатор "${mod.operation}" на производном "${id}": к базе производного применяются только проценты (аддитивы — на параметрах)`);
+          }
+          percents.push(mod.value);
+        }
+        if (percents.length > 0) value = applyPercent(value, percents);
+        values[id] = value;
       } catch (err) {
         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
       }
