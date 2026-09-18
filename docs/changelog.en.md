@@ -2,6 +2,16 @@
 
 ---
 
+## Series pivot — The test setting: the contract's second client, zero engine edits (patch 285)
+
+> Owner's word (spec verbatim, cascade map §8): «5 attributes; 5 derived values (health, mana, magic power, defense, attack); 7 skills; 5 spells. Attributes feed the derived values; spells spend mana (mana = attribute + skill); +5/10/15% to magic power / magic defense; spells gated by "skill rank 4"; the number of skill ranks depends on an attribute.»
+
+- The mini-setting became a real shipped module: `modules/test-setting/` — living JavaScript on the typed contract. Five attributes (strength, agility, intellect, spirit, luck), seven skills each with a governing attribute, five derived values, five spells with mana costs and the «Sorcery rank 4» gate, rank ceilings in bands from the governing attribute.
+- The contract's success criterion holds and is visible in the patch diff: **not a single line changed under `src/`** — the setting fit entirely onto the vocabulary sharpened by patches 282–284 (percentages from a declared base, anchor phases, rounding modes). The acceptance test (11 checks) drives the cascade: mana = Intellect + Sorcery, +5%/+10% bonuses to magic power sum into one multiplier, rank 4 is unreachable until the attribute grants ceiling 4.
+- The module is not imported by the running program — the wiring (a sandbox mini-screen) is the next patch; how to surface it (dev flag, hidden section) is a question for the owner.
+
+---
+
 ## Series pivot — Rounding mode: the setting dictates the direction (patch 284)
 
 > Owner's word (2026-09-18): «(10+18)×1.15 = 32.2 → 32 is not a mandatory state either. The setting can dictate which way the rounding goes. It can be 32 or 33. And for example at 32.01 a rule may force rounding up or down to a whole number.»
