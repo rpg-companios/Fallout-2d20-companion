@@ -284,7 +284,7 @@ function App() {
                           }}
                         />
                       </>
-                        ) : null}
+                    ) : null}
                   </Tab.Navigator>
                 </SafeAreaView>
               </ImageBackground>
