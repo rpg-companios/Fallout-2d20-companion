@@ -2,6 +2,18 @@
 
 ---
 
+## Fix — SPECIAL attribute order aligned with the rules (patch 289)
+
+> Owner's word (2026-09-21): «the attributes must go exactly this way and no other — Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck».
+
+- The order `STR, END, PER, AGI, INT, CHA, LCK` had been in the code since the project's very first commits — the rules' canon `STR, PER, END, CHA, INT, AGI, LCK` never existed in the repo (verified with `git log -S` over the whole history). Nobody «changed» it — it was born wrong.
+- Every place defining the order is fixed: `CANONICAL_ATTRIBUTE_KEYS` and `createInitialAttributes` (domain/characterCreation.js), `PERK_ATTRIBUTE_FILTER_CODES` (domain/perks.js — perk filters), literals in effects.js and the migrations.
+- `selectLegacyAttributes` (src/store/selectors.js) sorts its output by the canon — old saves stored in the historical order display correctly, and re-saving writes the canonical order (saves self-heal).
+- Fuse: `__tests__/domain/special-attribute-order.test.js` — 6 checks; any new place defining attribute order must match the canon.
+- Also: App.js indentation restored to main (a cosmetic leftover of the 286–288 cycle).
+
+---
+
 ## Cleanup — The sandbox screen removed: the setting is virtual, no UI needed (patch 288)
 
 > Owner's word (2026-09-18): «do I even need this screen if the setting is virtual, unconnected to reality, and I'm not going to wire it?» No — removed.

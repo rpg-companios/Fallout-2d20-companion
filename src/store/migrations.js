@@ -973,11 +973,11 @@ const MIGRATIONS = [
 
     const SHADOW_START = {
       STR: 6, // 4 + бонус 2
-      END: 6,
       PER: 4,
-      AGI: 4,
-      INT: 4,
+      END: 6,
       CHA: 4,
+      INT: 4,
+      AGI: 4,
       LCK: 4,
     };
     next.attributes = attrs.map((attr) => {
@@ -1016,7 +1016,7 @@ const MIGRATIONS = [
     const originId = typeof next.origin === 'string' ? next.origin : next.origin?.id;
     if (traitId !== 'shadow' && originId !== 'shadow') return next;
 
-    const SHADOW_START = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    const SHADOW_START = { STR: 6, PER: 4, END: 6, CHA: 4, INT: 4, AGI: 4, LCK: 4 };
     next.attributes = next.attributes.map((attr) => {
       if (!attr || typeof attr !== 'object') return attr;
       const name = String(attr.name || '').toUpperCase();
@@ -1098,7 +1098,7 @@ const MIGRATIONS = [
     }
     next.trait = { ...trait, modifiers: newModifiers };
 
-    const start = { STR: 6, END: 6, PER: 4, AGI: 4, INT: 4, CHA: 4, LCK: 4 };
+    const start = { STR: 6, PER: 4, END: 6, CHA: 4, INT: 4, AGI: 4, LCK: 4 };
     if (Array.isArray(next.attributes)) {
       next.attributes = next.attributes.map((a) =>
         a && typeof a === 'object' && start[a.name] !== undefined

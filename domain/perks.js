@@ -49,7 +49,9 @@ const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites || 
 const getLevelRequirement = (req) => req.char_lvl ?? req.level;
 const getAttributeRequirements = (req) => req.attributes || req.special || {};
 
-export const PERK_ATTRIBUTE_FILTER_CODES = ['STR', 'END', 'PER', 'AGI', 'INT', 'CHA', 'LCK'];
+// Порядок фильтров = канон SPECIAL (слово владельца 2026-09-21): STR, PER,
+// END, CHA, INT, AGI, LCK. Единый источник порядка — CANONICAL_ATTRIBUTE_KEYS.
+export const PERK_ATTRIBUTE_FILTER_CODES = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
 
 export function getPerkAttributeRequirementCodes(perk) {
     const spec = getAttributeRequirements(getPrerequisites(perk));
