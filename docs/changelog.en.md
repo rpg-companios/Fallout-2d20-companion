@@ -2,6 +2,31 @@
 
 ---
 
+## Feature — universal ammo spend per shot (patch 296)
+
+Per-shot ammo consumption is now computed by the `mechAmmoSpend` mechanism
+(domain/mechAmmoSpend.js) — a sum of conditions, each either:
+
+- **unconditional** — always spent, no questions asked: ammo-hungry
+  (`ammo-hungry_x`, "spends X per shot");
+- **asked** — the condition has a ceiling; the ammo cell asks "how many
+  of the available charges to spend", and the confirmed amount is
+  deducted: the Assaultron head laser capacitor (`ammoPerAttack`,
+  Mk III–VI = 3–6 charges per attack) and the laser musket crank
+  (`crank_x`, 1–4 cranks).
+
+A weapon with no special conditions spends one charge per shot, as before.
+A new spend rule is a new reader in the mechanism; the ammo-cell contract
+does not change. Robot slot weapons (not inventory items) can now spend
+charges too: `spendAmmoForWeapon` gained an `untrackedWeapon` mode —
+spending without durability-wear tracking. The confirmation dialog lives
+in the weapon card's AMMO cell (the "−" button).
+
+Locked by 12 checks in `__tests__/domain/mech-ammo-spend.test.js`
+(unconditional, asks, ceiling clamped by availability, hungry+ask combo,
+head laser with Mk VI restored from a slot, musket with the four-crank
+capacitor and without mods).
+
 ## Fix — Installed robot-weapon mod survived only until save (patch 294)
 
 `toModIds` (domain/robotSlots.js) checked the `modIds` array first — even an

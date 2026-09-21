@@ -538,15 +538,20 @@ const useCharacterStore = create(devtools(
       },
 
       /** Spend ammunition and update weapon wear in one state transaction. */
-      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots }) => {
+      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots, untrackedWeapon = false }) => {
         const state = get();
-        const weapon = state.items[weaponInstanceId];
+        const weapon = state.items[weaponInstanceId] || null;
         const amount = Math.max(1, Math.floor(Number(ammoAmount) || 1));
-        if (!weapon) return { ok: false, reason: 'weapon-not-found' };
-        const trackedWeapon = durabilityEnabled && !weapon.durabilityTracked
+        // Робо-оружие слотов — не предмет инвентаря: списываем заряды без
+        // записи износа (untrackedWeapon). Инвентарное оружие без записи —
+        // ошибка, как и раньше.
+        if (!weapon && !untrackedWeapon) return { ok: false, reason: 'weapon-not-found' };
+        // Износ прочности — только для предметов инвентаря.
+        const trackDurability = durabilityEnabled && !!weapon;
+        const trackedWeapon = trackDurability && !weapon.durabilityTracked
           ? { ...weapon, durabilityTracked: true, durability: 100, durabilityAmmoRemainder: 0, durabilityWearRemainder: 0 }
           : weapon;
-        if (durabilityEnabled && Number(trackedWeapon.durability) <= 0) {
+        if (trackDurability && Number(trackedWeapon.durability) <= 0) {
           return { ok: false, reason: 'broken' };
         }
 
@@ -567,7 +572,7 @@ const useCharacterStore = create(devtools(
           else items[itemId] = { ...ammo, quantity: quantity - spent };
           remaining -= spent;
         }
-        if (durabilityEnabled) {
+        if (trackDurability) {
           items[weaponInstanceId] = { ...trackedWeapon, ...applyWeaponWear(trackedWeapon, amount, baseLossPer10Shots) };
         }
         set({ items });

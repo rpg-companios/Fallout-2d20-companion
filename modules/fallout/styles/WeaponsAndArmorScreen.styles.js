@@ -301,6 +301,35 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   robotBodyModalButtonText: { color: '#fff', fontWeight: '700' },
+  weaponAmmoAskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginVertical: 6,
+  },
+  weaponAmmoAskLabel: {
+    fontSize: 14,
+    color: '#333',
+  },
+  weaponAmmoAskUpTo: {
+    fontSize: 12,
+    color: '#888',
+  },
+  weaponAmmoAskValue: {
+    minWidth: 28,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+  },
+  weaponAmmoSpendCancelBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  weaponAmmoSpendCancelBtnText: {
+    color: '#005A9C',
+    fontWeight: '700',
+  },
   weaponAmmoCellContainer: {
     flex: 1,
     flexDirection: 'row',

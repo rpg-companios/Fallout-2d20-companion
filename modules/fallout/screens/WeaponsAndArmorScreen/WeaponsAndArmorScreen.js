@@ -19,6 +19,7 @@ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../doma
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot } from '../../../../domain/robotSlots';
+import { mechAmmoSpendForWeapon } from '../../../../domain/mechAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
@@ -144,38 +145,130 @@ const RadiationCounter = ({ isEnabled }) => {
   );
 };
 
-const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
+// Диалог утверждения расхода (патч 296): условия с запросом — заводная
+// рукоятка, конденсатор — спрашивают «сколько максимум из доступного
+// потратить», безусловная часть (пожиратель патронов) показывается как
+// есть. Списывается утверждённое количество.
+const WeaponAmmoSpendDialog = ({ ask, available, onClose, onConfirm }) => {
+  const [answers, setAnswers] = useState(null);
+  useEffect(() => {
+    setAnswers(ask ? ask.plan.asks.map(() => 1) : null);
+  }, [ask]);
+  if (!ask || !answers) return null;
+  const { plan } = ask;
+  const total = plan.totalFor(answers);
+  const sourceLabel = (source) => (source === 'crank'
+    ? tWeaponsAndArmorScreen('weapon.ammoSpend.crank')
+    : tWeaponsAndArmorScreen('weapon.ammoSpend.capacitor'));
+  const change = (index, delta) => {
+    setAnswers((prev) => prev.map((value, i) => {
+      if (i !== index) return value;
+      const ceiling = Math.max(1, plan.asks[i].maxAvailable);
+      return Math.min(Math.max(1, value + delta), ceiling);
+    }));
+  };
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={localStyles.modalOverlay}>
+        <View style={localStyles.robotBodyModalContent}>
+          <Text style={localStyles.robotBodyModalTitle}>{tWeaponsAndArmorScreen('weapon.ammoSpend.title')}</Text>
+          <Text style={localStyles.robotBodyModalText}>
+            {`${tWeaponsAndArmorScreen('weapon.ammoSpend.available')}: ${available}`}
+          </Text>
+          {plan.fixed > 0 ? (
+            <Text style={localStyles.weaponAmmoAskLabel}>
+              {`${tWeaponsAndArmorScreen('weapon.ammoSpend.unconditional')}: ${plan.fixed}`}
+            </Text>
+          ) : null}
+          {plan.asks.map((askItem, index) => (
+            <View key={`${askItem.source}-${askItem.modId ?? index}`} style={localStyles.weaponAmmoAskRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={localStyles.weaponAmmoAskLabel}>{sourceLabel(askItem.source)}</Text>
+                <Text style={localStyles.weaponAmmoAskUpTo}>
+                  {`${tWeaponsAndArmorScreen('weapon.ammoSpend.upTo')} ${askItem.maxAvailable}`}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.counterButton, answers[index] <= 1 && { opacity: 0.5 }]}
+                disabled={answers[index] <= 1}
+                onPress={() => change(index, -1)}
+              >
+                <Text style={styles.counterButtonText}>-</Text>
+              </TouchableOpacity>
+              <Text style={localStyles.weaponAmmoAskValue}>{answers[index]}</Text>
+              <TouchableOpacity
+                style={[styles.counterButton, answers[index] >= askItem.maxAvailable && { opacity: 0.5 }]}
+                disabled={answers[index] >= askItem.maxAvailable}
+                onPress={() => change(index, 1)}
+              >
+                <Text style={styles.counterButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
+            <TouchableOpacity style={localStyles.weaponAmmoSpendCancelBtn} onPress={onClose}>
+              <Text style={localStyles.weaponAmmoSpendCancelBtnText}>
+                {tWeaponsAndArmorScreen('weapon.ammoSpend.cancel')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[localStyles.robotBodyModalButton, { marginLeft: 12 }, total < 1 && { opacity: 0.5 }]}
+              disabled={total < 1}
+              onPress={() => onConfirm(total)}
+            >
+              <Text style={localStyles.robotBodyModalButtonText}>
+                {`${tWeaponsAndArmorScreen('weapon.ammoSpend.confirm')} ${total}`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapon, untrackedWeapon }) => {
   const storeItems = useCharacterStore((state) => state.items);
   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
   const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const baseLossPer10Shots = useAppSettingsStore(selectWeaponDurabilityLossPer10Shots);
+  // Открытый запрос расхода: { plan }
+  const [ask, setAsk] = useState(null);
 
   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
-  let ammoPerShot = 1;
-  let parsedQ = qualities;
-  if (typeof parsedQ === 'string') {
-    try { parsedQ = JSON.parse(parsedQ); } catch { parsedQ = []; }
-  }
-  if (Array.isArray(parsedQ)) {
-    const hungryQ = parsedQ.find(q => q?.qualityId === 'quality_ammo-hungry_x');
-    if (hungryQ?.value != null) ammoPerShot = Math.max(1, Number(hungryQ.value) || 1);
-  }
   const ammoItems = Object.values(storeItems || {}).filter(
     item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
   );
   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const isBroken = durabilityLossEnabled && Number(durability) <= 0;
-  const canSpend = totalAmmo >= ammoPerShot && !isBroken;
 
-  const handleSpend = () => {
-    if (!canSpend) return;
+  // Универсальный механизм расхода (domain/mechAmmoSpend.js):
+  // mechAmmoSpend = [безусловные условия] + [условия с запросом].
+  // Пожиратель патронов списывает безусловно; рукоятка и конденсатор
+  // спрашивают пользователя и списывают утверждённое.
+  const plan = mechAmmoSpendForWeapon(weapon || { qualities }, { available: totalAmmo });
+  const needAsk = plan.asks.length > 0;
+  const minNeed = needAsk ? 1 : plan.fixed;
+  const canSpend = totalAmmo >= minNeed && !isBroken;
+
+  const doSpend = (amount) => {
     spendAmmoForWeapon({
       weaponInstanceId,
       ammoIds,
-      ammoAmount: ammoPerShot,
+      ammoAmount: amount,
       durabilityEnabled: durabilityLossEnabled,
       baseLossPer10Shots,
+      untrackedWeapon,
     });
+  };
+
+  const handleSpend = () => {
+    if (!canSpend) return;
+    if (needAsk) {
+      setAsk({ plan });
+      return;
+    }
+    doSpend(plan.fixed);
   };
 
   return (
@@ -184,6 +277,15 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => 
         <Text style={localStyles.weaponAmmoBtnText}>−</Text>
       </TouchableOpacity>
       <Text style={localStyles.weaponAmmoCount}>{totalAmmo}</Text>
+      <WeaponAmmoSpendDialog
+        ask={ask}
+        available={totalAmmo}
+        onClose={() => setAsk(null)}
+        onConfirm={(amount) => {
+          doSpend(amount);
+          setAsk(null);
+        }}
+      />
     </View>
   );
 };
@@ -504,7 +606,7 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
       { label: tWeaponsAndArmorScreen('weapon.fields.range'), value: rangeValue },
       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
       ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
-      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
+      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue, weapon: displayWeapon, untrackedWeapon: !displayWeapon.instanceId }] : []),
       ...((displayWeapon?.withoutMods || mk2Blocked) ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
     ];
   
@@ -528,7 +630,7 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
             <View key={index} style={[localStyles.weaponStatRow, { borderBottomWidth: 1 }]}>
               <Text style={localStyles.weaponStatLabel}>{stat.label}</Text>
               {stat.type === 'ammo' ? (
-                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} />
+                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} weapon={stat.weapon} untrackedWeapon={stat.untrackedWeapon} />
               ) : stat.type === 'button' ? (
                 <TouchableOpacity 
                   style={localStyles.weaponModificationButton}
