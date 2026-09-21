@@ -19,7 +19,7 @@ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../doma
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot } from '../../../../domain/robotSlots';
-import { mechAmmoSpendForWeapon } from '../../../../domain/mechAmmoSpend';
+import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
@@ -157,9 +157,9 @@ const WeaponAmmoSpendDialog = ({ ask, available, onClose, onConfirm }) => {
   if (!ask || !answers) return null;
   const { plan } = ask;
   const total = plan.totalFor(answers);
-  const sourceLabel = (source) => (source === 'crank'
-    ? tWeaponsAndArmorScreen('weapon.ammoSpend.crank')
-    : tWeaponsAndArmorScreen('weapon.ammoSpend.capacitor'));
+  // Метка запроса — по ключу источника: формула качества живёт в модуле
+  // (modules/fallout/weapons/weaponAmmoSpend.js), её источник = её ключ i18n.
+  const sourceLabel = (source) => tWeaponsAndArmorScreen(`weapon.ammoSpend.source.${source}`);
   const change = (index, delta) => {
     setAnswers((prev) => prev.map((value, i) => {
       if (i !== index) return value;

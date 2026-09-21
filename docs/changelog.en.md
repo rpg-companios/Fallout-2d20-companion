@@ -2,6 +2,33 @@
 
 ---
 
+## Architecture — Ammo-spend formulas moved into the module (patch 298)
+
+Owner's rule: a formula bound to a specific weapon quality is a MODULE
+formula, not an engine one. Qualities live in the module; their spend
+formulas live next to them. A formula applies while the quality is on
+the weapon and disappears together with it (the enrichment pipeline
+puts on and takes off mod qualities).
+
+- `domain/mechAmmoSpend.js` removed: the engine (ammo-cell screen +
+  `characterStore.spendAmmoForWeapon`) now knows only the plan contract
+  `{ fixed, asks, totalFor }`;
+- formulas live in `modules/fallout/weapons/weaponAmmoSpend.js`:
+  `quality_ammo-hungry_x` (unconditional), `quality_crank_x` (ask up
+  to X), the robot-weapon capacitor's `ammoPerAttack` (ask up to X);
+- a new quality = 2 edits: a reader in the module after the crank_x
+  pattern + a `weapon.ammoSpend.source.<source>` i18n key (ru/en);
+  the dialog label is resolved by the source key — the screen no
+  longer knows the list of sources;
+- the module header carries the recipe, using semi-auto as the example
+  (`quality_semi-auto_x`, "1 to 3 shots at once").
+
+Locked by 14 checks in `__tests__/weapons/weapon-ammo-spend.test.js`,
+including the new "formula applies and disappears with the quality"
+group: musket with the four-crank capacitor (enrichment puts on
+crank_x → the ask appears), without the mod and after removal (no
+formula), head laser with Mk VI and without. Suite 825/825, tsc clean.
+
 ## Feature — universal ammo spend per shot (patch 296)
 
 Per-shot ammo consumption is now computed by the `mechAmmoSpend` mechanism

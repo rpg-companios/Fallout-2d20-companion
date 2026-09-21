@@ -42,8 +42,10 @@
     "ammoSpend": {
       "title": "Ammo spend",
       "available": "Charges available",
-      "crank": "Crank",
-      "capacitor": "Capacitor",
+      "source": {
+        "crank": "Crank",
+        "capacitor": "Capacitor"
+      },
       "upTo": "spend up to",
       "unconditional": "Unconditional",
       "cancel": "Cancel",

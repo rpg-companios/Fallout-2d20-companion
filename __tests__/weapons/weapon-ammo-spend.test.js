@@ -1,12 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { buildMechAmmoSpend, mechAmmoSpendForWeapon } from '../../domain/mechAmmoSpend';
+import { buildMechAmmoSpend, mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
+import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 import { deserializeSlot } from '../../domain/robotSlots';
 import { SETTING } from '../../modules/fallout/index.js';
 
 const MK_VI = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi';
 const LASER = 'robot_weapon_assaultron_head_laser';
+// 4-оборотный конденсатор лазерного мушкета: gain quality_crank_x = 4
+const MUSKET_CRANK_MOD = 'mod_050';
 
-describe('универсальный механизм списания зарядов (296)', () => {
+const musketCatalog = {
+  weapons: SETTING.data.equipment.weapons,
+  weaponMods: SETTING.data.equipment.weaponMods,
+};
+
+const musket = () => SETTING.data.equipment.weapons.find((w) => w.id === 'weapon_laser_musket');
+
+describe('формулы расхода зарядов в модуле (296/298)', () => {
   it('оружие без особых условий: один заряд за выстрел', () => {
     const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_two-handed' }] });
     expect(plan.fixed).toBe(1);
@@ -21,7 +31,7 @@ describe('универсальный механизм списания заря�
     expect(plan.totalFor()).toBe(10);
   });
 
-  it('пожиратель без значения: один заряд (как до патча)', () => {
+  it('пожиратель без значения: один заряд', () => {
     const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_ammo-hungry_x' }] });
     expect(plan.fixed).toBe(1);
   });
@@ -43,7 +53,6 @@ describe('универсальный механизм списания заря�
       available: 2,
     });
     expect(plan.asks[0].maxAvailable).toBe(2);
-    // ответ выше доступного зажимается
     expect(plan.totalFor([9])).toBe(2);
   });
 
@@ -79,7 +88,33 @@ describe('универсальный механизм списания заря�
   });
 });
 
-describe('план списания для оружия экрана (296)', () => {
+describe('формула применяется и исчезает вместе с качеством (298)', () => {
+  it('мушкет с 4-оборотным конденсатором: обогащение надевает crank_x — запрос есть', () => {
+    const withMod = resolveWeaponWithAppliedMods(
+      { ...musket(), appliedMods: { Capacitor: MUSKET_CRANK_MOD } },
+      musketCatalog,
+    );
+    const plan = mechAmmoSpendForWeapon(withMod, { available: 5 });
+    expect(plan.asks).toEqual([{ source: 'crank', max: 4, maxAvailable: 4 }]);
+    expect(plan.fixed).toBe(0);
+  });
+
+  it('мушкет без мода: качества нет — формулы нет, обычный выстрел', () => {
+    const plan = mechAmmoSpendForWeapon(musket(), { available: 5 });
+    expect(plan.fixed).toBe(1);
+    expect(plan.asks).toEqual([]);
+  });
+
+  it('мушкет после снятия мода: качество снято обогащением — запрос исчез', () => {
+    const withoutMod = resolveWeaponWithAppliedMods(
+      { ...musket(), appliedMods: {} },
+      musketCatalog,
+    );
+    const plan = mechAmmoSpendForWeapon(withoutMod, { available: 5 });
+    expect(plan.fixed).toBe(1);
+    expect(plan.asks).toEqual([]);
+  });
+
   it('Головной лазер с Mk VI из восстановления слота: запрос до 6', () => {
     const saved = {
       content: 'robot_arm_assaultron',
@@ -94,20 +129,16 @@ describe('план списания для оружия экрана (296)', () 
     expect(plan.totalFor([6])).toBe(6);
   });
 
-  it('лазерный мушкет с 4-оборотным конденсатором: рукоятка до 4, без конденсаторного запроса', () => {
-    const musket = SETTING.data.equipment.weapons.find((w) => w.id === 'weapon_laser_musket');
-    // так выглядит оружие после мода: качество crank_x добавлено модом mod_050
-    const plan = mechAmmoSpendForWeapon(
-      { ...musket, qualities: [...(musket.qualities || []), { qualityId: 'quality_crank_x', value: 4 }] },
-      { available: 5 },
-    );
-    expect(plan.asks).toEqual([{ source: 'crank', max: 4, maxAvailable: 4 }]);
-    expect(plan.fixed).toBe(0);
-  });
-
-  it('мушкет без модов: обычный выстрел, один заряд', () => {
-    const musket = SETTING.data.equipment.weapons.find((w) => w.id === 'weapon_laser_musket');
-    const plan = mechAmmoSpendForWeapon(musket, { available: 5 });
+  it('Головной лазер без конденсатора: формулы нет, один заряд', () => {
+    const saved = {
+      content: 'robot_arm_assaultron',
+      armorLayers: { frame: null, plating: null, armor: null },
+      heldWeaponId: LASER,
+      heldWeaponMods: [],
+      installedWeapons: [],
+    };
+    const onScreen = deserializeSlot(saved);
+    const plan = mechAmmoSpendForWeapon(onScreen.heldWeapon, { available: 12 });
     expect(plan.fixed).toBe(1);
     expect(plan.asks).toEqual([]);
   });
