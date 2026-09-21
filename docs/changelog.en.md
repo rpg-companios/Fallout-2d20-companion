@@ -2,6 +2,18 @@
 
 ---
 
+## Fix — Assaultron head laser capacitors in the install modal (patch 293)
+
+> Owner report (2026-09-21): "The Assaultron doesn't get mods for the head laser. They're missing from the weapon modification modal" (patch 292 applied).
+
+- Cause: 290–291 wired the capacitors into data, catalog and registry, but `db/catalogSource.js` — the row source for the install modal — never saw them: mod-slot rows came from human `weapon_mod_slots.json` plus `ROBOT_WEAPON_BASE_MAP` inheritance (3 legacy robot weapons), while the robot's own slots file was unread; robot mods were absent from mod rows.
+- Wiring: mod rows = human + robot mods (names already id-merged in the catalog, 290); mod-slot rows = human + inheritance + robot-owned slots (robot-owned wins). The modal itself is untouched: slots/mods/preview (including `damageModifier` +1..4 DC) all flow through the common path.
+- Guard: +4 install-path checks in `__tests__/robot/assaultron-head-laser-mods.test.js` (slot = Capacitor; exactly 4 capacitors in rank order; resolve by id with name/cost/weight/requirements; no leakage into human weapon slots).
+- Bonus from the white-screen diagnostics: `__tests__/debug/app-boot.test.js` — boot spine (App.js non-UI graph in load order; react-native modules excluded — the bundle build covers those).
+
+---
+
+
 ## Architecture — Setting door and unified contract (patch 292)
 
 > Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").

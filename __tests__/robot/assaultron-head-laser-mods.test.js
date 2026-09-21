@@ -17,6 +17,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { SETTING } from '../../modules/fallout/index.js';
+import {
+  catalogGetModsForWeaponSlot,
+  catalogGetSlotsForWeapon,
+  catalogGetWeaponModById,
+} from '../../db/catalogSource';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
 const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
@@ -118,5 +123,36 @@ describe('уникальные моды Головного лазера Штур
       expect(byId(ruWeaponMods, mod.id), `ru i18n для ${mod.id}`).toBeTruthy();
       expect(byId(enWeaponMods, mod.id), `en i18n для ${mod.id}`).toBeTruthy();
     }
+  });
+});
+
+describe('установка: модалка модернизации получает конденсаторы (293)', () => {
+  it('слоты лазера — Capacitor (через catalogGetSlotsForWeapon, как у людей)', () => {
+    expect(catalogGetSlotsForWeapon('robot_weapon_assaultron_head_laser')).toEqual(['Capacitor']);
+  });
+
+  it('на слоте ровно четыре конденсатора по возрастанию ранга', () => {
+    const mods = catalogGetModsForWeaponSlot('robot_weapon_assaultron_head_laser', 'Capacitor');
+    expect(mods.map((m) => m.id)).toEqual([
+      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii',
+      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv',
+      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v',
+      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi',
+    ]);
+  });
+
+  it('мод resolveается по id: имя, стоимость, вес, слот, требования', () => {
+    const row = catalogGetWeaponModById('robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii');
+    expect(row).toBeTruthy();
+    expect(['Конденсатор Mk III', 'Capacitor Mk III']).toContain(row.name); // локаль окружения
+    expect(row.cost).toBe(4);
+    expect(row.weight).toBe('0');
+    expect(row.slot).toBe('Capacitor');
+    expect(row.perk_1).toBe('Robotics Expert 1');
+    expect(row.damageModifier).toEqual({ op: '+', value: 1 });
+  });
+
+  it('робо-моды не утекают в людские слоты: у обычного оружия Capacitor пуст', () => {
+    expect(catalogGetModsForWeaponSlot('weapon_002', 'Capacitor')).toEqual([]);
   });
 });
