@@ -1,0 +1,480 @@
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+new file mode 100644
+index 0000000..711b939
+--- /dev/null
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -0,0 +1,108 @@
++// Предохранитель данных: уникальные моды Головного лазера Штурмотрона.
++//
++// Слово владельца (2026-09-21): добавить уникальные моды для Головного лазера
++// Штурмотрона — именно «Головной лазер» (не «Лазер головы» и никак иначе;
++// английское название не меняется). Это оружие роботов, моды подходят только
++// к «robot_weapon_assaultron_head_laser» и живут отдельно от оружия.
++// Оперировать только данными: файл модов оружия роботов создан по аналогии
++// с оружием людей (weapon_mods.json + weapon_mod_slots.json + i18n ru/en).
++//
++// Таблица (источник — правила):
++//   Mk III: +1 DC, 3 заряда/атаку, вес —,   cost +4,  Robotics Expert
++//   Mk IV:  +2 DC, 4 заряда/атаку, вес +1,  cost +8,  Robotics Expert, Science! 1
++//   Mk V:   +3 DC, 5 зарядов/атаку, вес +1,  cost +12, Robotics Expert, Science! 2
++//   Mk VI:  +4 DC, 6 зарядов/атаку, вес +2,  cost +16, Robotics Expert, Science! 3
++// «Robotics Expert» без ранга в таблице записан как ранг 1 — по конвенции
++// данных оружия роботов («Robotics Expert 1»).
++
++import { describe, it, expect } from 'vitest';
++import robotWeaponMods from '../../modules/fallout/data/equipment/robot/weapon_mods.json';
++import robotWeaponModSlots from '../../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
++import ruWeaponMods from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
++import enWeaponMods from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
++import ruRobotWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
++import enRobotWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
++import robotWeaponsData from '../../modules/fallout/data/equipment/robot/weapons.json';
++
++const LASER_ID = 'robot_weapon_assaultron_head_laser';
++
++const EXPECTED = [
++  { suffix: 'mk_iii', damage: 1, ammoPerAttack: 3, weight: 0, cost: 4, perk2: '' },
++  { suffix: 'mk_iv', damage: 2, ammoPerAttack: 4, weight: 1, cost: 8, perk2: 'Science! 1' },
++  { suffix: 'mk_v', damage: 3, ammoPerAttack: 5, weight: 1, cost: 12, perk2: 'Science! 2' },
++  { suffix: 'mk_vi', damage: 4, ammoPerAttack: 6, weight: 2, cost: 16, perk2: 'Science! 3' },
++];
++
++const modId = (suffix) => `robot_weapon_mod_assaultron_head_laser_capacitor_${suffix}`;
++const MARK = { mk_iii: 'Mk III', mk_iv: 'Mk IV', mk_v: 'Mk V', mk_vi: 'Mk VI' };
++const byId = (list, id) => list.find((entry) => entry.id === id);
++
++describe('уникальные моды Головного лазера Штурмотрона (слово владельца 2026-09-21)', () => {
++  it('оружие-хозяин существует и это оружие роботов', () => {
++    const laser = byId(robotWeaponsData, LASER_ID);
++    expect(laser).toBeTruthy();
++    expect(laser.itemType).toBe('weapon');
++  });
++
++  it('ровно четыре конденсатора, все уникальные и только для лазера', () => {
++    expect(robotWeaponMods).toHaveLength(4);
++    for (const mod of robotWeaponMods) {
++      expect(mod.unique).toBe(true);
++      expect(mod.modType).toBe('weapon');
++      expect(mod.applies_to_ids).toEqual([LASER_ID]);
++      expect(mod.slot).toBe('Capacitor');
++    }
++  });
++
++  it.each(EXPECTED)('мод $suffix: значения из таблицы правил', ({ suffix, damage, ammoPerAttack, weight, cost, perk2 }) => {
++    const mod = byId(robotWeaponMods, modId(suffix));
++    expect(mod, `нет мода ${modId(suffix)}`).toBeTruthy();
++    expect(mod.damageModifier).toEqual({ op: '+', value: damage });
++    expect(mod.ammoPerAttack).toBe(ammoPerAttack);
++    expect(mod.weightModifier).toEqual({ op: '+', value: weight });
++    expect(mod.costModifier).toEqual({ op: '+', value: cost });
++    expect(mod.perk1).toBe('Robotics Expert 1');
++    expect(mod.perk2).toBe(perk2);
++  });
++
++  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {
++    const slots = robotWeaponModSlots[LASER_ID];
++    expect(Object.keys(slots)).toEqual(['Capacitor']);
++    expect(slots.Capacitor).toEqual(EXPECTED.map(({ suffix }) => modId(suffix)));
++  });
++
++  it('i18n ru: имена «Конденсатор Mk III–VI», префиксы Mk, эффекты с зарядами', () => {
++    for (const { suffix, damage, ammoPerAttack } of EXPECTED) {
++      const entry = byId(ruWeaponMods, modId(suffix));
++      expect(entry, `нет ru i18n для ${suffix}`).toBeTruthy();
++      expect(entry.name).toBe(`Конденсатор ${MARK[suffix]}`);
++      expect(entry.prefix).toBe(MARK[suffix]);
++      expect(entry.effectDescription).toContain(`+${damage} {/CD}`);
++      expect(entry.effectDescription).toContain(`${ammoPerAttack} заряд`);
++    }
++  });
++
++  it('i18n en: имена Capacitor Mk III–VI (английское название не меняется)', () => {
++    for (const { suffix } of EXPECTED) {
++      const entry = byId(enWeaponMods, modId(suffix));
++      expect(entry, `нет en i18n для ${suffix}`).toBeTruthy();
++      const mark = MARK[suffix];
++      expect(entry.name).toBe(`Capacitor ${mark}`);
++      expect(entry.prefix).toBe(mark);
++      expect(entry.effectDescription).toContain('Damage');
++      expect(entry.effectDescription).toContain('shots per attack');
++    }
++  });
++
++  it('имя оружия: ru — «Головной лазер Штурмотрона», en — не тронуто', () => {
++    expect(byId(ruRobotWeapons, LASER_ID).name).toBe('Головной лазер Штурмотрона');
++    expect(byId(enRobotWeapons, LASER_ID).name).toBe('Assaultron Head Laser');
++  });
++
++  it('каждый мод из данных имеет i18n в обоих языках (полнота)', () => {
++    for (const mod of robotWeaponMods) {
++      expect(byId(ruWeaponMods, mod.id), `ru i18n для ${mod.id}`).toBeTruthy();
++      expect(byId(enWeaponMods, mod.id), `en i18n для ${mod.id}`).toBeTruthy();
++    }
++  });
++});
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 1465364..078503a 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -35,7 +35,7 @@
+   поставке, без единой правки движка) → 286–287 (экран песочницы, только
+   разработка) → 288 (экран удалён по слову владельца: сеттинг виртуальный,
+   подключать не планируется; декларация и тест остаются) — сданы;
+-  следующий — 290+ (МК-3: каскад в хранилище, смерть 24 ручных пересчётов,
++  следующий — 291+ (МК-3: каскад в хранилище, смерть 24 ручных пересчётов,
+   Fallout-формулы в модуль).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index 3ec3d94..6df097c 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -98,7 +98,7 @@
+            подключать не планируется; тесты проверяют надёжнее UI);
+            декларация + приёмочный тест остаются как доказательство
+            универсальности — сдан                                     (1)
+-290+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++291+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -170,7 +170,7 @@ TS — язык контракта и движка; сеттинг — живо
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+ 282 семантика процентов → 283 фазы модификаторов → 284 режим округления →
+-285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран (__DEV__, удалён патчем 288) → 289 порядок SPECIAL (канон правил) → 290+ реализация и переезд Fallout-формул в модуль →
++285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран (__DEV__, удалён патчем 288) → 289 порядок SPECIAL (канон правил) → 290 моды Головного лазера (данные) → 291+ реализация и переезд Fallout-формул в модуль →
+ М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e83eb92..4149139 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Data — Unique mods for the Assaultron Head Laser (patch 290)
++
++> Owner's word (2026-09-21): «unique mods for the Assaultron Head Laser — in Russian exactly „Головной лазер“, not „Лазер головы“; the English name stays as is. It is a robot weapon; the mods fit only `robot_weapon_assaultron_head_laser` and live separately from the weapon. Data only; there is no robot weapon mods file — create one by analogy with human weapons».
++
++- Created the robot weapon mods data by analogy with human weapons: `data/equipment/robot/weapon_mods.json` (mods) + `robot/weapon_mod_slots.json` (slots) + ru/en i18n `robot/weapon_mods.json`.
++- Four capacitors (rules table): Mk III +1 {/CD}, 3 shots per attack, weight +0, cost +4; Mk IV +2, 4 shots, +1, +8, Science! 1; Mk V +3, 5 shots, +1, +12, Science! 2; Mk VI +4, 6 shots, +2, +16, Science! 3. All `unique: true`, `applies_to_ids` — the laser only, slot `Capacitor`, requirements: Robotics Expert 1 (+ Science! by rank).
++- The table's rank-less «Robotics Expert» is recorded as rank 1 — per the robot weapon data convention.
++- Weapon name: ru «Лазер головы Штурмотрона» → «Головной лазер Штурмотрона»; en «Assaultron Head Laser» — untouched.
++- Catalog wiring is import-and-merge-by-id only (no logic): `robotWeaponMods`, `robotWeaponModSlots` in the catalog and `getEquipmentData()`.
++- Fuse: `__tests__/robot/assaultron-head-laser-mods.test.js` — 11 checks over the table, slots, i18n and the name.
++
++---
++
+ ## Fix — SPECIAL attribute order aligned with the rules (patch 289)
+ 
+ > Owner's word (2026-09-21): «the attributes must go exactly this way and no other — Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck».
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ee5056b..2d94af2 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Данные — Уникальные моды Головного лазера Штурмотрона (патч 290)
++
++> Слово владельца (2026-09-21): «уникальные моды для Головного лазера Штурмотрона — именно „Головной лазер“, не „Лазер головы“; английское название не меняется. Это оружие роботов, моды подходят только к `robot_weapon_assaultron_head_laser` и живут отдельно от оружия. Оперировать только данными; файла модов для оружия роботов нет — создать по аналогии с оружием людей».
++
++- Создан файл модов оружия роботов по аналогии с оружием людей: `data/equipment/robot/weapon_mods.json` (моды) + `robot/weapon_mod_slots.json` (слоты) + i18n ru/en `robot/weapon_mods.json`.
++- Четыре конденсатора (таблица правил): Mk III +1 {/CD}, 3 заряда за атаку, вес +0, стоимость +4; Mk IV +2, 4 заряда, +1, +8, Science! 1; Mk V +3, 5 зарядов, +1, +12, Science! 2; Mk VI +4, 6 зарядов, +2, +16, Science! 3. Все — `unique: true`, `applies_to_ids` — только лазер, слот `Capacitor`, требования: Robotics Expert 1 (+ Science! по рангу).
++- «Robotics Expert» без ранга в таблице записан рангом 1 — по конвенции данных оружия роботов.
++- Имя оружия: ru «Лазер головы Штурмотрона» → «Головной лазер Штурмотрона»; en «Assaultron Head Laser» — не тронуто.
++- Проводка в каталог данных — только импорт и слияние по id (никакой логики): `robotWeaponMods`, `robotWeaponModSlots` в каталоге и `getEquipmentData()`.
++- Предохранитель: `__tests__/robot/assaultron-head-laser-mods.test.js` — 11 проверок таблицы, слотов, i18n и имени.
++
++---
++
+ ## Исправление — Порядок атрибутов SPECIAL приведён к правилам (патч 289)
+ 
+ > Слово владельца (2026-09-21): «атрибуты должны идти так и никак иначе — Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость, Удача».
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index eaf6514..0ae5ae4 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -9,6 +9,7 @@ import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment
+ import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+ import moduleRuRobotHeadsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+ import moduleRuRobotLegsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
++import moduleRuRobotWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
+ 
+ import moduleEnRobotWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+ import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+@@ -16,6 +17,7 @@ import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment
+ import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
+ import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
+ import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
++import moduleEnRobotWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
+ import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
+ import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+ import moduleEnRobotHeadsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+@@ -87,6 +89,8 @@ import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
+ import moduleChems from '../modules/fallout/data/consumables/chems.json';
+ import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
+ import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
++import moduleRobotWeaponMods from '../modules/fallout/data/equipment/robot/weapon_mods.json';
++import moduleRobotWeaponModSlots from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
+ import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
+ import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+ import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
+@@ -124,6 +128,7 @@ const moduleRuI18n = {
+   clothes: moduleRuClothesI18n,
+   generalGoods: moduleRuGeneralGoodsI18n,
+   weaponMods: moduleRuWeaponModsI18n,
++  robotWeaponMods: moduleRuRobotWeaponModsI18n,
+   food: moduleRuFoodI18n,
+   drinks: moduleRuDrinksI18n,
+   chems: moduleRuChemsI18n,
+@@ -151,6 +156,7 @@ const moduleEnI18n = {
+   clothes: moduleEnClothesI18n,
+   generalGoods: moduleEnGeneralGoodsI18n,
+   weaponMods: moduleEnWeaponModsI18n,
++  robotWeaponMods: moduleEnRobotWeaponModsI18n,
+   food: moduleEnFoodI18n,
+   drinks: moduleEnDrinksI18n,
+   chems: moduleEnChemsI18n,
+@@ -414,6 +420,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const mergedRobotHeads = limbsOfType('head');
+   const mergedRobotLegs = limbsOfType('mover');
+   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
++  const mergedRobotWeaponMods = mergeById(moduleRobotWeaponMods, moduleI18n.robotWeaponMods);
+   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
+   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
+ 
+@@ -465,6 +472,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+     materials: mergedScrapMaterials,
+     oddities: mergedOddities,
+     weaponMods: mergedWeaponMods,
++    robotWeaponMods: mergedRobotWeaponMods,
++    robotWeaponModSlots: moduleRobotWeaponModSlots,
+     armorMods: mergedArmorMods,
+     uniqArmorMods: mergedUniqArmorMods,
+     modsOverrides: moduleWeaponModSlots,
+@@ -491,6 +500,7 @@ export const getEquipmentData = () => ({
+   weapons: moduleWeapons,
+   armor: moduleArmor,
+   weaponMods: moduleWeaponMods,
++  robotWeaponMods: moduleRobotWeaponMods,
+   armorMods: moduleArmorMods,
+   uniqArmorMods: moduleUniqArmorMods,
+   ammo: moduleAmmo,
+diff --git a/modules/fallout/data/equipment/robot/weapon_mod_slots.json b/modules/fallout/data/equipment/robot/weapon_mod_slots.json
+new file mode 100644
+index 0000000..8909b11
+--- /dev/null
++++ b/modules/fallout/data/equipment/robot/weapon_mod_slots.json
+@@ -0,0 +1,10 @@
++{
++  "robot_weapon_assaultron_head_laser": {
++    "Capacitor": [
++      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
++      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
++      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
++      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi"
++    ]
++  }
++}
+diff --git a/modules/fallout/data/equipment/robot/weapon_mods.json b/modules/fallout/data/equipment/robot/weapon_mods.json
+new file mode 100644
+index 0000000..ec9077f
+--- /dev/null
++++ b/modules/fallout/data/equipment/robot/weapon_mods.json
+@@ -0,0 +1,114 @@
++[
++  {
++    "modType": "weapon",
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
++    "unique": true,
++    "slot": "Capacitor",
++    "complexity": 4,
++    "perk1": "Robotics Expert 1",
++    "perk2": "",
++    "skill": "Science",
++    "costModifier": {
++      "op": "+",
++      "value": 4
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "applies_to_ids": [
++      "robot_weapon_assaultron_head_laser"
++    ],
++    "damageModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "ammoPerAttack": 3,
++    "effectChanges": [],
++    "qualityChanges": []
++  },
++  {
++    "modType": "weapon",
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
++    "unique": true,
++    "slot": "Capacitor",
++    "complexity": 4,
++    "perk1": "Robotics Expert 1",
++    "perk2": "Science! 1",
++    "skill": "Science",
++    "costModifier": {
++      "op": "+",
++      "value": 8
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "applies_to_ids": [
++      "robot_weapon_assaultron_head_laser"
++    ],
++    "damageModifier": {
++      "op": "+",
++      "value": 2
++    },
++    "ammoPerAttack": 4,
++    "effectChanges": [],
++    "qualityChanges": []
++  },
++  {
++    "modType": "weapon",
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
++    "unique": true,
++    "slot": "Capacitor",
++    "complexity": 4,
++    "perk1": "Robotics Expert 1",
++    "perk2": "Science! 2",
++    "skill": "Science",
++    "costModifier": {
++      "op": "+",
++      "value": 12
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "applies_to_ids": [
++      "robot_weapon_assaultron_head_laser"
++    ],
++    "damageModifier": {
++      "op": "+",
++      "value": 3
++    },
++    "ammoPerAttack": 5,
++    "effectChanges": [],
++    "qualityChanges": []
++  },
++  {
++    "modType": "weapon",
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi",
++    "unique": true,
++    "slot": "Capacitor",
++    "complexity": 4,
++    "perk1": "Robotics Expert 1",
++    "perk2": "Science! 3",
++    "skill": "Science",
++    "costModifier": {
++      "op": "+",
++      "value": 16
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 2
++    },
++    "applies_to_ids": [
++      "robot_weapon_assaultron_head_laser"
++    ],
++    "damageModifier": {
++      "op": "+",
++      "value": 4
++    },
++    "ammoPerAttack": 6,
++    "effectChanges": [],
++    "qualityChanges": []
++  }
++]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json b/modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json
+new file mode 100644
+index 0000000..89a2694
+--- /dev/null
++++ b/modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json
+@@ -0,0 +1,26 @@
++[
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
++    "name": "Capacitor Mk III",
++    "prefix": "Mk III",
++    "effectDescription": "plus 1 {/CD} Damage, consumes 3 shots per attack"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
++    "name": "Capacitor Mk IV",
++    "prefix": "Mk IV",
++    "effectDescription": "plus 2 {/CD} Damage, consumes 4 shots per attack"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
++    "name": "Capacitor Mk V",
++    "prefix": "Mk V",
++    "effectDescription": "plus 3 {/CD} Damage, consumes 5 shots per attack"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi",
++    "name": "Capacitor Mk VI",
++    "prefix": "Mk VI",
++    "effectDescription": "plus 4 {/CD} Damage, consumes 6 shots per attack"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json
+new file mode 100644
+index 0000000..26c4a4b
+--- /dev/null
++++ b/modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json
+@@ -0,0 +1,26 @@
++[
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
++    "name": "Конденсатор Mk III",
++    "prefix": "Mk III",
++    "effectDescription": "+1 {/CD} урона, расходует 3 заряда за атаку"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
++    "name": "Конденсатор Mk IV",
++    "prefix": "Mk IV",
++    "effectDescription": "+2 {/CD} урона, расходует 4 заряда за атаку"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
++    "name": "Конденсатор Mk V",
++    "prefix": "Mk V",
++    "effectDescription": "+3 {/CD} урона, расходует 5 зарядов за атаку"
++  },
++  {
++    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi",
++    "name": "Конденсатор Mk VI",
++    "prefix": "Mk VI",
++    "effectDescription": "+4 {/CD} урона, расходует 6 зарядов за атаку"
++  }
++]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json b/modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json
+index b29195b..a6890f0 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json
+@@ -71,7 +71,7 @@
+   },
+   {
+     "id": "robot_weapon_assaultron_head_laser",
+-    "name": "Лазер головы Штурмотрона",
++    "name": "Головной лазер Штурмотрона",
+     "rangeName": "Близкая"
+   },
+   {
