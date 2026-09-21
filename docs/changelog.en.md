@@ -2,6 +2,17 @@
 
 ---
 
+## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
+
+> Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.
+
+- `domain/registry.js` (the engine's single data-reading point) now imports `robot/weapon_mods.json` and `robot/weapon_mod_slots.json`: the robot catalog's `weaponMods` pool includes the capacitors (save restoration via `domain/enrichItem.js` finds them by id), plus clean keys `robotWeaponMods` and `robotWeaponModSlots` for the future install screen.
+- The mod field shape now follows the `applyWeaponMods` pipeline convention: flat additive `cost`/`weight` instead of modifier objects (the pipeline adds: `cost += mod.cost`, `weight += mod.weight` — exactly the table's «+4»/«+1»). `ammoPerAttack` stays: the rules' semantics «N shots per attack» is per attack, not per shot; its consumer will arrive with the install screen.
+- Who connects the mods: stat restoration is the live `enrichItem` pipeline (the save stores mod ids); installation for humans is `WeaponModificationModal` (db/catalogSource → catalog); for robot weapons there is no install screen per the owner's word («data only»), the data and registry are ready.
+- The fuse gained registry checks (12 checks total).
+
+---
+
 ## Data — Unique mods for the Assaultron Head Laser (patch 290)
 
 > Owner's word (2026-09-21): «unique mods for the Assaultron Head Laser — in Russian exactly „Головной лазер“, not „Лазер головы“; the English name stays as is. It is a robot weapon; the mods fit only `robot_weapon_assaultron_head_laser` and live separately from the weapon. Data only; there is no robot weapon mods file — create one by analogy with human weapons».

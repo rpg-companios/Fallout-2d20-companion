@@ -23,6 +23,7 @@ import enWeaponMods from '../../modules/fallout/i18n/en-EN/data/equipment/robot/
 import ruRobotWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
 import enRobotWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
 import robotWeaponsData from '../../modules/fallout/data/equipment/robot/weapons.json';
+import { getRobotLimbCatalog } from '../../domain/registry';
 
 const LASER_ID = 'robot_weapon_assaultron_head_laser';
 
@@ -59,10 +60,21 @@ describe('уникальные моды Головного лазера Штур
     expect(mod, `нет мода ${modId(suffix)}`).toBeTruthy();
     expect(mod.damageModifier).toEqual({ op: '+', value: damage });
     expect(mod.ammoPerAttack).toBe(ammoPerAttack);
-    expect(mod.weightModifier).toEqual({ op: '+', value: weight });
-    expect(mod.costModifier).toEqual({ op: '+', value: cost });
+    // Плоские аддитивные cost/weight — конвенция конвейера applyWeaponMods
+    // (domain/enrichItem.js: weight += mod.weight; cost += mod.cost).
+    expect(mod.weight).toBe(weight);
+    expect(mod.cost).toBe(cost);
     expect(mod.perk1).toBe('Robotics Expert 1');
     expect(mod.perk2).toBe(perk2);
+  });
+
+  it('реестр знает: пул weaponMods содержит конденсаторы, слоты и список — на месте', () => {
+    const catalog = getRobotLimbCatalog();
+    for (const mod of robotWeaponMods) {
+      expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
+    }
+    expect(catalog.robotWeaponMods).toEqual(robotWeaponMods);
+    expect(catalog.robotWeaponModSlots).toEqual(robotWeaponModSlots);
   });
 
   it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {

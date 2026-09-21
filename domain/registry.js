@@ -17,6 +17,8 @@ import robotWeaponsJson from '../modules/fallout/data/equipment/robot/weapons.js
 import robotArmorJson from '../modules/fallout/data/equipment/robot/armor.json';
 import robotArmorPlatingJson from '../modules/fallout/data/equipment/robot/armor_plating.json';
 import robotFramesJson from '../modules/fallout/data/equipment/robot/frames.json';
+import robotWeaponModsJson from '../modules/fallout/data/equipment/robot/weapon_mods.json';
+import robotWeaponModSlotsJson from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
 
 import moduleOrigins from '../modules/fallout/data/origins/origins.json';
 import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
@@ -144,7 +146,14 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
   generalWeapons: moduleWeapons,
   // Моды оружия: сейв хранит id установленных модов, характеристики
   // восстанавливаются применением модов к базе (domain/enrichItem.js).
-  weaponMods: moduleWeaponMods,
+  // Пул включает и моды оружия роботов (290): уникальные конденсаторы
+  // Головного лазера Штурмотрона живут в robot/weapon_mods.json и
+  // восстанавливаются тем же конвейером.
+  weaponMods: [...moduleWeaponMods, ...robotWeaponModsJson],
+  // Моды оружия роботов (290) отдельным списком и слоты для них: будущий
+  // экран установки читает «какие моды предлагать» отсюда, а не из пула.
+  robotWeaponMods: robotWeaponModsJson,
+  robotWeaponModSlots: robotWeaponModSlotsJson,
   // Слои защиты плоским списком; принадлежность слою — в поле layer.
   armorLayers: [
     ...(robotArmorJson.armor || []),

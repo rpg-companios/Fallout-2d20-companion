@@ -8,14 +8,6 @@
     "perk1": "Robotics Expert 1",
     "perk2": "",
     "skill": "Science",
-    "costModifier": {
-      "op": "+",
-      "value": 4
-    },
-    "weightModifier": {
-      "op": "+",
-      "value": 0
-    },
     "applies_to_ids": [
       "robot_weapon_assaultron_head_laser"
     ],
@@ -23,9 +15,11 @@
       "op": "+",
       "value": 1
     },
-    "ammoPerAttack": 3,
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "cost": 4,
+    "weight": 0,
+    "ammoPerAttack": 3
   },
   {
     "modType": "weapon",
@@ -36,14 +30,6 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 1",
     "skill": "Science",
-    "costModifier": {
-      "op": "+",
-      "value": 8
-    },
-    "weightModifier": {
-      "op": "+",
-      "value": 1
-    },
     "applies_to_ids": [
       "robot_weapon_assaultron_head_laser"
     ],
@@ -51,9 +37,11 @@
       "op": "+",
       "value": 2
     },
-    "ammoPerAttack": 4,
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "cost": 8,
+    "weight": 1,
+    "ammoPerAttack": 4
   },
   {
     "modType": "weapon",
@@ -64,14 +52,6 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 2",
     "skill": "Science",
-    "costModifier": {
-      "op": "+",
-      "value": 12
-    },
-    "weightModifier": {
-      "op": "+",
-      "value": 1
-    },
     "applies_to_ids": [
       "robot_weapon_assaultron_head_laser"
     ],
@@ -79,9 +59,11 @@
       "op": "+",
       "value": 3
     },
-    "ammoPerAttack": 5,
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "cost": 12,
+    "weight": 1,
+    "ammoPerAttack": 5
   },
   {
     "modType": "weapon",
@@ -92,14 +74,6 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 3",
     "skill": "Science",
-    "costModifier": {
-      "op": "+",
-      "value": 16
-    },
-    "weightModifier": {
-      "op": "+",
-      "value": 2
-    },
     "applies_to_ids": [
       "robot_weapon_assaultron_head_laser"
     ],
@@ -107,8 +81,10 @@
       "op": "+",
       "value": 4
     },
-    "ammoPerAttack": 6,
     "effectChanges": [],
-    "qualityChanges": []
+    "qualityChanges": [],
+    "cost": 16,
+    "weight": 2,
+    "ammoPerAttack": 6
   }
 ]
