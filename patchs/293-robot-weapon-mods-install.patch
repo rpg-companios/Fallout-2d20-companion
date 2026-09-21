@@ -1,0 +1,156 @@
+diff --git a/__tests__/debug/app-boot.test.js b/__tests__/debug/app-boot.test.js
+new file mode 100644
+index 0000000..5744e8c
+--- /dev/null
++++ b/__tests__/debug/app-boot.test.js
+@@ -0,0 +1,27 @@
++// Диагностика белого экрана (после 292): НЕ-UI хребет загрузки приложения в
++// порядке App.js — единый реестр модулей, как в бандле Metro. Крах оценки
++// модуля (TDZ/цикл) воспроизводится здесь со стеком.
++import { describe, expect, it } from 'vitest';
++
++describe('хребет загрузки приложения (диагностика 292)', () => {
++  it('не-UI граф App.js вычисляется без краха, в порядке загрузки', async () => {
++    const steps = [
++      () => import('../../src/store/characterStore'),
++      () => import('../../db/seed'),
++      () => import('../../i18n/appI18n'),
++      () => import('../../domain/registry'),
++      () => import('../../i18n/equipmentCatalog'),
++      () => import('../../modules/fallout/index.js'),
++      () => import('../../modules/fallout/survival'),
++      () => import('../../modules/fallout/diseases/migration'),
++      () => import('../../db/catalogSource'),
++      () => import('../../src/store/resolvers'),
++      () => import('../../src/store/powerArmorSlice'),
++      () => import('../../src/store/migrations'),
++    ];
++    for (const load of steps) {
++      const mod = await load();
++      expect(mod).toBeTruthy();
++    }
++  });
++});
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index e198d17..2cf4acd 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -17,6 +17,11 @@
+ 
+ import { describe, it, expect } from 'vitest';
+ import { SETTING } from '../../modules/fallout/index.js';
++import {
++  catalogGetModsForWeaponSlot,
++  catalogGetSlotsForWeapon,
++  catalogGetWeaponModById,
++} from '../../db/catalogSource';
+ 
+ const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+ const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+@@ -120,3 +125,34 @@ describe('уникальные моды Головного лазера Штур
+     }
+   });
+ });
++
++describe('установка: модалка модернизации получает конденсаторы (293)', () => {
++  it('слоты лазера — Capacitor (через catalogGetSlotsForWeapon, как у людей)', () => {
++    expect(catalogGetSlotsForWeapon('robot_weapon_assaultron_head_laser')).toEqual(['Capacitor']);
++  });
++
++  it('на слоте ровно четыре конденсатора по возрастанию ранга', () => {
++    const mods = catalogGetModsForWeaponSlot('robot_weapon_assaultron_head_laser', 'Capacitor');
++    expect(mods.map((m) => m.id)).toEqual([
++      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii',
++      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv',
++      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v',
++      'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi',
++    ]);
++  });
++
++  it('мод resolveается по id: имя, стоимость, вес, слот, требования', () => {
++    const row = catalogGetWeaponModById('robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii');
++    expect(row).toBeTruthy();
++    expect(['Конденсатор Mk III', 'Capacitor Mk III']).toContain(row.name); // локаль окружения
++    expect(row.cost).toBe(4);
++    expect(row.weight).toBe('0');
++    expect(row.slot).toBe('Capacitor');
++    expect(row.perk_1).toBe('Robotics Expert 1');
++    expect(row.damageModifier).toEqual({ op: '+', value: 1 });
++  });
++
++  it('робо-моды не утекают в людские слоты: у обычного оружия Capacitor пуст', () => {
++    expect(catalogGetModsForWeaponSlot('weapon_002', 'Capacitor')).toEqual([]);
++  });
++});
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index c088db7..a84006c 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -206,7 +206,9 @@ const buildModSlotRows = (catalog) => {
+   Object.entries(ROBOT_WEAPON_BASE_MAP).forEach(([robotWeaponId, baseWeaponId]) => {
+     if (modsOverridesData[baseWeaponId]) robotSlotOverrides[robotWeaponId] = modsOverridesData[baseWeaponId];
+   });
+-  const merged = { ...modsOverridesData, ...robotSlotOverrides };
++  // Собственные слоты робо-оружия (293): robot/weapon_mod_slots.json — приоритетнее
++  // наследования от людской базы (у Головного лазера Штурмотрона — Capacitor).
++  const merged = { ...modsOverridesData, ...robotSlotOverrides, ...(catalog.robotWeaponModSlots || {}) };
+   const rows = [];
+   for (const [weaponId, slots] of Object.entries(merged)) {
+     for (const [slot, modIds] of Object.entries(slots)) {
+@@ -226,7 +228,9 @@ const build = () => {
+   const catalog = getEquipmentCatalog(locale);
+   _cache = {
+     weapons: (catalog.weapons || []).map(buildWeaponRow),
+-    weaponMods: (catalog.weaponMods || []).map(buildWeaponModRow),
++    // Робо-моды оружия (293): сливаются с людскими — модалка установки
++    // resolveает их тем же catalogGetWeaponModById (имена слиты в каталоге, 290).
++    weaponMods: [...(catalog.weaponMods || []), ...(catalog.robotWeaponMods || [])].map(buildWeaponModRow),
+     modSlots: buildModSlotRows(catalog),
+     ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
+     qualities: (catalog.qualities || []).map(buildQualityRow),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 79f66f3..509f4f7 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,18 @@
+ 
+ ---
+ 
++## Fix — Assaultron head laser capacitors in the install modal (patch 293)
++
++> Owner report (2026-09-21): "The Assaultron doesn't get mods for the head laser. They're missing from the weapon modification modal" (patch 292 applied).
++
++- Cause: 290–291 wired the capacitors into data, catalog and registry, but `db/catalogSource.js` — the row source for the install modal — never saw them: mod-slot rows came from human `weapon_mod_slots.json` plus `ROBOT_WEAPON_BASE_MAP` inheritance (3 legacy robot weapons), while the robot's own slots file was unread; robot mods were absent from mod rows.
++- Wiring: mod rows = human + robot mods (names already id-merged in the catalog, 290); mod-slot rows = human + inheritance + robot-owned slots (robot-owned wins). The modal itself is untouched: slots/mods/preview (including `damageModifier` +1..4 DC) all flow through the common path.
++- Guard: +4 install-path checks in `__tests__/robot/assaultron-head-laser-mods.test.js` (slot = Capacitor; exactly 4 capacitors in rank order; resolve by id with name/cost/weight/requirements; no leakage into human weapon slots).
++- Bonus from the white-screen diagnostics: `__tests__/debug/app-boot.test.js` — boot spine (App.js non-UI graph in load order; react-native modules excluded — the bundle build covers those).
++
++---
++
++
+ ## Architecture — Setting door and unified contract (patch 292)
+ 
+ > Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7dd095e..2898cd4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,18 @@
+ 
+ ---
+ 
++## Исправление — Конденсаторы Головного лазера в модалке установки (патч 293)
++
++> Сообщение владельца (2026-09-21): «Штурмотрон не получает моды для головного лазера. Их нет в модалке модернизации оружия» (патч 292 установлен).
++
++- Причина: 290–291 провели конденсаторы в данные, каталог и реестр, но `db/catalogSource.js` — источник строк для модалки установки — их не видел: строки слотов строились из людских `weapon_mod_slots.json` + наследования по `ROBOT_WEAPON_BASE_MAP` (3 старых робо-оружия), а собственные робо-слоты (`robot/weapon_mod_slots.json`, слот Capacitor) не читались; робо-моды не попадали в строки модов.
++- Проводка: `weaponMods` строки = людские + робо-моды (имена уже слиты в каталоге по id, 290); `modSlots` строки = людские + наследование + собственные слоты робо-оружия (приоритет последних). Модалка не менялась ни на строчку: слоты/моды/предпросмотр (включая `damageModifier` +1..4 DC) работают по общему пути.
++- Предохранитель: +4 проверки пути установки в `__tests__/robot/assaultron-head-laser-mods.test.js` (слот = Capacitor; ровно 4 конденсатора по возрастанию; resolve по id с именем/ценой/весом/требованиями; робо-моды не утекают в людские слоты).
++- Бонус из диагностики белого экрана: `__tests__/debug/app-boot.test.js` — boot-спин (не-UI граф App.js в порядке загрузки; модули с react-native исключены — их покрывает сборка).
++
++---
++
++
+ ## Архитектура — Дверь сеттинга и единый контракт (патч 292)
+ 
+ > Слово владельца (2026-09-21): «не хочу плодить файлы ради индексов… вырезать папку modules, убрать в другой репозиторий, там сборщик файла-сеттинга, грузить в движок… в экранах сократить до "импорт реестр данных", а в реестре записано, что где лежит и чему принадлежит» + «вписать домен: что универсально, что под сеттинг — хрен пойми» + критерий: «механика универсальна: берём одни данные, проверяем наличие, выдаём другие, старые списываем; что это за данные — скажет сеттинг».
