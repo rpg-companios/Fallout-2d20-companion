@@ -9,6 +9,7 @@ import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment
 import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
 import moduleRuRobotHeadsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
 import moduleRuRobotLegsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+import moduleRuRobotWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
 
 import moduleEnRobotWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
 import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
@@ -16,6 +17,7 @@ import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment
 import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
 import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
 import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
+import moduleEnRobotWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
 import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
 import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
 import moduleEnRobotHeadsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
@@ -87,6 +89,8 @@ import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
 import moduleChems from '../modules/fallout/data/consumables/chems.json';
 import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
 import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+import moduleRobotWeaponMods from '../modules/fallout/data/equipment/robot/weapon_mods.json';
+import moduleRobotWeaponModSlots from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
 import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
 import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
 import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
@@ -124,6 +128,7 @@ const moduleRuI18n = {
   clothes: moduleRuClothesI18n,
   generalGoods: moduleRuGeneralGoodsI18n,
   weaponMods: moduleRuWeaponModsI18n,
+  robotWeaponMods: moduleRuRobotWeaponModsI18n,
   food: moduleRuFoodI18n,
   drinks: moduleRuDrinksI18n,
   chems: moduleRuChemsI18n,
@@ -151,6 +156,7 @@ const moduleEnI18n = {
   clothes: moduleEnClothesI18n,
   generalGoods: moduleEnGeneralGoodsI18n,
   weaponMods: moduleEnWeaponModsI18n,
+  robotWeaponMods: moduleEnRobotWeaponModsI18n,
   food: moduleEnFoodI18n,
   drinks: moduleEnDrinksI18n,
   chems: moduleEnChemsI18n,
@@ -414,6 +420,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedRobotHeads = limbsOfType('head');
   const mergedRobotLegs = limbsOfType('mover');
   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
+  const mergedRobotWeaponMods = mergeById(moduleRobotWeaponMods, moduleI18n.robotWeaponMods);
   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
 
@@ -465,6 +472,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     materials: mergedScrapMaterials,
     oddities: mergedOddities,
     weaponMods: mergedWeaponMods,
+    robotWeaponMods: mergedRobotWeaponMods,
+    robotWeaponModSlots: moduleRobotWeaponModSlots,
     armorMods: mergedArmorMods,
     uniqArmorMods: mergedUniqArmorMods,
     modsOverrides: moduleWeaponModSlots,
@@ -491,6 +500,7 @@ export const getEquipmentData = () => ({
   weapons: moduleWeapons,
   armor: moduleArmor,
   weaponMods: moduleWeaponMods,
+  robotWeaponMods: moduleRobotWeaponMods,
   armorMods: moduleArmorMods,
   uniqArmorMods: moduleUniqArmorMods,
   ammo: moduleAmmo,

@@ -2,6 +2,19 @@
 
 ---
 
+## Data — Unique mods for the Assaultron Head Laser (patch 290)
+
+> Owner's word (2026-09-21): «unique mods for the Assaultron Head Laser — in Russian exactly „Головной лазер“, not „Лазер головы“; the English name stays as is. It is a robot weapon; the mods fit only `robot_weapon_assaultron_head_laser` and live separately from the weapon. Data only; there is no robot weapon mods file — create one by analogy with human weapons».
+
+- Created the robot weapon mods data by analogy with human weapons: `data/equipment/robot/weapon_mods.json` (mods) + `robot/weapon_mod_slots.json` (slots) + ru/en i18n `robot/weapon_mods.json`.
+- Four capacitors (rules table): Mk III +1 {/CD}, 3 shots per attack, weight +0, cost +4; Mk IV +2, 4 shots, +1, +8, Science! 1; Mk V +3, 5 shots, +1, +12, Science! 2; Mk VI +4, 6 shots, +2, +16, Science! 3. All `unique: true`, `applies_to_ids` — the laser only, slot `Capacitor`, requirements: Robotics Expert 1 (+ Science! by rank).
+- The table's rank-less «Robotics Expert» is recorded as rank 1 — per the robot weapon data convention.
+- Weapon name: ru «Лазер головы Штурмотрона» → «Головной лазер Штурмотрона»; en «Assaultron Head Laser» — untouched.
+- Catalog wiring is import-and-merge-by-id only (no logic): `robotWeaponMods`, `robotWeaponModSlots` in the catalog and `getEquipmentData()`.
+- Fuse: `__tests__/robot/assaultron-head-laser-mods.test.js` — 11 checks over the table, slots, i18n and the name.
+
+---
+
 ## Fix — SPECIAL attribute order aligned with the rules (patch 289)
 
 > Owner's word (2026-09-21): «the attributes must go exactly this way and no other — Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck».
