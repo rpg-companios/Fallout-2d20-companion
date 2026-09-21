@@ -2,6 +2,123 @@
 
 ---
 
+## Fix — SPECIAL attribute order aligned with the rules (patch 289)
+
+> Owner's word (2026-09-21): «the attributes must go exactly this way and no other — Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck».
+
+- The order `STR, END, PER, AGI, INT, CHA, LCK` had been in the code since the project's very first commits — the rules' canon `STR, PER, END, CHA, INT, AGI, LCK` never existed in the repo (verified with `git log -S` over the whole history). Nobody «changed» it — it was born wrong.
+- Every place defining the order is fixed: `CANONICAL_ATTRIBUTE_KEYS` and `createInitialAttributes` (domain/characterCreation.js), `PERK_ATTRIBUTE_FILTER_CODES` (domain/perks.js — perk filters), literals in effects.js and the migrations.
+- `selectLegacyAttributes` (src/store/selectors.js) sorts its output by the canon — old saves stored in the historical order display correctly, and re-saving writes the canonical order (saves self-heal).
+- Fuse: `__tests__/domain/special-attribute-order.test.js` — 6 checks; any new place defining attribute order must match the canon.
+- Also: App.js indentation restored to main (a cosmetic leftover of the 286–288 cycle).
+
+---
+
+## Cleanup — The sandbox screen removed: the setting is virtual, no UI needed (patch 288)
+
+> Owner's word (2026-09-18): «do I even need this screen if the setting is virtual, unconnected to reality, and I'm not going to wire it?» No — removed.
+
+- The sandbox screen (patches 286–287) was removed wholesale: the screen itself, the view model, the lazy registry, their test and the App.js wiring. The screen's only job — showing the cascade with your own eyes — is done more reliably by the acceptance tests, while the screen would have needed maintenance on every contract change.
+- The test setting's declaration and its acceptance test remain: that is not UI but the proof of the contract's universality (the §8 criterion — «a setting is described without engine edits»). The program never imports the module, it costs nothing; if a future contract change breaks the describability of a second setting, the test falls.
+- Verified: the publication build is clean (zero traces of the screen), 76 files / 781 tests green, tsc clean.
+
+---
+
+## Micro-patch — The sandbox no longer ships into the production build at all (patch 287)
+
+> Owner's word (2026-09-18): «So in the Replit preview I'll see 5 tabs, but when I publish the app I won't see it?» Yes: preview — 5 tabs, publication — 4. A nuance was found by inspecting a live build and fixed.
+
+- How the gate works: `__DEV__` is a build-time constant. The dev server (`expo start` — the Replit preview) builds with `__DEV__ = true` → the «Sandbox» tab mounts. Publication (`npm run build` → expo export) builds with `__DEV__ = false` → no tab.
+- Found by grepping the bundle: with a static import, the screen's code rode into the publication as dead weight (the tab never mounted, but the kilobytes of code and strings sat in the files). Fixed with a conditional require behind `__DEV__`: the export drops the whole branch.
+- Verified by grepping the built publication: no screen strings, view model, sandbox registry or tab name in the bundle — zero occurrences (control: HomeTab/Positronium are found).
+
+---
+
+## Series pivot — The rules sandbox: the test-setting screen, dev-only (patch 286)
+
+> Owner's word (2026-09-18): the sandbox lives only in the development environment — «don't show it in the main program at all»; a build for checking the contract.
+
+- A «Песочница» (Sandbox) tab was added (App.js, behind the `__DEV__` gate): production builds never see it; in development it runs the test setting on the derivation contract. The sandbox does not touch the character store — the tab's state is local.
+- On the screen: attributes (0–12), skills with a rank ceiling from the governing attribute (the «+» button dims at the ceiling — a rule inside a rule), +5%/+10% magic-power and +15% defense bonus toggles, derived values and counter ceilings — everything is recomputed by the registry cascade without a single manual call. Spells show why they are locked: «needs rank 4» or «not enough mana».
+- The screen's logic lives in a pure view model (`modules/test-setting/viewModel.js`) — an acceptance test (6 checks) drives it without react-native: the screen stays thin, the checkable part is separate.
+
+---
+
+## Series pivot — The test setting: the contract's second client, zero engine edits (patch 285)
+
+> Owner's word (spec verbatim, cascade map §8): «5 attributes; 5 derived values (health, mana, magic power, defense, attack); 7 skills; 5 spells. Attributes feed the derived values; spells spend mana (mana = attribute + skill); +5/10/15% to magic power / magic defense; spells gated by "skill rank 4"; the number of skill ranks depends on an attribute.»
+
+- The mini-setting became a real shipped module: `modules/test-setting/` — living JavaScript on the typed contract. Five attributes (strength, agility, intellect, spirit, luck), seven skills each with a governing attribute, five derived values, five spells with mana costs and the «Sorcery rank 4» gate, rank ceilings in bands from the governing attribute.
+- The contract's success criterion holds and is visible in the patch diff: **not a single line changed under `src/`** — the setting fit entirely onto the vocabulary sharpened by patches 282–284 (percentages from a declared base, anchor phases, rounding modes). The acceptance test (11 checks) drives the cascade: mana = Intellect + Sorcery, +5%/+10% bonuses to magic power sum into one multiplier, rank 4 is unreachable until the attribute grants ceiling 4.
+- The module is not imported by the running program — the wiring (a sandbox mini-screen) is the next patch; how to surface it (dev flag, hidden section) is a question for the owner.
+
+---
+
+## Series pivot — Rounding mode: the setting dictates the direction (patch 284)
+
+> Owner's word (2026-09-18): «(10+18)×1.15 = 32.2 → 32 is not a mandatory state either. The setting can dictate which way the rounding goes. It can be 32 or 33. And for example at 32.01 a rule may force rounding up or down to a whole number.»
+
+- The rounding mode is part of the vocabulary, not an engine constant. Declared per value: `math` (mathematical, 0.5 up — the default), `up` (always up: 32.01 → 33), `down` (always down: 32.99 → 32), `none` (no rounding — 32.2 stays 32.2).
+- A pipeline phase can round at its own step with the same mode (`round: true`) or its own (`round: 'up'`) — a rule whose step and total round differently is expressible.
+- The owner's examples are in the tests verbatim: (10+18)×1.15 = 32.2 yields 32 (math), 32 (down), 33 (up) and 32.2 (none) on the same base; 32.01 becomes 33 or 32 per the rule. The pure applyPercent takes the mode too: 26×1.15 = 29.9 → 29 down, 30 mathematically.
+- An unknown mode is a registration error listing the available ones. The contract test grew to 36 checks; the contract remains isolated — nothing changed in the running program.
+
+---
+
+## Series pivot — Modifier phases: the rules declare the order (patch 283)
+
+> Owner's word (2026-09-18): «This is an RPG program. There are rules, and percentages are calculated the way the rules say. [...] The base fire rate depends on installed mods, the trait's % applies to that, and the perk doubles afterwards. But there can also be a case where the trait boosts the final rate instead of the base one [...] And it might only apply if the fire rate is below or equal to a certain value. You can't guess that.»
+
+- The engine no longer dictates the modifier order — patch 282 hardcoded rigid levels («percentages only on derived values»); patch 283 turns that into a vocabulary: a value declares its own pipeline of phases in execution order (`modifierPhases`), and a modifier binds to a phase. «Trait +10% of base» and «trait +10% of final» are the same rule with the phase in a different position.
+- New in the vocabulary: the multiplier operation `×` (a «×2» perk), `when(value)` conditions — «the perk only works if fire rate ≤ N» — and per-phase rounding for rules that round at their own step. A modifier pointing at an undeclared phase is an error listing the declared phases.
+- The owner's fire-rate example is in the test wholesale: base 5, mods +1/−2, trait +10%, perk ×2 → 9; the anchor is observable through phase rounding (8 versus 9); a conditional perk switches on and off at the threshold.
+- Nerd Rage (the owner's example) is a reaction on a dynamic threshold: the perk waits for «current HP < 30% of max», and the max itself moves — a chem grants the max +50%, the cascade recomputes the ceiling, and the bar shifts: 12 out of 30 = 40% (the perk stays silent), 12 out of 45 = 27% (it fires). Also in the test.
+- The contract's acceptance test grew to 31 checks; the contract remains isolated — nothing changed in the running program.
+
+---
+
+## Series pivot — Percentage semantics: always from a declared base (patch 282)
+
+> Owner's word (2026-09-18): «% always comes from something. +15% fire-magic defense is calculated as −15% incoming damage from attacks with the fire property. +15% HP is calculated as the HP parameter's base value (e.g. attr1+attr2) × 1.15, mathematically rounded to a whole number».
+
+- An amendment to the derivation contract (patch 281): percentages no longer take part in a parameter's additive chain. The levels are separated and never mixed: parameters (attributes, skills) carry set and additives (perks, wounds, armor); derived values (health, mana) carry percentages — the formula's base × (1 + Σ%/100) with a single mathematical rounding at the end.
+- A pure function `applyPercent(base, percents)` appeared — it will also serve future damage channels: «+15% fire-magic defense» counts as −15% incoming damage from fire-property attacks.
+- Breaking the separation is a contract error, not a silent recomputation: a percentage in a parameter's additive chain and an additive on a derived value are both rejected with a clear message. The contract's acceptance test grew to 22 checks, including both of the owner's examples verbatim (26 × 1.15 = 29.9 → 30; 100 × 0.85 = 85).
+
+---
+
+## Series pivot — The derivation contract: the engine's typed vocabulary (patch 281)
+
+> Owner's word (2026-09-17): the engine is meant to be universal. The setting declares parameters, derived values, counters, requirements and reactions — the engine executes and cascades them. The contract and the engine are TypeScript; the setting stays living JavaScript behind a typed «door».
+
+- The first piece of the typed engine appeared: `src/engine/contracts/` (parameters, derived values, counters, rank ceilings, requirements, reactions, the setting assembly) and `src/engine/derivations/registry.ts` — a registry with validation, topological ordering (a cycle is a registration error) and a pure `evaluate` cascade. The modifier order is agreed: set replaces the base, then additives, then the summed percentage, rounding at the end.
+- The registry does NOT replace anything in the running program yet — only the acceptance test imports it. The contract settles in without risk to the Fallout module; wiring it into the store and the death of the 24 manual recomputes are patches 283+.
+- The acceptance test describes the mini-setting per the owner's spec (5 attributes, 7 skills, 5 derived values, mana = attribute + skill, skill rank ceiling from an attribute, +5/10/15% bonuses): 16 checks green — the criterion «a setting is described by declaration without engine changes» holds today.
+- Contract document: `docs/architecture/derivation-contract.md`; the tsconfig include now covers `src/engine` (the patch-280 fuse enforces the coverage).
+
+---
+
+## Infrastructure — TypeScript fuses: tsconfig coverage and a .js/.ts duplicate ban (patch 280)
+
+> Owner's word (2026-09-17): the series gets reordered — first the cascade map (279), then fuses (280), then the derivation contract (281), then the test setting (282) and the cascade implementation (283+).
+
+- Two ratchets for the TS series. First: every `.ts`/`.tsx` in the repository must be inside the tsconfig `include` — a new TS file outside the type-checking scope fails the test, and so does a stale include entry (include only grows). Second: stacks of `foo.js` + `foo.ts`/`foo.tsx` in one folder are banned — the Metro resolver picks `.js` first, so the TS file would be dead code that is «type-checked» but never executed.
+- The vitest plugin from patch 274 now covers `.ts`/`.tsx` too: replacing `require('<asset>')` with `{}` works there as well; TypeScript itself is transformed by vite/esbuild, no babel involved. TS modules enter the test run without separate infrastructure.
+- A conversion rule was added to the charter: a conversion patch does not change behavior; whatever typing uncovers (a possible null, a shape mismatch) goes into a separate fix patch with its own number and test — never «changed it while I was at it».
+
+---
+
+## Series pivot — The derived-values cascade map: diagnosis and plan (patch 279)
+
+> Owner's word (2026-09-18): I want changing one parameter to change everything — not «one piece of state updated and nothing else moves until you fix all the call sites by hand». The engine is meant to be universal — next come Heroes of Might and Magic 2d20, Disciples, Vampire: The Masquerade or my own setting.
+
+- The cascade map was added (`docs/architecture/cascade-map.md`) — an inventory of every derived value in the program. The diagnosis is confirmed: totals are stored in the state store and recomputed by 24 manual calls scattered across actions; the automatic watcher only tracks equipment and profile; the Weapons & Armor and Character screens keep their own recomputations — three copies of the same truth. Meanwhile derived values are never written into saves — the cascade can be fixed without any save migrations.
+- A live engine/setting boundary violation was found: the engine's derived-stats code contains Fallout formulas and reads the power armor catalog straight from the setting module. Moving the formulas into the module is part of the series plan.
+- The series plan pivoted: the centerpiece is a typed derivation mechanism. The setting declares parameters, derived values, counters, rank ceilings, requirements and reactions — the engine executes and cascades them. TypeScript rides along (contract and engine in TS; the setting stays living JavaScript). Changing the programming language and swapping the reactive core were ruled unnecessary: the program has only a handful of true «rules on change» today.
+- The test setting for proving universality — per the owner's word: 5 attributes, 7 skills, 5 derived values (health, mana, magic power, defense, attack), 5 spells; mana = attribute + skill; +5/10/15% bonuses; spells gated by skill rank 4; skill rank ceiling from an attribute. Success criterion: both Fallout and the mini-setting are describable without engine changes.
+
+---
+
 ## Cleanup — Tests: settled ones removed, the «tests do not pile up» rule written into the charter (patch 278)
 
 > Owner's word (2026-09-18): every feature wrote its own test, and after settling in the test was never deleted — they just piled up. Tests are a development-time checking tool, not part of the program.

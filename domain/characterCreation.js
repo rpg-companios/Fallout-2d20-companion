@@ -9,7 +9,11 @@ import { getOrigins, getTraits } from './registry';
 // Attribute key utilities (from attributeKeyUtils.js)
 // ---------------------------------------------------------------------------
 
-export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'END', 'PER', 'AGI', 'INT', 'CHA', 'LCK'];
+// Слово владельца (2026-09-21): порядок атрибутов SPECIAL — как в правилах,
+// и никак иначе: Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость,
+// Удача. Это не сортировка, а канон показа: любой список атрибутов в программе
+// обязан идти в этом порядке. Предохранитель — тест special-attribute-order.
+export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
 
 const ATTRIBUTE_KEY_ALIASES = {
     STR: 'STR',
@@ -96,11 +100,11 @@ export const ALL_SKILLS = SKILL_CATALOG_ORDER.map((key) => ({
 export function createInitialAttributes() {
     return [
         { name: 'STR', value: 4 },
-        { name: 'END', value: 4 },
         { name: 'PER', value: 4 },
-        { name: 'AGI', value: 4 },
-        { name: 'INT', value: 4 },
+        { name: 'END', value: 4 },
         { name: 'CHA', value: 4 },
+        { name: 'INT', value: 4 },
+        { name: 'AGI', value: 4 },
         { name: 'LCK', value: 4 },
     ];
 }

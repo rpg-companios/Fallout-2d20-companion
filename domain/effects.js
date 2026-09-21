@@ -5,7 +5,9 @@ import { rollCombatDice, rollCombatDiceEffects, rollMultipleCombatDice } from '.
 
 const SCENE_DURATION_MINUTES = 5;
 const SCENE_DURATION_MS = SCENE_DURATION_MINUTES * 60 * 1000;
-const CANONICAL_ATTRIBUTES = new Set(['STR', 'END', 'PER', 'AGI', 'INT', 'CHA', 'LCK']);
+// Порядок литерала — канон SPECIAL (слово владельца 2026-09-21); для Set он
+// функционально не важен, но все списки атрибутов в программе идут одинаково.
+const CANONICAL_ATTRIBUTES = new Set(['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK']);
 
 const DICTIONARIES = {
     'ru-RU': ruEffects,

@@ -5,7 +5,7 @@ import { debugLog } from '../debug/falloutDebug';
 import { effectsDictToLegacyArray } from './effectsSync.js';
 import { resolveWeaponRangeFields } from '../../domain/range.js';
 import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
-import { ALL_SKILLS, calculateCarryWeight } from '../../domain/characterCreation.js';
+import { ALL_SKILLS, calculateCarryWeight, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
 
 // ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
 // атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится
@@ -185,11 +185,21 @@ export const selectActiveTimedEffects = (state) => {
 
 /**
  * Словарь атрибутов (Parameter-формат) → legacy-массив [{name, value}].
+ * Порядок — канон SPECIAL (слово владельца 2026-09-21): STR, PER, END, CHA,
+ * INT, AGI, LCK. Старые сейвы хранят исторический порядок STR, END, PER, AGI,
+ * INT, CHA, LCK — селектор выравнивает показ, а пересохранение пишет уже
+ * канонический порядок (сейвы самоисцеляются).
  * @param {{attributes?: Record<string, {id: string, base: number}>}} state
  * @returns {Array<{name: string, value: number}>}
  */
+const SPECIAL_ORDER_INDEX = new Map(CANONICAL_ATTRIBUTE_KEYS.map((key, index) => [key, index]));
+const specialOrderRank = (name) =>
+    SPECIAL_ORDER_INDEX.get(getCanonicalAttributeKey(name) ?? name) ?? CANONICAL_ATTRIBUTE_KEYS.length;
+
 export const selectLegacyAttributes = ({ attributes = {} } = {}) =>
-  Object.values(attributes).map((attr) => ({ name: attr.id, value: attr.base }));
+    Object.values(attributes)
+        .map((attr) => ({ name: attr.id, value: attr.base }))
+        .sort((a, b) => specialOrderRank(a.name) - specialOrderRank(b.name));
 
 /**
  * Словарь навыков (Parameter-формат) → legacy-массив: каталожные записи

@@ -23,7 +23,8 @@
     "modules/fallout/screens/WeaponsAndArmorScreen/modals",
     "src/store/characterState.ts",
     "src/saves/saveSnapshot.ts",
-    "src/store/characterActions.ts"
+    "src/store/characterActions.ts",
+    "src/engine"
   ],
   "extends": "expo/tsconfig.base"
 }
