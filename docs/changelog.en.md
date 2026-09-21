@@ -2,6 +2,73 @@
 
 ---
 
+## Fix — Installed robot-weapon mod survived only until save (patch 294)
+
+`toModIds` (domain/robotSlots.js) checked the `modIds` array first — even an
+empty one — and never reached `appliedMods`, which is what the mod-install
+modal writes. A robot slot restored from a save carries an empty
+`heldWeapon.modIds`, so after installing a capacitor into the Assaultron head
+laser the mod lived in `appliedMods` but the first `serializeSlot` wiped it:
+the capacitor vanished and stats reverted to base. Now `appliedMods` is the
+screen truth with unconditional priority; an empty object means "no mods"
+(uninstalling works too), while `modIds` remains the source for slim saves
+without a weapon object.
+
+Locked by tests (`__tests__/robot/assaultron-head-laser-mods.test.js`): the
+mixed form (empty `modIds` + fresh `appliedMods`), mod removal, slim saves, the
+full save → screen → modal → save → screen round-trip, and pipeline application
+(laser 5/115/8 + Mk III capacitor → 6/119/8).
+
+## Fix — Assaultron head laser capacitors in the install modal (patch 293)
+
+> Owner report (2026-09-21): "The Assaultron doesn't get mods for the head laser. They're missing from the weapon modification modal" (patch 292 applied).
+
+- Cause: 290–291 wired the capacitors into data, catalog and registry, but `db/catalogSource.js` — the row source for the install modal — never saw them: mod-slot rows came from human `weapon_mod_slots.json` plus `ROBOT_WEAPON_BASE_MAP` inheritance (3 legacy robot weapons), while the robot's own slots file was unread; robot mods were absent from mod rows.
+- Wiring: mod rows = human + robot mods (names already id-merged in the catalog, 290); mod-slot rows = human + inheritance + robot-owned slots (robot-owned wins). The modal itself is untouched: slots/mods/preview (including `damageModifier` +1..4 DC) all flow through the common path.
+- Guard: +4 install-path checks in `__tests__/robot/assaultron-head-laser-mods.test.js` (slot = Capacitor; exactly 4 capacitors in rank order; resolve by id with name/cost/weight/requirements; no leakage into human weapon slots).
+- Bonus from the white-screen diagnostics: `__tests__/debug/app-boot.test.js` — boot spine (App.js non-UI graph in load order; react-native modules excluded — the bundle build covers those).
+
+---
+
+
+## Architecture — Setting door and unified contract (patch 292)
+
+> Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
+
+- New setting door `modules/fallout/index.js`: an 8-rule agent-facing contract header plus a single `SETTING` export (meta / data / locale names).
+- `domain/registry.js`: 43 internal-file imports collapsed to one door import (getters unchanged; bindings map old local names to SETTING paths). `i18n/equipmentCatalog.js`: 93 imports down to one.
+- Group manifests `junk/index.js`, `recipes/index.js`, `equipmentKits/index.js` dissolved into the door (3 files deleted). `db/catalogSource.js`: perks via the door. `InventoryScreen`: power armor via the new `getPowerArmorData()` getter.
+- `docs/architecture/domain-map.md`: domain map — 4 layers (contract core / universal domain / mechanic engines / Fallout-specific), per-file table, split plan (specifics move to modules/fallout/logic in MK-3+).
+- Guard `__tests__/settings/settings-boundary.test.js`: no setting-internal imports outside modules/** (explicit, shrink-only allowlist of 12 debt files), registry and catalog read only the door, SETTING shape verified (including the 290–291 capacitors and perk names).
+- test-setting: header aligned with the common setting standard.
+
+---
+
+
+## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
+
+> Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.
+
+- `domain/registry.js` (the engine's single data-reading point) now imports `robot/weapon_mods.json` and `robot/weapon_mod_slots.json`: the robot catalog's `weaponMods` pool includes the capacitors (save restoration via `domain/enrichItem.js` finds them by id), plus clean keys `robotWeaponMods` and `robotWeaponModSlots` for the future install screen.
+- The mod field shape now follows the `applyWeaponMods` pipeline convention: flat additive `cost`/`weight` instead of modifier objects (the pipeline adds: `cost += mod.cost`, `weight += mod.weight` — exactly the table's «+4»/«+1»). `ammoPerAttack` stays: the rules' semantics «N shots per attack» is per attack, not per shot; its consumer will arrive with the install screen.
+- Who connects the mods: stat restoration is the live `enrichItem` pipeline (the save stores mod ids); installation for humans is `WeaponModificationModal` (db/catalogSource → catalog); for robot weapons there is no install screen per the owner's word («data only»), the data and registry are ready.
+- The fuse gained registry checks (12 checks total).
+
+---
+
+## Data — Unique mods for the Assaultron Head Laser (patch 290)
+
+> Owner's word (2026-09-21): «unique mods for the Assaultron Head Laser — in Russian exactly „Головной лазер“, not „Лазер головы“; the English name stays as is. It is a robot weapon; the mods fit only `robot_weapon_assaultron_head_laser` and live separately from the weapon. Data only; there is no robot weapon mods file — create one by analogy with human weapons».
+
+- Created the robot weapon mods data by analogy with human weapons: `data/equipment/robot/weapon_mods.json` (mods) + `robot/weapon_mod_slots.json` (slots) + ru/en i18n `robot/weapon_mods.json`.
+- Four capacitors (rules table): Mk III +1 {/CD}, 3 shots per attack, weight +0, cost +4; Mk IV +2, 4 shots, +1, +8, Science! 1; Mk V +3, 5 shots, +1, +12, Science! 2; Mk VI +4, 6 shots, +2, +16, Science! 3. All `unique: true`, `applies_to_ids` — the laser only, slot `Capacitor`, requirements: Robotics Expert 1 (+ Science! by rank).
+- The table's rank-less «Robotics Expert» is recorded as rank 1 — per the robot weapon data convention.
+- Weapon name: ru «Лазер головы Штурмотрона» → «Головной лазер Штурмотрона»; en «Assaultron Head Laser» — untouched.
+- Catalog wiring is import-and-merge-by-id only (no logic): `robotWeaponMods`, `robotWeaponModSlots` in the catalog and `getEquipmentData()`.
+- Fuse: `__tests__/robot/assaultron-head-laser-mods.test.js` — 11 checks over the table, slots, i18n and the name.
+
+---
+
 ## Fix — SPECIAL attribute order aligned with the rules (patch 289)
 
 > Owner's word (2026-09-21): «the attributes must go exactly this way and no other — Strength, Perception, Endurance, Charisma, Intelligence, Agility, Luck».

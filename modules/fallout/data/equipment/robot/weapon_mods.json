@@ -1,0 +1,90 @@
+[
+  {
+    "modType": "weapon",
+    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
+    "unique": true,
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Robotics Expert 1",
+    "perk2": "",
+    "skill": "Science",
+    "applies_to_ids": [
+      "robot_weapon_assaultron_head_laser"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "cost": 4,
+    "weight": 0,
+    "ammoPerAttack": 3
+  },
+  {
+    "modType": "weapon",
+    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
+    "unique": true,
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Robotics Expert 1",
+    "perk2": "Science! 1",
+    "skill": "Science",
+    "applies_to_ids": [
+      "robot_weapon_assaultron_head_laser"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 2
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "cost": 8,
+    "weight": 1,
+    "ammoPerAttack": 4
+  },
+  {
+    "modType": "weapon",
+    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
+    "unique": true,
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Robotics Expert 1",
+    "perk2": "Science! 2",
+    "skill": "Science",
+    "applies_to_ids": [
+      "robot_weapon_assaultron_head_laser"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 3
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "cost": 12,
+    "weight": 1,
+    "ammoPerAttack": 5
+  },
+  {
+    "modType": "weapon",
+    "id": "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi",
+    "unique": true,
+    "slot": "Capacitor",
+    "complexity": 4,
+    "perk1": "Robotics Expert 1",
+    "perk2": "Science! 3",
+    "skill": "Science",
+    "applies_to_ids": [
+      "robot_weapon_assaultron_head_laser"
+    ],
+    "damageModifier": {
+      "op": "+",
+      "value": 4
+    },
+    "effectChanges": [],
+    "qualityChanges": [],
+    "cost": 16,
+    "weight": 2,
+    "ammoPerAttack": 6
+  }
+]

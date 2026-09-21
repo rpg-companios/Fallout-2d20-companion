@@ -10,64 +10,67 @@
 // Все потребители (domain/*, компоненты) читают данные ТОЛЬКО через реестр.
 
 // ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
-import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
-import robotLimbsJson from '../modules/fallout/data/equipment/robot/limbs.json';
-import robotWeaponAsLimbJson from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
-import robotWeaponsJson from '../modules/fallout/data/equipment/robot/weapons.json';
-import robotArmorJson from '../modules/fallout/data/equipment/robot/armor.json';
-import robotArmorPlatingJson from '../modules/fallout/data/equipment/robot/armor_plating.json';
-import robotFramesJson from '../modules/fallout/data/equipment/robot/frames.json';
+// Дверь сеттинга (292): единственный импорт данных Fallout — modules/fallout/index.js
+// (контракт — в шапке двери). Привязки ниже — карта «прежнее локальное имя →
+// канонический путь SETTING»; новые данные = файл + строка в двери, не здесь.
+import { SETTING } from '../modules/fallout/index.js';
 
-import moduleOrigins from '../modules/fallout/data/origins/origins.json';
-import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
-import moduleCategories from '../modules/fallout/data/equipment/categories.json';
-import moduleTraits from '../modules/fallout/data/traits/traits.json';
-import modulePerks from '../modules/fallout/data/perks/perks.json';
-import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
-import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
-import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
-import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
-
-// Данные разбора (260, реформа 269) и рецептов (249–269): где лежат файлы —
-// знают листы групп (modules/fallout/data/junk, .../recipes), а не каждый
-// потребитель: «импорт, импорт, импорт» по документам не размножаем (270).
-// Реестр — единственная точка, куда смотрят движок, окно и операции.
-import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
-import {
-  RECIPE_CATEGORY_RULES as moduleCraftingCategoryRules,
-  RECIPE_FILES as CRAFTING_FILES,
-  RECIPE_MANIFEST as moduleCraftingIndex,
-} from '../modules/fallout/data/recipes/index.js';
-const moduleScrapJunk = JUNK_DATASET.junk;
-const moduleScrapMaterials = JUNK_DATASET.materials;
-const moduleScrapTables = JUNK_DATASET.tables;
-// i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
-import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
-import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
-import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
-import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
-import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
-import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
-import moduleRuUniqQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/uniq_qualities.json';
-import moduleEnUniqQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/uniq_qualities.json';
-import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
-import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
-import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
-import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
-import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
-import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
-import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
-import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
-import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
-import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
-import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
-import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
-import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
-import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
-
-
-import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
+const bodyplansJson = SETTING.data.bodyplans;
+const robotLimbsJson = SETTING.data.equipment.robot.limbs;
+const robotWeaponAsLimbJson = SETTING.data.equipment.robot.weaponAsLimb;
+const robotWeaponsJson = SETTING.data.equipment.robot.weapons;
+const robotArmorJson = SETTING.data.equipment.robot.armor;
+const robotArmorPlatingJson = SETTING.data.equipment.robot.armorPlating;
+const robotFramesJson = SETTING.data.equipment.robot.frames;
+const robotWeaponModsJson = SETTING.data.equipment.robot.weaponMods;
+const robotWeaponModSlotsJson = SETTING.data.equipment.robot.modSlots;
+const moduleOrigins = SETTING.data.origins;
+const moduleFitProfiles = SETTING.data.fitProfiles;
+const moduleCategories = SETTING.data.equipment.categories;
+const moduleTraits = SETTING.data.traits;
+const modulePerks = SETTING.data.perks;
+const moduleWeapons = SETTING.data.equipment.weapons;
+const moduleWeaponMods = SETTING.data.equipment.weaponMods;
+const moduleGeneralGoods = SETTING.data.equipment.generalGoods;
+const moduleDiseaseExposureRule = SETTING.data.rules.diseaseExposure;
+const moduleEquipmentKits = SETTING.data.equipmentKits;
+const moduleRuOriginsI18n = SETTING.names['ru-RU'].system.origins;
+const moduleEnOriginsI18n = SETTING.names['en-EN'].system.origins;
+const moduleRuTraitsI18n = SETTING.names['ru-RU'].system.traits;
+const moduleEnTraitsI18n = SETTING.names['en-EN'].system.traits;
+const moduleRuEquipmentKitsI18n = SETTING.names['ru-RU'].system.equipmentKits;
+const moduleEnEquipmentKitsI18n = SETTING.names['en-EN'].system.equipmentKits;
+const moduleRuUniqQualitiesI18n = SETTING.names['ru-RU'].system.uniqQualities;
+const moduleEnUniqQualitiesI18n = SETTING.names['en-EN'].system.uniqQualities;
+const moduleRuWeaponsI18n = SETTING.names['ru-RU'].equipment.weapons;
+const moduleEnWeaponsI18n = SETTING.names['en-EN'].equipment.weapons;
+const moduleRuClothesI18n = SETTING.names['ru-RU'].equipment.clothes;
+const moduleEnClothesI18n = SETTING.names['en-EN'].equipment.clothes;
+const moduleRuGeneralGoodsI18n = SETTING.names['ru-RU'].equipment.generalGoods;
+const moduleEnGeneralGoodsI18n = SETTING.names['en-EN'].equipment.generalGoods;
+const moduleRuWeaponModsI18n = SETTING.names['ru-RU'].equipment.weaponMods;
+const moduleEnWeaponModsI18n = SETTING.names['en-EN'].equipment.weaponMods;
+const moduleRuFoodI18n = SETTING.names['ru-RU'].consumables.food;
+const moduleEnFoodI18n = SETTING.names['en-EN'].consumables.food;
+const moduleRuDrinksI18n = SETTING.names['ru-RU'].consumables.drinks;
+const moduleEnDrinksI18n = SETTING.names['en-EN'].consumables.drinks;
+const moduleRuSettingsI18n = SETTING.names['ru-RU'].system.settings;
+const moduleEnSettingsI18n = SETTING.names['en-EN'].system.settings;
+const moduleUniqQualities = SETTING.data.equipment.uniqQualities;
+// Разбор и рецептура: листы групп (junk/index.js, recipes/index.js) растворены
+// в двери (292) — сборка здесь, по каноническим путям.
+const moduleScrapJunk = SETTING.data.junk.items;
+const moduleScrapMaterials = SETTING.data.junk.materials;
+const moduleScrapTables = SETTING.data.junk.tables;
+const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
+const CRAFTING_FILES = {
+  'ammo.json': SETTING.data.recipes.sections.ammo,
+  'weapons.json': SETTING.data.recipes.sections.weapons,
+  'chems.json': SETTING.data.recipes.sections.chems,
+  'food.json': SETTING.data.recipes.sections.food,
+  'drinks.json': SETTING.data.recipes.sections.drinks,
+};
+const moduleCraftingIndex = SETTING.data.recipes.manifest;
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getDiseasesCatalog } from '../i18n/conditionsCatalog';
@@ -144,7 +147,14 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
   generalWeapons: moduleWeapons,
   // Моды оружия: сейв хранит id установленных модов, характеристики
   // восстанавливаются применением модов к базе (domain/enrichItem.js).
-  weaponMods: moduleWeaponMods,
+  // Пул включает и моды оружия роботов (290): уникальные конденсаторы
+  // Головного лазера Штурмотрона живут в robot/weapon_mods.json и
+  // восстанавливаются тем же конвейером.
+  weaponMods: [...moduleWeaponMods, ...robotWeaponModsJson],
+  // Моды оружия роботов (290) отдельным списком и слоты для них: будущий
+  // экран установки читает «какие моды предлагать» отсюда, а не из пула.
+  robotWeaponMods: robotWeaponModsJson,
+  robotWeaponModSlots: robotWeaponModSlotsJson,
   // Слои защиты плоским списком; принадлежность слою — в поле layer.
   armorLayers: [
     ...(robotArmorJson.armor || []),
@@ -192,6 +202,11 @@ export function getModuleGeneralGoods() {
 /**
  * Комплекты модуля: { [kitId]: { items } }.
  */
+/** Силовая броня: множества и части (id, прочность, зоны защиты). Экраны — через этот геттер, не по путям данных (292). */
+export function getPowerArmorData() {
+  return SETTING.data.equipment.powerArmor;
+}
+
 export function getModuleEquipmentKits() {
   return moduleEquipmentKits;
 }
@@ -268,7 +283,7 @@ export function getScrapMaterials() {
 
 /** Подписи d20-таблиц разбора — словарь i18n (269: данные молчат). */
 export function getScrapTableLabels(locale) {
-  return (JUNK_DATASET.names[locale] ?? JUNK_DATASET.names['ru-RU']).tableLabels;
+  return (SETTING.names[locale] ?? SETTING.names['ru-RU']).junk.tableLabels;
 }
 
 /**

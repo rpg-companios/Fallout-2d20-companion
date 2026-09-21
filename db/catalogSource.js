@@ -12,9 +12,12 @@
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../i18n/locale';
-import perksData from '../modules/fallout/data/perks/perks.json';
-import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
-import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
+// Дверь сеттинга (292): перки и их имена — только через modules/fallout/index.js.
+import { SETTING } from '../modules/fallout/index.js';
+
+const perksData = SETTING.data.perks;
+const ruPerksData = SETTING.names['ru-RU'].perks;
+const enPerksData = SETTING.names['en-EN'].perks;
 
 // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
 const safeStr = (v) => (v === null || v === undefined ? null : String(v));
@@ -203,7 +206,9 @@ const buildModSlotRows = (catalog) => {
   Object.entries(ROBOT_WEAPON_BASE_MAP).forEach(([robotWeaponId, baseWeaponId]) => {
     if (modsOverridesData[baseWeaponId]) robotSlotOverrides[robotWeaponId] = modsOverridesData[baseWeaponId];
   });
-  const merged = { ...modsOverridesData, ...robotSlotOverrides };
+  // Собственные слоты робо-оружия (293): robot/weapon_mod_slots.json — приоритетнее
+  // наследования от людской базы (у Головного лазера Штурмотрона — Capacitor).
+  const merged = { ...modsOverridesData, ...robotSlotOverrides, ...(catalog.robotWeaponModSlots || {}) };
   const rows = [];
   for (const [weaponId, slots] of Object.entries(merged)) {
     for (const [slot, modIds] of Object.entries(slots)) {
@@ -223,7 +228,9 @@ const build = () => {
   const catalog = getEquipmentCatalog(locale);
   _cache = {
     weapons: (catalog.weapons || []).map(buildWeaponRow),
-    weaponMods: (catalog.weaponMods || []).map(buildWeaponModRow),
+    // Робо-моды оружия (293): сливаются с людскими — модалка установки
+    // resolveает их тем же catalogGetWeaponModById (имена слиты в каталоге, 290).
+    weaponMods: [...(catalog.weaponMods || []), ...(catalog.robotWeaponMods || [])].map(buildWeaponModRow),
     modSlots: buildModSlotRows(catalog),
     ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
     qualities: (catalog.qualities || []).map(buildQualityRow),

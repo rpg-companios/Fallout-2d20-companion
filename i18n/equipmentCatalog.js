@@ -1,102 +1,99 @@
 // Locale-specific display data (names, descriptions, flavour text)
-import moduleRuRobotWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
-import moduleRuRobotArmsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
-import moduleRuRobotArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
-import moduleRuRobotPlatingI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
-import moduleRuRobotFramesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
-import moduleRuRobotModulesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/modules.json';
-import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/items.json';
-import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
-import moduleRuRobotHeadsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
-import moduleRuRobotLegsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
-
-import moduleEnRobotWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
-import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
-import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
-import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
-import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
-import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
-import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
-import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
-import moduleEnRobotHeadsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
-import moduleEnRobotLegsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
-
-// Locale-independent kit data (items composition, no names)
-import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
-import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
-// i18n модуля сеттинга — по категориям (зеркало раскладки i18n/<locale>/data/).
-import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
-import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
-import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
-import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
-import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
-import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
-import moduleRuArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
-import moduleEnArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
-import moduleRuPowerArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
-import moduleEnPowerArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
-import moduleRuOdditiesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/oddities.json';
-import moduleEnOdditiesI18n from '../modules/fallout/i18n/en-EN/data/equipment/oddities.json';
-import moduleRuItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/items.json';
-import moduleEnItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/items.json';
-import moduleRuQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
-import moduleEnQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
-import moduleRuEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
-import moduleEnEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/effects.json';
-import moduleRuDamageEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
-import moduleEnDamageEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
-import moduleRuAmmoI18n from '../modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json';
-import moduleEnAmmoI18n from '../modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json';
-import moduleRuArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
-import moduleEnArmorModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json';
-import moduleRuUniqArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json';
-import moduleEnUniqArmorModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json';
-import moduleRuArmorEffectsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_effects.json';
-import moduleEnArmorEffectsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor_effects.json';
-import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
-import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
-import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
-import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
-import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
-import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
-import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
-import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
-import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
-import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
-import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
-import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
-import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
-import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
-import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
-import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
-import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
-// Locale-independent technical data (stats, ids, game mechanics)
-import moduleArmor from '../modules/fallout/data/equipment/armor.json';
-import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
-import moduleOddities from '../modules/fallout/data/equipment/oddities.json';
-import moduleAmmo from '../modules/fallout/data/equipment/ammo.json';
-import moduleArmorMods from '../modules/fallout/data/equipment/armor_mods.json';
-import moduleUniqArmorMods from '../modules/fallout/data/equipment/uniq_armor_mods.json';
-import moduleArmorEffects from '../modules/fallout/data/equipment/armor_effects.json';
-import moduleClothesData from '../modules/fallout/data/equipment/clothes.json';
-import moduleFood from '../modules/fallout/data/consumables/food.json';
-import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
-// Разбор (260, лист группы 270): хлам и материалы — из JUNK_DATASET;
-// пути к файлам описаны один раз (modules/fallout/data/junk/index.js).
-import moduleChems from '../modules/fallout/data/consumables/chems.json';
-import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
-import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
-import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
-import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
-import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
-import moduleRobotWeaponAsLimb from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
-import moduleRobotArmor from '../modules/fallout/data/equipment/robot/armor.json';
-import moduleRobotPlating from '../modules/fallout/data/equipment/robot/armor_plating.json';
-import moduleRobotFrames from '../modules/fallout/data/equipment/robot/frames.json';
-import moduleRobotWeapons from '../modules/fallout/data/equipment/robot/weapons.json';
-
-
+// Дверь сеттинга (292): каталог отображения читает данные Fallout только через
+// modules/fallout/index.js; привязки — карта «локальное имя → путь SETTING».
+import { SETTING } from '../modules/fallout/index.js';
+const moduleRuRobotWeaponsI18n = SETTING.names['ru-RU'].equipment.robot.weapons;
+const moduleRuRobotArmsI18n = SETTING.names['ru-RU'].equipment.robot.arms;
+const moduleRuRobotArmorI18n = SETTING.names['ru-RU'].equipment.robot.armor;
+const moduleRuRobotPlatingI18n = SETTING.names['ru-RU'].equipment.robot.plating;
+const moduleRuRobotFramesI18n = SETTING.names['ru-RU'].equipment.robot.frames;
+const moduleRuRobotModulesI18n = SETTING.names['ru-RU'].equipment.robot.modules;
+const moduleRuRobotItemsI18n = SETTING.names['ru-RU'].equipment.robot.items;
+const moduleRuRobotBodyI18n = SETTING.names['ru-RU'].equipment.robot.body;
+const moduleRuRobotHeadsI18n = SETTING.names['ru-RU'].equipment.robot.heads;
+const moduleRuRobotLegsI18n = SETTING.names['ru-RU'].equipment.robot.legs;
+const moduleRuRobotWeaponModsI18n = SETTING.names['ru-RU'].equipment.robot.weaponMods;
+const moduleEnRobotWeaponsI18n = SETTING.names['en-EN'].equipment.robot.weapons;
+const moduleEnRobotArmsI18n = SETTING.names['en-EN'].equipment.robot.arms;
+const moduleEnRobotArmorI18n = SETTING.names['en-EN'].equipment.robot.armor;
+const moduleEnRobotPlatingI18n = SETTING.names['en-EN'].equipment.robot.plating;
+const moduleEnRobotFramesI18n = SETTING.names['en-EN'].equipment.robot.frames;
+const moduleEnRobotModulesI18n = SETTING.names['en-EN'].equipment.robot.modules;
+const moduleEnRobotWeaponModsI18n = SETTING.names['en-EN'].equipment.robot.weaponMods;
+const moduleEnRobotItemsI18n = SETTING.names['en-EN'].equipment.robot.items;
+const moduleEnRobotBodyI18n = SETTING.names['en-EN'].equipment.robot.body;
+const moduleEnRobotHeadsI18n = SETTING.names['en-EN'].equipment.robot.heads;
+const moduleEnRobotLegsI18n = SETTING.names['en-EN'].equipment.robot.legs;
+const moduleWeapons = SETTING.data.equipment.weapons;
+const moduleGeneralGoods = SETTING.data.equipment.generalGoods;
+const moduleEquipmentKits = SETTING.data.equipmentKits;
+const moduleRuOriginsI18n = SETTING.names['ru-RU'].system.origins;
+const moduleEnOriginsI18n = SETTING.names['en-EN'].system.origins;
+const moduleRuTraitsI18n = SETTING.names['ru-RU'].system.traits;
+const moduleEnTraitsI18n = SETTING.names['en-EN'].system.traits;
+const moduleRuEquipmentKitsI18n = SETTING.names['ru-RU'].system.equipmentKits;
+const moduleEnEquipmentKitsI18n = SETTING.names['en-EN'].system.equipmentKits;
+const moduleRuArmorI18n = SETTING.names['ru-RU'].equipment.armor.sets;
+const moduleEnArmorI18n = SETTING.names['en-EN'].equipment.armor.sets;
+const moduleRuPowerArmorI18n = SETTING.names['ru-RU'].equipment.armor.powerArmor;
+const moduleEnPowerArmorI18n = SETTING.names['en-EN'].equipment.armor.powerArmor;
+const moduleRuOdditiesI18n = SETTING.names['ru-RU'].equipment.oddities;
+const moduleEnOdditiesI18n = SETTING.names['en-EN'].equipment.oddities;
+const moduleRuItemsI18n = SETTING.names['ru-RU'].equipment.items;
+const moduleEnItemsI18n = SETTING.names['en-EN'].equipment.items;
+const moduleRuQualitiesI18n = SETTING.names['ru-RU'].system.qualities;
+const moduleEnQualitiesI18n = SETTING.names['en-EN'].system.qualities;
+const moduleRuEffectsI18n = SETTING.names['ru-RU'].system.effects;
+const moduleEnEffectsI18n = SETTING.names['en-EN'].system.effects;
+const moduleRuDamageEffectsI18n = SETTING.names['ru-RU'].system.damageEffects;
+const moduleEnDamageEffectsI18n = SETTING.names['en-EN'].system.damageEffects;
+const moduleRuAmmoI18n = SETTING.names['ru-RU'].equipment.ammoTypes;
+const moduleEnAmmoI18n = SETTING.names['en-EN'].equipment.ammoTypes;
+const moduleRuArmorModsI18n = SETTING.names['ru-RU'].equipment.armor.mods;
+const moduleEnArmorModsI18n = SETTING.names['en-EN'].equipment.armor.mods;
+const moduleRuUniqArmorModsI18n = SETTING.names['ru-RU'].equipment.armor.uniqMods;
+const moduleEnUniqArmorModsI18n = SETTING.names['en-EN'].equipment.armor.uniqMods;
+const moduleRuArmorEffectsI18n = SETTING.names['ru-RU'].equipment.armor.effects;
+const moduleEnArmorEffectsI18n = SETTING.names['en-EN'].equipment.armor.effects;
+const moduleRuWeaponsI18n = SETTING.names['ru-RU'].equipment.weapons;
+const moduleEnWeaponsI18n = SETTING.names['en-EN'].equipment.weapons;
+const moduleRuClothesI18n = SETTING.names['ru-RU'].equipment.clothes;
+const moduleEnClothesI18n = SETTING.names['en-EN'].equipment.clothes;
+const moduleRuGeneralGoodsI18n = SETTING.names['ru-RU'].equipment.generalGoods;
+const moduleEnGeneralGoodsI18n = SETTING.names['en-EN'].equipment.generalGoods;
+const moduleRuWeaponModsI18n = SETTING.names['ru-RU'].equipment.weaponMods;
+const moduleEnWeaponModsI18n = SETTING.names['en-EN'].equipment.weaponMods;
+const moduleRuFoodI18n = SETTING.names['ru-RU'].consumables.food;
+const moduleEnFoodI18n = SETTING.names['en-EN'].consumables.food;
+const moduleRuDrinksI18n = SETTING.names['ru-RU'].consumables.drinks;
+const moduleEnDrinksI18n = SETTING.names['en-EN'].consumables.drinks;
+const moduleRuChemsI18n = SETTING.names['ru-RU'].consumables.chems;
+const moduleEnChemsI18n = SETTING.names['en-EN'].consumables.chems;
+const moduleRuMagazinesI18n = SETTING.names['ru-RU'].consumables.magazines;
+const moduleEnMagazinesI18n = SETTING.names['en-EN'].consumables.magazines;
+const moduleArmor = SETTING.data.equipment.armor;
+const modulePowerArmor = SETTING.data.equipment.powerArmor;
+const moduleOddities = SETTING.data.equipment.oddities;
+const moduleAmmo = SETTING.data.equipment.ammo;
+const moduleArmorMods = SETTING.data.equipment.armorMods;
+const moduleUniqArmorMods = SETTING.data.equipment.uniqArmorMods;
+const moduleArmorEffects = SETTING.data.equipment.armorEffects;
+const moduleClothesData = SETTING.data.equipment.clothes;
+const moduleFood = SETTING.data.consumables.food;
+const moduleDrinks = SETTING.data.consumables.drinks;
+const moduleChems = SETTING.data.consumables.chems;
+const moduleMagazines = SETTING.data.consumables.magazines;
+const moduleWeaponMods = SETTING.data.equipment.weaponMods;
+const moduleRobotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+const moduleRobotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+const moduleRobotParts = SETTING.data.equipment.robotParts;
+const moduleWeaponModSlots = SETTING.data.equipment.weaponModSlots;
+const moduleRobotLimbs = SETTING.data.equipment.robot.limbs;
+const moduleRobotWeaponAsLimb = SETTING.data.equipment.robot.weaponAsLimb;
+const moduleRobotArmor = SETTING.data.equipment.robot.armor;
+const moduleRobotPlating = SETTING.data.equipment.robot.armorPlating;
+const moduleRobotFrames = SETTING.data.equipment.robot.frames;
+const moduleRobotWeapons = SETTING.data.equipment.robot.weapons;
 
 import { getCurrentModuleLocale } from './locale';
 import { expandTrueItems } from '../domain/packMerge';
@@ -124,12 +121,13 @@ const moduleRuI18n = {
   clothes: moduleRuClothesI18n,
   generalGoods: moduleRuGeneralGoodsI18n,
   weaponMods: moduleRuWeaponModsI18n,
+  robotWeaponMods: moduleRuRobotWeaponModsI18n,
   food: moduleRuFoodI18n,
   drinks: moduleRuDrinksI18n,
   chems: moduleRuChemsI18n,
   magazines: moduleRuMagazinesI18n,
-  junk: JUNK_DATASET.names['ru-RU'].junk,
-  materials: JUNK_DATASET.names['ru-RU'].materials,
+  junk: SETTING.names['ru-RU'].junk.items,
+  materials: SETTING.names['ru-RU'].junk.materials,
 };
 
 const moduleEnI18n = {
@@ -151,12 +149,13 @@ const moduleEnI18n = {
   clothes: moduleEnClothesI18n,
   generalGoods: moduleEnGeneralGoodsI18n,
   weaponMods: moduleEnWeaponModsI18n,
+  robotWeaponMods: moduleEnRobotWeaponModsI18n,
   food: moduleEnFoodI18n,
   drinks: moduleEnDrinksI18n,
   chems: moduleEnChemsI18n,
   magazines: moduleEnMagazinesI18n,
-  junk: JUNK_DATASET.names['en-EN'].junk,
-  materials: JUNK_DATASET.names['en-EN'].materials,
+  junk: SETTING.names['en-EN'].junk.items,
+  materials: SETTING.names['en-EN'].junk.materials,
 };
 
 const ALL_KIT_DATA = {
@@ -406,14 +405,15 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
   // Разбор (260): хлам и материалы — те же правила сборки, что у остальных
   // каталогов: данные задают механику, i18n — имя; отсутствие имени — падение.
-  const mergedJunk = mergeById(JUNK_DATASET.junk, moduleI18n.junk);
-  const mergedScrapMaterials = mergeById(JUNK_DATASET.materials, moduleI18n.materials);
+  const mergedJunk = mergeById(SETTING.data.junk.items, moduleI18n.junk);
+  const mergedScrapMaterials = mergeById(SETTING.data.junk.materials, moduleI18n.materials);
 
   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
   const mergedRobotBody = limbsOfType('body');
   const mergedRobotHeads = limbsOfType('head');
   const mergedRobotLegs = limbsOfType('mover');
   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
+  const mergedRobotWeaponMods = mergeById(moduleRobotWeaponMods, moduleI18n.robotWeaponMods);
   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
 
@@ -465,6 +465,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     materials: mergedScrapMaterials,
     oddities: mergedOddities,
     weaponMods: mergedWeaponMods,
+    robotWeaponMods: mergedRobotWeaponMods,
+    robotWeaponModSlots: moduleRobotWeaponModSlots,
     armorMods: mergedArmorMods,
     uniqArmorMods: mergedUniqArmorMods,
     modsOverrides: moduleWeaponModSlots,
@@ -491,6 +493,7 @@ export const getEquipmentData = () => ({
   weapons: moduleWeapons,
   armor: moduleArmor,
   weaponMods: moduleWeaponMods,
+  robotWeaponMods: moduleRobotWeaponMods,
   armorMods: moduleArmorMods,
   uniqArmorMods: moduleUniqArmorMods,
   ammo: moduleAmmo,

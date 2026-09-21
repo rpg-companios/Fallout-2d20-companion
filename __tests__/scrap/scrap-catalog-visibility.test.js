@@ -51,15 +51,13 @@ describe('каталог для окон (добыча/покупка)', () => {
   });
 });
 
-describe('листы групп данных (270): пути — в одном месте', () => {
-  it('реестр и каталог не импортируют JSON хлама/рецептов сами — только лист группы', () => {
-    for (const [rel, banned] of [
-      ['domain/registry.js', ["data/junk/junk.json'", "data/junk/material.json'", "data/recipes/ammo.json'"]],
-      ['i18n/equipmentCatalog.js', ["data/junk/junk.json'", "data/junk/material.json'"]],
-    ]) {
+describe('дверь сеттинга (292): пути — в одном месте', () => {
+  it('реестр и каталог читают сеттинг только через дверь (без внутренних путей)', () => {
+    for (const rel of ['domain/registry.js', 'i18n/equipmentCatalog.js']) {
       const source = readText(rel);
-      for (const b of banned) expect(source, `${rel}: ${b}`).not.toContain(b);
-      expect(source).toContain('data/junk/index.js');
+      expect(source, `${rel}: дверь`).toContain('modules/fallout/index.js');
+      expect(source, `${rel}: внутренности data/`).not.toMatch(/from '[^']*modules\/fallout\/data\//);
+      expect(source, `${rel}: внутренности i18n/`).not.toMatch(/from '[^']*modules\/fallout\/i18n\//);
     }
   });
 

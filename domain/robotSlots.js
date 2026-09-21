@@ -56,9 +56,14 @@ const EMPTY_ARMOR_LAYERS = () => ({ frame: null, plating: null, armor: null });
  */
 export const toModIds = (source) => {
   if (!source || typeof source !== 'object') return [];
-  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
+  // appliedMods — истина экрана: модалка WeaponModificationModal пишет именно её,
+  // а modIds у восстановленного heldWeapon остаётся служебным (часто пустым) поле-
+  // выгрузки. Если массив смотрит первым, пустой modIds маскирует свежие appliedMods
+  // и установленный мод теряется при сохранении слота. Пустой объект appliedMods —
+  // «модов нет» (снятие мода тоже истина экрана), поэтому приоритет безусловно.
   const map = source.appliedMods;
   if (map && typeof map === 'object') return Object.values(map).filter(Boolean);
+  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
   return [];
 };
 

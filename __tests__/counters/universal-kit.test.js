@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import origins from '../../modules/fallout/data/origins/origins.json';
-import kits from '../../modules/fallout/data/equipmentKits/index.js';
+import { SETTING } from '../../modules/fallout/index.js';
+
+const kits = SETTING.data.equipmentKits;
 import ruKits from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
 import enKits from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
 import { resolveLevelValue } from '../../domain/levelBands';
