@@ -1,0 +1,151 @@
+#!/bin/sh
+# Патч 294: appliedMods-приоритет в toModIds — мод робо-оружия выживает при сохранении.
+# Применять из корня репозитория: sh patchs/294-robot-weapon-mod-survives-save.patch
+# Зависит от патча 293 (модалка установки конденсаторов).
+patch -p1 <<'PATCH_294_EOF'
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index 2cf4acd..3042c1e 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -22,6 +22,9 @@ import {
+   catalogGetSlotsForWeapon,
+   catalogGetWeaponModById,
+ } from '../../db/catalogSource';
++import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
++import { getRobotLimbCatalog } from '../../domain/registry';
++import { applyWeaponMods } from '../../domain/enrichItem';
+ 
+ const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+ const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+@@ -156,3 +159,55 @@ describe('установка: модалка модернизации получ
+     expect(catalogGetModsForWeaponSlot('weapon_002', 'Capacitor')).toEqual([]);
+   });
+ });
++
++describe('применение: установленный конденсатор меняет статы лазера (294)', () => {
++  const MK3 = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii';
++  const LASER = 'robot_weapon_assaultron_head_laser';
++
++  it('формат модалки (appliedMods) читается робо-машиной: toModIds', () => {
++    expect(toModIds({ appliedMods: { Capacitor: MK3 } })).toEqual([MK3]);
++    // регрессия 294: пустой служебный modIds не должен маскировать appliedMods
++    // (heldWeapon после deserialize несёт modIds: [], модалка дописывает appliedMods)
++    expect(toModIds({ modIds: [], appliedMods: { Capacitor: MK3 } })).toEqual([MK3]);
++    // снятие мода: пустые appliedMods — тоже истина экрана
++    expect(toModIds({ modIds: [MK3], appliedMods: {} })).toEqual([]);
++    // худой сейв без heldWeapon-объекта: modIds остаётся источником
++    expect(toModIds({ modIds: [MK3] })).toEqual([MK3]);
++  });
++
++  it('цикл слота: appliedMods переживают serialize → deserialize (сейв → экран)', () => {
++    // Раунд-трип как в приложении: сейв (худая форма) → экран (толстая) →
++    // робо-ветка модалки дописывает appliedMods в heldWeapon → сейв → экран.
++    const saved = {
++      content: 'robot_arm_assaultron',
++      armorLayers: { frame: null, plating: null, armor: null },
++      heldWeaponId: LASER,
++      heldWeaponMods: [],
++      installedWeapons: [],
++    };
++    const onScreen = deserializeSlot(saved);            // толстая форма экрана
++    expect(onScreen.heldWeapon?.weaponId).toBe(LASER);
++    const afterModal = {                                 // handleApplyModification
++      ...onScreen,
++      heldWeapon: { ...onScreen.heldWeapon, appliedMods: { Capacitor: MK3 } },
++    };
++    const stored = serializeSlot(afterModal);           // обратно в сейв
++    expect(stored.heldWeaponId).toBe(LASER);
++    expect(stored.heldWeaponMods).toEqual([MK3]);
++    const restored = deserializeSlot(stored);           // снова экран
++    expect(restored.heldWeapon).toBeTruthy();
++    expect(restored.heldWeapon.modIds).toEqual([MK3]);
++    expect(restored.heldWeapon.appliedMods.Capacitor).toBe(MK3);
++  });
++
++  it('конвейер: лазер 5 урона / 115 цены / 8 веса + Mk III → 6 / 119 / 8', () => {
++    const catalog = getRobotLimbCatalog();
++    const base = SETTING.data.equipment.robot.weapons.find((w) => w.id === LASER);
++    const mod = catalog.weaponMods.find((m) => m.id === MK3);
++    expect(mod).toBeTruthy();
++    const result = applyWeaponMods(base, [mod]);
++    expect(Number(result.damage)).toBe(6);
++    expect(Number(result.cost)).toBe(119);
++    expect(Number(result.weight)).toBe(8);
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 509f4f7..fb3c0fb 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,23 @@
+ 
+ ---
+ 
++## Fix — Installed robot-weapon mod survived only until save (patch 294)
++
++`toModIds` (domain/robotSlots.js) checked the `modIds` array first — even an
++empty one — and never reached `appliedMods`, which is what the mod-install
++modal writes. A robot slot restored from a save carries an empty
++`heldWeapon.modIds`, so after installing a capacitor into the Assaultron head
++laser the mod lived in `appliedMods` but the first `serializeSlot` wiped it:
++the capacitor vanished and stats reverted to base. Now `appliedMods` is the
++screen truth with unconditional priority; an empty object means "no mods"
++(uninstalling works too), while `modIds` remains the source for slim saves
++without a weapon object.
++
++Locked by tests (`__tests__/robot/assaultron-head-laser-mods.test.js`): the
++mixed form (empty `modIds` + fresh `appliedMods`), mod removal, slim saves, the
++full save → screen → modal → save → screen round-trip, and pipeline application
++(laser 5/115/8 + Mk III capacitor → 6/119/8).
++
+ ## Fix — Assaultron head laser capacitors in the install modal (patch 293)
+ 
+ > Owner report (2026-09-21): "The Assaultron doesn't get mods for the head laser. They're missing from the weapon modification modal" (patch 292 applied).
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2898cd4..e3ed713 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,22 @@
+ 
+ ---
+ 
++## Исправление — Установленный мод робо-оружия выживал только до сохранения (патч 294)
++
++`toModIds` (domain/robotSlots.js) первым делом смотрел на массив `modIds` — даже
++пустой — и не доходил до `appliedMods`, которые пишет модалка установки модов.
++У робо-слота, восстановленного из сейва, `heldWeapon.modIds` пуст, поэтому после
++установки конденсатора в Головной лазер мод жил в `appliedMods`, но при первом
++же сохранении слота `serializeSlot` выгружал пустоту: конденсатор пропадал,
++статы возвращались к базе. Теперь `appliedMods` — истина экрана: приоритет
++безусловный, пустой объект означает «модов нет» (снятие мода тоже работает),
++`modIds` остаётся источником для худых сейвов без объекта оружия.
++
++Заперто тестами (`__tests__/robot/assaultron-head-laser-mods.test.js`): смешанная
++форма (пустой `modIds` + свежие `appliedMods`), снятие мода, худой сейв, полный
++раунд-трип сейв → экран → модалка → сейв → экран и применение конвейером
++(лазер 5/115/8 + конденсатор Mk III → 6/119/8).
++
+ ## Исправление — Конденсаторы Головного лазера в модалке установки (патч 293)
+ 
+ > Сообщение владельца (2026-09-21): «Штурмотрон не получает моды для головного лазера. Их нет в модалке модернизации оружия» (патч 292 установлен).
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index c52491a..18b039b 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -56,9 +56,14 @@ const EMPTY_ARMOR_LAYERS = () => ({ frame: null, plating: null, armor: null });
+  */
+ export const toModIds = (source) => {
+   if (!source || typeof source !== 'object') return [];
+-  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
++  // appliedMods — истина экрана: модалка WeaponModificationModal пишет именно её,
++  // а modIds у восстановленного heldWeapon остаётся служебным (часто пустым) поле-
++  // выгрузки. Если массив смотрит первым, пустой modIds маскирует свежие appliedMods
++  // и установленный мод теряется при сохранении слота. Пустой объект appliedMods —
++  // «модов нет» (снятие мода тоже истина экрана), поэтому приоритет безусловно.
+   const map = source.appliedMods;
+   if (map && typeof map === 'object') return Object.values(map).filter(Boolean);
++  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
+   return [];
+ };
+ 
+PATCH_294_EOF
