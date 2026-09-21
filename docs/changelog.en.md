@@ -2,6 +2,23 @@
 
 ---
 
+## Fix — Installed robot-weapon mod survived only until save (patch 294)
+
+`toModIds` (domain/robotSlots.js) checked the `modIds` array first — even an
+empty one — and never reached `appliedMods`, which is what the mod-install
+modal writes. A robot slot restored from a save carries an empty
+`heldWeapon.modIds`, so after installing a capacitor into the Assaultron head
+laser the mod lived in `appliedMods` but the first `serializeSlot` wiped it:
+the capacitor vanished and stats reverted to base. Now `appliedMods` is the
+screen truth with unconditional priority; an empty object means "no mods"
+(uninstalling works too), while `modIds` remains the source for slim saves
+without a weapon object.
+
+Locked by tests (`__tests__/robot/assaultron-head-laser-mods.test.js`): the
+mixed form (empty `modIds` + fresh `appliedMods`), mod removal, slim saves, the
+full save → screen → modal → save → screen round-trip, and pipeline application
+(laser 5/115/8 + Mk III capacitor → 6/119/8).
+
 ## Fix — Assaultron head laser capacitors in the install modal (patch 293)
 
 > Owner report (2026-09-21): "The Assaultron doesn't get mods for the head laser. They're missing from the weapon modification modal" (patch 292 applied).

@@ -22,6 +22,9 @@ import {
   catalogGetSlotsForWeapon,
   catalogGetWeaponModById,
 } from '../../db/catalogSource';
+import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
+import { getRobotLimbCatalog } from '../../domain/registry';
+import { applyWeaponMods } from '../../domain/enrichItem';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
 const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
@@ -154,5 +157,57 @@ describe('установка: модалка модернизации получ
 
   it('робо-моды не утекают в людские слоты: у обычного оружия Capacitor пуст', () => {
     expect(catalogGetModsForWeaponSlot('weapon_002', 'Capacitor')).toEqual([]);
+  });
+});
+
+describe('применение: установленный конденсатор меняет статы лазера (294)', () => {
+  const MK3 = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii';
+  const LASER = 'robot_weapon_assaultron_head_laser';
+
+  it('формат модалки (appliedMods) читается робо-машиной: toModIds', () => {
+    expect(toModIds({ appliedMods: { Capacitor: MK3 } })).toEqual([MK3]);
+    // регрессия 294: пустой служебный modIds не должен маскировать appliedMods
+    // (heldWeapon после deserialize несёт modIds: [], модалка дописывает appliedMods)
+    expect(toModIds({ modIds: [], appliedMods: { Capacitor: MK3 } })).toEqual([MK3]);
+    // снятие мода: пустые appliedMods — тоже истина экрана
+    expect(toModIds({ modIds: [MK3], appliedMods: {} })).toEqual([]);
+    // худой сейв без heldWeapon-объекта: modIds остаётся источником
+    expect(toModIds({ modIds: [MK3] })).toEqual([MK3]);
+  });
+
+  it('цикл слота: appliedMods переживают serialize → deserialize (сейв → экран)', () => {
+    // Раунд-трип как в приложении: сейв (худая форма) → экран (толстая) →
+    // робо-ветка модалки дописывает appliedMods в heldWeapon → сейв → экран.
+    const saved = {
+      content: 'robot_arm_assaultron',
+      armorLayers: { frame: null, plating: null, armor: null },
+      heldWeaponId: LASER,
+      heldWeaponMods: [],
+      installedWeapons: [],
+    };
+    const onScreen = deserializeSlot(saved);            // толстая форма экрана
+    expect(onScreen.heldWeapon?.weaponId).toBe(LASER);
+    const afterModal = {                                 // handleApplyModification
+      ...onScreen,
+      heldWeapon: { ...onScreen.heldWeapon, appliedMods: { Capacitor: MK3 } },
+    };
+    const stored = serializeSlot(afterModal);           // обратно в сейв
+    expect(stored.heldWeaponId).toBe(LASER);
+    expect(stored.heldWeaponMods).toEqual([MK3]);
+    const restored = deserializeSlot(stored);           // снова экран
+    expect(restored.heldWeapon).toBeTruthy();
+    expect(restored.heldWeapon.modIds).toEqual([MK3]);
+    expect(restored.heldWeapon.appliedMods.Capacitor).toBe(MK3);
+  });
+
+  it('конвейер: лазер 5 урона / 115 цены / 8 веса + Mk III → 6 / 119 / 8', () => {
+    const catalog = getRobotLimbCatalog();
+    const base = SETTING.data.equipment.robot.weapons.find((w) => w.id === LASER);
+    const mod = catalog.weaponMods.find((m) => m.id === MK3);
+    expect(mod).toBeTruthy();
+    const result = applyWeaponMods(base, [mod]);
+    expect(Number(result.damage)).toBe(6);
+    expect(Number(result.cost)).toBe(119);
+    expect(Number(result.weight)).toBe(8);
   });
 });
