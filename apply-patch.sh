@@ -39,6 +39,9 @@ usage() {
   ./apply-patch.sh --mark-through <номер>
                                   записать «всё до <номер> уже применено»
                                   в локальное состояние (дерево не трогает)
+  ./apply-patch.sh --mark <номер>
+                                  записать в состояние ровно один патч
+                                  (симметрия --unmark; дерево не трогает)
   ./apply-patch.sh --unmark <номер>
                                   вычеркнуть <номер> из записи состояния
 
@@ -85,6 +88,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --mark-through)
       MODE="mark"
+      shift
+      ;;
+    --mark)
+      MODE="mark-one"
       shift
       ;;
     --unmark)
@@ -269,6 +276,21 @@ find_by_number() {
   return 1
 }
 
+if [[ "$MODE" == "mark-one" ]]; then
+  TARGET="$(find_by_number "$PATCH_ID")" || {
+    echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
+    exit 1
+  }
+  if state_has "$TARGET"; then
+    echo "Патч $TARGET уже в записи состояния."
+  else
+    state_add "$TARGET"
+    echo "Записан ровно один: $TARGET (дерево не изменено)."
+  fi
+  echo "Файл записи: $STATE_FILE"
+  exit 0
+fi
+
 if [[ "$MODE" == "mark" ]]; then
   TARGET="$(find_by_number "$PATCH_ID")" || {
     echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
@@ -412,6 +434,22 @@ fi
 if [[ ${#RECORDED[@]} -eq 0 && ${#QUEUE[@]} -gt 0 ]]; then
   first_state="$(patch_state "$(extract_patch "${ALL_PATCHES[0]}")")"
   if [[ "$first_state" != "pending" ]]; then
+    # Сводка по дереву: сколько патчей выглядит стоящими и какой старший
+    # обратимо стоящий — это подсказка для --mark-through, а не истина.
+    sniff_applied=0
+    sniff_applied_max=""
+    sniff_conflict=0
+    for name in "${ALL_PATCHES[@]}"; do
+      case "$(patch_state "$(extract_patch "$name")")" in
+        applied)
+          sniff_applied=$((sniff_applied + 1))
+          sniff_applied_max="$name"
+          ;;
+        conflict)
+          sniff_conflict=$((sniff_conflict + 1))
+          ;;
+      esac
+    done
     echo "Остановка: первый патч цепочки (${ALL_PATCHES[0]}) на этом дереве"
     case "$first_state" in
       applied)  echo "уже стоит (откатывается начисто), " ;;
@@ -420,8 +458,18 @@ if [[ ${#RECORDED[@]} -eq 0 && ${#QUEUE[@]} -gt 0 ]]; then
     echo "а локальной записи состояния нет ($STATE_FILE). Применять вслепую —"
     echo "значит риск положить патчи поверх твоих локальных правок."
     echo
-    echo "Если нужные патчи уже стоят:"
-    echo "  ./apply-patch.sh --mark-through <последний номер, который точно стоит>"
+    echo "По дереву видно:"
+    echo "  стоит обратимо:      $sniff_applied (старший: ${sniff_applied_max:-—})"
+    echo "  контекст разошёлся:  $sniff_conflict (правлено локально или влито)"
+    echo
+    if [[ -n "$sniff_applied_max" ]]; then
+      echo "Похоже, твоё дерево — до № $(patch_number "$sniff_applied_max") включительно."
+      echo "Если согласен:"
+      echo "  ./apply-patch.sh --mark-through $(patch_number "$sniff_applied_max")"
+      echo
+    fi
+    echo "Точечно записать/вычеркнуть один патч:"
+    echo "  ./apply-patch.sh --mark <номер>   |   ./apply-patch.sh --unmark <номер>"
     echo
     echo "Если дерево должно быть чистым от патчей — проверь ветку:"
     echo "  git status && git log --oneline -5"
