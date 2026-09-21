@@ -16,13 +16,15 @@
 // данных оружия роботов («Robotics Expert 1»).
 
 import { describe, it, expect } from 'vitest';
-import robotWeaponMods from '../../modules/fallout/data/equipment/robot/weapon_mods.json';
-import robotWeaponModSlots from '../../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
-import ruWeaponMods from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
-import enWeaponMods from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
-import ruRobotWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
-import enRobotWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
-import robotWeaponsData from '../../modules/fallout/data/equipment/robot/weapons.json';
+import { SETTING } from '../../modules/fallout/index.js';
+
+const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+const ruWeaponMods = SETTING.names['ru-RU'].equipment.robot.weaponMods;
+const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
+const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
+const enRobotWeapons = SETTING.names['en-EN'].equipment.robot.weapons;
+const robotWeaponsData = SETTING.data.equipment.robot.weapons;
 import { getRobotLimbCatalog } from '../../domain/registry';
 
 const LASER_ID = 'robot_weapon_assaultron_head_laser';

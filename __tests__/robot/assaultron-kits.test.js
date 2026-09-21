@@ -7,7 +7,9 @@
 //    оружием, у которого есть статы (урон/тип/навык) для экрана экипировки.
 import { describe, it, expect } from 'vitest';
 
-import kits from '../../modules/fallout/data/equipmentKits/index.js';
+import { SETTING } from '../../modules/fallout/index.js';
+
+const kits = SETTING.data.equipmentKits;
 import origins from '../../modules/fallout/data/origins/origins.json';
 import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
 import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';

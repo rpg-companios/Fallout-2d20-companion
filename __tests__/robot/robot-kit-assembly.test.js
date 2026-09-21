@@ -22,7 +22,9 @@ vi.mock('../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScre
   tWeaponsAndArmorScreen: (key) => key,
 }));
 
-import kits from '../../modules/fallout/data/equipmentKits/index.js';
+import { SETTING } from '../../modules/fallout/index.js';
+
+const kits = SETTING.data.equipmentKits;
 import { resolveKitItems } from '../../domain/kitResolver';
 import { initRobotSlots } from '../../domain/robotEquip';
 import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';

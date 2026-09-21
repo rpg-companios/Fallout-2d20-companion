@@ -2,6 +2,20 @@
 
 ---
 
+## Architecture — Setting door and unified contract (patch 292)
+
+> Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
+
+- New setting door `modules/fallout/index.js`: an 8-rule agent-facing contract header plus a single `SETTING` export (meta / data / locale names).
+- `domain/registry.js`: 43 internal-file imports collapsed to one door import (getters unchanged; bindings map old local names to SETTING paths). `i18n/equipmentCatalog.js`: 93 imports down to one.
+- Group manifests `junk/index.js`, `recipes/index.js`, `equipmentKits/index.js` dissolved into the door (3 files deleted). `db/catalogSource.js`: perks via the door. `InventoryScreen`: power armor via the new `getPowerArmorData()` getter.
+- `docs/architecture/domain-map.md`: domain map — 4 layers (contract core / universal domain / mechanic engines / Fallout-specific), per-file table, split plan (specifics move to modules/fallout/logic in MK-3+).
+- Guard `__tests__/settings/settings-boundary.test.js`: no setting-internal imports outside modules/** (explicit, shrink-only allowlist of 12 debt files), registry and catalog read only the door, SETTING shape verified (including the 290–291 capacitors and perk names).
+- test-setting: header aligned with the common setting standard.
+
+---
+
+
 ## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
 
 > Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.

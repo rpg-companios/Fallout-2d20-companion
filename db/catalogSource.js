@@ -12,9 +12,12 @@
 
 import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../i18n/locale';
-import perksData from '../modules/fallout/data/perks/perks.json';
-import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
-import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
+// Дверь сеттинга (292): перки и их имена — только через modules/fallout/index.js.
+import { SETTING } from '../modules/fallout/index.js';
+
+const perksData = SETTING.data.perks;
+const ruPerksData = SETTING.names['ru-RU'].perks;
+const enPerksData = SETTING.names['en-EN'].perks;
 
 // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
 const safeStr = (v) => (v === null || v === undefined ? null : String(v));

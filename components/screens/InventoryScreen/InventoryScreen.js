@@ -22,7 +22,7 @@ import {
   hasFrame,
   FUSION_CORE_ID,
 } from '../../../domain/powerArmor';
-import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
+import { getPowerArmorData } from '../../../domain/registry';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
 import { slotsForLimbType, isArmAttachment, canReplaceArmWeapon } from '../../../domain/robotSlots';
 import { rerollConsumableRadiationRoll } from '../../../domain/effects';
@@ -52,7 +52,7 @@ const PARAM_FIELDS = [
 
 // Каталог механики силовой брони по id (макс. прочность частей, зоны защиты).
 const PA_CATALOG_BY_ID = Object.fromEntries(
-  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
+  Object.values(getPowerArmorData()).flatMap((set) => set.pieces).map((p) => [p.id, p]),
 );
 
 const flattenItemParams = (item) => {
