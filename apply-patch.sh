@@ -11,6 +11,21 @@ ROOT_DIR="$(
   pwd
 )"
 
+# Цепочка может переписать сам apply-patch.sh (так делает патч 295): bash
+# читает сценарий по смещениям, и перезапись файла посреди выполнения ломает
+# поток команд. Работаем со стабильной копией себя; оригинальный каталог
+# передаём через окружение (копия живёт во временном каталоге).
+if [[ "${APPLY_PATCH_STABLE:-}" != "1" ]]; then
+  STABLE_SELF="$(mktemp "${TMPDIR:-/tmp}/apply-patch.stable.XXXXXX.sh")"
+  cp -- "${BASH_SOURCE[0]}" "$STABLE_SELF"
+  chmod +x -- "$STABLE_SELF"
+  export APPLY_PATCH_STABLE=1
+  export APPLY_PATCH_ROOT="$ROOT_DIR"
+  export APPLY_PATCH_SELF="$STABLE_SELF"
+  exec bash "$STABLE_SELF" "$@"
+fi
+ROOT_DIR="${APPLY_PATCH_ROOT:?}"
+
 usage() {
   cat <<'USAGE'
 Использование:
@@ -32,6 +47,8 @@ usage() {
 Состояние НЕ «вынюхивается» из дерева: локальные коммиты и правки между
 запусками не сбивают цепочку. Недостающие патчи либо встают начисто,
 либо скрипт останавливается с точным отчётом, ничего не ломая.
+Патч, который доказуемо уже стоит (полный обратный откат возможен),
+в запись заносится без применения — дерево не трогается.
 
 Первый запуск на дереве, где патчи уже стоят (записи ещё нет):
   ./apply-patch.sh --mark-through <последний номер, который точно стоит>
@@ -170,6 +187,10 @@ WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/arena-patches.XXXXXX")"
 
 cleanup() {
   rm -rf -- "$WORKDIR"
+  # Стабильная копия скрипта (см. блок APPLY_PATCH_STABLE выше).
+  if [[ -n "${APPLY_PATCH_SELF:-}" ]]; then
+    rm -f -- "$APPLY_PATCH_SELF"
+  fi
 }
 
 trap cleanup EXIT
@@ -441,6 +462,17 @@ for name in "${QUEUE[@]}"; do
   if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>"$WORKDIR/check.err"; then
     git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
     echo "ок"
+    APPLIED+=("$name")
+    state_add "$name"
+    continue
+  fi
+
+  # Патч не встаёт — но, может, он уже стоит: обратимая проверка доказывает
+  # это однозначно (полный обратный откат возможен только при точном
+  # совпадении). Тогда не применяем, а заносим в запись состояния —
+  # дерево не трогаем.
+  if git -C "$ROOT_DIR" apply --reverse --check "$file" >/dev/null 2>&1; then
+    echo "ок (уже стоит — занесено в запись)"
     APPLIED+=("$name")
     state_add "$name"
     continue
