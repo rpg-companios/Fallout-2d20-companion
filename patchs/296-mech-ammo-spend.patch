@@ -1,0 +1,657 @@
+#!/bin/sh
+# Патч 296: универсальное списание зарядов за выстрел (mechAmmoSpend).
+# Применять из корня репозитория: sh patchs/296-mech-ammo-spend.patch
+patch -p1 <<'PATCH_296_EOF'
+diff --git a/__tests__/domain/mech-ammo-spend.test.js b/__tests__/domain/mech-ammo-spend.test.js
+new file mode 100644
+index 0000000..ac81baf
+--- /dev/null
++++ b/__tests__/domain/mech-ammo-spend.test.js
+@@ -0,0 +1,114 @@
++import { describe, it, expect } from 'vitest';
++import { buildMechAmmoSpend, mechAmmoSpendForWeapon } from '../../domain/mechAmmoSpend';
++import { deserializeSlot } from '../../domain/robotSlots';
++import { SETTING } from '../../modules/fallout/index.js';
++
++const MK_VI = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi';
++const LASER = 'robot_weapon_assaultron_head_laser';
++
++describe('универсальный механизм списания зарядов (296)', () => {
++  it('оружие без особых условий: один заряд за выстрел', () => {
++    const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_two-handed' }] });
++    expect(plan.fixed).toBe(1);
++    expect(plan.asks).toEqual([]);
++    expect(plan.totalFor()).toBe(1);
++  });
++
++  it('пожиратель патронов: безусловное списание без запросов', () => {
++    const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_ammo-hungry_x', value: 10 }] });
++    expect(plan.fixed).toBe(10);
++    expect(plan.asks).toEqual([]);
++    expect(plan.totalFor()).toBe(10);
++  });
++
++  it('пожиратель без значения: один заряд (как до патча)', () => {
++    const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_ammo-hungry_x' }] });
++    expect(plan.fixed).toBe(1);
++  });
++
++  it('заводная рукоятка: запрос с потолком, списывается утверждённое', () => {
++    const plan = buildMechAmmoSpend({
++      qualities: [{ qualityId: 'quality_crank_x', value: 4 }],
++      available: 10,
++    });
++    expect(plan.fixed).toBe(0);
++    expect(plan.asks).toEqual([{ source: 'crank', max: 4, maxAvailable: 4 }]);
++    expect(plan.totalFor([2])).toBe(2);
++    expect(plan.totalFor([4])).toBe(4);
++  });
++
++  it('рукоятка при нехватке зарядов: потолок обрезан доступным', () => {
++    const plan = buildMechAmmoSpend({
++      qualities: [{ qualityId: 'quality_crank_x', value: 4 }],
++      available: 2,
++    });
++    expect(plan.asks[0].maxAvailable).toBe(2);
++    // ответ выше доступного зажимается
++    expect(plan.totalFor([9])).toBe(2);
++  });
++
++  it('конденсатор робо-оружия: ammoPerAttack становится запросом', () => {
++    const plan = buildMechAmmoSpend({ mods: [{ id: MK_VI, ammoPerAttack: 6 }], available: 99 });
++    expect(plan.asks).toEqual([{ source: 'ammoPerAttack', max: 6, maxAvailable: 6, modId: MK_VI }]);
++    expect(plan.totalFor([6])).toBe(6);
++    expect(plan.totalFor([1])).toBe(1);
++  });
++
++  it('пожиратель + запрос: безусловная часть плюс утверждённое', () => {
++    const plan = buildMechAmmoSpend({
++      qualities: [
++        { qualityId: 'quality_ammo-hungry_x', value: 2 },
++        { qualityId: 'quality_crank_x', value: 3 },
++      ],
++      available: 10,
++    });
++    expect(plan.fixed).toBe(2);
++    expect(plan.asks.length).toBe(1);
++    expect(plan.totalFor([3])).toBe(5);
++  });
++
++  it('моды без ammoPerAttack запросов не дают', () => {
++    const plan = buildMechAmmoSpend({ mods: [{ id: 'mod_047', damageModifier: { op: '+', value: 1 } }] });
++    expect(plan.asks).toEqual([]);
++    expect(plan.fixed).toBe(1);
++  });
++
++  it('ноль зарядов доступно: потолок запроса 0', () => {
++    const plan = buildMechAmmoSpend({ qualities: [{ qualityId: 'quality_crank_x', value: 4 }], available: 0 });
++    expect(plan.asks[0].maxAvailable).toBe(0);
++  });
++});
++
++describe('план списания для оружия экрана (296)', () => {
++  it('Головной лазер с Mk VI из восстановления слота: запрос до 6', () => {
++    const saved = {
++      content: 'robot_arm_assaultron',
++      armorLayers: { frame: null, plating: null, armor: null },
++      heldWeaponId: LASER,
++      heldWeaponMods: [MK_VI],
++      installedWeapons: [],
++    };
++    const onScreen = deserializeSlot(saved);
++    const plan = mechAmmoSpendForWeapon(onScreen.heldWeapon, { available: 12 });
++    expect(plan.asks).toEqual([{ source: 'ammoPerAttack', max: 6, maxAvailable: 6, modId: MK_VI }]);
++    expect(plan.totalFor([6])).toBe(6);
++  });
++
++  it('лазерный мушкет с 4-оборотным конденсатором: рукоятка до 4, без конденсаторного запроса', () => {
++    const musket = SETTING.data.equipment.weapons.find((w) => w.id === 'weapon_laser_musket');
++    // так выглядит оружие после мода: качество crank_x добавлено модом mod_050
++    const plan = mechAmmoSpendForWeapon(
++      { ...musket, qualities: [...(musket.qualities || []), { qualityId: 'quality_crank_x', value: 4 }] },
++      { available: 5 },
++    );
++    expect(plan.asks).toEqual([{ source: 'crank', max: 4, maxAvailable: 4 }]);
++    expect(plan.fixed).toBe(0);
++  });
++
++  it('мушкет без модов: обычный выстрел, один заряд', () => {
++    const musket = SETTING.data.equipment.weapons.find((w) => w.id === 'weapon_laser_musket');
++    const plan = mechAmmoSpendForWeapon(musket, { available: 5 });
++    expect(plan.fixed).toBe(1);
++    expect(plan.asks).toEqual([]);
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fb3c0fb..cb313f5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,31 @@
+ 
+ ---
+ 
++## Feature — universal ammo spend per shot (patch 296)
++
++Per-shot ammo consumption is now computed by the `mechAmmoSpend` mechanism
++(domain/mechAmmoSpend.js) — a sum of conditions, each either:
++
++- **unconditional** — always spent, no questions asked: ammo-hungry
++  (`ammo-hungry_x`, "spends X per shot");
++- **asked** — the condition has a ceiling; the ammo cell asks "how many
++  of the available charges to spend", and the confirmed amount is
++  deducted: the Assaultron head laser capacitor (`ammoPerAttack`,
++  Mk III–VI = 3–6 charges per attack) and the laser musket crank
++  (`crank_x`, 1–4 cranks).
++
++A weapon with no special conditions spends one charge per shot, as before.
++A new spend rule is a new reader in the mechanism; the ammo-cell contract
++does not change. Robot slot weapons (not inventory items) can now spend
++charges too: `spendAmmoForWeapon` gained an `untrackedWeapon` mode —
++spending without durability-wear tracking. The confirmation dialog lives
++in the weapon card's AMMO cell (the "−" button).
++
++Locked by 12 checks in `__tests__/domain/mech-ammo-spend.test.js`
++(unconditional, asks, ceiling clamped by availability, hungry+ask combo,
++head laser with Mk VI restored from a slot, musket with the four-crank
++capacitor and without mods).
++
+ ## Fix — Installed robot-weapon mod survived only until save (patch 294)
+ 
+ `toModIds` (domain/robotSlots.js) checked the `modIds` array first — even an
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e3ed713..8100d94 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,31 @@
+ 
+ ---
+ 
++## Функция — универсальное списание зарядов за выстрел (патч 296)
++
++Расход за выстрел теперь считается механизмом `mechAmmoSpend`
++(domain/mechAmmoSpend.js) — суммой условий, и условие бывает двух видов:
++
++- **безусловное** — списывается всегда, без вопросов: пожиратель патронов
++  (`ammo-hungry_x`, «тратит X за выстрел»);
++- **с запросом** — у условия есть потолок, ячейка списания спрашивает
++  «сколько максимум из доступного потратить», и после утверждения
++  пользователя списывается указанное количество: конденсатор Головного
++  лазера Штурмотрона (`ammoPerAttack`, Mk III–VI = 3–6 зарядов за атаку)
++  и заводная рукоятка лазерного мушкета (`crank_x`, 1–4 оборота).
++
++Оружие без особых условий жрёт один заряд за выстрел, как и раньше.
++Новое правило расхода = новый читатель в механизме, контракт ячейки не
++меняется. Робо-оружие слотов (не предмет инвентаря) теперь тоже списывает
++заряды: `spendAmmoForWeapon` получил режим `untrackedWeapon` — списание
++без записи износа прочности. Диалог утверждения — в ячейке ПАТРОНЫ
++карточки оружия (кнопка «−»).
++
++Заперто 12 проверками в `__tests__/domain/mech-ammo-spend.test.js`
++(безусловное, запросы, обрезка потолка доступным,_combo пожиратель+запрос,
++Головной лазер с Mk VI из восстановления слота, мушкет с 4-оборотным
++конденсатором и без модов).
++
+ ## Исправление — Установленный мод робо-оружия выживал только до сохранения (патч 294)
+ 
+ `toModIds` (domain/robotSlots.js) первым делом смотрел на массив `modIds` — даже
+diff --git a/domain/mechAmmoSpend.js b/domain/mechAmmoSpend.js
+new file mode 100644
+index 0000000..425cb9c
+--- /dev/null
++++ b/domain/mechAmmoSpend.js
+@@ -0,0 +1,126 @@
++/**
++ * Универсальный механизм списания зарядов за выстрел (патч 296).
++ *
++ *   mechAmmoSpend = [условие1 + условие2 + ...]
++ *
++ * Расход за выстрел — сумма условий, и условие бывает двух видов:
++ *
++ *   - безусловное (fixed): списывается всегда, без вопросов.
++ *     Частная формула: пожиратель патронов quality_ammo-hungry_x
++ *     («тратит X за выстрел»).
++ *
++ *   - с запросом (ask): у условия есть потолок, ячейка списания
++ *     спрашивает пользователя «сколько максимум из доступного потратить»,
++ *     и после утверждения списывается указанное количество.
++ *     Частные формулы: ammoPerAttack (конденсатор Головного лазера
++ *     Штурмотрона — N зарядов за атаку) и crank_x (заводная рукоятка
++ *     лазерного мушкета — до N зарядов на обороты).
++ *
++ * Механизм расширяется: новое правило расхода = новый читатель в
++ * buildMechAmmoSpend (или в резолвере модов), контракт ячейки списания
++ * при этом не меняется. Оружие без особых условий жрёт один заряд за
++ * выстрел — как и до патча.
++ */
++
++import { getRobotLimbCatalog } from './registry';
++import { toModIds } from './robotSlots';
++
++const toNumber = (value) => {
++  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
++  if (typeof value === 'string' && value.trim() !== '') {
++    const parsed = Number(value);
++    return Number.isFinite(parsed) ? parsed : 0;
++  }
++  return 0;
++};
++
++// Пожиратель патронов: безусловно X зарядов за выстрел.
++const HUNGRY_QUALITY_ID = 'quality_ammo-hungry_x';
++// Заводная рукоятка: до X зарядов за выстрел, по утверждению пользователя.
++const CRANK_QUALITY_ID = 'quality_crank_x';
++
++/**
++ * Собирает план списания из условий.
++ *
++ * @param {object} params
++ * @param {Array}  params.qualities — качества оружия (после модов)
++ * @param {Array}  params.mods      — разрешённые объекты установленных модов
++ *                                    (для ammoPerAttack)
++ * @param {number} params.available — сколько зарядов доступно (для потолка)
++ * @returns {{ fixed: number,
++ *             asks: Array<{ source: string, max: number, maxAvailable: number }>,
++ *             totalFor: (answers?: number[]) => number }}
++ */
++export const buildMechAmmoSpend = ({ qualities = [], mods = [], available = Infinity } = {}) => {
++  const list = Array.isArray(qualities) ? qualities : [];
++
++  // Безусловное списание: пожиратель патронов. Несколько таких качеств
++  // не суммируются — действует сильнейшее (как и до патча: Math.max(1, value)).
++  let fixed = 0;
++  for (const q of list) {
++    if ((q?.qualityId || q?.id) !== HUNGRY_QUALITY_ID) continue;
++    fixed = Math.max(fixed, Math.max(1, toNumber(q?.value) || 1));
++  }
++
++  // Условия с запросом: рукоятка и конденсатор.
++  const asks = [];
++  for (const q of list) {
++    if ((q?.qualityId || q?.id) !== CRANK_QUALITY_ID) continue;
++    asks.push({ source: 'crank', max: Math.max(1, toNumber(q?.value) || 1) });
++  }
++  for (const mod of Array.isArray(mods) ? mods : []) {
++    const perAttack = toNumber(mod?.ammoPerAttack);
++    if (perAttack > 0) {
++      asks.push({ source: 'ammoPerAttack', max: perAttack, modId: mod?.id ?? null });
++    }
++  }
++
++  // Оружие без особых условий жрёт один заряд за выстрел.
++  if (fixed === 0 && asks.length === 0) fixed = 1;
++
++  const avail = Number.isFinite(available) ? Math.max(0, Math.floor(available)) : Infinity;
++  const capped = asks.map((ask) => ({
++    ...ask,
++    maxAvailable: Math.min(ask.max, avail),
++  }));
++
++  const clampAnswer = (answer, ask) => Math.min(
++    Math.max(1, Math.floor(toNumber(answer) || 1)),
++    Math.max(1, ask.maxAvailable),
++  );
++
++  return {
++    fixed,
++    asks: capped,
++    /**
++     * Итоговое списание: безусловная часть + утверждённые ответы по
++     * каждому запросу (по одному числу на элемент asks).
++     */
++    totalFor: (answers = []) => fixed + capped.reduce(
++      (sum, ask, index) => sum + clampAnswer(answers[index], ask),
++      0,
++    ),
++  };
++};
++
++/**
++ * План списания для конкретного оружия: качества берутся как есть,
++ * установленные моды робо-оружия разрешаются из пула каталога
++ * (appliedMods/modIds — обе формы, см. toModIds).
++ *
++ * @param {object} weapon  — обогащённое оружие экрана (qualities, appliedMods…)
++ * @param {object} options — { available, catalog? }
++ */
++export const mechAmmoSpendForWeapon = (weapon, { available, catalog = getRobotLimbCatalog() } = {}) => {
++  const modIds = toModIds(weapon);
++  const pool = catalog?.weaponMods || [];
++  const mods = modIds
++    .map((id) => pool.find((mod) => mod?.id === id))
++    .filter(Boolean);
++
++  return buildMechAmmoSpend({
++    qualities: weapon?.qualities,
++    mods,
++    available,
++  });
++};
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index dc5b460..fc621e2 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -10,10 +10,10 @@
+     "immunityPrefix": "Immunity to:",
+     "resist": "Resist",
+     "resistTitle": "Resist disease",
+-    "resistRolls": "Rolls: {r1}, {r2} (target \u2264 {t}).",
+-    "resistCured": "{s}/{r} successes \u2014 the disease \"{name}\" is cured.",
+-    "resistFailed": "{s}/{r} successes \u2014 the disease \"{name}\" remains.",
+-    "resistRankIncreased": "A 20 was rolled \u2014 the disease difficulty increased to {r}.",
++    "resistRolls": "Rolls: {r1}, {r2} (target ≤ {t}).",
++    "resistCured": "{s}/{r} successes — the disease \"{name}\" is cured.",
++    "resistFailed": "{s}/{r} successes — the disease \"{name}\" remains.",
++    "resistRankIncreased": "A 20 was rolled — the disease difficulty increased to {r}.",
+     "resistCooldown": "You can resist once per day."
+   },
+   "armor": {
+@@ -38,6 +38,16 @@
+       "ammo": "AMMO",
+       "modification": "Modification",
+       "durability": "DURABILITY"
++    },
++    "ammoSpend": {
++      "title": "Ammo spend",
++      "available": "Charges available",
++      "crank": "Crank",
++      "capacitor": "Capacitor",
++      "upTo": "spend up to",
++      "unconditional": "Unconditional",
++      "cancel": "Cancel",
++      "confirm": "Spend"
+     }
+   },
+   "common": {
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index b3301ae..c0ccd3c 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -38,6 +38,16 @@
+       "ammo": "ПАТРОНЫ",
+       "modification": "Модификация",
+       "durability": "ПРОЧНОСТЬ"
++    },
++    "ammoSpend": {
++      "title": "Списание зарядов",
++      "available": "Доступно зарядов",
++      "crank": "Заводная рукоятка",
++      "capacitor": "Конденсатор",
++      "upTo": "потратить до",
++      "unconditional": "Безусловно",
++      "cancel": "Отмена",
++      "confirm": "Списать"
+     }
+   },
+   "common": {
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 5626ca5..0133f47 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -19,6 +19,7 @@ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../doma
+ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+ import { normalizeSlot } from '../../../../domain/robotSlots';
++import { mechAmmoSpendForWeapon } from '../../../../domain/mechAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+ import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
+ import { renderTextWithIcons } from './textUtils';
+@@ -144,46 +145,147 @@ const RadiationCounter = ({ isEnabled }) => {
+   );
+ };
+ 
+-const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability }) => {
++// Диалог утверждения расхода (патч 296): условия с запросом — заводная
++// рукоятка, конденсатор — спрашивают «сколько максимум из доступного
++// потратить», безусловная часть (пожиратель патронов) показывается как
++// есть. Списывается утверждённое количество.
++const WeaponAmmoSpendDialog = ({ ask, available, onClose, onConfirm }) => {
++  const [answers, setAnswers] = useState(null);
++  useEffect(() => {
++    setAnswers(ask ? ask.plan.asks.map(() => 1) : null);
++  }, [ask]);
++  if (!ask || !answers) return null;
++  const { plan } = ask;
++  const total = plan.totalFor(answers);
++  const sourceLabel = (source) => (source === 'crank'
++    ? tWeaponsAndArmorScreen('weapon.ammoSpend.crank')
++    : tWeaponsAndArmorScreen('weapon.ammoSpend.capacitor'));
++  const change = (index, delta) => {
++    setAnswers((prev) => prev.map((value, i) => {
++      if (i !== index) return value;
++      const ceiling = Math.max(1, plan.asks[i].maxAvailable);
++      return Math.min(Math.max(1, value + delta), ceiling);
++    }));
++  };
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
++      <View style={localStyles.modalOverlay}>
++        <View style={localStyles.robotBodyModalContent}>
++          <Text style={localStyles.robotBodyModalTitle}>{tWeaponsAndArmorScreen('weapon.ammoSpend.title')}</Text>
++          <Text style={localStyles.robotBodyModalText}>
++            {`${tWeaponsAndArmorScreen('weapon.ammoSpend.available')}: ${available}`}
++          </Text>
++          {plan.fixed > 0 ? (
++            <Text style={localStyles.weaponAmmoAskLabel}>
++              {`${tWeaponsAndArmorScreen('weapon.ammoSpend.unconditional')}: ${plan.fixed}`}
++            </Text>
++          ) : null}
++          {plan.asks.map((askItem, index) => (
++            <View key={`${askItem.source}-${askItem.modId ?? index}`} style={localStyles.weaponAmmoAskRow}>
++              <View style={{ flex: 1 }}>
++                <Text style={localStyles.weaponAmmoAskLabel}>{sourceLabel(askItem.source)}</Text>
++                <Text style={localStyles.weaponAmmoAskUpTo}>
++                  {`${tWeaponsAndArmorScreen('weapon.ammoSpend.upTo')} ${askItem.maxAvailable}`}
++                </Text>
++              </View>
++              <TouchableOpacity
++                style={[styles.counterButton, answers[index] <= 1 && { opacity: 0.5 }]}
++                disabled={answers[index] <= 1}
++                onPress={() => change(index, -1)}
++              >
++                <Text style={styles.counterButtonText}>-</Text>
++              </TouchableOpacity>
++              <Text style={localStyles.weaponAmmoAskValue}>{answers[index]}</Text>
++              <TouchableOpacity
++                style={[styles.counterButton, answers[index] >= askItem.maxAvailable && { opacity: 0.5 }]}
++                disabled={answers[index] >= askItem.maxAvailable}
++                onPress={() => change(index, 1)}
++              >
++                <Text style={styles.counterButtonText}>+</Text>
++              </TouchableOpacity>
++            </View>
++          ))}
++          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 14 }}>
++            <TouchableOpacity style={localStyles.weaponAmmoSpendCancelBtn} onPress={onClose}>
++              <Text style={localStyles.weaponAmmoSpendCancelBtnText}>
++                {tWeaponsAndArmorScreen('weapon.ammoSpend.cancel')}
++              </Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              style={[localStyles.robotBodyModalButton, { marginLeft: 12 }, total < 1 && { opacity: 0.5 }]}
++              disabled={total < 1}
++              onPress={() => onConfirm(total)}
++            >
++              <Text style={localStyles.robotBodyModalButtonText}>
++                {`${tWeaponsAndArmorScreen('weapon.ammoSpend.confirm')} ${total}`}
++              </Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapon, untrackedWeapon }) => {
+   const storeItems = useCharacterStore((state) => state.items);
+   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
+   const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+   const baseLossPer10Shots = useAppSettingsStore(selectWeaponDurabilityLossPer10Shots);
++  // Открытый запрос расхода: { plan }
++  const [ask, setAsk] = useState(null);
+ 
+   const ammoIds = (ammoId || '').split(',').map(s => s.trim()).filter(Boolean);
+-  let ammoPerShot = 1;
+-  let parsedQ = qualities;
+-  if (typeof parsedQ === 'string') {
+-    try { parsedQ = JSON.parse(parsedQ); } catch { parsedQ = []; }
+-  }
+-  if (Array.isArray(parsedQ)) {
+-    const hungryQ = parsedQ.find(q => q?.qualityId === 'quality_ammo-hungry_x');
+-    if (hungryQ?.value != null) ammoPerShot = Math.max(1, Number(hungryQ.value) || 1);
+-  }
+   const ammoItems = Object.values(storeItems || {}).filter(
+     item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
+   );
+   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+   const isBroken = durabilityLossEnabled && Number(durability) <= 0;
+-  const canSpend = totalAmmo >= ammoPerShot && !isBroken;
+ 
+-  const handleSpend = () => {
+-    if (!canSpend) return;
++  // Универсальный механизм расхода (domain/mechAmmoSpend.js):
++  // mechAmmoSpend = [безусловные условия] + [условия с запросом].
++  // Пожиратель патронов списывает безусловно; рукоятка и конденсатор
++  // спрашивают пользователя и списывают утверждённое.
++  const plan = mechAmmoSpendForWeapon(weapon || { qualities }, { available: totalAmmo });
++  const needAsk = plan.asks.length > 0;
++  const minNeed = needAsk ? 1 : plan.fixed;
++  const canSpend = totalAmmo >= minNeed && !isBroken;
++
++  const doSpend = (amount) => {
+     spendAmmoForWeapon({
+       weaponInstanceId,
+       ammoIds,
+-      ammoAmount: ammoPerShot,
++      ammoAmount: amount,
+       durabilityEnabled: durabilityLossEnabled,
+       baseLossPer10Shots,
++      untrackedWeapon,
+     });
+   };
+ 
++  const handleSpend = () => {
++    if (!canSpend) return;
++    if (needAsk) {
++      setAsk({ plan });
++      return;
++    }
++    doSpend(plan.fixed);
++  };
++
+   return (
+     <View style={localStyles.weaponAmmoCellContainer}>
+       <TouchableOpacity style={[localStyles.weaponAmmoBtn, !canSpend && localStyles.weaponAmmoBtnDisabled]} onPress={handleSpend} disabled={!canSpend}>
+         <Text style={localStyles.weaponAmmoBtnText}>−</Text>
+       </TouchableOpacity>
+       <Text style={localStyles.weaponAmmoCount}>{totalAmmo}</Text>
++      <WeaponAmmoSpendDialog
++        ask={ask}
++        available={totalAmmo}
++        onClose={() => setAsk(null)}
++        onConfirm={(amount) => {
++          doSpend(amount);
++          setAsk(null);
++        }}
++      />
+     </View>
+   );
+ };
+@@ -504,7 +606,7 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
+       { label: tWeaponsAndArmorScreen('weapon.fields.range'), value: rangeValue },
+       { label: tWeaponsAndArmorScreen('weapon.fields.qualities'), value: qualitiesValue },
+       ...(showDurability ? [{ label: tWeaponsAndArmorScreen('weapon.fields.durability'), value: `${durabilityValue}%`, durability: true }] : []),
+-      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue }] : []),
++      ...(effectiveAmmoId ? [{ label: tWeaponsAndArmorScreen('weapon.fields.ammo'), type: 'ammo', ammoId: effectiveAmmoId, qualities: displayWeapon.qualities, weaponInstanceId: displayWeapon.instanceId, durability: durabilityValue, weapon: displayWeapon, untrackedWeapon: !displayWeapon.instanceId }] : []),
+       ...((displayWeapon?.withoutMods || mk2Blocked) ? [] : [{ label: tWeaponsAndArmorScreen('weapon.fields.modification'), type: 'button' }]),
+     ];
+   
+@@ -528,7 +630,7 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
+             <View key={index} style={[localStyles.weaponStatRow, { borderBottomWidth: 1 }]}>
+               <Text style={localStyles.weaponStatLabel}>{stat.label}</Text>
+               {stat.type === 'ammo' ? (
+-                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} />
++                <WeaponAmmoCell weaponInstanceId={stat.weaponInstanceId} ammoId={stat.ammoId} qualities={stat.qualities} durability={stat.durability} weapon={stat.weapon} untrackedWeapon={stat.untrackedWeapon} />
+               ) : stat.type === 'button' ? (
+                 <TouchableOpacity 
+                   style={localStyles.weaponModificationButton}
+diff --git a/modules/fallout/styles/WeaponsAndArmorScreen.styles.js b/modules/fallout/styles/WeaponsAndArmorScreen.styles.js
+index 382013c..cebbfb0 100644
+--- a/modules/fallout/styles/WeaponsAndArmorScreen.styles.js
++++ b/modules/fallout/styles/WeaponsAndArmorScreen.styles.js
+@@ -301,6 +301,35 @@ const styles = StyleSheet.create({
+     borderRadius: 6,
+   },
+   robotBodyModalButtonText: { color: '#fff', fontWeight: '700' },
++  weaponAmmoAskRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    width: '100%',
++    marginVertical: 6,
++  },
++  weaponAmmoAskLabel: {
++    fontSize: 14,
++    color: '#333',
++  },
++  weaponAmmoAskUpTo: {
++    fontSize: 12,
++    color: '#888',
++  },
++  weaponAmmoAskValue: {
++    minWidth: 28,
++    textAlign: 'center',
++    fontSize: 16,
++    fontWeight: '700',
++    color: '#333',
++  },
++  weaponAmmoSpendCancelBtn: {
++    paddingVertical: 10,
++    paddingHorizontal: 18,
++  },
++  weaponAmmoSpendCancelBtnText: {
++    color: '#005A9C',
++    fontWeight: '700',
++  },
+   weaponAmmoCellContainer: {
+     flex: 1,
+     flexDirection: 'row',
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 14eafc8..11d3da4 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -538,15 +538,20 @@ const useCharacterStore = create(devtools(
+       },
+ 
+       /** Spend ammunition and update weapon wear in one state transaction. */
+-      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots }) => {
++      spendAmmoForWeapon: ({ weaponInstanceId, ammoIds, ammoAmount, durabilityEnabled, baseLossPer10Shots, untrackedWeapon = false }) => {
+         const state = get();
+-        const weapon = state.items[weaponInstanceId];
++        const weapon = state.items[weaponInstanceId] || null;
+         const amount = Math.max(1, Math.floor(Number(ammoAmount) || 1));
+-        if (!weapon) return { ok: false, reason: 'weapon-not-found' };
+-        const trackedWeapon = durabilityEnabled && !weapon.durabilityTracked
++        // Робо-оружие слотов — не предмет инвентаря: списываем заряды без
++        // записи износа (untrackedWeapon). Инвентарное оружие без записи —
++        // ошибка, как и раньше.
++        if (!weapon && !untrackedWeapon) return { ok: false, reason: 'weapon-not-found' };
++        // Износ прочности — только для предметов инвентаря.
++        const trackDurability = durabilityEnabled && !!weapon;
++        const trackedWeapon = trackDurability && !weapon.durabilityTracked
+           ? { ...weapon, durabilityTracked: true, durability: 100, durabilityAmmoRemainder: 0, durabilityWearRemainder: 0 }
+           : weapon;
+-        if (durabilityEnabled && Number(trackedWeapon.durability) <= 0) {
++        if (trackDurability && Number(trackedWeapon.durability) <= 0) {
+           return { ok: false, reason: 'broken' };
+         }
+ 
+@@ -567,7 +572,7 @@ const useCharacterStore = create(devtools(
+           else items[itemId] = { ...ammo, quantity: quantity - spent };
+           remaining -= spent;
+         }
+-        if (durabilityEnabled) {
++        if (trackDurability) {
+           items[weaponInstanceId] = { ...trackedWeapon, ...applyWeaponWear(trackedWeapon, amount, baseLossPer10Shots) };
+         }
+         set({ items });
+PATCH_296_EOF

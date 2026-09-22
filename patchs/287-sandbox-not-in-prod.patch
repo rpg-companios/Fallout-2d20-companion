@@ -1,0 +1,135 @@
+diff --git a/App.js b/App.js
+index 80f6384..273fa64 100644
+--- a/App.js
++++ b/App.js
+@@ -41,7 +41,13 @@ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
+ // Песочница правил — тестовый сеттинг на контракте выводимости (патч 286).
+ // Слово владельца: в основной программе не показывать вообще — вкладка
+ // монтируется ТОЛЬКО в среде разработки (__DEV__); продакшн её не видит.
+-import SandboxScreen from './modules/test-setting/screens/SandboxScreen';
++// Патч 287: условный require вместо статического импорта — продакшн-сборка
++// (expo export) выкидывает ветку целиком, и кода песочницы в публикуемых
++// файлах нет вообще (проверено grep по собранному бандлу).
++let SandboxScreen = null;
++if (__DEV__) {
++  SandboxScreen = require('./modules/test-setting/screens/SandboxScreen').default;
++}
+ import useAppSettingsStore, {
+   selectBootScreenEnabled,
+   selectSettingsHydrated,
+@@ -224,7 +230,7 @@ function App() {
+                           iconName = focused ? 'briefcase' : 'briefcase-outline';
+                         } else if (route.name === TAB_ROUTES.PERKS) {
+                           iconName = focused ? 'star' : 'star-outline';
+-                        } else if (route.name === 'SandboxTab') {
++                        } else if (__DEV__ && route.name === 'SandboxTab') {
+                           iconName = focused ? 'flask' : 'flask-outline';
+                         }
+                         return <Ionicons name={iconName} size={16} color={color} />;
+@@ -291,7 +297,7 @@ function App() {
+                         />
+                       </>
+                         ) : null}
+-                    {__DEV__ ? (
++                    {__DEV__ && SandboxScreen ? (
+                       <Tab.Screen
+                         name="SandboxTab"
+                         component={SandboxScreen}
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 2793eb2..488229a 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -33,8 +33,9 @@
+   выводимости, изолирован) → 282 (семантика процентов) → 283 (фазы
+   модификаторов) → 284 (режим округления) → 285 (тестовый сеттинг в
+   поставке, без единой правки движка) → 286 (экран песочницы за __DEV__,
+-  только разработка) — сданы; следующий — 287+ (МК-3: каскад в хранилище,
+-  смерть 24 ручных пересчётов, Fallout-формулы в модуль).
++  только разработка) → 287 (микропатч: код песочницы не едет в
++  продакшн-сборку вообще) — сданы; следующий — 288+ (МК-3: каскад в
++  хранилище, смерть 24 ручных пересчётов, Fallout-формулы в модуль).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+   отдельная фича, с конверсией не смешивать. Цель — ловить ошибки до старта
+diff --git a/docs/architecture/test-setting.md b/docs/architecture/test-setting.md
+index 3cc15bf..cd0f402 100644
+--- a/docs/architecture/test-setting.md
++++ b/docs/architecture/test-setting.md
+@@ -47,7 +47,10 @@
+ 
+ **Показ — только среда разработки:** вкладка «Песочница» монтируется в
+ App.js за гейтом `__DEV__` (слово владельца: «в основной программе не
+-показывать вообще»). Продакшн-сборка её не видит. Логика экрана — в чистой
++показывать вообще»). Dev-сервер (превью) собирает с `__DEV__ = true` —
++вкладка есть; публикация (`expo export`) с `__DEV__ = false` — вкладки нет,
++а с патча 287 (условный require) код экрана в публикуемые файлы не попадает
++вообще: проверено grep по собранному бандлу. Логика экрана — в чистой
+ вью-модели `viewModel.js` (покрыта тестом без react-native), реестр
+ песочницы — ленивый синглтон `sandbox.js`. Хранилище персонажа не трогается.
+ 
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index 276f979..cb2c846 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -92,7 +92,9 @@
+ 286  МК-2  Мини-экран песочницы за гейтом __DEV__ (слово владельца:
+            только разработка, в основной программе не показывать);
+            вью-модель чистая, тест без react-native — сдан      (1)
+-287+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++287  МК-2  Микропатч: условный require песочницы — код экрана не едет
++           в продакшн-сборку ВООБЩЕ (проверено grep по бандлу) — сдан (1)
++288+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -165,7 +167,7 @@ TS — язык контракта и движка; сеттинг — живо
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+ 282 семантика процентов → 283 фазы модификаторов → 284 режим округления →
+ 285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран
+-(__DEV__) → 287+ реализация и переезд Fallout-формул в модуль →
++(__DEV__) → 288+ реализация и переезд Fallout-формул в модуль →
+ М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5a4ef42..f1f9e4e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Micro-patch — The sandbox no longer ships into the production build at all (patch 287)
++
++> Owner's word (2026-09-18): «So in the Replit preview I'll see 5 tabs, but when I publish the app I won't see it?» Yes: preview — 5 tabs, publication — 4. A nuance was found by inspecting a live build and fixed.
++
++- How the gate works: `__DEV__` is a build-time constant. The dev server (`expo start` — the Replit preview) builds with `__DEV__ = true` → the «Sandbox» tab mounts. Publication (`npm run build` → expo export) builds with `__DEV__ = false` → no tab.
++- Found by grepping the bundle: with a static import, the screen's code rode into the publication as dead weight (the tab never mounted, but the kilobytes of code and strings sat in the files). Fixed with a conditional require behind `__DEV__`: the export drops the whole branch.
++- Verified by grepping the built publication: no screen strings, view model, sandbox registry or tab name in the bundle — zero occurrences (control: HomeTab/Positronium are found).
++
++---
++
+ ## Series pivot — The rules sandbox: the test-setting screen, dev-only (patch 286)
+ 
+ > Owner's word (2026-09-18): the sandbox lives only in the development environment — «don't show it in the main program at all»; a build for checking the contract.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4476d7f..0fe4ac5 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Микропатч — Песочница не едет в продакшн-сборку вообще (патч 287)
++
++> Слово владельца (2026-09-18): «в превью Replit я буду видеть 5 вкладок, а когда буду публиковать приложение — не увижу её или как?» Да: превью — 5 вкладок, публикация — 4. Проверкой живой сборки найден нюанс и устранён.
++
++- Как работает гейт: `__DEV__` — константа сборки. Dev-сервер (`expo start` — превью Replit) собирает с `__DEV__ = true` → вкладка «Песочница» монтируется. Публикация (`npm run build` → expo export) собирает с `__DEV__ = false` → вкладки нет.
++- Найдено проверкой бандла: при статическом импорте код экрана ехал в публикацию мёртвым грузом (вкладка не монтировалась, но килобайты кода и строк лежали в файлах). Исправлено условным require за `__DEV__`: экспорт выкидывает ветку целиком.
++- Проверено grep по собранной публикации: строк экрана, вью-модели, реестра песочницы и имени вкладки в бандле нет — ноль вхождений (контроль: HomeTab/Positronium находятся).
++
++---
++
+ ## Разворот серии — Песочница правил: экран тест-сеттинга только для разработки (патч 286)
+ 
+ > Слово владельца (2026-09-18): песочница живёт только в среде разработки — «в основной программе не показывать вообще», сборка для проверки контракта.

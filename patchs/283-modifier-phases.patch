@@ -1,0 +1,1006 @@
+diff --git a/__tests__/engine/derivation-contract.test.js b/__tests__/engine/derivation-contract.test.js
+index 89061bd..2e51b8d 100644
+--- a/__tests__/engine/derivation-contract.test.js
++++ b/__tests__/engine/derivation-contract.test.js
+@@ -1,4 +1,4 @@
+-// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патч 281).
++// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–283).
+ //
+ // КРИТЕРИЙ УСПЕХА (карта каскада §8, слово владельца): мини-сеттинг
+ // описывается ДЕКЛАРАЦИЕЙ без правок движка — 5 атрибутов, 7 навыков,
+@@ -6,14 +6,22 @@
+ // 5 заклинаний с требованием ранга 4, бонусы +5/10/15%, потолок ранга
+ // навыка — от атрибута, манна = атрибут + навык.
+ //
++// СЛОВО ВЛАДЕЛЬЦА (2026-09-18, патч 283): «как в правилах напишут, так %
++// и будут рассчитываться. [...] Базовая скорострельность будет зависеть от
++// установленных модов, % от черты будет влиять на неё, а перк уже после
++// удваивать. Но может быть и случай, когда черта вместо базовой
++// скорострельности будет увеличивать итоговую [...] А может вообще
++// примениться, если скорострельность будет меньше или равна определённому
++// значению. И это хрен угадаешь.» Движок исполняет объявленный порядок.
++//
+ // Реестр пока никуда не подключён (изоляция МК-1→МК-3): этот тест —
+-// единственный потребитель. При подключении (патч 283+) тест остаётся
++// единственный потребитель. При подключении (патчи 285+) тест остаётся
+ // эквивалентностью контракта.
+ 
+ import { describe, expect, it } from 'vitest';
+ import {
+-  applyModifiers,
+   applyPercent,
++  applyPipeline,
+   ceilingFor,
+   changedParams,
+   checkRequirements,
+@@ -21,6 +29,8 @@ import {
+ } from '../../src/engine/contracts/index';
+ import { createDerivationRegistry } from '../../src/engine/derivations/registry';
+ 
++const emptyCtx = { values: {}, modifiers: {} };
++
+ // --- декларация мини-сеттинга по спеке владельца (§8) ------------------------
+ 
+ const ATTRIBUTES = ['strength', 'agility', 'intellect', 'spirit', 'luck'];
+@@ -41,6 +51,21 @@ const miniSetting = () => ({
+   parameters: [
+     ...ATTRIBUTES.map((name) => ({ id: attr(name), kind: 'number', label: name })),
+     ...SKILLS.map((name) => ({ id: skill(name), kind: 'number', label: name })),
++    // Скорострельность — по примеру владельца: фазы объявляет правило.
++    {
++      id: 'test.attr.fireRate',
++      kind: 'number',
++      label: 'скорострельность',
++      modifierPhases: ['mods', 'traitPercent', 'perkMult'],
++    },
++    {
++      // Второй вариант из слова владельца: «черта вместо базовой скорострельности
++      // увеличивает итоговую — уже после расчёта базы + влияния перка».
++      id: 'test.attr.fireRateFinisher',
++      kind: 'number',
++      label: 'скорострельность (черта итоговой)',
++      modifierPhases: ['mods', 'perkMult', 'traitPercent'],
++    },
+   ],
+   derived: [
+     {
+@@ -106,25 +131,36 @@ const miniSetting = () => ({
+       on: () => {},
+       description: 'подрезка текущей манны при падении потолка',
+     },
++    {
++      // Ярость ботаника — по примеру владельца: срабатывает, когда текущие ОЗ
++      // меньше 30% от МАКСИМУМА, а максимум сам движется (химия +50%).
++      id: 'test.reaction.nerdRage',
++      watch: ['test.derived.maxHealth'],
++      on: () => {},
++      description: 'Ярость ботаника: текущие ОЗ < 30% макс. ОЗ',
++    },
+   ],
+ });
+ 
+-// --- модификаторы: договорный порядок ---------------------------------------
++// --- модификаторы: конвейер по объявлению ------------------------------------
+ 
+ describe('МК-1: контракт выводимости — модификаторы', () => {
+-  it('параметры: set заменяет базу, аддитивы складываются; проценты в цепочке запрещены', () => {
+-    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана
++  it('дефолтный конвейер: set → аддитивы → суммарный процент → множители', () => {
++    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана, +10% и +5%, ×2
+     const mods = [
+       { source: 'perk.bruiser', operation: '+', value: 2 },
+       { source: 'armor.pa', operation: 'set', value: 11 },
+       { source: 'wound.arm', operation: '-', value: 2 },
++      { source: 'perk.tough', operation: '%', value: 10 },
++      { source: 'spell.bless', operation: '%', value: 5 },
++      { source: 'perk.double', operation: '×', value: 2 },
+     ];
+-    // set 11 → +2 −2 = 11
+-    expect(applyModifiers(5, mods)).toBe(11);
++    // set 11 → +2 −2 = 11; ×1.15 = 12.65; ×2 = 25.3 → 25
++    expect(applyPipeline(5, mods, ['add', 'percent', 'mult'], emptyCtx)).toBe(25);
+   });
+ 
+   it('без модификаторов значение возвращается как есть', () => {
+-    expect(applyModifiers(7, [])).toBe(7);
++    expect(applyPipeline(7, [], ['add', 'percent', 'mult'], emptyCtx)).toBe(7);
+   });
+ 
+   it('несколько set: берётся последний (переопределение сильнее дополнения)', () => {
+@@ -132,16 +168,19 @@ describe('МК-1: контракт выводимости — модификат
+       { source: 'armor.pa', operation: 'set', value: 11 },
+       { source: 'armor.advanced', operation: 'set', value: 13 },
+     ];
+-    expect(applyModifiers(5, mods)).toBe(13);
++    expect(applyPipeline(5, mods, ['add'], emptyCtx)).toBe(13);
++  });
++
++  it('модификатор в необъявленную фазу — ошибка с перечислением объявленных', () => {
++    const mods = [{ source: 'trait.x', operation: '%', value: 10, phase: 'finalPercent' }];
++    expect(() => applyPipeline(5, mods, ['add', 'percent'], emptyCtx)).toThrow(/finalPercent/);
+   });
+ });
+ 
+-// --- проценты: всегда от объявленной базы (слово владельца, 2026-09-18) ------
++// --- проценты: всегда от объявленной базы ------------------------------------
+ 
+-describe('МК-1: проценты — от объявленной базы', () => {
++describe('МК-1: проценты — от базы, которую объявило правило', () => {
+   it('слово владельца: +15% жизней = база ОЗ × 1.15, округлённая математически', () => {
+-    // applyPercent(база, проценты): чистая функция и для производных, и для
+-    // будущих каналов урона
+     expect(applyPercent(26, [15])).toBe(30); // 26 × 1.15 = 29.9 → 30
+   });
+ 
+@@ -152,35 +191,182 @@ describe('МК-1: проценты — от объявленной базы', ()
+   it('несколько процентов суммируются и применяются одним множителем', () => {
+     expect(applyPercent(40, [10, 5])).toBe(46); // 40 × 1.15 = 46
+   });
++});
+ 
+-  it('реестр: процент на id производного применяется к его базе при каскаде', () => {
+-    const registry = createDerivationRegistry();
+-    registry.register(miniSetting());
+-    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
+-    // ОЗ = 10 + СИЛ×2 = 26; +15% → 29.9 → 30
+-    const { values } = registry.evaluate(baseState, {
+-      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
++// --- фазы-якоря: пример владельца «скорострельность» -------------------------
++
++describe('МК-1: фазы — скорострельность (пример владельца)', () => {
++  const registry = createDerivationRegistry();
++  registry.register(miniSetting());
++  // test.attr.fireRate объявлен с фазами: mods → traitPercent → perkMult
++
++  const FIRE = 'test.attr.fireRate';
++
++  it('база 5, моды +1/−2, черта +10% базы, перк ×2 → 9', () => {
++    // «Базовая скорострельность будет зависеть от установленных модов,
++    //  % от черты будет влиять на неё, а перк уже после удваивать»
++    const { values } = registry.evaluate({ [FIRE]: 5 }, {
++      [FIRE]: [
++        { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
++        { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
++        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
++        { source: 'perk.doubletap', operation: '×', value: 2, phase: 'perkMult' },
++      ],
++    });
++    // 5 +1 −2 = 4; ×1.1 = 4.4; ×2 = 8.8 → 9
++    expect(values[FIRE]).toBe(9);
++  });
++
++  it('черта даёт +10% ИТОГОВОЙ (после перка): порядок фаз объявлен правилом', () => {
++    const FINISH = 'test.attr.fireRateFinisher';
++    const mods = [
++      { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
++      { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
++      { source: 'trait.finisher', operation: '%', value: 10, phase: 'traitPercent' },
++      { source: 'perk.doubletap', operation: '×', value: 2, phase: 'perkMult' },
++    ];
++    const { values } = registry.evaluate({ [FINISH]: 5 }, { [FINISH]: mods });
++    // fireRateFinisher объявлен mods → perkMult → traitPercent:
++    // 4 → ×2 = 8 → ×1.1 = 8.8 → 9. Проценты и множители коммутируют,
++    // поэтому без промежуточных округлений итог совпадает с первым вариантом;
++    // наблюдаемая разница якорей — в следующем тесте (округление по фазам).
++    expect(values[FINISH]).toBe(9);
++  });
++
++  it('якорь наблюдаем через пофазное округление: % базы против % итоговой', () => {
++    // Одни и те же модификаторы, но порядок фаз (якорь %) разный — и правила
++    // с промежуточным округлением дают РАЗНЫЕ числа: 8 против 9.
++    const mods = [
++      { source: 'mod.trigger', operation: '+', value: 1, phase: 'mods' },
++      { source: 'mod.heavy', operation: '-', value: 2, phase: 'mods' },
++      { source: 'trait', operation: '%', value: 10, phase: 'percentPhase' },
++      { source: 'perk', operation: '×', value: 2, phase: 'perkPhase' },
++    ];
++    // % базы с модами, округлить, потом перк: 4 ×1.1 = 4.4 → 4 → ×2 = 8
++    const baseAnchored = applyPipeline(5, mods, ['mods', { id: 'percentPhase', round: true }, 'perkPhase'], emptyCtx);
++    // перк, округлить, потом % итоговой: 4 ×2 = 8 → 8 ×1.1 = 8.8 → 9
++    const finalAnchored = applyPipeline(5, mods, ['mods', { id: 'perkPhase', round: true }, 'percentPhase'], emptyCtx);
++    expect(baseAnchored).toBe(8);
++    expect(finalAnchored).toBe(9);
++  });
++
++  it('якорь наблюдаем: % базы с модами против % сырой базы — разные числа', () => {
++    // Порядок фаз решает: mods → percent (по умолчанию) даёт 4×1.1 = 4.4 → 4,
++    // а percent → mods даёт 5×1.1 = 5.5 → +1 −2 = 4.5 → 5 (математически).
++    const after = applyPipeline(
++      5,
++      [
++        { source: 'mod.trigger', operation: '+', value: 1 },
++        { source: 'mod.heavy', operation: '-', value: 2 },
++        { source: 'trait.gunner', operation: '%', value: 10 },
++      ],
++      ['add', 'percent'],
++      emptyCtx,
++    );
++    const before = applyPipeline(
++      5,
++      [
++        { source: 'mod.trigger', operation: '+', value: 1 },
++        { source: 'mod.heavy', operation: '-', value: 2 },
++        { source: 'trait.gunner', operation: '%', value: 10 },
++      ],
++      ['percent', 'add'],
++      emptyCtx,
++    );
++    expect(after).toBe(4); // (5+1−2) × 1.1 = 4.4 → 4
++    expect(before).toBe(5); // (5×1.1) +1 −2 = 4.5 → 5
++  });
++
++  it('условный модификатор: перк ×2 действует, только если скорострельность ≤ 5', () => {
++    // «А может вообще примениться, если скорострельность будет меньше
++    //  или равна определённому значению» — условие видит вход фазы.
++    const when = (value) => value <= 5;
++    const heavy = registry.evaluate({ [FIRE]: 5 }, {
++      [FIRE]: [
++        { source: 'mod.heavy', operation: '-', value: 1, phase: 'mods' },
++        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
++        { source: 'perk.conditional', operation: '×', value: 2, phase: 'perkMult', when },
++      ],
++    });
++    // 5−1 = 4; ×1.1 = 4.4 ≤ 5 → ×2 = 8.8 → 9
++    expect(heavy.values[FIRE]).toBe(9);
++
++    const fast = registry.evaluate({ [FIRE]: 8 }, {
++      [FIRE]: [
++        { source: 'mod.heavy', operation: '-', value: 1, phase: 'mods' },
++        { source: 'trait.gunner', operation: '%', value: 10, phase: 'traitPercent' },
++        { source: 'perk.conditional', operation: '×', value: 2, phase: 'perkMult', when },
++      ],
+     });
++    // 8−1 = 7; ×1.1 = 7.7 > 5 → перк не действует → 7.7 → 8
++    expect(fast.values[FIRE]).toBe(8);
++  });
++
++  it('промежуточное округление фазой: round:true на выходе фазы', () => {
++    const phased = applyPipeline(
++      5,
++      [
++        { source: 'mod.trigger', operation: '+', value: 1 },
++        { source: 'trait.gunner', operation: '%', value: 10 },
++        { source: 'perk.doubletap', operation: '×', value: 2 },
++      ],
++      [{ id: 'add' }, { id: 'percent', round: true }, { id: 'mult' }],
++      emptyCtx,
++    );
++    // 6 × 1.1 = 6.6 → округлили в фазе → 7; ×2 = 14
++    expect(phased).toBe(14);
++    const unphased = applyPipeline(
++      5,
++      [
++        { source: 'mod.trigger', operation: '+', value: 1 },
++        { source: 'trait.gunner', operation: '%', value: 10 },
++        { source: 'perk.doubletap', operation: '×', value: 2 },
++      ],
++      ['add', 'percent', 'mult'],
++      emptyCtx,
++    );
++    // 6.6 × 2 = 13.2 → 13
++    expect(unphased).toBe(13);
++  });
++});
++
++// --- Ярость ботаника: порог от динамического максимума ------------------------
++
++describe('МК-1: Ярость ботаника — порог смещается вместе с максимумом ОЗ', () => {
++  const registry = createDerivationRegistry();
++  registry.register(miniSetting());
++
++  const state = { [attr('strength')]: 10 }; // ОЗ = 10 + 10×2 = 30
++
++  /** Логика перка: текущие ОЗ < 30% максимальных. */
++  const nerdRageActive = (values, currentHp) => currentHp < 0.3 * values['test.derived.maxHealth'];
++
++  it('без химии: 12 из 30 = 40% — перк молчит', () => {
++    const { values } = registry.evaluate(state);
+     expect(values['test.derived.maxHealth']).toBe(30);
+-    // потолок счётчика тянет производное с процентом
+-    expect(registry.evaluate(baseState, {
+-      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+-    }).ceilings['test.counter.health']).toBe(30);
++    expect(nerdRageActive(values, 12)).toBe(false);
+   });
+ 
+-  it('процент в аддитивной цепочке параметра отклоняется', () => {
+-    expect(() => applyModifiers(8, [{ source: 'x', operation: '%', value: 15 }])).toThrow(/процент всегда привязан к базе/);
++  it('химия +50% максимума: 12 из 45 = 27% — перк сработал, планка сместилась', () => {
++    // «Временно макс ОЗ будет на 50% больше — и тогда планка менее 30%
++    //  текущих ОЗ от максимума сместится»
++    const { values, ceilings } = registry.evaluate(state, {
++      'test.derived.maxHealth': [{ source: 'chem.superStimpak', operation: '%', value: 50 }],
++    });
++    expect(values['test.derived.maxHealth']).toBe(45);
++    expect(ceilings['test.counter.health']).toBe(45);
++    expect(nerdRageActive(values, 12)).toBe(true);
+   });
+ 
+-  it('аддитив на id производного отклоняется: смешивание запрещено', () => {
+-    const registry = createDerivationRegistry();
+-    registry.register(miniSetting());
+-    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
+-    expect(() =>
+-      registry.evaluate(baseState, {
+-        'test.derived.maxHealth': [{ source: 'x', operation: '+', value: 5 }],
+-      }),
+-    ).toThrow(/только проценты/);
++  it('реакция слушает изменение максимума — каскад её находит', () => {
++    const before = registry.evaluate(state).values;
++    const after = registry.evaluate(state, {
++      'test.derived.maxHealth': [{ source: 'chem.superStimpak', operation: '%', value: 50 }],
++    }).values;
++    const changed = changedParams(['test.derived.maxHealth'], before, after);
++    expect(changed).toEqual(['test.derived.maxHealth']);
++    const fired = registry.reactionsFor(changed).map((r) => r.id);
++    expect(fired).toContain('test.reaction.nerdRage');
+   });
+ });
+ 
+@@ -208,8 +394,6 @@ describe('МК-1: реестр — валидация деклараций', ()
+   it('повторная регистрация того же id отклоняется', () => {
+     const registry = createDerivationRegistry();
+     registry.register(miniSetting());
+-    // префиксы исключают коллизии МЕЖДУ сеттингами; дубль возможен только
+-    // при повторной регистрации того же сеттинга — её и ловим
+     expect(() => registry.register(miniSetting())).toThrow(/уже зарегистрирован/);
+   });
+ 
+@@ -257,6 +441,26 @@ describe('МК-1: реестр — валидация деклараций', ()
+     ).toThrow(/цикл/);
+   });
+ 
++  it('пустой или кривой список фаз отклоняется', () => {
++    const registry = createDerivationRegistry();
++    expect(() =>
++      registry.register({
++        id: 'test',
++        parameters: [
++          { id: 'test.attr.a', kind: 'number', label: 'a', modifierPhases: [] },
++        ],
++      }),
++    ).toThrow(/modifierPhases/);
++    expect(() =>
++      registry.register({
++        id: 'test',
++        parameters: [
++          { id: 'test.attr.a', kind: 'number', label: 'a', modifierPhases: [{ id: 'x' }, { id: 'x' }] },
++        ],
++      }),
++    ).toThrow(/дважды/);
++  });
++
+   it('форма SettingExtension проверяется отдельно (дверь JS→TS)', () => {
+     expect(validateSettingExtension(miniSetting())).toEqual([]);
+     expect(validateSettingExtension({ id: '' }).length).toBeGreaterThan(0);
+@@ -308,6 +512,15 @@ describe('МК-1: реестр — каскад по мини-сеттингу (
+     expect(ceilings['test.counter.mana']).toBe(11);
+   });
+ 
++  it('процент на производном: база формулы × 1.15 (слово владельца про +15% жизней)', () => {
++    const { values, ceilings } = registry.evaluate(baseState, {
++      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
++    });
++    // ОЗ = 26 × 1.15 = 29.9 → 30
++    expect(values['test.derived.maxHealth']).toBe(30);
++    expect(ceilings['test.counter.health']).toBe(30);
++  });
++
+   it('модификаторы каскадируются: аддитив на атрибуте, процент на производном', () => {
+     const modifiers = {
+       [attr('strength')]: [
+@@ -365,6 +578,6 @@ describe('МК-1: требования и реакции', () => {
+     const changed = changedParams(['test.derived.maxMana', 'test.derived.maxHealth'], before, after);
+     expect(changed).toEqual(['test.derived.maxMana']);
+     expect(registry.reactionsFor(changed).map((r) => r.id)).toEqual(['test.reaction.clampMana']);
+-    expect(registry.reactionsFor(['test.derived.maxHealth'])).toEqual([]);
++    expect(registry.reactionsFor(['test.derived.maxHealth']).map((r) => r.id)).toEqual(['test.reaction.nerdRage']);
+   });
+ });
+diff --git a/docs/architecture/derivation-contract.md b/docs/architecture/derivation-contract.md
+index 9132a98..23b3895 100644
+--- a/docs/architecture/derivation-contract.md
++++ b/docs/architecture/derivation-contract.md
+@@ -1,9 +1,9 @@
+-# Контракт выводимости (МК-1, патч 281)
++# Контракт выводимости (МК-1, патчи 281–283)
+ 
+ > Статус: **реализован, изолирован**. Контракт и реестр живут в `src/engine/`,
+ > работают и покрыты тестом `__tests__/engine/derivation-contract.test.js`,
+ > но в работающую программу пока НЕ подключены — ни один экран, действие или
+-> экран-оркестратор их не импортирует. Подключение — МК-3 (патчи 283+).
++> экран-оркестратор их не импортирует. Подключение — МК-3 (патчи 285+).
+ > Это страховка: контракт приживается без риска для Fallout-модуля.
+ 
+ ## Зачем
+@@ -21,38 +21,67 @@
+ 
+ | Секция | Тип | Что задаёт |
+ |---|---|---|
+-| `parameters` | `ParameterDefinition[]` | числа-параметры (атрибуты, навыки); v1 — только `kind: 'number'` |
+-| `derived` | `DerivedDefinition[]` | производные: `{ id, kind, deps, compute(ctx), description }` |
++| `parameters` | `ParameterDefinition[]` | числа-параметры (атрибуты, навыки); v1 — только `kind: 'number'`; конвейер модификаторов (`modifierPhases`) |
++| `derived` | `DerivedDefinition[]` | производные: `{ id, kind, deps, compute(ctx), description, modifierPhases? }` |
+ | `counters` | `CounterDefinition[]` | расходуемые ресурсы; `max` — число или **ссылка на производное** |
+ | `rankBands` | `RankBands[]` | ступени потолка ранга от параметра-входа |
+ | `requirements` | `Requirement[]` | гейты «можно ли»: `minValue` / `minRank` по параметру |
+ | `reactions` | `ReactionDefinition[]` | правила при изменении: `{ watch, on(changed, ctx) }` |
+ | `initialModifiers` | `ParameterModifier[]` | стартовые модификаторы ориджина/трейтов |
+ 
+-## Порядок модификаторов (договор по слову владельца, 2026-09-18)
+-
+-> Слово владельца: «% всегда будут от чего-либо. +15% к защите от магии огня
+-> будут рассчитываться, как −15% входящего урона от атаки со свойством стихии
+-> огня. +15% жизней будут считаться как базовое значение параметра ОЗ
+-> (например атр1+атр2) × 1.15, округлённого математически до целого».
+-
+-**Принцип привязки:** процент всегда применяется к объявленной базе — и никогда
+-не смешивается с аддитивной цепочкой параметра. Отдельные уровни:
+-
+-| Уровень | Операции | Формула |
++## Модификаторы: порядок объявляют правила (слово владельца, 2026-09-18)
++
++> Слово владельца: «Это программа rpg игр. Там есть правила, и как в правилах
++> напишут, так % и будут рассчитываться. [...] Базовая скорострельность будет
++> зависеть от установленных модов, % от черты будет влиять на неё, а перк уже
++> после удваивать. Но может быть и случай, когда черта вместо базовой
++> скорострельности будет увеличивать итоговую [...] А может вообще примениться,
++> если скорострельность будет меньше или равна определённому значению.
++> И это хрен угадаешь.»
++
++**Принцип:** движок НЕ диктует порядок модификаторов — его объявляет правило
++сеттинга. Контракт даёт словарь, правило — рецепт:
++
++- **Фазы-якоря.** Значение объявляет свой конвейер: список фаз в порядке
++  исполнения (`modifierPhases`). Каждый модификатор привязывается к фазе
++  (`phase`). Якорь «+10% базовой» против «+10% итоговой» — это просто место
++  фазы в списке. Дефолт, если фазы не объявлены: `['add', 'percent', 'mult']`
++  (аддитивы → суммарный процент → множители).
++- **Операции.** `'+'`, `'-'` — аддитивы; `'%'` — процент (в фазе суммируются
++  одним множителем); `'×'` — множитель (перк «х2»); `'set'` — замена
++  («СИЛ в силовой броне = 11»). Внутри фазы канонический порядок:
++  set → аддитивы → процент → множители.
++- **Условия.** Модификатор может нести `when(value, ctx)` — применяется,
++  только если условие выполнено на входе фазы («перк действует, если
++  скорострельность ≤ N»).
++- **Округление.** Математическое, один раз в конце конвейера; фаза может
++  объявить промежуточное округление (`{ id, round: true }`) — для правил,
++  которые округляют на своём шаге.
++- **Модификатор в необъявленную фазу** — ошибка с перечислением объявленных
++  фаз, не молчаливый пропуск.
++
++**Пример владельца (скорострельность), все варианты живут в тесте:**
++
++| Правило | Объявление | Расчёт (база 5, моды +1/−2) |
+ |---|---|---|
+-| Параметр (атрибут/навык) | `set`, `'+'`, `'-'` | set (последний побеждает) → сумма аддитивов |
+-| Производное (ОЗ, манна…) | `'%'` на id производного | `round(база_формулы × (1 + Σ%/100))` — округление математическое, одно, в конце |
+-| Канал урона (будущее) | `'%'` со знаком | тот же `applyPercent` на входящем уроне со свойствами («+15% защиты от огня» = −15% входящего урона огня) |
++| Черта +10% базы с модами, перк ×2 | `['mods','traitPercent','perkMult']` | 4 × 1.1 = 4.4 × 2 = 8.8 → **9** |
++| Черта +10% итоговой (после перка) | `['mods','perkMult','traitPercent']` | 4 × 2 = 8 × 1.1 = 8.8 → **9** |
++| Те же + пофазное округление | `round: true` на фазе | **8** против **9** — якорь наблюдаем |
++| Условный перк ×2 | `when: (v) => v <= 5` | при базе 4.4 — сработает; при 7.7 — нет |
++
++**Ярость ботаника (пример владельца):** порог «текущие ОЗ < 30% максимальных» —
++это реакция (`watch: [maxHealth, текущие ОЗ]`), а максимум сам движется:
++химия даёт +50% максимуму (модификатор `'%'` на производном), потолок
++пересчитывается каскадом, и планка 30% сместилась — 12 из 30 = 40% (перк
++молчит), но 12 из 45 = 27% (перк сработал). Всё в тесте контракта.
+ 
+-Несколько процентов на одной базе суммируются и применяются одним множителем:
+-+10% и +5% = ×1.15. Нарушения (процент в аддитивной цепочке параметра,
+-аддитив на производном) — ошибки контракта, а не молчаливый пересчёт.
++**Проценты от одной базы** (первое слово владельца о %) остаются чистой
++функцией `applyPercent(база, проценты)`: «+15% жизней = база × 1.15,
++округлённая математически»; «+15% защиты от магии огня = −15% входящего урона
++от атаки со свойством огня» — тот же помощник для будущих каналов урона.
+ 
+-**Почему так:** в стеке Fallout проценты на сегодня не используются — аддитивы
+-живут на атрибутах (перки, раны, броня), а бонусы тест-сеттинга (+5/10/15%)
+-относятся к производным (здоровье, манна…). Уровни не пересекаются, и каждая
+-величина знает, от чего она посчитана.
++**Совсем дикие правила** — это `compute()`: производное может вычислить что
++угодно из контекста; фазы покрывают типовые конвейеры, формула — всё остальное.
+ 
+ ## Реестр (`src/engine/derivations/registry.ts`)
+ 
+@@ -85,8 +114,8 @@
+ 
+ ## Что дальше (по плану v3)
+ 
+-- **283** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
++- **284 (МК-2)** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
+   на этом контракте (не в тесте, а в поставке) + проводка экранов-песочниц.
+-- **284+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
++- **285+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
+   пересчёта, Fallout-формулы переезжают из движка в `modules/fallout`,
+   починка границы движок/сеттинг.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 7ca83c1..52d3856 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -30,8 +30,9 @@
+   Fallout-формулы переезжают из движка в модуль сеттинга. Движок универсальный —
+   вторые сеттинги планируются, тестовый мини-сеттинг — второй клиент контракта.
+   Прогресс серии: 279 (карта каскада) → 280 (TS-предохранители) → 281 (контракт
+-  выводимости, изолирован) → 282 (семантика процентов: процент — всегда от
+-  объявленной базы) — сданы; следующий — 283 (тестовый сеттинг по спеке).
++  выводимости, изолирован) → 282 (семантика процентов) → 283 (фазы
++  модификаторов: порядок объявляют правила, «хрен угадаешь» → словарь) —
++  сданы; следующий — 284 (тестовый сеттинг по спеке).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+   отдельная фича, с конверсией не смешивать. Цель — ловить ошибки до старта
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index 966f6dc..1563721 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -78,11 +78,13 @@
+            (+/−/процент/set); виды значений (число; треки/списки — версией);
+            вход через реестр расширений и адаптер сеттинга   (1–2)
+ 282  МК-1  Семантика процентов по слову владельца: процент — всегда от
+-           объявленной базы (аддитивы на параметрах, проценты на базах
+-           производных и каналах урона); applyPercent              (1)
+-283+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
++           объявленной базы; applyPercent                          (1)
++283  МК-1  Фазы модификаторов по слову владельца: порядок объявляют
++           правила (якоря-фазы, условия when, множитель ×, пофазное
++           округление); «хрен угадаешь» → словарь, а не догма     (1)
++284+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
+            мини-экран-кирпич; критерий — без правок движка    (2–3)
+-284+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++285+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -153,7 +155,8 @@
+ TS — язык контракта и движка; сеттинг — живой JS.
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+-282 семантика процентов → 283 тестовый сеттинг → 284+ реализация и переезд
++282 семантика процентов → 283 фазы модификаторов (порядок объявляют
++правила) → 284 тестовый сеттинг → 285+ реализация и переезд
+ Fallout-формул в модуль → М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5cc3031..42aa98c 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,18 @@
+ 
+ ---
+ 
++## Series pivot — Modifier phases: the rules declare the order (patch 283)
++
++> Owner's word (2026-09-18): «This is an RPG program. There are rules, and percentages are calculated the way the rules say. [...] The base fire rate depends on installed mods, the trait's % applies to that, and the perk doubles afterwards. But there can also be a case where the trait boosts the final rate instead of the base one [...] And it might only apply if the fire rate is below or equal to a certain value. You can't guess that.»
++
++- The engine no longer dictates the modifier order — patch 282 hardcoded rigid levels («percentages only on derived values»); patch 283 turns that into a vocabulary: a value declares its own pipeline of phases in execution order (`modifierPhases`), and a modifier binds to a phase. «Trait +10% of base» and «trait +10% of final» are the same rule with the phase in a different position.
++- New in the vocabulary: the multiplier operation `×` (a «×2» perk), `when(value)` conditions — «the perk only works if fire rate ≤ N» — and per-phase rounding for rules that round at their own step. A modifier pointing at an undeclared phase is an error listing the declared phases.
++- The owner's fire-rate example is in the test wholesale: base 5, mods +1/−2, trait +10%, perk ×2 → 9; the anchor is observable through phase rounding (8 versus 9); a conditional perk switches on and off at the threshold.
++- Nerd Rage (the owner's example) is a reaction on a dynamic threshold: the perk waits for «current HP < 30% of max», and the max itself moves — a chem grants the max +50%, the cascade recomputes the ceiling, and the bar shifts: 12 out of 30 = 40% (the perk stays silent), 12 out of 45 = 27% (it fires). Also in the test.
++- The contract's acceptance test grew to 31 checks; the contract remains isolated — nothing changed in the running program.
++
++---
++
+ ## Series pivot — Percentage semantics: always from a declared base (patch 282)
+ 
+ > Owner's word (2026-09-18): «% always comes from something. +15% fire-magic defense is calculated as −15% incoming damage from attacks with the fire property. +15% HP is calculated as the HP parameter's base value (e.g. attr1+attr2) × 1.15, mathematically rounded to a whole number».
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 49de2dc..7331aa2 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,18 @@
+ 
+ ---
+ 
++## Разворот серии — Фазы модификаторов: порядок объявляют правила (патч 283)
++
++> Слово владельца (2026-09-18): «Это программа rpg игр. Там есть правила, и как в правилах напишут, так % и будут рассчитываться. [...] Базовая скорострельность будет зависеть от установленных модов, % от черты будет влиять на неё, а перк уже после удваивать. Но может быть и случай, когда черта вместо базовой скорострельности будет увеличивать итоговую [...] А может вообще примениться, если скорострельность будет меньше или равна определённому значению. И это хрен угадаешь.»
++
++- Движок больше не диктует порядок модификаторов — патч 282 зашил жёсткие уровни («проценты только на производных»), патч 283 разворачивает это в словарь: значение объявляет свой конвейер фаз в порядке исполнения (`modifierPhases`), модификатор привязывается к фазе. «Черта +10% базовой» и «черта +10% итоговой» — одно и то же правило с разным местом фазы.
++- Новое в словаре: операция-множитель `×` (перк «х2»), условия `when(value)` — «перк действует, только если скорострельность ≤ N», и пофазное округление для правил, округляющих на своём шаге. Модификатор в необъявленную фазу — ошибка с перечислением объявленных фаз.
++- Пример владельца про скорострельность целиком в тесте: база 5, моды +1/−2, черта +10%, перк ×2 → 9; якорь наблюдаем через пофазное округление (8 против 9); условный перк включается/выключается порогом.
++- Ярость ботаника (пример владельца) — реакция на динамическом пороге: перк ждёт «текущие ОЗ < 30% максимальных», а максимум сам движется — химия даёт +50% максимуму, каскад пересчитывает потолок, планка сместилась: 12 из 30 = 40% (перк молчит), 12 из 45 = 27% (сработал). Тоже в тесте.
++- Приёмочный тест контракта вырос до 31 проверки; контракт по-прежнему изолирован — в работающей программе ничего не изменилось.
++
++---
++
+ ## Разворот серии — Семантика процентов: всегда от объявленной базы (патч 282)
+ 
+ > Слово владельца (2026-09-18): «% всегда будут от чего-либо. +15% к защите от магии огня будут рассчитываться, как −15% входящего урона от атаки со свойством стихии огня. +15% жизней будут считаться как базовое значение параметра ОЗ (например атр1+атр2) × 1.15, округлённого математически до целого».
+diff --git a/src/engine/contracts/derived.ts b/src/engine/contracts/derived.ts
+index 9efc6b9..cff9d8d 100644
+--- a/src/engine/contracts/derived.ts
++++ b/src/engine/contracts/derived.ts
+@@ -1,4 +1,4 @@
+-// КОНТРАКТ ВЫВОДИМОСТИ — производные значения (МК-1, патч 281).
++// КОНТРАКТ ВЫВОДИМОСТИ — производные значения (МК-1, патчи 281–283).
+ //
+ // Производное — значение, которое ВЫЧИСЛЯЕТСЯ из параметров, а не хранится.
+ // Ключевой разворот серии (карта каскада, docs/architecture/cascade-map.md):
+@@ -6,15 +6,11 @@
+ // МК-3 производные будут вычисляться каскадом реестра при любом изменении
+ // входа. Контракт ниже — то, что сеттинг объявляет, а движок исполняет.
+ 
+-import type { ModifierBag, ParameterModifier } from './parameter';
++import type { DerivationContext, ModifierPhase, ParameterModifier } from './parameter';
+ 
+-/** Что производное умеет читать со входа. Только эти поля — никакого стора. */
+-export interface DerivationContext {
+-  /** Значения параметров после модификаторов (то, что видит игрок). */
+-  values: Readonly<Record<string, number>>;
+-  /** Модификаторы по источникам — для производных вида «сколько дал перк». */
+-  modifiers: Readonly<ModifierBag>;
+-}
++// Контекст вычислений живёт в parameter.ts (общий для условий и формул);
++// реэкспортируем, чтобы потребитель брал всё из бочки contracts.
++export type { DerivationContext } from './parameter';
+ 
+ /** Объявление производного значения. */
+ export interface DerivedDefinition {
+@@ -24,10 +20,14 @@ export interface DerivedDefinition {
+   kind: 'derived' | 'max' | 'rankCeiling';
+   /** Параметры-входы: непустой список полных id. */
+   deps: readonly string[];
+-  /** Чистая функция: контекст → число. Без побочных эффектов. */
++  /** Чистая функция: контекст → число (БАЗА производного). Без побочных эффектов. */
+   compute: (ctx: DerivationContext) => number;
+   /** Что это и откуда берётся — для трассировки и ошибок. */
+   description: string;
++  /** Конвейер модификаторов поверх базы: фазы в порядке исполнения.
++   *  Отсутствует — дефолт ['add', 'percent', 'mult']. Порядок объявляет
++   *  правило сеттинга (слово владельца: «как в правилах напишут»). */
++  modifierPhases?: readonly ModifierPhase[];
+ }
+ 
+ /** Модификатор, привязанный к параметру-цели (для реестра). */
+diff --git a/src/engine/contracts/index.ts b/src/engine/contracts/index.ts
+index b1fc09c..69e6f16 100644
+--- a/src/engine/contracts/index.ts
++++ b/src/engine/contracts/index.ts
+@@ -1,4 +1,4 @@
+-// Бочка контрактов выводимости (МК-1, патч 281).
++// Бочка контрактов выводимости (МК-1, патчи 281–283).
+ // Единственный типизированный вход движка для сеттингов. Ничего не исполняется —
+ // только типы и чистые функции; реестр живёт в src/engine/derivations/registry.ts.
+ 
+@@ -19,12 +19,18 @@ export type {
+   RankBands,
+ } from './bands';
+ export {
+-  applyModifiers,
+   applyPercent,
++  applyPipeline,
++  applyWithinPhase,
++  DEFAULT_PHASES,
++  defaultPhaseFor,
++  resolvePhases,
+ } from './parameter';
+ export type {
++  DerivationContext as ModifierContext,
+   ModifierBag,
+   ModifierOperation,
++  ModifierPhase,
+   ParameterDefinition,
+   ParameterModifier,
+   ParameterValueKind,
+diff --git a/src/engine/contracts/parameter.ts b/src/engine/contracts/parameter.ts
+index ea66020..7f408b4 100644
+--- a/src/engine/contracts/parameter.ts
++++ b/src/engine/contracts/parameter.ts
+@@ -1,20 +1,37 @@
+-// КОНТРАКТ ВЫВОДИМОСТИ — параметры (МК-1, патч 281).
++// КОНТРАКТ ВЫВОДИМОСТИ — параметры (МК-1, патчи 281–283).
+ //
+ // Параметр — число, которым сеттинг описывает персонажа: атрибут, навык,
+-// производное здоровье, потолок и т.п. Движок ничего не знает о смыслах:
+-// он хранит значения и применяет модификаторы по правилам этого контракта.
++// производное здоровье, потолок и т.п. Движок ничего не знает о смыслах.
++//
++// СЛОВО ВЛАДЕЛЬЦА (2026-09-18) — главный урок патча 283:
++//   «Это программа rpg игр. Там есть правила, и как в правилах напишут,
++//    так % и будут рассчитываться. [...] И это хрен угадаешь.»
++// Движок НЕ диктует порядок модификаторов — его объявляет правило сеттинга.
++// Контракт даёт словарь: фазы-якоря (где применяется модификатор), условия
++// (когда применяется) и операции (что делает). Пример владельца (скорострельность):
++//   база 5 → моды +1/−2 → черта +10% [базы с модами] → перк ×2  = 9;
++//   а другая черта даёт +10% уже ИТОГОВОЙ — после перка; а третья срабатывает
++//    только если скорострельность ≤ порога. Всё это — объявления, не догмы.
+ //
+ // v1: значение — только число (ParameterValueKind зафиксирован для будущего
+ // расширения на «дорожки» и списки, но движок пока принимает 'number').
+ 
+-/** Операция модификатора параметра.
+- *  - '+'  — прибавить к базе (аддитивная цепочка параметра);
+- *  - '-'  — вычесть из базы (аддитивная цепочка параметра);
+- *  - '%'  — процент от ОБЪЯВЛЕННОЙ БАЗЫ: применяется только к базе
+- *           производного (например ОЗ) или к каналу урона (см. applyPercent),
+- *           в аддитивной цепочке параметра запрещён;
+- *  - 'set' — заменить базу целиком (семантика «СИЛ в силовой броне = 11»). */
+-export type ModifierOperation = '+' | '-' | '%' | 'set';
++/** Операция модификатора.
++ *  - '+'  — прибавить;
++ *  - '-'  — вычесть;
++ *  - '%'  — процент (в своей фазе суммируются);
++ *  - '×'  — множитель (перк «х2», половина и т.п.);
++ *  - 'set' — заменить значение фазы целиком («СИЛ в силовой броне = 11»). */
++export type ModifierOperation = '+' | '-' | '%' | '×' | 'set';
++
++/** Контекст для условий и формул: значения (на текущий момент каскада)
++ *  и модификаторы по источникам. Никакого стора — только объявленный вход. */
++export interface DerivationContext {
++  /** Значения параметров после модификаторов (то, что видит игрок). */
++  values: Readonly<Record<string, number>>;
++  /** Модификаторы по источникам — для производных вида «сколько дал перк». */
++  modifiers: Readonly<ModifierBag>;
++}
+ 
+ /** Один модификатор параметра: источник обязателен — для отчёта «откуда что». */
+ export interface ParameterModifier {
+@@ -22,11 +39,20 @@ export interface ParameterModifier {
+   source: string;
+   operation: ModifierOperation;
+   value: number;
++  /** Фаза-якорь: к какому шагу конвейера модификатор привязан.
++   *  Без меты — фаза по умолчанию для операции (add/percent/mult). */
++  phase?: string;
++  /** Условие применения: получает значение НА ВХОДЕ фазы (до её операций).
++   *  Пример владельца: перк действует, только если скорострельность ≤ N. */
++  when?: (value: number, ctx: DerivationContext) => boolean;
+ }
+ 
+ /** Kind значения параметра. v1 — только 'number'. */
+ export type ParameterValueKind = 'number' | 'track' | 'list';
+ 
++/** Фаза конвейера: имя ИЛИ объект с промежуточным округлением. */
++export type ModifierPhase = string | { id: string; round?: boolean };
++
+ /** Объявление параметра. Значение живёт в состоянии; объявление — в сеттинге. */
+ export interface ParameterDefinition {
+   /** Полный id: с префиксом сеттинга ('fallout.maxHealth'). */
+@@ -36,37 +62,91 @@ export interface ParameterDefinition {
+   label: string;
+   /** Необязательный потолок, которого держит движок (может быть ссылкой на derived). */
+   max?: number | string;
++  /** Конвейер модификаторов: фазы в порядке исполнения. Отсутствует — дефолт
++   *  ['add', 'percent', 'mult'] (аддитивы → суммарный процент → множители). */
++  modifierPhases?: readonly ModifierPhase[];
+ }
+ 
+ /** Модификаторы, сгруппированные по параметру. */
+ export type ModifierBag = Record<string, ParameterModifier[]>;
+ 
++/** Дефолтный конвейер: база+моды → суммарный процент → множители. */
++export const DEFAULT_PHASES: readonly string[] = ['add', 'percent', 'mult'];
++
++/** Фаза по умолчанию для операции (когда модификатор не привязан явно). */
++export const defaultPhaseFor = (operation: ModifierOperation): string => {
++  if (operation === '+' || operation === '-' || operation === 'set') return 'add';
++  if (operation === '%') return 'percent';
++  return 'mult';
++};
++
++/** Разрешить объявление фаз в список { id, round? }. */
++export const resolvePhases = (
++  phases: readonly ModifierPhase[],
++): { id: string; round: boolean }[] =>
++  phases.map((p) => (typeof p === 'string' ? { id: p, round: false } : { id: p.id, round: p.round === true }));
++
+ /**
+- * Применить АДДИТИВНЫЕ модификаторы к базовому значению параметра.
+- * Порядок договорён словом владельца (2026-09-18): «процент всегда от
+- * чего-либо» — поэтому '%' ЗДЕСЬ ЗАПРЕЩЁН и бросает ошибку: аддитивная
+- * цепочка параметра (set → '+'/'-') не смешивается с процентами.
+- *   1) 'set' — последний set заменяет базу (семантика «СИЛ в СБ = 11»);
+- *   2) '+' и '-' складываются в любом порядке (коммутативны).
+- * Проценты применяются к базам производных — см. applyPercent и реестр.
++ * Исполнить ОДНУ фазу: условия проверяются на входе фазы, затем в фазе
++ * действует канонический порядок (set → сумма аддитивов → суммарный процент →
++ * множители по порядку). Чистая функция.
+  */
+-export const applyModifiers = (base: number, modifiers: readonly ParameterModifier[]): number => {
+-  let value = base;
++export const applyWithinPhase = (
++  entry: number,
++  modifiers: readonly ParameterModifier[],
++  ctx: DerivationContext,
++): number => {
++  const active = modifiers.filter((mod) => !mod.when || mod.when(entry, ctx));
++  let value = entry;
++  for (const mod of active) {
++    if (mod.operation === 'set') value = mod.value;
++  }
++  let adds = 0;
++  let percents = 0;
++  for (const mod of active) {
++    if (mod.operation === '+') adds += mod.value;
++    else if (mod.operation === '-') adds -= mod.value;
++    else if (mod.operation === '%') percents += mod.value;
++  }
++  value += adds;
++  if (percents !== 0) value = value * (1 + percents / 100);
++  for (const mod of active) {
++    if (mod.operation === '×') value = value * mod.value;
++  }
++  return value;
++};
++
++/**
++ * Исполнить КОНВЕЙЕР значения: база → фазы в объявленном порядке.
++ * Порядок фаз — это и есть якорь: где «+10% базовой», а где «+10% итоговой» —
++ * решает правило сеттинга (слово владельца: «как в правилах напишут»).
++ * Округление: математическое, в конце конвейера; фаза с round:true округляет
++ * и на своём выходе. Модификатор в необъявленную фазу — ошибка.
++ */
++export const applyPipeline = (
++  base: number,
++  modifiers: readonly ParameterModifier[],
++  phases: readonly ModifierPhase[],
++  ctx: DerivationContext,
++): number => {
++  const declared = new Set(resolvePhases(phases).map((p) => p.id));
++  const byPhase = new Map<string, ParameterModifier[]>();
+   for (const mod of modifiers) {
+-    if (mod.operation === '%') {
++    const phase = mod.phase ?? defaultPhaseFor(mod.operation);
++    if (!declared.has(phase)) {
+       throw new Error(
+-        '[derivations] "%" не применяется в аддитивной цепочке параметра: процент всегда привязан к базе производного (или к каналу урона) — используйте модификатор с operation "%" на id производного',
++        `[derivations] Модификатор от "${mod.source}" сослался на фазу "${phase}", которая для этого значения не объявлена (объявлено: ${Array.from(declared).join(', ') || 'ничего'})`,
+       );
+     }
++    if (!byPhase.has(phase)) byPhase.set(phase, []);
++    byPhase.get(phase)!.push(mod);
+   }
+-  for (const mod of modifiers) {
+-    if (mod.operation === 'set') value = mod.value;
+-  }
+-  for (const mod of modifiers) {
+-    if (mod.operation === '+') value += mod.value;
+-    else if (mod.operation === '-') value -= mod.value;
++  let value = base;
++  for (const phase of resolvePhases(phases)) {
++    value = applyWithinPhase(value, byPhase.get(phase.id) ?? [], ctx);
++    if (phase.round) value = Math.round(value);
+   }
+-  return value;
++  return Math.round(value);
+ };
+ 
+ /**
+diff --git a/src/engine/derivations/registry.ts b/src/engine/derivations/registry.ts
+index 72e64cb..62ad4fc 100644
+--- a/src/engine/derivations/registry.ts
++++ b/src/engine/derivations/registry.ts
+@@ -1,23 +1,24 @@
+-// РЕЕСТР ВЫВОДИМОСТИ (МК-1, патч 281).
++// РЕЕСТР ВЫВОДИМОСТИ (МК-1, патчи 281–283).
+ //
+ // Исполняемая часть контракта: сеттинг регистрирует декларации, движок
+ // валидирует их, строит топологический порядок и вычисляет каскадом.
+ //
+-// ИЗОЛЯЦИЯ (важно): в этом патче реестр НИЧЕГО не подменяет в работающей
+-// программе — его импортируют только тесты контракта. Подключение к стору
+-// и смерть 24 ручных вызовов — МК-3 (патчи 283+), после тестового сеттинга
+-// (282). Так контракт приживается без риска для Fallout-модуля.
++// ИЗОЛЯЦИЯ (важно): реестр НИЧЕГО не подменяет в работающей программе —
++// его импортируют только тесты контракта. Подключение к стору и смерть
++// 24 ручных вызовов — МК-3 (патчи 285+), после тестового сеттинга (284).
+ //
+ // ПРАВИЛА:
+ //   - id уникальны глобально и обязаны начинаться с префикса сеттинга
+ //     ('fallout.maxHealth') — коллизии между сеттингами исключены;
+ //   - deps непусты и ссылаются только на известные параметры/производные;
+ //   - цикл в графе зависимостей — ошибка регистрации, а не вечный цикл;
++//   - порядок модификаторов объявляет СЕТТИНГ (фазы-якоря), движок исполняет;
+ //   - evaluate чистая: снимок на входе, новый снимок на выходе.
+ 
+-import { applyModifiers, applyPercent } from '../contracts/parameter';
+-import type { ModifierBag } from '../contracts/parameter';
+-import type { DerivationContext, DerivedDefinition } from '../contracts/derived';
++import { applyPipeline, DEFAULT_PHASES } from '../contracts/parameter';
++import type { DerivationContext, ModifierBag } from '../contracts/parameter';
++import type { DerivedDefinition } from '../contracts/derived';
++import type { ParameterDefinition } from '../contracts/parameter';
+ import type { CounterDefinition } from '../contracts/counter';
+ import type { RankBands } from '../contracts/bands';
+ import type { ReactionDefinition } from '../contracts/reactions';
+@@ -47,7 +48,7 @@ export interface DerivationRegistry {
+ const KNOWN_KINDS: ReadonlySet<string> = new Set(['derived', 'max', 'rankCeiling']);
+ 
+ export const createDerivationRegistry = (): DerivationRegistry => {
+-  const parameters = new Map<string, { setting: string }>();
++  const parameters = new Map<string, ParameterDefinition & { setting: string }>();
+   const derived = new Map<string, DerivedDefinition & { setting: string }>();
+   const counters = new Map<string, CounterDefinition & { setting: string }>();
+   const rankBands: (RankBands & { setting: string })[] = [];
+@@ -64,6 +65,23 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+     }
+   };
+ 
++  /** Фазы модификаторов: если объявлены — непустой список с уникальными id. */
++  const validatePhases = (def: { id: string; modifierPhases?: unknown }) => {
++    if (def.modifierPhases === undefined) return;
++    if (!Array.isArray(def.modifierPhases) || def.modifierPhases.length === 0) {
++      fail(`"${def.id}": modifierPhases, если объявлены, — непустой список фаз`);
++    }
++    const seen = new Set<string>();
++    for (const phase of def.modifierPhases as Array<string | { id?: string }>) {
++      const id: string = typeof phase === 'string' ? phase : (phase?.id ?? '');
++      if (id === '') {
++        fail(`"${def.id}": каждая фаза — строка или { id, round? }`);
++      }
++      if (seen.has(id)) fail(`"${def.id}": фаза "${id}" объявлена дважды`);
++      seen.add(id);
++    }
++  };
++
+   const rebuildTopo = () => {
+     // Kahn по графу deps: параметры — готовые узлы-источники, производные
+     // встают после своих производных-входов. Цикл = ошибка регистрации.
+@@ -131,7 +149,8 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+       if (param.kind !== 'number') {
+         fail(`параметр "${param.id}": v1 поддерживает только kind 'number'`);
+       }
+-      parameters.set(param.id, { setting: prefix });
++      validatePhases(param);
++      parameters.set(param.id, { ...param, setting: prefix });
+     }
+     put(derived, setting.derived, 'производное');
+     for (const def of setting.derived ?? []) {
+@@ -144,6 +163,7 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+       if (typeof def.compute !== 'function') {
+         fail(`производное "${def.id}" обязано иметь compute`);
+       }
++      validatePhases(def);
+     }
+     put(counters, setting.counters, 'счётчик');
+     for (const bands of setting.rankBands ?? []) {
+@@ -169,32 +189,27 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+     modifiers: Readonly<ModifierBag> = {},
+   ) => {
+     const values: Record<string, number> = {};
+-    for (const id of parameters.keys()) {
+-      const base = state[id];
+-      if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
+-      values[id] = applyModifiers(base, modifiers[id] ?? []);
+-    }
+     const ctx: DerivationContext = {
+       values: values as Readonly<Record<string, number>>,
+       modifiers,
+     };
++    // Параметры: база из состояния → конвейер модификаторов (фазы — по объявлению).
++    // Условия видят значения, вычисленные к их моменту (объявляйте deps честно).
++    for (const [id, def] of parameters) {
++      const base = state[id];
++      if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
++      try {
++        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
++      } catch (err) {
++        fail(`параметр "${id}" упал при вычислении: ${(err as Error).message}`);
++      }
++    }
++    // Производные: база = compute(ctx) → конвейер модификаторов поверх базы.
+     for (const id of topo) {
+       const def = derived.get(id)!;
+       try {
+-        let value = def.compute(ctx);
+-        // Проценты — к базе производного (слово владельца: «+15% жизней =
+-        // базовое значение ОЗ × 1.15, округлённое математически до целого»).
+-        // К производному применяются ТОЛЬКО проценты: аддитивы живут
+-        // на параметрах, смешивание запрещено.
+-        const percents: number[] = [];
+-        for (const mod of modifiers[id] ?? []) {
+-          if (mod.operation !== '%') {
+-            fail(`модификатор "${mod.operation}" на производном "${id}": к базе производного применяются только проценты (аддитивы — на параметрах)`);
+-          }
+-          percents.push(mod.value);
+-        }
+-        if (percents.length > 0) value = applyPercent(value, percents);
+-        values[id] = value;
++        const base = def.compute(ctx);
++        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
+       } catch (err) {
+         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
+       }

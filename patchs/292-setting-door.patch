@@ -1,0 +1,1393 @@
+diff --git a/__tests__/counters/universal-kit.test.js b/__tests__/counters/universal-kit.test.js
+index deaf0c8..8e30905 100644
+--- a/__tests__/counters/universal-kit.test.js
++++ b/__tests__/counters/universal-kit.test.js
+@@ -1,6 +1,8 @@
+ import { describe, it, expect } from 'vitest';
+ import origins from '../../modules/fallout/data/origins/origins.json';
+-import kits from '../../modules/fallout/data/equipmentKits/index.js';
++import { SETTING } from '../../modules/fallout/index.js';
++
++const kits = SETTING.data.equipmentKits;
+ import ruKits from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+ import enKits from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+ import { resolveLevelValue } from '../../domain/levelBands';
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index a3cce4f..e198d17 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -16,13 +16,15 @@
+ // данных оружия роботов («Robotics Expert 1»).
+ 
+ import { describe, it, expect } from 'vitest';
+-import robotWeaponMods from '../../modules/fallout/data/equipment/robot/weapon_mods.json';
+-import robotWeaponModSlots from '../../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
+-import ruWeaponMods from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
+-import enWeaponMods from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
+-import ruRobotWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
+-import enRobotWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+-import robotWeaponsData from '../../modules/fallout/data/equipment/robot/weapons.json';
++import { SETTING } from '../../modules/fallout/index.js';
++
++const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
++const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
++const ruWeaponMods = SETTING.names['ru-RU'].equipment.robot.weaponMods;
++const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
++const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
++const enRobotWeapons = SETTING.names['en-EN'].equipment.robot.weapons;
++const robotWeaponsData = SETTING.data.equipment.robot.weapons;
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ 
+ const LASER_ID = 'robot_weapon_assaultron_head_laser';
+diff --git a/__tests__/robot/assaultron-kits.test.js b/__tests__/robot/assaultron-kits.test.js
+index 363d80a..e1520c2 100644
+--- a/__tests__/robot/assaultron-kits.test.js
++++ b/__tests__/robot/assaultron-kits.test.js
+@@ -7,7 +7,9 @@
+ //    оружием, у которого есть статы (урон/тип/навык) для экрана экипировки.
+ import { describe, it, expect } from 'vitest';
+ 
+-import kits from '../../modules/fallout/data/equipmentKits/index.js';
++import { SETTING } from '../../modules/fallout/index.js';
++
++const kits = SETTING.data.equipmentKits;
+ import origins from '../../modules/fallout/data/origins/origins.json';
+ import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
+ import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+diff --git a/__tests__/robot/robot-kit-assembly.test.js b/__tests__/robot/robot-kit-assembly.test.js
+index 66cedb4..0c5b7d8 100644
+--- a/__tests__/robot/robot-kit-assembly.test.js
++++ b/__tests__/robot/robot-kit-assembly.test.js
+@@ -22,7 +22,9 @@ vi.mock('../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScre
+   tWeaponsAndArmorScreen: (key) => key,
+ }));
+ 
+-import kits from '../../modules/fallout/data/equipmentKits/index.js';
++import { SETTING } from '../../modules/fallout/index.js';
++
++const kits = SETTING.data.equipmentKits;
+ import { resolveKitItems } from '../../domain/kitResolver';
+ import { initRobotSlots } from '../../domain/robotEquip';
+ import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
+diff --git a/__tests__/scrap/scrap-catalog-visibility.test.js b/__tests__/scrap/scrap-catalog-visibility.test.js
+index 3ee7d4f..3cbe769 100644
+--- a/__tests__/scrap/scrap-catalog-visibility.test.js
++++ b/__tests__/scrap/scrap-catalog-visibility.test.js
+@@ -51,15 +51,13 @@ describe('каталог для окон (добыча/покупка)', () => {
+   });
+ });
+ 
+-describe('листы групп данных (270): пути — в одном месте', () => {
+-  it('реестр и каталог не импортируют JSON хлама/рецептов сами — только лист группы', () => {
+-    for (const [rel, banned] of [
+-      ['domain/registry.js', ["data/junk/junk.json'", "data/junk/material.json'", "data/recipes/ammo.json'"]],
+-      ['i18n/equipmentCatalog.js', ["data/junk/junk.json'", "data/junk/material.json'"]],
+-    ]) {
++describe('дверь сеттинга (292): пути — в одном месте', () => {
++  it('реестр и каталог читают сеттинг только через дверь (без внутренних путей)', () => {
++    for (const rel of ['domain/registry.js', 'i18n/equipmentCatalog.js']) {
+       const source = readText(rel);
+-      for (const b of banned) expect(source, `${rel}: ${b}`).not.toContain(b);
+-      expect(source).toContain('data/junk/index.js');
++      expect(source, `${rel}: дверь`).toContain('modules/fallout/index.js');
++      expect(source, `${rel}: внутренности data/`).not.toMatch(/from '[^']*modules\/fallout\/data\//);
++      expect(source, `${rel}: внутренности i18n/`).not.toMatch(/from '[^']*modules\/fallout\/i18n\//);
+     }
+   });
+ 
+diff --git a/__tests__/settings/settings-boundary.test.js b/__tests__/settings/settings-boundary.test.js
+new file mode 100644
+index 0000000..62ef06a
+--- /dev/null
++++ b/__tests__/settings/settings-boundary.test.js
+@@ -0,0 +1,130 @@
++// Тест границы сеттингов (патч 292) — предохранитель контракта «одна дверь»
++// (правило 3 в шапке modules/fallout/index.js).
++//
++// Правило: файлы ВНЕ modules/** не импортируют внутренности сеттингов
++// (modules/<сеттинг>/data/** и modules/<сеттинг>/i18n/**) — только двери
++// (modules/<сеттинг>/index.js). Движок и экраны читают сеттинг через
++// domain/registry.js; каталог отображения — через дверь сам.
++//
++// Исключения:
++//   - __tests__/ — известный долг (26 файлов на 292), гасится по мере правок;
++//   - DEBT ниже — продакшн-файлы, тянущие внутренности напрямую; долг
++//     документирован в docs/architecture/domain-map.md, план погашения — МК-3.
++//
++// Список DEBT может только сокращаться: новый нарушитель или протухшая запись
++// (файл уже чист) — красный тест.
++
++import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++import { join } from 'node:path';
++import { describe, expect, it } from 'vitest';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++
++// Долг границы на момент 292 (см. docs/architecture/domain-map.md).
++const DEBT = new Set([
++  'domain/effects.js',
++  'domain/skillCanonical.js',
++  'domain/skillRewards.js',
++  'domain/weaponDisplay.js',
++  'i18n/appI18n.js',
++  'i18n/conditionsCatalog.js',
++  'components/screens/InventoryScreen/logic/inventoryI18n.js',
++  'src/saves/characterSaves.js',
++  'src/store/characterStore.js',
++  'src/store/migrations.js',
++  'src/store/powerArmorSlice.js',
++  'src/store/resolvers.js',
++]);
++
++const SKIP_DIRS = new Set([
++  'node_modules', '.git', '.expo', 'dist', 'patchs', 'modules', '__tests__',
++  'coverage', 'android', 'ios', 'assets',
++]);
++
++/** Импорт внутренности сеттинга: modules/<имя>/(data|i18n)/… в import/require-строке. */
++const INTERNAL = /^[^\n]*\b(?:import|from|require)\b[^\n]*['"][^'"]*modules\/[a-zA-Z0-9_-]+\/(?:data|i18n)\//;
++
++function collectJsFiles(dir, out = []) {
++  for (const name of readdirSync(dir)) {
++    const full = join(dir, name);
++    const st = statSync(full);
++    if (st.isDirectory()) {
++      if (!SKIP_DIRS.has(name)) collectJsFiles(full, out);
++    } else if (name.endsWith('.js') || name.endsWith('.jsx') || name.endsWith('.ts') || name.endsWith('.tsx')) {
++      out.push(full);
++    }
++  }
++  return out;
++}
++
++function violations() {
++  const found = [];
++  for (const abs of collectJsFiles(ROOT)) {
++    const rel = relPath(abs);
++    const text = readFileSync(abs, 'utf8');
++    const bad = text.split('\n').some((line) => INTERNAL.test(line));
++    if (bad && !DEBT.has(rel)) found.push(rel);
++  }
++  return found;
++}
++
++function relPath(abs) {
++  let rel = abs.slice(ROOT.length).replace(/\\/g, '/');
++  if (rel.startsWith('/')) rel = rel.slice(1);
++  return rel;
++}
++
++describe('граница сеттингов (292): одна дверь', () => {
++  it('вне modules/** внутренности сеттингов не импортируются (кроме известного долга)', () => {
++    expect(violations()).toEqual([]);
++  });
++
++  it('реестр и каталог читают сеттинг только через дверь', () => {
++    for (const rel of ['domain/registry.js', 'i18n/equipmentCatalog.js']) {
++      const source = readFileSync(join(ROOT, rel), 'utf8');
++      expect(source, `${rel}: импорт двери`).toMatch(
++        /import \{ SETTING \} from '[^']*modules\/fallout\/index\.js';/,
++      );
++      expect(source, `${rel}: внутренних путей быть не должно`).not.toMatch(
++        /from '[^']*modules\/fallout\/(?:data|i18n)\//,
++      );
++    }
++  });
++
++  it('долг границы актуален: каждая запись DEBT существует и действительно должна', () => {
++    const stale = [];
++    for (const rel of DEBT) {
++      const abs = join(ROOT, rel);
++      if (!existsSync(abs)) { stale.push(`${rel}: файла нет`); continue; }
++      const hasInternal = readFileSync(abs, 'utf8')
++        .split('\n')
++        .some((line) => INTERNAL.test(line));
++      if (!hasInternal) stale.push(`${rel}: уже чист — убрать из DEBT`);
++    }
++    expect(stale).toEqual([]);
++  });
++
++  it('дверь fallout экспортирует SETTING: meta/data/names, обе локали', async () => {
++    const { SETTING } = await import('../../modules/fallout/index.js');
++    expect(SETTING.meta.id).toBe('fallout');
++    expect(SETTING.meta.locales).toEqual(['ru-RU', 'en-EN']);
++
++    for (const section of ['equipment', 'consumables', 'junk', 'recipes', 'equipmentKits', 'origins', 'traits', 'perks']) {
++      expect(SETTING.data[section], `data.${section}`).toBeTruthy();
++    }
++    expect(SETTING.data.equipment.robot.limbs.length).toBeGreaterThan(0);
++    expect(SETTING.data.equipment.robot.weaponMods.length).toBe(4); // конденсаторы 290–291
++    expect(Object.keys(SETTING.data.equipmentKits).length).toBeGreaterThan(0);
++
++    for (const locale of ['ru-RU', 'en-EN']) {
++      const names = SETTING.names[locale];
++      for (const section of ['system', 'equipment', 'consumables', 'junk']) {
++        expect(names[section], `names[${locale}].${section}`).toBeTruthy();
++      }
++      expect(names.equipment.robot.weaponMods.length).toBe(4);
++      expect(names.junk.tableLabels).toBeTruthy();
++      expect(names.perks.length).toBeGreaterThan(0);
++    }
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 206f453..c6cbe77 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -22,7 +22,7 @@ import {
+   hasFrame,
+   FUSION_CORE_ID,
+ } from '../../../domain/powerArmor';
+-import dataPowerArmor from '../../../modules/fallout/data/equipment/powerArmor.json';
++import { getPowerArmorData } from '../../../domain/registry';
+ import { formatInventoryText, tInventory } from './logic/inventoryI18n';
+ import { slotsForLimbType, isArmAttachment, canReplaceArmWeapon } from '../../../domain/robotSlots';
+ import { rerollConsumableRadiationRoll } from '../../../domain/effects';
+@@ -52,7 +52,7 @@ const PARAM_FIELDS = [
+ 
+ // Каталог механики силовой брони по id (макс. прочность частей, зоны защиты).
+ const PA_CATALOG_BY_ID = Object.fromEntries(
+-  Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
++  Object.values(getPowerArmorData()).flatMap((set) => set.pieces).map((p) => [p.id, p]),
+ );
+ 
+ const flattenItemParams = (item) => {
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index 493a05f..c088db7 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -12,9 +12,12 @@
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import { getCurrentModuleLocale } from '../i18n/locale';
+-import perksData from '../modules/fallout/data/perks/perks.json';
+-import ruPerksData from '../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+-import enPerksData from '../modules/fallout/i18n/en-EN/data/perks/perks.json';
++// Дверь сеттинга (292): перки и их имена — только через modules/fallout/index.js.
++import { SETTING } from '../modules/fallout/index.js';
++
++const perksData = SETTING.data.perks;
++const ruPerksData = SETTING.names['ru-RU'].perks;
++const enPerksData = SETTING.names['en-EN'].perks;
+ 
+ // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
+ const safeStr = (v) => (v === null || v === undefined ? null : String(v));
+diff --git a/docs/architecture/domain-map.md b/docs/architecture/domain-map.md
+new file mode 100644
+index 0000000..7bfa78c
+--- /dev/null
++++ b/docs/architecture/domain-map.md
+@@ -0,0 +1,136 @@
++# Карта домена: что универсально, что — специфика сеттинга
++
++> Вопрос владельца (2026-09-21): «domain на 90% написан под текущий сеттинг, что там
++> универсального, что подойдёт любому сеттингу — хрен пойми». Этот документ — ответ:
++> карта слоёв, пер-файловая, с планом разделения. Дополняется при каждом переезде.
++
++## Критерий разделения (слово владельца, дословно)
++
++> «Система крафта относительно универсальна. Берём одни данные, проверяем их наличие,
++> выдаём другие данные, старые списываем. А что это за данные — хлам, или еда, или
++> детали оружия — скажет сеттинг на основе своей формулы».
++
++То есть: **механика = универсальная формула** (живёт в движке/домене, значений сеттинга
++в ней нет); **значения = данные сеттинга** (живут в `modules/<сеттинг>/`); **правила,
++которые не выражаются данными, = специфика сеттинга** (место им — в модуле, не в домене).
++
++## Слои
++
++| Слой | Где | Что это | Судьба |
++|---|---|---|---|
++| 0. Ядро контрактов | `src/engine/contracts`, `src/engine/derivations` | Контракт выводимости, валидация сеттингов (МК-2). Про fallout не знает ничего; единственный клиент — `modules/test-setting` | Остаётся |
++| 1. Универсальный домен | `domain/` | Не знает сеттинга вовсе: броски, ресурсы, сейвы, персонажи как записи | Остаётся |
++| 2. Движки механик | `domain/` | Формула универсальна, значения приезжают из данных сеттинга через реестр | Остаётся |
++| 3. Специфика Fallout | `domain/` (сейчас) | Правила, не выражаемые данными: роботы, перки, силовая броня, киты… | **Уезжает в `modules/fallout/logic/`** (фазы МК-3+; по образцу test-setting, где формулы внутри модуля) |
++
++Замер на 292: domain/ = 49 файлов, ~9900 строк. Слой 3 ≈ 5500–6000 строк (робо-семейство
++одино ~2000). По строкам «под сеттинг» ~60%, но **форма API реестра — 100% fallout**
++(getPerks, getRobotLimbCatalog, getScrap*), и это главный предмет универсализации.
++
++## Пер-файловая карта
++
++### Слой 1 — универсальный домен (остаётся)
++
++| Файл | Назначение |
++|---|---|
++| types.js | JSDoc-типы движка, файл без рантайм-кода |
++| counters.js | Числовые ресурсы персонажа: форма + действия («ни данных сеттинга» — их шапка) |
++| d20Checks.js | Проверки d20: успех/сложность/крит |
++| diceRollsLogic.js | Формулы бросков (evaluateFormula, rollDie) |
++| levelBands.js | Полосы уровней: механизм шкалы |
++| premium.js | Премиум-статус (уровень приложения, не сеттинга) |
++| moduleLocale.js | Локаль активного модуля |
++| settingsCatalog.js | Каталог настроек: движковые + настройки активного сеттинга |
++| packMerge.js | Пользовательские пакеты правил («свои правила») |
++| characterFolders.js | Папки персонажей в сейве |
++| characterDuplication.js | Дублирование персонажей |
++| characterTransfer.js | Перенос персонажей |
++| characterAvatar.js | Аватары персонажей |
++| itemfitRules.js | Правила посадки предметов (профили — данные сеттинга) |
++
++### Слой 2 — движки механик (остаётся; механизм универсален, значения — из данных)
++
++| Файл | Механика |
++|---|---|
++| craftingEngine.js | Крафт: наличие → производство → списание (критерий владельца) |
++| salvageEngine.js | Разбор: состав → материалы («универсальный движок», патч 260) |
++| enrichItem.js | Обогащение предметов: моды/качества/эффекты (applyWeaponMods, 291) |
++| resolveItem.js | Поиск записи каталога по id |
++| itemIdentity.js | Канонизация id предметов |
++| itemfit.js | Посадка предметов по fit-профилям |
++| equippedArmor.js | Целевые слои брони, блокировки поверх |
++| protectionKind.js | Виды защиты (физ/энерг/рад) |
++| immunities.js | Иммунитеты |
++| range.js | Дальность атак |
++| meleeSlot.js | Слот ближнего боя/руки |
++| weaponDurability.js | Прочность оружия |
++| weaponQualityConflicts.js | Конфликты качеств оружия |
++| uniqQuality.js | Уникальные качества (данные — из реестра) |
++| weaponDisplay.js | Сборка отображения оружия (имена — из i18n; долг границы) |
++| skillCanonical.js | Канонизация имён навыков (долг: импорт экранного словаря) |
++| skillRewards.js | Награды за навыки (данные — data/skillRewards.json; долг границы) |
++| sceneRiskChecks.js | Проверки риска сцены (правила — из реестра) |
++| saveSlimming.js | Похудение сейвов (знает форму предметов; кандидат на параметризацию) |
++| bodyplan.js | Планы тела (данные — из bodyplans через реестр) |
++
++### Слой 3 — специфика Fallout (уезжает в modules/fallout/logic/)
++
++| Файл | Что делает |
++|---|---|
++| robotSlots.js | Модель слотов роботов (~1000 строк) |
++| robotEquip.js | Экипировка роботов: правила, лимиты (~800 строк) |
++| robotSlotLogic.js | Логика слотов роботов |
++| robotDamageResistance.js | Сопротивление урона брони роботов |
++| perks.js | Требования и эффекты перков |
++| traits.js | Черты |
++| powerArmor.js | Правила силовой брони |
++| diseaseConditions.js | Болезни и состояния |
++| characterCreation.js | Создание персонажа (SPECIAL) |
++| origins.js | Происхождения (в т.ч. картинки модуля) |
++| kitResolver.js | Сборка комплектов |
++| kitEquip.js | Экипировка комплекта |
++| kitItemCanonical.js | Канонизация предметов комплектов |
++| equipmentKits.js | Доступ к комплектам |
++| startingPurchase.js | Стартовые покупки |
++| foundItemBonus.js | Бонусы найденного (перки удачи) |
++
++### Требуют решения (слои смешаны)
++
++| Файл | Проблема |
++|---|---|
++| effects.js (~800 строк) | Механизм применения эффектов — generic; номенклатура эффектов — fallout. Делить на движок эффектов + данные сеттинга |
++| registry.js | Точка чтения — универсальна по роли, но форма API повторяет группы fallout. При МК-3 форма API описывается дверью сеттинга, реестр становится универсальным |
++
++## Долг границы (кто ещё тянет внутренности сеттинга напрямую)
++
++Предохранитель — `__tests__/settings/settings-boundary.test.js` (allowlist ниже —
++его же список; может только сокращаться).
++
++| Файл | Что тянет | Категория |
++|---|---|---|
++| i18n/appI18n.js | App.json (UI-строки приложения сеттинга) | UI-словари |
++| components/…/inventoryI18n.js | screens/inventory/*.json | UI-словари |
++| src/saves/characterSaves.js | screens/perksAndTraits/*.json | UI-словари |
++| domain/skillCanonical.js | screens/character/screen.json | UI-словари |
++| domain/effects.js | i18n system/effects.json | Имена данных напрямую |
++| domain/weaponDisplay.js | i18n system/qualities, damageEffects.json | Имена данных напрямую |
++| domain/skillRewards.js | data/skillRewards.json | Данные напрямую |
++| i18n/conditionsCatalog.js | data/conditions/diseases.json + i18n | Агрегатор-сиблинг (кандидат на чтение через дверь) |
++| src/store/characterStore.js | data/perks/perks.json | Данные напрямую (→ геттер реестра) |
++| src/store/migrations.js | data/equipment/robot/*.json | Данные напрямую (→ геттер реестра) |
++| src/store/powerArmorSlice.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
++| src/store/resolvers.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
++
++Тесты: 26 файлов в `__tests__/` читают данные напрямую — из скана границы исключены,
++гасятся по мере правки (новые киты/моды-тесты 292 уже идут через дверь).
++
++## План разделения (фазы)
++
++1. **292 (этот патч)** — дверь `modules/fallout/index.js` + контракт; реестр и каталог
++   читают только дверь; тест границы с allowlist долга.
++2. **МК-3 (293+)** — каскад→стор; погашение долга: UI-словари экранов → своя агрегация;
++   conditionsCatalog → дверь; store-файлы → геттеры реестра.
++3. **294+** — физический переезд слоя 3 в `modules/fallout/logic/` по семействам
++   (роботы → перки/черты → силовая броня → киты → создание/происхождения).
++4. **Конечное состояние** — `modules/fallout` вырезается в отдельный репо; `domain/` =
++   слои 1–2; `src/engine/` = ядро контрактов; сеттинги подключаются дверью и схемой.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 86674f5..79f66f3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,20 @@
+ 
+ ---
+ 
++## Architecture — Setting door and unified contract (patch 292)
++
++> Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
++
++- New setting door `modules/fallout/index.js`: an 8-rule agent-facing contract header plus a single `SETTING` export (meta / data / locale names).
++- `domain/registry.js`: 43 internal-file imports collapsed to one door import (getters unchanged; bindings map old local names to SETTING paths). `i18n/equipmentCatalog.js`: 93 imports down to one.
++- Group manifests `junk/index.js`, `recipes/index.js`, `equipmentKits/index.js` dissolved into the door (3 files deleted). `db/catalogSource.js`: perks via the door. `InventoryScreen`: power armor via the new `getPowerArmorData()` getter.
++- `docs/architecture/domain-map.md`: domain map — 4 layers (contract core / universal domain / mechanic engines / Fallout-specific), per-file table, split plan (specifics move to modules/fallout/logic in MK-3+).
++- Guard `__tests__/settings/settings-boundary.test.js`: no setting-internal imports outside modules/** (explicit, shrink-only allowlist of 12 debt files), registry and catalog read only the door, SETTING shape verified (including the 290–291 capacitors and perk names).
++- test-setting: header aligned with the common setting standard.
++
++---
++
++
+ ## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
+ 
+ > Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9a5e1e8..7dd095e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,20 @@
+ 
+ ---
+ 
++## Архитектура — Дверь сеттинга и единый контракт (патч 292)
++
++> Слово владельца (2026-09-21): «не хочу плодить файлы ради индексов… вырезать папку modules, убрать в другой репозиторий, там сборщик файла-сеттинга, грузить в движок… в экранах сократить до "импорт реестр данных", а в реестре записано, что где лежит и чему принадлежит» + «вписать домен: что универсально, что под сеттинг — хрен пойми» + критерий: «механика универсальна: берём одни данные, проверяем наличие, выдаём другие, старые списываем; что это за данные — скажет сеттинг».
++
++- Создана дверь сеттинга `modules/fallout/index.js`: контракт из 8 правил в шапке (для ИИ-агентов: оперируем данными, данные молчат, одна дверь, одна точка чтения, форма полей по конвенции потребителя, i18n обязателен, структура едина, где живёт логика) + единый экспорт `SETTING` (meta / data / names по локалям).
++- `domain/registry.js`: 43 импорта внутренних файлов → 1 импорт двери (геттеры без изменений; привязки — явная карта «локальное имя → путь SETTING»). `i18n/equipmentCatalog.js`: 93 импорта → 1.
++- Групповые листы `junk/index.js`, `recipes/index.js`, `equipmentKits/index.js` растворены в двери (3 файла удалены). `db/catalogSource.js`: перки — через дверь. `InventoryScreen`: силовая броня — через новый геттер `getPowerArmorData()` (экраны не ходят по путям данных).
++- `docs/architecture/domain-map.md`: карта домена — 4 слоя (ядро контрактов / универсальный домен / движки механик / fallout-специфика), пер-файловая таблица 49 файлов, план разделения (специфика уезжает в modules/fallout/logic при МК-3+, реестр — универсальная форма API).
++- Предохранитель `__tests__/settings/settings-boundary.test.js`: вне modules/** внутренности сеттингов не импортируются (долг — явный allowlist из 12 файлов, может только сокращаться), реестр и каталог — только через дверь, форма SETTING проверена (включая 4 конденсатора 290–291 и имена перков для db).
++- test-setting: шапка выровнена под общий стандарт сеттингов.
++
++---
++
++
+ ## Данные — Реестр узнал о модах оружия роботов; форма полей — по конвенции конвейера (патч 291)
+ 
+ > Вопрос владельца (2026-09-21): «а реестр о новых данных знает? Кто и как будет подключать моды к оружию?» — Нет, не знал; вопрос вскрыл дыру доставки 290.
+diff --git a/domain/registry.js b/domain/registry.js
+index 4445176..817c62f 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -10,66 +10,67 @@
+ // Все потребители (domain/*, компоненты) читают данные ТОЛЬКО через реестр.
+ 
+ // ── Модуль сеттинга (modules/fallout) ──────────────────────────────────────
+-import bodyplansJson from '../modules/fallout/data/bodyplans/bodyplans.json';
+-import robotLimbsJson from '../modules/fallout/data/equipment/robot/limbs.json';
+-import robotWeaponAsLimbJson from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+-import robotWeaponsJson from '../modules/fallout/data/equipment/robot/weapons.json';
+-import robotArmorJson from '../modules/fallout/data/equipment/robot/armor.json';
+-import robotArmorPlatingJson from '../modules/fallout/data/equipment/robot/armor_plating.json';
+-import robotFramesJson from '../modules/fallout/data/equipment/robot/frames.json';
+-import robotWeaponModsJson from '../modules/fallout/data/equipment/robot/weapon_mods.json';
+-import robotWeaponModSlotsJson from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
+-
+-import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+-import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
+-import moduleCategories from '../modules/fallout/data/equipment/categories.json';
+-import moduleTraits from '../modules/fallout/data/traits/traits.json';
+-import modulePerks from '../modules/fallout/data/perks/perks.json';
+-import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+-import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+-import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+-import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
+-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+-
+-// Данные разбора (260, реформа 269) и рецептов (249–269): где лежат файлы —
+-// знают листы групп (modules/fallout/data/junk, .../recipes), а не каждый
+-// потребитель: «импорт, импорт, импорт» по документам не размножаем (270).
+-// Реестр — единственная точка, куда смотрят движок, окно и операции.
+-import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
+-import {
+-  RECIPE_CATEGORY_RULES as moduleCraftingCategoryRules,
+-  RECIPE_FILES as CRAFTING_FILES,
+-  RECIPE_MANIFEST as moduleCraftingIndex,
+-} from '../modules/fallout/data/recipes/index.js';
+-const moduleScrapJunk = JUNK_DATASET.junk;
+-const moduleScrapMaterials = JUNK_DATASET.materials;
+-const moduleScrapTables = JUNK_DATASET.tables;
+-// i18n модуля сеттинга — по категориям, зеркало раскладки i18n/<locale>/data/.
+-import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
+-import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
+-import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
+-import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
+-import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+-import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+-import moduleRuUniqQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/uniq_qualities.json';
+-import moduleEnUniqQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/uniq_qualities.json';
+-import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
+-import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
+-import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
+-import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
+-import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
+-import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
+-import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
+-import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
+-import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
+-import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+-import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+-import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
+-import moduleRuSettingsI18n from '../modules/fallout/i18n/ru-RU/data/system/settings.json';
+-import moduleEnSettingsI18n from '../modules/fallout/i18n/en-EN/data/system/settings.json';
+-
+-
+-import moduleUniqQualities from '../modules/fallout/data/equipment/uniq_qualities.json';
++// Дверь сеттинга (292): единственный импорт данных Fallout — modules/fallout/index.js
++// (контракт — в шапке двери). Привязки ниже — карта «прежнее локальное имя →
++// канонический путь SETTING»; новые данные = файл + строка в двери, не здесь.
++import { SETTING } from '../modules/fallout/index.js';
++
++const bodyplansJson = SETTING.data.bodyplans;
++const robotLimbsJson = SETTING.data.equipment.robot.limbs;
++const robotWeaponAsLimbJson = SETTING.data.equipment.robot.weaponAsLimb;
++const robotWeaponsJson = SETTING.data.equipment.robot.weapons;
++const robotArmorJson = SETTING.data.equipment.robot.armor;
++const robotArmorPlatingJson = SETTING.data.equipment.robot.armorPlating;
++const robotFramesJson = SETTING.data.equipment.robot.frames;
++const robotWeaponModsJson = SETTING.data.equipment.robot.weaponMods;
++const robotWeaponModSlotsJson = SETTING.data.equipment.robot.modSlots;
++const moduleOrigins = SETTING.data.origins;
++const moduleFitProfiles = SETTING.data.fitProfiles;
++const moduleCategories = SETTING.data.equipment.categories;
++const moduleTraits = SETTING.data.traits;
++const modulePerks = SETTING.data.perks;
++const moduleWeapons = SETTING.data.equipment.weapons;
++const moduleWeaponMods = SETTING.data.equipment.weaponMods;
++const moduleGeneralGoods = SETTING.data.equipment.generalGoods;
++const moduleDiseaseExposureRule = SETTING.data.rules.diseaseExposure;
++const moduleEquipmentKits = SETTING.data.equipmentKits;
++const moduleRuOriginsI18n = SETTING.names['ru-RU'].system.origins;
++const moduleEnOriginsI18n = SETTING.names['en-EN'].system.origins;
++const moduleRuTraitsI18n = SETTING.names['ru-RU'].system.traits;
++const moduleEnTraitsI18n = SETTING.names['en-EN'].system.traits;
++const moduleRuEquipmentKitsI18n = SETTING.names['ru-RU'].system.equipmentKits;
++const moduleEnEquipmentKitsI18n = SETTING.names['en-EN'].system.equipmentKits;
++const moduleRuUniqQualitiesI18n = SETTING.names['ru-RU'].system.uniqQualities;
++const moduleEnUniqQualitiesI18n = SETTING.names['en-EN'].system.uniqQualities;
++const moduleRuWeaponsI18n = SETTING.names['ru-RU'].equipment.weapons;
++const moduleEnWeaponsI18n = SETTING.names['en-EN'].equipment.weapons;
++const moduleRuClothesI18n = SETTING.names['ru-RU'].equipment.clothes;
++const moduleEnClothesI18n = SETTING.names['en-EN'].equipment.clothes;
++const moduleRuGeneralGoodsI18n = SETTING.names['ru-RU'].equipment.generalGoods;
++const moduleEnGeneralGoodsI18n = SETTING.names['en-EN'].equipment.generalGoods;
++const moduleRuWeaponModsI18n = SETTING.names['ru-RU'].equipment.weaponMods;
++const moduleEnWeaponModsI18n = SETTING.names['en-EN'].equipment.weaponMods;
++const moduleRuFoodI18n = SETTING.names['ru-RU'].consumables.food;
++const moduleEnFoodI18n = SETTING.names['en-EN'].consumables.food;
++const moduleRuDrinksI18n = SETTING.names['ru-RU'].consumables.drinks;
++const moduleEnDrinksI18n = SETTING.names['en-EN'].consumables.drinks;
++const moduleRuSettingsI18n = SETTING.names['ru-RU'].system.settings;
++const moduleEnSettingsI18n = SETTING.names['en-EN'].system.settings;
++const moduleUniqQualities = SETTING.data.equipment.uniqQualities;
++// Разбор и рецептура: листы групп (junk/index.js, recipes/index.js) растворены
++// в двери (292) — сборка здесь, по каноническим путям.
++const moduleScrapJunk = SETTING.data.junk.items;
++const moduleScrapMaterials = SETTING.data.junk.materials;
++const moduleScrapTables = SETTING.data.junk.tables;
++const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
++const CRAFTING_FILES = {
++  'ammo.json': SETTING.data.recipes.sections.ammo,
++  'weapons.json': SETTING.data.recipes.sections.weapons,
++  'chems.json': SETTING.data.recipes.sections.chems,
++  'food.json': SETTING.data.recipes.sections.food,
++  'drinks.json': SETTING.data.recipes.sections.drinks,
++};
++const moduleCraftingIndex = SETTING.data.recipes.manifest;
+ 
+ import { getEquipmentCatalog } from '../i18n/equipmentCatalog';
+ import { getDiseasesCatalog } from '../i18n/conditionsCatalog';
+@@ -201,6 +202,11 @@ export function getModuleGeneralGoods() {
+ /**
+  * Комплекты модуля: { [kitId]: { items } }.
+  */
++/** Силовая броня: множества и части (id, прочность, зоны защиты). Экраны — через этот геттер, не по путям данных (292). */
++export function getPowerArmorData() {
++  return SETTING.data.equipment.powerArmor;
++}
++
+ export function getModuleEquipmentKits() {
+   return moduleEquipmentKits;
+ }
+@@ -277,7 +283,7 @@ export function getScrapMaterials() {
+ 
+ /** Подписи d20-таблиц разбора — словарь i18n (269: данные молчат). */
+ export function getScrapTableLabels(locale) {
+-  return (JUNK_DATASET.names[locale] ?? JUNK_DATASET.names['ru-RU']).tableLabels;
++  return (SETTING.names[locale] ?? SETTING.names['ru-RU']).junk.tableLabels;
+ }
+ 
+ /**
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 0ae5ae4..da032cc 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -1,106 +1,99 @@
+ // Locale-specific display data (names, descriptions, flavour text)
+-import moduleRuRobotWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
+-import moduleRuRobotArmsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotarms.json';
+-import moduleRuRobotArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/armor.json';
+-import moduleRuRobotPlatingI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/plating.json';
+-import moduleRuRobotFramesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/frames.json';
+-import moduleRuRobotModulesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/modules.json';
+-import moduleRuRobotItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/items.json';
+-import moduleRuRobotBodyI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotbody.json';
+-import moduleRuRobotHeadsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotheads.json';
+-import moduleRuRobotLegsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/robotlegs.json';
+-import moduleRuRobotWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/robot/weapon_mods.json';
+-
+-import moduleEnRobotWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+-import moduleEnRobotArmsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotarms.json';
+-import moduleEnRobotArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/armor.json';
+-import moduleEnRobotPlatingI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/plating.json';
+-import moduleEnRobotFramesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/frames.json';
+-import moduleEnRobotModulesI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/modules.json';
+-import moduleEnRobotWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/weapon_mods.json';
+-import moduleEnRobotItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/items.json';
+-import moduleEnRobotBodyI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotbody.json';
+-import moduleEnRobotHeadsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotheads.json';
+-import moduleEnRobotLegsI18n from '../modules/fallout/i18n/en-EN/data/equipment/robot/robotlegs.json';
+-
+-// Locale-independent kit data (items composition, no names)
+-import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
+-import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+-import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+-// i18n модуля сеттинга — по категориям (зеркало раскладки i18n/<locale>/data/).
+-import moduleRuOriginsI18n from '../modules/fallout/i18n/ru-RU/data/system/origins.json';
+-import moduleEnOriginsI18n from '../modules/fallout/i18n/en-EN/data/system/origins.json';
+-import moduleRuTraitsI18n from '../modules/fallout/i18n/ru-RU/data/system/traits.json';
+-import moduleEnTraitsI18n from '../modules/fallout/i18n/en-EN/data/system/traits.json';
+-import moduleRuEquipmentKitsI18n from '../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
+-import moduleEnEquipmentKitsI18n from '../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
+-import moduleRuArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor.json';
+-import moduleEnArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor.json';
+-import moduleRuPowerArmorI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/powerArmor.json';
+-import moduleEnPowerArmorI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/powerArmor.json';
+-import moduleRuOdditiesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/oddities.json';
+-import moduleEnOdditiesI18n from '../modules/fallout/i18n/en-EN/data/equipment/oddities.json';
+-import moduleRuItemsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/items.json';
+-import moduleEnItemsI18n from '../modules/fallout/i18n/en-EN/data/equipment/items.json';
+-import moduleRuQualitiesI18n from '../modules/fallout/i18n/ru-RU/data/system/qualities.json';
+-import moduleEnQualitiesI18n from '../modules/fallout/i18n/en-EN/data/system/qualities.json';
+-import moduleRuEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/effects.json';
+-import moduleEnEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/effects.json';
+-import moduleRuDamageEffectsI18n from '../modules/fallout/i18n/ru-RU/data/system/damageEffects.json';
+-import moduleEnDamageEffectsI18n from '../modules/fallout/i18n/en-EN/data/system/damageEffects.json';
+-import moduleRuAmmoI18n from '../modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json';
+-import moduleEnAmmoI18n from '../modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json';
+-import moduleRuArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
+-import moduleEnArmorModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json';
+-import moduleRuUniqArmorModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json';
+-import moduleEnUniqArmorModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json';
+-import moduleRuArmorEffectsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_effects.json';
+-import moduleEnArmorEffectsI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/armor_effects.json';
+-import moduleRuWeaponsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json';
+-import moduleEnWeaponsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapons/weapons.json';
+-import moduleRuClothesI18n from '../modules/fallout/i18n/ru-RU/data/equipment/armor/clothes.json';
+-import moduleEnClothesI18n from '../modules/fallout/i18n/en-EN/data/equipment/armor/clothes.json';
+-import moduleRuGeneralGoodsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/general_goods.json';
+-import moduleEnGeneralGoodsI18n from '../modules/fallout/i18n/en-EN/data/equipment/general_goods.json';
+-import moduleRuWeaponModsI18n from '../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
+-import moduleEnWeaponModsI18n from '../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
+-import moduleRuFoodI18n from '../modules/fallout/i18n/ru-RU/data/consumables/food.json';
+-import moduleEnFoodI18n from '../modules/fallout/i18n/en-EN/data/consumables/food.json';
+-import moduleRuDrinksI18n from '../modules/fallout/i18n/ru-RU/data/consumables/drinks.json';
+-import moduleEnDrinksI18n from '../modules/fallout/i18n/en-EN/data/consumables/drinks.json';
+-import moduleRuChemsI18n from '../modules/fallout/i18n/ru-RU/data/consumables/chems.json';
+-import { JUNK_DATASET } from '../modules/fallout/data/junk/index.js';
+-import moduleEnChemsI18n from '../modules/fallout/i18n/en-EN/data/consumables/chems.json';
+-import moduleRuMagazinesI18n from '../modules/fallout/i18n/ru-RU/data/consumables/magazines.json';
+-import moduleEnMagazinesI18n from '../modules/fallout/i18n/en-EN/data/consumables/magazines.json';
+-// Locale-independent technical data (stats, ids, game mechanics)
+-import moduleArmor from '../modules/fallout/data/equipment/armor.json';
+-import modulePowerArmor from '../modules/fallout/data/equipment/powerArmor.json';
+-import moduleOddities from '../modules/fallout/data/equipment/oddities.json';
+-import moduleAmmo from '../modules/fallout/data/equipment/ammo.json';
+-import moduleArmorMods from '../modules/fallout/data/equipment/armor_mods.json';
+-import moduleUniqArmorMods from '../modules/fallout/data/equipment/uniq_armor_mods.json';
+-import moduleArmorEffects from '../modules/fallout/data/equipment/armor_effects.json';
+-import moduleClothesData from '../modules/fallout/data/equipment/clothes.json';
+-import moduleFood from '../modules/fallout/data/consumables/food.json';
+-import moduleDrinks from '../modules/fallout/data/consumables/drinks.json';
+-// Разбор (260, лист группы 270): хлам и материалы — из JUNK_DATASET;
+-// пути к файлам описаны один раз (modules/fallout/data/junk/index.js).
+-import moduleChems from '../modules/fallout/data/consumables/chems.json';
+-import moduleMagazines from '../modules/fallout/data/consumables/magazines.json';
+-import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+-import moduleRobotWeaponMods from '../modules/fallout/data/equipment/robot/weapon_mods.json';
+-import moduleRobotWeaponModSlots from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
+-import moduleRobotParts from '../modules/fallout/data/equipment/robotparts.json';
+-import moduleWeaponModSlots from '../modules/fallout/data/equipment/weapon_mod_slots.json';
+-import moduleRobotLimbs from '../modules/fallout/data/equipment/robot/limbs.json';
+-import moduleRobotWeaponAsLimb from '../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+-import moduleRobotArmor from '../modules/fallout/data/equipment/robot/armor.json';
+-import moduleRobotPlating from '../modules/fallout/data/equipment/robot/armor_plating.json';
+-import moduleRobotFrames from '../modules/fallout/data/equipment/robot/frames.json';
+-import moduleRobotWeapons from '../modules/fallout/data/equipment/robot/weapons.json';
+-
+-
++// Дверь сеттинга (292): каталог отображения читает данные Fallout только через
++// modules/fallout/index.js; привязки — карта «локальное имя → путь SETTING».
++import { SETTING } from '../modules/fallout/index.js';
++const moduleRuRobotWeaponsI18n = SETTING.names['ru-RU'].equipment.robot.weapons;
++const moduleRuRobotArmsI18n = SETTING.names['ru-RU'].equipment.robot.arms;
++const moduleRuRobotArmorI18n = SETTING.names['ru-RU'].equipment.robot.armor;
++const moduleRuRobotPlatingI18n = SETTING.names['ru-RU'].equipment.robot.plating;
++const moduleRuRobotFramesI18n = SETTING.names['ru-RU'].equipment.robot.frames;
++const moduleRuRobotModulesI18n = SETTING.names['ru-RU'].equipment.robot.modules;
++const moduleRuRobotItemsI18n = SETTING.names['ru-RU'].equipment.robot.items;
++const moduleRuRobotBodyI18n = SETTING.names['ru-RU'].equipment.robot.body;
++const moduleRuRobotHeadsI18n = SETTING.names['ru-RU'].equipment.robot.heads;
++const moduleRuRobotLegsI18n = SETTING.names['ru-RU'].equipment.robot.legs;
++const moduleRuRobotWeaponModsI18n = SETTING.names['ru-RU'].equipment.robot.weaponMods;
++const moduleEnRobotWeaponsI18n = SETTING.names['en-EN'].equipment.robot.weapons;
++const moduleEnRobotArmsI18n = SETTING.names['en-EN'].equipment.robot.arms;
++const moduleEnRobotArmorI18n = SETTING.names['en-EN'].equipment.robot.armor;
++const moduleEnRobotPlatingI18n = SETTING.names['en-EN'].equipment.robot.plating;
++const moduleEnRobotFramesI18n = SETTING.names['en-EN'].equipment.robot.frames;
++const moduleEnRobotModulesI18n = SETTING.names['en-EN'].equipment.robot.modules;
++const moduleEnRobotWeaponModsI18n = SETTING.names['en-EN'].equipment.robot.weaponMods;
++const moduleEnRobotItemsI18n = SETTING.names['en-EN'].equipment.robot.items;
++const moduleEnRobotBodyI18n = SETTING.names['en-EN'].equipment.robot.body;
++const moduleEnRobotHeadsI18n = SETTING.names['en-EN'].equipment.robot.heads;
++const moduleEnRobotLegsI18n = SETTING.names['en-EN'].equipment.robot.legs;
++const moduleWeapons = SETTING.data.equipment.weapons;
++const moduleGeneralGoods = SETTING.data.equipment.generalGoods;
++const moduleEquipmentKits = SETTING.data.equipmentKits;
++const moduleRuOriginsI18n = SETTING.names['ru-RU'].system.origins;
++const moduleEnOriginsI18n = SETTING.names['en-EN'].system.origins;
++const moduleRuTraitsI18n = SETTING.names['ru-RU'].system.traits;
++const moduleEnTraitsI18n = SETTING.names['en-EN'].system.traits;
++const moduleRuEquipmentKitsI18n = SETTING.names['ru-RU'].system.equipmentKits;
++const moduleEnEquipmentKitsI18n = SETTING.names['en-EN'].system.equipmentKits;
++const moduleRuArmorI18n = SETTING.names['ru-RU'].equipment.armor.sets;
++const moduleEnArmorI18n = SETTING.names['en-EN'].equipment.armor.sets;
++const moduleRuPowerArmorI18n = SETTING.names['ru-RU'].equipment.armor.powerArmor;
++const moduleEnPowerArmorI18n = SETTING.names['en-EN'].equipment.armor.powerArmor;
++const moduleRuOdditiesI18n = SETTING.names['ru-RU'].equipment.oddities;
++const moduleEnOdditiesI18n = SETTING.names['en-EN'].equipment.oddities;
++const moduleRuItemsI18n = SETTING.names['ru-RU'].equipment.items;
++const moduleEnItemsI18n = SETTING.names['en-EN'].equipment.items;
++const moduleRuQualitiesI18n = SETTING.names['ru-RU'].system.qualities;
++const moduleEnQualitiesI18n = SETTING.names['en-EN'].system.qualities;
++const moduleRuEffectsI18n = SETTING.names['ru-RU'].system.effects;
++const moduleEnEffectsI18n = SETTING.names['en-EN'].system.effects;
++const moduleRuDamageEffectsI18n = SETTING.names['ru-RU'].system.damageEffects;
++const moduleEnDamageEffectsI18n = SETTING.names['en-EN'].system.damageEffects;
++const moduleRuAmmoI18n = SETTING.names['ru-RU'].equipment.ammoTypes;
++const moduleEnAmmoI18n = SETTING.names['en-EN'].equipment.ammoTypes;
++const moduleRuArmorModsI18n = SETTING.names['ru-RU'].equipment.armor.mods;
++const moduleEnArmorModsI18n = SETTING.names['en-EN'].equipment.armor.mods;
++const moduleRuUniqArmorModsI18n = SETTING.names['ru-RU'].equipment.armor.uniqMods;
++const moduleEnUniqArmorModsI18n = SETTING.names['en-EN'].equipment.armor.uniqMods;
++const moduleRuArmorEffectsI18n = SETTING.names['ru-RU'].equipment.armor.effects;
++const moduleEnArmorEffectsI18n = SETTING.names['en-EN'].equipment.armor.effects;
++const moduleRuWeaponsI18n = SETTING.names['ru-RU'].equipment.weapons;
++const moduleEnWeaponsI18n = SETTING.names['en-EN'].equipment.weapons;
++const moduleRuClothesI18n = SETTING.names['ru-RU'].equipment.clothes;
++const moduleEnClothesI18n = SETTING.names['en-EN'].equipment.clothes;
++const moduleRuGeneralGoodsI18n = SETTING.names['ru-RU'].equipment.generalGoods;
++const moduleEnGeneralGoodsI18n = SETTING.names['en-EN'].equipment.generalGoods;
++const moduleRuWeaponModsI18n = SETTING.names['ru-RU'].equipment.weaponMods;
++const moduleEnWeaponModsI18n = SETTING.names['en-EN'].equipment.weaponMods;
++const moduleRuFoodI18n = SETTING.names['ru-RU'].consumables.food;
++const moduleEnFoodI18n = SETTING.names['en-EN'].consumables.food;
++const moduleRuDrinksI18n = SETTING.names['ru-RU'].consumables.drinks;
++const moduleEnDrinksI18n = SETTING.names['en-EN'].consumables.drinks;
++const moduleRuChemsI18n = SETTING.names['ru-RU'].consumables.chems;
++const moduleEnChemsI18n = SETTING.names['en-EN'].consumables.chems;
++const moduleRuMagazinesI18n = SETTING.names['ru-RU'].consumables.magazines;
++const moduleEnMagazinesI18n = SETTING.names['en-EN'].consumables.magazines;
++const moduleArmor = SETTING.data.equipment.armor;
++const modulePowerArmor = SETTING.data.equipment.powerArmor;
++const moduleOddities = SETTING.data.equipment.oddities;
++const moduleAmmo = SETTING.data.equipment.ammo;
++const moduleArmorMods = SETTING.data.equipment.armorMods;
++const moduleUniqArmorMods = SETTING.data.equipment.uniqArmorMods;
++const moduleArmorEffects = SETTING.data.equipment.armorEffects;
++const moduleClothesData = SETTING.data.equipment.clothes;
++const moduleFood = SETTING.data.consumables.food;
++const moduleDrinks = SETTING.data.consumables.drinks;
++const moduleChems = SETTING.data.consumables.chems;
++const moduleMagazines = SETTING.data.consumables.magazines;
++const moduleWeaponMods = SETTING.data.equipment.weaponMods;
++const moduleRobotWeaponMods = SETTING.data.equipment.robot.weaponMods;
++const moduleRobotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
++const moduleRobotParts = SETTING.data.equipment.robotParts;
++const moduleWeaponModSlots = SETTING.data.equipment.weaponModSlots;
++const moduleRobotLimbs = SETTING.data.equipment.robot.limbs;
++const moduleRobotWeaponAsLimb = SETTING.data.equipment.robot.weaponAsLimb;
++const moduleRobotArmor = SETTING.data.equipment.robot.armor;
++const moduleRobotPlating = SETTING.data.equipment.robot.armorPlating;
++const moduleRobotFrames = SETTING.data.equipment.robot.frames;
++const moduleRobotWeapons = SETTING.data.equipment.robot.weapons;
+ 
+ import { getCurrentModuleLocale } from './locale';
+ import { expandTrueItems } from '../domain/packMerge';
+@@ -133,8 +126,8 @@ const moduleRuI18n = {
+   drinks: moduleRuDrinksI18n,
+   chems: moduleRuChemsI18n,
+   magazines: moduleRuMagazinesI18n,
+-  junk: JUNK_DATASET.names['ru-RU'].junk,
+-  materials: JUNK_DATASET.names['ru-RU'].materials,
++  junk: SETTING.names['ru-RU'].junk.items,
++  materials: SETTING.names['ru-RU'].junk.materials,
+ };
+ 
+ const moduleEnI18n = {
+@@ -161,8 +154,8 @@ const moduleEnI18n = {
+   drinks: moduleEnDrinksI18n,
+   chems: moduleEnChemsI18n,
+   magazines: moduleEnMagazinesI18n,
+-  junk: JUNK_DATASET.names['en-EN'].junk,
+-  materials: JUNK_DATASET.names['en-EN'].materials,
++  junk: SETTING.names['en-EN'].junk.items,
++  materials: SETTING.names['en-EN'].junk.materials,
+ };
+ 
+ const ALL_KIT_DATA = {
+@@ -412,8 +405,8 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const mergedGeneralGoods = [...moduleGeneralGoodsLocalized];
+   // Разбор (260): хлам и материалы — те же правила сборки, что у остальных
+   // каталогов: данные задают механику, i18n — имя; отсутствие имени — падение.
+-  const mergedJunk = mergeById(JUNK_DATASET.junk, moduleI18n.junk);
+-  const mergedScrapMaterials = mergeById(JUNK_DATASET.materials, moduleI18n.materials);
++  const mergedJunk = mergeById(SETTING.data.junk.items, moduleI18n.junk);
++  const mergedScrapMaterials = mergeById(SETTING.data.junk.materials, moduleI18n.materials);
+ 
+   const mergedOddities = mergeById(moduleOddities, moduleI18n.oddities || []);
+   const mergedRobotBody = limbsOfType('body');
+diff --git a/modules/fallout/data/equipmentKits/index.js b/modules/fallout/data/equipmentKits/index.js
+deleted file mode 100644
+index f9b99b6..0000000
+--- a/modules/fallout/data/equipmentKits/index.js
++++ /dev/null
+@@ -1,50 +0,0 @@
+-// modules/fallout/data/equipmentKits/index.js
+-// Индекс комплектов модуля (сеттинг).
+-//
+-// Комплекты разложены по файлам — по одному на фракцию/группу
+-// (brotherhood.json, ncr.json, treefamilies.json и т.д.), чтобы каталог
+-// оставался поддерживаемым при росте числа комплектов (1к, 1м…).
+-// Этот индекс объединяет их в один объект { [kitId]: { items } }.
+-//
+-// ПРАВИЛО (владелец): новый комплект = новый файл (или запись в файле
+-// своей фракции) + строка импорта здесь. Движок не трогается.
+-
+-import brotherhood from './brotherhood.json';
+-import brotherhoodOutcast from './brotherhoodOutcast.json';
+-import childOfAtom from './childOfAtom.json';
+-import defaultKit from './default.json';
+-import enclave from './enclave.json';
+-import minuteman from './minuteman.json';
+-import misterHandy from './misterHandy.json';
+-import ncr from './ncr.json';
+-import nightkin from './nightkin.json';
+-import assaultron from './assaultron.json';
+-import protectron from './protectron.json';
+-import purchase from './purchase.json';
+-import robobrain from './robobrain.json';
+-import securitron from './securitron.json';
+-import superMutant from './superMutant.json';
+-import vaultDweller from './vaultDweller.json';
+-import wastelander from './wastelander.json';
+-import treefamilies from './treefamilies.json';
+-
+-export default {
+-  ...brotherhood,
+-  ...brotherhoodOutcast,
+-  ...childOfAtom,
+-  ...defaultKit,
+-  ...enclave,
+-  ...minuteman,
+-  ...misterHandy,
+-  ...ncr,
+-  ...nightkin,
+-  ...assaultron,
+-  ...protectron,
+-  ...purchase,
+-  ...robobrain,
+-  ...securitron,
+-  ...superMutant,
+-  ...vaultDweller,
+-  ...wastelander,
+-  ...treefamilies,
+-};
+diff --git a/modules/fallout/data/junk/index.js b/modules/fallout/data/junk/index.js
+deleted file mode 100644
+index 94a9d43..0000000
+--- a/modules/fallout/data/junk/index.js
++++ /dev/null
+@@ -1,26 +0,0 @@
+-// Реестр группы «хлам» (270): где лежат данные разбора — одна точка.
+-// domain/registry.js и i18n/equipmentCatalog.js импортируют этот лист, а не
+-// отдельные файлы: новая группа или переезд пути = правка здесь, а не
+-// «импорт, импорт, импорт» по всем документам. Лист модулей данных не импортирует
+-// ничего из домена — циклов нет по построению.
+-import junk from './junk.json';
+-import materials from './material.json';
+-import tables from './tables.json';
+-import junkNamesRu from '../../i18n/ru-RU/data/junk/junk.json';
+-import junkNamesEn from '../../i18n/en-EN/data/junk/junk.json';
+-import materialNamesRu from '../../i18n/ru-RU/data/junk/material.json';
+-import materialNamesEn from '../../i18n/en-EN/data/junk/material.json';
+-import tableLabelsRu from '../../i18n/ru-RU/data/junk/tables.json';
+-import tableLabelsEn from '../../i18n/en-EN/data/junk/tables.json';
+-
+-export const JUNK_DATASET = {
+-  junk,
+-  materials,
+-  tables,
+-  // junk/materials — списки имён для каталога; tableLabels — подписи
+-  // d20-таблиц для ГМ-секции (сами таблицы подписей не носят, 269).
+-  names: {
+-    'ru-RU': { junk: junkNamesRu, materials: materialNamesRu, tableLabels: tableLabelsRu },
+-    'en-EN': { junk: junkNamesEn, materials: materialNamesEn, tableLabels: tableLabelsEn },
+-  },
+-};
+diff --git a/modules/fallout/data/recipes/index.js b/modules/fallout/data/recipes/index.js
+deleted file mode 100644
+index abc2dd7..0000000
+--- a/modules/fallout/data/recipes/index.js
++++ /dev/null
+@@ -1,24 +0,0 @@
+-// Реестр группы «рецепты» (270): манифест и файлы-разделы — одна точка.
+-// Реестр домена читает отсюда и порядок категорий, и строки: новый файл
+-// рецептуры = импорт здесь + строка в index.json, движок и окно не трогаем.
+-import recipeIndex from './index.json';
+-import categoryRules from './categoryRules.json';
+-import ammo from './ammo.json';
+-import weapons from './weapons.json';
+-import chems from './chems.json';
+-import food from './food.json';
+-import drinks from './drinks.json';
+-
+-export const RECIPE_FILES = {
+-  'ammo.json': ammo,
+-  'weapons.json': weapons,
+-  'chems.json': chems,
+-  'food.json': food,
+-  'drinks.json': drinks,
+-};
+-
+-export const RECIPE_MANIFEST = recipeIndex;
+-
+-// Параметры категорий — рядом с манифестом, поэтому потребители группы
+-// рецептов знают единственную точку входа (этот файл), а не пути JSON.
+-export const RECIPE_CATEGORY_RULES = categoryRules;
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+new file mode 100644
+index 0000000..295e684
+--- /dev/null
++++ b/modules/fallout/index.js
+@@ -0,0 +1,395 @@
++// СЕТТИНГ «Fallout 2d20» — ДВЕРЬ МОДУЛЯ (патч 292).
++//
++// Единственный файл модуля, который читается СНАРУЖИ (движок, экраны, тесты).
++// Экспорт один: SETTING. Внутри модуля свои файлы модуль читает свободно.
++//
++// ── КОНТРАКТ СЕТТИНГА (единый для всех сеттингов; для ИИ-агентов) ──────────
++//
++// 1. ОПЕРИРУЕМ ДАННЫМИ. Все игровые значения — в data/**/*.json. Хардкоды
++//    значений в коде запрещены: новое значение = строка в json, не правка
++//    кода.
++// 2. ДАННЫЕ МОЛЧАТ. В данных — id и числа. Всё, что видит игрок, — имена
++//    из i18n/<locale>/. Текстов интерфейса в данных нет.
++// 3. ОДНА ДВЕРЬ. Снаружи modules/<сеттинг>/ читается ТОЛЬКО этот index.js.
++//    Прямые импорты data/** и i18n/** снаружи запрещены — держит тест
++//    границы __tests__/settings/settings-boundary.test.js (известный долг —
++//    в его allowlist и в docs/architecture/domain-map.md).
++// 4. ОДНА ТОЧКА ЧТЕНИЯ. Движок и экраны получают данные сеттинга через
++//    domain/registry.js (геттеры). Реестр и каталог отображения
++//    (i18n/equipmentCatalog.js) импортируют только двери сеттингов.
++// 5. НОВЫЕ ДАННЫЕ = json-файл + импорт здесь + место в SETTING (+ геттер
++//    в реестре, если появилась новая ГРУППА). Форма полей — конвенция
++//    живого потребителя (пример: domain/enrichItem.js applyWeaponMods
++//    требует плоские аддитивные cost/weight — патч 291).
++// 6. I18N ОБЯЗАТЕЛЕН. Каждая видимая игроку строка — в обеих локалях
++//    (ru-RU, en-EN).
++// 7. СТРУКТУРА ЕДИНА. Любой сеттинг держит скелет: index.js (дверь +
++//    контракт), data/ (значения), i18n/ (имена), screens/ (экраны
++//    сеттинга). Другой сеттинг = другое наполнение, не другая архитектура.
++// 8. ГДЕ ЖИВЁТ ЛОГИКА. Механика = универсальная формула в domain/ (движки
++//    механик: «берём одни данные, проверяем их наличие, выдаём другие,
++//    старые списываем; а ЧТО это за данные — хлам, еда или детали оружия —
++//    скажет сеттинг на основе своей формулы»). Правила конкретного сеттинга,
++//    не выражаемые данными, живут в modules/<сеттинг>/ — не в domain/.
++//    Карта слоёв домена и план разделения: docs/architecture/domain-map.md.
++//
++// ── СХЕМА SETTING ──────────────────────────────────────────────────────────
++//
++//   SETTING.meta          — id сеттинга, поддерживаемые локали
++//   SETTING.data          — значения: equipment (включая robot), consumables,
++//                           junk, recipes, equipmentKits, origins, traits,
++//                           perks, bodyplans, rules
++//   SETTING.names[locale] — имена данных: system, equipment (включая robot),
++//                           consumables, junk (items/materials/tableLabels)
++//
++// Порядок разделов ниже повторяет структуру SETTING — сверху вниз.
++
++import bodyplans from './data/bodyplans/bodyplans.json';
++import origins from './data/origins/origins.json';
++import fitProfiles from './data/origins/fitProfiles.json';
++import traits from './data/traits/traits.json';
++import perks from './data/perks/perks.json';
++import diseaseExposure from './data/rules/diseaseExposure.json';
++
++// — снаряжение —
++import categories from './data/equipment/categories.json';
++import weapons from './data/equipment/weapons.json';
++import weaponMods from './data/equipment/weapon_mods.json';
++import weaponModSlots from './data/equipment/weapon_mod_slots.json';
++import generalGoods from './data/equipment/general_goods.json';
++import uniqQualities from './data/equipment/uniq_qualities.json';
++import armor from './data/equipment/armor.json';
++import powerArmor from './data/equipment/powerArmor.json';
++import clothes from './data/equipment/clothes.json';
++import oddities from './data/equipment/oddities.json';
++import ammo from './data/equipment/ammo.json';
++import armorMods from './data/equipment/armor_mods.json';
++import uniqArmorMods from './data/equipment/uniq_armor_mods.json';
++import armorEffects from './data/equipment/armor_effects.json';
++import robotParts from './data/equipment/robotparts.json';
++
++// — роботы —
++import robotLimbs from './data/equipment/robot/limbs.json';
++import robotWeaponAsLimb from './data/equipment/robot/weaponAsLimb.json';
++import robotWeapons from './data/equipment/robot/weapons.json';
++import robotArmor from './data/equipment/robot/armor.json';
++import robotArmorPlating from './data/equipment/robot/armor_plating.json';
++import robotFrames from './data/equipment/robot/frames.json';
++import robotWeaponMods from './data/equipment/robot/weapon_mods.json';
++import robotWeaponModSlots from './data/equipment/robot/weapon_mod_slots.json';
++
++// — расходники —
++import food from './data/consumables/food.json';
++import drinks from './data/consumables/drinks.json';
++import chems from './data/consumables/chems.json';
++import magazines from './data/consumables/magazines.json';
++
++// — разбор (хлам, материалы, d20-таблицы) —
++import junkItems from './data/junk/junk.json';
++import junkMaterials from './data/junk/material.json';
++import junkTables from './data/junk/tables.json';
++
++// — рецептура (манифест порядка, правила категорий, разделы) —
++import recipesManifest from './data/recipes/index.json';
++import recipesCategoryRules from './data/recipes/categoryRules.json';
++import recipesAmmo from './data/recipes/ammo.json';
++import recipesWeapons from './data/recipes/weapons.json';
++import recipesChems from './data/recipes/chems.json';
++import recipesFood from './data/recipes/food.json';
++import recipesDrinks from './data/recipes/drinks.json';
++
++// — комплекты (по файлу на фракцию/группу; слияние — здесь, 270) —
++import kitAssaultron from './data/equipmentKits/assaultron.json';
++import kitBrotherhood from './data/equipmentKits/brotherhood.json';
++import kitBrotherhoodOutcast from './data/equipmentKits/brotherhoodOutcast.json';
++import kitChildOfAtom from './data/equipmentKits/childOfAtom.json';
++import kitDefault from './data/equipmentKits/default.json';
++import kitEnclave from './data/equipmentKits/enclave.json';
++import kitMinuteman from './data/equipmentKits/minuteman.json';
++import kitMisterHandy from './data/equipmentKits/misterHandy.json';
++import kitNcr from './data/equipmentKits/ncr.json';
++import kitNightkin from './data/equipmentKits/nightkin.json';
++import kitProtectron from './data/equipmentKits/protectron.json';
++import kitPurchase from './data/equipmentKits/purchase.json';
++import kitRobobrain from './data/equipmentKits/robobrain.json';
++import kitSecuritron from './data/equipmentKits/securitron.json';
++import kitSuperMutant from './data/equipmentKits/superMutant.json';
++import kitTreefamilies from './data/equipmentKits/treefamilies.json';
++import kitVaultDweller from './data/equipmentKits/vaultDweller.json';
++import kitWastelander from './data/equipmentKits/wastelander.json';
++
++// — имена: ru-RU —
++import ruSystemOrigins from './i18n/ru-RU/data/system/origins.json';
++import ruSystemTraits from './i18n/ru-RU/data/system/traits.json';
++import ruSystemEquipmentKits from './i18n/ru-RU/data/system/equipmentKits.json';
++import ruSystemUniqQualities from './i18n/ru-RU/data/system/uniq_qualities.json';
++import ruSystemQualities from './i18n/ru-RU/data/system/qualities.json';
++import ruSystemEffects from './i18n/ru-RU/data/system/effects.json';
++import ruSystemDamageEffects from './i18n/ru-RU/data/system/damageEffects.json';
++import ruSystemSettings from './i18n/ru-RU/data/system/settings.json';
++import ruEquipmentWeapons from './i18n/ru-RU/data/equipment/weapons/weapons.json';
++import ruEquipmentClothes from './i18n/ru-RU/data/equipment/armor/clothes.json';
++import ruEquipmentGeneralGoods from './i18n/ru-RU/data/equipment/general_goods.json';
++import ruEquipmentWeaponMods from './i18n/ru-RU/data/equipment/weapon_mods.json';
++import ruEquipmentItems from './i18n/ru-RU/data/equipment/items.json';
++import ruEquipmentOddities from './i18n/ru-RU/data/equipment/oddities.json';
++import ruEquipmentAmmoTypes from './i18n/ru-RU/data/equipment/ammo/ammo_types.json';
++import ruArmorSets from './i18n/ru-RU/data/equipment/armor/armor.json';
++import ruArmorPowerArmor from './i18n/ru-RU/data/equipment/armor/powerArmor.json';
++import ruArmorMods from './i18n/ru-RU/data/equipment/armor/armor_mods.json';
++import ruArmorUniqMods from './i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json';
++import ruArmorEffects from './i18n/ru-RU/data/equipment/armor/armor_effects.json';
++import ruRobotWeapons from './i18n/ru-RU/data/equipment/robot/weapons.json';
++import ruRobotArms from './i18n/ru-RU/data/equipment/robot/robotarms.json';
++import ruRobotArmor from './i18n/ru-RU/data/equipment/robot/armor.json';
++import ruRobotPlating from './i18n/ru-RU/data/equipment/robot/plating.json';
++import ruRobotFrames from './i18n/ru-RU/data/equipment/robot/frames.json';
++import ruRobotModules from './i18n/ru-RU/data/equipment/robot/modules.json';
++import ruRobotItems from './i18n/ru-RU/data/equipment/robot/items.json';
++import ruRobotBody from './i18n/ru-RU/data/equipment/robot/robotbody.json';
++import ruRobotHeads from './i18n/ru-RU/data/equipment/robot/robotheads.json';
++import ruRobotLegs from './i18n/ru-RU/data/equipment/robot/robotlegs.json';
++import ruRobotWeaponMods from './i18n/ru-RU/data/equipment/robot/weapon_mods.json';
++import ruConsumablesFood from './i18n/ru-RU/data/consumables/food.json';
++import ruConsumablesDrinks from './i18n/ru-RU/data/consumables/drinks.json';
++import ruConsumablesChems from './i18n/ru-RU/data/consumables/chems.json';
++import ruConsumablesMagazines from './i18n/ru-RU/data/consumables/magazines.json';
++import ruPerksNames from './i18n/ru-RU/data/perks/perks.json';
++import ruJunkItems from './i18n/ru-RU/data/junk/junk.json';
++import ruJunkMaterials from './i18n/ru-RU/data/junk/material.json';
++import ruJunkTableLabels from './i18n/ru-RU/data/junk/tables.json';
++
++// — имена: en-EN —
++import enSystemOrigins from './i18n/en-EN/data/system/origins.json';
++import enSystemTraits from './i18n/en-EN/data/system/traits.json';
++import enSystemEquipmentKits from './i18n/en-EN/data/system/equipmentKits.json';
++import enSystemUniqQualities from './i18n/en-EN/data/system/uniq_qualities.json';
++import enSystemQualities from './i18n/en-EN/data/system/qualities.json';
++import enSystemEffects from './i18n/en-EN/data/system/effects.json';
++import enSystemDamageEffects from './i18n/en-EN/data/system/damageEffects.json';
++import enSystemSettings from './i18n/en-EN/data/system/settings.json';
++import enEquipmentWeapons from './i18n/en-EN/data/equipment/weapons/weapons.json';
++import enEquipmentClothes from './i18n/en-EN/data/equipment/armor/clothes.json';
++import enEquipmentGeneralGoods from './i18n/en-EN/data/equipment/general_goods.json';
++import enEquipmentWeaponMods from './i18n/en-EN/data/equipment/weapon_mods.json';
++import enEquipmentItems from './i18n/en-EN/data/equipment/items.json';
++import enEquipmentOddities from './i18n/en-EN/data/equipment/oddities.json';
++import enEquipmentAmmoTypes from './i18n/en-EN/data/equipment/ammo/ammo_types.json';
++import enArmorSets from './i18n/en-EN/data/equipment/armor/armor.json';
++import enArmorPowerArmor from './i18n/en-EN/data/equipment/armor/powerArmor.json';
++import enArmorMods from './i18n/en-EN/data/equipment/armor/armor_mods.json';
++import enArmorUniqMods from './i18n/en-EN/data/equipment/armor/uniq_armor_mods.json';
++import enArmorEffects from './i18n/en-EN/data/equipment/armor/armor_effects.json';
++import enRobotWeapons from './i18n/en-EN/data/equipment/robot/weapons.json';
++import enRobotArms from './i18n/en-EN/data/equipment/robot/robotarms.json';
++import enRobotArmor from './i18n/en-EN/data/equipment/robot/armor.json';
++import enRobotPlating from './i18n/en-EN/data/equipment/robot/plating.json';
++import enRobotFrames from './i18n/en-EN/data/equipment/robot/frames.json';
++import enRobotModules from './i18n/en-EN/data/equipment/robot/modules.json';
++import enRobotItems from './i18n/en-EN/data/equipment/robot/items.json';
++import enRobotBody from './i18n/en-EN/data/equipment/robot/robotbody.json';
++import enRobotHeads from './i18n/en-EN/data/equipment/robot/robotheads.json';
++import enRobotLegs from './i18n/en-EN/data/equipment/robot/robotlegs.json';
++import enRobotWeaponMods from './i18n/en-EN/data/equipment/robot/weapon_mods.json';
++import enConsumablesFood from './i18n/en-EN/data/consumables/food.json';
++import enConsumablesDrinks from './i18n/en-EN/data/consumables/drinks.json';
++import enConsumablesChems from './i18n/en-EN/data/consumables/chems.json';
++import enConsumablesMagazines from './i18n/en-EN/data/consumables/magazines.json';
++import enPerksNames from './i18n/en-EN/data/perks/perks.json';
++import enJunkItems from './i18n/en-EN/data/junk/junk.json';
++import enJunkMaterials from './i18n/en-EN/data/junk/material.json';
++import enJunkTableLabels from './i18n/en-EN/data/junk/tables.json';
++
++export const SETTING = Object.freeze({
++  meta: {
++    id: 'fallout',
++    locales: ['ru-RU', 'en-EN'],
++  },
++
++  data: {
++    bodyplans,
++    origins,
++    fitProfiles,
++    traits,
++    perks,
++    rules: { diseaseExposure },
++
++    equipment: {
++      categories,
++      weapons,
++      weaponMods,
++      weaponModSlots,
++      generalGoods,
++      uniqQualities,
++      armor,
++      powerArmor,
++      clothes,
++      oddities,
++      ammo,
++      armorMods,
++      uniqArmorMods,
++      armorEffects,
++      robotParts,
++      robot: {
++        limbs: robotLimbs,
++        weaponAsLimb: robotWeaponAsLimb,
++        weapons: robotWeapons,
++        armor: robotArmor,
++        armorPlating: robotArmorPlating,
++        frames: robotFrames,
++        weaponMods: robotWeaponMods,
++        modSlots: robotWeaponModSlots,
++      },
++    },
++
++    consumables: { food, drinks, chems, magazines },
++
++    junk: {
++      items: junkItems,
++      materials: junkMaterials,
++      tables: junkTables,
++    },
++
++    recipes: {
++      manifest: recipesManifest,
++      categoryRules: recipesCategoryRules,
++      sections: {
++        ammo: recipesAmmo,
++        weapons: recipesWeapons,
++        chems: recipesChems,
++        food: recipesFood,
++        drinks: recipesDrinks,
++      },
++    },
++
++    equipmentKits: {
++      ...kitAssaultron,
++      ...kitBrotherhood,
++      ...kitBrotherhoodOutcast,
++      ...kitChildOfAtom,
++      ...kitDefault,
++      ...kitEnclave,
++      ...kitMinuteman,
++      ...kitMisterHandy,
++      ...kitNcr,
++      ...kitNightkin,
++      ...kitProtectron,
++      ...kitPurchase,
++      ...kitRobobrain,
++      ...kitSecuritron,
++      ...kitSuperMutant,
++      ...kitTreefamilies,
++      ...kitVaultDweller,
++      ...kitWastelander,
++    },
++  },
++
++  names: {
++    'ru-RU': {
++      system: {
++        origins: ruSystemOrigins,
++        traits: ruSystemTraits,
++        equipmentKits: ruSystemEquipmentKits,
++        uniqQualities: ruSystemUniqQualities,
++        qualities: ruSystemQualities,
++        effects: ruSystemEffects,
++        damageEffects: ruSystemDamageEffects,
++        settings: ruSystemSettings,
++      },
++      equipment: {
++        weapons: ruEquipmentWeapons,
++        clothes: ruEquipmentClothes,
++        generalGoods: ruEquipmentGeneralGoods,
++        weaponMods: ruEquipmentWeaponMods,
++        items: ruEquipmentItems,
++        oddities: ruEquipmentOddities,
++        ammoTypes: ruEquipmentAmmoTypes,
++        armor: {
++          sets: ruArmorSets,
++          powerArmor: ruArmorPowerArmor,
++          mods: ruArmorMods,
++          uniqMods: ruArmorUniqMods,
++          effects: ruArmorEffects,
++        },
++        robot: {
++          weapons: ruRobotWeapons,
++          arms: ruRobotArms,
++          armor: ruRobotArmor,
++          plating: ruRobotPlating,
++          frames: ruRobotFrames,
++          modules: ruRobotModules,
++          items: ruRobotItems,
++          body: ruRobotBody,
++          heads: ruRobotHeads,
++          legs: ruRobotLegs,
++          weaponMods: ruRobotWeaponMods,
++        },
++      },
++      consumables: {
++        food: ruConsumablesFood,
++        drinks: ruConsumablesDrinks,
++        chems: ruConsumablesChems,
++        magazines: ruConsumablesMagazines,
++      },
++      junk: {
++        items: ruJunkItems,
++        materials: ruJunkMaterials,
++        tableLabels: ruJunkTableLabels,
++      },
++      perks: ruPerksNames,
++    },
++    'en-EN': {
++      system: {
++        origins: enSystemOrigins,
++        traits: enSystemTraits,
++        equipmentKits: enSystemEquipmentKits,
++        uniqQualities: enSystemUniqQualities,
++        qualities: enSystemQualities,
++        effects: enSystemEffects,
++        damageEffects: enSystemDamageEffects,
++        settings: enSystemSettings,
++      },
++      equipment: {
++        weapons: enEquipmentWeapons,
++        clothes: enEquipmentClothes,
++        generalGoods: enEquipmentGeneralGoods,
++        weaponMods: enEquipmentWeaponMods,
++        items: enEquipmentItems,
++        oddities: enEquipmentOddities,
++        ammoTypes: enEquipmentAmmoTypes,
++        armor: {
++          sets: enArmorSets,
++          powerArmor: enArmorPowerArmor,
++          mods: enArmorMods,
++          uniqMods: enArmorUniqMods,
++          effects: enArmorEffects,
++        },
++        robot: {
++          weapons: enRobotWeapons,
++          arms: enRobotArms,
++          armor: enRobotArmor,
++          plating: enRobotPlating,
++          frames: enRobotFrames,
++          modules: enRobotModules,
++          items: enRobotItems,
++          body: enRobotBody,
++          heads: enRobotHeads,
++          legs: enRobotLegs,
++          weaponMods: enRobotWeaponMods,
++        },
++      },
++      consumables: {
++        food: enConsumablesFood,
++        drinks: enConsumablesDrinks,
++        chems: enConsumablesChems,
++        magazines: enConsumablesMagazines,
++      },
++      junk: {
++        items: enJunkItems,
++        materials: enJunkMaterials,
++        tableLabels: enJunkTableLabels,
++      },
++      perks: enPerksNames,
++    },
++  },
++});
+diff --git a/modules/test-setting/index.js b/modules/test-setting/index.js
+index fd47999..7a6b6e1 100644
+--- a/modules/test-setting/index.js
++++ b/modules/test-setting/index.js
+@@ -14,6 +14,10 @@
+ // хранилище) — патч 286 и МК-3. Патч 285 не трогает src/ вообще — критерий
+ // виден в диффе патча.
+ //
++// Скелет — общий стандарт сеттингов (патч 292): index.js — дверь и контракт,
++// данные и имена — внутри модуля; правила контракта — в шапке
++// modules/fallout/index.js (для всех сеттингов одни и те же).
++//
+ // Числовые правила (здоровье = 10 + СИЛ×2 и т.п.) — выбор мини-сеттинга:
+ // контракту всё равно, какие формулы пишет сеттинг.
+ 

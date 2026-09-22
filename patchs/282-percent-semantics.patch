@@ -1,0 +1,378 @@
+diff --git a/__tests__/engine/derivation-contract.test.js b/__tests__/engine/derivation-contract.test.js
+index 74f7c7c..89061bd 100644
+--- a/__tests__/engine/derivation-contract.test.js
++++ b/__tests__/engine/derivation-contract.test.js
+@@ -13,6 +13,7 @@
+ import { describe, expect, it } from 'vitest';
+ import {
+   applyModifiers,
++  applyPercent,
+   ceilingFor,
+   changedParams,
+   checkRequirements,
+@@ -111,17 +112,15 @@ const miniSetting = () => ({
+ // --- модификаторы: договорный порядок ---------------------------------------
+ 
+ describe('МК-1: контракт выводимости — модификаторы', () => {
+-  it('порядок: set заменяет базу, потом +/-, потом суммарный %, округление в конце', () => {
+-    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана, +10% и +5%
++  it('параметры: set заменяет базу, аддитивы складываются; проценты в цепочке запрещены', () => {
++    // СИЛ в силовой броне = 11 (set), +2 перк, −2 рана
+     const mods = [
+       { source: 'perk.bruiser', operation: '+', value: 2 },
+       { source: 'armor.pa', operation: 'set', value: 11 },
+       { source: 'wound.arm', operation: '-', value: 2 },
+-      { source: 'perk.tough', operation: '%', value: 10 },
+-      { source: 'spell.bless', operation: '%', value: 5 },
+     ];
+-    // set 11 → +2 −2 = 11; ×(1 + 15%) = 12.65 → 13
+-    expect(applyModifiers(5, mods)).toBe(13);
++    // set 11 → +2 −2 = 11
++    expect(applyModifiers(5, mods)).toBe(11);
+   });
+ 
+   it('без модификаторов значение возвращается как есть', () => {
+@@ -137,6 +136,54 @@ describe('МК-1: контракт выводимости — модификат
+   });
+ });
+ 
++// --- проценты: всегда от объявленной базы (слово владельца, 2026-09-18) ------
++
++describe('МК-1: проценты — от объявленной базы', () => {
++  it('слово владельца: +15% жизней = база ОЗ × 1.15, округлённая математически', () => {
++    // applyPercent(база, проценты): чистая функция и для производных, и для
++    // будущих каналов урона
++    expect(applyPercent(26, [15])).toBe(30); // 26 × 1.15 = 29.9 → 30
++  });
++
++  it('слово владельца: +15% защиты от магии огня = −15% входящего урона огня', () => {
++    expect(applyPercent(100, [-15])).toBe(85);
++  });
++
++  it('несколько процентов суммируются и применяются одним множителем', () => {
++    expect(applyPercent(40, [10, 5])).toBe(46); // 40 × 1.15 = 46
++  });
++
++  it('реестр: процент на id производного применяется к его базе при каскаде', () => {
++    const registry = createDerivationRegistry();
++    registry.register(miniSetting());
++    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
++    // ОЗ = 10 + СИЛ×2 = 26; +15% → 29.9 → 30
++    const { values } = registry.evaluate(baseState, {
++      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
++    });
++    expect(values['test.derived.maxHealth']).toBe(30);
++    // потолок счётчика тянет производное с процентом
++    expect(registry.evaluate(baseState, {
++      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
++    }).ceilings['test.counter.health']).toBe(30);
++  });
++
++  it('процент в аддитивной цепочке параметра отклоняется', () => {
++    expect(() => applyModifiers(8, [{ source: 'x', operation: '%', value: 15 }])).toThrow(/процент всегда привязан к базе/);
++  });
++
++  it('аддитив на id производного отклоняется: смешивание запрещено', () => {
++    const registry = createDerivationRegistry();
++    registry.register(miniSetting());
++    const baseState = { [attr('strength')]: 8, [attr('intellect')]: 9, [skill('sorcery')]: 2 };
++    expect(() =>
++      registry.evaluate(baseState, {
++        'test.derived.maxHealth': [{ source: 'x', operation: '+', value: 5 }],
++      }),
++    ).toThrow(/только проценты/);
++  });
++});
++
+ // --- реестр: валидация -------------------------------------------------------
+ 
+ describe('МК-1: реестр — валидация деклараций', () => {
+@@ -261,17 +308,18 @@ describe('МК-1: реестр — каскад по мини-сеттингу (
+     expect(ceilings['test.counter.mana']).toBe(11);
+   });
+ 
+-  it('модификаторы каскадируются: атрибут с бонусом тянет производные', () => {
++  it('модификаторы каскадируются: аддитив на атрибуте, процент на производном', () => {
+     const modifiers = {
+       [attr('strength')]: [
+-        { source: 'spell.might', operation: '%', value: 15 },
++        { source: 'spell.might', operation: '+', value: 2 },
+         { source: 'wound.arm', operation: '-', value: 1 },
+       ],
++      'test.derived.maxHealth': [{ source: 'spell.vigor', operation: '%', value: 15 }],
+     };
+     const { values } = registry.evaluate(baseState, modifiers);
+-    // СИЛ: (8 − 1) × 1.15 = 8.05 → 8
+-    expect(values[attr('strength')]).toBe(8);
+-    expect(values['test.derived.maxHealth']).toBe(10 + values[attr('strength')] * 2);
++    // СИЛ: 8 + 2 − 1 = 9; ОЗ = (10 + 9×2) × 1.15 = 32.2 → 32
++    expect(values[attr('strength')]).toBe(9);
++    expect(values['test.derived.maxHealth']).toBe(32);
+   });
+ 
+   it('топологический порядок: все производные входят в порядок', () => {
+diff --git a/docs/architecture/derivation-contract.md b/docs/architecture/derivation-contract.md
+index 4a17c57..9132a98 100644
+--- a/docs/architecture/derivation-contract.md
++++ b/docs/architecture/derivation-contract.md
+@@ -29,21 +29,30 @@
+ | `reactions` | `ReactionDefinition[]` | правила при изменении: `{ watch, on(changed, ctx) }` |
+ | `initialModifiers` | `ParameterModifier[]` | стартовые модификаторы ориджина/трейтов |
+ 
+-## Порядок модификаторов (`applyModifiers`, договор v1)
++## Порядок модификаторов (договор по слову владельца, 2026-09-18)
+ 
+-```
+-база → set (последний побеждает) → '+' и '-' (суммарно) → '%' (суммарно) → Math.round
+-```
++> Слово владельца: «% всегда будут от чего-либо. +15% к защите от магии огня
++> будут рассчитываться, как −15% входящего урона от атаки со свойством стихии
++> огня. +15% жизней будут считаться как базовое значение параметра ОЗ
++> (например атр1+атр2) × 1.15, округлённого математически до целого».
+ 
+-- `set` — семантика «СИЛ в силовой броне = 11»: заменяет базу целиком;
+-  несколько `set` — берётся последний (переопределение сильнее дополнения).
+-- `'+'`/`'-'` аддитивны и коммутативны.
+-- `'%'` суммируются и применяются к результату аддитивов: +10% и +5% = ×1.15.
+-- Округление — один раз, в самом конце.
++**Принцип привязки:** процент всегда применяется к объявленной базе — и никогда
++не смешивается с аддитивной цепочкой параметра. Отдельные уровни:
+ 
+-**Открытый вопрос владельцу (проверяется тестовым сеттингом 282):** в текущем
+-стеке Fallout есть только `+`/`-`; спека тест-сеттинга (+5/10/15%) впервые
+-требует проценты. Предложенное правило выше — база для решения.
++| Уровень | Операции | Формула |
++|---|---|---|
++| Параметр (атрибут/навык) | `set`, `'+'`, `'-'` | set (последний побеждает) → сумма аддитивов |
++| Производное (ОЗ, манна…) | `'%'` на id производного | `round(база_формулы × (1 + Σ%/100))` — округление математическое, одно, в конце |
++| Канал урона (будущее) | `'%'` со знаком | тот же `applyPercent` на входящем уроне со свойствами («+15% защиты от огня» = −15% входящего урона огня) |
++
++Несколько процентов на одной базе суммируются и применяются одним множителем:
+++10% и +5% = ×1.15. Нарушения (процент в аддитивной цепочке параметра,
++аддитив на производном) — ошибки контракта, а не молчаливый пересчёт.
++
++**Почему так:** в стеке Fallout проценты на сегодня не используются — аддитивы
++живут на атрибутах (перки, раны, броня), а бонусы тест-сеттинга (+5/10/15%)
++относятся к производным (здоровье, манна…). Уровни не пересекаются, и каждая
++величина знает, от чего она посчитана.
+ 
+ ## Реестр (`src/engine/derivations/registry.ts`)
+ 
+@@ -76,8 +85,8 @@
+ 
+ ## Что дальше (по плану v3)
+ 
+-- **282** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
++- **283** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
+   на этом контракте (не в тесте, а в поставке) + проводка экранов-песочниц.
+-- **283+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
++- **284+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
+   пересчёта, Fallout-формулы переезжают из движка в `modules/fallout`,
+   починка границы движок/сеттинг.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 78406ae..7ca83c1 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -30,7 +30,8 @@
+   Fallout-формулы переезжают из движка в модуль сеттинга. Движок универсальный —
+   вторые сеттинги планируются, тестовый мини-сеттинг — второй клиент контракта.
+   Прогресс серии: 279 (карта каскада) → 280 (TS-предохранители) → 281 (контракт
+-  выводимости, изолирован) — сданы; следующий — 282 (тестовый сеттинг по спеке).
++  выводимости, изолирован) → 282 (семантика процентов: процент — всегда от
++  объявленной базы) — сданы; следующий — 283 (тестовый сеттинг по спеке).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+   отдельная фича, с конверсией не смешивать. Цель — ловить ошибки до старта
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index d980538..966f6dc 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -77,9 +77,12 @@
+            каунтеров/лент/гейтов/реакций; операции модификаторов
+            (+/−/процент/set); виды значений (число; треки/списки — версией);
+            вход через реестр расширений и адаптер сеттинга   (1–2)
+-282+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
++282  МК-1  Семантика процентов по слову владельца: процент — всегда от
++           объявленной базы (аддитивы на параметрах, проценты на базах
++           производных и каналах урона); applyPercent              (1)
++283+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
+            мини-экран-кирпич; критерий — без правок движка    (2–3)
+-283+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++284+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -150,8 +153,8 @@
+ TS — язык контракта и движка; сеттинг — живой JS.
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+-282 тестовый сеттинг → 283+ реализация и переезд Fallout-формул в модуль →
+-М3–М8 конверсия и экраны.
++282 семантика процентов → 283 тестовый сеттинг → 284+ реализация и переезд
++Fallout-формул в модуль → М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+ ```
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0f7fc79..5cc3031 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Series pivot — Percentage semantics: always from a declared base (patch 282)
++
++> Owner's word (2026-09-18): «% always comes from something. +15% fire-magic defense is calculated as −15% incoming damage from attacks with the fire property. +15% HP is calculated as the HP parameter's base value (e.g. attr1+attr2) × 1.15, mathematically rounded to a whole number».
++
++- An amendment to the derivation contract (patch 281): percentages no longer take part in a parameter's additive chain. The levels are separated and never mixed: parameters (attributes, skills) carry set and additives (perks, wounds, armor); derived values (health, mana) carry percentages — the formula's base × (1 + Σ%/100) with a single mathematical rounding at the end.
++- A pure function `applyPercent(base, percents)` appeared — it will also serve future damage channels: «+15% fire-magic defense» counts as −15% incoming damage from fire-property attacks.
++- Breaking the separation is a contract error, not a silent recomputation: a percentage in a parameter's additive chain and an additive on a derived value are both rejected with a clear message. The contract's acceptance test grew to 22 checks, including both of the owner's examples verbatim (26 × 1.15 = 29.9 → 30; 100 × 0.85 = 85).
++
++---
++
+ ## Series pivot — The derivation contract: the engine's typed vocabulary (patch 281)
+ 
+ > Owner's word (2026-09-17): the engine is meant to be universal. The setting declares parameters, derived values, counters, requirements and reactions — the engine executes and cascades them. The contract and the engine are TypeScript; the setting stays living JavaScript behind a typed «door».
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 3684f4f..49de2dc 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Разворот серии — Семантика процентов: всегда от объявленной базы (патч 282)
++
++> Слово владельца (2026-09-18): «% всегда будут от чего-либо. +15% к защите от магии огня будут рассчитываться, как −15% входящего урона от атаки со свойством стихии огня. +15% жизней будут считаться как базовое значение параметра ОЗ (например атр1+атр2) × 1.15, округлённого математически до целого».
++
++- Поправка контракта выводимости (патч 281): процент больше не участвует в аддитивной цепочке параметра. Уровни разделены и не смешиваются: на параметрах (атрибуты, навыки) живут set и аддитивы (перки, раны, броня); на производных (здоровье, манна) живут проценты — база формулы × (1 + Σ%/100) с одним математическим округлением в конце.
++- Появилась чистая функция `applyPercent(база, проценты)` — она же обслужит будущие каналы урона: «+15% защиты от магии огня» считается как −15% входящего урона от атаки со свойством огня.
++- Нарушения разделения — ошибки контракта, а не молчаливый пересчёт: процент в аддитивной цепочке параметра и аддитив на производном отклоняются с внятным сообщением. Приёмочный тест контракта вырос до 22 проверок, включая оба примера владельца дословно (26 × 1.15 = 29.9 → 30; 100 × 0.85 = 85).
++
++---
++
+ ## Разворот серии — Контракт выводимости: типизированный словарь движка (патч 281)
+ 
+ > Слово владельца (2026-09-17): движок задуман универсальным. Сеттинг объявляет параметры, производные, счётчики, требования и реакции — движок исполняет и каскадирует. Контракт и движок — TypeScript, сеттинг — живой JavaScript за типизированной «дверью».
+diff --git a/src/engine/contracts/index.ts b/src/engine/contracts/index.ts
+index 5fb0fb2..b1fc09c 100644
+--- a/src/engine/contracts/index.ts
++++ b/src/engine/contracts/index.ts
+@@ -20,6 +20,7 @@ export type {
+ } from './bands';
+ export {
+   applyModifiers,
++  applyPercent,
+ } from './parameter';
+ export type {
+   ModifierBag,
+diff --git a/src/engine/contracts/parameter.ts b/src/engine/contracts/parameter.ts
+index d32b11e..ea66020 100644
+--- a/src/engine/contracts/parameter.ts
++++ b/src/engine/contracts/parameter.ts
+@@ -8,9 +8,11 @@
+ // расширения на «дорожки» и списки, но движок пока принимает 'number').
+ 
+ /** Операция модификатора параметра.
+- *  - '+'  — прибавить к базе;
+- *  - '-'  — вычесть из базы;
+- *  - '%'  — процент от результата базы (см. порядок в derived.ts);
++ *  - '+'  — прибавить к базе (аддитивная цепочка параметра);
++ *  - '-'  — вычесть из базы (аддитивная цепочка параметра);
++ *  - '%'  — процент от ОБЪЯВЛЕННОЙ БАЗЫ: применяется только к базе
++ *           производного (например ОЗ) или к каналу урона (см. applyPercent),
++ *           в аддитивной цепочке параметра запрещён;
+  *  - 'set' — заменить базу целиком (семантика «СИЛ в силовой броне = 11»). */
+ export type ModifierOperation = '+' | '-' | '%' | 'set';
+ 
+@@ -40,25 +42,43 @@ export interface ParameterDefinition {
+ export type ModifierBag = Record<string, ParameterModifier[]>;
+ 
+ /**
+- * Применить модификаторы к базовому значению в договорном порядке:
+- *   1) 'set' — последний set заменяет базу (если set несколько, берём последний
+- *      по порядку массива: «переопределение» сильнее «дополнения»);
+- *   2) '+' и '-' складываются в любом порядке (аддитивы коммутативны);
+- *   3) '%' суммируются и применяются к результату шага 2;
+- *   4) итог округляется Math.round.
+- * Функция чистая; параметр без модификаторов возвращается как есть.
++ * Применить АДДИТИВНЫЕ модификаторы к базовому значению параметра.
++ * Порядок договорён словом владельца (2026-09-18): «процент всегда от
++ * чего-либо» — поэтому '%' ЗДЕСЬ ЗАПРЕЩЁН и бросает ошибку: аддитивная
++ * цепочка параметра (set → '+'/'-') не смешивается с процентами.
++ *   1) 'set' — последний set заменяет базу (семантика «СИЛ в СБ = 11»);
++ *   2) '+' и '-' складываются в любом порядке (коммутативны).
++ * Проценты применяются к базам производных — см. applyPercent и реестр.
+  */
+ export const applyModifiers = (base: number, modifiers: readonly ParameterModifier[]): number => {
+   let value = base;
+-  let percents = 0;
++  for (const mod of modifiers) {
++    if (mod.operation === '%') {
++      throw new Error(
++        '[derivations] "%" не применяется в аддитивной цепочке параметра: процент всегда привязан к базе производного (или к каналу урона) — используйте модификатор с operation "%" на id производного',
++      );
++    }
++  }
+   for (const mod of modifiers) {
+     if (mod.operation === 'set') value = mod.value;
+   }
+   for (const mod of modifiers) {
+     if (mod.operation === '+') value += mod.value;
+     else if (mod.operation === '-') value -= mod.value;
+-    else if (mod.operation === '%') percents += mod.value;
+   }
+-  if (percents !== 0) value = value * (1 + percents / 100);
+-  return Math.round(value);
++  return value;
++};
++
++/**
++ * Процент к ОБЪЯВЛЕННОЙ БАЗЕ — по слову владельца (2026-09-18):
++ * «+15% жизней считаются как базовое значение параметра ОЗ (например
++ * атр1+атр2) × 1.15, округлённое математически до целого»; «+15% к защите
++ * от магии огня рассчитываются как −15% входящего урона от атаки со
++ * свойством стихии огня». Проценты суммируются и применяются к базе одним
++ * множителем, округление — одно, в конце. Чистая функция: база → итог.
++ */
++export const applyPercent = (base: number, percents: readonly number[]): number => {
++  if (percents.length === 0) return base;
++  const sum = percents.reduce((acc, p) => acc + p, 0);
++  return Math.round(base * (1 + sum / 100));
+ };
+diff --git a/src/engine/derivations/registry.ts b/src/engine/derivations/registry.ts
+index df358b7..72e64cb 100644
+--- a/src/engine/derivations/registry.ts
++++ b/src/engine/derivations/registry.ts
+@@ -15,7 +15,7 @@
+ //   - цикл в графе зависимостей — ошибка регистрации, а не вечный цикл;
+ //   - evaluate чистая: снимок на входе, новый снимок на выходе.
+ 
+-import { applyModifiers } from '../contracts/parameter';
++import { applyModifiers, applyPercent } from '../contracts/parameter';
+ import type { ModifierBag } from '../contracts/parameter';
+ import type { DerivationContext, DerivedDefinition } from '../contracts/derived';
+ import type { CounterDefinition } from '../contracts/counter';
+@@ -181,7 +181,20 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+     for (const id of topo) {
+       const def = derived.get(id)!;
+       try {
+-        values[id] = def.compute(ctx);
++        let value = def.compute(ctx);
++        // Проценты — к базе производного (слово владельца: «+15% жизней =
++        // базовое значение ОЗ × 1.15, округлённое математически до целого»).
++        // К производному применяются ТОЛЬКО проценты: аддитивы живут
++        // на параметрах, смешивание запрещено.
++        const percents: number[] = [];
++        for (const mod of modifiers[id] ?? []) {
++          if (mod.operation !== '%') {
++            fail(`модификатор "${mod.operation}" на производном "${id}": к базе производного применяются только проценты (аддитивы — на параметрах)`);
++          }
++          percents.push(mod.value);
++        }
++        if (percents.length > 0) value = applyPercent(value, percents);
++        values[id] = value;
+       } catch (err) {
+         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
+       }

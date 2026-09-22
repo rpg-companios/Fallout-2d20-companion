@@ -2,6 +2,123 @@
 
 ---
 
+## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
+
+Owner's word: the single source of truth is the actual file content,
+verified fresh on every run for every patch. The state journal no
+longer decides (nor do the --3way, --mark-through, --mark, --unmark
+keys and all status-guessing heuristics — removed). A patch that
+passes neither check is deferred; the verdict comes from later patches
+on the same files or from traces of its added lines in the tree.
+Rollback leftovers (git reset does not touch future patches' new
+files) are recognized by byte-exact match and recreated by the patch.
+After applying — and on repeat runs — the integrity of all data files
+is checked: glues are caught immediately, with the cure attached.
+Rolling back a batch of patches and reinstalling works without
+touching history. No migration needed: .git/arena-patches.state is
+no longer used.
+
+## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
+
+Six data files in the owner's working tree turned out glued: after a
+complete JSON in each, another chunk of content follows. No patch in
+300–307 touched those files (except material.json, which patch 303
+repaired rather than broke); the patch applier is strict — it applies
+exactly or refuses entirely, it cannot glue anything to a file's end.
+The tool tools/fix-double-json.js finds glues, shows what got glued,
+saves a .bak backup and merges the chunks: on duplicates the later
+chunk wins. Run: node tools/fix-double-json.js
+
+## Decision list — 13 disputed weapon mods (patch 307)
+
+Moving knowledge from the slot list into mod descriptions is almost
+clean (295 additions, no behavior change), but 13 mods on six weapons
+claim applicability the list does not allow. The list with questions is
+in docs/reference-data/weapon-mods-open-questions.md; patches do not
+wait for the answer — the owner's decision will close the move.
+
+## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
+
+Owner's rule: no point keeping a separate file listing which mods live
+in which slots of which weapon, when every mod record already says so
+itself — via its slot and its applicability list.
+
+- the robot/weapon_mod_slots.json file (a duplicate of the Head Laser
+  capacitor knowledge) is removed;
+- robot weapon slots are derived from the mods: slot + applicability;
+  mod order follows the data record order;
+- the mod-install dialog and ammo spending work as before — locked by
+  checks: the laser has one capacitor slot with all four mods, same as
+  the removed file had;
+- new fuse: every robot mod must declare a slot and applicability —
+  otherwise the derived slots would lose it, and the test fails before
+  the mod disappears from the install dialog.
+
+## Robots — Mods for weapons installed into a limb (patch 305)
+
+Owner's report: the laser gun from the "assaultron_us_military" kit
+(installTo: 'arm' — the weapon is part of the arm, the palm stays free)
+would not accept mods. The mod-install dialog opened, the selection went
+through — but the mod never stuck: the apply logic could only write mods
+to the palm or the inventory, while a weapon installed into a limb lives
+inside the limb itself.
+
+- mods for installed weapons are now written into the weapon's entry
+  inside the limb (both arm and head installs from kits);
+- the weapon card reads mods from that entry — damage and name include
+  the mod;
+- the entry with mods survives save and load (the save format did not
+  change — mods for installed weapons were already provided for there);
+- patch 304 closed the neighbouring case (a weapon held in the palm);
+  this one closes installed weapons — both carrying styles now accept
+  mods.
+
+Locked by checks in `__tests__/robot/robot-slot-model.test.js`: the card
+reads mods from the entry; the write function updates only the target
+entry and leaves the original map untouched; the save cycle keeps the
+mod. Suite 833/833, tsc clean.
+
+## Robots — Weapons held in a robot palm get their card (patch 304)
+
+Owner's report: "mods won't install on the assaultron laser in the hand".
+Equipping into a robot palm is allowed (weight and two-handed checks
+apply), but the weapon produced no card in the attack list: robot-mounted
+weapons ("not hand-held") were skipped — there was nothing to attach
+mods to.
+
+- the palm now shows everything it holds: human weapons, arm
+  attachments, and robot-mounted weapons (the Head Laser);
+- the only exception is the limb's own attack (claw/manipulator in an
+  old save): the limb itself provides that card, no palm duplicate
+  (also closes a long-standing duplicate claw card);
+- the chain after the fix: card → damage with the capacitor
+  (base + mod) → the ammo-spend plan sees the capacitor → mods install
+  and survive the save.
+
+Locked by checks in `__tests__/robot/assaultron-head-laser-mods.test.js`
+(laser in palm: card, damage 7, 4 charges per attack; no claw duplicate).
+Suite 831/831, tsc clean.
+
+## Weapons & materials — patches 300–303 summary
+
+- **300:** translation for the "Mod spend per attack" spend source (the
+  `weapon.ammoSpend.source.ammoPerAttack` key was missing from both
+  dictionaries — the dialog showed the raw key).
+- **301:** the Head Laser capacitors counted in the install dialog and
+  in the ammo-spend plan, but not on the weapon card — the card damage
+  fell back to base (5 instead of 5+2 for Mk IV). The screen catalog's
+  mod pool now matches the registry: robot mods are part of the shared
+  pool.
+- **302:** the knowledge "full mod pool = human + robot" lived in two
+  places; after 301 the adapter's merge became redundant (robot mods
+  arrived twice). The merge now lives in one place.
+- **303:** materials file repair (report: "App Error: Cannot read
+  properties of undefined (reading 'map')"): the materials list was
+  written into the file twice, the app received "no materials", and
+  junk salvaging crashed. The duplicate removed.
+
+---
+
 ## Architecture — Ammo-spend formulas moved into the module (patch 298)
 
 Owner's rule: a formula bound to a specific weapon quality is a MODULE

@@ -23,14 +23,14 @@ import {
   catalogGetWeaponModById,
   catalogGetWeaponMods,
 } from '../../db/catalogSource';
-import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
+import { deserializeSlot, serializeSlot, toModIds, collectAttacks } from '../../domain/robotSlots';
 import { getRobotLimbCatalog } from '../../domain/registry';
 import { applyWeaponMods } from '../../domain/enrichItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
+import { mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
-const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
 const ruWeaponMods = SETTING.names['ru-RU'].equipment.robot.weaponMods;
 const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
 const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
@@ -87,13 +87,25 @@ describe('уникальные моды Головного лазера Штур
       expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
     }
     expect(catalog.robotWeaponMods).toEqual(robotWeaponMods);
-    expect(catalog.robotWeaponModSlots).toEqual(robotWeaponModSlots);
   });
 
-  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {
-    const slots = robotWeaponModSlots[LASER_ID];
+  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами — ВЫВЕДЕНЫ из самих модов (патч 306)', () => {
+    const cat = getEquipmentCatalog('ru-RU');
+    const slots = cat.robotWeaponModSlots[LASER_ID];
     expect(Object.keys(slots)).toEqual(['Capacitor']);
     expect(slots.Capacitor).toEqual(EXPECTED.map(({ suffix }) => modId(suffix)));
+    // файл-дубль удалён: слоты робо-оружия существуют только как производные
+    expect(SETTING.data.equipment.robot.modSlots).toBeUndefined();
+  });
+
+  it('каждый робо-мод заявляет слот и применимость — иначе производные слоты его потеряют', () => {
+    for (const mod of robotWeaponMods) {
+      expect(mod.slot, `${mod.id}: slot`).toBeTruthy();
+      expect(
+        Array.isArray(mod.applies_to_ids) && mod.applies_to_ids.length > 0,
+        `${mod.id}: applies_to_ids непуст`,
+      ).toBe(true);
+    }
   });
 
   it('i18n ru: имена «Конденсатор Mk III–VI», префиксы Mk, эффекты с зарядами', () => {
@@ -155,6 +167,54 @@ describe('уникальные моды Головного лазера Штур
     for (const mod of robotWeaponMods) {
       expect(ids.filter((id) => id === mod.id), `${mod.id} ровно один раз`).toHaveLength(1);
     }
+  });
+
+  it('лазер в ладони руки робота — карточка есть, мод считается, заряды видны (репорт владельца: «моды не ставятся»)', () => {
+    // До фикса оружие робота (handheld === false) в ладони выпадало из списка
+    // атак: карточки нет — ставить моды не на что, хотя экипировка в ладонь
+    // разрешена. Теперь карточка есть; проверяем всю цепочку: карточка →
+    // урон с модом → план списания зарядов (298) видит конденсатор.
+    const armLimb = SETTING.data.equipment.robot.limbs.find((l) => l.id === 'robot_arm_assaultron');
+    const slots = {
+      leftArm: {
+        limb: armLimb,
+        armor: null, plating: null, frame: null,
+        heldWeapon: {
+          id: LASER_ID,
+          weaponId: LASER_ID,
+          itemType: 'weapon',
+          sourceSlot: 'leftArm',
+          appliedMods: { Capacitor: modId('mk_iv') },
+        },
+      },
+    };
+    const attacks = collectAttacks(slots, { bodyPlan: 'assaultron' });
+    const laserCard = attacks.find((a) => a.id === LASER_ID);
+    expect(laserCard, 'карточка лазера в ладони').toBeTruthy();
+    expect(laserCard.sourceSlot).toBe('leftArm');
+    expect(laserCard.damage, 'урон базы + Mk IV').toBe(5 + 2);
+    expect(laserCard.modIds).toEqual([modId('mk_iv')]);
+    const plan = mechAmmoSpendForWeapon(laserCard, { available: 10 });
+    expect(
+      plan.asks.some((a) => a.source === 'ammoPerAttack' && a.max === 4),
+      'план списания видит 4 заряда за атаку (Mk IV)',
+    ).toBe(true);
+  });
+
+  it('собственная атака конечности в ладони не дублируется (старый сейв)', () => {
+    // Коготь — собственная атака руки штурмотрона; в старом сейве он мог
+    // лежать и в heldWeapon. Карточка когтя должна быть ОДНА (ветка builtin).
+    const armLimb = SETTING.data.equipment.robot.limbs.find((l) => l.id === 'robot_arm_assaultron');
+    const slots = {
+      leftArm: {
+        limb: armLimb,
+        armor: null, plating: null, frame: null,
+        heldWeapon: { id: 'robot_weapon_claw', weaponId: 'robot_weapon_claw', itemType: 'weapon' },
+      },
+    };
+    const attacks = collectAttacks(slots, { bodyPlan: 'assaultron' });
+    const clawCards = attacks.filter((a) => a.id === 'robot_weapon_claw');
+    expect(clawCards).toHaveLength(1);
   });
 
   it('карточка лазера с конденсатором: урон базы + мод (экранный путь, репродукция отчёта владельца)', () => {

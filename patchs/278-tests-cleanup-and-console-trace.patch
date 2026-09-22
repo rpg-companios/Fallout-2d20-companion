@@ -1,0 +1,2781 @@
+From 47bae325d4225686c40255d74fb0990bad12a9b9 Mon Sep 17 00:00:00 2001
+From: handylinux <8155246+handylinux@users.noreply.github.com>
+Date: Fri, 18 Sep 2026 05:10:43 +0000
+Subject: [PATCH] =?UTF-8?q?=D0=9F=D0=B0=D1=82=D1=87=20278:=20=D1=87=D0=B8?=
+ =?UTF-8?q?=D1=81=D1=82=D0=BA=D0=B0=20=D1=82=D0=B5=D1=81=D1=82=D0=BE=D0=B2?=
+ =?UTF-8?q?=20=E2=80=94=2015=20=D0=BF=D1=80=D0=B8=D0=B6=D0=B8=D0=B2=D1=88?=
+ =?UTF-8?q?=D0=B8=D1=85=D1=81=D1=8F=20=D1=83=D0=B4=D0=B0=D0=BB=D0=B5=D0=BD?=
+ =?UTF-8?q?=D1=8B,=20console-trace=20=D0=B2=D0=BE=D1=81=D1=81=D1=82=D0=B0?=
+ =?UTF-8?q?=D0=BD=D0=BE=D0=B2=D0=BB=D0=B5=D0=BD,=20=D0=BF=D0=BE=D0=BB?=
+ =?UTF-8?q?=D0=B8=D1=82=D0=B8=D0=BA=D0=B0=20=D1=82=D0=B5=D1=81=D1=82=D0=BE?=
+ =?UTF-8?q?=D0=B2=20=D0=B2=20=D1=83=D1=81=D1=82=D0=B0=D0=B2=D0=B5?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Удалены приёмочные тесты прижившихся фич (список утверждён владельцем
+2026-09-18); предохранители и целостность данных не тронуты (86 → 72 файла,
+731 зелёный). Восстановлен __tests__/debug/console-trace.test.js; единственное
+нарушение (alertService) переведено на debugLog, категория alerts в доке.
+Устав: политика двух сортов тестов + предохранитель №10.
+
+Co-authored-by: arena-agent <297053741+arena-agent@users.noreply.github.com>
+---
+ __tests__/alerts/raw-alert-scope.test.js     |  40 ---
+ __tests__/crafting/crafting-window.test.js   | 286 ----------------
+ __tests__/debug/console-trace.test.js        |  67 ++++
+ __tests__/robot/card-cell-labels.test.js     |  51 ---
+ __tests__/robot/mister-handy.test.js         | 253 --------------
+ __tests__/robot/weapon-card-dedupe.test.js   |  94 ------
+ __tests__/scrap/inventory-salvage-ui.test.js | 290 ----------------
+ __tests__/scrap/salvage-operations.test.js   | 180 ----------
+ __tests__/scrap/scrapper-rarity-gate.test.js | 105 ------
+ __tests__/survival/activity-time.test.js     | 218 ------------
+ __tests__/survival/fatigue-breakdown.test.js |  78 -----
+ __tests__/survival/fatigue-colors.test.js    |  71 ----
+ __tests__/survival/survival-bridge.test.js   | 195 -----------
+ __tests__/survival/survival-domain.test.js   | 334 -------------------
+ __tests__/survival/survival-modals.test.js   | 134 --------
+ __tests__/survival/survival-ui.test.js       | 125 -------
+ components/alerts/alertService.js            |   7 +-
+ docs/architecture/engine-charter.md          |   9 +
+ docs/changelog.en.md                         |  10 +
+ docs/changelog.ru.md                         |  10 +
+ docs/debug-tracing.md                        |   1 +
+ 21 files changed, 102 insertions(+), 2456 deletions(-)
+ delete mode 100644 __tests__/alerts/raw-alert-scope.test.js
+ delete mode 100644 __tests__/crafting/crafting-window.test.js
+ create mode 100644 __tests__/debug/console-trace.test.js
+ delete mode 100644 __tests__/robot/card-cell-labels.test.js
+ delete mode 100644 __tests__/robot/mister-handy.test.js
+ delete mode 100644 __tests__/robot/weapon-card-dedupe.test.js
+ delete mode 100644 __tests__/scrap/inventory-salvage-ui.test.js
+ delete mode 100644 __tests__/scrap/salvage-operations.test.js
+ delete mode 100644 __tests__/scrap/scrapper-rarity-gate.test.js
+ delete mode 100644 __tests__/survival/activity-time.test.js
+ delete mode 100644 __tests__/survival/fatigue-breakdown.test.js
+ delete mode 100644 __tests__/survival/fatigue-colors.test.js
+ delete mode 100644 __tests__/survival/survival-bridge.test.js
+ delete mode 100644 __tests__/survival/survival-domain.test.js
+ delete mode 100644 __tests__/survival/survival-modals.test.js
+ delete mode 100644 __tests__/survival/survival-ui.test.js
+
+diff --git a/__tests__/alerts/raw-alert-scope.test.js b/__tests__/alerts/raw-alert-scope.test.js
+deleted file mode 100644
+index 3fd2bd0..0000000
+--- a/__tests__/alerts/raw-alert-scope.test.js
++++ /dev/null
+@@ -1,40 +0,0 @@
+-// Патч 208 — сырые алерты: кнопка «Ок» должна переводиться, а не
+-// показывать путь «buttons.ok». Дефект был в отсутствии scope у raw-записи:
+-// AlertHost не находил словарь и возвращал сам путь. Теперь scope:'app' +
+-// ключи buttons.* в общем словаре приложения (i18n/*/App.json).
+-
+-import { describe, expect, it } from 'vitest';
+-import { registerAlertHost, showRawAlert } from '../../components/alerts/alertService';
+-import ruApp from '../../i18n/ru-RU/App.json';
+-import enApp from '../../i18n/en-EN/App.json';
+-
+-describe('showRawAlert: scope кнопок', () => {
+-  it('запрос сырого алерта получает scope "app"', async () => {
+-    let captured = null;
+-    registerAlertHost((request) => {
+-      captured = request;
+-      return Promise.resolve(undefined);
+-    });
+-
+-    await showRawAlert({ title: 'Заголовок', message: 'Текст' });
+-
+-    expect(captured).not.toBeNull();
+-    expect(captured.entry.scope).toBe('app');
+-    expect(captured.entry.kind).toBe('info');
+-    expect(captured.raw.title).toBe('Заголовок');
+-  });
+-
+-  it('ключ buttons.ok есть в словарях приложения (ru/en)', () => {
+-    expect(ruApp.buttons.ok).toBe('Ок');
+-    expect(enApp.buttons.ok).toBe('Ok');
+-  });
+-
+-  it('подписи confirm-кнопок тоже закрыты общим словарём', () => {
+-    // DEFAULT_CONFIRM_BUTTONS ссылается на buttons.yes / buttons.cancel —
+-    // при scope:'app' они обязаны существовать в обоих словарях.
+-    expect(ruApp.buttons.yes).toBe('Да');
+-    expect(ruApp.buttons.cancel).toBe('Отмена');
+-    expect(enApp.buttons.yes).toBe('Yes');
+-    expect(enApp.buttons.cancel).toBe('Cancel');
+-  });
+-});
+diff --git a/__tests__/crafting/crafting-window.test.js b/__tests__/crafting/crafting-window.test.js
+deleted file mode 100644
+index 53968ef..0000000
+--- a/__tests__/crafting/crafting-window.test.js
++++ /dev/null
+@@ -1,286 +0,0 @@
+-// Окно крафта (патч 265): модель верстаков, пакет, отчёт владельца — чистые
+-// функции без React; плюс гварды обвязки экрана и словарей локализации.
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import { readFileSync } from 'node:fs';
+-import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+-import { findCatalogEntry } from '../../domain/resolveItem';
+-import { getCraftingRecipes } from '../../domain/registry';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { getCurrentModuleLocale, setCurrentModuleLocale } from '../../i18n/locale';
+-import { getCraftingCategories } from '../../domain/registry';
+-import {
+-  buildCraftModel,
+-  craftBatch,
+-  buildCraftReport,
+-  formatCraftMinutes,
+-} from '../../modules/fallout/crafting/windowModel';
+-import ruDict from '../../modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json';
+-import enDict from '../../modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json';
+-
+-const state = () => useCharacterStore.getState();
+-
+-// Сид стека — тот же канон, что в crafting-operations: items-карта, weaponId.
+-const seedStack = (itemId, quantity) => {
+-  useCharacterStore.setState((prev) => ({
+-    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
+-      weaponId: itemId, quantity,
+-    } },
+-  }));
+-};
+-const countStack = (itemId) => Object.values(state().items)
+-  .filter((item) => item.weaponId === itemId)
+-  .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+-const setSkill = (skillId, total) => {
+-  useCharacterStore.setState((prev) => ({
+-    skills: { ...prev.skills, [skillId]: { ...(prev.skills?.[skillId] ?? {}), base: total, total } },
+-  }));
+-};
+-const seedFor = (recipe, mult) => {
+-  for (const m of recipe.materials) seedStack(m.itemId, m.count * mult);
+-};
+-
+-const allRows = () => buildCraftModel().flatMap((g) => g.rows);
+-const flattenKeys = (obj, prefix = '') =>
+-  Object.entries(obj).flatMap(([k, v]) =>
+-    (v && typeof v === 'object' && !Array.isArray(v) ? flattenKeys(v, `${prefix}${k}.`) : [`${prefix}${k}`]));
+-
+-const prevLocale = getCurrentModuleLocale();
+-beforeEach(() => {
+-  setCurrentModuleLocale('ru-RU'); // строки отчёта проверяем на русской локали
+-  state().resetCharacterStore();
+-});
+-afterEach(async () => {
+-  setCurrentModuleLocale(prevLocale);
+-  state().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-describe('каталожные имена материалов-редкостей (переименование владельца)', () => {
+-  it('ru: «обычный/необычный/редкий материал» — единственное число, без «пачек»', () => {
+-    const catalog = getEquipmentCatalog('ru-RU');
+-    for (const [id, name] of [
+-      ['item_common_materials', 'Обычный материал'],
+-      ['item_uncommon_materials', 'Необычный материал'],
+-      ['item_rare_materials', 'Редкий материал'],
+-    ]) {
+-      const entry = findCatalogEntry(catalog, id, 'misc');
+-      expect(entry, id).toBeTruthy();
+-      expect(entry.name, id).toBe(name);
+-    }
+-  });
+-
+-  it('en: Common/Uncommon/Rare material', () => {
+-    const catalog = getEquipmentCatalog('en-EN');
+-    for (const [id, name] of [
+-      ['item_common_materials', 'Common material'],
+-      ['item_uncommon_materials', 'Uncommon material'],
+-      ['item_rare_materials', 'Rare material'],
+-    ]) {
+-      expect(findCatalogEntry(catalog, id, 'misc')?.name, id).toBe(name);
+-    }
+-  });
+-});
+-
+-describe('вкладки категорий (269: верстаков в данных нет)', () => {
+-  it('каждый рецепт реестра живёт на заявленной вкладке, все вкладки непустые', () => {
+-    const categories = getCraftingCategories();
+-    expect(categories).toEqual(['ammo', 'chems', 'drinks', 'food', 'weapons']);
+-    const recipes = getCraftingRecipes();
+-    for (const recipe of recipes) {
+-      expect(categories, `категория ${recipe.category}`).toContain(recipe.category);
+-    }
+-    const groups = buildCraftModel();
+-    expect(groups.map((g) => g.category)).toEqual(categories);
+-    expect(groups.reduce((n, g) => n + g.rows.length, 0)).toBe(recipes.length);
+-  });
+-
+-  it('подписи вкладок — i18n-категории, а не тексты из данных', () => {
+-    const dict = getCurrentModuleLocale() === 'en-EN' ? enDict : ruDict;
+-    expect(dict.categoryNames).toBeTruthy();
+-    for (const g of buildCraftModel()) {
+-      expect(g.label, `вкладка ${g.category}`).toBe(dict.categoryNames[g.category]);
+-      expect(ruDict.benchNames, 'benchNames больше нет ни в одном словаре').toBeUndefined();
+-      expect(enDict.benchNames).toBeUndefined();
+-    }
+-  });
+-});
+-
+-describe('buildCraftModel: статусы строк', () => {
+-  it('без перка — «нужен перк»; без материалов — «не хватает»; о заменах окно молчит', () => {
+-    const rows = allRows();
+-    const withPerk = rows.filter((r) => r.status === 'missing-perk');
+-    expect(withPerk.length).toBeGreaterThan(0);
+-    for (const row of withPerk) {
+-      expect(row.reason).toContain(ruDict.ui.needPerk.split('{')[0].trim());
+-      expect(row.canCraft).toBe(false);
+-    }
+-    const jet = rows.find((r) => r.outputId === 'chem_jet');
+-    expect(jet, 'рецепт реактика должен быть в модели').toBeTruthy();
+-    expect(jet.status).toBe('missing-material');
+-    expect(jet.reason).toBe(ruDict.ui.shortMaterials);
+-    // «рецепт знает только требуемые материалы»: в строке нет поля про замены
+-    expect(JSON.stringify(jet)).not.toContain('substitut');
+-    expect(JSON.stringify(jet)).not.toContain('замена');
+-    // антибиотики требуют «Химика» — без перка статус именно про перк
+-    const ab = rows.find((r) => r.recipeId === 'chem_antibiotics');
+-    expect(ab.status).toBe('missing-perk');
+-    seedFor(ab && getCraftingRecipes().find((r) => r.id === 'chem_antibiotics'), 1);
+-    expect(allRows().find((r) => r.recipeId === 'chem_antibiotics').status).toBe('missing-perk');
+-  });
+-
+-  it('готовый рецепт: можно крафтить, максимум пакета — по дефицитному материалу', () => {
+-    const jetRecipe = getCraftingRecipes().find((r) => r.id === 'chem_jet');
+-    seedFor(jetRecipe, 3);
+-    setSkill('SCIENCE', 10); // сложность снята — автоуспех
+-    const row = allRows().find((r) => r.outputId === 'chem_jet');
+-    expect(row.status).toBe('ready');
+-    expect(row.canCraft).toBe(true);
+-    expect(row.reason).toBe(null);
+-    expect(row.maxCraft).toBe(3);
+-    for (const m of row.materials) expect(m.have).toBeGreaterThanOrEqual(m.need);
+-    expect(row.metaLine).toContain('Сложность 2');
+-    expect(row.metaLine).toContain('1 ч'); // сложность 2 → час по таблице 262
+-  });
+-
+-  it('формат времени: минуты/часы/сутки', () => {
+-    expect(formatCraftMinutes(10)).toBe('10 мин');
+-    expect(formatCraftMinutes(60)).toBe('1 ч');
+-    expect(formatCraftMinutes(2 * 60)).toBe('2 ч');
+-    expect(formatCraftMinutes(1440)).toBe('1 сут');
+-    expect(formatCraftMinutes(3 * 1440)).toBe('3 сут');
+-  });
+-});
+-
+-describe('craftBatch: пакет и остановка на исходе', () => {
+-  const paxRecipe = () => getCraftingRecipes().find((r) => r.id === 'ammo_syringe_pax');
+-
+-  it('пакет из трёх проходит тремя попытками и всё тратит', () => {
+-    const recipe = paxRecipe();
+-    seedFor(recipe, 3);
+-    setSkill(recipe.requires.skill, 10);
+-    const run = craftBatch(recipe.id, 3);
+-    expect(run.attempts.length).toBe(3);
+-    expect(run.attempts.every((a) => a.done)).toBe(true);
+-    expect(run.stoppedEarly).toBe(0);
+-    expect(countStack('ammo_syringe_pax')).toBe(3);
+-    expect(countStack('item_common_materials')).toBe(0);
+-  });
+-
+-  it('материалов на две попытки: остальные не начинаются, это видно в отчёте', () => {
+-    const recipe = paxRecipe();
+-    seedFor(recipe, 2);
+-    setSkill(recipe.requires.skill, 10);
+-    const run = craftBatch(recipe.id, 5);
+-    expect(run.attempts.length).toBe(2);
+-    expect(run.stoppedEarly).toBe(3);
+-    const report = buildCraftReport(recipe.id, run);
+-    expect(report.lines.at(-1)).toContain('Остановлено');
+-    expect(report.lines.at(-1)).toContain('3');
+-  });
+-});
+-
+-describe('buildCraftReport: формат владельца', () => {
+-  const attempt = (over = {}) => ({
+-    stage: 'done',
+-    done: true,
+-    auto: false,
+-    check: { rolls: [3, 12], successes: 2, passed: true, targetNumber: 5, complicationCount: 0 },
+-    granted: { itemId: 'steel', quantity: 1 },
+-    spent: [{ itemId: 'item_common_materials', count: 2 }],
+-    burned: [],
+-    time: { minutes: 60, durationMultiplier: 1 },
+-    ...over,
+-  });
+-
+-  it('одна попытка — ровно три строки: арифметика, кубики, итог', () => {
+-    const recipeId = getCraftingRecipes()[0].id;
+-    const report = buildCraftReport(recipeId, { attempts: [attempt()], stoppedEarly: 0 });
+-    expect(report.lines.length).toBe(3);
+-    expect(report.lines[0]).toMatch(/^Интеллект \+ .+ = 5$/);
+-    expect(report.lines[1]).toBe('Выпало 3, 12. Успехов 2');
+-    expect(report.lines[2]).toContain('Получено: Сталь ×1');
+-    expect(report.lines[2]).toContain('Потрачено: Обычный материал ×2');
+-    expect(report.lines[2]).toContain('Время: 1 ч');
+-  });
+-
+-  it('провал: неудача и честная пометка — сгорело или цело', () => {
+-    const recipeId = getCraftingRecipes()[0].id;
+-    const failed = {
+-      stage: 'check', done: false, auto: false,
+-      check: { rolls: [19, 20], successes: 0, passed: false, targetNumber: 5, complicationCount: 0 },
+-      granted: null, spent: [], burned: [],
+-    };
+-    const intact = buildCraftReport(recipeId, { attempts: [attempt(failed)], stoppedEarly: 0 });
+-    expect(intact.lines[1]).toBe(`Выпало 19, 20. Неудача. ${ruDict.ui.intactNote}`);
+-    expect(intact.lines[2]).toContain(ruDict.ui.nothing);
+-    const burn = buildCraftReport(recipeId, {
+-      attempts: [attempt({
+-        ...failed,
+-        spent: [{ itemId: 'item_common_materials', count: 2 }],
+-        burned: [{ itemId: 'item_common_materials', count: 2 }],
+-      })],
+-      stoppedEarly: 0,
+-    });
+-    expect(burn.lines[1]).toContain(ruDict.ui.burnNote);
+-    expect(burn.lines[2]).toContain('Потрачено: Обычный материал ×2');
+-  });
+-
+-  it('автоуспех без броска; осложнение помечено и удваивает время в итоге', () => {
+-    const recipeId = getCraftingRecipes()[0].id;
+-    const auto = buildCraftReport(recipeId, {
+-      attempts: [attempt({ auto: true, check: null })], stoppedEarly: 0,
+-    });
+-    expect(auto.lines[1]).toBe(ruDict.ui.autoNote);
+-    const comp = buildCraftReport(recipeId, {
+-      attempts: [attempt({
+-        check: { rolls: [1, 20], successes: 1, passed: true, targetNumber: 5, complicationCount: 1 },
+-        time: { minutes: 60, durationMultiplier: 2 },
+-      })],
+-      stoppedEarly: 0,
+-    });
+-    expect(comp.lines[1]).toContain(ruDict.ui.complicationNote);
+-    expect(comp.lines[2]).toContain('Время: 2 ч');
+-  });
+-
+-  it('пакет: арифметика общая, у каждой попытки своя строка, итог свёрнут', () => {
+-    const recipeId = getCraftingRecipes()[0].id;
+-    const failed = {
+-      stage: 'check', done: false, auto: false,
+-      check: { rolls: [19, 20], successes: 0, passed: false, targetNumber: 5, complicationCount: 0 },
+-      granted: null, spent: [], burned: [],
+-    };
+-    const report = buildCraftReport(recipeId, {
+-      attempts: [attempt(), attempt(failed), attempt()],
+-      stoppedEarly: 0,
+-    });
+-    expect(report.lines[1]).toMatch(/^#1: Выпало 3, 12/);
+-    expect(report.lines[2]).toMatch(/^#2: Выпало 19, 20/);
+-    expect(report.lines[3]).toMatch(/^#3: Выпало 3, 12/);
+-    expect(report.lines[4]).toContain('Получено: Сталь ×2');
+-    expect(report.lines[4]).toContain('Потрачено: Обычный материал ×4');
+-  });
+-});
+-
+-describe('обвязка экрана и словари', () => {
+-  const screenSrc = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+-  const modalSrc = readFileSync(
+-    'modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
+-
+-  it('до перестройки (266) кнопка неактивна: модалка не открывается, обвязка на месте', () => {
+-    expect(screenSrc).not.toContain('setCraftModalVisible(true)');
+-    expect(screenSrc).toContain('tInventory(\'screen.craft.placeholder\')');
+-    // модалка и модель не удалены — 267 подключит окно к категориям предмета
+-    expect(screenSrc).toContain('modals/CraftingModal');
+-    expect(screenSrc).toContain('<CraftingModal');
+-  });
+-
+-  it('модалка тонкая: только модель и прогон, без своей механики', () => {
+-    expect(modalSrc).toContain('craftBatch(');
+-    expect(modalSrc).toContain('buildCraftReport(');
+-    expect(modalSrc).toContain('buildCraftModel()');
+-  });
+-
+-  it('ru/en словари модалки идентичны по ключам', () => {
+-    expect(flattenKeys(ruDict).sort()).toEqual(flattenKeys(enDict).sort());
+-  });
+-});
+diff --git a/__tests__/debug/console-trace.test.js b/__tests__/debug/console-trace.test.js
+new file mode 100644
+index 0000000..e353f53
+--- /dev/null
++++ b/__tests__/debug/console-trace.test.js
+@@ -0,0 +1,67 @@
++// Предохранитель трассировки: в рантайм-коде НЕТ плоских console.*.
++//
++// Правило (docs/debug-tracing.md): всё логирование идёт через один гейт
++// src/debug/falloutDebug.js — по умолчанию выключен (ноль шума и аллокаций
++// в проде), включается вручную из консоли браузера. Восстановлен патчем 278
++// после того, как тест потерялся, а ссылки на него остались в коде и доке.
++//
++// Обход components/, modules/, src/, domain/, db/, i18n/, styles/,
++// App.js, index.js. Разрешённое место ровно одно — сам гейт
++// (его вызов g.console?.log?.(...) в правило не попадает).
++// Комментарии в коде игнорируются грубо (строки с //) — как и в остальных
++// предохранителях, защита от опечатки, а не от злонамеренности.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ROOT = path.resolve(__dirname, '../..');
++const SCAN_TARGETS = [
++  path.join(ROOT, 'components'),
++  path.join(ROOT, 'modules'),
++  path.join(ROOT, 'src'),
++  path.join(ROOT, 'domain'),
++  path.join(ROOT, 'db'),
++  path.join(ROOT, 'i18n'),
++  path.join(ROOT, 'styles'),
++  path.join(ROOT, 'App.js'),
++  path.join(ROOT, 'index.js'),
++];
++const FILE_RE = /\.(js|jsx|ts|tsx)$/;
++const GATE_FILE = path.join(ROOT, 'src', 'debug', 'falloutDebug.js');
++// Плоский вызов: console.log(...) / console . error (...) / console?.warn?(...)
++const FLAT_CONSOLE_RE = /\bconsole\s*(?:\?\.|\.)\s*(?:log|warn|error|info|debug|trace)\s*\(/g;
++
++const collectFiles = (target, acc = []) => {
++  if (!fs.existsSync(target)) return acc;
++  const stat = fs.statSync(target);
++  if (stat.isFile()) {
++    if (FILE_RE.test(target)) acc.push(target);
++    return acc;
++  }
++  for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
++    if (entry.name === 'node_modules' || entry.name === '__tests__') continue;
++    collectFiles(path.join(target, entry.name), acc);
++  }
++  return acc;
++};
++
++describe('предохранитель: плоских console.* в рантайме нет', () => {
++  it('весь логирование — только через гейт falloutDebug', () => {
++    const files = SCAN_TARGETS.flatMap((target) => collectFiles(target));
++    const violations = [];
++    for (const file of files) {
++      if (file === GATE_FILE) continue;
++      const source = fs.readFileSync(file, 'utf8');
++      const codeOnly = source
++        .split('\n')
++        .filter((line) => !line.trim().startsWith('//'))
++        .join('\n');
++      for (const match of codeOnly.matchAll(FLAT_CONSOLE_RE)) {
++        const line = source.slice(0, match.index).split('\n').length;
++        violations.push(`${path.relative(ROOT, file)}:${line}`);
++      }
++    }
++    expect(violations).toEqual([]);
++  });
++});
+diff --git a/__tests__/robot/card-cell-labels.test.js b/__tests__/robot/card-cell-labels.test.js
+deleted file mode 100644
+index 4b3c232..0000000
+--- a/__tests__/robot/card-cell-labels.test.js
++++ /dev/null
+@@ -1,51 +0,0 @@
+-// Патч 214 — ячейки карточек оружия/конечностей.
+-//
+-// Владелец: слова «Дистанция» и «Модификация» не помещаются в карточке
+-// оружия (лейбл 61% / значение 39%, кегль лейбла 11 — БЕЗ сокращений);
+-// в карточках конечностей «Конечность» заменена на «Часть тела»
+-// (переносится на две строки), ячейки — 70/30 (в значениях в основном
+-// числа). Лейблы приходят из словарей — здесь закреплены обе локали и
+-// кнопка конечности из buildRobotSlotStats.
+-
+-import { describe, expect, it } from 'vitest';
+-import { buildRobotSlotStats } from '../../domain/robotSlotLogic';
+-import { WEAPONS_DICTIONARIES } from '../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+-
+-const at = (dict, path) => path.split('.').reduce((acc, part) => acc?.[part], dict);
+-
+-describe('карточки конечностей: лейбл «Часть тела» (патч 214)', () => {
+-  it('обе локали: кнопка конечности — «Часть тела» / «Body part», без сокращений', () => {
+-    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'robotSlot.buttons.upgradeLimb')).toBe('Часть тела');
+-    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'robotSlot.buttons.upgradeLimb')).toBe('Body part');
+-  });
+-
+-  it('buildRobotSlotStats выдаёт кнопку с лейблом из словаря', () => {
+-    const t = (path) => at(WEAPONS_DICTIONARIES['ru-RU'], path);
+-    const { stats } = buildRobotSlotStats('leftArm', { limb: null }, {
+-      t,
+-      onUpgradeLimb: () => null,
+-      onOpenArmorPicker: () => null,
+-    });
+-    const limbButton = stats.find((s) => s.type === 'button' && s.onPress);
+-    expect(limbButton).toMatchObject({ label: 'Часть тела', value: '⋯' });
+-  });
+-});
+-
+-describe('карточки оружия: лейблы без сокращений (патч 214)', () => {
+-  it('«Дистанция» и «Модификация» — полными словами в обеих локалях', () => {
+-    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.range')).toBe('ДИСТАНЦИЯ');
+-    expect(at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.modification')).toBe('Модификация');
+-    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'weapon.fields.range')).toBe('RANGE');
+-    expect(at(WEAPONS_DICTIONARIES['en-EN'], 'weapon.fields.modification')).toBe('Modification');
+-  });
+-
+-  it('лейблы не обрезаны многоточием и не содержат сокращающей точки', () => {
+-    const ruRange = at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.range');
+-    const ruMod = at(WEAPONS_DICTIONARIES['ru-RU'], 'weapon.fields.modification');
+-    expect(ruRange).not.toContain('…');
+-    expect(ruMod).not.toContain('…');
+-    // «Дист.»/«Модиф.» — не наш случай: точка сокращения в конце слова.
+-    expect(ruRange.endsWith('.')).toBe(false);
+-    expect(ruMod.endsWith('.')).toBe(false);
+-  });
+-});
+diff --git a/__tests__/robot/mister-handy.test.js b/__tests__/robot/mister-handy.test.js
+deleted file mode 100644
+index 31bb495..0000000
+--- a/__tests__/robot/mister-handy.test.js
++++ /dev/null
+@@ -1,253 +0,0 @@
+-// __tests__/robot/mister-handy.test.js
+-//
+-// ACCEPTANCE-тест переработки слотовой модели роботов (этап 0, план завершён
+-// 2026-09; детали — история Git и чейнджлоги).
+-//
+-// Мистер Хэнди выбран не случайно: это единственный план тела, который ломает
+-// все три старые модели слотов одновременно —
+-//   * три руки arm1/arm2/arm3 (ни одна не называется leftArm/rightArm);
+-//   * движитель называется thruster (не leftLeg/rightLeg);
+-//   * голову зовут head, но это «оптика» (Optics) для брони.
+-//
+-// Acceptance-критерий рефакторинга: зелёный файл означает, что этапы 1–4
+-// выполнены. Идёт через существующие точки входа (initRobotSlots →
+-// getBuiltinWeaponsFromSlots), а не через новые чистые функции, — так он
+-// проверяет именно то, что видит игрок.
+-//
+-// Часть проверок зелёная уже сейчас — это регрессионные страховки: они должны
+-// остаться зелёными на всех этапах.
+-
+-import { describe, it, expect } from 'vitest';
+-
+-import kits from '../../modules/fallout/data/equipmentKits/index.js';
+-import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
+-import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
+-import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
+-import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
+-import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
+-import {
+-  initRobotSlots,
+-  getBuiltinWeaponsFromSlots,
+-  findFreeWeaponHand,
+-} from '../../domain/robotEquip';
+-
+-// ---------------------------------------------------------------------------
+-// Сборка предметов кита: то же, что делает kitResolver, но синхронно и без БД
+-// ---------------------------------------------------------------------------
+-
+-const PLATING = platingFile.plating || [];
+-const FRAMES = framesFile.frames || [];
+-
+-const robotCatalog = {
+-  limbs,
+-  weaponAsLimb,
+-  weapons: robotWeapons,
+-  plating: PLATING,
+-  frames: FRAMES,
+-};
+-
+-const CATALOG_BY_ID = new Map(
+-  [...limbs, ...weaponAsLimb, ...robotWeapons, ...PLATING, ...FRAMES]
+-    .map((entry) => [entry.id, entry]),
+-);
+-
+-/** Разворачивает комплект в список предметов для initRobotSlots. */
+-const resolveKit = (kitId, { choiceIndex = 0 } = {}) => {
+-  const kit = kits[kitId];
+-  if (!kit) throw new Error(`нет комплекта ${kitId}`);
+-
+-  const pushEntry = (out, entry) => {
+-    const id = entry.itemId || entry.weaponId || entry.armorId;
+-    if (!id) return;
+-    const source = CATALOG_BY_ID.get(id);
+-    if (!source) return;
+-    out.push({ ...source, ...entry, itemType: entry.itemType });
+-  };
+-
+-  const out = [];
+-  for (const entry of kit.items) {
+-    if (entry.type === 'choice') {
+-      // Выбор игрока в тесте детерминирован: берём вариант choiceIndex.
+-      const chosen = entry.items?.[choiceIndex];
+-      if (!chosen) continue;
+-      if (chosen.type === 'fixed') pushEntry(out, chosen);
+-      continue;
+-    }
+-    pushEntry(out, entry);
+-  }
+-  return out;
+-};
+-
+-/** Защитный слой (обшивка) указанного типа конечности — как запись из каталога. */
+-const platingFor = (limbType) => {
+-  const found = PLATING.find((entry) => entry.limbType === limbType);
+-  if (!found) throw new Error(`нет обшивки для типа конечности ${limbType}`);
+-  return { ...found, itemType: 'plating' };
+-};
+-
+-/** Атаки, которые слот отдаёт в список оружия. */
+-const attacksOfSlot = (slots, slotKey) =>
+-  getBuiltinWeaponsFromSlots(slots).filter((w) => w.sourceSlot === slotKey);
+-
+-// Пустой Хэнди = базовая модель из bodyPlan.defaults: три руки-манипулятора,
+-// корпус, оптика и реактивная тяга.
+-const emptyHandy = () => initRobotSlots('misterHandy', [], robotCatalog);
+-
+-describe('Мистер Хэнди — acceptance-критерий новой модели слотов', () => {
+-  // -------------------------------------------------------------------------
+-  // Регрессионные страховки (зелёные сейчас, должны остаться зелёными)
+-  // -------------------------------------------------------------------------
+-
+-  it('конечности берутся из единого каталога, а не из старых файлов', () => {
+-    // Каталог конечностей один: limbs.json + weaponAsLimb.json. Старых ключей
+-    // (heads/bodies/arms/legs) движок больше не знает — данные импортируются
+-    // в его вызове, скрытых источников нет.
+-    const { slots } = emptyHandy();
+-    for (const key of Object.keys(slots)) {
+-      expect(slots[key].limb, `слот ${key} остался пустым`).toBeTruthy();
+-    }
+-    expect(slots.thruster.limb?.limbType).toBe('mover');
+-    expect(slots.arm1.limb?.limbType).toBe('arm');
+-
+-    // Каталога нет — конечности не берутся ниоткуда: фолбэков в движке нет.
+-    const bare = initRobotSlots('misterHandy', [], {});
+-    for (const key of Object.keys(bare.slots)) {
+-      expect(bare.slots[key].limb, `слот ${key} заполнился без каталога`).toBeNull();
+-    }
+-  });
+-
+-  it('три слота рук и движитель заполняются из комплекта, arm3 не теряется', () => {
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      resolveKit('mister_handy_assistant'),
+-      robotCatalog,
+-    );
+-
+-    expect(Object.keys(slots)).toEqual(['head', 'body', 'arm1', 'arm2', 'arm3', 'thruster']);
+-    // Патч 191: навесы крепятся К рукам — во всех трёх слотах руки-манипуляторы,
+-    // огнемёт и пила — в ладонях.
+-    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm1.heldWeapon?.id).toBe('robot_weapon_flamethrower');
+-    expect(slots.arm2.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm2.heldWeapon?.id).toBe('robot_weapon_circular_saw');
+-    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+-    // Движитель: thruster, а не leftLeg/rightLeg.
+-    expect(slots.thruster.limb?.id).toBe('robot_legs_mister_handy_thruster');
+-  });
+-
+-  it('все три руки доступны для оружия (arm3 не пропускается при выборе)', () => {
+-    const { slots } = emptyHandy();
+-
+-    // Ищем свободную руку three раза подряд, помечая предыдущие занятыми —
+-    // так же, как это делает инвентарь при экипировке оружия.
+-    const occupied = [];
+-    const found = [];
+-    for (let i = 0; i < 3; i += 1) {
+-      const hand = findFreeWeaponHand(slots, occupied);
+-      if (!hand) break;
+-      found.push(hand[0]);
+-      occupied.push(hand[0]);
+-    }
+-
+-    expect(found).toEqual(['arm1', 'arm2', 'arm3']);
+-  });
+-
+-  it('обшивка локации «Thruster» ложится на слот движителя', () => {
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      [platingFor('mover')],
+-      robotCatalog,
+-    );
+-
+-    expect(slots.thruster.plating?.id).toBeTruthy();
+-    expect(slots.body.plating).toBeFalsy();
+-  });
+-
+-  it('рука-манипулятор с ПУСТОЙ ладонью даёт одну атаку', () => {
+-    const { slots } = emptyHandy();
+-
+-    expect(attacksOfSlot(slots, 'arm1').map((w) => w.id)).toEqual([
+-      'robot_weapon_manipulator',
+-    ]);
+-  });
+-
+-  it('три одинаковые руки-манипулятора: обшивка «Arms» — по одной на руку', () => {
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      [platingFor('arm'), platingFor('arm'), platingFor('arm')],
+-      robotCatalog,
+-    );
+-
+-    // 1 предмет = 1 слот: три обшивки должны лечь на три РАЗНЫЕ руки,
+-    // а не все три в первый подходящий слот.
+-    expect(slots.arm1.plating?.id).toBeTruthy();
+-    expect(slots.arm2.plating?.id).toBeTruthy();
+-    expect(slots.arm3.plating?.id).toBeTruthy();
+-    expect(slots.thruster.plating).toBeFalsy();
+-    expect(slots.head.plating).toBeFalsy();
+-  });
+-
+-  // -------------------------------------------------------------------------
+-  // Критерии готовности (падают до рефакторинга)
+-  // -------------------------------------------------------------------------
+-
+-  it('рука-манипулятор, держащая оружие, даёт две атаки', () => {
+-    const { slots: baseSlots } = emptyHandy();
+-    const slots = {
+-      ...baseSlots,
+-      arm1: {
+-        ...baseSlots.arm1,
+-        heldWeapon: { id: 'weapon_10mm_pistol', itemType: 'weapon', name: '10mm pistol' },
+-      },
+-    };
+-
+-    // Встроенный манипулятор не занимает ладонь, поэтому атак две:
+-    // вложенный пистолет + встроенный манипулятор.
+-    const attacks = attacksOfSlot(slots, 'arm1').map((w) => w.id);
+-    expect(attacks).toHaveLength(2);
+-    expect(attacks).toContain('weapon_10mm_pistol');
+-    expect(attacks).toContain('robot_weapon_manipulator');
+-  });
+-
+-  it('arm3 не теряется: каждая рука-манипулятор даёт собственную атаку', () => {
+-    // Комплект «Няня»: arm1 — рука-манипулятор, arm2 — огнемёт (навес в ладони,
+-    // патч 191), arm3 — рука-манипулятор (первый вариант выбора).
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      resolveKit('mister_handy_nanny'),
+-      robotCatalog,
+-    );
+-
+-    expect(slots.arm1.limb?.id).toBe('robot_arm_mister_handy');
+-    expect(slots.arm3.limb?.id).toBe('robot_arm_mister_handy');
+-
+-    // Четыре источника атак: манипулятор arm1 + огнемёт в его ладони (навес
+-    // не глушит собственную атаку руки), манипуляторы arm2 и arm3.
+-    // Дедуп по id оружия второй манипулятор не съедает.
+-    expect(attacksOfSlot(slots, 'arm1')).toHaveLength(2);
+-    expect(attacksOfSlot(slots, 'arm2')).toHaveLength(1);
+-    expect(attacksOfSlot(slots, 'arm3')).toHaveLength(1);
+-    expect(getBuiltinWeaponsFromSlots(slots)).toHaveLength(4);
+-  });
+-
+-  it('рука с навесом принимает обшивку: броня — на любую конечность (патч 191)', () => {
+-    // Комплект «Помощник»: во всех трёх слотах — руки-манипуляторы; огнемёт
+-    // и пила — навесы в ладонях, а не «оружие вместо руки».
+-    const { slots } = initRobotSlots(
+-      'misterHandy',
+-      [
+-        ...resolveKit('mister_handy_assistant'),
+-        platingFor('arm'),
+-        platingFor('arm'),
+-        platingFor('arm'),
+-      ],
+-      robotCatalog,
+-    );
+-
+-    // Обшивка ложится на каждую руку: навес в ладони ей не мешает.
+-    expect(slots.arm1.plating?.id).toBeTruthy();
+-    expect(slots.arm2.plating?.id).toBeTruthy();
+-    expect(slots.arm3.plating?.id).toBeTruthy();
+-  });
+-
+-});
+diff --git a/__tests__/robot/weapon-card-dedupe.test.js b/__tests__/robot/weapon-card-dedupe.test.js
+deleted file mode 100644
+index 5214908..0000000
+--- a/__tests__/robot/weapon-card-dedupe.test.js
++++ /dev/null
+@@ -1,94 +0,0 @@
+-// __tests__/robot/weapon-card-dedupe.test.js
+-//
+-// Правило владельца: дедупликация одинаковых атак — забота экрана, а не
+-// модели. Домен обязан отдавать каждую атаку; экран сводит одинаковые
+-// карточки к одной, без счётчика и пометок.
+-
+-import { describe, it, expect } from 'vitest';
+-
+-import { attacksFromSlot, collectAttacks } from '../../domain/robotSlots';
+-import {
+-  dedupeWeaponCards,
+-  weaponFingerprint,
+-} from '../../modules/fallout/screens/WeaponsAndArmorScreen/dedupeWeaponCards';
+-
+-describe('домен: одинаковые атаки не склеиваются', () => {
+-  it('в ладони то же оружие, что и встроено, — две карточки', () => {
+-    // Рука секьюритрона бьёт манипулятором; в ладонь игрок взял точно такой
+-    // же манипулятор. Сутей две, домен обязан отдать обе.
+-    const attacks = attacksFromSlot({
+-      content: 'robot_arm_securitron',
+-      heldWeaponId: 'robot_weapon_manipulator',
+-    }, { slotId: 'leftArm' });
+-
+-    expect(attacks).toHaveLength(2);
+-    expect(attacks.map((a) => a.source).sort()).toEqual(['builtin', 'held']);
+-    expect(new Set(attacks.map((a) => a.instanceKey)).size).toBe(2);
+-  });
+-
+-  it('установка с тем же id, что в ладони, — тоже две карточки', () => {
+-    const attacks = attacksFromSlot({
+-      content: 'robot_arm_securitron',
+-      heldWeaponId: 'weapon_laser_gun',
+-      installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }],
+-    }, { slotId: 'leftArm' });
+-
+-    expect(attacks).toHaveLength(3); // ладонь + манипулятор + установка
+-    const lasers = attacks.filter((a) => a.id === 'weapon_laser_gun');
+-    expect(lasers).toHaveLength(2);
+-    expect(lasers.map((a) => a.source).sort()).toEqual(['held', 'installed']);
+-  });
+-
+-  it('две одинаковые руки дают две карточки и в общем сборе', () => {
+-    const cards = collectAttacks({
+-      arm1: { content: 'robot_arm_mister_handy' },
+-      arm3: { content: 'robot_arm_mister_handy' },
+-    });
+-    expect(cards).toHaveLength(2);
+-    expect(cards.map((c) => c.sourceSlot).sort()).toEqual(['arm1', 'arm3']);
+-  });
+-});
+-
+-describe('экран: одинаковые карточки сводятся к одной', () => {
+-  const card = (id, mods = {}) => ({ id, weaponId: id, name: id, appliedMods: mods });
+-
+-  it('две одинаковые — остаётся одна, без счётчика', () => {
+-    const list = [card('robot_weapon_manipulator'), card('robot_weapon_manipulator')];
+-    const result = dedupeWeaponCards(list);
+-    expect(result).toHaveLength(1);
+-    expect(result[0].count).toBeUndefined();
+-    expect(result[0].name).toBe('robot_weapon_manipulator');
+-  });
+-
+-  it('порядок сохраняется, первая карточка побеждает', () => {
+-    const list = [card('a'), card('b'), card('a'), card('c'), card('b')];
+-    expect(dedupeWeaponCards(list).map((w) => w.id)).toEqual(['a', 'b', 'c']);
+-  });
+-
+-  it('разные моды — разные карточки', () => {
+-    const list = [
+-      card('weapon_10mm_smg'),
+-      card('weapon_10mm_smg', { Receiver: 'mod_001' }),
+-    ];
+-    expect(dedupeWeaponCards(list)).toHaveLength(2);
+-  });
+-
+-  it('оружие с разными id не склеивается', () => {
+-    expect(dedupeWeaponCards([card('a'), card('b')])).toHaveLength(2);
+-  });
+-
+-  it('отпечаток одинаков у карточек из разных рук', () => {
+-    const fromDomain = collectAttacks({
+-      arm1: { content: 'robot_arm_mister_handy' },
+-      arm3: { content: 'robot_arm_mister_handy' },
+-    });
+-    expect(weaponFingerprint(fromDomain[0])).toBe(weaponFingerprint(fromDomain[1]));
+-    expect(dedupeWeaponCards(fromDomain)).toHaveLength(1);
+-  });
+-
+-  it('мусор во входе не роняет экран', () => {
+-    expect(dedupeWeaponCards([])).toEqual([]);
+-    expect(dedupeWeaponCards(null)).toEqual([]);
+-    expect(dedupeWeaponCards([null, undefined, card('a')])).toHaveLength(3);
+-  });
+-});
+diff --git a/__tests__/scrap/inventory-salvage-ui.test.js b/__tests__/scrap/inventory-salvage-ui.test.js
+deleted file mode 100644
+index 8849762..0000000
+--- a/__tests__/scrap/inventory-salvage-ui.test.js
++++ /dev/null
+@@ -1,290 +0,0 @@
+-// Патч 264, UI разбора в инвентаре: подстрока состава со скрытием недостижимого
+-// (решение владельца 263: не цвета, а скрытие + счётчик) и отчёт о результате.
+-// Тесты без React: чистые функции + проверка обвязки экрана по исходнику и
+-// наличия строк обеих локалей (тот же приём, что у обвязки AddItemModal в 260).
+-
+-import { readFileSync } from 'node:fs';
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { salvageButtonForItem, salvageSublineForItem } from '../../modules/fallout/salvage/subline';
+-import { buildSalvageReport } from '../../components/screens/InventoryScreen/logic/salvageResultReport';
+-import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
+-import { formatInventoryText as formatText } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
+-import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+-import { getCurrentModuleLocale } from '../../i18n/locale';
+-
+-const ROOT = new URL('../../', import.meta.url).pathname;
+-const readText = (rel) => readFileSync(ROOT + rel, 'utf8');
+-
+-const state = () => useCharacterStore.getState();
+-const scrapper = (rank) => useCharacterStore.setState({
+-  selectedPerks: Array.from({ length: rank }, () => ({ perkId: 'scrapper' })),
+-});
+-
+-const stackOf = (itemId, quantity = 1) => {
+-  const instanceId = state().addNewItem({ itemId, quantity });
+-  return state().items[instanceId];
+-};
+-
+-beforeEach(() => {
+-  state().resetCharacterStore();
+-});
+-
+-afterEach(async () => {
+-  state().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-describe('подстрока состава в строке инвентаря', () => {
+-  it('battery без «Мусорщика»: виден только пластик (263, список — достижимое)', () => {
+-    const subline = salvageSublineForItem(stackOf('battery'), state());
+-    expect(subline).toMatchObject({ salvageable: true, hidden: 2, ceiling: 0 });
+-    expect(subline.parts).toEqual([{ itemId: 'plastic', name: expect.any(String), count: 1 }]);
+-  });
+-
+-  it('ранг 1: пластик и свинец, кислота скрыта; ранг 2: всё и без счётчика', () => {
+-    scrapper(1);
+-    const one = salvageSublineForItem(stackOf('battery'), state());
+-    expect(one.parts.map((p) => p.itemId).sort()).toEqual(['lead', 'plastic']);
+-    expect(one.hidden).toBe(1);
+-    scrapper(2);
+-    const two = salvageSublineForItem(stackOf('battery'), state());
+-    expect(two.parts.map((p) => p.itemId).sort()).toEqual(['acid', 'lead', 'plastic']);
+-    expect(two.hidden).toBe(0);
+-  });
+-
+-  it('будильник без перка: доступного нет — подстрока есть, кнопки не будет', () => {
+-    const subline = salvageSublineForItem(stackOf('alarm_clock'), state());
+-    expect(subline).toMatchObject({ salvageable: false, hidden: 4 });
+-    expect(subline.parts).toEqual([]);
+-  });
+-
+-  it('альтернатива «или»: список — объединение, количество не обещаем', () => {
+-    scrapper(2);
+-    const subline = salvageSublineForItem(stackOf('can'), state());
+-    expect(subline.salvageable).toBe(true);
+-    // два варианта дают разные материалы — счёт показан только там, где он однозначен
+-    const withCount = subline.parts.filter((p) => p.count != null);
+-    const total = subline.parts.length;
+-    expect(total).toBeGreaterThanOrEqual(1);
+-    expect(withCount.length).toBeLessThanOrEqual(total);
+-  });
+-
+-  it('хлам без состава и несуществующий предмет — подстроки нет вообще', () => {
+-    expect(salvageSublineForItem(stackOf('bloatfly_gland'), state())).toBeNull();
+-    expect(salvageSublineForItem({ id: 'x', weaponId: 'not_a_real_item' }, state())).toBeNull();
+-    expect(salvageSublineForItem(null, state())).toBeNull();
+-  });
+-
+-  it('строка UI с синтетическим uniqueId всё равно находит состав по коду каталога', () => {
+-    const bucket = stackOf('bucket');
+-    const displayRow = { ...bucket, uniqueId: `inv-stack-${bucket.stackKey}` };
+-
+-    expect(salvageSublineForItem(displayRow, state())).toMatchObject({
+-      salvageable: true,
+-      parts: [{ itemId: 'steel', count: 2 }],
+-    });
+-    expect(salvageButtonForItem(displayRow, state())?.enabled).toBe(true);
+-  });
+-});
+-
+-describe('отчёт о разборе для алерта', () => {
+-  it('успех: список с количеством, время и пометка про осложнение', () => {
+-    const report = buildSalvageReport({
+-      done: true,
+-      granted: [{ itemId: 'plastic', quantity: 1 }, { itemId: 'lead', quantity: 3 }],
+-      time: { minutes: 10, durationMultiplier: 2 },
+-    });
+-    const names = getEquipmentCatalog(getCurrentModuleLocale()).materials;
+-    const plastic = names.find((m) => m.id === 'plastic').name;
+-    expect(report.title).toBe(tInventory('screen.salvage.doneTitle'));
+-    expect(report.message).toContain(plastic);
+-    expect(report.message).toContain('×3');
+-    expect(report.message).toContain('20');
+-    expect(report.message).toContain(tInventory('screen.salvage.complicationNote'));
+-  });
+-
+-  it('нули на костях: предмет списан, выхода нет', () => {
+-    const report = buildSalvageReport({
+-      done: true, granted: [], time: { minutes: 10, durationMultiplier: 1 },
+-    });
+-    expect(report.message).toContain(tInventory('screen.salvage.empty'));
+-    expect(report.message).toContain('10');
+-    expect(report.message).not.toContain(tInventory('screen.salvage.complicationNote'));
+-  });
+-
+-  it('провал проверки: хлам цел, потерянное время честно', () => {
+-    const report = buildSalvageReport({
+-      done: false, stage: 'check', reason: 'check-failed',
+-      time: { minutes: 10, durationMultiplier: 2 },
+-    });
+-    expect(report.title).toBe(tInventory('screen.salvage.failTitle'));
+-    expect(report.message).toContain(tInventory('screen.salvage.fail'));
+-    expect(report.message).toContain('20');
+-  });
+-
+-  it('гейты: «Мусорщик» и прочие причины рассказаны по-человечески', () => {
+-    const empty = buildSalvageReport({ done: false, stage: 'gate', reason: 'no-materials', time: null });
+-    expect(empty.message).toBe(tInventory('screen.salvage.noMaterials'));
+-    const inUse = buildSalvageReport({ done: false, stage: 'gate', reason: 'in-use', time: null });
+-    expect(inUse.title).toBe(tInventory('screen.salvage.notStartedTitle'));
+-    expect(inUse.message).toContain('in-use');
+-  });
+-});
+-
+-describe('обвязка экрана и строки локалей (по исходнику)', () => {
+-  it('InventoryScreen импортирует разбор и рисует кнопку/подстроку', () => {
+-    const src = readText('components/screens/InventoryScreen/InventoryScreen.js');
+-    expect(src).toContain("from '../../../modules/fallout/salvage/operations'");
+-    expect(src).toContain("from '../../../modules/fallout/salvage/subline'");
+-    expect(src).toContain('const handleSalvagePress = (rowItem) => {');
+-    expect(src).toContain("tInventory('screen.salvage.action')");
+-    expect(src).toContain("tInventory('screen.salvage.label')");
+-    // 267: кнопка у хлама есть всегда, активность — по общему превью;
+-    // при несоблюдённых условиях — затемнена и не срабатывает.
+-    expect(src).toContain('salvageButtonForItem(item, useCharacterStore.getState())');
+-    expect(src).toContain('!salvage.enabled && styles.applyButtonDisabled');
+-    expect(src).toContain('disabled={!salvage.enabled}');
+-    // 275: нехватка ранга называется прямо — «требуется перк … ранг N».
+-    expect(src).toContain("salvage.gate === 'rank'");
+-    expect(src).toContain("tInventory('screen.salvage.requiresRank')");
+-    expect(src).not.toContain('salvage?.salvageable &&');
+-    // 276 (слово владельца): счётчик «+N недоступно» снят — недоступные
+-    // материалы состава просто не показываются; разбор идёт с отсечением.
+-    expect(src).not.toContain('screen.salvage.hidden');
+-    expect(readText('styles/InventoryScreen.styles.js')).toContain('applyButtonDisabled');
+-  });
+-
+-  it('секция salvage есть в обеих локалях слоя Fallout', () => {
+-    for (const locale of ['ru-RU', 'en-EN']) {
+-      const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
+-      const need = ['action', 'label', 'unavailable', 'requiresRank', 'doneTitle', 'failTitle',
+-        'emptyTitle', 'notStartedTitle', 'done', 'empty', 'fail', 'timeLine',
+-        'complicationNote', 'noMaterials', 'notStarted', 'material'];
+-      for (const key of need) {
+-        expect(typeof dict.salvage?.[key], `${locale}/${key}`).toBe('string');
+-        expect(dict.salvage[key].length, `${locale}/${key}`).toBeGreaterThan(0);
+-      }
+-    }
+-  });
+-});
+-
+-describe('кнопка «Разобрать» у хлама (267): есть всегда, работает по условиям', () => {
+-  const equip = (instanceId) => useCharacterStore.setState((prev) => ({
+-    items: { ...prev.items, [instanceId]: { ...prev.items[instanceId], equipped: true } },
+-  }));
+-
+-  it('хлам без печатного состава: кнопка есть и активна (общий пул 261), подстроки нет', () => {
+-    const gland = stackOf('bloatfly_gland');
+-    const button = salvageButtonForItem(gland, state());
+-    expect(button).not.toBeNull();
+-    expect(button.hasComposition).toBe(false);
+-    expect(button.parts).toEqual([]);
+-    expect(button.enabled).toBe(true);
+-  });
+-
+-  it('будильник без «Мусорщика»: состав срезан целиком — кнопка затемнена, не сработает', () => {
+-    const clock = stackOf('alarm_clock');
+-    const button = salvageButtonForItem(clock, state());
+-    expect(button).not.toBeNull();
+-    expect(button.hasComposition).toBe(true);
+-    expect(button.enabled).toBe(false);
+-    expect(button.hidden).toBe(4);
+-  });
+-
+-  it('battery без перка: пластик доступен — кнопка активна; надетый хлам — всегда серая', () => {
+-    const battery = stackOf('battery');
+-    expect(salvageButtonForItem(battery, state()).enabled).toBe(true);
+-    equip(battery.id);
+-    const worn = salvageButtonForItem(state().items[battery.id], state());
+-    expect(worn).not.toBeNull();
+-    expect(worn.enabled).toBe(false);
+-  });
+-
+-  it('не хлам без состава — кнопки нет вообще (как и подстроки)', () => {
+-    const pistol = stackOf('weapon_10mm_pistol');
+-    expect(salvageButtonForItem(pistol, state())).toBeNull();
+-    expect(salvageButtonForItem({ id: 'x', weaponId: 'not_a_real_item' }, state())).toBeNull();
+-    expect(salvageButtonForItem(null, state())).toBeNull();
+-  });
+-});
+-
+-describe('гейт по рангу «Мусорщика» (275): нехватка ранга называется прямо', () => {
+-  it('мел с рангом 1: не «недоступно без Мусорщика», а «требуется ранг 2»', () => {
+-    scrapper(1);
+-    const subline = salvageSublineForItem(stackOf('chalk'), state());
+-    expect(subline).toMatchObject({
+-      salvageable: false, hidden: 1, ceiling: 1, gate: 'rank', requiredRank: 2,
+-    });
+-    const line = formatText(tInventory('screen.salvage.requiresRank'), { rank: subline.requiredRank });
+-    // Локаль теста может быть любой — проверяем подстановку ранга и имя перка
+-    // в обеих формах словаря (ключ есть в обеих локалях — ниже по «обвязке»).
+-    expect(line).toContain('2');
+-    expect(/Мусорщик|Scrapper/.test(line)).toBe(true);
+-    expect(line).not.toContain('{rank}');
+-  });
+-
+-  it('мел без перка: прежняя формулировка причины (уговор 264), гейт — no-perk', () => {
+-    const subline = salvageSublineForItem(stackOf('chalk'), state());
+-    expect(subline).toMatchObject({ salvageable: false, gate: 'no-perk' });
+-  });
+-
+-  it('мел с рангом 2: состав доступен — гейта нет, счётчик скрытых пуст', () => {
+-    scrapper(2);
+-    const subline = salvageSublineForItem(stackOf('chalk'), state());
+-    expect(subline).toMatchObject({ salvageable: true, gate: null, hidden: 0 });
+-    expect(subline.requiredRank).toBeNull();
+-  });
+-
+-  it('battery без перка: часть доступна — ранговый гейт не вставляется, счётчик остаётся', () => {
+-    const subline = salvageSublineForItem(stackOf('battery'), state());
+-    expect(subline).toMatchObject({ salvageable: true, gate: null, hidden: 2 });
+-  });
+-
+-  it('строка экрана (с uniqueId) на мелу ранга 1: гейт доживает до кнопки, она серая', () => {
+-    scrapper(1);
+-    const chalk = stackOf('chalk');
+-    const displayRow = { ...chalk, uniqueId: `inv-stack-${chalk.stackKey}` };
+-    const button = salvageButtonForItem(displayRow, state());
+-    expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false, hidden: 1 });
+-  });
+-});
+-
+-describe('276 (слово владельца): состава-списка без счётчика, лут и покупка вне потолка', () => {
+-  it('экран больше не печатает «+N недоступно»; ключ вычист из обеих локалей', () => {
+-    expect(readText('components/screens/InventoryScreen/InventoryScreen.js'))
+-      .not.toContain('screen.salvage.hidden');
+-    for (const locale of ['ru-RU', 'en-EN']) {
+-      const dict = JSON.parse(readText(`modules/fallout/i18n/${locale}/screens/inventory/screen.json`));
+-      expect(dict.salvage.hidden).toBeUndefined();
+-    }
+-  });
+-
+-  it('магазин и выдача предметов ничего не знают о «Мусорщике»: потолок — только разбор', () => {
+-    for (const rel of [
+-      'components/screens/InventoryScreen/modals/BuyItemModal.js',
+-      'components/screens/InventoryScreen/modals/AddItemModal.js',
+-      'components/screens/InventoryScreen/modals/SellItemModal.js',
+-    ]) {
+-      const src = readText(rel);
+-      expect(src, rel).not.toContain('scrapperCeiling');
+-      expect(src, rel).not.toContain('salvage/');
+-    }
+-  });
+-
+-  it('мел с рангом 1: подстрока — ровно гейт «требуется ранг 2»; hidden жив как данные', () => {
+-    scrapper(1);
+-    const subline = salvageSublineForItem(stackOf('chalk'), state());
+-    expect(subline).toMatchObject({ salvageable: false, gate: 'rank', requiredRank: 2, hidden: 1 });
+-    // 276: hidden остался полем данных (превью/будущая модалка), но экран его
+-    // не печатает — проверка обвязкой выше (not.toContain('screen.salvage.hidden')).
+-    const button = salvageButtonForItem(stackOf('chalk'), state());
+-    expect(button).toMatchObject({ gate: 'rank', requiredRank: 2, enabled: false });
+-  });
+-
+-  it('battery без перка: список — только пластик, без всяких «+2» в данных строки', () => {
+-    const subline = salvageSublineForItem(stackOf('battery'), state());
+-    expect(subline.parts.map((p) => p.itemId)).toEqual(['plastic']);
+-    expect(subline.gate).toBeNull();
+-  });
+-});
+diff --git a/__tests__/scrap/salvage-operations.test.js b/__tests__/scrap/salvage-operations.test.js
+deleted file mode 100644
+index e16dc7e..0000000
+--- a/__tests__/scrap/salvage-operations.test.js
++++ /dev/null
+@@ -1,180 +0,0 @@
+-// Адаптер разбора (патч 260) на НАСТОЯЩИХ данных пакета: реестр, стор, списание
+-// и выдача. Кубики подменены там, где важна достоверность ветки.
+-
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { getItemId } from '../../domain/itemIdentity';
+-import { getSalvageComposition, getScrapMaterials } from '../../domain/registry';
+-import { salvageItem, salvagePreview } from '../../modules/fallout/salvage/operations';
+-
+-const state = () => useCharacterStore.getState();
+-
+-beforeEach(() => {
+-  state().resetCharacterStore();
+-});
+-
+-afterEach(async () => {
+-  state().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-const give = (itemId, quantity = 1) => state().addNewItem({ itemId, quantity });
+-const countOf = (itemId) => Object.values(state().items)
+-  .reduce((sum, item) => (getItemId(item) === itemId ? sum + (Number(item.quantity) || 1) : sum), 0);
+-// «Мусорщик» ранга N (263): тесты печатного состава выше common играют с ним,
+-// иначе редкий материал строка просто не бросается и разбор отказывает по гейту.
+-const setScrapper = (rank) => useCharacterStore.setState({
+-  selectedPerks: Array.from({ length: rank }, () => ({ perkId: 'scrapper' })),
+-});
+-
+-describe('разбор хлама по печатному составу', () => {
+-  it('фиксированный состав: будильник даёт алюминий, стекло, ядерку и пружину; стек тратится', () => {
+-    setScrapper(2); // в составе unusual и rare (263)
+-    const instanceId = give('alarm_clock', 2);
+-    const result = salvageItem(instanceId, { rollD20: () => 3 });
+-    expect(result.done).toBe(true);
+-    expect(result.granted.map((g) => [g.itemId, g.quantity]).sort()).toEqual([
+-      ['aluminum', 2], ['glass', 1], ['nuclear_material', 1], ['spring', 1],
+-    ].sort());
+-    expect(countOf('alarm_clock')).toBe(1);
+-    expect(countOf('aluminum')).toBe(2);
+-    expect(result.time.minutes).toBe(10);
+-  });
+-
+-  it('DC-кости идут портом: нули законны — предмет списан, выход пуст', () => {
+-    setScrapper(1); // стекло — unusual
+-    const instanceId = give('glass_bottle');
+-    const result = salvageItem(instanceId, {
+-      rollD20: () => 3,
+-      rollDice: () => ({ units: 0, effects: 0 }),
+-    });
+-    expect(result.done).toBe(true);
+-    expect(result.granted).toEqual([]);
+-    expect(countOf('glass_bottle')).toBe(0);
+-  });
+-
+-  it('эффект-грани добавляют материал; choose выбирает альтернативу «или»', () => {
+-    setScrapper(2); // кислота и ядерка — rare
+-    const instanceId = give('mutated_viscera');
+-    const result = salvageItem(instanceId, {
+-      rollD20: () => 3,
+-      rollDice: () => ({ units: 2, effects: 2 }),
+-    });
+-    expect(result.granted.map((g) => [g.itemId, g.quantity]).sort()).toEqual([
+-      ['acid', 2], ['nuclear_material', 2],
+-    ].sort());
+-
+-    const canId = give('can');
+-    const alt = salvageItem(canId, {
+-      rollD20: () => 3,
+-      choose: () => 1, // вторая альтернатива: сталь
+-    });
+-    expect(alt.granted).toEqual([{ itemId: 'steel', quantity: 2, instanceId: alt.granted[0].instanceId }]);
+-  });
+-
+-  it('осложнение не отменяет успех: время ×2, изделие выдано', () => {
+-    const instanceId = give('bucket');
+-    let i = 0;
+-    const seq = [3, 20];
+-    const result = salvageItem(instanceId, { rollD20: () => seq[i++] });
+-    expect(result.done).toBe(true);
+-    expect(result.granted[0]).toMatchObject({ itemId: 'steel', quantity: 2 });
+-    expect(result.time).toEqual({ minutes: 10, durationMultiplier: 2 });
+-  });
+-
+-  it('провал: предмет не расходуется, выход не бросается', () => {
+-    setScrapper(2); // состав выше common — без перка отказ отдался бы раньше проверки (263)
+-    const instanceId = give('alarm_clock', 2);
+-    const result = salvageItem(instanceId, { rollD20: () => 20 });
+-    expect(result.done).toBe(false);
+-    expect(result.reason).toBe('check-failed');
+-    expect(countOf('alarm_clock')).toBe(2);
+-    expect(countOf('aluminum')).toBe(0);
+-  });
+-});
+-
+-describe('разбор не-хлама и линкованные предметы', () => {
+-  it('линк из таблицы (радио) разбирается по составу таблицы', () => {
+-    setScrapper(2); // в составе радио rare и unusual — потолок не должен резать этот тест
+-    expect(getSalvageComposition('item_radio')).toBeTruthy();
+-    const instanceId = give('item_radio');
+-    const result = salvageItem(instanceId, { rollD20: () => 3 });
+-    expect(result.done).toBe(true);
+-    expect(result.granted.map((g) => [g.itemId, g.quantity]).sort()).toEqual([
+-      ['circuitry', 1], ['copper', 1], ['plastic', 2], ['rubber', 2],
+-    ].sort());
+-  });
+-
+-  it('НЕ-хлам без печатного состава не разбирается и не расходуется', () => {
+-    const instanceId = give('weapon_baseball_bat', 2);
+-    const result = salvageItem(instanceId, { rollD20: () => 3 });
+-    expect(result).toMatchObject({ done: false, stage: 'gate', reason: 'not-salvageable' });
+-    expect(countOf('weapon_baseball_bat')).toBe(2);
+-  });
+-
+-  it('хлам без печатного состава идёт общим правилом: один common, кап по весу', () => {
+-    const instanceId = give('weapon_baseball_bat', 2);
+-    // для модалки бита мертва, но её вес — образец; разбираем желёзу (хлам без таблицы)
+-    const glandId = give('bloatfly_gland');
+-    const result = salvageItem(glandId, {
+-      rollD20: () => 3,
+-      choose: (n) => n, // pickOption приводит % len → 0
+-    });
+-    expect(result.done).toBe(true);
+-    // 269: пул общий — любой материал редкости 0, включая пачку (все равны).
+-    const commonOnly = getScrapMaterials().filter((m) => m.rarity === 0).map((m) => m.id);
+-    expect(result.granted.length).toBe(1);
+-    expect(commonOnly).toContain(result.granted[0].itemId);
+-    expect(result.granted[0].quantity).toBe(1);
+-    expect(countOf('bloatfly_gland')).toBe(0);
+-    expect(countOf('weapon_baseball_bat')).toBe(2); // рядом лежащая бита не тронута
+-  });
+-
+-  it('«Мусорщик» поднимает потолок редкости; клей и масло — никогда', () => {
+-    const previewNone = salvagePreview(give('bloatfly_gland'));
+-    expect(previewNone.mode).toBe('generic');
+-    const rarities = (previewNone.pool || []).map((p) => (getScrapMaterials().find((m) => m.id === p.id) || {}).rarity);
+-    expect(rarities.length).toBeGreaterThan(0);
+-    expect(rarities.every((r) => r === 0)).toBe(true);
+-    const ids = (previewNone.pool || []).map((p) => p.id);
+-    expect(ids).not.toContain('adhesive');
+-    expect(ids).not.toContain('oil');
+-
+-    useCharacterStore.setState({ selectedPerks: [{ perkId: 'scrapper' }, { perkId: 'scrapper' }] });
+-    const previewTwo = salvagePreview(give('bloatfly_gland'));
+-    const raritiesTwo = (previewTwo.pool || []).map((p) => (getScrapMaterials().find((m) => m.id === p.id) || {}).rarity);
+-    expect(raritiesTwo).toContain(2);
+-    expect(new Set(raritiesTwo)).toEqual(new Set([0, 1, 2]));
+-  });
+-});
+-
+-describe('гейты операций разбора', () => {
+-  it('расходники и боеприпасы не разбираются (они не хлам и состава не имеют)', () => {
+-    expect(salvageItem(give('drink_purified_water'), { rollD20: () => 3 }))
+-      .toMatchObject({ done: false, stage: 'gate', reason: 'not-salvageable' });
+-    expect(salvageItem(give('ammo_9mm'), { rollD20: () => 3 }))
+-      .toMatchObject({ done: false, stage: 'gate', reason: 'not-salvageable' });
+-  });
+-
+-  it('надетое и запертое не расходуется', () => {
+-    const instanceId = give('abraxo_cleaner');
+-    useCharacterStore.setState((prev) => ({
+-      items: { ...prev.items, [instanceId]: { ...prev.items[instanceId], equipped: true } },
+-    }));
+-    expect(salvageItem(instanceId, { rollD20: () => 3 })).toMatchObject({ stage: 'gate', reason: 'in-use' });
+-  });
+-
+-  it('несуществующий инстанс и пустая сумка — gate без изменений', () => {
+-    expect(salvageItem('no-such-instance', { rollD20: () => 3 })).toMatchObject({ stage: 'gate', reason: 'item-not-found' });
+-  });
+-
+-  it('превью: режим table у хлама из таблицы, generic у остального', () => {
+-    expect(salvagePreview(give('bloatfly_gland'))).toMatchObject({ salvageable: true, mode: 'generic' });
+-    expect(salvagePreview(give('weapon_baseball_bat'))).toMatchObject({ salvageable: false, reason: 'not-salvageable' });
+-    expect(salvagePreview(give('totally_unknown_item'))).toMatchObject({ salvageable: false, reason: 'unknown-item' });
+-    const radioPreview = salvagePreview(give('item_radio'));
+-    expect(radioPreview.mode).toBe('table');
+-    expect(radioPreview.difficulty).toBe(0);
+-    expect(radioPreview.complicationDurationMultiplier).toBe(2);
+-  });
+-});
+diff --git a/__tests__/scrap/scrapper-rarity-gate.test.js b/__tests__/scrap/scrapper-rarity-gate.test.js
+deleted file mode 100644
+index 9249fca..0000000
+--- a/__tests__/scrap/scrapper-rarity-gate.test.js
++++ /dev/null
+@@ -1,105 +0,0 @@
+-// Патч 263: редкость получаемых материалов под потолком «Мусорщика» — для
+-// печатного состава тоже. Аккумулятор (battery) — эталон: ровно по одному
+-// материалу каждой редкости (plastic common, lead uncommon, acid rare).
+-
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { getItemId } from '../../domain/itemIdentity';
+-import { getSalvageComposition } from '../../domain/registry';
+-import { salvageItem, salvagePreview } from '../../modules/fallout/salvage/operations';
+-
+-const state = () => useCharacterStore.getState();
+-
+-beforeEach(() => {
+-  state().resetCharacterStore();
+-});
+-
+-afterEach(async () => {
+-  state().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-const give = (itemId, quantity = 1) => state().addNewItem({ itemId, quantity });
+-const countOf = (itemId) => Object.values(state().items)
+-  .reduce((sum, item) => (getItemId(item) === itemId ? sum + (Number(item.quantity) || 1) : sum), 0);
+-const scrapper = (rank) => useCharacterStore.setState({
+-  selectedPerks: Array.from({ length: rank }, () => ({ perkId: 'scrapper' })),
+-});
+-
+-const grantedIds = (result) => result.granted.map((g) => g.itemId);
+-
+-describe('потолок «Мусорщика» на печатном составе (battery: common+uncommon+rare)', () => {
+-  it('без перка: выдаётся только обычный, необычный и редкий не бросаются', () => {
+-    const result = salvageItem(give('battery'), { rollD20: () => 3, choose: (n) => n });
+-    expect(result.done).toBe(true);
+-    expect(result.granted).toEqual([{ itemId: 'plastic', quantity: 1, instanceId: result.granted[0].instanceId }]);
+-    expect(countOf('plastic')).toBe(1);
+-    expect(countOf('battery')).toBe(0); // хлам списан честно: что мог вынуть — вынул
+-  });
+-
+-  it('ранг 1: обычный + необычный', () => {
+-    scrapper(1);
+-    const result = salvageItem(give('battery'), { rollD20: () => 3, choose: (n) => n });
+-    expect(result.done).toBe(true);
+-    expect(grantedIds(result).sort()).toEqual(['lead', 'plastic']);
+-    expect(countOf('acid')).toBe(0);
+-  });
+-
+-  it('ранг 2: все три — и ровно состав, без надбавки сверху', () => {
+-    scrapper(2);
+-    const result = salvageItem(give('battery'), { rollD20: () => 3, choose: (n) => n });
+-    const printed = getSalvageComposition('battery').options[0].map((r) => r.material).sort();
+-    expect(grantedIds(result).sort()).toEqual(printed); // ничего лишнего не появилось
+-  });
+-
+-  it('если в хламе только то, что выше потолка — попытка отказывает, предмет цел', () => {
+-    // alarm_clock: три unusual и одна rare — без «Мусорщика» ловить нечего.
+-    const instanceId = give('alarm_clock', 2);
+-    const result = salvageItem(instanceId, { rollD20: () => 3 });
+-    expect(result).toMatchObject({ done: false, stage: 'gate', reason: 'no-materials', rarityCeiling: 0 });
+-    expect(countOf('alarm_clock')).toBe(2);
+-    expect(result.time).toBeNull(); // и время не тратится: броска не было
+-  });
+-
+-  it('строка без основного материала остаётся ради достижимого эффекта', () => {
+-    // blood_sac: антисептик (rare) с костью-эффектом fiberglass (uncommon).
+-    // Ранг 1: основа срезана, кости строки живут — эффект падает как падает.
+-    scrapper(1);
+-    const result = salvageItem(give('blood_sac'), {
+-      rollD20: () => 3,
+-      rollDice: () => ({ units: 0, effects: 1 }),
+-      choose: (n) => n,
+-    });
+-    expect(result.done).toBe(true);
+-    expect(grantedIds(result)).toEqual(['fiberglass']);
+-    expect(countOf('antiseptic')).toBe(0);
+-  });
+-
+-  it('линк-исключение (радио) тоже под потолком: без перка — только пластику и резина', () => {
+-    const result = salvageItem(give('item_radio'), { rollD20: () => 3 });
+-    expect(result.done).toBe(true);
+-    expect(grantedIds(result).sort()).toEqual(['plastic', 'rubber']);
+-    expect(countOf('circuitry')).toBe(0);
+-    expect(countOf('copper')).toBe(0);
+-    scrapper(2);
+-    const full = salvageItem(give('item_radio'), { rollD20: () => 3 });
+-    expect(grantedIds(full).sort()).toEqual(['circuitry', 'copper', 'plastic', 'rubber']);
+-  });
+-});
+-
+-describe('превью знает потолок', () => {
+-  it('rarityCeiling и число срезанных строк; полный отказ тоже описан', () => {
+-    const alarmNone = salvagePreview(give('alarm_clock'));
+-    expect(alarmNone).toMatchObject({ salvageable: false, reason: 'no-materials', rarityCeiling: 0 });
+-    scrapper(1);
+-    const alarmOne = salvagePreview(give('alarm_clock'));
+-    expect(alarmOne).toMatchObject({ salvageable: true, mode: 'table', rarityCeiling: 1, gatedRows: 1 });
+-    expect(alarmOne.composition.options[0].map((r) => r.material).sort())
+-      .toEqual(['aluminum', 'glass', 'spring']);
+-    scrapper(2);
+-    const alarmTwo = salvagePreview(give('alarm_clock'));
+-    expect(alarmTwo.gatedRows).toBe(0);
+-    const gland = salvagePreview(give('bloatfly_gland'));
+-    expect(gland).toMatchObject({ mode: 'generic', rarityCeiling: 2 });
+-  });
+-});
+diff --git a/__tests__/survival/activity-time.test.js b/__tests__/survival/activity-time.test.js
+deleted file mode 100644
+index 7f6202f..0000000
+--- a/__tests__/survival/activity-time.test.js
++++ /dev/null
+@@ -1,218 +0,0 @@
+-// Патч 262: время разбора и крафта привязано к часам выживания.
+-// Проверка трёх контуров: чистая операция applyActivityMinutes (лестницы,
+-// перенос дроби, гейты), подключение её к операциям крафта и разбора
+-// (время тратится на успехе и на сорванной работе, не тратится на отказах),
+-// и числовая устойчивость: мост эффектов обязан выдерживать дробные часы.
+-
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import useAppSettingsStore from '../../src/store/appSettingsStore';
+-import { legacyEffectToStore } from '../../src/store/effectsSync';
+-import { applyActivityMinutes } from '../../modules/fallout/survival/operations';
+-import { createSurvivalState } from '../../modules/fallout/survival/survival';
+-import { craftRecipe, craftMinutesForRecipe } from '../../modules/fallout/crafting/operations';
+-import { salvageItem } from '../../modules/fallout/salvage/operations';
+-import { getItemId } from '../../domain/itemIdentity';
+-
+-const state = () => useCharacterStore.getState();
+-const storeSurvival = () => state().stateExtensions?.survival ?? null;
+-const setSurvivalEnabled = (value) => {
+-  useAppSettingsStore.getState().setValue('survivalModeEnabled', value);
+-};
+-
+-const give = (itemId, quantity = 1) => state().addNewItem({ itemId, quantity });
+-const countOf = (itemId) => Object.values(state().items)
+-  .reduce((sum, item) => (getItemId(item) === itemId ? sum + (Number(item.quantity) || 1) : sum), 0);
+-
+-const seedHuman = (patch = {}) => {
+-  const start = createSurvivalState('human');
+-  Object.assign(start, patch);
+-  state().setStateExtensions({ survival: start });
+-  return start;
+-};
+-
+-beforeEach(() => {
+-  state().resetCharacterStore();
+-  setSurvivalEnabled(true);
+-});
+-
+-afterEach(async () => {
+-  state().setStateExtensions({});
+-  state().resetCharacterStore();
+-  setSurvivalEnabled(false);
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-describe('applyActivityMinutes: работа идёт по часам', () => {
+-  it('час работы: лестницы тикают как на контуре реального времени', () => {
+-    seedHuman();
+-    const result = applyActivityMinutes(60, 'test');
+-    expect(result).toMatchObject({ applied: true, minutes: 60, gameHours: 1 });
+-    const survival = storeSurvival();
+-    expect(survival.food).toBe(4); // 5 → 4 на первом же часу
+-    expect(survival.water).toBe(3); // 4 → 3 тоже (порог 1 ч)
+-    expect(survival.sleep).toBe(5); // сон шагает раз в 8 часов
+-    expect(survival.timeCarried).toBeCloseTo(0, 10);
+-  });
+-
+-  it('дробь переносится: шесть дел по 10 минут складываются ровно в час', () => {
+-    // Float-ловушка, из-за которой и нужен допуск в advanceHours:
+-    // 6 × (10/60) = 0.9999999999999999 — без допуска час не тикает никогда.
+-    seedHuman();
+-    for (let i = 0; i < 5; i += 1) {
+-      applyActivityMinutes(10, 'test');
+-      expect(storeSurvival().food).toBe(5); // шагов ещё нет
+-    }
+-    expect(storeSurvival().timeCarried).toBeCloseTo(5 / 6, 10);
+-    applyActivityMinutes(10, 'test');
+-    expect(storeSurvival().food).toBe(4);
+-    expect(storeSurvival().water).toBe(3);
+-  });
+-
+-  it('гейты: выключенное выживание заморожено, робот без шкал не считается', () => {
+-    const start = seedHuman();
+-    setSurvivalEnabled(false);
+-    expect(applyActivityMinutes(120, 'test')).toMatchObject({ applied: false, reason: 'disabled' });
+-    setSurvivalEnabled(true);
+-    state().setStateExtensions({}); // шкал нет (робот/киборг)
+-    expect(applyActivityMinutes(120, 'test')).toMatchObject({ applied: false, reason: 'notCapable' });
+-    // состояние не сдвинулось ни на йоту
+-    expect(storeSurvival()).toBeNull();
+-    state().setStateExtensions({ survival: start });
+-    expect(storeSurvival().food).toBe(5);
+-  });
+-
+-  it('ноль и дурные минуты — отказ без последствий', () => {
+-    seedHuman();
+-    expect(applyActivityMinutes(0)).toMatchObject({ applied: false, reason: 'nothing-to-spend' });
+-    expect(applyActivityMinutes(Number.NaN)).toMatchObject({ applied: false, reason: 'nothing-to-spend' });
+-    expect(storeSurvival().timeCarried).toBe(0);
+-  });
+-
+-  it('дробные часы не ломают мост эффектов: 10 минут = ровно 2 сцены', () => {
+-    // Без округления в сторе (патч 262) 1/6 ч × 12 дали бы 1.999… и домен
+-    // бросал бы на нецелом числе сцен. Истечение — по дедлайну, не по сумме
+-    // шагов, поэтому проверяем один проход: короткий эффект погас, длинный нет.
+-    seedHuman();
+-    useCharacterStore.setState({
+-      effects: {
+-        e1: legacyEffectToStore({ id: 'e1', effectName: 'Рад', effectKind: 'negative', scenesLeft: 1 }),
+-        e2: legacyEffectToStore({ id: 'e2', effectName: 'Леч', effectKind: 'positive', scenesLeft: 5 }),
+-      },
+-    });
+-    const result = applyActivityMinutes(10, 'test');
+-    expect(result.expired.map((e) => e.id)).toEqual(['e1']);
+-    expect(state().effects.e1.active).toBe(false);
+-    expect(state().effects.e2.active).not.toBe(false);
+-  });
+-});
+-
+-describe('ступени длительности крафта', () => {
+-  it('10 минут / час / сутки по печатной Complexity рецепта', () => {
+-    const at = (complexity) => craftMinutesForRecipe({ requires: { complexity } });
+-    expect(at(0)).toBe(10);
+-    expect(at(1)).toBe(10);
+-    expect(at(2)).toBe(60);
+-    expect(at(3)).toBe(60);
+-    expect(at(4)).toBe(1440);
+-    expect(at(7)).toBe(1440);
+-  });
+-});
+-
+-describe('крафт тратит время', () => {
+-  const grill = 'food_grilled_bloatfly'; // cooking, Complexity 1, навык SURVIVAL
+-
+-  it('автоуспех (сложность 0 после навыка): +10 минут, время в ответе', () => {
+-    seedHuman();
+-    give('food_bloatfly_meat', 2);
+-    useCharacterStore.setState((prev) => ({
+-      skills: { ...prev.skills, SURVIVAL: { ...(prev.skills?.SURVIVAL ?? {}), base: 1, total: 1 } },
+-    }));
+-    const result = craftRecipe(grill);
+-    expect(result.done).toBe(true);
+-    expect(result.auto).toBe(true);
+-    expect(result.time).toEqual({ minutes: 10, durationMultiplier: 1 });
+-    expect(result.survival).toMatchObject({ applied: true, minutes: 10 });
+-    expect(storeSurvival().timeCarried).toBeCloseTo(1 / 6, 10);
+-  });
+-
+-  it('сорванная работа тоже идёт по часам: провал с осложнением — 20 минут, материалы сгорают', () => {
+-    seedHuman();
+-    give('food_bloatfly_meat', 2);
+-    const meatBefore = countOf('food_bloatfly_meat');
+-    const result = craftRecipe(grill, { rollD20: () => 20 }); // 20 = осложнение, два = автопровал; ×2
+-    expect(result.done).toBe(false);
+-    expect(result.stage).toBe('check');
+-    expect(result.time).toEqual({ minutes: 10, durationMultiplier: 2 });
+-    expect(result.survival).toMatchObject({ applied: true, minutes: 20 });
+-    expect(storeSurvival().timeCarried).toBeCloseTo(20 / 60, 10);
+-    // кухня/химия: провал сжигает материалы (251) — время честно потрачено на пепел
+-    expect(countOf('food_bloatfly_meat')).toBe(meatBefore - 2);
+-  });
+-
+-  it('отказ гейта (нет материалов) — ни минут', () => {
+-    seedHuman();
+-    const result = craftRecipe(grill);
+-    expect(result.done).toBe(false);
+-    expect(result.stage).toBe('gate');
+-    expect(result.time).toBeUndefined();
+-    expect(result.survival).toBeUndefined();
+-    expect(storeSurvival().timeCarried).toBe(0);
+-    expect(storeSurvival().food).toBe(5);
+-  });
+-
+-  it('выключенные часы выживания: время в ответе есть, лестницы заморожены', () => {
+-    seedHuman();
+-    give('food_bloatfly_meat', 2);
+-    useCharacterStore.setState((prev) => ({
+-      skills: { ...prev.skills, SURVIVAL: { ...(prev.skills?.SURVIVAL ?? {}), base: 1, total: 1 } },
+-    }));
+-    setSurvivalEnabled(false);
+-    const result = craftRecipe(grill);
+-    expect(result.done).toBe(true);
+-    expect(result.time.minutes).toBe(10);
+-    expect(result.survival).toMatchObject({ applied: false, reason: 'disabled' });
+-  });
+-});
+-
+-describe('разбор тратит время', () => {
+-  it('успешный разбор желёзы: +10 минут в часы выживания', () => {
+-    seedHuman();
+-    const result = salvageItem(give('bloatfly_gland'), { rollD20: () => 3, choose: (n) => n });
+-    expect(result.done).toBe(true);
+-    expect(result.survival).toMatchObject({ applied: true, minutes: 10, cause: 'salvage' });
+-    expect(storeSurvival().timeCarried).toBeCloseTo(1 / 6, 10);
+-  });
+-
+-  it('провал с осложнением: предмет цел, вечер потерян — 20 минут', () => {
+-    seedHuman();
+-    const instanceId = give('bloatfly_gland');
+-    const result = salvageItem(instanceId, { rollD20: () => 20 });
+-    expect(result.done).toBe(false);
+-    expect(result.stage).toBe('check');
+-    expect(countOf('bloatfly_gland')).toBe(1);
+-    expect(result.time).toEqual({ minutes: 10, durationMultiplier: 2 });
+-    expect(result.survival).toMatchObject({ applied: true, minutes: 20 });
+-  });
+-
+-  it('гейт-отказ (не хлам) кубиков не видит — время не тратится', () => {
+-    seedHuman();
+-    const result = salvageItem(give('weapon_baseball_bat', 2), { rollD20: () => 3 });
+-    expect(result.reason).toBe('not-salvageable');
+-    expect(result.survival).toBeUndefined();
+-    expect(storeSurvival().timeCarried).toBe(0);
+-  });
+-
+-  it('шесть разборов кряду = час: лестницы сдвигаются на шестом', () => {
+-    seedHuman();
+-    for (let i = 0; i < 5; i += 1) {
+-      const result = salvageItem(give('bloatfly_gland'), { rollD20: () => 3, choose: (n) => n });
+-      expect(result.survival).toMatchObject({ applied: true });
+-      expect(storeSurvival().food).toBe(5);
+-      expect(storeSurvival().timeCarried).toBeCloseTo((i + 1) / 6, 10);
+-    }
+-    salvageItem(give('bloatfly_gland'), { rollD20: () => 3, choose: (n) => n });
+-    expect(storeSurvival().food).toBe(4);
+-    expect(storeSurvival().water).toBe(3);
+-  });
+-});
+diff --git a/__tests__/survival/fatigue-breakdown.test.js b/__tests__/survival/fatigue-breakdown.test.js
+deleted file mode 100644
+index aed3f2b..0000000
+--- a/__tests__/survival/fatigue-breakdown.test.js
++++ /dev/null
+@@ -1,78 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-import {
+-  addDiseaseFatigue,
+-  addFatigue,
+-  createSurvivalState,
+-  fatigueSourceBreakdown,
+-  survivalEffectRows,
+-} from '../../modules/fallout/survival/survival';
+-
+-describe('survival: разбивка усталости по источникам (патч 217)', () => {
+-  it('пустое состояние — пустой список', () => {
+-    expect(fatigueSourceBreakdown(createSurvivalState('human'))).toEqual([]);
+-  });
+-
+-  it('показываются только активные источники (amount > 0)', () => {
+-    const s = createSurvivalState('human');
+-    addFatigue(s, 'food', 2);
+-    addFatigue(s, 'sleep', 1);
+-    addDiseaseFatigue(s, 3);
+-    expect(fatigueSourceBreakdown(s)).toEqual([
+-      { source: 'food', amount: 2 },
+-      { source: 'sleep', amount: 1 },
+-      { source: 'disease', amount: 3 },
+-    ]);
+-  });
+-
+-  it('канонический порядок: еда, вода, сон, болезнь — независимо от порядка добавления', () => {
+-    const s = createSurvivalState('human');
+-    addFatigue(s, 'disease', 1);
+-    addFatigue(s, 'water', 2);
+-    addFatigue(s, 'food', 1);
+-    addFatigue(s, 'sleep', 1);
+-    expect(fatigueSourceBreakdown(s).map((e) => e.source)).toEqual([
+-      'food',
+-      'water',
+-      'sleep',
+-      'disease',
+-    ]);
+-  });
+-
+-  it('нулевой источник не показывается', () => {
+-    const s = createSurvivalState('human');
+-    addFatigue(s, 'water', 0);
+-    addFatigue(s, 'food', 1);
+-    expect(fatigueSourceBreakdown(s)).toEqual([{ source: 'food', amount: 1 }]);
+-  });
+-
+-  it('неизвестный источник идёт в конце списка', () => {
+-    const s = createSurvivalState('human');
+-    addFatigue(s, 'disease', 1);
+-    addFatigue(s, 'custom', 4);
+-    expect(fatigueSourceBreakdown(s).map((e) => e.source)).toEqual([
+-      'disease',
+-      'custom',
+-    ]);
+-  });
+-
+-  it('строка «Усталость» несёт источники, остальные строки — нет', () => {
+-    const s = createSurvivalState('human');
+-    addFatigue(s, 'food', 1);
+-    addDiseaseFatigue(s, 2);
+-    const rows = survivalEffectRows(s);
+-    expect(rows).toEqual([
+-      {
+-        key: 'fatigue',
+-        n: 3,
+-        sources: [
+-          { source: 'food', amount: 1 },
+-          { source: 'disease', amount: 2 },
+-        ],
+-      },
+-      { key: 'apPenalty', n: 3 },
+-      { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ — потеря ОЗ за игровой час (патч 232)
+-    ]);
+-    expect(rows[1].sources).toBeUndefined();
+-    expect(rows[2].sources).toBeUndefined();
+-  });
+-});
+diff --git a/__tests__/survival/fatigue-colors.test.js b/__tests__/survival/fatigue-colors.test.js
+deleted file mode 100644
+index 6565b10..0000000
+--- a/__tests__/survival/fatigue-colors.test.js
++++ /dev/null
+@@ -1,71 +0,0 @@
+-// Патч 231 (решение владельца): индикация состояний выживания — цветом,
+-// без текстовых подсказок. Шкала: потолок — обычный цвет ('ok'), дальше
+-// серый, серо-жёлтый, жёлто-красный, на дне красный. У воды 4 ступени —
+-// «жёлто-красный» пропущен (дно сразу красное).
+-//
+-// Заодно (тот же патч): разбивка источников усталости в скобках (патч 217)
+-// убрана из панели «Эффекты» — происхождение усталости видно по цветам
+-// состояний; строка снова просто «Усталость N». Доменная разбивка
+-// (fatigueSourceBreakdown) и i18n-ключи 217 остаются — их не трогали.
+-
+-import { describe, expect, it } from 'vitest';
+-import fs from 'node:fs';
+-import path from 'node:path';
+-import { ladderColorKey } from '../../modules/fallout/survival/survival';
+-
+-describe('ladderColorKey: цвет состояния лестницы', () => {
+-  it('еда и сон (5 ступеней): ok → grey → yellow → orange → red', () => {
+-    for (const ladder of ['food', 'sleep']) {
+-      expect(ladderColorKey(ladder, 5)).toBe('ok');
+-      expect(ladderColorKey(ladder, 4)).toBe('grey');
+-      expect(ladderColorKey(ladder, 3)).toBe('yellow');
+-      expect(ladderColorKey(ladder, 2)).toBe('orange');
+-      expect(ladderColorKey(ladder, 1)).toBe('red');
+-    }
+-  });
+-
+-  it('вода (4 ступени): жёлто-красный пропущен, дно сразу красное', () => {
+-    expect(ladderColorKey('water', 4)).toBe('ok');
+-    expect(ladderColorKey('water', 3)).toBe('grey');
+-    expect(ladderColorKey('water', 2)).toBe('yellow');
+-    expect(ladderColorKey('water', 1)).toBe('red');
+-  });
+-
+-  it('выход за границы трактуется консервативно (выше потолка — ок)', () => {
+-    expect(ladderColorKey('food', 6)).toBe('ok');
+-  });
+-});
+-
+-describe('экран: окраска значений и строка усталости без скобок', () => {
+-  const source = fs.readFileSync(
+-    path.resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'),
+-    'utf8',
+-  );
+-  const stylesSource = fs.readFileSync(
+-    path.resolve(__dirname, '../../modules/fallout/styles/WeaponsAndArmorScreen.styles.js'),
+-    'utf8',
+-  );
+-
+-  it('значения Голод/Жажда/Сон окрашиваются через ladderColorKey', () => {
+-    expect(source).toContain("ladderColorKey('food', survival.food)");
+-    expect(source).toContain("ladderColorKey('water', survival.water)");
+-    expect(source).toContain("ladderColorKey('sleep', survival.sleep)");
+-    for (const key of ['survivalValueGrey', 'survivalValueYellow', 'survivalValueOrange', 'survivalValueRed']) {
+-      expect(stylesSource).toContain(`${key}:`);
+-    }
+-  });
+-
+-  it('строка усталости — без разбивки источников (патч 217 снят с рендера)', () => {
+-    expect(source).not.toContain('survival.fatigueSources');
+-    expect(source).not.toContain('fatigueSourceJoin');
+-    expect(source).toContain("tWeaponsAndArmorScreen(`survival.${row.key}`)");
+-  });
+-
+-  it('i18n-ключи 217 не удалялись (формат словарей не менялся)', () => {
+-    const ru = JSON.parse(fs.readFileSync(
+-      path.resolve(__dirname, '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json'),
+-      'utf8',
+-    ));
+-    expect(ru.survival.fatigueSources).toBe('Усталость {n} ({sources})');
+-  });
+-});
+diff --git a/__tests__/survival/survival-bridge.test.js b/__tests__/survival/survival-bridge.test.js
+deleted file mode 100644
+index eb8989a..0000000
+--- a/__tests__/survival/survival-bridge.test.js
++++ /dev/null
+@@ -1,195 +0,0 @@
+-// Патчи 208–210 — слушатель расходников выживания (survivalConsumableListener),
+-// хранилище в зустанд-слайсе stateExtensions и гейт настройкой (этап 5):
+-// употребление еды/напитков ЛЮБЫМ путём (инвентарь или модалки) двигает
+-// шкалы одинаково, одним кодом; при выключенном выживании — заморожено.
+-// Операции читают свежее состояние прямо из стора.
+-
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import useAppSettingsStore from '../../src/store/appSettingsStore';
+-import { sleepSurvival, survivalConsumableListener } from '../../modules/fallout/survival/operations';
+-import { createSurvivalState, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
+-import food from '../../modules/fallout/data/consumables/food.json';
+-import drinks from '../../modules/fallout/data/consumables/drinks.json';
+-
+-const steak = food.find((entry) => entry.id === 'food_bloodbug_steak') || food[0];
+-const rawMeat = food.find((entry) => entry.id === 'food_bloatfly_meat') || food[1];
+-const soupEntry = food.find((entry) => entry.id === 'food_vegetable_soup') || food[2];
+-const purified = drinks.find((entry) => entry.id === 'drink_purified_water') || drinks[0];
+-const dirty = drinks.find((entry) => entry.id === 'drink_dirty_water') || drinks[1];
+-
+-// Контекст для слушателя: пишет через действие стора (как контекст движка).
+-const ctx = () => ({
+-  setStateExtension: useCharacterStore.getState().setStateExtension,
+-});
+-
+-const storeSurvival = () => useCharacterStore.getState().stateExtensions?.survival ?? null;
+-const setStoreSurvival = (survival) => {
+-  useCharacterStore.getState().setStateExtensions({ survival });
+-};
+-
+-const setSurvivalEnabled = (value) => {
+-  useAppSettingsStore.getState().setValue('survivalModeEnabled', value);
+-};
+-
+-beforeEach(() => {
+-  setSurvivalEnabled(true); // операторы выживания тестируем на включённой системе
+-});
+-
+-afterEach(() => {
+-  useCharacterStore.getState().setStateExtensions({});
+-  setSurvivalEnabled(false); // дефолт настройки
+-});
+-
+-describe('survivalConsumableListener: еда и напитки двигают шкалы (через стор)', () => {
+-  it('готовый стейк: +2 еды, вода не трогается', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    start.water = 1;
+-    setStoreSurvival(start);
+-    const result = survivalConsumableListener(steak, ctx());
+-    expect(result).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
+-    expect(storeSurvival().food).toBe(3);
+-    expect(storeSurvival().water).toBe(1);
+-  });
+-
+-  it('суп: +1 еды и +1 воды (данные soup)', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    start.water = 1;
+-    setStoreSurvival(start);
+-    const result = survivalConsumableListener(soupEntry, ctx());
+-    expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 1 } });
+-    expect(storeSurvival().food).toBe(2);
+-    expect(storeSurvival().water).toBe(2);
+-  });
+-
+-  it('очищенная вода: +2 воды; грязная: +1', () => {
+-    const start = createSurvivalState('human');
+-    start.water = 1;
+-    setStoreSurvival(start);
+-    const purifiedResult = survivalConsumableListener(purified, ctx());
+-    expect(purifiedResult).toMatchObject({ ok: true, gained: { food: 0, water: 2 } });
+-    expect(storeSurvival().water).toBe(3);
+-
+-    const second = createSurvivalState('human');
+-    second.water = 2;
+-    setStoreSurvival(second);
+-    const dirtyResult = survivalConsumableListener(dirty, ctx());
+-    expect(dirtyResult).toMatchObject({ ok: true, gained: { food: 0, water: 1 } });
+-    expect(storeSurvival().water).toBe(3);
+-  });
+-
+-  it('еда на максимуме: ok:false, состояние не меняется', () => {
+-    const start = createSurvivalState('human');
+-    start.food = SURVIVAL_RULES.max.food;
+-    setStoreSurvival(start);
+-    const result = survivalConsumableListener(steak, ctx());
+-    expect(result).toEqual({ ok: false, reason: 'full' });
+-    expect(storeSurvival().food).toBe(SURVIVAL_RULES.max.food);
+-  });
+-
+-  it('вода на максимуме: ок, шкала не двигается, подъём 0', () => {
+-    const start = createSurvivalState('human');
+-    start.water = SURVIVAL_RULES.max.water;
+-    setStoreSurvival(start);
+-    const result = survivalConsumableListener(purified, ctx());
+-    expect(result).toMatchObject({ ok: true, gained: { food: 0, water: 0 } });
+-    expect(storeSurvival().water).toBe(SURVIVAL_RULES.max.water);
+-  });
+-
+-  it('сырое мясо — тоже еда: +1 (признак state)', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    setStoreSurvival(start);
+-    const result = survivalConsumableListener(rawMeat, ctx());
+-    expect(result).toMatchObject({ ok: true, gained: { food: 1, water: 0 } });
+-    expect(storeSurvival().food).toBe(2);
+-  });
+-
+-  it('не еда/не напиток — null; нет выживания (робот) — null', () => {
+-    setStoreSurvival(createSurvivalState('human'));
+-    expect(survivalConsumableListener({ itemType: 'chem', id: 'chem_mentats' }, ctx())).toBeNull();
+-
+-    setStoreSurvival(null);
+-    expect(survivalConsumableListener(steak, ctx())).toBeNull();
+-    expect(survivalConsumableListener(purified, ctx())).toBeNull();
+-  });
+-
+-  it('два употребления подряд читают свежее состояние стора', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    setStoreSurvival(start);
+-    survivalConsumableListener(steak, ctx()); // 1 → 3
+-    const second = survivalConsumableListener(steak, ctx()); // 3 → 5
+-    expect(second).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
+-    expect(storeSurvival().food).toBe(5);
+-  });
+-});
+-
+-describe('survival: гейт настройкой survivalModeEnabled (этап 5)', () => {
+-  it('выключено — слушатель заморожен: null, шкала не двигается', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    setStoreSurvival(start);
+-    setSurvivalEnabled(false);
+-    expect(survivalConsumableListener(steak, ctx())).toBeNull();
+-    expect(storeSurvival().food).toBe(1);
+-  });
+-
+-  it('включено — слушатель снова работает', () => {
+-    const start = createSurvivalState('human');
+-    start.food = 1;
+-    setStoreSurvival(start);
+-    setSurvivalEnabled(false);
+-    setSurvivalEnabled(true);
+-    const result = survivalConsumableListener(steak, ctx());
+-    expect(result).toMatchObject({ ok: true, gained: { food: 2, water: 0 } });
+-    expect(storeSurvival().food).toBe(3);
+-  });
+-
+-  it('выключено — сон не применяется (reason disabled), состояние не трогается', () => {
+-    const start = createSurvivalState('human');
+-    start.sleep = 2;
+-    setStoreSurvival(start);
+-    setSurvivalEnabled(false);
+-    // Патч 240: sleepSurvival(options) — все зависимости из стора.
+-    const result = sleepSurvival({ place: 'bed', hours: 8 });
+-    expect(result).toEqual({ ok: false, reason: 'disabled' });
+-    expect(storeSurvival().sleep).toBe(2);
+-  });
+-});
+-
+-describe('sleepSurvival: сон применяется к слайсу стора', () => {
+-  it('8 часов в кровати: sleep 5, бонус +2, текущие ОЗ не трогаются (патч 213)', () => {
+-    const start = createSurvivalState('human');
+-    start.sleep = 2;
+-    setStoreSurvival(start);
+-    useCharacterStore.setState({ currentHealth: 20 });
+-    const result = sleepSurvival({ place: 'bed', hours: 8 });
+-    expect(result.ok).toBe(true);
+-    expect(storeSurvival().sleep).toBe(5);
+-    expect(storeSurvival().hpBonus).toBe(SURVIVAL_RULES.sleep.hpBonus);
+-    expect(result.diseaseRiskResult).toBeNull(); // кровать — без проверки болезни
+-    // Усталость снижает максимум ОЗ (производная), сон текущие ОЗ не пишет.
+-    expect(useCharacterStore.getState().currentHealth).toBe(20);
+-  });
+-
+-  it('сон в пустоши — проверка болезни', () => {
+-    const start = createSurvivalState('human');
+-    setStoreSurvival(start);
+-    // Проверку болезни подменяем стор-экшен (броски случая — не для теста).
+-    const disease = { status: 'passed' };
+-    const realCheck = useCharacterStore.getState().applyDiseaseExposureEvent;
+-    useCharacterStore.setState({ applyDiseaseExposureEvent: () => disease });
+-    try {
+-      var result = sleepSurvival({ place: 'wasteland', hours: 4 });
+-    } finally {
+-      useCharacterStore.setState({ applyDiseaseExposureEvent: realCheck });
+-    }
+-    expect(result.ok).toBe(true);
+-    expect(result.diseaseRiskResult).toBe(disease);
+-    // пустошь: потолок «отдохнувший», бонуса нет
+-    expect(storeSurvival().hpBonus).toBe(0);
+-  });
+-});
+diff --git a/__tests__/survival/survival-domain.test.js b/__tests__/survival/survival-domain.test.js
+deleted file mode 100644
+index 69aed8d..0000000
+--- a/__tests__/survival/survival-domain.test.js
++++ /dev/null
+@@ -1,334 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-import {
+-    SURVIVAL_RULES,
+-    addFatigue,
+-    advanceHours,
+-    advanceRealMinutes,
+-    clearFatigueSource,
+-    consumeDrink,
+-    consumeFood,
+-    createSurvivalState,
+-    fatigueFromSource,
+-    forecastSleep,
+-    hpMaxPenaltyForFatigue,
+-    isSurvivalCapable,
+-    removeFatigueTotal,
+-    rest,
+-    totalFatigue,
+-} from '../../modules/fallout/survival/survival';
+-import food from '../../modules/fallout/data/consumables/food.json';
+-import drinks from '../../modules/fallout/data/consumables/drinks.json';
+-
+-const foodItem = (id) => food.find((x) => x.id === id);
+-const drinkItem = (id) => drinks.find((x) => x.id === id);
+-
+-describe('survival: доступность и начальное состояние', () => {
+-    it('шкалы у органиков, роботам/киборгам — null', () => {
+-        expect(isSurvivalCapable('human')).toBe(true);
+-        expect(isSurvivalCapable('ghoul')).toBe(true);
+-        expect(isSurvivalCapable('mutant')).toBe(true);
+-        expect(isSurvivalCapable('robot')).toBe(false);
+-        expect(isSurvivalCapable('cyborg')).toBe(false);
+-        expect(createSurvivalState('robot')).toBeNull();
+-        expect(createSurvivalState('cyborg')).toBeNull();
+-    });
+-
+-    it('начальное состояние — максимумы, усталости нет', () => {
+-        const s = createSurvivalState('human');
+-        expect(s).toMatchObject({ food: 5, water: 4, sleep: 5, timeCarried: 0, hpBonus: 0 });
+-        expect(s.fatigue).toEqual([]);
+-        expect(s.acc).toEqual({ food: 0, water: 0, sleep: 0 });
+-    });
+-});
+-
+-describe('survival: лестница еды (1/4/8/16 ч, дно 24 ч)', () => {
+-    it('полный спуск за 29 часов с начислением усталости на дне', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceHours(s, 1).state;
+-        expect(s.food).toBe(4);
+-        s = advanceHours(s, 4).state; // 5 ч всего
+-        expect(s.food).toBe(3);
+-        s = advanceHours(s, 8).state; // 13 ч
+-        expect(s.food).toBe(2);
+-        expect(fatigueFromSource(s, 'food')).toBe(0); // вода к этому часу уже на дне — её усталость не трогаем
+-        s = advanceHours(s, 16).state; // 29 ч
+-        expect(s.food).toBe(1);
+-        expect(fatigueFromSource(s, 'food')).toBe(1); // переход 2→1
+-        s = advanceHours(s, 24).state; // 53 ч
+-        expect(fatigueFromSource(s, 'food')).toBe(2); // сутки на дне
+-        s = advanceHours(s, 24).state;
+-        expect(fatigueFromSource(s, 'food')).toBe(3);
+-    });
+-
+-    it('счётчик секции сбрасывается при подъёме едой', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceHours(s, 3).state; // food 4, acc 2 из 4
+-        s = consumeFood(s, foodItem('food_instamash')).state; // консерва +1 → 5
+-        expect(s.food).toBe(5);
+-        expect(s.acc.food).toBe(0);
+-        const after = advanceHours(s, 1).state; // снова 1 ч до спуска
+-        expect(after.food).toBe(4);
+-    });
+-});
+-
+-describe('survival: лестница воды (1/2/4 ч, дно 8 ч)', () => {
+-    it('полный спуск за 7 часов', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceHours(s, 1).state;
+-        expect(s.water).toBe(3);
+-        s = advanceHours(s, 2).state;
+-        expect(s.water).toBe(2);
+-        s = advanceHours(s, 4).state;
+-        expect(s.water).toBe(1);
+-        expect(fatigueFromSource(s, 'water')).toBe(1);
+-        s = advanceHours(s, 8).state;
+-        expect(fatigueFromSource(s, 'water')).toBe(2);
+-    });
+-});
+-
+-describe('survival: лестница сна (8/8/8/8 ч, дно 4 ч)', () => {
+-    it('полный спуск за 32 часа с двумя очками усталости', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceHours(s, 8).state;
+-        expect(s.sleep).toBe(4);
+-        s = advanceHours(s, 8).state; // 16 ч
+-        expect(s.sleep).toBe(3);
+-        s = advanceHours(s, 8).state; // 24 ч
+-        expect(s.sleep).toBe(2);
+-        expect(fatigueFromSource(s, 'sleep')).toBe(1); // 3→2
+-        s = advanceHours(s, 8).state; // 32 ч
+-        expect(s.sleep).toBe(1);
+-        expect(fatigueFromSource(s, 'sleep')).toBe(2); // 2→1
+-        s = advanceHours(s, 4).state;
+-        expect(fatigueFromSource(s, 'sleep')).toBe(3); // дно: каждые 4 ч
+-    });
+-});
+-
+-describe('survival: часовой тик — порядок трёх шагов', () => {
+-    it('дрен ОЗ = ⌊N/2⌋ по итоговому N', () => {
+-        expect(hpMaxPenaltyForFatigue(0)).toBe(0);
+-        expect(hpMaxPenaltyForFatigue(1)).toBe(0);
+-        expect(hpMaxPenaltyForFatigue(2)).toBe(1);
+-        expect(hpMaxPenaltyForFatigue(3)).toBe(1);
+-        expect(hpMaxPenaltyForFatigue(4)).toBe(2);
+-        const r = advanceHours({ ...createSurvivalState('human'), food: 1, fatigue: [{ source: 'food', amount: 4 }] }, 1);
+-        expect(r.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
+-    });
+-
+-    it('снятие −1 в час при чистых источниках, не ниже нуля', () => {
+-        let s = createSurvivalState('human');
+-        addFatigue(s, 'food', 3);
+-        const r1 = advanceHours(s, 1);
+-        expect(totalFatigue(r1.state)).toBe(2); // чист по всем лестницам → −1
+-        expect(r1.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 1 })); // ⌊2/2⌋ = 1
+-        s = r1.state;
+-        const r2 = advanceHours(s, 2);
+-        expect(totalFatigue(r2.state)).toBe(0); // −1 и −1, пол нуля не пробивает
+-    });
+-
+-    it('в час падения в «сильно голоден» снятия нет (состояние после шага)', () => {
+-        let s = createSurvivalState('human');
+-        addFatigue(s, 'food', 1);
+-        s = advanceHours(s, 29).state; // еда на дне, усталость food=2 (1+переход)
+-        const before = totalFatigue(s);
+-        const r = advanceHours(s, 1);
+-        expect(totalFatigue(r.state)).toBe(before); // food=1 блокирует снятие
+-    });
+-
+-    it('снятие блокируется изнеможением (сон 2 < 3)', () => {
+-        let s = createSurvivalState('human');
+-        addFatigue(s, 'food', 1);
+-        s.sleep = 2;
+-        const r = advanceHours(s, 1);
+-        expect(totalFatigue(r.state)).toBe(1);
+-    });
+-
+-    it('списание −1 берёт с наибольшего источника', () => {
+-        const s = createSurvivalState('human');
+-        addFatigue(s, 'food', 2);
+-        addFatigue(s, 'water', 1);
+-        removeFatigueTotal(s, 1);
+-        expect(fatigueFromSource(s, 'food')).toBe(1);
+-        expect(fatigueFromSource(s, 'water')).toBe(1);
+-    });
+-});
+-
+-describe('survival: реальный тик по курсу', () => {
+-    it('дефолт 30 минут = 1 игровой час', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceRealMinutes(s, 30).state;
+-        expect(s.water).toBe(3); // 1 час: вода 4→3
+-        expect(s.timeCarried).toBe(0);
+-    });
+-
+-    it('дробные часы копятся до целого', () => {
+-        let s = createSurvivalState('human');
+-        s = advanceRealMinutes(s, 10).state; // 1/3 часа
+-        expect(s.water).toBe(4);
+-        expect(s.timeCarried).toBeCloseTo(1 / 3, 10);
+-        s = advanceRealMinutes(s, 10).state;
+-        expect(s.water).toBe(4);
+-        expect(s.timeCarried).toBeCloseTo(2 / 3, 10);
+-        s = advanceRealMinutes(s, 10).state; // суммарно 30 минут = 1 час
+-        expect(s.water).toBe(3);
+-        expect(s.timeCarried).toBe(0);
+-    });
+-
+-    it('курс из настройки: 10 минут = 1 час', () => {
+-        const s = advanceRealMinutes(createSurvivalState('human'), 30, 10).state;
+-        expect(s.water).toBe(2); // 3 часа: 4→3, ещё через 2 ч → 2
+-    });
+-});
+-
+-describe('survival: еда и питьё', () => {
+-    it('сырая +1, приготовленная +2, консервы +1', () => {
+-        let s = createSurvivalState('human');
+-        s.food = 2;
+-        s = consumeFood(s, foodItem('food_brahmin_meat')).state; // rawMeat, сырое
+-        expect(s.food).toBe(3);
+-        s = consumeFood(s, foodItem('food_grilled_bloatfly')).state; // cooked
+-        expect(s.food).toBe(5); // +2 с потолком
+-        s.food = 3;
+-        s = consumeFood(s, foodItem('food_instamash')).state; // preserved
+-        expect(s.food).toBe(4);
+-    });
+-
+-    it('суп: +1 еда и +1 вода одновременно', () => {
+-        let s = createSurvivalState('human');
+-        s.food = 3;
+-        s.water = 2;
+-        const r = consumeFood(s, foodItem('food_vegetable_soup'));
+-        expect(r.ok).toBe(true);
+-        expect(r.gained).toEqual({ food: 1, water: 1 });
+-        expect(r.state.food).toBe(4);
+-        expect(r.state.water).toBe(3);
+-    });
+-
+-    it('на секции 5 есть нельзя, включая суп', () => {
+-        const s = createSurvivalState('human'); // food=5
+-        expect(consumeFood(s, foodItem('food_grilled_bloatfly')).ok).toBe(false);
+-        expect(consumeFood(s, foodItem('food_vegetable_soup')).ok).toBe(false);
+-    });
+-
+-    it('напитки: любой +1, очищенная вода +2, на потолке пить можно', () => {
+-        let s = createSurvivalState('human');
+-        s.water = 1;
+-        s = consumeDrink(s, drinkItem('drink_dirty_water')).state; // грязная: +1, побочки — вне шкал
+-        expect(s.water).toBe(2);
+-        s = consumeDrink(s, drinkItem('drink_purified_water')).state; // очищенная: +2
+-        expect(s.water).toBe(4);
+-        const r = consumeDrink(s, drinkItem('drink_nuka_cola')); // на потолке — ок, шкала стоит
+-        expect(r.ok).toBe(true);
+-        expect(r.gained.water).toBe(0);
+-        expect(r.state.water).toBe(4);
+-    });
+-
+-    it('не-еда и не-напиток отклоняются', () => {
+-        const s = createSurvivalState('human');
+-        expect(consumeFood(s, drinkItem('drink_nuka_cola')).ok).toBe(false);
+-        expect(consumeDrink(s, foodItem('food_instamash')).ok).toBe(false);
+-    });
+-});
+-
+-describe('survival: сон', () => {
+-    it('короткий сон 1–5 ч: +1 ступень с потолком «усталый»', () => {
+-        let s = createSurvivalState('human');
+-        s.sleep = 1;
+-        s = rest(s, { place: 'wasteland', hours: 3 }).state;
+-        expect(s.sleep).toBe(2);
+-        s = rest(s, { place: 'wasteland', hours: 1 }).state;
+-        expect(s.sleep).toBe(3); // потолок короткого сна
+-        const fresh = createSurvivalState('human'); // sleep=5
+-        const r = rest(fresh, { place: 'wasteland', hours: 2 });
+-        expect(r.state.sleep).toBe(5); // короткий сон не понижает
+-    });
+-
+-    it('≥6 ч — «отдохнувший»; ≥8 ч в кровати — «прекрасно» + бонус ОЗ', () => {
+-        let s = createSurvivalState('human');
+-        s.sleep = 1;
+-        s = rest(s, { place: 'wasteland', hours: 6 }).state;
+-        expect(s.sleep).toBe(4); // пустошь: потолок «отдохнувший»
+-        expect(s.hpBonus).toBe(0);
+-        s.sleep = 1;
+-        const r = rest(s, { place: 'bed', hours: 8 });
+-        expect(r.state.sleep).toBe(5);
+-        expect(r.state.hpBonus).toBe(2);
+-    });
+-
+-    it('любой сон снимает бонус +2 ОЗ («до следующего сна»)', () => {
+-        let s = createSurvivalState('human');
+-        s.hpBonus = 2;
+-        s = rest(s, { place: 'wasteland', hours: 1 }).state;
+-        expect(s.hpBonus).toBe(0);
+-    });
+-
+-    it('сон двигает еду и воду по их таймингам', () => {
+-        let s = createSurvivalState('human');
+-        s = rest(s, { place: 'bed', hours: 8 }).state;
+-        expect(s.food).toBe(3); // 1 ч → 4, 5 ч → 3
+-        expect(s.water).toBe(1); // 1 ч → 3, 3 ч → 2, 7 ч → 1
+-        expect(fatigueFromSource(s, 'water')).toBe(1); // переход 2→1 на 7-м часу
+-    });
+-
+-    it('на 6-м часе сна списывается только усталость недосыпа', () => {
+-        // вода на дне блокирует почасовое снятие — изолируем списание сна
+-        let s = createSurvivalState('human');
+-        s.food = 3;
+-        s.water = 1;
+-        addFatigue(s, 'sleep', 2);
+-        addFatigue(s, 'food', 3);
+-        const r = rest(s, { place: 'wasteland', hours: 7 });
+-        expect(fatigueFromSource(r.state, 'sleep')).toBe(0);
+-        expect(fatigueFromSource(r.state, 'food')).toBe(3);
+-        const cleared = r.events.find((e) => e.type === 'fatigueSleepCleared');
+-        expect(cleared).toMatchObject({ hour: 6, removed: 2 });
+-    });
+-
+-    it('сон не трогает текущие ОЗ: снижение максимума — от итоговой усталости', () => {
+-        // еда на дне: снятие заблокировано, усталость food сном не лечится.
+-        const s = createSurvivalState('human');
+-        s.food = 1;
+-        addFatigue(s, 'food', 4); // ⌊4/2⌋ = 2 к макс. ОЗ
+-        const f = forecastSleep(s, { place: 'bed', hours: 8 });
+-        expect(hpMaxPenaltyForFatigue(totalFatigue(f.state))).toBe(2);
+-        expect(f.events).toContainEqual(expect.objectContaining({ type: 'hpMaxPenalty', amount: 2 }));
+-        // сам прогноз состояние не меняет:
+-        expect(fatigueFromSource(s, 'food')).toBe(4);
+-    });
+-
+-    it('валидация аргументов', () => {
+-        const s = createSurvivalState('human');
+-        expect(() => rest(s, { place: 'tent', hours: 4 })).toThrow();
+-        expect(() => rest(s, { place: 'bed', hours: 0 })).toThrow();
+-        expect(() => rest(s, { place: 'bed', hours: 25 })).toThrow();
+-        expect(() => advanceHours(s, -1)).toThrow();
+-    });
+-});
+-
+-describe('survival: данные', () => {
+-    it('флаг soup ровно на четырёх утверждённых блюдах', () => {
+-        const soups = food.filter((x) => x.soup === true).map((x) => x.id).sort();
+-        expect(soups).toEqual([
+-            'food_iguana_stew',
+-            'food_radstag_stew',
+-            'food_squirrel_stew',
+-            'food_vegetable_soup',
+-        ]);
+-        expect(food.find((x) => x.id === 'food_yao_guai_roast').soup).toBeUndefined();
+-    });
+-
+-    it('флаг purified только у очищенной воды', () => {
+-        const purified = drinks.filter((x) => x.purified === true).map((x) => x.id);
+-        expect(purified).toEqual(['drink_purified_water']);
+-    });
+-
+-    it('константы правил соответствуют дока 0.3', () => {
+-        expect(SURVIVAL_RULES.stepHours).toEqual({
+-            food: { 5: 1, 4: 4, 3: 8, 2: 16 },
+-            water: { 4: 1, 3: 2, 2: 4 },
+-            sleep: { 5: 8, 4: 8, 3: 8, 2: 8 },
+-        });
+-        expect(SURVIVAL_RULES.bottomPeriodHours).toEqual({ food: 24, water: 8, sleep: 4 });
+-        expect(SURVIVAL_RULES.defaultCourseMinutesPerHour).toBe(30);
+-    });
+-});
+diff --git a/__tests__/survival/survival-modals.test.js b/__tests__/survival/survival-modals.test.js
+deleted file mode 100644
+index 8ad11d0..0000000
+--- a/__tests__/survival/survival-modals.test.js
++++ /dev/null
+@@ -1,134 +0,0 @@
+-// Патч 206 — модалки еды/питья/сна: превью подъёма шкал, мост контуров
+-// (продвижение эффектов сценами), полнота i18n ключей модалок.
+-
+-import { describe, expect, it } from 'vitest';
+-import { drinkGain, foodGain } from '../../modules/fallout/survival/survival';
+-import { advanceEffectsByScenes } from '../../domain/effects';
+-import food from '../../modules/fallout/data/consumables/food.json';
+-import drinks from '../../modules/fallout/data/consumables/drinks.json';
+-import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
+-import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
+-
+-const SCENE_MS = 5 * 60 * 1000;
+-
+-const timedEffect = (scenesLeft, extra = {}) => ({
+-    id: `effect-${Math.random().toString(36).slice(2, 8)}`,
+-    effectName: 'Тестовый эффект',
+-    effectKind: 'positive',
+-    sourceName: 'Тест',
+-    createdAt: Date.now(),
+-    durationMs: scenesLeft * SCENE_MS,
+-    expiresAt: Date.now() + scenesLeft * SCENE_MS,
+-    scenesLeft,
+-    ...extra,
+-});
+-
+-describe('survival: превью подъёма шкал (foodGain / drinkGain)', () => {
+-    it('суп — +1 еда и +1 вода (замещает категорию приготовленного)', () => {
+-        const soup = food.find((x) => x.id === 'food_vegetable_soup');
+-        expect(foodGain(soup)).toEqual({ food: 1, water: 1 });
+-    });
+-
+-    it('приготовленное не консервированное — +2 еды', () => {
+-        const cooked = food.find((x) => x.state === 'cooked' && !x.preserved && !x.soup);
+-        expect(foodGain(cooked)).toEqual({ food: 2, water: 0 });
+-    });
+-
+-    it('сырое и консервированное — +1 еда', () => {
+-        const raw = food.find((x) => x.state === 'raw');
+-        const preserved = food.find((x) => x.preserved);
+-        expect(foodGain(raw)).toEqual({ food: 1, water: 0 });
+-        expect(foodGain(preserved)).toEqual({ food: 1, water: 0 });
+-    });
+-
+-    it('напитки: очищенная вода +2, остальное +1', () => {
+-        const purified = drinks.find((x) => x.id === 'drink_purified_water');
+-        const other = drinks.find((x) => !x.purified);
+-        expect(drinkGain(purified)).toEqual({ food: 0, water: 2 });
+-        expect(drinkGain(other)).toEqual({ food: 0, water: 1 });
+-    });
+-});
+-
+-describe('survival: мост контуров — advanceEffectsByScenes (§5)', () => {
+-    it('12 сцен (= 1 час сна) укорачивают эффект на 12 сцен', () => {
+-        const effect = timedEffect(24);
+-        const { effects, expired } = advanceEffectsByScenes([effect], 12);
+-        expect(expired).toEqual([]);
+-        expect(effects[0].scenesLeft).toBe(12);
+-    });
+-
+-    it('эффект короче срока сна истекает', () => {
+-        const effect = timedEffect(6);
+-        const { effects, expired } = advanceEffectsByScenes([effect], 12);
+-        expect(effects).toEqual([]);
+-        expect(expired.map((e) => e.id)).toEqual([effect.id]);
+-    });
+-
+-    it('перманентные эффекты сценами не двигаются', () => {
+-        const permanent = timedEffect(9999, { isPermanent: true });
+-        const { effects, expired } = advanceEffectsByScenes([permanent], 288);
+-        expect(expired).toEqual([]);
+-        expect(effects[0].scenesLeft).toBe(9999);
+-    });
+-
+-    it('некорректное число сцен — ошибка', () => {
+-        expect(() => advanceEffectsByScenes([], -1)).toThrow();
+-        expect(() => advanceEffectsByScenes([], 1.5)).toThrow();
+-    });
+-});
+-
+-describe('survival: i18n модалок (ru/en)', () => {
+-    const keyPaths = [
+-        'survival.actions.eat',
+-        'survival.actions.drink',
+-        'survival.actions.sleep',
+-        'survival.gain.food',
+-        'survival.gain.water',
+-        'survival.consumeNotAllowed',
+-        'survival.eat.title',
+-        'survival.eat.blocked',
+-        'survival.eat.empty',
+-        'survival.drink.title',
+-        'survival.drink.empty',
+-        'survival.sleep.title',
+-        'survival.sleep.placeBed',
+-        'survival.sleep.placeWasteland',
+-        'survival.sleep.hours',
+-        'survival.sleep.wastelandNote',
+-        'survival.sleep.forecastTitle',
+-        'survival.sleep.forecastState',
+-        'survival.sleep.forecastMaxHp',
+-        'survival.sleep.forecastFatigueCleared',
+-        'survival.sleep.forecastFoodDown',
+-        'survival.sleep.forecastWaterDown',
+-        'survival.sleep.forecastHpBonus',
+-        'survival.sleep.confirm',
+-        'survival.sleep.cancel',
+-        'survival.sleep.reportTitle',
+-        'survival.sleep.reportState',
+-        'survival.sleep.reportMaxHp',
+-        'survival.sleep.reportHpBonus',
+-        'survival.sleep.reportFatigueCleared',
+-    ];
+-
+-    const at = (dict, path) => path.split('.').reduce((acc, part) => acc?.[part], dict);
+-
+-    it.each(['ru-RU', 'en-EN'])('%s: каждый ключ модалок есть и непустой', (locale) => {
+-        const dict = locale === 'ru-RU' ? ruScreen : enScreen;
+-        for (const path of keyPaths) {
+-            const value = at(dict, path);
+-            expect(typeof value, `${locale}: ${path}`).toBe('string');
+-            expect(value, `${locale}: ${path}`).toMatch(/\S/);
+-        }
+-    });
+-
+-    it('структура секций модалок идентична в обеих локалях', () => {
+-        const ruKeys = Object.keys(ruScreen.survival.sleep).sort();
+-        const enKeys = Object.keys(enScreen.survival.sleep).sort();
+-        expect(enKeys).toEqual(ruKeys);
+-        expect(Object.keys(ruScreen.survival.eat).sort())
+-            .toEqual(Object.keys(enScreen.survival.eat).sort());
+-        expect(Object.keys(ruScreen.survival.drink).sort())
+-            .toEqual(Object.keys(enScreen.survival.drink).sort());
+-    });
+-});
+diff --git a/__tests__/survival/survival-ui.test.js b/__tests__/survival/survival-ui.test.js
+deleted file mode 100644
+index 1ee6748..0000000
+--- a/__tests__/survival/survival-ui.test.js
++++ /dev/null
+@@ -1,125 +0,0 @@
+-import { describe, expect, it } from 'vitest';
+-import { SURVIVAL_RULES, addFatigue, createSurvivalState, survivalEffectRows } from '../../modules/fallout/survival/survival';
+-import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
+-import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
+-
+-describe('survival: строки эффектов (§6)', () => {
+-    it('нет состояния (робот/киборг) — строк нет', () => {
+-        expect(survivalEffectRows(null)).toEqual([]);
+-    });
+-
+-    it('нулевая усталость — строк нет', () => {
+-        expect(survivalEffectRows(createSurvivalState('human'))).toEqual([]);
+-    });
+-
+-    it('N ≥ 1 — «Усталость N» и «Количество получаемых ОД −N», M = N', () => {
+-        const s = createSurvivalState('human');
+-        addFatigue(s, 'food', 1);
+-        expect(survivalEffectRows(s)).toEqual([
+-            // Патч 217: строка «Усталость» несёт разбивку по источникам.
+-            { key: 'fatigue', n: 1, sources: [{ source: 'food', amount: 1 }] },
+-            { key: 'apPenalty', n: 1 },
+-        ]);
+-        addFatigue(s, 'water', 2);
+-        expect(survivalEffectRows(s)).toEqual([
+-            {
+-                key: 'fatigue',
+-                n: 3,
+-                sources: [
+-                    { source: 'food', amount: 1 },
+-                    { source: 'water', amount: 2 },
+-                ],
+-            },
+-            { key: 'apPenalty', n: 3 },
+-            { key: 'hpPerHour', n: 1 }, // ⌊3/2⌋ (патч 232)
+-        ]);
+-    });
+-});
+-
+-// ПРАВИЛО владельца: никаких пропусков i18n — ключи обязаны быть в обеих
+-// локалях, промах ключа виден как сам путь.
+-describe('survival: i18n шкал (ru/en)', () => {
+-    const locales = { 'ru-RU': ruScreen, 'en-EN': enScreen };
+-
+-    it.each(Object.entries(locales))('%s: названия всех секций всех шкал', (loc, dict) => {
+-        const survival = dict.survival;
+-        expect(survival).toBeTruthy();
+-        for (const [ladder, max] of Object.entries(SURVIVAL_RULES.max)) {
+-            for (let section = 1; section <= max; section += 1) {
+-                const name = survival?.[ladder]?.[String(section)];
+-                expect(name, `${loc} survival.${ladder}.${section}`).toMatch(/^\S.+$/);
+-            }
+-        }
+-    });
+-
+-    it('ru: канонические названия владельца дословно', () => {
+-        expect(ruScreen.survival.food).toEqual({
+-            5: 'Полностью сыт',
+-            4: 'Сыт',
+-            3: 'Проголодался',
+-            2: 'Голодный',
+-            1: 'Сильно голоден',
+-        });
+-        expect(ruScreen.survival.water).toEqual({
+-            4: 'Полностью гидратирован',
+-            3: 'Гидратирован',
+-            2: 'Мучает жажда',
+-            1: 'Обезвожен',
+-        });
+-        // С патча 206 survival.sleep кроме названий секций несёт ключи
+-        // модалки сна — проверяем секции частичным совпадением.
+-        expect(ruScreen.survival.sleep).toMatchObject({
+-            5: 'Прекрасно отдохнувший',
+-            4: 'Отдохнувший',
+-            3: 'Усталый',
+-            2: 'Измождённый',
+-            1: 'Истощённый',
+-        });
+-    });
+-
+-    it.each(Object.entries(locales))('%s: шаблоны строк эффектов с {n}', (loc, dict) => {
+-        expect(dict.survival.fatigue).toContain('{n}');
+-        expect(dict.survival.apPenalty).toContain('{n}');
+-        expect(dict.survival.hpPerHour).toContain('{n}'); // патч 232
+-    });
+-
+-    it.each(Object.entries(locales))('%s: заголовки областей Голод/Жажда/Сон', (loc, dict) => {
+-        expect(dict.survival.foodTitle).toMatch(/^\S.+$/);
+-        expect(dict.survival.waterTitle).toMatch(/^\S.+$/);
+-        expect(dict.survival.sleepTitle).toMatch(/^\S.+$/);
+-    });
+-
+-    it('ru: заголовки — слова владельца', () => {
+-        expect(ruScreen.survival.foodTitle).toBe('Голод');
+-        expect(ruScreen.survival.waterTitle).toBe('Жажда');
+-        expect(ruScreen.survival.sleepTitle).toBe('Сон');
+-    });
+-
+-    it('ru: формулировки строк эффектов — слова владельца', () => {
+-        expect(ruScreen.survival.fatigue).toBe('Усталость {n}');
+-        expect(ruScreen.survival.apPenalty).toBe('Количество получаемых ОД −{n}');
+-    });
+-
+-    // Патч 217: разбивка усталости по активным источникам.
+-    it.each(Object.entries(locales))('%s: ключи разбивки источников', (loc, dict) => {
+-        expect(dict.survival.fatigueSources).toContain('{n}');
+-        expect(dict.survival.fatigueSources).toContain('{sources}');
+-        expect(dict.survival.fatigueSourceJoin).toMatch(/^.+$/);
+-        for (const source of ['food', 'water', 'sleep', 'disease']) {
+-            expect(
+-                dict.survival.fatigueSource?.[source],
+-                `${loc} survival.fatigueSource.${source}`,
+-            ).toMatch(/^\S.+$/);
+-        }
+-    });
+-
+-    it('ru: разбивка — слова владельца', () => {
+-        expect(ruScreen.survival.fatigueSources).toBe('Усталость {n} ({sources})');
+-        expect(ruScreen.survival.fatigueSource).toEqual({
+-            food: 'голод',
+-            water: 'жажда',
+-            sleep: 'сон',
+-            disease: 'болезнь',
+-        });
+-    });
+-});
+diff --git a/components/alerts/alertService.js b/components/alerts/alertService.js
+index 7ac8620..38c96f0 100644
+--- a/components/alerts/alertService.js
++++ b/components/alerts/alertService.js
+@@ -30,6 +30,7 @@
+  */
+ 
+ import { ALERTS } from './catalog';
++import { debugLog } from '../../src/debug/falloutDebug';
+ 
+ let hostHandler = null;
+ // Очередь запросов, пришедших до монтирования хоста (например, ранняя ошибка
+@@ -60,8 +61,10 @@ export const registerAlertHost = (handler) => {
+ export const showAlert = (alertId, params = {}) => {
+   const entry = ALERTS[alertId];
+   if (!entry) {
+-    // Промах ключа — дефект данных. Не роняем приложение, но и не молчим.
+-    console.error(`[alertService] Неизвестный алерт: ${alertId}`);
++    // Промах ключа — дефект данных. Не роняем приложение; след оставляем
++    // в трассе (включается из консоли, см. docs/debug-tracing.md) — плоские
++    // console.* в рантайме запрещены инвариантом __tests__/debug/console-trace.test.js.
++    debugLog('alerts.unknown:id', { alertId });
+     return Promise.resolve(entry?.kind === 'confirm' ? false : null);
+   }
+ 
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 4d8b315..e01267e 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -38,6 +38,15 @@
+ 1. Один шаг = один патч. Номер — только ярлык доставки: берётся следующий свободный
+    (последний сданный + 1) и используется в имени файла и команде применения. После шага приложение рабочее.
+ 2. Перед сдачей ОБЯЗАТЕЛЬНО: полный `npx vitest run` + `tsc --noEmit` (все предохранители зелёные).
++2а. **Политика тестов (решение владельца 2026-09-18):** тесты делятся на два
++   сорта. **Предохранители** (§3 + целостность данных) живут в репозитории
++   всегда. **Приёмочные** — инструмент разработки, не артефакт: пишутся при
++   фиче, живут в песочнице, в патчи не входят; фича прижилась (e2e-проверка
++   владельца) — следующий патч, трогающий область, удаляет её приёмочные
++   тесты. Исключение: приёмочные движковых областей могут временно ехать
++   в репо с пометкой `// ПРИЁМОЧНЫЙ (патч N): удалить при конверсии/приживании` —
++   они служат базой эквивалентности для TypeScript-серии
++   (`docs/architecture/typescript-migration-plan.md`, раздел 5).
+ 3. Коммит в ветку `arena/01a08a17-fallout-2d20-companion` → файл патча в `patchs/` → коммит файла → push.
+ 4. Владелец применяет `./apply-patch.sh <номер>` (скрипт сам ставит недостающую цепочку).
+    **Ручной перенос файлов запрещён** (инцидент с потерей правок при ручном копировании).
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7678788..136120d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Cleanup — Tests: settled ones removed, the «tests do not pile up» rule written into the charter (patch 278)
++
++> Owner's word (2026-09-18): every feature wrote its own test, and after settling in the test was never deleted — they just piled up. Tests are a development-time checking tool, not part of the program.
++
++- 15 acceptance tests of settled features were deleted (survival UI labels and colors, modals, the crafting window, the salvage messages from patches 275–276, the «acceptance» of the finished robot rework). Rule checking is unharmed: the fuses (store and save passports, catalog data integrity) were not touched; the repository now holds 72 test files instead of 86.
++- The lost fuse «no direct console calls in the program» was restored: all logging goes through the diagnostics journal that is off by default. The single violation found (the unknown-alert message) now goes through that journal; the `alerts` category is documented in the tracing doc.
++- The test policy is written into the charter: fuses stay forever; acceptance tests live in the sandbox during development and do not ship; a settled feature loses its right to a test — the next patch touching that area removes it.
++
++---
++
+ ## Cleanup — Documentation: implemented designs removed, deferred ideas honestly labeled (patch 277)
+ 
+ > Owner's word (2026-09-18): docs piled up descriptions of things already built — the source of truth is now the program itself and the changelogs. Keep only the acting contracts and clearly marked «not implemented» ideas.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 78d3efd..a6765a6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,16 @@
+ 
+ ---
+ 
++## Чистка — Тесты: прижившееся убрано, правило «тесты не копятся» записано в устав (патч 278)
++
++> Слово владельца (2026-09-18): каждая фича писала свой тест, после приживания он не удалялся и они копились. Тесты — инструмент проверки при разработке, не часть программы.
++
++- Удалены 15 приёмочных тестов прижившихся фич (подписи и цвета интерфейса выживания, модалки, окно крафта, сообщения разбора из патчей 275–276, «принятие» завершённого переустройства роботов). Проверка правил не пострадала: предохранители (паспорта хранилища и сейвов, целостность данных каталогов) не тронуты; тестов в репозитории стало 72 вместо 86.
++- Восстановлен потерянный предохранитель «в программе нет прямых вызовов консоли»: всё журналирование идёт через выключаемый по умолчанию журнал диагностики. Единственное найденное нарушение (сообщение о неизвестном алерте) переведено на этот журнал; категория `alerts` описана в доке трассировки.
++- В устав записана политика тестов: предохранители — навсегда; приёмочные — живут в песочнице при разработке и в поставку не входят; прижившаяся фича теряет право на свой тест, следующий патч по области его удаляет.
++
++---
++
+ ## Чистка — Документация: реализованное удалено, отложенному — честный статус (патч 277)
+ 
+ > Слово владельца (2026-09-18): в docs накопились описания уже сделанного — источник правды теперь сама программа и чейнджлоги. Оставить только действующие договоры и честно помеченные «не реализовано» задумки.
+diff --git a/docs/debug-tracing.md b/docs/debug-tracing.md
+index 570b735..2d035ac 100644
+--- a/docs/debug-tracing.md
++++ b/docs/debug-tracing.md
+@@ -49,6 +49,7 @@
+ | `i18n` | локализация предметов (резолв chem и т.п.) |
+ | `catalog` | каталог экипировки: отсутствующие i18n-записи |
+ | `sync` | облачная синхронизация |
++| `alerts` | промах ключа алерта (дефект данных, не роняет приложение) |
+ | `ctx` | контекст персонажа (deprecated-вызовы) |
+ | `trace` | служебные маркеры (`__fallout.mark`) |
+ 
+-- 
+2.39.5
+

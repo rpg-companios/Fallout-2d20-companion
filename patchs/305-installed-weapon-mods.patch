@@ -1,0 +1,237 @@
+#!/bin/sh
+# Патч 305: моды на оружие, УСТАНОВЛЕННОЕ в конечность (installTo из комплекта —
+# репорт владельца: лазер-ган из «assaultron_us_military», часть руки). Моды
+# пишутся в запись оружия внутри конечности, карточка и сейв читают её же.
+# Тянет цепочку 300–304, если они ещё не стоят.
+patch -p1 <<'PATCH_305_EOF'
+diff --git a/__tests__/robot/robot-slot-model.test.js b/__tests__/robot/robot-slot-model.test.js
+index 7395700..849b196 100644
+--- a/__tests__/robot/robot-slot-model.test.js
++++ b/__tests__/robot/robot-slot-model.test.js
+@@ -20,6 +20,9 @@ import {
+   attacksFromSlot,
+   collectAttacks,
+   splitLimbWeapons,
++  serializeSlot,
++  deserializeSlot,
++  setInstalledWeaponMods,
+   resolveHit,
+   validateHitTable,
+ } from '../../domain/robotSlots';
+@@ -523,3 +526,69 @@ describe('таблица попаданий', () => {
+     }
+   });
+ });
++
++describe('моды оружия, установленного в конечность (installTo из комплекта)', () => {
++  // Репорт владельца: лазер-ган из комплекта «assaultron_us_military»
++  // (installTo: 'arm' — часть руки, не ладонь) не принимал моды: применяющий
++  // код писал только в ладонь/инвентарь, а карточка не читала моды из записи.
++  const MOD_044 = 'mod_044'; // Конденсатор лазер-гана: +1 урон (база 4)
++  const LASER_GUN = 'weapon_laser_gun';
++
++  const armWithLaserGun = () => {
++    const arm = limbById('robot_arm_assaultron');
++    return {
++      ...arm,
++      builtinWeapons: [
++        { id: LASER_GUN, weaponId: LASER_GUN, itemType: 'weapon', isBuiltin: true, installTo: 'arm', locked: true },
++      ],
++    };
++  };
++
++  it('карточка установленного оружия читает моды из записи (appliedMods)', () => {
++    const slots = {
++      leftArm: {
++        limb: {
++          ...armWithLaserGun(),
++          builtinWeapons: [{
++            id: LASER_GUN, weaponId: LASER_GUN, itemType: 'weapon',
++            isBuiltin: true, installTo: 'arm',
++            appliedMods: { Capacitor: MOD_044 },
++          }],
++        },
++        armor: null, plating: null, frame: null,
++      },
++    };
++    const card = collectAttacks(slots, { bodyPlan: 'assaultron' })
++      .find((a) => a.id === LASER_GUN);
++    expect(card, 'карточка есть').toBeTruthy();
++    expect(card.isBuiltin, 'часть конечности').toBe(true);
++    expect(card.sourceSlot).toBe('leftArm');
++    expect(card.modIds).toEqual([MOD_044]);
++    expect(card.damage, 'урон базы + мод').toBe(4 + 1);
++  });
++
++  it('setInstalledWeaponMods пишет запись; мод виден на карточке и переживает сейв-цикл', () => {
++    const before = { leftArm: { limb: armWithLaserGun(), armor: null, plating: null, frame: null } };
++    // Нет записи — null (вызывающий код пробует другие ветки)
++    expect(setInstalledWeaponMods({ leftArm: { limb: limbById('robot_arm_assaultron'), armor: null } }, 'leftArm', LASER_GUN, {})).toBeNull();
++
++    const next = setInstalledWeaponMods(before, 'leftArm', LASER_GUN, { Capacitor: MOD_044 });
++    expect(next, 'запись найдена и обновлена').toBeTruthy();
++    expect(next).not.toBe(before);
++    expect(before.leftArm.limb.builtinWeapons[0].appliedMods, 'исходная карта не тронута').toBeUndefined();
++
++    const card = collectAttacks(next, { bodyPlan: 'assaultron' }).find((a) => a.id === LASER_GUN);
++    expect(card.modIds).toEqual([MOD_044]);
++    expect(card.damage).toBe(4 + 1);
++
++    const slim = serializeSlot(next.leftArm);
++    expect(slim.installedWeapons).toEqual([{ id: LASER_GUN, modIds: [MOD_044] }]);
++
++    const restored = deserializeSlot(slim);
++    const restoredEntry = restored.limb.builtinWeapons.find((w) => w.id === LASER_GUN);
++    expect(restoredEntry.appliedMods).toEqual({ Capacitor: MOD_044 });
++    const restoredCard = collectAttacks({ leftArm: restored }, { bodyPlan: 'assaultron' })
++      .find((a) => a.id === LASER_GUN);
++    expect(restoredCard.damage, 'после загрузки — с модом').toBe(4 + 1);
++  });
++});
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 42e8810..2968127 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -829,13 +829,48 @@ export function attacksFromSlot(slot, options = {}) {
+   }
+ 
+   // Установленное в конечность оружие (апгрейд): своя карточка на каждый id.
++  // Моды — из записи оружия (appliedMods приоритетнее modIds, семантика 294):
++  // записанные установленные моды должны попадать на карточку.
+   for (const installed of state.installedWeapons) {
+-    push(installed.id, 'installed', installed.modIds);
++    push(installed.id, 'installed', toModIds(installed));
+   }
+ 
+   return result;
+ }
+ 
++/**
++ * Записать моды на оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head'
++ * из комплекта — живёт в limb.builtinWeapons, не в ладони).
++ *
++ * Возвращает новую карту слотов с обновлённой записью оружия (appliedMods +
++ * modIds) или null, если в слоте нет конечности с таким оружием — вызывающий
++ * код тогда пробует следующие ветки применения.
++ *
++ * @param {object} slots - карта слотов (как в хранилище)
++ * @param {string} slotKey - слот конечности
++ * @param {string} weaponId - id установленного оружия
++ * @param {object} appliedMods - { [slot]: modId } из окна модификации
++ * @returns {object|null}
++ */
++export function setInstalledWeaponMods(slots, slotKey, weaponId, appliedMods) {
++  const slotData = slots?.[slotKey];
++  const limb = slotData?.limb;
++  const list = Array.isArray(limb?.builtinWeapons) ? limb.builtinWeapons : null;
++  if (!list) return null;
++  const index = list.findIndex((w) => (w?.weaponId ?? w?.id) === weaponId || w?.id === weaponId);
++  if (index === -1) return null;
++  const nextList = [...list];
++  nextList[index] = {
++    ...list[index],
++    appliedMods: appliedMods || {},
++    modIds: toModIds({ appliedMods }),
++  };
++  return {
++    ...slots,
++    [slotKey]: { ...slotData, limb: { ...limb, builtinWeapons: nextList } },
++  };
++}
++
+ // ---------------------------------------------------------------------------
+ // Сбор атак со всех слотов
+ // ---------------------------------------------------------------------------
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 94c0f18..cbc0982 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -18,7 +18,7 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
+ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
+ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+-import { normalizeSlot } from '../../../../domain/robotSlots';
++import { normalizeSlot, setInstalledWeaponMods } from '../../../../domain/robotSlots';
+ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+ import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
+@@ -981,6 +981,22 @@ const WeaponsAndArmorScreen = () => {
+       return;
+     }
+ 
++    // Оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head' из комплекта):
++    // живёт внутри конечности, не в ладони и не в инвентаре — моды пишутся
++    // в его запись (appliedMods), карточка и сейв читают её же.
++    if (selectedWeaponForModification?.sourceSlot && selectedWeaponForModification.isBuiltin) {
++      const installedNext = setInstalledWeaponMods(
++        equippedRobotSlots,
++        selectedWeaponForModification.sourceSlot,
++        selectedWeaponForModification.weaponId || selectedWeaponForModification.id,
++        modifiedWeapon?.appliedMods || {},
++      );
++      if (installedNext) {
++        setEquippedRobotSlots(installedNext);
++        return;
++      }
++    }
++
+     if (itemId) {
+       const patch = weaponModPatchToStore(modifiedWeapon);
+       debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -5,1 +5,23 @@
++## Роботы — Моды на оружие, установленное в конечность (патч 305)
++
++Репорт владельца: лазер-ган из комплекта «assaultron_us_military»
++(installTo: 'arm' — оружие является частью руки, ладонь свободна)
++не принимал моды. Оконко установки модов на оружие открывалось, выбор
++проходил — но мод не сохранялся: применяющий код умел писать моды только
++в ладонь и в инвентарь, а установленное в конечность оружие живёт внутри
++самой конечности.
++
++- моды установленного оружия пишутся в его запись внутри конечности
++  (и для руки, и для головы — оба вида установки из комплекта);
++- карточка оружия читает моды из записи — урон и имя считаются с модом;
++- запись с модами переживает сохранение и загрузку (формат сейва не
++  менялся — моды установленного оружия в нём уже были предусмотрены);
++- патч 304 закрыл соседний случай (оружие, зажатое в ладони); этот закрывает
++  установленные — теперь оба способа ношения принимают моды.
++
++Заперто проверками в `__tests__/robot/robot-slot-model.test.js`:
++карточка читает моды из записи; запись-функция обновляет только нужную
++запись, исходная карта не тронута; сейв-цикл сохраняет мод. Сюит 833/833,
++tsc чист.
++
+ ## Роботы — Оружие в ладони получает карточку (патч 304)
+ 
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -5,1 +5,25 @@
++## Robots — Mods for weapons installed into a limb (patch 305)
++
++Owner's report: the laser gun from the "assaultron_us_military" kit
++(installTo: 'arm' — the weapon is part of the arm, the palm stays free)
++would not accept mods. The mod-install dialog opened, the selection went
++through — but the mod never stuck: the apply logic could only write mods
++to the palm or the inventory, while a weapon installed into a limb lives
++inside the limb itself.
++
++- mods for installed weapons are now written into the weapon's entry
++  inside the limb (both arm and head installs from kits);
++- the weapon card reads mods from that entry — damage and name include
++  the mod;
++- the entry with mods survives save and load (the save format did not
++  change — mods for installed weapons were already provided for there);
++- patch 304 closed the neighbouring case (a weapon held in the palm);
++  this one closes installed weapons — both carrying styles now accept
++  mods.
++
++Locked by checks in `__tests__/robot/robot-slot-model.test.js`: the card
++reads mods from the entry; the write function updates only the target
++entry and leaves the original map untouched; the save cycle keeps the
++mod. Suite 833/833, tsc clean.
++
+ ## Robots — Weapons held in a robot palm get their card (patch 304)
+ 
+PATCH_305_EOF

@@ -1,0 +1,256 @@
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index 711b939..a3cce4f 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -23,6 +23,7 @@ import enWeaponMods from '../../modules/fallout/i18n/en-EN/data/equipment/robot/
+ import ruRobotWeapons from '../../modules/fallout/i18n/ru-RU/data/equipment/robot/weapons.json';
+ import enRobotWeapons from '../../modules/fallout/i18n/en-EN/data/equipment/robot/weapons.json';
+ import robotWeaponsData from '../../modules/fallout/data/equipment/robot/weapons.json';
++import { getRobotLimbCatalog } from '../../domain/registry';
+ 
+ const LASER_ID = 'robot_weapon_assaultron_head_laser';
+ 
+@@ -59,12 +60,23 @@ describe('уникальные моды Головного лазера Штур
+     expect(mod, `нет мода ${modId(suffix)}`).toBeTruthy();
+     expect(mod.damageModifier).toEqual({ op: '+', value: damage });
+     expect(mod.ammoPerAttack).toBe(ammoPerAttack);
+-    expect(mod.weightModifier).toEqual({ op: '+', value: weight });
+-    expect(mod.costModifier).toEqual({ op: '+', value: cost });
++    // Плоские аддитивные cost/weight — конвенция конвейера applyWeaponMods
++    // (domain/enrichItem.js: weight += mod.weight; cost += mod.cost).
++    expect(mod.weight).toBe(weight);
++    expect(mod.cost).toBe(cost);
+     expect(mod.perk1).toBe('Robotics Expert 1');
+     expect(mod.perk2).toBe(perk2);
+   });
+ 
++  it('реестр знает: пул weaponMods содержит конденсаторы, слоты и список — на месте', () => {
++    const catalog = getRobotLimbCatalog();
++    for (const mod of robotWeaponMods) {
++      expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
++    }
++    expect(catalog.robotWeaponMods).toEqual(robotWeaponMods);
++    expect(catalog.robotWeaponModSlots).toEqual(robotWeaponModSlots);
++  });
++
+   it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {
+     const slots = robotWeaponModSlots[LASER_ID];
+     expect(Object.keys(slots)).toEqual(['Capacitor']);
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 078503a..7f3cac9 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -35,7 +35,7 @@
+   поставке, без единой правки движка) → 286–287 (экран песочницы, только
+   разработка) → 288 (экран удалён по слову владельца: сеттинг виртуальный,
+   подключать не планируется; декларация и тест остаются) — сданы;
+-  следующий — 291+ (МК-3: каскад в хранилище, смерть 24 ручных пересчётов,
++  следующий — 292+ (МК-3: каскад в хранилище, смерть 24 ручных пересчётов,
+   Fallout-формулы в модуль).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index 6df097c..49e5bfe 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -170,7 +170,7 @@ TS — язык контракта и движка; сеттинг — живо
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+ 282 семантика процентов → 283 фазы модификаторов → 284 режим округления →
+-285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран (__DEV__, удалён патчем 288) → 289 порядок SPECIAL (канон правил) → 290 моды Головного лазера (данные) → 291+ реализация и переезд Fallout-формул в модуль →
++285 тестовый сеттинг (декларация, без правок движка) → 286 мини-экран (__DEV__, удалён патчем 288) → 289 порядок SPECIAL (канон правил) → 290 моды Головного лазера (данные) → 291 реестр и конвенция полей → 292+ реализация и переезд Fallout-формул в модуль →
+ М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4149139..86674f5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
++
++> Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.
++
++- `domain/registry.js` (the engine's single data-reading point) now imports `robot/weapon_mods.json` and `robot/weapon_mod_slots.json`: the robot catalog's `weaponMods` pool includes the capacitors (save restoration via `domain/enrichItem.js` finds them by id), plus clean keys `robotWeaponMods` and `robotWeaponModSlots` for the future install screen.
++- The mod field shape now follows the `applyWeaponMods` pipeline convention: flat additive `cost`/`weight` instead of modifier objects (the pipeline adds: `cost += mod.cost`, `weight += mod.weight` — exactly the table's «+4»/«+1»). `ammoPerAttack` stays: the rules' semantics «N shots per attack» is per attack, not per shot; its consumer will arrive with the install screen.
++- Who connects the mods: stat restoration is the live `enrichItem` pipeline (the save stores mod ids); installation for humans is `WeaponModificationModal` (db/catalogSource → catalog); for robot weapons there is no install screen per the owner's word («data only»), the data and registry are ready.
++- The fuse gained registry checks (12 checks total).
++
++---
++
+ ## Data — Unique mods for the Assaultron Head Laser (patch 290)
+ 
+ > Owner's word (2026-09-21): «unique mods for the Assaultron Head Laser — in Russian exactly „Головной лазер“, not „Лазер головы“; the English name stays as is. It is a robot weapon; the mods fit only `robot_weapon_assaultron_head_laser` and live separately from the weapon. Data only; there is no robot weapon mods file — create one by analogy with human weapons».
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2d94af2..9a5e1e8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## Данные — Реестр узнал о модах оружия роботов; форма полей — по конвенции конвейера (патч 291)
++
++> Вопрос владельца (2026-09-21): «а реестр о новых данных знает? Кто и как будет подключать моды к оружию?» — Нет, не знал; вопрос вскрыл дыру доставки 290.
++
++- `domain/registry.js` (единая точка чтения данных движка) теперь импортирует `robot/weapon_mods.json` и `robot/weapon_mod_slots.json`: пул `weaponMods` робо-каталога включает конденсаторы (восстановление из сейва через `domain/enrichItem.js` находит их по id), плюс чистые ключи `robotWeaponMods` и `robotWeaponModSlots` для будущего экрана установки.
++- Форма полей модов приведена к конвенции конвейера `applyWeaponMods`: плоские аддитивные `cost`/`weight` вместо объектов-модификаторов (конвейер складывает: `cost += mod.cost`, `weight += mod.weight` — ровно «+4»/«+1» из таблицы). `ammoPerAttack` оставлен: семантика правил «N зарядов за атаку» — от атаки, не от выстрела; потребитель появится вместе с экраном установки.
++- Кто подключает моды: восстановление статов — живой конвейер `enrichItem` (сейв хранит id модов); установка — у людей `WeaponModificationModal` (db/catalogSource → каталог), для оружия роботов экрана установки нет по слову владельца («оперировать только данными»), данные и реестр готовы.
++- Предохранитель дополнен проверкой реестра (12 проверок всего).
++
++---
++
+ ## Данные — Уникальные моды Головного лазера Штурмотрона (патч 290)
+ 
+ > Слово владельца (2026-09-21): «уникальные моды для Головного лазера Штурмотрона — именно „Головной лазер“, не „Лазер головы“; английское название не меняется. Это оружие роботов, моды подходят только к `robot_weapon_assaultron_head_laser` и живут отдельно от оружия. Оперировать только данными; файла модов для оружия роботов нет — создать по аналогии с оружием людей».
+diff --git a/domain/registry.js b/domain/registry.js
+index 433e444..4445176 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -17,6 +17,8 @@ import robotWeaponsJson from '../modules/fallout/data/equipment/robot/weapons.js
+ import robotArmorJson from '../modules/fallout/data/equipment/robot/armor.json';
+ import robotArmorPlatingJson from '../modules/fallout/data/equipment/robot/armor_plating.json';
+ import robotFramesJson from '../modules/fallout/data/equipment/robot/frames.json';
++import robotWeaponModsJson from '../modules/fallout/data/equipment/robot/weapon_mods.json';
++import robotWeaponModSlotsJson from '../modules/fallout/data/equipment/robot/weapon_mod_slots.json';
+ 
+ import moduleOrigins from '../modules/fallout/data/origins/origins.json';
+ import moduleFitProfiles from '../modules/fallout/data/origins/fitProfiles.json';
+@@ -144,7 +146,14 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
+   generalWeapons: moduleWeapons,
+   // Моды оружия: сейв хранит id установленных модов, характеристики
+   // восстанавливаются применением модов к базе (domain/enrichItem.js).
+-  weaponMods: moduleWeaponMods,
++  // Пул включает и моды оружия роботов (290): уникальные конденсаторы
++  // Головного лазера Штурмотрона живут в robot/weapon_mods.json и
++  // восстанавливаются тем же конвейером.
++  weaponMods: [...moduleWeaponMods, ...robotWeaponModsJson],
++  // Моды оружия роботов (290) отдельным списком и слоты для них: будущий
++  // экран установки читает «какие моды предлагать» отсюда, а не из пула.
++  robotWeaponMods: robotWeaponModsJson,
++  robotWeaponModSlots: robotWeaponModSlotsJson,
+   // Слои защиты плоским списком; принадлежность слою — в поле layer.
+   armorLayers: [
+     ...(robotArmorJson.armor || []),
+diff --git a/modules/fallout/data/equipment/robot/weapon_mods.json b/modules/fallout/data/equipment/robot/weapon_mods.json
+index ec9077f..1d69144 100644
+--- a/modules/fallout/data/equipment/robot/weapon_mods.json
++++ b/modules/fallout/data/equipment/robot/weapon_mods.json
+@@ -8,14 +8,6 @@
+     "perk1": "Robotics Expert 1",
+     "perk2": "",
+     "skill": "Science",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 4
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 0
+-    },
+     "applies_to_ids": [
+       "robot_weapon_assaultron_head_laser"
+     ],
+@@ -23,9 +15,11 @@
+       "op": "+",
+       "value": 1
+     },
+-    "ammoPerAttack": 3,
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "cost": 4,
++    "weight": 0,
++    "ammoPerAttack": 3
+   },
+   {
+     "modType": "weapon",
+@@ -36,14 +30,6 @@
+     "perk1": "Robotics Expert 1",
+     "perk2": "Science! 1",
+     "skill": "Science",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 8
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 1
+-    },
+     "applies_to_ids": [
+       "robot_weapon_assaultron_head_laser"
+     ],
+@@ -51,9 +37,11 @@
+       "op": "+",
+       "value": 2
+     },
+-    "ammoPerAttack": 4,
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "cost": 8,
++    "weight": 1,
++    "ammoPerAttack": 4
+   },
+   {
+     "modType": "weapon",
+@@ -64,14 +52,6 @@
+     "perk1": "Robotics Expert 1",
+     "perk2": "Science! 2",
+     "skill": "Science",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 12
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 1
+-    },
+     "applies_to_ids": [
+       "robot_weapon_assaultron_head_laser"
+     ],
+@@ -79,9 +59,11 @@
+       "op": "+",
+       "value": 3
+     },
+-    "ammoPerAttack": 5,
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "cost": 12,
++    "weight": 1,
++    "ammoPerAttack": 5
+   },
+   {
+     "modType": "weapon",
+@@ -92,14 +74,6 @@
+     "perk1": "Robotics Expert 1",
+     "perk2": "Science! 3",
+     "skill": "Science",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 16
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 2
+-    },
+     "applies_to_ids": [
+       "robot_weapon_assaultron_head_laser"
+     ],
+@@ -107,8 +81,10 @@
+       "op": "+",
+       "value": 4
+     },
+-    "ammoPerAttack": 6,
+     "effectChanges": [],
+-    "qualityChanges": []
++    "qualityChanges": [],
++    "cost": 16,
++    "weight": 2,
++    "ammoPerAttack": 6
+   }
+ ]

@@ -1,0 +1,522 @@
+diff --git a/__tests__/engine/derivation-contract.test.js b/__tests__/engine/derivation-contract.test.js
+index 2e51b8d..a940f26 100644
+--- a/__tests__/engine/derivation-contract.test.js
++++ b/__tests__/engine/derivation-contract.test.js
+@@ -1,4 +1,4 @@
+-// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–283).
++// КОНТРАКТ ВЫВОДИМОСТИ — приёмочный тест МК-1 (патчи 281–284).
+ //
+ // КРИТЕРИЙ УСПЕХА (карта каскада §8, слово владельца): мини-сеттинг
+ // описывается ДЕКЛАРАЦИЕЙ без правок движка — 5 атрибутов, 7 навыков,
+@@ -370,6 +370,135 @@ describe('МК-1: Ярость ботаника — порог смещаетс
+   });
+ });
+ 
++// --- округление: направление диктует сеттинг (слово владельца, 284) ---------
++
++describe('МК-1: округление — направление диктует сеттинг', () => {
++  // «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может
++  //  диктовать, в какую сторону должно быть округление. И может быть и 32
++  //  и 33. И например при 32.01 правило будет заставлять округлить в большую
++  //  или меньшую сторону до целого.»
++  const roundSetting = () => ({
++    id: 'round',
++    parameters: [{ id: 'round.attr.str', kind: 'number', label: 'СИЛ' }],
++    derived: [
++      {
++        id: 'round.derived.hpMath',
++        kind: 'max',
++        deps: ['round.attr.str'],
++        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
++        description: 'ОЗ, округление по умолчанию (математическое)',
++      },
++      {
++        id: 'round.derived.hpDown',
++        kind: 'max',
++        deps: ['round.attr.str'],
++        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
++        description: 'ОЗ, округление в меньшую',
++        rounding: 'down',
++      },
++      {
++        id: 'round.derived.hpUp',
++        kind: 'max',
++        deps: ['round.attr.str'],
++        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
++        description: 'ОЗ, округление в большую',
++        rounding: 'up',
++      },
++      {
++        id: 'round.derived.hpExact',
++        kind: 'max',
++        deps: ['round.attr.str'],
++        compute: (ctx) => 10 + ctx.values['round.attr.str'] * 2,
++        description: 'ОЗ, без округления',
++        rounding: 'none',
++      },
++      {
++        id: 'round.derived.penny',
++        kind: 'derived',
++        deps: ['round.attr.str'],
++        compute: () => 32.01,
++        description: 'значение 32.01 — правило решает, куда округлить',
++        rounding: 'up',
++      },
++      {
++        id: 'round.derived.pennyDown',
++        kind: 'derived',
++        deps: ['round.attr.str'],
++        compute: () => 32.01,
++        description: 'значение 32.01 — вниз',
++        rounding: 'down',
++      },
++    ],
++  });
++
++  const registry = createDerivationRegistry();
++  registry.register(roundSetting());
++
++  const modifiers = {
++    'round.derived.hpMath': [{ source: 'spell', operation: '%', value: 15 }],
++    'round.derived.hpDown': [{ source: 'spell', operation: '%', value: 15 }],
++    'round.derived.hpUp': [{ source: 'spell', operation: '%', value: 15 }],
++    'round.derived.hpExact': [{ source: 'spell', operation: '%', value: 15 }],
++  };
++
++  it('(10+18)×1.15 = 32.2: математическое → 32, в меньшую → 32, в большую → 33', () => {
++    const { values } = registry.evaluate({ 'round.attr.str': 9 }, modifiers);
++    expect(values['round.derived.hpMath']).toBe(32); // Math.round(32.2)
++    expect(values['round.derived.hpDown']).toBe(32); // пол
++    expect(values['round.derived.hpUp']).toBe(33); // потолок
++    expect(values['round.derived.hpExact']).toBeCloseTo(32.2, 10); // не округляем
++  });
++
++  it('при 32.01 правило заставляет: в большую → 33, в меньшую → 32', () => {
++    const { values } = registry.evaluate({ 'round.attr.str': 9 });
++    expect(values['round.derived.penny']).toBe(33);
++    expect(values['round.derived.pennyDown']).toBe(32);
++  });
++
++  it('applyPercent тоже подчиняется режиму: 26×1.15 = 29.9 → вниз 29, math 30', () => {
++    expect(applyPercent(26, [15], 'down')).toBe(29);
++    expect(applyPercent(26, [15])).toBe(30);
++    expect(applyPercent(26, [15], 'up')).toBe(30);
++  });
++
++  it('фаза может округлять своим режимом, не как итог', () => {
++    // конвейер: 4 ×1.1 = 4.4 — фаза округляет вверх → 5; итог не дробится
++    const up = applyPipeline(
++      4,
++      [{ source: 'trait', operation: '%', value: 10 }],
++      [{ id: 'percent', round: 'up' }],
++      emptyCtx,
++    );
++    expect(up).toBe(5);
++    // та же фаза вниз → 4
++    const down = applyPipeline(
++      4,
++      [{ source: 'trait', operation: '%', value: 10 }],
++      [{ id: 'percent', round: 'down' }],
++      emptyCtx,
++    );
++    expect(down).toBe(4);
++  });
++
++  it('неизвестный режим округления отклоняется при регистрации', () => {
++    const bad = createDerivationRegistry();
++    expect(() =>
++      bad.register({
++        id: 'round',
++        parameters: [{ id: 'round.attr.str', kind: 'number', label: 'СИЛ', rounding: 'кверх' }],
++      }),
++    ).toThrow(/режим округления/);
++    expect(() =>
++      bad.register({
++        id: 'round',
++        parameters: [
++          { id: 'round.attr.str', kind: 'number', label: 'СИЛ', modifierPhases: [{ id: 'x', round: 'боком' }] },
++        ],
++      }),
++    ).toThrow(/режим округления/);
++  });
++});
++
+ // --- реестр: валидация -------------------------------------------------------
+ 
+ describe('МК-1: реестр — валидация деклараций', () => {
+diff --git a/docs/architecture/derivation-contract.md b/docs/architecture/derivation-contract.md
+index 23b3895..8d40eb6 100644
+--- a/docs/architecture/derivation-contract.md
++++ b/docs/architecture/derivation-contract.md
+@@ -1,9 +1,9 @@
+-# Контракт выводимости (МК-1, патчи 281–283)
++# Контракт выводимости (МК-1, патчи 281–284)
+ 
+ > Статус: **реализован, изолирован**. Контракт и реестр живут в `src/engine/`,
+ > работают и покрыты тестом `__tests__/engine/derivation-contract.test.js`,
+ > но в работающую программу пока НЕ подключены — ни один экран, действие или
+-> экран-оркестратор их не импортирует. Подключение — МК-3 (патчи 285+).
++> экран-оркестратор их не импортирует. Подключение — МК-3 (патчи 286+).
+ > Это страховка: контракт приживается без риска для Fallout-модуля.
+ 
+ ## Зачем
+@@ -54,9 +54,13 @@
+ - **Условия.** Модификатор может нести `when(value, ctx)` — применяется,
+   только если условие выполнено на входе фазы («перк действует, если
+   скорострельность ≤ N»).
+-- **Округление.** Математическое, один раз в конце конвейера; фаза может
+-  объявить промежуточное округление (`{ id, round: true }`) — для правил,
+-  которые округляют на своём шаге.
++- **Округление.** Режим тоже диктует сеттинг (слово владельца, патч 284):
++  `'math'` — математическое (0.5 вверх, по умолчанию), `'up'` — всегда в
++  большую (32.01 → 33), `'down'` — всегда в меньшую (32.99 → 32), `'none'` —
++  не округлять (32.2 остаётся 32.2). Объявляется на значении (`rounding`);
++  фаза может округлить на своём шаге (`round: true` — тем же режимом,
++  `round: 'up'` — своим). `(10+18)×1.15 = 32.2` может стать и 32, и 33,
++  и остаться собой — по правилу.
+ - **Модификатор в необъявленную фазу** — ошибка с перечислением объявленных
+   фаз, не молчаливый пропуск.
+ 
+@@ -114,8 +118,8 @@
+ 
+ ## Что дальше (по плану v3)
+ 
+-- **284 (МК-2)** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
++- **285 (МК-2)** — тестовый сеттинг как настоящий модуль `modules/test-setting/`
+   на этом контракте (не в тесте, а в поставке) + проводка экранов-песочниц.
+-- **285+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
++- **286+ (МК-3)** — подключение реестра к стору: смерть 24 ручных вызовов
+   пересчёта, Fallout-формулы переезжают из движка в `modules/fallout`,
+   починка границы движок/сеттинг.
+diff --git a/docs/architecture/engine-charter.md b/docs/architecture/engine-charter.md
+index 52d3856..5a08969 100644
+--- a/docs/architecture/engine-charter.md
++++ b/docs/architecture/engine-charter.md
+@@ -31,8 +31,8 @@
+   вторые сеттинги планируются, тестовый мини-сеттинг — второй клиент контракта.
+   Прогресс серии: 279 (карта каскада) → 280 (TS-предохранители) → 281 (контракт
+   выводимости, изолирован) → 282 (семантика процентов) → 283 (фазы
+-  модификаторов: порядок объявляют правила, «хрен угадаешь» → словарь) —
+-  сданы; следующий — 284 (тестовый сеттинг по спеке).
++  модификаторов: порядок объявляют правила) → 284 (режим округления:
++  направление диктует сеттинг) — сданы; следующий — 285 (тестовый сеттинг).
+   TypeScript — попутно: контракт и движок в TS, сеттинг — живой JS.
+   Движковые экраны: Инвентарь первым, HomeScreen вторым. Миниатюры HomeScreen —
+   отдельная фича, с конверсией не смешивать. Цель — ловить ошибки до старта
+diff --git a/docs/architecture/typescript-migration-plan.md b/docs/architecture/typescript-migration-plan.md
+index 1563721..a763d8b 100644
+--- a/docs/architecture/typescript-migration-plan.md
++++ b/docs/architecture/typescript-migration-plan.md
+@@ -82,9 +82,12 @@
+ 283  МК-1  Фазы модификаторов по слову владельца: порядок объявляют
+            правила (якоря-фазы, условия when, множитель ×, пофазное
+            округление); «хрен угадаешь» → словарь, а не догма     (1)
+-284+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
++284  МК-1  Режим округления по слову владельца: сеттинг диктует
++           направление (math/up/down/none) — «(10+18)×1.15 может
++           стать и 32, и 33»; на значении и на фазе            (1)
++285+ МК-2  Тестовый сеттинг по спеке владельца (§4): пакет-регистрация,
+            мини-экран-кирпич; критерий — без правок движка    (2–3)
+-285+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
++286+ МК-3  Реализация движка каскада (путь А по умолчанию: вывод-при-чтении
+            + реестр реакций; Б — только если А не вытянет):
+            − Fallout-формулы переезжают из движка в модуль (JS),
+              заодно чинится нарушение границы (resolvers → каталог СБ)
+@@ -156,7 +159,8 @@ TS — язык контракта и движка; сеттинг — живо
+ 
+ 279 карта каскада (готова) → 280 предохранители TS → 281 контракт →
+ 282 семантика процентов → 283 фазы модификаторов (порядок объявляют
+-правила) → 284 тестовый сеттинг → 285+ реализация и переезд
++правила) → 284 режим округления (направление диктует сеттинг) →
++285 тестовый сеттинг → 286+ реализация и переезд
+ Fallout-формул в модуль → М3–М8 конверсия и экраны.
+ 
+ Реактивное ядро не меняем, пока факты (карта реакций) не скажут обратное.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 42aa98c..e91ae85 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## Series pivot — Rounding mode: the setting dictates the direction (patch 284)
++
++> Owner's word (2026-09-18): «(10+18)×1.15 = 32.2 → 32 is not a mandatory state either. The setting can dictate which way the rounding goes. It can be 32 or 33. And for example at 32.01 a rule may force rounding up or down to a whole number.»
++
++- The rounding mode is part of the vocabulary, not an engine constant. Declared per value: `math` (mathematical, 0.5 up — the default), `up` (always up: 32.01 → 33), `down` (always down: 32.99 → 32), `none` (no rounding — 32.2 stays 32.2).
++- A pipeline phase can round at its own step with the same mode (`round: true`) or its own (`round: 'up'`) — a rule whose step and total round differently is expressible.
++- The owner's examples are in the tests verbatim: (10+18)×1.15 = 32.2 yields 32 (math), 32 (down), 33 (up) and 32.2 (none) on the same base; 32.01 becomes 33 or 32 per the rule. The pure applyPercent takes the mode too: 26×1.15 = 29.9 → 29 down, 30 mathematically.
++- An unknown mode is a registration error listing the available ones. The contract test grew to 36 checks; the contract remains isolated — nothing changed in the running program.
++
++---
++
+ ## Series pivot — Modifier phases: the rules declare the order (patch 283)
+ 
+ > Owner's word (2026-09-18): «This is an RPG program. There are rules, and percentages are calculated the way the rules say. [...] The base fire rate depends on installed mods, the trait's % applies to that, and the perk doubles afterwards. But there can also be a case where the trait boosts the final rate instead of the base one [...] And it might only apply if the fire rate is below or equal to a certain value. You can't guess that.»
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7331aa2..85e5af1 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## Разворот серии — Режим округления: направление диктует сеттинг (патч 284)
++
++> Слово владельца (2026-09-18): «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может диктовать, в какую сторону должно быть округление. И может быть и 32 и 33. И например при 32.01 правило будет заставлять округлить в большую или меньшую сторону до целого.»
++
++- Режим округления — часть словаря, а не константа движка. Объявляется на значении: `math` (математическое, 0.5 вверх — по умолчанию), `up` (всегда в большую: 32.01 → 33), `down` (всегда в меньшую: 32.99 → 32), `none` (не округлять — 32.2 остаётся 32.2).
++- Фаза конвейера может округлять на своём шаге тем же режимом (`round: true`) или собственным (`round: 'up'`) — правило, у которого шаг и итог округляются по-разному, выразимо.
++- Примеры владельца — в тестах дословно: (10+18)×1.15 = 32.2 даёт 32 (математическое), 32 (вниз), 33 (вверх) и 32.2 (без округления) на одной и той же базе; 32.01 по правилу становится 33 или 32. Чистая функция applyPercent тоже принимает режим: 26×1.15 = 29.9 → вниз 29, математически 30.
++- Неизвестный режим — ошибка регистрации с перечислением доступных. Тест контракта вырос до 36 проверок; контракт по-прежнему изолирован, в работающей программе ничего не изменилось.
++
++---
++
+ ## Разворот серии — Фазы модификаторов: порядок объявляют правила (патч 283)
+ 
+ > Слово владельца (2026-09-18): «Это программа rpg игр. Там есть правила, и как в правилах напишут, так % и будут рассчитываться. [...] Базовая скорострельность будет зависеть от установленных модов, % от черты будет влиять на неё, а перк уже после удваивать. Но может быть и случай, когда черта вместо базовой скорострельности будет увеличивать итоговую [...] А может вообще примениться, если скорострельность будет меньше или равна определённому значению. И это хрен угадаешь.»
+diff --git a/src/engine/contracts/derived.ts b/src/engine/contracts/derived.ts
+index cff9d8d..357e1e2 100644
+--- a/src/engine/contracts/derived.ts
++++ b/src/engine/contracts/derived.ts
+@@ -6,7 +6,7 @@
+ // МК-3 производные будут вычисляться каскадом реестра при любом изменении
+ // входа. Контракт ниже — то, что сеттинг объявляет, а движок исполняет.
+ 
+-import type { DerivationContext, ModifierPhase, ParameterModifier } from './parameter';
++import type { DerivationContext, ModifierPhase, ParameterModifier, RoundingMode } from './parameter';
+ 
+ // Контекст вычислений живёт в parameter.ts (общий для условий и формул);
+ // реэкспортируем, чтобы потребитель брал всё из бочки contracts.
+@@ -28,6 +28,8 @@ export interface DerivedDefinition {
+    *  Отсутствует — дефолт ['add', 'percent', 'mult']. Порядок объявляет
+    *  правило сеттинга (слово владельца: «как в правилах напишут»). */
+   modifierPhases?: readonly ModifierPhase[];
++  /** Режим округления итога — диктует сеттинг (патч 284). По умолчанию 'math'. */
++  rounding?: RoundingMode;
+ }
+ 
+ /** Модификатор, привязанный к параметру-цели (для реестра). */
+diff --git a/src/engine/contracts/index.ts b/src/engine/contracts/index.ts
+index 69e6f16..359de4d 100644
+--- a/src/engine/contracts/index.ts
++++ b/src/engine/contracts/index.ts
+@@ -25,6 +25,7 @@ export {
+   DEFAULT_PHASES,
+   defaultPhaseFor,
+   resolvePhases,
++  roundValue,
+ } from './parameter';
+ export type {
+   DerivationContext as ModifierContext,
+@@ -34,6 +35,7 @@ export type {
+   ParameterDefinition,
+   ParameterModifier,
+   ParameterValueKind,
++  RoundingMode,
+ } from './parameter';
+ export {
+   checkRequirements,
+diff --git a/src/engine/contracts/parameter.ts b/src/engine/contracts/parameter.ts
+index 7f408b4..9af8e21 100644
+--- a/src/engine/contracts/parameter.ts
++++ b/src/engine/contracts/parameter.ts
+@@ -50,8 +50,30 @@ export interface ParameterModifier {
+ /** Kind значения параметра. v1 — только 'number'. */
+ export type ParameterValueKind = 'number' | 'track' | 'list';
+ 
+-/** Фаза конвейера: имя ИЛИ объект с промежуточным округлением. */
+-export type ModifierPhase = string | { id: string; round?: boolean };
++/** Фаза конвейера: имя ИЛИ объект с промежуточным округлением.
++ *  round: true — округлить режимом, объявленным для значения; round: режим —
++ *  округлить именно так на выходе фазы (правило может округлять шаг иначе,
++ *  чем итог). */
++export type ModifierPhase = string | { id: string; round?: boolean | RoundingMode };
++
++/** Режим округления — диктует сеттинг (слово владельца, 2026-09-18):
++ *  «(10+18)×1.15 = 32.2 → 32 — тоже не обязательное состояние. Сеттинг может
++ *  диктовать, в какую сторону должно быть округление. И может быть и 32 и 33.
++ *  И например при 32.01 правило будет заставлять округлить в большую или
++ *  меньшую сторону до целого».
++ *  - 'math' — математическое (0.5 вверх), по умолчанию;
++ *  - 'up'   — всегда в большую сторону (потолок): 32.01 → 33;
++ *  - 'down' — всегда в меньшую сторону (пол): 32.99 → 32;
++ *  - 'none' — не округлять (значение остаётся дробным). */
++export type RoundingMode = 'math' | 'up' | 'down' | 'none';
++
++/** Округлить число в объявленном режиме. Чистая функция. */
++export const roundValue = (value: number, mode: RoundingMode): number => {
++  if (mode === 'up') return Math.ceil(value);
++  if (mode === 'down') return Math.floor(value);
++  if (mode === 'none') return value;
++  return Math.round(value);
++};
+ 
+ /** Объявление параметра. Значение живёт в состоянии; объявление — в сеттинге. */
+ export interface ParameterDefinition {
+@@ -65,6 +87,8 @@ export interface ParameterDefinition {
+   /** Конвейер модификаторов: фазы в порядке исполнения. Отсутствует — дефолт
+    *  ['add', 'percent', 'mult'] (аддитивы → суммарный процент → множители). */
+   modifierPhases?: readonly ModifierPhase[];
++  /** Режим округления итога — диктует сеттинг (патч 284). По умолчанию 'math'. */
++  rounding?: RoundingMode;
+ }
+ 
+ /** Модификаторы, сгруппированные по параметру. */
+@@ -80,11 +104,14 @@ export const defaultPhaseFor = (operation: ModifierOperation): string => {
+   return 'mult';
+ };
+ 
+-/** Разрешить объявление фаз в список { id, round? }. */
++/** Разрешить объявление фаз в список { id, round }. */
+ export const resolvePhases = (
+   phases: readonly ModifierPhase[],
+-): { id: string; round: boolean }[] =>
+-  phases.map((p) => (typeof p === 'string' ? { id: p, round: false } : { id: p.id, round: p.round === true }));
++): { id: string; round: boolean | RoundingMode }[] =>
++  phases.map((p) => {
++    if (typeof p === 'string') return { id: p, round: false as const };
++    return { id: p.id, round: p.round ?? false };
++  });
+ 
+ /**
+  * Исполнить ОДНУ фазу: условия проверяются на входе фазы, затем в фазе
+@@ -120,14 +147,16 @@ export const applyWithinPhase = (
+  * Исполнить КОНВЕЙЕР значения: база → фазы в объявленном порядке.
+  * Порядок фаз — это и есть якорь: где «+10% базовой», а где «+10% итоговой» —
+  * решает правило сеттинга (слово владельца: «как в правилах напишут»).
+- * Округление: математическое, в конце конвейера; фаза с round:true округляет
+- * и на своём выходе. Модификатор в необъявленную фазу — ошибка.
++ * Округление: режим тоже диктует сеттинг (final, по умолчанию 'math');
++ * фаза с round:true округляет тем же режимом, с round:<режим> — своим.
++ * Модификатор в необъявленную фазу — ошибка.
+  */
+ export const applyPipeline = (
+   base: number,
+   modifiers: readonly ParameterModifier[],
+   phases: readonly ModifierPhase[],
+   ctx: DerivationContext,
++  final: RoundingMode = 'math',
+ ): number => {
+   const declared = new Set(resolvePhases(phases).map((p) => p.id));
+   const byPhase = new Map<string, ParameterModifier[]>();
+@@ -144,9 +173,12 @@ export const applyPipeline = (
+   let value = base;
+   for (const phase of resolvePhases(phases)) {
+     value = applyWithinPhase(value, byPhase.get(phase.id) ?? [], ctx);
+-    if (phase.round) value = Math.round(value);
++    if (phase.round !== false) {
++      const mode: RoundingMode = phase.round === true ? final : phase.round;
++      value = roundValue(value, mode);
++    }
+   }
+-  return Math.round(value);
++  return roundValue(value, final);
+ };
+ 
+ /**
+@@ -155,10 +187,15 @@ export const applyPipeline = (
+  * атр1+атр2) × 1.15, округлённое математически до целого»; «+15% к защите
+  * от магии огня рассчитываются как −15% входящего урона от атаки со
+  * свойством стихии огня». Проценты суммируются и применяются к базе одним
+- * множителем, округление — одно, в конце. Чистая функция: база → итог.
++ * множителем. Режим округления — аргумент (по умолчанию математическое);
++ * с патча 284 сеттинг диктует и направление. Чистая функция: база → итог.
+  */
+-export const applyPercent = (base: number, percents: readonly number[]): number => {
+-  if (percents.length === 0) return base;
++export const applyPercent = (
++  base: number,
++  percents: readonly number[],
++  mode: RoundingMode = 'math',
++): number => {
++  if (percents.length === 0) return roundValue(base, mode);
+   const sum = percents.reduce((acc, p) => acc + p, 0);
+-  return Math.round(base * (1 + sum / 100));
++  return roundValue(base * (1 + sum / 100), mode);
+ };
+diff --git a/src/engine/derivations/registry.ts b/src/engine/derivations/registry.ts
+index 62ad4fc..17f7a3a 100644
+--- a/src/engine/derivations/registry.ts
++++ b/src/engine/derivations/registry.ts
+@@ -46,6 +46,7 @@ export interface DerivationRegistry {
+ }
+ 
+ const KNOWN_KINDS: ReadonlySet<string> = new Set(['derived', 'max', 'rankCeiling']);
++const ROUNDING_MODES: ReadonlySet<string> = new Set(['math', 'up', 'down', 'none']);
+ 
+ export const createDerivationRegistry = (): DerivationRegistry => {
+   const parameters = new Map<string, ParameterDefinition & { setting: string }>();
+@@ -65,18 +66,29 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+     }
+   };
+ 
+-  /** Фазы модификаторов: если объявлены — непустой список с уникальными id. */
+-  const validatePhases = (def: { id: string; modifierPhases?: unknown }) => {
++  /** Фазы модификаторов: если объявлены — непустой список с уникальными id;
++   *  round фазы — boolean или режим округления; rounding итога — режим. */
++  const validatePhases = (def: { id: string; modifierPhases?: unknown; rounding?: unknown }) => {
++    if (def.rounding !== undefined && !ROUNDING_MODES.has(def.rounding as string)) {
++      fail(`"${def.id}": неизвестный режим округления "${String(def.rounding)}" (доступны: math, up, down, none)`);
++    }
+     if (def.modifierPhases === undefined) return;
+     if (!Array.isArray(def.modifierPhases) || def.modifierPhases.length === 0) {
+       fail(`"${def.id}": modifierPhases, если объявлены, — непустой список фаз`);
+     }
+     const seen = new Set<string>();
+-    for (const phase of def.modifierPhases as Array<string | { id?: string }>) {
++    for (const phase of def.modifierPhases as Array<string | { id?: string; round?: unknown }>) {
+       const id: string = typeof phase === 'string' ? phase : (phase?.id ?? '');
+       if (id === '') {
+         fail(`"${def.id}": каждая фаза — строка или { id, round? }`);
+       }
++      if (typeof phase !== 'string') {
++        const round = phase.round;
++        const valid = round === undefined || round === true || round === false || ROUNDING_MODES.has(round as string);
++        if (!valid) {
++          fail(`"${def.id}": round фазы "${id}" — boolean или режим округления (math, up, down, none)`);
++        }
++      }
+       if (seen.has(id)) fail(`"${def.id}": фаза "${id}" объявлена дважды`);
+       seen.add(id);
+     }
+@@ -193,13 +205,20 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+       values: values as Readonly<Record<string, number>>,
+       modifiers,
+     };
+-    // Параметры: база из состояния → конвейер модификаторов (фазы — по объявлению).
+-    // Условия видят значения, вычисленные к их моменту (объявляйте deps честно).
++    // Параметры: база из состояния → конвейер модификаторов (фазы и режим
++    // округления — по объявлению). Условия видят значения, вычисленные
++    // к их моменту (объявляйте deps честно).
+     for (const [id, def] of parameters) {
+       const base = state[id];
+       if (base === undefined) continue; // параметр ещё не задан — каскад ждёт
+       try {
+-        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
++        values[id] = applyPipeline(
++          base,
++          modifiers[id] ?? [],
++          def.modifierPhases ?? DEFAULT_PHASES,
++          ctx,
++          def.rounding ?? 'math',
++        );
+       } catch (err) {
+         fail(`параметр "${id}" упал при вычислении: ${(err as Error).message}`);
+       }
+@@ -209,7 +228,13 @@ export const createDerivationRegistry = (): DerivationRegistry => {
+       const def = derived.get(id)!;
+       try {
+         const base = def.compute(ctx);
+-        values[id] = applyPipeline(base, modifiers[id] ?? [], def.modifierPhases ?? DEFAULT_PHASES, ctx);
++        values[id] = applyPipeline(
++          base,
++          modifiers[id] ?? [],
++          def.modifierPhases ?? DEFAULT_PHASES,
++          ctx,
++          def.rounding ?? 'math',
++        );
+       } catch (err) {
+         fail(`производное "${id}" упало при вычислении: ${(err as Error).message}`);
+       }
