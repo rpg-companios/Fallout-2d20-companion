@@ -21,6 +21,7 @@ import {
   catalogGetModsForWeaponSlot,
   catalogGetSlotsForWeapon,
   catalogGetWeaponModById,
+  catalogGetWeaponMods,
 } from '../../db/catalogSource';
 import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
 import { getRobotLimbCatalog } from '../../domain/registry';
@@ -141,6 +142,18 @@ describe('уникальные моды Головного лазера Штур
         equipmentCatalog.weaponMods.some((m) => m?.id === mod.id),
         `${mod.id} в пуле weaponMods экранного каталога`,
       ).toBe(true);
+    }
+  });
+
+  it('адаптер модалки установки: каждый мод в списке ровно один раз', () => {
+    // Знание «полный пул = людские + робо-моды» живёт в базовой сборке
+    // каталога (301). Адаптер не должен склеивать пулы повторно — иначе
+    // робо-моды приходят дважды.
+    const all = catalogGetWeaponMods();
+    const ids = all.map((m) => m.id);
+    expect(new Set(ids).size, 'дубликаты id в полном списке модов').toBe(ids.length);
+    for (const mod of robotWeaponMods) {
+      expect(ids.filter((id) => id === mod.id), `${mod.id} ровно один раз`).toHaveLength(1);
     }
   });
 
