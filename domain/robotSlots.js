@@ -788,10 +788,18 @@ export function attacksFromSlot(slot, options = {}) {
 
   if (state.heldWeaponId && canHold) {
     const held = resolveWeapon(catalog, state.heldWeaponId);
-    // Навес в ладони законен даже при handheld === false: это не ручное
-    // оружие человека, а оружие, крепящееся к руке (arm attachment).
-    const heldIsAttachment = isArmAttachment({ id: state.heldWeaponId }, catalog);
-    if (!held || held.handheld !== false || heldIsAttachment) {
+    // Правило карточек ладони (репорт владельца: «моды на лазер в руке не
+    // ставятся»): ладонь показывает ВСЁ, что в ней лежит — человеческое
+    // оружие, навес (arm attachment) и смонтированное оружие робота
+    // (handheld === false: Головной лазер в ладони руки робота — законная
+    // экипировка). Единственное исключение — собственная атака самой
+    // конечности (коготь/манипулятор в старом сейве мог лежать и в
+    // heldWeapon): её карточку даёт ветка builtin, дубль не нужен.
+    const ownAttackId = limb.itemCategory === 'weaponAsLimb'
+      ? (limb.attackId ?? null)
+      : (limb.builtinWeaponId ?? (limb.builtinManipulator ? limb.id : null));
+    const heldIsOwnAttack = held != null && held.id === ownAttackId;
+    if (!held || !heldIsOwnAttack) {
       push(held || { id: state.heldWeaponId }, 'held', state.heldWeaponMods);
     }
   }

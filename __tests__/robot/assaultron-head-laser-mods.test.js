@@ -23,11 +23,12 @@ import {
   catalogGetWeaponModById,
   catalogGetWeaponMods,
 } from '../../db/catalogSource';
-import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
+import { deserializeSlot, serializeSlot, toModIds, collectAttacks } from '../../domain/robotSlots';
 import { getRobotLimbCatalog } from '../../domain/registry';
 import { applyWeaponMods } from '../../domain/enrichItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
+import { mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
 const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
@@ -155,6 +156,54 @@ describe('уникальные моды Головного лазера Штур
     for (const mod of robotWeaponMods) {
       expect(ids.filter((id) => id === mod.id), `${mod.id} ровно один раз`).toHaveLength(1);
     }
+  });
+
+  it('лазер в ладони руки робота — карточка есть, мод считается, заряды видны (репорт владельца: «моды не ставятся»)', () => {
+    // До фикса оружие робота (handheld === false) в ладони выпадало из списка
+    // атак: карточки нет — ставить моды не на что, хотя экипировка в ладонь
+    // разрешена. Теперь карточка есть; проверяем всю цепочку: карточка →
+    // урон с модом → план списания зарядов (298) видит конденсатор.
+    const armLimb = SETTING.data.equipment.robot.limbs.find((l) => l.id === 'robot_arm_assaultron');
+    const slots = {
+      leftArm: {
+        limb: armLimb,
+        armor: null, plating: null, frame: null,
+        heldWeapon: {
+          id: LASER_ID,
+          weaponId: LASER_ID,
+          itemType: 'weapon',
+          sourceSlot: 'leftArm',
+          appliedMods: { Capacitor: modId('mk_iv') },
+        },
+      },
+    };
+    const attacks = collectAttacks(slots, { bodyPlan: 'assaultron' });
+    const laserCard = attacks.find((a) => a.id === LASER_ID);
+    expect(laserCard, 'карточка лазера в ладони').toBeTruthy();
+    expect(laserCard.sourceSlot).toBe('leftArm');
+    expect(laserCard.damage, 'урон базы + Mk IV').toBe(5 + 2);
+    expect(laserCard.modIds).toEqual([modId('mk_iv')]);
+    const plan = mechAmmoSpendForWeapon(laserCard, { available: 10 });
+    expect(
+      plan.asks.some((a) => a.source === 'ammoPerAttack' && a.max === 4),
+      'план списания видит 4 заряда за атаку (Mk IV)',
+    ).toBe(true);
+  });
+
+  it('собственная атака конечности в ладони не дублируется (старый сейв)', () => {
+    // Коготь — собственная атака руки штурмотрона; в старом сейве он мог
+    // лежать и в heldWeapon. Карточка когтя должна быть ОДНА (ветка builtin).
+    const armLimb = SETTING.data.equipment.robot.limbs.find((l) => l.id === 'robot_arm_assaultron');
+    const slots = {
+      leftArm: {
+        limb: armLimb,
+        armor: null, plating: null, frame: null,
+        heldWeapon: { id: 'robot_weapon_claw', weaponId: 'robot_weapon_claw', itemType: 'weapon' },
+      },
+    };
+    const attacks = collectAttacks(slots, { bodyPlan: 'assaultron' });
+    const clawCards = attacks.filter((a) => a.id === 'robot_weapon_claw');
+    expect(clawCards).toHaveLength(1);
   });
 
   it('карточка лазера с конденсатором: урон базы + мод (экранный путь, репродукция отчёта владельца)', () => {

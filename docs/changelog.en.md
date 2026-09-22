@@ -2,6 +2,47 @@
 
 ---
 
+## Robots — Weapons held in a robot palm get their card (patch 304)
+
+Owner's report: "mods won't install on the assaultron laser in the hand".
+Equipping into a robot palm is allowed (weight and two-handed checks
+apply), but the weapon produced no card in the attack list: robot-mounted
+weapons ("not hand-held") were skipped — there was nothing to attach
+mods to.
+
+- the palm now shows everything it holds: human weapons, arm
+  attachments, and robot-mounted weapons (the Head Laser);
+- the only exception is the limb's own attack (claw/manipulator in an
+  old save): the limb itself provides that card, no palm duplicate
+  (also closes a long-standing duplicate claw card);
+- the chain after the fix: card → damage with the capacitor
+  (base + mod) → the ammo-spend plan sees the capacitor → mods install
+  and survive the save.
+
+Locked by checks in `__tests__/robot/assaultron-head-laser-mods.test.js`
+(laser in palm: card, damage 7, 4 charges per attack; no claw duplicate).
+Suite 831/831, tsc clean.
+
+## Weapons & materials — patches 300–303 summary
+
+- **300:** translation for the "Mod spend per attack" spend source (the
+  `weapon.ammoSpend.source.ammoPerAttack` key was missing from both
+  dictionaries — the dialog showed the raw key).
+- **301:** the Head Laser capacitors counted in the install dialog and
+  in the ammo-spend plan, but not on the weapon card — the card damage
+  fell back to base (5 instead of 5+2 for Mk IV). The screen catalog's
+  mod pool now matches the registry: robot mods are part of the shared
+  pool.
+- **302:** the knowledge "full mod pool = human + robot" lived in two
+  places; after 301 the adapter's merge became redundant (robot mods
+  arrived twice). The merge now lives in one place.
+- **303:** materials file repair (report: "App Error: Cannot read
+  properties of undefined (reading 'map')"): the materials list was
+  written into the file twice, the app received "no materials", and
+  junk salvaging crashed. The duplicate removed.
+
+---
+
 ## Architecture — Ammo-spend formulas moved into the module (patch 298)
 
 Owner's rule: a formula bound to a specific weapon quality is a MODULE
