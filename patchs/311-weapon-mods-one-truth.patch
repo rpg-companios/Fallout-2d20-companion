@@ -13,7 +13,9 @@
 #   — мёртвая карта «робо-оружие наследует людские моды» удалена из кода:
 #     она указывала на номерные id, которых в данных нет, и никогда
 #     не срабатывала; механизм наследования — в данных (baseWeaponId),
-#     пары «робо-оружие → людское» — на решение владельца.
+#     пары «робо-оружие → людское» — на решение владельца;
+#   — осиротевший файл-перечень слотов робо-модов удаляется патчем
+#     (ручной шаг переиздания 306 больше не нужен).
 # Заперто 15 проверками в __tests__/robot/weapon-mods-one-truth.test.js.
 # Применять из корня репозитория: sh patchs/311-weapon-mods-one-truth.patch
 # или цепочкой: ./apply-patch.sh 311 (установщик — версии 309, бутстрап).
@@ -259,10 +261,10 @@ index 0602e65..5d1975a 100644
      ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
      qualities: (catalog.qualities || []).map(buildQualityRow),
 diff --git a/docs/changelog.en.md b/docs/changelog.en.md
-index 27f65d9..4c63e91 100644
+index 27f65d9..07333a9 100644
 --- a/docs/changelog.en.md
 +++ b/docs/changelog.en.md
-@@ -2,6 +2,38 @@
+@@ -2,6 +2,41 @@
  
  ---
  
@@ -293,6 +295,9 @@ index 27f65d9..4c63e91 100644
 +  inheritance mechanism moved into the data (a link field on the robot
 +  weapon record); the "robot weapon → human weapon" pairs are the
 +  owner's decision.
++- The orphaned robot mod-slot list file is removed: the knowledge of
++  "which mods fit which slots" lives in the mods' own descriptions
++  (reissue of 306 — the manual removal step is no longer needed).
 +- Locked by 15 checks in `__tests__/robot/weapon-mods-one-truth.test.js`
 +  (truth shape, write plans for all five storage places, the Mk III
 +  capacitor on the Head Laser: damage 5 → 6 and back, slim save shape,
@@ -302,10 +307,10 @@ index 27f65d9..4c63e91 100644
  
  Owner's word: the single source of truth is the actual file content,
 diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
-index 00c9186..75119b4 100644
+index 00c9186..e19fc56 100644
 --- a/docs/changelog.ru.md
 +++ b/docs/changelog.ru.md
-@@ -2,6 +2,39 @@
+@@ -2,6 +2,42 @@
  
  ---
  
@@ -337,6 +342,9 @@ index 00c9186..75119b4 100644
 +  наследовали людские моды). Механизм наследования перенесён в данные
 +  (поле связи в записи робо-оружия); пары «робо-оружие → людское» — на
 +  решение владельца.
++- Убран осиротевший файл-перечень слотов робо-модов: знание «какие моды
++  в каких слотах» живёт в описаниях самих модов (переиздание 306 — ручной
++  шаг удаления больше не нужен).
 +- Заперто 15 проверками в `__tests__/robot/weapon-mods-one-truth.test.js`
 +  (форма правды, план записи на все пять мест хранения, конденсатор
 +  Mk III на Головном лазере: урон 5 → 6 и обратно, худая форма сейва,
