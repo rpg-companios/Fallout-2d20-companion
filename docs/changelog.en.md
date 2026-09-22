@@ -2,6 +2,26 @@
 
 ---
 
+## Docs — an AI-agent starter map: how the app works, what flows from where to where (patch 313)
+
+Owner's word: maintain files describing how the app works and where the
+data flows, for AI agents — so they don't guess how things are built and
+read a couple of files instead of the whole stack.
+
+- `docs/agents/README.md` — the entry point: required reading order,
+  the repo map by layers, a "typical task → files to touch" table, a
+  short list of prohibitions.
+- `docs/agents/data-flows.md` — data flows across six mechanics: the
+  catalog (JSON → setting door → registry → screen catalog), weapon mods
+  (one truth and the write plan, 311), robot slots (robot anatomy from
+  data), saves (passports and migrations), survival (the extension
+  precedent), and the patch installer.
+- `replit.md` now points agents to `docs/agents/` first.
+- Maintenance rule: when a flow moves, the map is edited IN THE SAME
+  PATCH — the map must not lie.
+
+---
+
 ## Data — robot weapons inherit human mods via a data link; weapons "with a mod out of the box" (patch 312)
 
 Owner's word: the Mister Handy Flamer IS the human Flamer; the Laser

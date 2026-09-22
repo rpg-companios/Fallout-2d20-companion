@@ -6,6 +6,8 @@ A mobile-focused web application built with React Native (Expo) for managing tab
 
 Before making architectural, state, catalog, save, or gameplay changes, read:
 
+- `docs/agents/README.md` — стартовая карта агента: слои, «задача → файлы»,
+  короткий список запретов; `docs/agents/data-flows.md` — потоки данных;
 - `docs/architecture/engine-dna.md` — the authoritative engine/setting boundary,
   source-of-truth rules, TypeScript migration strategy, and AI working protocol;
 - `setting-contract.md` — the setting package and `.trpg` contract;
