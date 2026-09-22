@@ -2,6 +2,22 @@
 
 ---
 
+## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
+
+Owner's word: the single source of truth is the actual file content,
+verified fresh on every run for every patch. The state journal no
+longer decides (nor do the --3way, --mark-through, --mark, --unmark
+keys and all status-guessing heuristics — removed). A patch that
+passes neither check is deferred; the verdict comes from later patches
+on the same files or from traces of its added lines in the tree.
+Rollback leftovers (git reset does not touch future patches' new
+files) are recognized by byte-exact match and recreated by the patch.
+After applying — and on repeat runs — the integrity of all data files
+is checked: glues are caught immediately, with the cure attached.
+Rolling back a batch of patches and reinstalling works without
+touching history. No migration needed: .git/arena-patches.state is
+no longer used.
+
 ## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
 
 Six data files in the owner's working tree turned out glued: after a
