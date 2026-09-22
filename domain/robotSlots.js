@@ -26,6 +26,9 @@
 import { getBodyPlan } from './bodyplan';
 import { getRobotLimbCatalog } from './registry';
 import { applyWeaponMods } from './enrichItem';
+// Единая форма правды модов — движковый контракт (311): список id на
+// экземпляре, карта «слот → id» выводится. Локальный toModIds ниже — фасад.
+import { modIdList } from '../src/engine/items/weaponMods';
 
 /** Слои защиты в порядке приоритета (armor и frame совместимы, plating — нет). */
 export const LAYER_KEYS = ['armor', 'frame', 'plating'];
@@ -54,18 +57,7 @@ const EMPTY_ARMOR_LAYERS = () => ({ frame: null, plating: null, armor: null });
  * @param {object} source
  * @returns {string[]}
  */
-export const toModIds = (source) => {
-  if (!source || typeof source !== 'object') return [];
-  // appliedMods — истина экрана: модалка WeaponModificationModal пишет именно её,
-  // а modIds у восстановленного heldWeapon остаётся служебным (часто пустым) поле-
-  // выгрузки. Если массив смотрит первым, пустой modIds маскирует свежие appliedMods
-  // и установленный мод теряется при сохранении слота. Пустой объект appliedMods —
-  // «модов нет» (снятие мода тоже истина экрана), поэтому приоритет безусловно.
-  const map = source.appliedMods;
-  if (map && typeof map === 'object') return Object.values(map).filter(Boolean);
-  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
-  return [];
-};
+export const toModIds = (source) => modIdList(source);
 
 /** Приводит список установленного оружия к виду [{ id, modIds }]. */
 const normalizeInstalled = (list) => (Array.isArray(list) ? list : [])
@@ -367,12 +359,22 @@ export function serializeSlot(slot, options = {}) {
 
   const canHold = limbKeepsHeldWeapon(limb);
 
+  // Моды собственной атаки конечности (311): у живого слота они лежат на
+  // экземпляре конечности, у худого сейва — на самом слоте. Пишем, только
+  // если есть: пустой список держит худую форму прежней.
+  const ownMods = toModIds({
+    modIds: (typeof state.content === 'object' && state.content
+      ? state.content.ownWeaponMods
+      : null) ?? slot?.ownWeaponMods,
+  });
+
   return {
     content,
     armorLayers,
     heldWeaponId: canHold ? state.heldWeaponId : null,
     heldWeaponMods: canHold ? state.heldWeaponMods : [],
     installedWeapons: state.installedWeapons.filter((entry) => entry?.id),
+    ...(ownMods.length > 0 ? { ownWeaponMods: ownMods } : {}),
   };
 }
 
@@ -402,19 +404,32 @@ export function deserializeSlot(slot, options = {}) {
     ? state.content
     : (state.content?.id ?? null);
 
-  let limb = null;
-  if (limbId) {
-    const entry = resolveLimb(catalog, limbId);
-    const itemType = entry?.itemType
-      ?? ITEM_TYPE_BY_LIMB_TYPE[entry?.limbType]
-      ?? 'robotPart';
-    const builtinWeapons = [];
-    const ownId = entry?.itemCategory === 'weaponAsLimb'
-      ? entry.attackId
-      : (entry?.builtinWeaponId ?? (entry?.builtinManipulator ? entry.id : null));
-    if (ownId) {
-      builtinWeapons.push({ ...(resolveWeapon(catalog, ownId) || {}), id: ownId, weaponId: ownId, itemType: 'weapon', isBuiltin: true });
-    }
+    let limb = null;
+    if (limbId) {
+      const entry = resolveLimb(catalog, limbId);
+      const itemType = entry?.itemType
+        ?? ITEM_TYPE_BY_LIMB_TYPE[entry?.limbType]
+        ?? 'robotPart';
+      // Моды собственной атаки (311): в худом сейве лежат на слоте.
+      const ownMods = Array.isArray(slot?.ownWeaponMods)
+        ? slot.ownWeaponMods.filter(Boolean)
+        : [];
+      const builtinWeapons = [];
+      const ownId = entry?.itemCategory === 'weaponAsLimb'
+        ? entry.attackId
+        : (entry?.builtinWeaponId ?? (entry?.builtinManipulator ? entry.id : null));
+      if (ownId) {
+        builtinWeapons.push({
+          ...(resolveWeapon(catalog, ownId) || {}),
+          id: ownId,
+          weaponId: ownId,
+          itemType: 'weapon',
+          isBuiltin: true,
+          ...(ownMods.length > 0
+            ? { appliedMods: modMap(catalog, ownMods), modIds: ownMods }
+            : {}),
+        });
+      }
     for (const installed of state.installedWeapons) {
       builtinWeapons.push({
         ...(resolveWeapon(catalog, installed.id) || {}),
@@ -430,6 +445,7 @@ export function deserializeSlot(slot, options = {}) {
       ...(entry || {}),
       id: limbId,
       itemType,
+      ...(ownMods.length > 0 ? { ownWeaponMods: ownMods } : {}),
       ...(builtinWeapons.length > 0 ? { builtinWeapons } : {}),
     };
   }
@@ -805,15 +821,18 @@ export function attacksFromSlot(slot, options = {}) {
   }
 
   // Собственная атака конечности. Экземпляр важнее каталога (в нём могут
-  // быть моды и имя), каталог — источник характеристик.
+  // быть моды и имя), каталог — источник характеристик. Моды собственной
+  // атаки (311) живут на экземпляре конечности (ownWeaponMods) — они и
+  // применяются здесь; у худого сейва их восстанавливает deserializeSlot.
+  const ownMods = toModIds({ modIds: limb?.ownWeaponMods });
   const { own } = splitLimbWeapons(limb, { catalog });
   const ownEntry = own[0] ?? null;
   if (ownEntry) {
-    push(ownEntry, 'builtin');
+    push(ownEntry, 'builtin', ownMods.length > 0 ? ownMods : toModIds(ownEntry));
   } else if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
-    push(limb.attackId, 'builtin');
+    push(limb.attackId, 'builtin', ownMods);
   } else if (limb.builtinWeaponId) {
-    push(limb.builtinWeaponId, 'builtin');
+    push(limb.builtinWeaponId, 'builtin', ownMods);
   } else if (limb.builtinManipulator) {
     // Наследие: рука-манипулятор без ссылки на оружие бьёт сама собой.
     result.push({
@@ -822,8 +841,8 @@ export function attacksFromSlot(slot, options = {}) {
       source: 'builtin',
       slotId: slotId ?? null,
       instanceKey: `${slotId ?? '?'}:builtin:${limb.id}`,
-      modIds: [],
-      appliedMods: {},
+      modIds: ownMods,
+      appliedMods: modMap(catalog, ownMods),
       isManipulator: true,
     });
   }
@@ -868,6 +887,30 @@ export function setInstalledWeaponMods(slots, slotKey, weaponId, appliedMods) {
   return {
     ...slots,
     [slotKey]: { ...slotData, limb: { ...limb, builtinWeapons: nextList } },
+  };
+}
+
+/**
+ * Записать моды на СОБСТВЕННУЮ атаку конечности (311): коготь руки
+ * Штурмотрона, Головной лазер родной головы. База атаки — из каталога,
+ * поставленные моды — состояние персонажа: живут на экземпляре конечности
+ * (ownWeaponMods) и переживают сохранение (serializeSlot/deserializeSlot).
+ *
+ * Возвращает новую карту слотов или null, если в слоте нет конечности.
+ *
+ * @param {object} slots - карта слотов (как в хранилище)
+ * @param {string} slotKey - слот конечности
+ * @param {object} appliedMods - { [slot]: modId } из окна модификации
+ * @returns {object|null}
+ */
+export function setOwnWeaponMods(slots, slotKey, appliedMods) {
+  const slotData = slots?.[slotKey];
+  const limb = slotData?.limb;
+  if (!limb) return null;
+  const modIds = toModIds({ appliedMods: appliedMods || {} });
+  return {
+    ...slots,
+    [slotKey]: { ...slotData, limb: { ...limb, ownWeaponMods: modIds } },
   };
 }
 
@@ -926,6 +969,12 @@ export function collectAttacks(slots, options = {}) {
         source: undefined,
         slotId: undefined,
         instanceKey: undefined,
+        // Роль внутри слота — для плана записи модов (311): ладонь /
+        // установленное / собственная атака. Внутренний источник 'builtin'
+        // (собственная атака) на карточке называется 'ownAttack'.
+        // Классификация места записи живёт в движке
+        // (src/engine/items/weaponMods).
+        attackRole: attack.source === 'builtin' ? 'ownAttack' : (attack.source ?? null),
         // Встроенная атака конечности и установленное в неё оружие — одно и то
         // же по смыслу: оружие, которым робот владеет сам, без инвентаря.
         ...(attack.source === 'builtin' || attack.source === 'installed'

@@ -2,6 +2,38 @@
 
 ---
 
+## Unification — weapon mods: one truth, one write path; a limb's own-attack mods now survive saving (patch 311)
+
+Owner's rule: modifying items is a property of many games, so the shape
+of truth and the write place are decided by the engine (a universal
+TypeScript contract); the setting supplies the mod catalog and storage.
+
+- One shape of truth: a weapon instance carries a LIST of mod ids; the
+  "slot → id" map is a derived view for the screen (the mod knows its
+  slot). The "list or map" duality is gone: priority is unconditional,
+  an empty map means "no mods".
+- One write path: the upgrade dialog no longer chooses among four
+  branches by storage place. The engine classifies the place and returns
+  a plan (inventory item / human equipped weapon / robot palm / weapon
+  installed into a limb / the limb's own attack); the screen only
+  executes the plan.
+- New state: mods can be installed on a LIMB'S OWN ATTACK (the Assaultron
+  arm claw, the head's built-in Head Laser). The dialog used to offer
+  them, but the save had no place for them — mods vanished on reload.
+  Mods now live on the limb itself and survive saving; the slim save
+  shape gains an optional field (old saves read as before).
+- Data: the hardcoded "robot weapon inherits human mods" map is removed
+  from code — a check across all data files showed it pointed at numeric
+  ids that exist nowhere in the data and never fired (the Flamer, Laser
+  Cutter and Automatic 10mm pistol never inherited human mods). The
+  inheritance mechanism moved into the data (a link field on the robot
+  weapon record); the "robot weapon → human weapon" pairs are the
+  owner's decision.
+- Locked by 15 checks in `__tests__/robot/weapon-mods-one-truth.test.js`
+  (truth shape, write plans for all five storage places, the Mk III
+  capacitor on the Head Laser: damage 5 → 6 and back, slim save shape,
+  card roles, no dead map). Suite 849/849, tsc clean.
+
 ## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
 
 Owner's word: the single source of truth is the actual file content,
