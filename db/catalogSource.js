@@ -228,9 +228,11 @@ const build = () => {
   const catalog = getEquipmentCatalog(locale);
   _cache = {
     weapons: (catalog.weapons || []).map(buildWeaponRow),
-    // Робо-моды оружия (293): сливаются с людскими — модалка установки
-    // resolveает их тем же catalogGetWeaponModById (имена слиты в каталоге, 290).
-    weaponMods: [...(catalog.weaponMods || []), ...(catalog.robotWeaponMods || [])].map(buildWeaponModRow),
+    // Робо-моды оружия (293→301): полный пул модов собирает базовая сборка
+    // (i18n/equipmentCatalog.weaponMods уже включает робо-моды) — здесь
+    // только адаптация формы строки. Склейка «людские + робо» жила тут
+    // отдельной копией знания и после 301 давала дубли.
+    weaponMods: (catalog.weaponMods || []).map(buildWeaponModRow),
     modSlots: buildModSlotRows(catalog),
     ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
     qualities: (catalog.qualities || []).map(buildQualityRow),

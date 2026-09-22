@@ -464,7 +464,13 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     junk: mergedJunk,
     materials: mergedScrapMaterials,
     oddities: mergedOddities,
-    weaponMods: mergedWeaponMods,
+    // Пул weaponMods включает и моды оружия роботов (290): экранный каталог —
+    // источник для enrichWeaponItem (карточки оружия на экране снаряжения), и
+    // конденсаторы Головного лазера Штурмотрона обязаны находиться в том же
+    // пуле, что и в реестре конечностей (ROBOT_LIMB_CATALOG.weaponMods).
+    // Без этого установленный мод молча терялся: урон карточки возвращался
+    // к базе, хотя превью модалки и план списания зарядов мод видели.
+    weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods],
     robotWeaponMods: mergedRobotWeaponMods,
     robotWeaponModSlots: moduleRobotWeaponModSlots,
     armorMods: mergedArmorMods,

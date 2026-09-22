@@ -143,3 +143,24 @@ describe('формула применяется и исчезает вместе
     expect(plan.asks).toEqual([]);
   });
 });
+
+describe('источники запросов расхода зарядов: переводы (298, пропуск ammoPerAttack)', () => {
+  it('каждый source из плана — с непустым ключом в словарях ru и en', async () => {
+    const { WEAPONS_DICTIONARIES } = await import(
+      '../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n'
+    );
+    const plan = buildMechAmmoSpend({
+      qualities: [{ qualityId: 'quality_crank_x', value: 3 }],
+      mods: [{ id: 'mod_test_ammo_per_attack', ammoPerAttack: 6 }],
+      available: 12,
+    });
+    expect(plan.asks.map((a) => a.source)).toEqual(['crank', 'ammoPerAttack']);
+    for (const locale of ['ru-RU', 'en-EN']) {
+      for (const source of plan.asks.map((a) => a.source)) {
+        // ПРАВИЛО (владелец): промах ключа — дефект данных, маркер — сам путь.
+        const label = WEAPONS_DICTIONARIES[locale]?.weapon?.ammoSpend?.source?.[source];
+        expect(label, `${locale}: weapon.ammoSpend.source.${source}`).toBeTruthy();
+      }
+    }
+  });
+});
