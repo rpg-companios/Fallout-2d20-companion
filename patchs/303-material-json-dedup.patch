@@ -1,0 +1,268 @@
+#!/bin/sh
+# Патч 303: починка material.json — из файла убрана случайно вставленная
+# копия всего списка материалов (254 строки после закрывающей скобки).
+# Двойной массив не ошибка сборки: сборщик читает его как «пусто», и первый
+# же обход списка материалов падал с «Cannot read properties of undefined
+# (reading map)». Применять: sh patchs/303-material-json-dedup.patch
+patch -p1 <<'PATCH_303_EOF'
+--- a/modules/fallout/data/junk/material.json
++++ b/modules/fallout/data/junk/material.json
+@@ -252,257 +252,3 @@
+     "rarity": 0
+   }
+ ]
+-[
+-  {
+-    "id": "item_common_materials",
+-    "materialType": "common",
+-    "weight": 1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "item_uncommon_materials",
+-    "materialType": "uncommon",
+-    "weight": 1,
+-    "cost": 3,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "item_rare_materials",
+-    "materialType": "rare",
+-    "weight": 1,
+-    "cost": 5,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "acid",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 2,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "adhesive",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 8,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "aluminum",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 3,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "antiseptic",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 3,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "asbestos",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 6,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "ballistic_fiber",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 5,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "bone",
+-    "materialType": "common",
+-    "weight": 1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "ceramic",
+-    "materialType": "common",
+-    "weight": 0.1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "circuitry",
+-    "materialType": "rare",
+-    "weight": 0.3,
+-    "cost": 5,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "cloth",
+-    "materialType": "common",
+-    "weight": 0.1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "concrete",
+-    "materialType": "common",
+-    "weight": 3,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "copper",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 4,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "cork",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 1,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "fertilizer",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 1,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "fiber_optics",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 6,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "fiberglass",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 5,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "gears",
+-    "materialType": "uncommon",
+-    "weight": 0.2,
+-    "cost": 3,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "glass",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 2,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "lead",
+-    "materialType": "uncommon",
+-    "weight": 0.3,
+-    "cost": 1,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "leather",
+-    "materialType": "common",
+-    "weight": 0.1,
+-    "cost": 2,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "nuclear_material",
+-    "materialType": "rare",
+-    "weight": 0.1,
+-    "cost": 10,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "oil",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 4,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "plastic",
+-    "materialType": "common",
+-    "weight": 0.1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "rubber",
+-    "materialType": "common",
+-    "weight": 0.1,
+-    "cost": 2,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "screw",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 2,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "silver",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 6,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "spring",
+-    "materialType": "uncommon",
+-    "weight": 0.1,
+-    "cost": 3,
+-    "rarity": 1
+-  },
+-  {
+-    "id": "steel",
+-    "materialType": "common",
+-    "weight": 0.2,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "wood",
+-    "materialType": "common",
+-    "weight": 0.2,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "crystal",
+-    "materialType": "rare",
+-    "weight": 1,
+-    "cost": 5,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "gold",
+-    "materialType": "rare",
+-    "weight": 1,
+-    "cost": 5,
+-    "rarity": 2
+-  },
+-  {
+-    "id": "coal",
+-    "materialType": "common",
+-    "weight": 1,
+-    "cost": 1,
+-    "rarity": 0
+-  },
+-  {
+-    "id": "iron",
+-    "materialType": "common",
+-    "weight": 1,
+-    "cost": 1,
+-    "rarity": 0
+-  }
+-]
+PATCH_303_EOF
