@@ -29,6 +29,9 @@ TypeScript contract); the setting supplies the mod catalog and storage.
   inheritance mechanism moved into the data (a link field on the robot
   weapon record); the "robot weapon → human weapon" pairs are the
   owner's decision.
+- The orphaned robot mod-slot list file is removed: the knowledge of
+  "which mods fit which slots" lives in the mods' own descriptions
+  (reissue of 306 — the manual removal step is no longer needed).
 - Locked by 15 checks in `__tests__/robot/weapon-mods-one-truth.test.js`
   (truth shape, write plans for all five storage places, the Mk III
   capacitor on the Head Laser: damage 5 → 6 and back, slim save shape,
