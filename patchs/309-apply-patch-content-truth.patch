@@ -1,18 +1,33 @@
 #!/bin/sh
-# Патч 309: установщик патчей переписан по принципу владельца —
-# «единственный источник истины — реальное содержимое файлов прямо сейчас».
-# Каждый патч проверяется заново при каждом запуске (git apply --check и
-# --reverse --check). Журнал состояния, --3way, --mark-through/--mark/--unmark
+# Патч 309 (переиздание под дерево владельца): установщик патчей переписан по
+# принципу «единственный источник истины — реальное содержимое файлов прямо
+# сейчас». Каждый патч проверяется заново при каждом запуске (git apply --check
+# и --reverse --check). Журнал состояния, --3way, --mark-through/--mark/--unmark
 # и эвристики угадывания удалены. Отложенный патч подтверждается более поздним
 # патчем на тех же файлах или следом своих строк. Остатки отката узнаются
 # по побайтовому совпадению и воссоздаются. Целостность файлов данных
 # проверяется после применения и на повторных запусках.
 # Старая запись .git/arena-patches.state больше не используется — можно удалить.
+# ЧЕМ ОТЛИЧАЕТСЯ ОТ ПЕРВОГО ИЗДАНИЯ: адрес ветки установки —
+# arena/01a0c8e2-fallout-2d20-companion (эта сессия); записи чейнджлога
+# построены поверх дерева ПОСЛЕ патчей 304–308 — на нём первый издание
+# не вставало. Применять из корня репозитория:
+#   sh patchs/309-apply-patch-content-truth.patch
+# или цепочкой: ./apply-patch.sh 309
 patch -p1 <<'PATCH_309_EOF'
 diff --git a/apply-patch.sh b/apply-patch.sh
-index 29d718c..82acd12 100755
+index 29d718c..e28169c 100755
 --- a/apply-patch.sh
 +++ b/apply-patch.sh
+@@ -2,7 +2,7 @@
+ 
+ set -euo pipefail
+ 
+-ARENA_BRANCH="arena/01a0b2bb-fallout-2d20-companion"
++ARENA_BRANCH="arena/01a0c8e2-fallout-2d20-companion"
+ REMOTE="origin"
+ 
+ ROOT_DIR="$(
 @@ -11,10 +11,10 @@ ROOT_DIR="$(
    pwd
  )"
@@ -840,29 +855,14 @@ index 29d718c..82acd12 100755
 +echo "  — файлы из отчёта выше могли быть повреждены локальными правками:"
 +echo "    сравни с ожидаемым (git diff / скажи мне)."
 +exit 1
---- a/docs/changelog.ru.md
-+++ b/docs/changelog.ru.md
-@@ -5,1 +5,16 @@
-+## Установщик патчей — переписан по принципу «истина — в файлах» (патч 309)
-+
-+Слово владельца: единственный источник истины — реальное содержимое
-+файлов, проверяемое заново при каждом запуске для каждого патча.
-+Журнал состояния больше не решает (как и ключи --3way, --mark-through,
-+--mark, --unmark и вся эвристика угадывания статусов — удалены).
-+Патч, не проходящий ни одну проверку, откладывается; вердикт выносят
-+более поздние патчи на тех же файлах или след добавленных строк в
-+дереве. Остатки отката (git reset не трогает новые файлы будущих
-+патчей) узнаются по побайтовому совпадению и воссоздаются патчем.
-+После применения и на повторных запусках проверяется целостность всех
-+файлов данных: склейки ловятся сразу, с рецептом лечения. Откат
-+пачки патчей и повторная установка работают без правки истории.
-+Миграция не нужна: .git/arena-patches.state больше не используется.
-+
- ## Инструмент — починка склейки «два JSON подряд» в файлах данных (патч 308)
- 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 53d12b1..27f65d9 100644
 --- a/docs/changelog.en.md
 +++ b/docs/changelog.en.md
-@@ -5,1 +5,17 @@
+@@ -2,6 +2,123 @@
+ 
+ ---
+ 
 +## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
 +
 +Owner's word: the single source of truth is the actual file content,
@@ -879,6 +879,231 @@ index 29d718c..82acd12 100755
 +touching history. No migration needed: .git/arena-patches.state is
 +no longer used.
 +
- ## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
++## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
++
++Six data files in the owner's working tree turned out glued: after a
++complete JSON in each, another chunk of content follows. No patch in
++300–307 touched those files (except material.json, which patch 303
++repaired rather than broke); the patch applier is strict — it applies
++exactly or refuses entirely, it cannot glue anything to a file's end.
++The tool tools/fix-double-json.js finds glues, shows what got glued,
++saves a .bak backup and merges the chunks: on duplicates the later
++chunk wins. Run: node tools/fix-double-json.js
++
++## Decision list — 13 disputed weapon mods (patch 307)
++
++Moving knowledge from the slot list into mod descriptions is almost
++clean (295 additions, no behavior change), but 13 mods on six weapons
++claim applicability the list does not allow. The list with questions is
++in docs/reference-data/weapon-mods-open-questions.md; patches do not
++wait for the answer — the owner's decision will close the move.
++
++## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
++
++Owner's rule: no point keeping a separate file listing which mods live
++in which slots of which weapon, when every mod record already says so
++itself — via its slot and its applicability list.
++
++- the robot/weapon_mod_slots.json file (a duplicate of the Head Laser
++  capacitor knowledge) is removed;
++- robot weapon slots are derived from the mods: slot + applicability;
++  mod order follows the data record order;
++- the mod-install dialog and ammo spending work as before — locked by
++  checks: the laser has one capacitor slot with all four mods, same as
++  the removed file had;
++- new fuse: every robot mod must declare a slot and applicability —
++  otherwise the derived slots would lose it, and the test fails before
++  the mod disappears from the install dialog.
++
++## Robots — Mods for weapons installed into a limb (patch 305)
++
++Owner's report: the laser gun from the "assaultron_us_military" kit
++(installTo: 'arm' — the weapon is part of the arm, the palm stays free)
++would not accept mods. The mod-install dialog opened, the selection went
++through — but the mod never stuck: the apply logic could only write mods
++to the palm or the inventory, while a weapon installed into a limb lives
++inside the limb itself.
++
++- mods for installed weapons are now written into the weapon's entry
++  inside the limb (both arm and head installs from kits);
++- the weapon card reads mods from that entry — damage and name include
++  the mod;
++- the entry with mods survives save and load (the save format did not
++  change — mods for installed weapons were already provided for there);
++- patch 304 closed the neighbouring case (a weapon held in the palm);
++  this one closes installed weapons — both carrying styles now accept
++  mods.
++
++Locked by checks in `__tests__/robot/robot-slot-model.test.js`: the card
++reads mods from the entry; the write function updates only the target
++entry and leaves the original map untouched; the save cycle keeps the
++mod. Suite 833/833, tsc clean.
++
++## Robots — Weapons held in a robot palm get their card (patch 304)
++
++Owner's report: "mods won't install on the assaultron laser in the hand".
++Equipping into a robot palm is allowed (weight and two-handed checks
++apply), but the weapon produced no card in the attack list: robot-mounted
++weapons ("not hand-held") were skipped — there was nothing to attach
++mods to.
++
++- the palm now shows everything it holds: human weapons, arm
++  attachments, and robot-mounted weapons (the Head Laser);
++- the only exception is the limb's own attack (claw/manipulator in an
++  old save): the limb itself provides that card, no palm duplicate
++  (also closes a long-standing duplicate claw card);
++- the chain after the fix: card → damage with the capacitor
++  (base + mod) → the ammo-spend plan sees the capacitor → mods install
++  and survive the save.
++
++Locked by checks in `__tests__/robot/assaultron-head-laser-mods.test.js`
++(laser in palm: card, damage 7, 4 charges per attack; no claw duplicate).
++Suite 831/831, tsc clean.
++
++## Weapons & materials — patches 300–303 summary
++
++- **300:** translation for the "Mod spend per attack" spend source (the
++  `weapon.ammoSpend.source.ammoPerAttack` key was missing from both
++  dictionaries — the dialog showed the raw key).
++- **301:** the Head Laser capacitors counted in the install dialog and
++  in the ammo-spend plan, but not on the weapon card — the card damage
++  fell back to base (5 instead of 5+2 for Mk IV). The screen catalog's
++  mod pool now matches the registry: robot mods are part of the shared
++  pool.
++- **302:** the knowledge "full mod pool = human + robot" lived in two
++  places; after 301 the adapter's merge became redundant (robot mods
++  arrived twice). The merge now lives in one place.
++- **303:** materials file repair (report: "App Error: Cannot read
++  properties of undefined (reading 'map')"): the materials list was
++  written into the file twice, the app received "no materials", and
++  junk salvaging crashed. The duplicate removed.
++
++---
++
+ ## Architecture — Ammo-spend formulas moved into the module (patch 298)
  
+ Owner's rule: a formula bound to a specific weapon quality is a MODULE
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ef3a021..00c9186 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,118 @@
+ 
+ ---
+ 
++## Установщик патчей — переписан по принципу «истина — в файлах» (патч 309)
++
++Слово владельца: единственный источник истины — реальное содержимое
++файлов, проверяемое заново при каждом запуске для каждого патча.
++Журнал состояния больше не решает (как и ключи --3way, --mark-through,
++--mark, --unmark и вся эвристика угадывания статусов — удалены).
++Патч, не проходящий ни одну проверку, откладывается; вердикт выносят
++более поздние патчи на тех же файлах или след добавленных строк в
++дереве. Остатки отката (git reset не трогает новые файлы будущих
++патчей) узнаются по побайтовому совпадению и воссоздаются патчем.
++После применения и на повторных запусках проверяется целостность всех
++файлов данных: склейки ловятся сразу, с рецептом лечения. Откат
++пачки патчей и повторная установка работают без правки истории.
++Миграция не нужна: .git/arena-patches.state больше не используется.
++
++## Инструмент — починка склейки «два JSON подряд» в файлах данных (патч 308)
++
++У владельца в рабочем дереве шесть файлов данных оказались склеены:
++после полного JSON в каждом — ещё один кусок содержимого. Ни один патч
++300–307 эти файлы не трогал (кроме material.json, который патч 303 чинил,
++а не ломал); применятель патчей строгий — применяет точно или отказывается
++целиком, приклеить в конец ничего не может. Инструмент
++tools/fix-double-json.js находит склейки, показывает что склеено,
++сохраняет резервную копию .bak и сливает куски: при дублях побеждает
++более поздний кусок. Запуск: node tools/fix-double-json.js
++
++## Список на решение — 13 спорных модов оружия (патч 307)
++
++Перенос знаний из перечня слотов в описания модов почти чистый (295
++дописок, поведение не меняется), но 13 модов на шести видах оружия
++заявляют применимость, которую перечень не разрешает. Список с вопросами
++— в docs/reference-data/weapon-mods-open-questions.md; патчи не ждут
++ответа, решение владельца закроет перенос целиком.
++
++## Роботы — Слоты модов выведены из самих модов, файл-дубль удалён (патч 306)
++
++Слово владельца: незачем держать отдельный файл, перечисляющий, какие
++моды в каких слотах какого оружия живут, если каждая запись мода уже
++говорит это сама — своим слотом и списком применимости.
++
++- файл robot/weapon_mod_slots.json (дубль знаний о конденсаторах
++  Головного лазера) удалён;
++- слоты робо-оружия собираются из самих модов: слот + применимость;
++  порядок модов — порядок записей в данных;
++- окно установки модов и списание зарядов работают как раньше —
++  проверками зафиксировано: у лазера один слот конденсатора со всеми
++  четырьмя модами, как в удалённом файле;
++- новый предохранитель: каждый робо-мод обязан заявлять слот и
++  применимость — иначе производные слоты его потеряют, и тест падает
++  до того, как мод исчезнет из окна установки.
++
++## Роботы — Моды на оружие, установленное в конечность (патч 305)
++
++Репорт владельца: лазер-ган из комплекта «assaultron_us_military»
++(installTo: 'arm' — оружие является частью руки, ладонь свободна)
++не принимал моды. Оконко установки модов на оружие открывалось, выбор
++проходил — но мод не сохранялся: применяющий код умел писать моды только
++в ладонь и в инвентарь, а установленное в конечность оружие живёт внутри
++самой конечности.
++
++- моды установленного оружия пишутся в его запись внутри конечности
++  (и для руки, и для головы — оба вида установки из комплекта);
++- карточка оружия читает моды из записи — урон и имя считаются с модом;
++- запись с модами переживает сохранение и загрузку (формат сейва не
++  менялся — моды установленного оружия в нём уже были предусмотрены);
++- патч 304 закрыл соседний случай (оружие, зажатое в ладони); этот закрывает
++  установленные — теперь оба способа ношения принимают моды.
++
++Заперто проверками в `__tests__/robot/robot-slot-model.test.js`:
++карточка читает моды из записи; запись-функция обновляет только нужную
++запись, исходная карта не тронута; сейв-цикл сохраняет мод. Сюит 833/833,
++tsc чист.
++
++## Роботы — Оружие в ладони получает карточку (патч 304)
++
++Репорт владельца: «на лазер штурмотрона в руке не ставятся моды».
++Экипировка в ладонь руки робота разрешена (вес и двуручность проверяются),
++но карточки оружия в списке атак не было: смонтированное оружие робота
++(«не ручное») выпадало из списка — ставить моды было не на что.
++
++- ладонь показывает всё, что в ней лежит: человеческое оружие, навес
++  (arm attachment) и смонтированное оружие робота (Головной лазер);
++- единственное исключение — собственная атака самой конечности
++  (коготь/манипулятор в старом сейве): её карточку даёт сама конечность,
++  дубль из ладони не нужен (заодно закрыт старый дубль карточки когтя);
++- цепочка после фикса: карточка → урон с конденсатором (база + мод) →
++  план списания зарядов видит конденсатор → моды устанавливаются и
++  переживают сохранение.
++
++Заперто проверками в `__tests__/robot/assaultron-head-laser-mods.test.js`
++(лазер в ладони: карточка, урон 7, 4 заряда за атаку; дубль когтя).
++Сюит 831/831, tsc чист.
++
++## Оружие и материалы — сводка патчей 300–303
++
++- **300:** перевод источника списания «Расход мода за атаку» (ключ
++  `weapon.ammoSpend.source.ammoPerAttack` отсутствовал в обоих словарях —
++  диалог показывал сырой ключ).
++- **301:** конденсаторы Головного лазера считались в окне установки и в
++  списании зарядов, но не в карточке оружия — урон карточки возвращался
++  к базе (5 вместо 5+2 у Mk IV). Пул модов экранного каталога выровнен
++  с реестром: робо-моды входят в общий пул.
++- **302:** знание «полный пул модов = людские + робо» жило в двух
++  местах; после 301 склейка в адаптере стала повторной (робо-моды
++  приходили дважды). Склейка осталась в одной точке.
++- **303:** починка файла материалов (репорт «App Error: Cannot read
++  properties of undefined (reading 'map')»): список материалов оказался
++  записан в файле дважды, программа получала «материалов нет», и разбор
++  хлама падал. Дубль удалён.
++
++---
++
+ ## Архитектура — Формулы расхода зарядов переехали в модуль (патч 298)
+ 
+ Правило владельца: формула конкретного качества оружия — это формула
 PATCH_309_EOF
