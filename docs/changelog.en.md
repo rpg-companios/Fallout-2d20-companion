@@ -2,6 +2,17 @@
 
 ---
 
+## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
+
+Six data files in the owner's working tree turned out glued: after a
+complete JSON in each, another chunk of content follows. No patch in
+300–307 touched those files (except material.json, which patch 303
+repaired rather than broke); the patch applier is strict — it applies
+exactly or refuses entirely, it cannot glue anything to a file's end.
+The tool tools/fix-double-json.js finds glues, shows what got glued,
+saves a .bak backup and merges the chunks: on duplicates the later
+chunk wins. Run: node tools/fix-double-json.js
+
 ## Decision list — 13 disputed weapon mods (patch 307)
 
 Moving knowledge from the slot list into mod descriptions is almost
