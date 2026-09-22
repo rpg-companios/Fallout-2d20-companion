@@ -836,4 +836,20 @@ index 0000000..46a0b72
 +  }
 +  return null;
 +}
+diff --git a/modules/fallout/data/equipment/robot/weapon_mod_slots.json b/modules/fallout/data/equipment/robot/weapon_mod_slots.json
+deleted file mode 100644
+index 8909b11ebc50..0000000
+--- a/modules/fallout/data/equipment/robot/weapon_mod_slots.json
++++ /dev/null
+@@ -1,10 +0,0 @@
+-{
+-  "robot_weapon_assaultron_head_laser": {
+-    "Capacitor": [
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi"
+-    ]
+-  }
+-}
 PATCH_311_EOF
