@@ -1,0 +1,831 @@
+#!/bin/sh
+# Патч 311: моды оружия — единая правда и один путь записи.
+#   — форма правды (список id модов на экземпляре; карта «слот → id» —
+#     вывод для экрана) и план записи (куда пишется выбор окна улучшения)
+#     живут в движке: src/engine/items/weaponMods.ts — универсальный
+#     контракт, сеттинг подставляет каталог и хранилища;
+#   — окно улучшения больше не выбирает из четырёх веток: место хранения
+#     классифицирует движок, экран исполняет план;
+#   — НОВОЕ: моды ставятся на собственную атаку конечности (коготь руки
+#     Штурмотрона, Головной лазер родной головы) и переживают сохранение —
+#     раньше место в сейве для них не было предусмотрено; в худой форме
+#     сейва необязательное поле, старые сейвы читаются как раньше;
+#   — мёртвая карта «робо-оружие наследует людские моды» удалена из кода:
+#     она указывала на номерные id, которых в данных нет, и никогда
+#     не срабатывала; механизм наследования — в данных (baseWeaponId),
+#     пары «робо-оружие → людское» — на решение владельца.
+# Заперто 15 проверками в __tests__/robot/weapon-mods-one-truth.test.js.
+# Применять из корня репозитория: sh patchs/311-weapon-mods-one-truth.patch
+# или цепочкой: ./apply-patch.sh 311 (установщик — версии 309, бутстрап).
+patch -p1 <<'PATCH_311_EOF'
+diff --git a/__tests__/robot/weapon-mods-one-truth.test.js b/__tests__/robot/weapon-mods-one-truth.test.js
+new file mode 100644
+index 0000000..5645b0c
+--- /dev/null
++++ b/__tests__/robot/weapon-mods-one-truth.test.js
+@@ -0,0 +1,163 @@
++// __tests__/robot/weapon-mods-one-truth.test.js
++//
++// Патч 311: единая правда модов оружия.
++//   — форма правды (список id; карта «слот → id» выводится) — движок,
++//     src/engine/items/weaponMods.ts;
++//   — план записи (куда пишется выбор окна модификации) — движок;
++//   — собственная атака конечности принимает моды и переживает сохранение
++//     (раньше окно их предлагало, а место в сейве не было предусмотрено);
++//   — мёртвая карта наследования робо-оружия удалена из кода (id эпохи
++//     старой базы не существуют в данных).
++
++import { describe, it, expect } from 'vitest';
++import { readFileSync, existsSync } from 'node:fs';
++import { join } from 'node:path';
++
++import { modIdList, modIdMap, classifyModWritePlan } from '../../src/engine/items/weaponMods';
++import {
++  collectAttacks,
++  attacksFromSlot,
++  serializeSlot,
++  deserializeSlot,
++  setOwnWeaponMods,
++  setInstalledWeaponMods,
++} from '../../domain/robotSlots';
++import { getRobotLimbCatalog } from '../../domain/registry';
++
++const ROOT = join(__dirname, '../..');
++const catalog = getRobotLimbCatalog();
++const MK3 = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii';
++
++// Голова Штурмотрона с Головным лазером (слот робота в живой форме стора).
++const assaultronHeadSlot = () => ({ limb: { id: 'robot_head_assaultron_laser' } });
++const resolveMod = (id) => catalog.weaponMods.find((m) => m.id === id) || null;
++
++describe('движок: единая форма правды модов', () => {
++  it('appliedMods (карта) — истина экрана; пустая карта означает «модов нет»', () => {
++    expect(modIdList({ appliedMods: { Capacitor: MK3 } })).toEqual([MK3]);
++    expect(modIdList({ modIds: [MK3], appliedMods: {} })).toEqual([]);
++  });
++
++  it('modIds (список) — форма хранения; мусор отфильтровывается', () => {
++    expect(modIdList({ modIds: [MK3, null, ''] })).toEqual([MK3]);
++    expect(modIdList(undefined)).toEqual([]);
++    expect(modIdList('нет')).toEqual([]);
++  });
++
++  it('modIdMap: мод знает свой слот; мод без слота не теряется', () => {
++    expect(modIdMap([MK3], resolveMod)).toEqual({ Capacitor: MK3 });
++    expect(modIdMap(['mod_without_slot'], () => null)).toEqual({ mod_without_slot: 'mod_without_slot' });
++  });
++});
++
++describe('движок: план записи выбора модов', () => {
++  it('ладонь робота — по роли из карточки', () => {
++    expect(classifyModWritePlan(
++      { sourceSlot: 'arm1', attackRole: 'held', weaponId: 'w1' },
++      { slotHasHeldWeapon: true },
++    )).toEqual({ kind: 'robotSlot', slotKey: 'arm1', role: 'held', weaponId: 'w1' });
++  });
++
++  it('установленное в конечность и собственная атака различаются по роли', () => {
++    expect(classifyModWritePlan({ sourceSlot: 'head', attackRole: 'installed' }, {})?.role).toBe('installed');
++    expect(classifyModWritePlan({ sourceSlot: 'head', attackRole: 'ownAttack' }, {})?.role).toBe('ownAttack');
++  });
++
++  it('наследие: карточка без роли — встроенное считается установленным, ладонь по занятости слота', () => {
++    expect(classifyModWritePlan({ sourceSlot: 'arm1', isBuiltin: true }, {})?.role).toBe('installed');
++    expect(classifyModWritePlan({ sourceSlot: 'arm1' }, { slotHasHeldWeapon: true })?.role).toBe('held');
++    expect(classifyModWritePlan({ sourceSlot: 'arm1' }, {})).toBeNull();
++  });
++
++  it('инвентарь и надетое оружие человека; неопознанное — null', () => {
++    expect(classifyModWritePlan({ storeItemId: 'item_1' }, {}))
++      .toEqual({ kind: 'storeItem', itemId: 'item_1' });
++    expect(classifyModWritePlan({ uniqueId: 'u1' }, {}))
++      .toEqual({ kind: 'equippedWeapon', uniqueId: 'u1' });
++    expect(classifyModWritePlan({}, {})).toBeNull();
++  });
++});
++
++describe('собственная атака конечности принимает моды и переживает сохранение', () => {
++  it('моды пишутся на конечность, карточка Головного лазера считает урон с конденсатором', () => {
++    const slots = { head: assaultronHeadSlot() };
++    const before = attacksFromSlot(slots.head, { slotId: 'head' });
++    expect(before[0].damage).toBe(5);
++
++    const next = setOwnWeaponMods(slots, 'head', { Capacitor: MK3 });
++    expect(next.head.limb.ownWeaponMods).toEqual([MK3]);
++    // исходные слоты не тронуты
++    expect(slots.head.limb.ownWeaponMods).toBeUndefined();
++
++    const card = attacksFromSlot(next.head, { slotId: 'head' })[0];
++    expect(card.modIds).toEqual([MK3]);
++    expect(card.appliedMods).toEqual({ Capacitor: MK3 });
++    expect(card.damage).toBe(6); // 5 базы + 1 конденсатора Mk III
++  });
++
++  it('снятие мода возвращает базовый урон', () => {
++    let slots = { head: assaultronHeadSlot() };
++    slots = setOwnWeaponMods(slots, 'head', { Capacitor: MK3 });
++    slots = setOwnWeaponMods(slots, 'head', {});
++    expect(slots.head.limb.ownWeaponMods).toEqual([]);
++    expect(attacksFromSlot(slots.head, { slotId: 'head' })[0].damage).toBe(5);
++  });
++
++  it('худая форма: serialize пишет ownWeaponMods, deserialize восстанавливает карточку', () => {
++    let slots = { head: assaultronHeadSlot() };
++    slots = setOwnWeaponMods(slots, 'head', { Capacitor: MK3 });
++
++    const slim = serializeSlot(slots.head);
++    expect(slim.ownWeaponMods).toEqual([MK3]);
++    // без модов поле в худую форму не пишется — форма прежняя
++    const slimClean = serializeSlot(assaultronHeadSlot());
++    expect('ownWeaponMods' in slimClean).toBe(false);
++
++    const restored = deserializeSlot(slim);
++    expect(restored.limb.ownWeaponMods).toEqual([MK3]);
++    const ownEntry = restored.limb.builtinWeapons.find((w) => w.isBuiltin);
++    expect(ownEntry.appliedMods).toEqual({ Capacitor: MK3 });
++    expect(attacksFromSlot(restored, { slotId: 'head' })[0].damage).toBe(6);
++  });
++
++  it('карточки collectAttacks несут роль в слоте (для плана записи)', () => {
++    let slots = { head: assaultronHeadSlot() };
++    slots = setOwnWeaponMods(slots, 'head', { Capacitor: MK3 });
++    const cards = collectAttacks(slots);
++    const own = cards.find((c) => c.id === 'robot_weapon_assaultron_head_laser');
++    expect(own.attackRole).toBe('ownAttack');
++    expect(own.isBuiltin).toBe(true);
++  });
++
++  it('у установленного оружия и ладони роли тоже размечены', () => {
++    // Установленное оружие живёт в записи конечности (как после комплекта
++    // или восстановления сейва — deserializeSlot строит builtinWeapons).
++    let slots = {
++      head: assaultronHeadSlot(),
++      arm1: { limb: { id: 'robot_arm_assaultron', builtinWeapons: [{ id: 'robot_weapon_flamethrower' }] } },
++    };
++    slots = setOwnWeaponMods(slots, 'head', { Capacitor: MK3 });
++    const installedNext = setInstalledWeaponMods(slots, 'arm1', 'robot_weapon_flamethrower', {});
++    expect(installedNext).not.toBeNull();
++    const cards = collectAttacks(installedNext);
++    const installed = cards.find((c) => c.id === 'robot_weapon_flamethrower' && c.attackRole);
++    expect(installed?.attackRole).toBe('installed');
++  });
++});
++
++describe('данные: наследование робо-оружия — только через данные', () => {
++  it('мёртвой карты в коде больше нет: id weapon_### нигде не зашиты', () => {
++    const src = readFileSync(join(ROOT, 'db/catalogSource.js'), 'utf8');
++    expect(src).not.toMatch(/ROBOT_WEAPON_BASE_MAP/);
++    expect(src).not.toMatch(/weapon_022|weapon_018|weapon_002/);
++  });
++
++  it('id вида weapon_### не существуют в данных — карта была мёртвой', () => {
++    const weapons = JSON.parse(readFileSync(join(ROOT, 'modules/fallout/data/equipment/weapons.json'), 'utf8'));
++    expect(weapons.some((w) => /^weapon_\d+$/.test(w.id || ''))).toBe(false);
++  });
++
++  it('файл-перечень слотов робо-модов удалён (знание — в описаниях самих модов)', () => {
++    expect(existsSync(join(ROOT, 'modules/fallout/data/equipment/robot/weapon_mod_slots.json'))).toBe(false);
++  });
++});
+diff --git a/db/catalogSource.js b/db/catalogSource.js
+index 0602e65..5d1975a 100644
+--- a/db/catalogSource.js
++++ b/db/catalogSource.js
+@@ -31,11 +31,16 @@ const slugify = (str) => {
+   return str.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '_').replace(/_+/g, '_').slice(0, 40);
+ };
+ 
+-const ROBOT_WEAPON_BASE_MAP = {
+-  robot_weapon_flamethrower: 'weapon_022',
+-  robot_weapon_laser_cutter: 'weapon_018',
+-  robot_weapon_auto_10mm: 'weapon_002',
+-};
++// Робо-оружие может наследовать моды человеческой базы через ДАННЫЕ (311):
++// поле baseWeaponId в robot/weapons.json — механизм вариантов, как у людского
++// оружия («Опасная бритва» — вариант бритвы-переключателя). ЗАШИТАЯ КАРТА ИЗ
++// КОДА УДАЛЕНА: она указывала на номерные id эпохи старой базы, которых
++// в данных не существует ни в одном файле, — наследование никогда
++// не срабатывало (мёртвый код). Сегодня ни одно робо-оружие базу не declares;
++// если владелец назовёт пары «робо-оружие → людское», пары лягут в данные.
++const robotBaseAliases = (catalog) => (catalog.weapons || [])
++  .filter((w) => w?.isRobotWeapon && w?.baseWeaponId)
++  .map((w) => [w.id, w.baseWeaponId]);
+ 
+ // ─── row builders (identical shape to seed.js INSERTs) ──────────────────────
+ 
+@@ -75,9 +80,9 @@ const buildWeaponRow = (w) => {
+   };
+ };
+ 
+-const buildWeaponModRow = (m) => {
++const buildWeaponModRow = (m, aliases = []) => {
+   const baseIds = Array.isArray(m.applies_to_ids) ? m.applies_to_ids : [];
+-  const robotAliases = Object.entries(ROBOT_WEAPON_BASE_MAP)
++  const robotAliases = aliases
+     .filter(([, baseId]) => baseIds.includes(baseId))
+     .map(([robotId]) => robotId);
+   const appliesToIds = Array.from(new Set([...baseIds, ...robotAliases]));
+@@ -202,12 +207,13 @@ const buildItemRows = (catalog) => {
+ // Mod-slot overrides → list of { weapon_id, slot, mod_id } (mirrors seedWeaponModSlots)
+ const buildModSlotRows = (catalog) => {
+   const modsOverridesData = catalog.modsOverrides || {};
++  // Наследование слотов робо-оружия — из данных (trueItemId, 311).
+   const robotSlotOverrides = {};
+-  Object.entries(ROBOT_WEAPON_BASE_MAP).forEach(([robotWeaponId, baseWeaponId]) => {
++  robotBaseAliases(catalog).forEach(([robotWeaponId, baseWeaponId]) => {
+     if (modsOverridesData[baseWeaponId]) robotSlotOverrides[robotWeaponId] = modsOverridesData[baseWeaponId];
+   });
+-  // Собственные слоты робо-оружия (293): robot/weapon_mod_slots.json — приоритетнее
+-  // наследования от людской базы (у Головного лазера Штурмотрона — Capacitor).
++  // Собственные слоты робо-оружия (293): производные от самих модов —
++  // приоритетнее наследования от людской базы (у Головного лазера — Capacitor).
+   const merged = { ...modsOverridesData, ...robotSlotOverrides, ...(catalog.robotWeaponModSlots || {}) };
+   const rows = [];
+   for (const [weaponId, slots] of Object.entries(merged)) {
+@@ -226,13 +232,14 @@ const build = () => {
+   const locale = getCurrentModuleLocale();
+   if (_cache && _cacheLocale === locale) return _cache;
+   const catalog = getEquipmentCatalog(locale);
++  const aliases = robotBaseAliases(catalog);
+   _cache = {
+     weapons: (catalog.weapons || []).map(buildWeaponRow),
+     // Робо-моды оружия (293→301): полный пул модов собирает базовая сборка
+     // (i18n/equipmentCatalog.weaponMods уже включает робо-моды) — здесь
+     // только адаптация формы строки. Склейка «людские + робо» жила тут
+     // отдельной копией знания и после 301 давала дубли.
+-    weaponMods: (catalog.weaponMods || []).map(buildWeaponModRow),
++    weaponMods: (catalog.weaponMods || []).map((m) => buildWeaponModRow(m, aliases)),
+     modSlots: buildModSlotRows(catalog),
+     ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
+     qualities: (catalog.qualities || []).map(buildQualityRow),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 27f65d9..4c63e91 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,38 @@
+ 
+ ---
+ 
++## Unification — weapon mods: one truth, one write path; a limb's own-attack mods now survive saving (patch 311)
++
++Owner's rule: modifying items is a property of many games, so the shape
++of truth and the write place are decided by the engine (a universal
++TypeScript contract); the setting supplies the mod catalog and storage.
++
++- One shape of truth: a weapon instance carries a LIST of mod ids; the
++  "slot → id" map is a derived view for the screen (the mod knows its
++  slot). The "list or map" duality is gone: priority is unconditional,
++  an empty map means "no mods".
++- One write path: the upgrade dialog no longer chooses among four
++  branches by storage place. The engine classifies the place and returns
++  a plan (inventory item / human equipped weapon / robot palm / weapon
++  installed into a limb / the limb's own attack); the screen only
++  executes the plan.
++- New state: mods can be installed on a LIMB'S OWN ATTACK (the Assaultron
++  arm claw, the head's built-in Head Laser). The dialog used to offer
++  them, but the save had no place for them — mods vanished on reload.
++  Mods now live on the limb itself and survive saving; the slim save
++  shape gains an optional field (old saves read as before).
++- Data: the hardcoded "robot weapon inherits human mods" map is removed
++  from code — a check across all data files showed it pointed at numeric
++  ids that exist nowhere in the data and never fired (the Flamer, Laser
++  Cutter and Automatic 10mm pistol never inherited human mods). The
++  inheritance mechanism moved into the data (a link field on the robot
++  weapon record); the "robot weapon → human weapon" pairs are the
++  owner's decision.
++- Locked by 15 checks in `__tests__/robot/weapon-mods-one-truth.test.js`
++  (truth shape, write plans for all five storage places, the Mk III
++  capacitor on the Head Laser: damage 5 → 6 and back, slim save shape,
++  card roles, no dead map). Suite 849/849, tsc clean.
++
+ ## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
+ 
+ Owner's word: the single source of truth is the actual file content,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 00c9186..75119b4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,39 @@
+ 
+ ---
+ 
++## Унификация — моды оружия: одна правда и один путь записи; моды собственной атаки конечности переживают сохранение (патч 311)
++
++Правило владельца: модификация предметов — свойство многих игр, поэтому
++форма правды и место записи решаются в движке (универсальный контракт на
++TypeScript), сеттинг подставляет каталог модов и хранилища.
++
++- Единая форма правды: экземпляр оружия несёт СПИСОК id модов; карта
++  «слот → id» — выводимый вид для экрана (мод сам знает свой слот).
++  Двоевластие «список или карта» убрано: приоритет безусловный, пустая
++  карта означает «модов нет».
++- Один путь записи: окно улучшения больше не выбирает из четырёх веток
++  по месту хранения. Место классифицирует движок и отдаёт план (предмет
++  инвентаря / надетое оружие человека / ладонь робота / оружие,
++  установленное в конечность / собственная атака конечности), экран
++  только исполняет план.
++- Новое состояние: моды можно ставить на СОБСТВЕННУЮ атаку конечности
++  (коготь руки Штурмотрона, Головной лазер родной головы). Раньше окно
++  их предлагало, но место в сохранении не было предусмотрено — после
++  перезахода в героя моды пропадали. Теперь моды хранятся на самой
++  конечности и переживают сохранение; в худой форме сейва появляется
++  необязательное поле (старые сейвы читаются как раньше).
++- Данные: из кода удалена зашитая карта «робо-оружие наследует людские
++  моды» — проверкой по всем файлам данных установлено, что она указывала
++  на номерные id, которых в данных нет, и никогда не срабатывала
++  (Огнемёт, Лазерный резак и Автоматический 10-мм пистолет никогда не
++  наследовали людские моды). Механизм наследования перенесён в данные
++  (поле связи в записи робо-оружия); пары «робо-оружие → людское» — на
++  решение владельца.
++- Заперто 15 проверками в `__tests__/robot/weapon-mods-one-truth.test.js`
++  (форма правды, план записи на все пять мест хранения, конденсатор
++  Mk III на Головном лазере: урон 5 → 6 и обратно, худая форма сейва,
++  роли карточек, отсутствие мёртвой карты). Сюит 849/849, tsc чист.
++
+ ## Установщик патчей — переписан по принципу «истина — в файлах» (патч 309)
+ 
+ Слово владельца: единственный источник истины — реальное содержимое
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 2968127..4f95aa8 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -26,6 +26,9 @@
+ import { getBodyPlan } from './bodyplan';
+ import { getRobotLimbCatalog } from './registry';
+ import { applyWeaponMods } from './enrichItem';
++// Единая форма правды модов — движковый контракт (311): список id на
++// экземпляре, карта «слот → id» выводится. Локальный toModIds ниже — фасад.
++import { modIdList } from '../src/engine/items/weaponMods';
+ 
+ /** Слои защиты в порядке приоритета (armor и frame совместимы, plating — нет). */
+ export const LAYER_KEYS = ['armor', 'frame', 'plating'];
+@@ -54,18 +57,7 @@ const EMPTY_ARMOR_LAYERS = () => ({ frame: null, plating: null, armor: null });
+  * @param {object} source
+  * @returns {string[]}
+  */
+-export const toModIds = (source) => {
+-  if (!source || typeof source !== 'object') return [];
+-  // appliedMods — истина экрана: модалка WeaponModificationModal пишет именно её,
+-  // а modIds у восстановленного heldWeapon остаётся служебным (часто пустым) поле-
+-  // выгрузки. Если массив смотрит первым, пустой modIds маскирует свежие appliedMods
+-  // и установленный мод теряется при сохранении слота. Пустой объект appliedMods —
+-  // «модов нет» (снятие мода тоже истина экрана), поэтому приоритет безусловно.
+-  const map = source.appliedMods;
+-  if (map && typeof map === 'object') return Object.values(map).filter(Boolean);
+-  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
+-  return [];
+-};
++export const toModIds = (source) => modIdList(source);
+ 
+ /** Приводит список установленного оружия к виду [{ id, modIds }]. */
+ const normalizeInstalled = (list) => (Array.isArray(list) ? list : [])
+@@ -367,12 +359,22 @@ export function serializeSlot(slot, options = {}) {
+ 
+   const canHold = limbKeepsHeldWeapon(limb);
+ 
++  // Моды собственной атаки конечности (311): у живого слота они лежат на
++  // экземпляре конечности, у худого сейва — на самом слоте. Пишем, только
++  // если есть: пустой список держит худую форму прежней.
++  const ownMods = toModIds({
++    modIds: (typeof state.content === 'object' && state.content
++      ? state.content.ownWeaponMods
++      : null) ?? slot?.ownWeaponMods,
++  });
++
+   return {
+     content,
+     armorLayers,
+     heldWeaponId: canHold ? state.heldWeaponId : null,
+     heldWeaponMods: canHold ? state.heldWeaponMods : [],
+     installedWeapons: state.installedWeapons.filter((entry) => entry?.id),
++    ...(ownMods.length > 0 ? { ownWeaponMods: ownMods } : {}),
+   };
+ }
+ 
+@@ -402,19 +404,32 @@ export function deserializeSlot(slot, options = {}) {
+     ? state.content
+     : (state.content?.id ?? null);
+ 
+-  let limb = null;
+-  if (limbId) {
+-    const entry = resolveLimb(catalog, limbId);
+-    const itemType = entry?.itemType
+-      ?? ITEM_TYPE_BY_LIMB_TYPE[entry?.limbType]
+-      ?? 'robotPart';
+-    const builtinWeapons = [];
+-    const ownId = entry?.itemCategory === 'weaponAsLimb'
+-      ? entry.attackId
+-      : (entry?.builtinWeaponId ?? (entry?.builtinManipulator ? entry.id : null));
+-    if (ownId) {
+-      builtinWeapons.push({ ...(resolveWeapon(catalog, ownId) || {}), id: ownId, weaponId: ownId, itemType: 'weapon', isBuiltin: true });
+-    }
++    let limb = null;
++    if (limbId) {
++      const entry = resolveLimb(catalog, limbId);
++      const itemType = entry?.itemType
++        ?? ITEM_TYPE_BY_LIMB_TYPE[entry?.limbType]
++        ?? 'robotPart';
++      // Моды собственной атаки (311): в худом сейве лежат на слоте.
++      const ownMods = Array.isArray(slot?.ownWeaponMods)
++        ? slot.ownWeaponMods.filter(Boolean)
++        : [];
++      const builtinWeapons = [];
++      const ownId = entry?.itemCategory === 'weaponAsLimb'
++        ? entry.attackId
++        : (entry?.builtinWeaponId ?? (entry?.builtinManipulator ? entry.id : null));
++      if (ownId) {
++        builtinWeapons.push({
++          ...(resolveWeapon(catalog, ownId) || {}),
++          id: ownId,
++          weaponId: ownId,
++          itemType: 'weapon',
++          isBuiltin: true,
++          ...(ownMods.length > 0
++            ? { appliedMods: modMap(catalog, ownMods), modIds: ownMods }
++            : {}),
++        });
++      }
+     for (const installed of state.installedWeapons) {
+       builtinWeapons.push({
+         ...(resolveWeapon(catalog, installed.id) || {}),
+@@ -430,6 +445,7 @@ export function deserializeSlot(slot, options = {}) {
+       ...(entry || {}),
+       id: limbId,
+       itemType,
++      ...(ownMods.length > 0 ? { ownWeaponMods: ownMods } : {}),
+       ...(builtinWeapons.length > 0 ? { builtinWeapons } : {}),
+     };
+   }
+@@ -805,15 +821,18 @@ export function attacksFromSlot(slot, options = {}) {
+   }
+ 
+   // Собственная атака конечности. Экземпляр важнее каталога (в нём могут
+-  // быть моды и имя), каталог — источник характеристик.
++  // быть моды и имя), каталог — источник характеристик. Моды собственной
++  // атаки (311) живут на экземпляре конечности (ownWeaponMods) — они и
++  // применяются здесь; у худого сейва их восстанавливает deserializeSlot.
++  const ownMods = toModIds({ modIds: limb?.ownWeaponMods });
+   const { own } = splitLimbWeapons(limb, { catalog });
+   const ownEntry = own[0] ?? null;
+   if (ownEntry) {
+-    push(ownEntry, 'builtin');
++    push(ownEntry, 'builtin', ownMods.length > 0 ? ownMods : toModIds(ownEntry));
+   } else if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
+-    push(limb.attackId, 'builtin');
++    push(limb.attackId, 'builtin', ownMods);
+   } else if (limb.builtinWeaponId) {
+-    push(limb.builtinWeaponId, 'builtin');
++    push(limb.builtinWeaponId, 'builtin', ownMods);
+   } else if (limb.builtinManipulator) {
+     // Наследие: рука-манипулятор без ссылки на оружие бьёт сама собой.
+     result.push({
+@@ -822,8 +841,8 @@ export function attacksFromSlot(slot, options = {}) {
+       source: 'builtin',
+       slotId: slotId ?? null,
+       instanceKey: `${slotId ?? '?'}:builtin:${limb.id}`,
+-      modIds: [],
+-      appliedMods: {},
++      modIds: ownMods,
++      appliedMods: modMap(catalog, ownMods),
+       isManipulator: true,
+     });
+   }
+@@ -871,6 +890,30 @@ export function setInstalledWeaponMods(slots, slotKey, weaponId, appliedMods) {
+   };
+ }
+ 
++/**
++ * Записать моды на СОБСТВЕННУЮ атаку конечности (311): коготь руки
++ * Штурмотрона, Головной лазер родной головы. База атаки — из каталога,
++ * поставленные моды — состояние персонажа: живут на экземпляре конечности
++ * (ownWeaponMods) и переживают сохранение (serializeSlot/deserializeSlot).
++ *
++ * Возвращает новую карту слотов или null, если в слоте нет конечности.
++ *
++ * @param {object} slots - карта слотов (как в хранилище)
++ * @param {string} slotKey - слот конечности
++ * @param {object} appliedMods - { [slot]: modId } из окна модификации
++ * @returns {object|null}
++ */
++export function setOwnWeaponMods(slots, slotKey, appliedMods) {
++  const slotData = slots?.[slotKey];
++  const limb = slotData?.limb;
++  if (!limb) return null;
++  const modIds = toModIds({ appliedMods: appliedMods || {} });
++  return {
++    ...slots,
++    [slotKey]: { ...slotData, limb: { ...limb, ownWeaponMods: modIds } },
++  };
++}
++
+ // ---------------------------------------------------------------------------
+ // Сбор атак со всех слотов
+ // ---------------------------------------------------------------------------
+@@ -926,6 +969,12 @@ export function collectAttacks(slots, options = {}) {
+         source: undefined,
+         slotId: undefined,
+         instanceKey: undefined,
++        // Роль внутри слота — для плана записи модов (311): ладонь /
++        // установленное / собственная атака. Внутренний источник 'builtin'
++        // (собственная атака) на карточке называется 'ownAttack'.
++        // Классификация места записи живёт в движке
++        // (src/engine/items/weaponMods).
++        attackRole: attack.source === 'builtin' ? 'ownAttack' : (attack.source ?? null),
+         // Встроенная атака конечности и установленное в неё оружие — одно и то
+         // же по смыслу: оружие, которым робот владеет сам, без инвентаря.
+         ...(attack.source === 'builtin' || attack.source === 'installed'
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index cbc0982..d0c58a8 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -18,7 +18,9 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
+ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
+ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+-import { normalizeSlot, setInstalledWeaponMods } from '../../../../domain/robotSlots';
++import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
++// Единый путь записи модов (311): классификация места хранения — движок.
++import { classifyModWritePlan } from '../../../../src/engine/items/weaponMods';
+ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+ import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
+@@ -952,65 +954,99 @@ const WeaponsAndArmorScreen = () => {
+     const itemId = resolveStoreItemId(selectedWeaponForModification);
+     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
+ 
+-    if (selectedWeaponForModification?.sourceSlot && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon) {
+-      const sourceSlot = selectedWeaponForModification.sourceSlot;
+-      setEquippedRobotSlots((prev) => {
+-        const currentSlot = prev?.[sourceSlot];
+-        const currentWeapon = currentSlot?.heldWeapon;
+-        if (!currentWeapon) return prev;
+-        const sameWeapon = currentWeapon.uniqueId === selectedWeaponForModification.uniqueId
+-          || currentWeapon.stackKey === selectedWeaponForModification.stackKey
+-          || currentWeapon.weaponId === selectedWeaponForModification.weaponId
+-          || currentWeapon.id === selectedWeaponForModification.id;
+-        if (!sameWeapon) return prev;
+-        return {
+-          ...prev,
+-          [sourceSlot]: {
+-            ...currentSlot,
+-            heldWeapon: {
+-              ...currentWeapon,
+-              ...modifiedWeapon,
+-              sourceSlot,
+-              uniqueId: currentWeapon.uniqueId,
+-              stackKey: currentWeapon.stackKey,
+-              itemType: 'weapon',
++    // Единый путь записи модов (311): место хранения классифицирует движок
++    // (classifyModWritePlan), экран только исполняет план. Роли слота робота:
++    // ладонь / установленное в конечность / собственная атака конечности.
++    const modPlan = classifyModWritePlan(
++      {
++        sourceSlot: selectedWeaponForModification?.sourceSlot,
++        attackRole: selectedWeaponForModification?.attackRole,
++        isBuiltin: selectedWeaponForModification?.isBuiltin,
++        storeItemId: itemId || null,
++        uniqueId: selectedWeaponForModification?.uniqueId || null,
++        weaponId: selectedWeaponForModification?.weaponId || selectedWeaponForModification?.id || null,
++      },
++      {
++        slotHasHeldWeapon: Boolean(
++          selectedWeaponForModification?.sourceSlot
++          && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon,
++        ),
++      },
++    );
++    debugLog('weapon.mod.apply.screen.plan', { itemId, modPlan });
++
++    if (modPlan?.kind === 'robotSlot') {
++      if (modPlan.role === 'held') {
++        const sourceSlot = modPlan.slotKey;
++        setEquippedRobotSlots((prev) => {
++          const currentSlot = prev?.[sourceSlot];
++          const currentWeapon = currentSlot?.heldWeapon;
++          if (!currentWeapon) return prev;
++          const sameWeapon = currentWeapon.uniqueId === selectedWeaponForModification.uniqueId
++            || currentWeapon.stackKey === selectedWeaponForModification.stackKey
++            || currentWeapon.weaponId === selectedWeaponForModification.weaponId
++            || currentWeapon.id === selectedWeaponForModification.id;
++          if (!sameWeapon) return prev;
++          return {
++            ...prev,
++            [sourceSlot]: {
++              ...currentSlot,
++              heldWeapon: {
++                ...currentWeapon,
++                ...modifiedWeapon,
++                sourceSlot,
++                uniqueId: currentWeapon.uniqueId,
++                stackKey: currentWeapon.stackKey,
++                itemType: 'weapon',
++              },
+             },
+-          },
+-        };
+-      });
+-      return;
+-    }
++          };
++        });
++        return;
++      }
+ 
+-    // Оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head' из комплекта):
+-    // живёт внутри конечности, не в ладони и не в инвентаре — моды пишутся
+-    // в его запись (appliedMods), карточка и сейв читают её же.
+-    if (selectedWeaponForModification?.sourceSlot && selectedWeaponForModification.isBuiltin) {
+-      const installedNext = setInstalledWeaponMods(
++      if (modPlan.role === 'installed') {
++        // Оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head' из
++        // комплекта): живёт внутри конечности, моды пишутся в его запись.
++        const installedNext = setInstalledWeaponMods(
++          equippedRobotSlots,
++          modPlan.slotKey,
++          modPlan.weaponId,
++          modifiedWeapon?.appliedMods || {},
++        );
++        if (installedNext) {
++          setEquippedRobotSlots(installedNext);
++        }
++        return;
++      }
++
++      // Собственная атака конечности (коготь/Головной лазер): моды —
++      // состояние персонажа, пишутся на конечность и переживают сохранение.
++      const ownNext = setOwnWeaponMods(
+         equippedRobotSlots,
+-        selectedWeaponForModification.sourceSlot,
+-        selectedWeaponForModification.weaponId || selectedWeaponForModification.id,
++        modPlan.slotKey,
+         modifiedWeapon?.appliedMods || {},
+       );
+-      if (installedNext) {
+-        setEquippedRobotSlots(installedNext);
+-        return;
++      if (ownNext) {
++        setEquippedRobotSlots(ownNext);
+       }
++      return;
+     }
+ 
+-    if (itemId) {
++    if (modPlan?.kind === 'storeItem') {
+       const patch = weaponModPatchToStore(modifiedWeapon);
+-      debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
+-      updateItem(itemId, patch);
++      debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
++      updateItem(modPlan.itemId, patch);
+       return;
+     }
+ 
+-    // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+-    // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
+-    setEquippedWeapons((prev) => prev.map((w) => (
+-      w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
+-        ? modifiedWeapon
+-        : w
+-    )));
++    if (modPlan?.kind === 'equippedWeapon') {
++      // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
++      // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
++      setEquippedWeapons((prev) => prev.map((w) => (
++        w && w.uniqueId === modPlan.uniqueId ? modifiedWeapon : w
++      )));
++    }
+   }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
+ 
+   const handleUnequipWeapon = useCallback((weapon) => {
+diff --git a/src/engine/items/weaponMods.ts b/src/engine/items/weaponMods.ts
+new file mode 100644
+index 0000000..46a0b72
+--- /dev/null
++++ b/src/engine/items/weaponMods.ts
+@@ -0,0 +1,126 @@
++/**
++ * Движковый контракт модов предмета (универсальный, сеттинга не знает).
++ *
++ * Решение владельца (2026-09-22): модификация предметов — свойство многих
++ * игр, поэтому форма правды и классификация места записи живут в движке;
++ * сеттинг (Fallout) подставляет только каталог модов и хранилища.
++ *
++ * Единая форма правды: ЭКЗЕМПЛЯР оружия несёт СПИСОК id модов.
++ *   — в хранилищах и сейвах список id (`modIds`);
++ *   — карта «слот → id» (`appliedMods`) — выводимый вид для экрана,
++ *     мод сам знает свой слот; пустая карта означает «модов нет».
++ *
++ * Запись выбора из окна модификации: экран строит ПЛАН (classifyModWritePlan)
++ * по месту хранения экземпляра и исполняет его — один путь записи вместо
++ * ветвления по месту (правило: одна операция — один владелец).
++ */
++
++export type ModId = string;
++
++/** Источник в любом из двух видов: список id или карта «слот → id». */
++export type ModSource = {
++  modIds?: unknown;
++  appliedMods?: unknown;
++};
++
++/**
++ * Список id модов экземпляра — единственная форма правды.
++ *
++ * Приоритет безусловный у карты `appliedMods` (её пишет окно модификации,
++ * пустой объект означает «модов нет» — снятие мода тоже истина экрана);
++ * список `modIds` — форма хранения, чаще служебная. Порядок списка —
++ * порядок значений карты (устойчивый, зависит от порядка ключей).
++ */
++export function modIdList(source: unknown): ModId[] {
++  if (!source || typeof source !== 'object') return [];
++  const map = (source as ModSource).appliedMods;
++  if (map && typeof map === 'object') {
++    return Object.values(map as Record<string, unknown>)
++      .filter((v): v is ModId => typeof v === 'string' && v.length > 0);
++  }
++  const list = (source as ModSource).modIds;
++  if (Array.isArray(list)) {
++    return list.filter((v): v is ModId => typeof v === 'string' && v.length > 0);
++  }
++  return [];
++}
++
++/**
++ * Выводимая карта «слот → id» для показа: мод находит свой слот через
++ * `resolve`. Мод без слота попадает под собственным id (не теряется).
++ */
++export function modIdMap<M extends { slot?: string | null; id?: string }>(
++  ids: readonly ModId[],
++  resolve: (id: ModId) => M | null | undefined,
++): Record<string, ModId> {
++  const out: Record<string, ModId> = {};
++  for (const id of ids) {
++    const mod = resolve(id);
++    const key = mod?.slot || id;
++    out[key] = id;
++  }
++  return out;
++}
++
++/** Роль экземпляра оружия внутри слота робота (форма слота — дело сеттинга). */
++export type RobotWeaponRole = 'held' | 'installed' | 'ownAttack';
++
++/** План записи выбора модов: куда и какой экземпляр меняется. */
++export type WeaponModWritePlan =
++  | { kind: 'storeItem'; itemId: string }
++  | { kind: 'equippedWeapon'; uniqueId: string }
++  | { kind: 'robotSlot'; slotKey: string; role: RobotWeaponRole; weaponId: string | null };
++
++/** Карточка оружия на экране: поля, по которым строится план. */
++export type WeaponCardRef = {
++  /** Слот робота, показавший карточку (если карточка из слотов робота). */
++  sourceSlot?: string | null;
++  /** Роль внутри слота: ладонь / установленное / собственная атака. */
++  attackRole?: RobotWeaponRole | null;
++  /** Наследие старых карточек: встроенное (установленное или собственное). */
++  isBuiltin?: boolean | null;
++  /** Предмет инвентаря (id записи хранилища), если карточка из инвентаря. */
++  storeItemId?: string | null;
++  /** Ключ экземпляра в списке надетого оружия человека. */
++  uniqueId?: string | null;
++  /** id оружия (база из каталога). */
++  id?: string | null;
++  weaponId?: string | null;
++};
++
++/** Контекст, которого нет на карточке: чем занят слот робота. */
++export type ModWriteContext = {
++  /** В слоте робота есть оружие в ладони (ветка ладони законна). */
++  slotHasHeldWeapon?: boolean;
++};
++
++/**
++ * План записи выбора модов. Роль внутри слота берётся из `attackRole`;
++ * у старых карточек без роли она выводится: встроенное — установленное,
++ * иначе (если слот занят ладонью) — ладонь. Инвентарь и надетое оружие
++ * человека различаются по наличию id записи хранилища.
++ */
++export function classifyModWritePlan(
++  ref: WeaponCardRef,
++  context: ModWriteContext = {},
++): WeaponModWritePlan | null {
++  const weaponId = ref.weaponId ?? ref.id ?? null;
++
++  if (ref.sourceSlot) {
++    let role = ref.attackRole ?? null;
++    if (!role) {
++      role = ref.isBuiltin ? 'installed' : (context.slotHasHeldWeapon ? 'held' : null);
++    }
++    if (role) {
++      return { kind: 'robotSlot', slotKey: ref.sourceSlot, role, weaponId };
++    }
++  }
++
++  if (ref.storeItemId) {
++    return { kind: 'storeItem', itemId: ref.storeItemId };
++  }
++  if (ref.uniqueId) {
++    return { kind: 'equippedWeapon', uniqueId: ref.uniqueId };
++  }
++  return null;
++}
+PATCH_311_EOF
