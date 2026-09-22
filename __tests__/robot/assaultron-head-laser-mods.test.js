@@ -25,6 +25,8 @@ import {
 import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
 import { getRobotLimbCatalog } from '../../domain/registry';
 import { applyWeaponMods } from '../../domain/enrichItem';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
 const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
@@ -125,6 +127,34 @@ describe('уникальные моды Головного лазера Штур
     for (const mod of robotWeaponMods) {
       expect(byId(ruWeaponMods, mod.id), `ru i18n для ${mod.id}`).toBeTruthy();
       expect(byId(enWeaponMods, mod.id), `en i18n для ${mod.id}`).toBeTruthy();
+    }
+  });
+
+  it('экранный каталог: конденсаторы в пуле weaponMods (не только в реестре)', () => {
+    // Установка мода идёт через БД, план списания — через реестр конечностей,
+    // а карточка оружия на экране резолвится через экранный каталог
+    // (enrichWeaponItem). Пул обязан содержать робо-моды, иначе после
+    // установки мод молча теряется: урон карточки возвращается к базе.
+    const equipmentCatalog = getEquipmentCatalog('ru-RU');
+    for (const mod of robotWeaponMods) {
+      expect(
+        equipmentCatalog.weaponMods.some((m) => m?.id === mod.id),
+        `${mod.id} в пуле weaponMods экранного каталога`,
+      ).toBe(true);
+    }
+  });
+
+  it('карточка лазера с конденсатором: урон базы + мод (экранный путь, репродукция отчёта владельца)', () => {
+    const laser = byId(robotWeaponsData, LASER_ID);
+    const equipmentCatalog = getEquipmentCatalog('ru-RU');
+    for (const { suffix, damage } of EXPECTED) {
+      const resolved = resolveWeaponWithAppliedMods({
+        id: LASER_ID,
+        weaponId: LASER_ID,
+        itemType: 'weapon',
+        appliedMods: { Capacitor: modId(suffix) },
+      }, equipmentCatalog);
+      expect(resolved.damage, `${suffix}: урон карточки`).toBe(laser.damage + damage);
     }
   });
 });

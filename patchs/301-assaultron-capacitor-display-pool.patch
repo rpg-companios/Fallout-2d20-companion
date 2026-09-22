@@ -1,0 +1,75 @@
+#!/bin/sh
+# Патч 301: конденсаторы Головного лазера не меняли урон карточки (экранный каталог).
+# Применять из корня репозитория: sh patchs/301-assaultron-capacitor-display-pool.patch
+# Одна правка: пул weaponMods экранного каталога включает моды оружия роботов,
+# как в реестре конечностей (290). Требует файл __tests__/robot/assaultron-head-laser-mods.test.js
+# (эпоха 290) — если он у тебя удалён, скажи, дам вариант без тестового ханка.
+patch -p1 <<'PATCH_301_EOF'
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index 3042c1e..b3edbc2 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -25,6 +25,8 @@ import {
+ import { deserializeSlot, serializeSlot, toModIds } from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ import { applyWeaponMods } from '../../domain/enrichItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
+ 
+ const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+ const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+@@ -127,6 +129,34 @@ describe('уникальные моды Головного лазера Штур
+       expect(byId(enWeaponMods, mod.id), `en i18n для ${mod.id}`).toBeTruthy();
+     }
+   });
++
++  it('экранный каталог: конденсаторы в пуле weaponMods (не только в реестре)', () => {
++    // Установка мода идёт через БД, план списания — через реестр конечностей,
++    // а карточка оружия на экране резолвится через экранный каталог
++    // (enrichWeaponItem). Пул обязан содержать робо-моды, иначе после
++    // установки мод молча теряется: урон карточки возвращается к базе.
++    const equipmentCatalog = getEquipmentCatalog('ru-RU');
++    for (const mod of robotWeaponMods) {
++      expect(
++        equipmentCatalog.weaponMods.some((m) => m?.id === mod.id),
++        `${mod.id} в пуле weaponMods экранного каталога`,
++      ).toBe(true);
++    }
++  });
++
++  it('карточка лазера с конденсатором: урон базы + мод (экранный путь, репродукция отчёта владельца)', () => {
++    const laser = byId(robotWeaponsData, LASER_ID);
++    const equipmentCatalog = getEquipmentCatalog('ru-RU');
++    for (const { suffix, damage } of EXPECTED) {
++      const resolved = resolveWeaponWithAppliedMods({
++        id: LASER_ID,
++        weaponId: LASER_ID,
++        itemType: 'weapon',
++        appliedMods: { Capacitor: modId(suffix) },
++      }, equipmentCatalog);
++      expect(resolved.damage, `${suffix}: урон карточки`).toBe(laser.damage + damage);
++    }
++  });
+ });
+ 
+ describe('установка: модалка модернизации получает конденсаторы (293)', () => {
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index da032cc..3d4edf4 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -464,7 +464,13 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+     junk: mergedJunk,
+     materials: mergedScrapMaterials,
+     oddities: mergedOddities,
+-    weaponMods: mergedWeaponMods,
++    // Пул weaponMods включает и моды оружия роботов (290): экранный каталог —
++    // источник для enrichWeaponItem (карточки оружия на экране снаряжения), и
++    // конденсаторы Головного лазера Штурмотрона обязаны находиться в том же
++    // пуле, что и в реестре конечностей (ROBOT_LIMB_CATALOG.weaponMods).
++    // Без этого установленный мод молча терялся: урон карточки возвращался
++    // к базе, хотя превью модалки и план списания зарядов мод видели.
++    weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods],
+     robotWeaponMods: mergedRobotWeaponMods,
+     robotWeaponModSlots: moduleRobotWeaponModSlots,
+     armorMods: mergedArmorMods,
+PATCH_301_EOF
