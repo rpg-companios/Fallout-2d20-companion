@@ -258,6 +258,19 @@ is_confirmed() {
   dfile="$(extract_patch "$dname")"
   ok=0
 
+  # 0) патч самого установщика: установщик приходит бутстрапом (копия себя
+  # из ветки до цепочки), минуя промежуточные патчи 295→297→299 — их
+  # содержимое в дереве перекрыто самой программой установки. Такой патч
+  # подтверждён, если его единственный содержательный файл — apply-patch.sh.
+  local only_installer=1
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if [[ "$f" != "apply-patch.sh" ]]; then only_installer=0; break; fi
+  done < <(patch_files_strong "$dfile")
+  if [[ $only_installer -eq 1 ]]; then
+    return 0
+  fi
+
   # 1) общий файл с более поздним стоящим/применённым
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
