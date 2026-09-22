@@ -529,17 +529,27 @@ for name in "${QUEUE[@]}"; do
     fi
   done < <(grep 'already exists' "$WORKDIR/fwd.err" || true)
 
+  apply_done=0
   if [[ $leftovers_ok -eq 1 && ${#moved[@]} -gt 0 ]]; then
     if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>/dev/null; then
       git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
       echo "ок (остатки отката совпали байт в байт — воссозданы патчем)"
       APPLIED+=("$name")
-      continue
+      apply_done=1
     fi
-    # не помогло — вернуть остатки на место и идти к откладыванию
+  fi
+  if [[ $apply_done -ne 1 && ${#moved[@]} -gt 0 ]]; then
+    # Вернуть перемещённое на место ВСЕГДА: и когда очередной файл не
+    # совпал (leftovers_ok=0), и когда проверка с перемещённым не прошла.
+    # Раньше возврат был только во второй ветке — частично перемещённые
+    # файлы терялись из дерева (случай с приёмочным тестом тест-сеттинга).
     for p in "${moved[@]}"; do
-      mv "$WORKDIR/leftovers/$p" "$ROOT_DIR/$p"
+      [[ -e "$WORKDIR/leftovers/$p" ]] && mv "$WORKDIR/leftovers/$p" "$ROOT_DIR/$p"
     done
+  fi
+
+  if [[ $apply_done -eq 1 ]]; then
+    continue
   fi
 
   echo "отложен (дерево разошлось — проверю по ходу цепочки)"
