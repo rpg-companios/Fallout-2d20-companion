@@ -1,0 +1,214 @@
+#!/bin/sh
+# Патч 306: слоты модов робо-оружия выведены из самих модов (slot + applies_to_ids).
+# Файл-дубль robot/weapon_mod_slots.json удалён (слово владельца: мод сам заявляет
+# слот и применимость — отдельный файл плодил вторую копию знания).
+# Тянет цепочку 300–305, если они ещё не стоят.
+patch -p1 <<'PATCH_306_EOF'
+diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
+index a5077e2..ca64ce1 100644
+--- a/__tests__/robot/assaultron-head-laser-mods.test.js
++++ b/__tests__/robot/assaultron-head-laser-mods.test.js
+@@ -31,7 +31,6 @@ import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
+ import { mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
+ 
+ const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+-const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+ const ruWeaponMods = SETTING.names['ru-RU'].equipment.robot.weaponMods;
+ const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
+ const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
+@@ -88,13 +87,25 @@ describe('уникальные моды Головного лазера Штур
+       expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
+     }
+     expect(catalog.robotWeaponMods).toEqual(robotWeaponMods);
+-    expect(catalog.robotWeaponModSlots).toEqual(robotWeaponModSlots);
+   });
+ 
+-  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {
+-    const slots = robotWeaponModSlots[LASER_ID];
++  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами — ВЫВЕДЕНЫ из самих модов (патч 306)', () => {
++    const cat = getEquipmentCatalog('ru-RU');
++    const slots = cat.robotWeaponModSlots[LASER_ID];
+     expect(Object.keys(slots)).toEqual(['Capacitor']);
+     expect(slots.Capacitor).toEqual(EXPECTED.map(({ suffix }) => modId(suffix)));
++    // файл-дубль удалён: слоты робо-оружия существуют только как производные
++    expect(SETTING.data.equipment.robot.modSlots).toBeUndefined();
++  });
++
++  it('каждый робо-мод заявляет слот и применимость — иначе производные слоты его потеряют', () => {
++    for (const mod of robotWeaponMods) {
++      expect(mod.slot, `${mod.id}: slot`).toBeTruthy();
++      expect(
++        Array.isArray(mod.applies_to_ids) && mod.applies_to_ids.length > 0,
++        `${mod.id}: applies_to_ids непуст`,
++      ).toBe(true);
++    }
+   });
+ 
+   it('i18n ru: имена «Конденсатор Mk III–VI», префиксы Mk, эффекты с зарядами', () => {
+diff --git a/domain/registry.js b/domain/registry.js
+index 817c62f..9788424 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -23,7 +23,6 @@ const robotArmorJson = SETTING.data.equipment.robot.armor;
+ const robotArmorPlatingJson = SETTING.data.equipment.robot.armorPlating;
+ const robotFramesJson = SETTING.data.equipment.robot.frames;
+ const robotWeaponModsJson = SETTING.data.equipment.robot.weaponMods;
+-const robotWeaponModSlotsJson = SETTING.data.equipment.robot.modSlots;
+ const moduleOrigins = SETTING.data.origins;
+ const moduleFitProfiles = SETTING.data.fitProfiles;
+ const moduleCategories = SETTING.data.equipment.categories;
+@@ -151,10 +150,10 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
+   // Головного лазера Штурмотрона живут в robot/weapon_mods.json и
+   // восстанавливаются тем же конвейером.
+   weaponMods: [...moduleWeaponMods, ...robotWeaponModsJson],
+-  // Моды оружия роботов (290) отдельным списком и слоты для них: будущий
+-  // экран установки читает «какие моды предлагать» отсюда, а не из пула.
++  // Моды оружия роботов (290) отдельным списком. Слоты — ПРОИЗВОДНЫЕ от
++  // самих модов (slot + applies_to_ids, патч 306): их собирает экранный
++  // каталог (i18n/equipmentCatalog), файл-дубль удалён.
+   robotWeaponMods: robotWeaponModsJson,
+-  robotWeaponModSlots: robotWeaponModSlotsJson,
+   // Слои защиты плоским списком; принадлежность слою — в поле layer.
+   armorLayers: [
+     ...(robotArmorJson.armor || []),
+diff --git a/i18n/equipmentCatalog.js b/i18n/equipmentCatalog.js
+index 3d4edf4..f063a09 100644
+--- a/i18n/equipmentCatalog.js
++++ b/i18n/equipmentCatalog.js
+@@ -85,7 +85,6 @@ const moduleChems = SETTING.data.consumables.chems;
+ const moduleMagazines = SETTING.data.consumables.magazines;
+ const moduleWeaponMods = SETTING.data.equipment.weaponMods;
+ const moduleRobotWeaponMods = SETTING.data.equipment.robot.weaponMods;
+-const moduleRobotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
+ const moduleRobotParts = SETTING.data.equipment.robotParts;
+ const moduleWeaponModSlots = SETTING.data.equipment.weaponModSlots;
+ const moduleRobotLimbs = SETTING.data.equipment.robot.limbs;
+@@ -414,6 +413,18 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+   const mergedRobotLegs = limbsOfType('mover');
+   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
+   const mergedRobotWeaponMods = mergeById(moduleRobotWeaponMods, moduleI18n.robotWeaponMods);
++  // Слоты модов робо-оружия — ПРОИЗВОДНЫЕ от самих модов (слово владельца,
++  // патч 306): мод заявляет слот (slot) и применимость (applies_to_ids);
++  // отдельный файл-дубль robot/weapon_mod_slots.json удалён. Порядок модов
++  // в слоте — порядок записей в данных.
++  const robotWeaponModSlots = {};
++  for (const mod of mergedRobotWeaponMods) {
++    if (!mod.slot) continue;
++    for (const weaponId of mod.applies_to_ids || []) {
++      (robotWeaponModSlots[weaponId] ??= {});
++      (robotWeaponModSlots[weaponId][mod.slot] ??= []).push(mod.id);
++    }
++  }
+   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
+   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
+ 
+@@ -472,7 +483,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
+     // к базе, хотя превью модалки и план списания зарядов мод видели.
+     weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods],
+     robotWeaponMods: mergedRobotWeaponMods,
+-    robotWeaponModSlots: moduleRobotWeaponModSlots,
++    robotWeaponModSlots,
+     armorMods: mergedArmorMods,
+     uniqArmorMods: mergedUniqArmorMods,
+     modsOverrides: moduleWeaponModSlots,
+diff --git a/modules/fallout/data/equipment/robot/weapon_mod_slots.json b/modules/fallout/data/equipment/robot/weapon_mod_slots.json
+deleted file mode 100644
+index 8909b11..0000000
+--- a/modules/fallout/data/equipment/robot/weapon_mod_slots.json
++++ /dev/null
+@@ -1,10 +0,0 @@
+-{
+-  "robot_weapon_assaultron_head_laser": {
+-    "Capacitor": [
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
+-      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi"
+-    ]
+-  }
+-}
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+index 295e684..9bb37b6 100644
+--- a/modules/fallout/index.js
++++ b/modules/fallout/index.js
+@@ -76,7 +76,6 @@ import robotArmor from './data/equipment/robot/armor.json';
+ import robotArmorPlating from './data/equipment/robot/armor_plating.json';
+ import robotFrames from './data/equipment/robot/frames.json';
+ import robotWeaponMods from './data/equipment/robot/weapon_mods.json';
+-import robotWeaponModSlots from './data/equipment/robot/weapon_mod_slots.json';
+ 
+ // — расходники —
+ import food from './data/consumables/food.json';
+@@ -238,7 +237,6 @@ export const SETTING = Object.freeze({
+         armorPlating: robotArmorPlating,
+         frames: robotFrames,
+         weaponMods: robotWeaponMods,
+-        modSlots: robotWeaponModSlots,
+       },
+     },
+ 
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 8295028..2c2c865 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -349,10 +349,11 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+         const slots = await getSlotsForWeapon(resolvedWeaponId);
+         const bySlot = {};
+ 
+-        // ПРАВИЛО (владелец, патч 108): источник слотов — ТОЛЬКО
+-        // weapon_mod_slots (контент модуля). Фолбэк на appliesToIds удалён:
+-        // если для оружия записей нет — моды не предлагаются, данные
+-        // дополняются в модуле (weapon_mod_slots).
++        // ПРАВИЛО (владелец, патч 108; уточнение патча 306): источник слотов —
++        // данные модуля. Для оружия людей — weapon_mod_slots.json; слоты
++        // робо-оружия ВЫВЕДЕНЫ из самих модов (slot + applies_to_ids),
++        // файл-дубль robot/weapon_mod_slots.json удалён. Оба вида приходят
++        // сюда одним списком через каталог (getSlotsForWeapon).
+         if (slots && slots.length) {
+           for (const slot of slots) {
+             const normalizedSlot = normalizeSlotKey(slot);
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -5,1 +5,18 @@
++## Роботы — Слоты модов выведены из самих модов, файл-дубль удалён (патч 306)
++
++Слово владельца: незачем держать отдельный файл, перечисляющий, какие
++моды в каких слотах какого оружия живут, если каждая запись мода уже
++говорит это сама — своим слотом и списком применимости.
++
++- файл robot/weapon_mod_slots.json (дубль знаний о конденсаторах
++  Головного лазера) удалён;
++- слоты робо-оружия собираются из самих модов: слот + применимость;
++  порядок модов — порядок записей в данных;
++- окно установки модов и списание зарядов работают как раньше —
++  проверками зафиксировано: у лазера один слот конденсатора со всеми
++  четырьмя модами, как в удалённом файле;
++- новый предохранитель: каждый робо-мод обязан заявлять слот и
++  применимость — иначе производные слоты его потеряют, и тест падает
++  до того, как мод исчезнет из окна установки.
++
+ ## Роботы — Моды на оружие, установленное в конечность (патч 305)
+ 
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -5,1 +5,18 @@
++## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
++
++Owner's rule: no point keeping a separate file listing which mods live
++in which slots of which weapon, when every mod record already says so
++itself — via its slot and its applicability list.
++
++- the robot/weapon_mod_slots.json file (a duplicate of the Head Laser
++  capacitor knowledge) is removed;
++- robot weapon slots are derived from the mods: slot + applicability;
++  mod order follows the data record order;
++- the mod-install dialog and ammo spending work as before — locked by
++  checks: the laser has one capacitor slot with all four mods, same as
++  the removed file had;
++- new fuse: every robot mod must declare a slot and applicability —
++  otherwise the derived slots would lose it, and the test fails before
++  the mod disappears from the install dialog.
++
+ ## Robots — Mods for weapons installed into a limb (patch 305)
+ 
+PATCH_306_EOF

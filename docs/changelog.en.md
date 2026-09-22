@@ -2,6 +2,23 @@
 
 ---
 
+## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
+
+Owner's rule: no point keeping a separate file listing which mods live
+in which slots of which weapon, when every mod record already says so
+itself — via its slot and its applicability list.
+
+- the robot/weapon_mod_slots.json file (a duplicate of the Head Laser
+  capacitor knowledge) is removed;
+- robot weapon slots are derived from the mods: slot + applicability;
+  mod order follows the data record order;
+- the mod-install dialog and ammo spending work as before — locked by
+  checks: the laser has one capacitor slot with all four mods, same as
+  the removed file had;
+- new fuse: every robot mod must declare a slot and applicability —
+  otherwise the derived slots would lose it, and the test fails before
+  the mod disappears from the install dialog.
+
 ## Robots — Mods for weapons installed into a limb (patch 305)
 
 Owner's report: the laser gun from the "assaultron_us_military" kit

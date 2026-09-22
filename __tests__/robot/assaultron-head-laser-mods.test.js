@@ -31,7 +31,6 @@ import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 import { mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
 
 const robotWeaponMods = SETTING.data.equipment.robot.weaponMods;
-const robotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
 const ruWeaponMods = SETTING.names['ru-RU'].equipment.robot.weaponMods;
 const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
 const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
@@ -88,13 +87,25 @@ describe('уникальные моды Головного лазера Штур
       expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
     }
     expect(catalog.robotWeaponMods).toEqual(robotWeaponMods);
-    expect(catalog.robotWeaponModSlots).toEqual(robotWeaponModSlots);
   });
 
-  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами', () => {
-    const slots = robotWeaponModSlots[LASER_ID];
+  it('слоты: у лазера один слот Capacitor со всеми четырьмя модами — ВЫВЕДЕНЫ из самих модов (патч 306)', () => {
+    const cat = getEquipmentCatalog('ru-RU');
+    const slots = cat.robotWeaponModSlots[LASER_ID];
     expect(Object.keys(slots)).toEqual(['Capacitor']);
     expect(slots.Capacitor).toEqual(EXPECTED.map(({ suffix }) => modId(suffix)));
+    // файл-дубль удалён: слоты робо-оружия существуют только как производные
+    expect(SETTING.data.equipment.robot.modSlots).toBeUndefined();
+  });
+
+  it('каждый робо-мод заявляет слот и применимость — иначе производные слоты его потеряют', () => {
+    for (const mod of robotWeaponMods) {
+      expect(mod.slot, `${mod.id}: slot`).toBeTruthy();
+      expect(
+        Array.isArray(mod.applies_to_ids) && mod.applies_to_ids.length > 0,
+        `${mod.id}: applies_to_ids непуст`,
+      ).toBe(true);
+    }
   });
 
   it('i18n ru: имена «Конденсатор Mk III–VI», префиксы Mk, эффекты с зарядами', () => {

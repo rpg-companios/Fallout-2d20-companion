@@ -76,7 +76,6 @@ import robotArmor from './data/equipment/robot/armor.json';
 import robotArmorPlating from './data/equipment/robot/armor_plating.json';
 import robotFrames from './data/equipment/robot/frames.json';
 import robotWeaponMods from './data/equipment/robot/weapon_mods.json';
-import robotWeaponModSlots from './data/equipment/robot/weapon_mod_slots.json';
 
 // — расходники —
 import food from './data/consumables/food.json';
@@ -238,7 +237,6 @@ export const SETTING = Object.freeze({
         armorPlating: robotArmorPlating,
         frames: robotFrames,
         weaponMods: robotWeaponMods,
-        modSlots: robotWeaponModSlots,
       },
     },
 
