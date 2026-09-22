@@ -70,7 +70,8 @@
         "effectId": "effect_spread"
       }
     ],
-    "handheld": false
+    "handheld": false,
+    "baseWeaponId": "weapon_flamer"
   },
   {
     "id": "robot_weapon_circular_saw",
@@ -130,7 +131,8 @@
         "effectId": "effect_piercing_x"
       }
     ],
-    "handheld": false
+    "handheld": false,
+    "baseWeaponId": "weapon_laser_gun"
   },
   {
     "id": "robot_weapon_auto_10mm",
@@ -160,7 +162,11 @@
         "effectId": "effect_burst"
       }
     ],
-    "handheld": false
+    "handheld": false,
+    "baseWeaponId": "weapon_10mm_pistol",
+    "modIds": [
+      "mod_008"
+    ]
   },
   {
     "id": "robot_weapon_cryojet",

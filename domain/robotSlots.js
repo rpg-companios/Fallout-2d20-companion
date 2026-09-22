@@ -307,10 +307,27 @@ const materializeWeapon = (catalog, entry, modIds = []) => {
   const merged = base
     ? { ...base, ...(instance || {}) }
     : (instance ? { ...instance } : { id });
-  const ids = modIds.length > 0 ? modIds : toModIds(instance);
+  // Моды «из коробки» (312): запись оружия может нести modIds — заводские
+  // моды, с которыми оружие существует (Автоматический 10-мм пистолет —
+  // 10-мм пистолет с авто-ресивером, как оружие с модом в ките супермутанта).
+  // Установленный игроком мод в том же слоте снимает заводской; снятие
+  // всех модов возвращает заводские — это часть сути оружия.
+  const factoryIds = Array.isArray(base?.modIds) ? base.modIds.filter(Boolean) : [];
+  const instanceIds = modIds.length > 0 ? modIds : toModIds(instance);
+  const instanceSlots = new Set(
+    resolveMods(catalog, instanceIds).map((mod) => mod.slot).filter(Boolean),
+  );
+  const keptFactoryIds = factoryIds.filter((factoryId) => {
+    const factoryMod = resolveMods(catalog, [factoryId])[0];
+    return !factoryMod?.slot || !instanceSlots.has(factoryMod.slot);
+  });
+  const ids = [...new Set([...keptFactoryIds, ...instanceIds])];
   const mods = resolveMods(catalog, ids);
   const plain = flattenStats(merged);
-  return mods.length > 0 ? applyWeaponMods(plain, mods) : plain;
+  const out = mods.length > 0 ? applyWeaponMods(plain, mods) : plain;
+  // Служебное поле: эффективный список модов (заводские + экземпляра).
+  // Карточки его читают и снимают (collectAttacks), в сейвы оно не идёт.
+  return { ...out, effectiveModIds: ids };
 };
 
 // ---------------------------------------------------------------------------
@@ -784,14 +801,20 @@ export function attacksFromSlot(slot, options = {}) {
     if (!id) return;
     const instanceKey = `${slotId ?? '?'}:${source}:${id}`;
     const resolved = materializeWeapon(catalog, weapon, modIds);
+    // Эффективный список модов считает materializeWeapon: заводские «из
+    // коробки» (312) + моды экземпляра. Карточка показывает его — это
+    // та же правда, из которой посчитаны статы.
+    const effectiveModIds = Array.isArray(resolved?.effectiveModIds)
+      ? resolved.effectiveModIds
+      : modIds;
     result.push({
       ...resolved,
       id,
       source,
       slotId: slotId ?? null,
       instanceKey,
-      modIds,
-      appliedMods: modMap(catalog, modIds),
+      modIds: effectiveModIds,
+      appliedMods: modMap(catalog, effectiveModIds),
     });
   };
 
@@ -969,6 +992,7 @@ export function collectAttacks(slots, options = {}) {
         source: undefined,
         slotId: undefined,
         instanceKey: undefined,
+        effectiveModIds: undefined,
         // Роль внутри слота — для плана записи модов (311): ладонь /
         // установленное / собственная атака. Внутренний источник 'builtin'
         // (собственная атака) на карточке называется 'ownAttack'.

@@ -2,6 +2,36 @@
 
 ---
 
+## Data — robot weapons inherit human mods via a data link; weapons "with a mod out of the box" (patch 312)
+
+Owner's word: the Mister Handy Flamer IS the human Flamer; the Laser
+Cutter IS the human Laser Gun; the Automatic 10mm Pistol is a 10mm Pistol
+with an auto receiver pre-installed, like the kit weapon with a mod the
+super mutant gets.
+
+- The link lives in data: a baseWeaponId field on the robot weapon record
+  (Flamer → weapon_flamer, Laser Cutter → weapon_laser_gun, Automatic
+  10mm Pistol → weapon_10mm_pistol). The upgrade dialog now offers human
+  mods to robot weapons: Flamer — fuels and barrels (6 mods), Laser
+  Cutter — capacitors and barrels (21), Automatic 10mm — the full Pistol
+  set (28). An edit to a human mod reaches the robot version without
+  touching the program.
+- "Out of the box": a weapon record may carry modIds — factory mods. The
+  Automatic 10mm ships with the auto receiver mod_008: damage 4 → 3,
+  fire rate 3 → 5, the Inaccurate quality. The card shows the mod as
+  installed. A player mod in the same slot replaces the factory one;
+  removing all mods brings the factory one back — it is part of the
+  weapon's identity.
+- Locked by 10 checks in
+  `__tests__/weapons/robot-weapon-inheritance.test.js` — links point to
+  existing records (the dead-map lesson of 311), upgrade dialogs see the
+  human mods, the auto-receiver math on the card, replacement and return
+  of the factory mod, the slim save shape. Suite 859/859, tsc clean.
+
+---
+
+---
+
 ## Unification — weapon mods: one truth, one write path; a limb's own-attack mods now survive saving (patch 311)
 
 Owner's rule: modifying items is a property of many games, so the shape
