@@ -1,0 +1,331 @@
+#!/bin/sh
+# Патч 312: робо-оружие наследует людские моды по связи В ДАННЫХ
+# (baseWeaponId в robot/weapons.json):
+#   Огнемёт Мистера Помощника → людской Огнемёт (weapon_flamer);
+#   Лазерный резак → людской Лазерный пистолет (weapon_laser_gun);
+#   Автоматический 10-мм пистолет → Пистолет 10мм (weapon_10mm_pistol)
+#     и выходит С МОДОМ ИЗ КОРОБКИ: авто-ресивер mod_008 (конвенция кита
+#     супермутанта: weaponId + modIds). Урон 4 → 3, скорострельность
+#     3 → 5, качество «Неточный». Карточка показывает заводской мод;
+#     мод игрока в том же слоте снимает заводской; снятие всех модов
+#     возвращает заводской.
+# Окно улучшения предлагает робо-оружию людские моды: правка людского
+# мода едет в робо-версию без правки программы.
+# Заперто 10 проверками в __tests__/weapons/robot-weapon-inheritance.test.js.
+# Применять: sh patchs/312-robot-weapon-inheritance.patch или ./apply-patch.sh 312
+patch -p1 <<'PATCH_312_EOF'
+diff --git a/__tests__/weapons/robot-weapon-inheritance.test.js b/__tests__/weapons/robot-weapon-inheritance.test.js
+new file mode 100644
+index 0000000..606268c
+--- /dev/null
++++ b/__tests__/weapons/robot-weapon-inheritance.test.js
+@@ -0,0 +1,125 @@
++// __tests__/weapons/robot-weapon-inheritance.test.js
++//
++// Патч 312: робо-оружие наследует людские моды через ДАННЫЕ (baseWeaponId),
++// и оружие может выходить «с модом из коробки» (modIds в записи — конвенция
++// кита супермутанта: weaponId + modIds).
++//   Огнемёт Мистера Помощника — это людской Огнемёт;
++//   Лазерный резак — людской Лазерный пистолет;
++//   Автоматический 10-мм пистолет — Пистолет 10мм с авто-ресивером (mod_008).
++
++import { describe, it, expect } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++
++import { attacksFromSlot, collectAttacks, serializeSlot } from '../../domain/robotSlots';
++import { getRobotLimbCatalog } from '../../domain/registry';
++import { catalogGetWeaponMods, catalogGetModsForWeaponSlot } from '../../db/catalogSource';
++
++const ROOT = join(__dirname, '../..');
++const catalog = getRobotLimbCatalog();
++
++const robotWeapons = () => JSON.parse(
++  readFileSync(join(ROOT, 'modules/fallout/data/equipment/robot/weapons.json'), 'utf8'),
++);
++const humanWeapons = () => JSON.parse(
++  readFileSync(join(ROOT, 'modules/fallout/data/equipment/weapons.json'), 'utf8'),
++);
++
++describe('данные: связи робо-оружия с людской базой живые', () => {
++  it('baseWeaponId указывает на существующие записи людского оружия', () => {
++    const humans = new Set(humanWeapons().map((w) => w.id));
++    const linked = robotWeapons().filter((w) => w.baseWeaponId);
++    expect(linked.map((w) => w.id).sort()).toEqual([
++      'robot_weapon_auto_10mm',
++      'robot_weapon_flamethrower',
++      'robot_weapon_laser_cutter',
++    ]);
++    for (const w of linked) {
++      expect(humans.has(w.baseWeaponId)).toBe(true);
++    }
++  });
++
++  it('заводской мод auto-ресивера существует и подходит к Пистолету 10мм', () => {
++    const mods = JSON.parse(
++      readFileSync(join(ROOT, 'modules/fallout/data/equipment/weapon_mods.json'), 'utf8'),
++    );
++    const auto = mods.find((m) => m.id === 'mod_008');
++    expect(auto).toBeTruthy();
++    expect(auto.applies_to_ids).toContain('weapon_10mm_pistol');
++  });
++});
++
++describe('окно улучшения: людские моды подходят к робо-версиям', () => {
++  it('моды Огнемёта людей видны у Огнемёта Мистера Помощника', () => {
++    const human = catalogGetWeaponMods('weapon_flamer').map((m) => m.id);
++    const robot = catalogGetWeaponMods('robot_weapon_flamethrower').map((m) => m.id);
++    expect(robot).toEqual(expect.arrayContaining(human));
++    expect(human.length).toBeGreaterThan(0);
++  });
++
++  it('слоты Лазерного резака — слоты Лазерного пистолета (конденсаторы и ствол)', () => {
++    const slots = catalogGetModsForWeaponSlot('robot_weapon_laser_cutter', 'Capacitor').map((m) => m.id);
++    expect(slots).toEqual(expect.arrayContaining(['mod_043', 'mod_044', 'mod_045', 'mod_046']));
++  });
++});
++
++describe('оружие «с модом из коробки»: Автоматический 10-мм пистолет', () => {
++  // Рука Мистера Помощника держит оружие (canHoldWeapons: true).
++  const slot = (mods = []) => ({
++    limb: { id: 'robot_arm_mister_handy' },
++    heldWeapon: { id: 'robot_weapon_auto_10mm', ...(mods.length ? { appliedMods: Object.fromEntries(mods.map((m) => [m.slot, m.id])) } : {}) },
++  });
++
++  it('заводской авто-ресивер применён: урон 4−1=3, скорострельность 3+2=5, качество «Неточный»', () => {
++    const cards = attacksFromSlot(slot(), { slotId: 'arm1' });
++    const card = cards.find((c) => c.id === 'robot_weapon_auto_10mm');
++    expect(card.damage).toBe(3);
++    expect(card.fireRate).toBe(5);
++    expect(card.qualities.map((q) => q.qualityId ?? q)).toContain('quality_inaccurate');
++    expect(card.appliedMods).toEqual({ Receiver: 'mod_008' });
++  });
++
++  it('карточка показывает заводской мод как установленный (и в худой форме)', () => {
++    const cards = collectAttacks({ arm1: slot() });
++    const card = cards.find((c) => c.id === 'robot_weapon_auto_10mm');
++    expect(card.modIds).toContain('mod_008');
++    expect(card.isBuiltin).toBeUndefined(); // в ладони — не встроенное
++  });
++
++  it('мод игрока в том же слоте снимает заводской: Усиленный (+2 урона) вместо авто', () => {
++    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_005');
++    const cards = attacksFromSlot(slot([mod_005]), { slotId: 'arm1' });
++    const card = cards.find((c) => c.id === 'robot_weapon_auto_10mm');
++    expect(card.damage).toBe(6); // 4 базы + 2 Усиленного, авто-мода нет
++    expect(card.fireRate).toBe(3); // заводская скорострельность записи
++    expect(card.appliedMods).toEqual({ Receiver: 'mod_005' });
++    expect(card.modIds).not.toContain('mod_008');
++  });
++
++  it('снятие модов возвращает заводской авто-ресивер — это часть сути оружия', () => {
++    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_005');
++    const cleared = slot([mod_005]);
++    cleared.heldWeapon = { id: 'robot_weapon_auto_10mm', appliedMods: {} };
++    const card = attacksFromSlot(cleared, { slotId: 'arm1' }).find((c) => c.id === 'robot_weapon_auto_10mm');
++    expect(card.appliedMods).toEqual({ Receiver: 'mod_008' });
++    expect(card.damage).toBe(3);
++  });
++
++  it('незаводской мод не теряется при сохранении слота (roundtrip худой формы)', () => {
++    const slim = serializeSlot(slot());
++    expect(slim.heldWeaponId).toBe('robot_weapon_auto_10mm');
++    expect(slim.heldWeaponMods).toEqual([]); // заводской мод — из записи, не из слота
++  });
++
++  it('оружие-конечность (кит Мистера Помощника) тоже несёт заводской мод', () => {
++    // Огнемёт как конечность в ките: weaponAsLimb → attackId → та же materialize.
++    const flamerSlot = { limb: { id: 'robot_weapon_flamethrower' } };
++    const cards = collectAttacks({ arm1: flamerSlot });
++    const card = cards.find((c) => c.id === 'robot_weapon_flamethrower');
++    expect(card).toBeTruthy();
++    expect(card.attackRole).toBe('ownAttack');
++    // у Огнемёта заводских модов нет — статы записи без изменений
++    expect(card.modIds).toEqual([]);
++    expect(card.appliedMods).toEqual({});
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 07333a9..85fdcdf 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,36 @@
+ 
+ ---
+ 
++## Data — robot weapons inherit human mods via a data link; weapons "with a mod out of the box" (patch 312)
++
++Owner's word: the Mister Handy Flamer IS the human Flamer; the Laser
++Cutter IS the human Laser Gun; the Automatic 10mm Pistol is a 10mm Pistol
++with an auto receiver pre-installed, like the kit weapon with a mod the
++super mutant gets.
++
++- The link lives in data: a baseWeaponId field on the robot weapon record
++  (Flamer → weapon_flamer, Laser Cutter → weapon_laser_gun, Automatic
++  10mm Pistol → weapon_10mm_pistol). The upgrade dialog now offers human
++  mods to robot weapons: Flamer — fuels and barrels (6 mods), Laser
++  Cutter — capacitors and barrels (21), Automatic 10mm — the full Pistol
++  set (28). An edit to a human mod reaches the robot version without
++  touching the program.
++- "Out of the box": a weapon record may carry modIds — factory mods. The
++  Automatic 10mm ships with the auto receiver mod_008: damage 4 → 3,
++  fire rate 3 → 5, the Inaccurate quality. The card shows the mod as
++  installed. A player mod in the same slot replaces the factory one;
++  removing all mods brings the factory one back — it is part of the
++  weapon's identity.
++- Locked by 10 checks in
++  `__tests__/weapons/robot-weapon-inheritance.test.js` — links point to
++  existing records (the dead-map lesson of 311), upgrade dialogs see the
++  human mods, the auto-receiver math on the card, replacement and return
++  of the factory mod, the slim save shape. Suite 859/859, tsc clean.
++
++---
++
++---
++
+ ## Unification — weapon mods: one truth, one write path; a limb's own-attack mods now survive saving (patch 311)
+ 
+ Owner's rule: modifying items is a property of many games, so the shape
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e19fc56..661a104 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,35 @@
+ 
+ ---
+ 
++## Данные — робо-оружие наследует людские моды по связи в данных; оружие «с модом из коробки» (патч 312)
++
++Слово владельца: Огнемёт Мистера Помощника — это людской Огнемёт;
++Лазерный резак — людской Лазерный пистолет; Автоматический 10-мм пистолет —
++Пистолет 10мм с установленным авто-ресивером, как оружие с модом в ките
++супермутанта.
++
++- Связь живёт в данных: поле baseWeaponId в записи робо-оружия (Огнемёт →
++  weapon_flamer, Лазерный резак → weapon_laser_gun, Автоматический 10-мм
++  пистолет → weapon_10mm_pistol). Окно улучшения теперь предлагает
++  робо-оружию людские моды: Огнемёту — топливо и стволы (6 модов),
++  Лазерному резаку — конденсаторы и стволы (21), Автоматическому 10-мм —
++  весь набор Пистолета 10мм (28). Правка людского мода едет в робо-версию
++  без правки программы.
++- «Из коробки»: запись оружия может нести modIds — заводские моды. У
++  Автоматического 10-мм это авто-ресивер mod_008: урон 4 → 3,
++  скорострельность 3 → 5, качество «Неточный». Карточка показывает мод
++  как установленный. Мод игрока в том же слоте снимает заводской; снятие
++  всех модов возвращает заводской — это часть сути оружия.
++- Предохранители: 10 проверок в
++  `__tests__/weapons/robot-weapon-inheritance.test.js` — связи указывают
++  на существующие записи (урок мёртвой карты 311), окна улучшения видят
++  людские моды, математика авто-ресивера на карточке, замена и возврат
++  заводского, худая форма сейва. Сюит 859/859, tsc чист.
++
++---
++
++---
++
+ ## Унификация — моды оружия: одна правда и один путь записи; моды собственной атаки конечности переживают сохранение (патч 311)
+ 
+ Правило владельца: модификация предметов — свойство многих игр, поэтому
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 4f95aa8..e152634 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -307,10 +307,27 @@ const materializeWeapon = (catalog, entry, modIds = []) => {
+   const merged = base
+     ? { ...base, ...(instance || {}) }
+     : (instance ? { ...instance } : { id });
+-  const ids = modIds.length > 0 ? modIds : toModIds(instance);
++  // Моды «из коробки» (312): запись оружия может нести modIds — заводские
++  // моды, с которыми оружие существует (Автоматический 10-мм пистолет —
++  // 10-мм пистолет с авто-ресивером, как оружие с модом в ките супермутанта).
++  // Установленный игроком мод в том же слоте снимает заводской; снятие
++  // всех модов возвращает заводские — это часть сути оружия.
++  const factoryIds = Array.isArray(base?.modIds) ? base.modIds.filter(Boolean) : [];
++  const instanceIds = modIds.length > 0 ? modIds : toModIds(instance);
++  const instanceSlots = new Set(
++    resolveMods(catalog, instanceIds).map((mod) => mod.slot).filter(Boolean),
++  );
++  const keptFactoryIds = factoryIds.filter((factoryId) => {
++    const factoryMod = resolveMods(catalog, [factoryId])[0];
++    return !factoryMod?.slot || !instanceSlots.has(factoryMod.slot);
++  });
++  const ids = [...new Set([...keptFactoryIds, ...instanceIds])];
+   const mods = resolveMods(catalog, ids);
+   const plain = flattenStats(merged);
+-  return mods.length > 0 ? applyWeaponMods(plain, mods) : plain;
++  const out = mods.length > 0 ? applyWeaponMods(plain, mods) : plain;
++  // Служебное поле: эффективный список модов (заводские + экземпляра).
++  // Карточки его читают и снимают (collectAttacks), в сейвы оно не идёт.
++  return { ...out, effectiveModIds: ids };
+ };
+ 
+ // ---------------------------------------------------------------------------
+@@ -784,14 +801,20 @@ export function attacksFromSlot(slot, options = {}) {
+     if (!id) return;
+     const instanceKey = `${slotId ?? '?'}:${source}:${id}`;
+     const resolved = materializeWeapon(catalog, weapon, modIds);
++    // Эффективный список модов считает materializeWeapon: заводские «из
++    // коробки» (312) + моды экземпляра. Карточка показывает его — это
++    // та же правда, из которой посчитаны статы.
++    const effectiveModIds = Array.isArray(resolved?.effectiveModIds)
++      ? resolved.effectiveModIds
++      : modIds;
+     result.push({
+       ...resolved,
+       id,
+       source,
+       slotId: slotId ?? null,
+       instanceKey,
+-      modIds,
+-      appliedMods: modMap(catalog, modIds),
++      modIds: effectiveModIds,
++      appliedMods: modMap(catalog, effectiveModIds),
+     });
+   };
+ 
+@@ -969,6 +992,7 @@ export function collectAttacks(slots, options = {}) {
+         source: undefined,
+         slotId: undefined,
+         instanceKey: undefined,
++        effectiveModIds: undefined,
+         // Роль внутри слота — для плана записи модов (311): ладонь /
+         // установленное / собственная атака. Внутренний источник 'builtin'
+         // (собственная атака) на карточке называется 'ownAttack'.
+diff --git a/modules/fallout/data/equipment/robot/weapons.json b/modules/fallout/data/equipment/robot/weapons.json
+index 6625519..021f523 100644
+--- a/modules/fallout/data/equipment/robot/weapons.json
++++ b/modules/fallout/data/equipment/robot/weapons.json
+@@ -70,7 +70,8 @@
+         "effectId": "effect_spread"
+       }
+     ],
+-    "handheld": false
++    "handheld": false,
++    "baseWeaponId": "weapon_flamer"
+   },
+   {
+     "id": "robot_weapon_circular_saw",
+@@ -130,7 +131,8 @@
+         "effectId": "effect_piercing_x"
+       }
+     ],
+-    "handheld": false
++    "handheld": false,
++    "baseWeaponId": "weapon_laser_gun"
+   },
+   {
+     "id": "robot_weapon_auto_10mm",
+@@ -160,7 +162,11 @@
+         "effectId": "effect_burst"
+       }
+     ],
+-    "handheld": false
++    "handheld": false,
++    "baseWeaponId": "weapon_10mm_pistol",
++    "modIds": [
++      "mod_008"
++    ]
+   },
+   {
+     "id": "robot_weapon_cryojet",
+PATCH_312_EOF

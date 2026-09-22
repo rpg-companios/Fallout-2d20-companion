@@ -1,0 +1,270 @@
+#!/bin/sh
+# Патч 313 (только документация): стартовая карта ИИ-агента.
+#   docs/agents/README.md — порядок чтения, карта слоёв,
+#     таблица «типовая задача → какие файлы править», список запретов;
+#   docs/agents/data-flows.md — потоки данных: каталог, моды оружия
+#     (311), робо-слоты, сейвы, выживание, установщик патчей;
+#   replit.md ведёт агента в docs/agents/ первым пунктом.
+# Правило: при переезде потока данных карта правится В ТОМ ЖЕ ПАТЧЕ.
+# Применять: sh patchs/313-agent-starter-map.patch или ./apply-patch.sh 313
+patch -p1 <<'PATCH_313_EOF'
+diff --git a/docs/agents/README.md b/docs/agents/README.md
+new file mode 100644
+index 0000000..ad2bfae
+--- /dev/null
++++ b/docs/agents/README.md
+@@ -0,0 +1,58 @@
++# Стартовая карта ИИ-агента
++
++> Назначение: агент, открывший репозиторий, смотрит СЮДА первым делом —
++> чтобы понять, как приложение работает, и править 1–2 файла вместо
++> чтения всего стека. Карта содержит только проверенные факты; дополняется
++> при каждом переезде. Дата ревизии: 2026-09-22 (патч 312).
++
++## Порядок чтения (обязательный минимум)
++
++1. `replit.md` — что за программа, стек, структура папок.
++2. `docs/architecture/engine-dna.md` — главный контракт: движок не знает
++   сеттинг; TS для новых контрактов; один владелец правила; миграции —
++   единственная граница legacy.
++3. `docs/architecture/engine-charter.md` — устав: один шаг = один патч,
++   паспорта стора/сейва, политика тестов, протокол отчёта об ошибке.
++4. `setting-contract.md` — контракт пакета сеттинга (`.trpg`).
++5. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
++   (каталог, моды оружия, робо-слоты, сейвы, выживание).
++
++## Карта репозитория по слоям
++
++| Слой | Где | Что там |
++|---|---|---|
++| Точка входа | `App.js`, `index.js` | навигация, инициализация БД, автосейв-таймер |
++| Движок (контракты) | `src/engine/` | контракты выводимости (`contracts/`), реестр (`derivations/`), моды предметов (`items/weaponMods.ts` — единая правда модов и план записи) |
++| Движок (состояние) | `src/store/` | `characterStore.js` (всё состояние персонажа), паспорта `characterState.ts`/`saveSnapshot.ts`/`characterActions.ts`, `saveSchema.js` (версия сейва), `migrations.js` (НЕ трогать задним числом) |
++| Сейвы | `src/saves/characterSaves.js` | снапшот/загрузка/список; база — `db/` |
++| База/каталог | `db/` | `catalogSource.js` — строки каталога из JSON (перки — через дверь сеттинга); SQLite — состояние, не каталог |
++| Универсальный домен | `domain/` | броски, счётчики, миграции форм, `robotSlots.js` (слоты роботов), `enrichItem.js` (конвейер модов), `registry.js` (единая точка чтения данных) |
++| Сеттинг Fallout | `modules/fallout/` | данные (`data/`), i18n (`i18n/`), экраны (`screens/`), выживание (`survival/`), формулы модуля (`weapons/weaponAmmoSpend.js`), дверь — `modules/fallout/index.js` (экспорт `SETTING`) |
++| Движковые экраны | `components/` | инвентарь (`InventoryScreen/`), менеджер героев |
++| Тесты | `__tests__/` | предохранители живут всегда; сюит зелёный = патч готов |
++
++## Типовая задача → какие файлы править
++
++| Задача | Файлы |
++|---|---|
++| Добавить мод оружия людей | `modules/fallout/data/equipment/weapon_mods.json` + i18n-зеркало `modules/fallout/i18n/<ru-RU,en-EN>/data/equipment/weapon_mods.json` |
++| Добавить мод робо-оружия | `modules/fallout/data/equipment/robot/weapon_mods.json` + i18n; мод ОБЯЗАН заявить `slot` и `applies_to_ids` (слоты робо-оружия выводятся из модов) |
++| Связать робо-оружие с людской базой | поле `baseWeaponId` в `robot/weapons.json` — моды людской базы становятся доступны робо-версии |
++| Оружие «с модом из коробки» | поле `modIds` в записи оружия (`robot/weapons.json`); конвенция китов: `weaponId` + `modIds` |
++| Новое качество расхода зарядов | читатель в `modules/fallout/weapons/weaponAmmoSpend.js` + ключ i18n `weapon.ammoSpend.source.<source>` (ru+en) |
++| Добавить предмет/броню/расходник | соответствующий JSON в `modules/fallout/data/equipment/` + i18n-зеркало |
++| Экран сеттинга | `modules/fallout/screens/<Screen>/` — экраны НЕ импортируют данные напрямую, только через реестр/каталог |
++| Новое поле состояния стора | паспорт `src/store/characterState.ts` В ТОМ ЖЕ ПАТЧЕ (тест `data-passports` упадёт иначе) |
++| Новый формат сейва | версия в `src/store/saveSchema.js` + миграция в конец цепочки `migrations.js` |
++| Универсальная механика | `domain/` (JS) или `src/engine/` (TS для новых контрактов); сеттинг подставляет данные через реестр |
++
++## Правила, которые нельзя нарушать (короткий список)
++
++- Движок не импортирует `modules/...` — граница проверяется тестом
++  `__tests__/settings/settings-boundary.test.js`.
++- Каталог — JSON сеттинга; DB хранит состояние. Двух копий каталога не
++  заводить; поиск предмета — один (`domain/resolveItem.js`).
++- Одна операция = один action; модалка показывает/спрашивает/сообщает,
++  но не считает правила.
++- Установщик патчей: истина — в содержимом файлов (`./apply-patch.sh N`,
++  `--status`); правки в рабочем дереве коммитить до применения цепочки.
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+new file mode 100644
+index 0000000..d829ce0
+--- /dev/null
++++ b/docs/agents/data-flows.md
+@@ -0,0 +1,114 @@
++# Потоки данных: как что откуда и куда идёт
++
++> Дополнение к `docs/agents/README.md`. Каждый поток проверен по коду;
++> при переезде потока править и этот файл (в том же патче).
++
++## 1. Каталог предметов (источник правды — JSON сеттинга)
++
++```
++modules/fallout/data/**/*.json          (механика: id, статы, цены)
++modules/fallout/i18n/<локаль>/**.json   (имена/тексты; зеркало объявленных файлов)
++        │
++        ▼
++modules/fallout/index.js                (дверь SETTING: data + names по локалям)
++        │
++        ├──► domain/registry.js         (единая точка чтения: геттеры, робо-каталог)
++        ├──► i18n/equipmentCatalog.js   (слияние данных+имён, робо-оружие → общий пул)
++        └──► db/catalogSource.js        (строки «как ряды старой БД»: weapons, mods,
++                                         modSlots, perks, items) → экраны/модалки
++```
++
++Правила: файл без объявления в двери = файла нет (ошибка, не пустой
++список); «вариант» оружия — `trueItemId` (механика от истинного предмета,
++имя своё: «Опасная бритва» ← бритва-переключатель).
++
++## 2. Моды оружия (единая правда, патч 311)
++
++```
++ФОРМА ПРАВДЫ (src/engine/items/weaponMods.ts):
++  экземпляр несёт СПИСОК id модов (modIds);
++  карта «слот → id» (appliedMods) — выводимый вид для окна/карточки.
++  modIdList()  — читает любую из двух форм (appliedMods приоритетнее);
++  modIdMap()   — строит карту по каталогу (мод сам знает свой слот).
++
++ПЛАН ЗАПИСИ (classifyModWritePlan):
++  карточка (sourceSlot/attackRole/storeItemId/uniqueId)
++        → план: robotSlot{role: held|installed|ownAttack}
++              | storeItem | equippedWeapon
++  экран (WeaponsAndArmorScreen) только ИСПОЛНЯЕТ план:
++    held       → запись оружия в слоте робота (heldWeapon)
++    installed  → запись в limb.builtinWeapons (setInstalledWeaponMods)
++    ownAttack  → на саму конечность (setOwnWeaponMods, поле ownWeaponMods)
++    storeItem  → updateItem (предмет инвентаря)
++    equippedWeapon → список надетого оружия человека
++
++ЧТЕНИЕ: domain/enrichItem.js (applyWeaponMods, enrichWeaponItem) — база
++из каталога + моды; карточки роботов — domain/robotSlots.js
++(materializeWeapon: база + заводские modIds записи + моды экземпляра).
++```
++
++## 3. Робо-слоты (анатомия робота — из данных)
++
++```
++ДАННЫЕ (modules/fallout/data/equipment/robot/):
++  limbs.json        конечности: limbType (arm/head/body/mover),
++                    canHoldWeapons, weaponSlots, builtinWeaponId,
++                    replaceable, compatibleBodyPlans
++  weaponAsLimb.json конечность-оружие (attackId, установка: сложность/
++                    перки/навык)
++  weapons.json      робо-оружие; baseWeaponId → людская база модов (312),
++                    modIds → заводские моды «из коробки» (312)
++  weapon_mods.json  моды робо-оружия (slot + applies_to_ids — слоты
++                    ВЫВОДЯТСЯ из модов; файла-перечня больше нет)
++
++СОСТОЯНИЕ СЛОТА (domain/robotSlots.js):
++  худая форма (сейв): { content, armorLayers, heldWeaponId,
++                        heldWeaponMods, installedWeapons[],
++                        ownWeaponMods? }
++  живая форма (экран): { limb, armor, plating, frame, heldWeapon }
++  normalizeSlot / serializeSlot / deserializeSlot — мосты; каталог важнее
++  экземпляра для механики, экземпляр — для модов/имени.
++
++КАРТОЧКИ АТАК: attacksFromSlot → collectAttacks (instanceKey = слот:
++источник:id; дедуп — правило экрана). Роль карточки: attackRole =
++held | installed | ownAttack — её читает план записи модов.
++```
++
++## 4. Сохранения (паспорта и миграции)
++
++```
++СТОРА → СЕЙВ: src/saves/characterSaves.js пишет снимок по паспорту
++src/saves/saveSnapshot.ts (CHARACTER_SAVE_KEYS); реальный persist-JSON
++стора сверяется с CHARACTER_PERSISTED_KEYS (characterState.ts) — тест
++data-passports в обе стороны.
++
++ЗАГРУЗКА СТАРОГО: src/store/migrations.js — цепочка версий
++(schemaVersion); чтение legacy ТОЛЬКО здесь; после миграции рантайм
++видит современный формат. migrations.js задним числом не правят.
++
++РОБО-СЛОТЫ В СЕЙВЕ: худая форма (id + списки id модов); восстановление —
++deserializeSlot по каталогу; локализованные имена дообогащает
++restoreSaveData.
++```
++
++## 5. Выживание (прецедент сеттингового расширения)
++
++```
++modules/fallout/survival/  (голод/жажда/сон/усталость)
++  → зарегистрировано через реестр расширений состояния
++    (src/store/stateExtensions.js: {id, fieldKey, factory, hydrate, reset})
++  → слушает расходники (применение еды/питья) и часы (SurvivalClock)
++Движок расширения исполняет, не зная их содержимого. Новые сеттинговые
++поля состояния — через этот же реестр, не прямо в стор.
++```
++
++## 6. Установщик патчей (доставка правок владельцу)
++
++```
++patchs/<N>-имя.patch  (файлы патчей в ветке Arena)
++./apply-patch.sh N    (установщик: истина в содержимом файлов;
++                       --status — сводка; проверка целостности JSON)
++Бутстрап: git show <ветка>:apply-patch.sh > apply-patch.sh — ДО цепочки.
++Ветки: правки программы — в ветку движка; правки данных/экранов
++Fallout — по слову владельца (сеттинг пока живёт здесь).
++```
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 85fdcdf..c88048d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## Docs — an AI-agent starter map: how the app works, what flows from where to where (patch 313)
++
++Owner's word: maintain files describing how the app works and where the
++data flows, for AI agents — so they don't guess how things are built and
++read a couple of files instead of the whole stack.
++
++- `docs/agents/README.md` — the entry point: required reading order,
++  the repo map by layers, a "typical task → files to touch" table, a
++  short list of prohibitions.
++- `docs/agents/data-flows.md` — data flows across six mechanics: the
++  catalog (JSON → setting door → registry → screen catalog), weapon mods
++  (one truth and the write plan, 311), robot slots (robot anatomy from
++  data), saves (passports and migrations), survival (the extension
++  precedent), and the patch installer.
++- `replit.md` now points agents to `docs/agents/` first.
++- Maintenance rule: when a flow moves, the map is edited IN THE SAME
++  PATCH — the map must not lie.
++
++---
++
+ ## Data — robot weapons inherit human mods via a data link; weapons "with a mod out of the box" (patch 312)
+ 
+ Owner's word: the Mister Handy Flamer IS the human Flamer; the Laser
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 661a104..7aeaa20 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## Документация — стартовая карта ИИ-агента: как приложение работает, что откуда и куда идёт (патч 313)
++
++Слово владельца: завести файлы, описывающие работу приложения и потоки
++данных для ИИ-агентов — чтобы не гадать, как что устроено, и смотреть в
++пару файлов вместо полного стека.
++
++- `docs/agents/README.md` — точка входа: порядок чтения обязательных
++  документов, карта репозитория по слоям, таблица «типовая задача → какие
++  файлы править», короткий список запретов.
++- `docs/agents/data-flows.md` — потоки данных по шести механикам: каталог
++  (JSON → дверь сеттинга → реестр → экранный каталог), моды оружия
++  (единая правда и план записи 311), робо-слоты (анатомия робота из
++  данных), сохранения (паспорта и миграции), выживание (прецедент
++  расширения), установщик патчей.
++- `replit.md` теперь ведёт агента в `docs/agents/` первым пунктом.
++- Правило сопровождения: при переезде потока данных файл правится В ТОМ
++  ЖЕ ПАТЧЕ — карта не должна врать.
++
++---
++
+ ## Данные — робо-оружие наследует людские моды по связи в данных; оружие «с модом из коробки» (патч 312)
+ 
+ Слово владельца: Огнемёт Мистера Помощника — это людской Огнемёт;
+diff --git a/replit.md b/replit.md
+index 626a950..c0d81f0 100644
+--- a/replit.md
++++ b/replit.md
+@@ -6,6 +6,8 @@ A mobile-focused web application built with React Native (Expo) for managing tab
+ 
+ Before making architectural, state, catalog, save, or gameplay changes, read:
+ 
++- `docs/agents/README.md` — стартовая карта агента: слои, «задача → файлы»,
++  короткий список запретов; `docs/agents/data-flows.md` — потоки данных;
+ - `docs/architecture/engine-dna.md` — the authoritative engine/setting boundary,
+   source-of-truth rules, TypeScript migration strategy, and AI working protocol;
+ - `setting-contract.md` — the setting package and `.trpg` contract;
+PATCH_313_EOF
