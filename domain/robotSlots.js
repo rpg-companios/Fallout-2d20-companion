@@ -303,9 +303,20 @@ const materializeWeapon = (catalog, entry, modIds = []) => {
   const id = typeof entry === 'string' ? entry : entry?.id ?? entry?.weaponId;
   if (!id) return null;
   const base = resolveWeapon(catalog, id);
+  // Вариант (trueItemId, 314): робо-оружие, которое 100% людское, несёт
+  // ТОЛЬКО личность (id, имя, флаги монтажа, заводские modIds) — боевые
+  // характеристики берутся от истинного предмета. Иначе это была бы
+  // отдельная запись с отдельными характеристиками (слово владельца).
+  const variant = base?.trueItemId ? (resolveWeapon(catalog, base.trueItemId) || base) : base;
+  const {
+    id: _variantId,
+    trueItemId: _variantTrue,
+    modIds: _variantMods,
+    ...variantStats
+  } = variant || {};
   const instance = typeof entry === 'object' && entry ? entry : null;
   const merged = base
-    ? { ...base, ...(instance || {}) }
+    ? { ...base, ...variantStats, ...(instance || {}) }
     : (instance ? { ...instance } : { id });
   // Моды «из коробки» (312): запись оружия может нести modIds — заводские
   // моды, с которыми оружие существует (Автоматический 10-мм пистолет —

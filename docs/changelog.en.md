@@ -2,6 +2,34 @@
 
 ---
 
+## Data — robot weapons that ARE human weapons: full variants, stats only from the base (patch 314)
+
+Owner's word: "a robot weapon that's a human weapon is 100% the human
+one. Otherwise it would be a separate record with a separate id and
+separate stats."
+
+- The link moved onto the existing variant mechanism (like "The
+  Danger razor" being a variant of the switchblade): the robot weapon
+  record now carries trueItemId and NO combat fields at all — only its
+  identity (id, name, group, mounting flag) and factory mods. The Mister
+  Handy Flamer IS the human Flamer; the Laser Cutter IS the human Laser
+  Gun; the Automatic 10mm Pistol IS a 10mm Pistol with an auto receiver
+  out of the box.
+- On screen: the Flamer's fire rate 2 → 4 (as the human one), attack
+  attr STR (was AGI), damage type energy (was fire); the Laser Cutter's
+  fire rate 1 → 2; the Automatic 10mm unchanged (3 damage / 4 shots —
+  base 4/2 plus the auto receiver −1/+2). An edit to a human weapon now
+  reaches the robot version entirely: stats, effects, qualities, ammo,
+  mods.
+- The upgrade dialog offers all human mods to the robot versions (as in
+  312); the dialog preview computes from the base.
+- Locked by 14 checks — a variant must not own combat fields (the test
+  falls otherwise), the expanded catalog carries base stats and the
+  variant's OWN name ("Laser Cutter", not "Laser Gun"), the screen
+  catalog rows agree, the auto-receiver math on the card (replacement
+  and return of the factory mod), the slim save shape.
+  Suite 863/863, tsc clean.
+
 ## Docs — an AI-agent starter map: how the app works, what flows from where to where (patch 313)
 
 Owner's word: maintain files describing how the app works and where the

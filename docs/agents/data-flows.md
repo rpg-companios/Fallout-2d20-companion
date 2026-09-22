@@ -56,8 +56,10 @@ modules/fallout/index.js                (дверь SETTING: data + names по �
                     replaceable, compatibleBodyPlans
   weaponAsLimb.json конечность-оружие (attackId, установка: сложность/
                     перки/навык)
-  weapons.json      робо-оружие; baseWeaponId → людская база модов (312),
-                    modIds → заводские моды «из коробки» (312)
+  weapons.json      робо-оружие; trueItemId → ПОЛНЫЙ вариант людского
+                    (314): робо-запись несёт только личность (id, имя,
+                    weaponType, handheld) и заводские modIds «из коробки»;
+                    боевые характеристики — от людской базы
   weapon_mods.json  моды робо-оружия (slot + applies_to_ids — слоты
                     ВЫВОДЯТСЯ из модов; файла-перечня больше нет)
 

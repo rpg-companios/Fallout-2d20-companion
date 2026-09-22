@@ -46,32 +46,9 @@
   {
     "id": "robot_weapon_flamethrower",
     "itemType": "weapon",
-    "weaponSlots": 0,
     "weaponType": "Heavy",
-    "damage": 3,
-    "damageType": "fire",
-    "fireRate": 2,
-    "range": "C",
-    "mainAttr": "AGI",
-    "mainSkill": "BIG_GUNS",
-    "weight": 0,
-    "cost": 0,
-    "rarity": 0,
-    "ammoId": "ammo_flamer_fuel",
-    "installComplexity": null,
-    "installPerksRequired": null,
-    "installSkill": null,
-    "qualities": [],
-    "effects": [
-      {
-        "effectId": "effect_persistent"
-      },
-      {
-        "effectId": "effect_spread"
-      }
-    ],
     "handheld": false,
-    "baseWeaponId": "weapon_flamer"
+    "trueItemId": "weapon_flamer"
   },
   {
     "id": "robot_weapon_circular_saw",
@@ -110,63 +87,19 @@
   {
     "id": "robot_weapon_laser_cutter",
     "itemType": "weapon",
-    "weaponSlots": 0,
     "weaponType": "Energy",
-    "damage": 4,
-    "damageType": "energy",
-    "fireRate": 1,
-    "range": "C",
-    "mainAttr": "PER",
-    "mainSkill": "ENERGY_WEAPONS",
-    "weight": 0,
-    "cost": 0,
-    "rarity": 0,
-    "ammoId": "ammo_energy_cell",
-    "installComplexity": null,
-    "installPerksRequired": null,
-    "installSkill": null,
-    "qualities": [],
-    "effects": [
-      {
-        "effectId": "effect_piercing_x"
-      }
-    ],
     "handheld": false,
-    "baseWeaponId": "weapon_laser_gun"
+    "trueItemId": "weapon_laser_gun"
   },
   {
     "id": "robot_weapon_auto_10mm",
     "itemType": "weapon",
-    "weaponSlots": 0,
     "weaponType": "Light",
-    "damage": 4,
-    "damageType": "physical",
-    "fireRate": 3,
-    "range": "C",
-    "mainAttr": "AGI",
-    "mainSkill": "SMALL_GUNS",
-    "weight": 0,
-    "cost": 0,
-    "rarity": 0,
-    "ammoId": "ammo_10mm",
-    "installComplexity": null,
-    "installPerksRequired": null,
-    "installSkill": null,
-    "qualities": [
-      {
-        "qualityId": "quality_close_quarters"
-      }
-    ],
-    "effects": [
-      {
-        "effectId": "effect_burst"
-      }
-    ],
     "handheld": false,
-    "baseWeaponId": "weapon_10mm_pistol",
     "modIds": [
       "mod_008"
-    ]
+    ],
+    "trueItemId": "weapon_10mm_pistol"
   },
   {
     "id": "robot_weapon_cryojet",

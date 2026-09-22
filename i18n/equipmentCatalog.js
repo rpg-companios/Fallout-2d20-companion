@@ -307,9 +307,12 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
       return w;
     })
     .map((w) => ({ ...w, itemType: 'weapon' }));
-  const robotWeapons = mergeById(
-    (moduleRobotWeapons || []).filter((item) => item.itemType === 'weapon'),
-    i18n.robotWeapons || [],
+  const robotWeapons = expandTrueItems(
+    mergeById(
+      (moduleRobotWeapons || []).filter((item) => item.itemType === 'weapon'),
+      i18n.robotWeapons || [],
+    ),
+    moduleWeaponsLocalized,
   )
     .map((w) => ({ ...w, itemType: 'weapon', isRobotWeapon: true }));
   // Конечности робота: источник один — limbs.json + weaponAsLimb.json.

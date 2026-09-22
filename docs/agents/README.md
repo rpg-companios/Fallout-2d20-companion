@@ -37,7 +37,7 @@
 |---|---|
 | Добавить мод оружия людей | `modules/fallout/data/equipment/weapon_mods.json` + i18n-зеркало `modules/fallout/i18n/<ru-RU,en-EN>/data/equipment/weapon_mods.json` |
 | Добавить мод робо-оружия | `modules/fallout/data/equipment/robot/weapon_mods.json` + i18n; мод ОБЯЗАН заявить `slot` и `applies_to_ids` (слоты робо-оружия выводятся из модов) |
-| Связать робо-оружие с людской базой | поле `baseWeaponId` в `robot/weapons.json` — моды людской базы становятся доступны робо-версии |
+| Связать робо-оружие с людской базой | поле `trueItemId` в `robot/weapons.json` — ПОЛНЫЙ вариант: боевых полей в робо-записи быть не должно, статы/эффекты/моды едут от людской базы |
 | Оружие «с модом из коробки» | поле `modIds` в записи оружия (`robot/weapons.json`); конвенция китов: `weaponId` + `modIds` |
 | Новое качество расхода зарядов | читатель в `modules/fallout/weapons/weaponAmmoSpend.js` + ключ i18n `weapon.ammoSpend.source.<source>` (ru+en) |
 | Добавить предмет/броню/расходник | соответствующий JSON в `modules/fallout/data/equipment/` + i18n-зеркало |
