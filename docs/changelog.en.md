@@ -2,6 +2,30 @@
 
 ---
 
+## Robots — Mods for weapons installed into a limb (patch 305)
+
+Owner's report: the laser gun from the "assaultron_us_military" kit
+(installTo: 'arm' — the weapon is part of the arm, the palm stays free)
+would not accept mods. The mod-install dialog opened, the selection went
+through — but the mod never stuck: the apply logic could only write mods
+to the palm or the inventory, while a weapon installed into a limb lives
+inside the limb itself.
+
+- mods for installed weapons are now written into the weapon's entry
+  inside the limb (both arm and head installs from kits);
+- the weapon card reads mods from that entry — damage and name include
+  the mod;
+- the entry with mods survives save and load (the save format did not
+  change — mods for installed weapons were already provided for there);
+- patch 304 closed the neighbouring case (a weapon held in the palm);
+  this one closes installed weapons — both carrying styles now accept
+  mods.
+
+Locked by checks in `__tests__/robot/robot-slot-model.test.js`: the card
+reads mods from the entry; the write function updates only the target
+entry and leaves the original map untouched; the save cycle keeps the
+mod. Suite 833/833, tsc clean.
+
 ## Robots — Weapons held in a robot palm get their card (patch 304)
 
 Owner's report: "mods won't install on the assaultron laser in the hand".

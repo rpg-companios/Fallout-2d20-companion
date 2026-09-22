@@ -20,6 +20,9 @@ import {
   attacksFromSlot,
   collectAttacks,
   splitLimbWeapons,
+  serializeSlot,
+  deserializeSlot,
+  setInstalledWeaponMods,
   resolveHit,
   validateHitTable,
 } from '../../domain/robotSlots';
@@ -521,5 +524,71 @@ describe('таблица попаданий', () => {
       expect(result.warnings, `${planId}: таблицы нет — ${result.warnings.join('; ')}`).toEqual([]);
       expect(result.covered, `${planId}: покрытие неполное`).toHaveLength(20);
     }
+  });
+});
+
+describe('моды оружия, установленного в конечность (installTo из комплекта)', () => {
+  // Репорт владельца: лазер-ган из комплекта «assaultron_us_military»
+  // (installTo: 'arm' — часть руки, не ладонь) не принимал моды: применяющий
+  // код писал только в ладонь/инвентарь, а карточка не читала моды из записи.
+  const MOD_044 = 'mod_044'; // Конденсатор лазер-гана: +1 урон (база 4)
+  const LASER_GUN = 'weapon_laser_gun';
+
+  const armWithLaserGun = () => {
+    const arm = limbById('robot_arm_assaultron');
+    return {
+      ...arm,
+      builtinWeapons: [
+        { id: LASER_GUN, weaponId: LASER_GUN, itemType: 'weapon', isBuiltin: true, installTo: 'arm', locked: true },
+      ],
+    };
+  };
+
+  it('карточка установленного оружия читает моды из записи (appliedMods)', () => {
+    const slots = {
+      leftArm: {
+        limb: {
+          ...armWithLaserGun(),
+          builtinWeapons: [{
+            id: LASER_GUN, weaponId: LASER_GUN, itemType: 'weapon',
+            isBuiltin: true, installTo: 'arm',
+            appliedMods: { Capacitor: MOD_044 },
+          }],
+        },
+        armor: null, plating: null, frame: null,
+      },
+    };
+    const card = collectAttacks(slots, { bodyPlan: 'assaultron' })
+      .find((a) => a.id === LASER_GUN);
+    expect(card, 'карточка есть').toBeTruthy();
+    expect(card.isBuiltin, 'часть конечности').toBe(true);
+    expect(card.sourceSlot).toBe('leftArm');
+    expect(card.modIds).toEqual([MOD_044]);
+    expect(card.damage, 'урон базы + мод').toBe(4 + 1);
+  });
+
+  it('setInstalledWeaponMods пишет запись; мод виден на карточке и переживает сейв-цикл', () => {
+    const before = { leftArm: { limb: armWithLaserGun(), armor: null, plating: null, frame: null } };
+    // Нет записи — null (вызывающий код пробует другие ветки)
+    expect(setInstalledWeaponMods({ leftArm: { limb: limbById('robot_arm_assaultron'), armor: null } }, 'leftArm', LASER_GUN, {})).toBeNull();
+
+    const next = setInstalledWeaponMods(before, 'leftArm', LASER_GUN, { Capacitor: MOD_044 });
+    expect(next, 'запись найдена и обновлена').toBeTruthy();
+    expect(next).not.toBe(before);
+    expect(before.leftArm.limb.builtinWeapons[0].appliedMods, 'исходная карта не тронута').toBeUndefined();
+
+    const card = collectAttacks(next, { bodyPlan: 'assaultron' }).find((a) => a.id === LASER_GUN);
+    expect(card.modIds).toEqual([MOD_044]);
+    expect(card.damage).toBe(4 + 1);
+
+    const slim = serializeSlot(next.leftArm);
+    expect(slim.installedWeapons).toEqual([{ id: LASER_GUN, modIds: [MOD_044] }]);
+
+    const restored = deserializeSlot(slim);
+    const restoredEntry = restored.limb.builtinWeapons.find((w) => w.id === LASER_GUN);
+    expect(restoredEntry.appliedMods).toEqual({ Capacitor: MOD_044 });
+    const restoredCard = collectAttacks({ leftArm: restored }, { bodyPlan: 'assaultron' })
+      .find((a) => a.id === LASER_GUN);
+    expect(restoredCard.damage, 'после загрузки — с модом').toBe(4 + 1);
   });
 });

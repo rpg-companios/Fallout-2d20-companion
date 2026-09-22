@@ -18,7 +18,7 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
-import { normalizeSlot } from '../../../../domain/robotSlots';
+import { normalizeSlot, setInstalledWeaponMods } from '../../../../domain/robotSlots';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
@@ -979,6 +979,22 @@ const WeaponsAndArmorScreen = () => {
         };
       });
       return;
+    }
+
+    // Оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head' из комплекта):
+    // живёт внутри конечности, не в ладони и не в инвентаре — моды пишутся
+    // в его запись (appliedMods), карточка и сейв читают её же.
+    if (selectedWeaponForModification?.sourceSlot && selectedWeaponForModification.isBuiltin) {
+      const installedNext = setInstalledWeaponMods(
+        equippedRobotSlots,
+        selectedWeaponForModification.sourceSlot,
+        selectedWeaponForModification.weaponId || selectedWeaponForModification.id,
+        modifiedWeapon?.appliedMods || {},
+      );
+      if (installedNext) {
+        setEquippedRobotSlots(installedNext);
+        return;
+      }
     }
 
     if (itemId) {

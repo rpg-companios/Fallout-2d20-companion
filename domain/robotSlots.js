@@ -829,11 +829,46 @@ export function attacksFromSlot(slot, options = {}) {
   }
 
   // Установленное в конечность оружие (апгрейд): своя карточка на каждый id.
+  // Моды — из записи оружия (appliedMods приоритетнее modIds, семантика 294):
+  // записанные установленные моды должны попадать на карточку.
   for (const installed of state.installedWeapons) {
-    push(installed.id, 'installed', installed.modIds);
+    push(installed.id, 'installed', toModIds(installed));
   }
 
   return result;
+}
+
+/**
+ * Записать моды на оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head'
+ * из комплекта — живёт в limb.builtinWeapons, не в ладони).
+ *
+ * Возвращает новую карту слотов с обновлённой записью оружия (appliedMods +
+ * modIds) или null, если в слоте нет конечности с таким оружием — вызывающий
+ * код тогда пробует следующие ветки применения.
+ *
+ * @param {object} slots - карта слотов (как в хранилище)
+ * @param {string} slotKey - слот конечности
+ * @param {string} weaponId - id установленного оружия
+ * @param {object} appliedMods - { [slot]: modId } из окна модификации
+ * @returns {object|null}
+ */
+export function setInstalledWeaponMods(slots, slotKey, weaponId, appliedMods) {
+  const slotData = slots?.[slotKey];
+  const limb = slotData?.limb;
+  const list = Array.isArray(limb?.builtinWeapons) ? limb.builtinWeapons : null;
+  if (!list) return null;
+  const index = list.findIndex((w) => (w?.weaponId ?? w?.id) === weaponId || w?.id === weaponId);
+  if (index === -1) return null;
+  const nextList = [...list];
+  nextList[index] = {
+    ...list[index],
+    appliedMods: appliedMods || {},
+    modIds: toModIds({ appliedMods }),
+  };
+  return {
+    ...slots,
+    [slotKey]: { ...slotData, limb: { ...limb, builtinWeapons: nextList } },
+  };
 }
 
 // ---------------------------------------------------------------------------
