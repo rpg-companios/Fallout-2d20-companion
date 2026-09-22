@@ -2,6 +2,14 @@
 
 ---
 
+## Decision list — 13 disputed weapon mods (patch 307)
+
+Moving knowledge from the slot list into mod descriptions is almost
+clean (295 additions, no behavior change), but 13 mods on six weapons
+claim applicability the list does not allow. The list with questions is
+in docs/reference-data/weapon-mods-open-questions.md; patches do not
+wait for the answer — the owner's decision will close the move.
+
 ## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
 
 Owner's rule: no point keeping a separate file listing which mods live
