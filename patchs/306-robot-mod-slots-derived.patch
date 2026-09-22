@@ -1,7 +1,12 @@
 #!/bin/sh
-# Патч 306: слоты модов робо-оружия выведены из самих модов (slot + applies_to_ids).
-# Файл-дубль robot/weapon_mod_slots.json удалён (слово владельца: мод сам заявляет
-# слот и применимость — отдельный файл плодил вторую копию знания).
+# Патч 306 (переиздание под дерево владельца): слоты модов робо-оружия
+# выведены из самих модов (slot + applies_to_ids). Код и чейнджлоги — как
+# в оригинале; удаление файла robot/weapon_mod_slots.json ВЫНЕСЕНО из патча
+# (на дереве владельца файл расходился с эталоном — патч не проходил начисто).
+# ПОСЛЕ применения удали файл руками:
+#   rm modules/fallout/data/equipment/robot/weapon_mod_slots.json
+# Если в твоём файле было что-то СВЕРХ четырёх конденсаторов лазера —
+# скажи, перенесу эти знания в описания самих модов.
 # Тянет цепочку 300–305, если они ещё не стоят.
 patch -p1 <<'PATCH_306_EOF'
 diff --git a/__tests__/robot/assaultron-head-laser-mods.test.js b/__tests__/robot/assaultron-head-laser-mods.test.js
@@ -111,62 +116,6 @@ index 3d4edf4..f063a09 100644
      armorMods: mergedArmorMods,
      uniqArmorMods: mergedUniqArmorMods,
      modsOverrides: moduleWeaponModSlots,
-diff --git a/modules/fallout/data/equipment/robot/weapon_mod_slots.json b/modules/fallout/data/equipment/robot/weapon_mod_slots.json
-deleted file mode 100644
-index 8909b11..0000000
---- a/modules/fallout/data/equipment/robot/weapon_mod_slots.json
-+++ /dev/null
-@@ -1,10 +0,0 @@
--{
--  "robot_weapon_assaultron_head_laser": {
--    "Capacitor": [
--      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii",
--      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_iv",
--      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_v",
--      "robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi"
--    ]
--  }
--}
-diff --git a/modules/fallout/index.js b/modules/fallout/index.js
-index 295e684..9bb37b6 100644
---- a/modules/fallout/index.js
-+++ b/modules/fallout/index.js
-@@ -76,7 +76,6 @@ import robotArmor from './data/equipment/robot/armor.json';
- import robotArmorPlating from './data/equipment/robot/armor_plating.json';
- import robotFrames from './data/equipment/robot/frames.json';
- import robotWeaponMods from './data/equipment/robot/weapon_mods.json';
--import robotWeaponModSlots from './data/equipment/robot/weapon_mod_slots.json';
- 
- // — расходники —
- import food from './data/consumables/food.json';
-@@ -238,7 +237,6 @@ export const SETTING = Object.freeze({
-         armorPlating: robotArmorPlating,
-         frames: robotFrames,
-         weaponMods: robotWeaponMods,
--        modSlots: robotWeaponModSlots,
-       },
-     },
- 
-diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
-index 8295028..2c2c865 100644
---- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
-+++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
-@@ -349,10 +349,11 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
-         const slots = await getSlotsForWeapon(resolvedWeaponId);
-         const bySlot = {};
- 
--        // ПРАВИЛО (владелец, патч 108): источник слотов — ТОЛЬКО
--        // weapon_mod_slots (контент модуля). Фолбэк на appliesToIds удалён:
--        // если для оружия записей нет — моды не предлагаются, данные
--        // дополняются в модуле (weapon_mod_slots).
-+        // ПРАВИЛО (владелец, патч 108; уточнение патча 306): источник слотов —
-+        // данные модуля. Для оружия людей — weapon_mod_slots.json; слоты
-+        // робо-оружия ВЫВЕДЕНЫ из самих модов (slot + applies_to_ids),
-+        // файл-дубль robot/weapon_mod_slots.json удалён. Оба вида приходят
-+        // сюда одним списком через каталог (getSlotsForWeapon).
-         if (slots && slots.length) {
-           for (const slot of slots) {
-             const normalizedSlot = normalizeSlotKey(slot);
 --- a/docs/changelog.ru.md
 +++ b/docs/changelog.ru.md
 @@ -5,1 +5,18 @@
