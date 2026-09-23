@@ -2,7 +2,25 @@
 
 ---
 
-## Rarity, capacity and item are independent (patch 328)
+## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
+
+Owner's design word: the categories window gets the setting windows'
+background, category areas styled like the home screen, spoilers as neat
+cards like the perks modal; availability by color and in parentheses.
+
+- The categories window now sits on the setting windows' background image
+  (assets/bg.png, dimmed like the Gear/Character screens).
+- Category tiles match the home-screen areas: dark panel, gold border,
+  rounded corners; warm-gold label, grey counter.
+- Recipe spoilers are cards modeled on the perks modal: border, radius,
+  padding, separator before the body — no more solid sheets.
+- An available recipe is a light card; perk/rank-locked is grey (grey name
+  too). Material availability sits next to the name in parentheses:
+  "(can craft)" / "(missing materials)" / "(needs a perk)".
+- Complexity, skill and cooking time moved inside the spoiler (first line);
+  the full missing-perk text is there as well.
+
+## ## Rarity, capacity and item are independent (patch 328)
 
 Owner's clarification to the armor-mods table (327), recorded in
 `docs/reference-data/armor-mods-crafting.md` (section 1.1). The app is

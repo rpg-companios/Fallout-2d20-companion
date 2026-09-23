@@ -30,8 +30,8 @@
     "timeHours": "{n} ч",
     "timeDays": "{n} сут",
     "needPerk": "Нужен перк «{perk}», ранг {rank}",
-    "shortMaterials": "Не хватает материалов",
-    "ready": "Можно крафтить",
+    "shortMaterials": "не хватает материалов",
+    "ready": "можно создать",
     "materialsTitle": "Материалы",
     "haveNeed": "есть {have} шт. · нужно {need} шт.",
     "quantity": "Сколько раз",
@@ -55,7 +55,8 @@
     "apYes": "Потратить 2 ОД",
     "apNo": "Полное время",
     "apHalvedNote": "Время сокращено за 2 ОД",
-    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
+    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)",
+    "perkShort": "нужен перк"
   },
   "attributes": {
     "INT": "Интеллект"

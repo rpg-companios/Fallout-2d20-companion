@@ -8,9 +8,12 @@
 // здесь только кнопки, списки и иконки квадратов.
 
 import React, { useMemo, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView, ImageBackground } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from '../../../styles/CraftingModal.styles';
+// 329 (слово владельца): фон окна категорий — фоновое изображение окон
+// сеттинга (как на экранах Снаряжения/Персонажа, opacity 0.3).
+const BG_IMAGE = require('../../../../../assets/bg.png');
 import {
   buildCraftTiles,
   buildCategoryModel,
@@ -151,6 +154,7 @@ export default function CraftingModal({ visible, onClose }) {
           </View>
 
           {!report && view === 'categories' && (
+            <ImageBackground source={BG_IMAGE} style={styles.bg} imageStyle={styles.bgImage}>
             <ScrollView style={styles.body} contentContainerStyle={styles.tilesContent}>
               {/* Патч 322: строки по 3 квадрата, прокрутка (владелец: окно на ПК
                   не прокручивалось). Выравнивание остатка строки: одинокая — по
@@ -180,6 +184,7 @@ export default function CraftingModal({ visible, onClose }) {
                 <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
               </TouchableOpacity>
             </ScrollView>
+            </ImageBackground>
           )}
 
           {!report && view === 'category' && (
@@ -190,27 +195,37 @@ export default function CraftingModal({ visible, onClose }) {
               ListEmptyComponent={<Text style={styles.empty}>{ui.emptyCategory ?? '—'}</Text>}
               renderItem={({ item }) => {
                 const expanded = item.recipeId === openId;
+                // 329 (слово владельца): доступные — светлые, недоступные по
+                // перку/рангу — серые; доступность материалов — в скобках
+                // рядом с названием; сложность/навык/время — внутри спойлера.
+                const perkLocked = item.status === 'missing-perk';
+                const note = item.canCraft
+                  ? (ui.ready ?? '')
+                  : perkLocked ? (ui.perkShort ?? '') : (ui.shortMaterials ?? '');
                 return (
-                  <View style={[styles.row, !item.canCraft && styles.rowDisabled]}>
+                  <View style={[styles.row, perkLocked && styles.rowDisabled]}>
                     <TouchableOpacity
                       style={styles.spoilerHead}
                       onPress={() => setOpenId(expanded ? null : item.recipeId)}>
                       <View style={styles.rowTop}>
-                        <Text style={[styles.rowName, item.canCraft && styles.rowNameReady]}>
+                        <Text style={[styles.rowName, perkLocked && styles.rowNameLocked]} numberOfLines={2}>
                           {item.outputName}
+                        </Text>
+                        {/* 326: никаких сводок по видам — счётчики штук на строках материалов */}
+                        <Text style={[
+                          styles.rowNote,
+                          item.canCraft ? styles.rowNoteOk : perkLocked ? styles.rowNoteLocked : styles.rowNoteBad,
+                        ]}>
+                          ({note})
                         </Text>
                         <Text style={styles.spoilerArrow}>{expanded ? '▾' : '▸'}</Text>
                       </View>
-                      <Text style={styles.rowMeta}>{item.metaLine}</Text>
-                      <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
-                        {/* 326 (слово владельца): никаких сводок по видам —
-                            счётчики штук живут на строках материалов. */}
-                        {item.canCraft ? (ui.ready ?? '') : (item.reason || '')}
-                      </Text>
                     </TouchableOpacity>
 
                     {expanded && (
                       <View style={styles.spoilerBody}>
+                        <Text style={styles.rowMeta}>{item.metaLine}</Text>
+                        {perkLocked && <Text style={styles.rowReason}>{item.reason}</Text>}
                         <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
                         {item.materialGroups.map((group) => (
                           <View key={group.type}>

@@ -30,8 +30,8 @@
     "timeHours": "{n} hr",
     "timeDays": "{n} d",
     "needPerk": "Needs perk \"{perk}\" rank {rank}",
-    "shortMaterials": "Missing materials",
-    "ready": "Ready",
+    "shortMaterials": "missing materials",
+    "ready": "can craft",
     "materialsTitle": "Materials",
     "haveNeed": "have {have} · need {need}",
     "quantity": "Attempts",
@@ -55,7 +55,8 @@
     "apYes": "Spend 2 AP",
     "apNo": "Full time",
     "apHalvedNote": "Time halved for 2 AP",
-    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)"
+    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)",
+    "perkShort": "needs a perk"
   },
   "attributes": {
     "INT": "Intelligence"

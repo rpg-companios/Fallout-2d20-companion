@@ -1,6 +1,10 @@
-// Стили модалки крафта (редизайн, патч 318: квадраты категорий, спойлеры
-// рецептов, окно количества). Тёмная тема по образцу остальных модалок
-// инвентаря; отдельных палитр не заводим — цвета редкостей придут своим слоем.
+// Стили модалки крафта (318: квадраты категорий, спойлеры; 325 — светлая
+// гамма; 329 — слово владельца: фон окна категорий = фон окон сеттинга
+// (assets/bg.png), квадраты — как области home screen (тёмная панель с
+// золотой рамкой), спойлеры рецептов — карточки по образцу модалки перков
+// (рамка, отступы, не сплошное полотно); доступные рецепты — светлые,
+// недоступные по перку/рангу — серые; доступность материалов — в скобках
+// рядом с названием; сложность/навык/время — внутри спойлера).
 import { StyleSheet } from 'react-native';
 
 export default StyleSheet.create({
@@ -12,7 +16,11 @@ export default StyleSheet.create({
   closeText: { color: '#444', fontSize: 20, paddingHorizontal: 8 },
   backText: { color: '#444', fontSize: 14, paddingRight: 8 },
 
-  // Квадраты категорий (318; 322 — прокрутка, строки по 3, выравнивание от центра)
+  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга
+  // и оформление областей как у home screen: folderCell — тёмная панель,
+  // золотая рамка, скругление 8)
+  bg: { flex: 1 },
+  bgImage: { opacity: 0.3 }, // как на экранах сеттинга (WeaponsAndArmor)
   body: { flex: 1, paddingHorizontal: 12 },
   tilesContent: { paddingBottom: 8 },
   tileRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
@@ -21,19 +29,19 @@ export default StyleSheet.create({
   tile: {
     width: '30%',
     aspectRatio: 1,
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderRadius: 8,
+    backgroundColor: '#111827',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d4af37',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     padding: 4,
   },
   tileIcon: { fontSize: 38, color: '#fff' },
-  tileLabel: { color: '#000', fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  tileCount: { color: '#16a34a', fontSize: 11 },
-  tileCountZero: { color: '#777' },
+  tileLabel: { color: '#f0e68c', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  tileCount: { color: '#d1d5db', fontSize: 11 },
+  tileCountZero: { color: '#6b7280' },
   closeBtn: {
     backgroundColor: '#f1f5f9',
     borderRadius: 10,
@@ -44,19 +52,37 @@ export default StyleSheet.create({
   },
   closeBtnText: { color: '#444', fontSize: 15, fontWeight: '600' },
 
-  // Список рецептов-спойлеров (318): доступные белые, недоступные серые
+  // Список рецептов (329): карточки-спойлеры по образцу модалки перков —
+  // рамка #ddd, скругление 6, отступы; доступные — светлые (белые),
+  // недоступные по перку/рангу — серые (#f1f5f9), материалы — текстом
+  // в скобках рядом с названием. Сложность/навык/время — внутри спойлера.
   list: { flex: 1, paddingHorizontal: 12 },
-  row: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
-  rowDisabled: { backgroundColor: '#f1f5f9' },
-  spoilerHead: { },
+  row: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 6,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  rowDisabled: { backgroundColor: '#f1f5f9' }, // недоступен по перку/рангу
+  spoilerHead: { paddingHorizontal: 10, paddingVertical: 10 },
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowName: { color: '#000', fontSize: 15, fontWeight: '600', flex: 1 },
-  rowNameReady: { color: '#000' },
+  rowName: { color: '#000', fontSize: 15, fontWeight: 'bold', flex: 1, flexShrink: 1 },
+  rowNameLocked: { color: '#9aa1a9' }, // серое имя как perkNameDisabled
+  rowNote: { fontSize: 12, flexShrink: 0 },
+  rowNoteOk: { color: '#16a34a' }, // «(можно создать)»
+  rowNoteBad: { color: '#dc2626' }, // «(не хватает материалов)»
+  rowNoteLocked: { color: '#9aa1a9' }, // «(нужен перк)»
   spoilerArrow: { color: '#777', fontSize: 14 },
-  rowMeta: { color: '#777', fontSize: 12, marginTop: 2 },
-  rowReason: { color: '#dc2626', fontSize: 12, marginTop: 2 },
-  rowReady: { color: '#16a34a', fontSize: 12, marginTop: 2 },
-  spoilerBody: { paddingTop: 8 },
+  rowMeta: { color: '#777', fontSize: 12, marginBottom: 6 },
+  rowReason: { color: '#dc2626', fontSize: 12, marginBottom: 6 },
+  spoilerBody: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+  },
   detailLabel: { color: '#777', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
   rarityLine: { color: '#444', fontSize: 12, fontWeight: '700', marginTop: 6 },
   // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
