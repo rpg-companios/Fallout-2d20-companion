@@ -1,0 +1,1636 @@
+diff --git a/__tests__/crafting/armor-mod-crafting-341.test.js b/__tests__/crafting/armor-mod-crafting-341.test.js
+new file mode 100644
+index 0000000..f8221e9
+--- /dev/null
++++ b/__tests__/crafting/armor-mod-crafting-341.test.js
+@@ -0,0 +1,107 @@
++// ПРИЁМОЧНЫЙ (патч 341): крафт модов брони — квадрат «Броня» жив.
++//   • 44 рецепта (диктованная таблица 327–340, материалы по материалоёмкости);
++//   • проверка — ИНТ + Ремонт, сложность = ёмкость − ранг (правила 323);
++//   • перковый гейт (Бронник/Наука!) работает как у остальных рецептов;
++//   • провал жжёт материалы по группе gear (настройка 323);
++//   • созданный мод — предмет в сумке с каталожным именем (окно установки
++//     берёт моды из каталога, так что мод в сумке — результат теста владельца).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { buildCraftTiles, buildCategoryModel } from '../../modules/fallout/crafting/windowModel';
++import { craftRecipe } from '../../modules/fallout/crafting/operations';
++import { getCraftingRecipeById, getCraftingCategoryRules } from '../../domain/registry';
++import { findCatalogEntry } from '../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++  useAppSettingsStore.getState().setValue('craftFailLossConsumables', true);
++  useAppSettingsStore.getState().setValue('craftFailLossGear', true);
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const seedStack = (itemId, quantity) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++      weaponId: itemId, quantity,
++    } },
++  }));
++};
++
++const inventoryList = () => Object.values(state().items || {});
++
++describe('Крафт модов брони (341): квадрат «Броня», проверка, мод в сумке', () => {
++  it('квадрат «Броня»: 44 рецепта из диктованной таблицы', () => {
++    const tiles = buildCraftTiles();
++    const armor = tiles.find((t) => t.category === 'armor');
++    expect(armor.recipes).toBe(44);
++    expect(buildCategoryModel('armor').length).toBe(44);
++    // Ремонт не жжёт материалы при провале (правило верстака брони)
++    expect(getCraftingCategoryRules('armor').failBurnsMaterialsSkills).toEqual([]);
++  });
++
++  it('простой мод (Вываренная кожа, ёмкость 2): крафт успешен, мод в сумке с именем', () => {
++    const recipe = getCraftingRecipeById('uniq_leather_boiled');
++    expect(recipe.requires).toEqual({ skill: 'REPAIR', complexity: 2 });
++    expect(recipe.materials).toEqual([{ itemId: 'item_common_materials', count: 3 }]);
++
++    seedStack('item_common_materials', 3);
++    // бросок 3 ≤ ИНТ+Ремонт → успех; сложность 2, ранг 0
++    const result = craftRecipe('uniq_leather_boiled', { rollD20: () => 3 }, { deferTime: true });
++    expect(result.done).toBe(true);
++    expect(result.granted.itemId).toBe('uniq_leather_boiled');
++
++    const inBag = inventoryList().find((i) => i.weaponId === 'uniq_leather_boiled');
++    expect(inBag, 'мод-предмет в сумке').toBeTruthy();
++    // имя мода разрешено из каталога (локаль тестов — en, в приложении будет ru)
++    const catalog = getEquipmentCatalog();
++    const catalogName = findCatalogEntry(catalog, 'uniq_leather_boiled', 'armorMod')?.name;
++    expect(catalogName).toBe('Boiled Leather');
++    expect(inBag.name).toBe(catalogName);
++    // материалы списаны
++    expect(inventoryList().filter((i) => i.weaponId === 'item_common_materials')
++      .reduce((acc, i) => acc + (i.quantity || 0), 0)).toBe(0);
++  });
++
++  it('перковый гейт: «Плотная» (Бронник 3) без перка заблокирована, с перком — крафтится', () => {
++    // без перка: строка есть, но reason «нужен перк»
++    const blocked = buildCategoryModel('armor').find((r) => r.recipeId === 'mod_std_dense');
++    expect(blocked.canCraft).toBe(false);
++    expect(blocked.status).toBe('missing-perk');
++
++    seedStack('item_common_materials', 7);
++    seedStack('item_uncommon_materials', 5);
++    seedStack('item_rare_materials', 3);
++    // ранг перка = число выбранных рангов (getPerkSelectionCount): 3 выбора = Бронник 3
++    useCharacterStore.setState((prev) => ({
++      selectedPerks: [
++        ...(prev.selectedPerks || []),
++        { perkId: 'armorer', index: 0 }, { perkId: 'armorer', index: 1 }, { perkId: 'armorer', index: 2 },
++      ],
++      // Ремонт 6: сложность 6 − 6 = 0 → автоуспех (броска нет, правило 323)
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++    const ok = buildCategoryModel('armor').find((r) => r.recipeId === 'mod_std_dense');
++    expect(ok.canCraft).toBe(true);
++
++    const result = craftRecipe('mod_std_dense', {}, { deferTime: true });
++    expect(result.done).toBe(true);
++    expect(result.granted.itemId).toBe('mod_std_dense');
++  });
++
++  it('провал (осложнение) жжёт материалы — группа gear, настройка включена', () => {
++    seedStack('item_common_materials', 3);
++    const failed = craftRecipe('uniq_leather_boiled', { rollD20: () => 20 });
++    expect(failed.stage).toBe('check');
++    expect(failed.burned.length).toBeGreaterThan(0);
++    expect(inventoryList().filter((i) => i.weaponId === 'item_common_materials').length).toBe(0);
++  });
++});
+diff --git a/__tests__/crafting/crafting-data.test.js b/__tests__/crafting/crafting-data.test.js
+index 7f6654c..77c5b18 100644
+--- a/__tests__/crafting/crafting-data.test.js
++++ b/__tests__/crafting/crafting-data.test.js
+@@ -45,6 +45,9 @@ import junkData from '../../modules/fallout/data/junk/junk.json';
+ import materialsData from '../../modules/fallout/data/junk/material.json';
+ import foragingTable from '../../modules/fallout/data/loot/foraging.json';
+ 
++import armorModsData from '../../modules/fallout/data/equipment/armor_mods.json';
++import uniqArmorModsData from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
++
+ import craftingIndex from '../../modules/fallout/data/recipes/index.json';
+ 
+ const ROOT = new URL('../../', import.meta.url).pathname;
+@@ -76,6 +79,8 @@ collectIds(clothesData, 'clothing', catalogIds);
+ collectIds(powerArmorData, 'powerArmor', catalogIds);
+ collectIds(junkData, 'junk', catalogIds);
+ collectIds(materialsData, 'misc', catalogIds);
++collectIds(armorModsData, 'armorMod', catalogIds);
++collectIds(uniqArmorModsData, 'armorMod', catalogIds);
+ 
+ const perkIds = new Set(perksData.map((p) => p.id));
+ 
+@@ -127,6 +132,7 @@ describe('данные крафта: файлы категории', () => {
+     // Порядок и состав манифеста — он же порядок вкладок окна (269).
+     expect(craftingIndex.recipes).toEqual([
+       { file: 'ammo.json', category: 'ammo', count: 28 },
++      { file: 'armor.json', category: 'armor', count: 44 },
+       { file: 'chems.json', category: 'chems', count: 21 },
+       { file: 'drinks.json', category: 'drinks', count: 8 },
+       { file: 'explosives.json', category: 'explosives', count: 9 },
+@@ -200,7 +206,7 @@ describe('данные крафта: ссылки', () => {
+   it('навык — канонический ключ, категория — из манифеста', () => {
+     for (const { category, record } of allRecipes()) {
+       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
+-      expect(['ammo', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
++      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
+       expect(Number.isInteger(record.requires.complexity)).toBe(true);
+       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
+       expect(record.requires.complexity).toBeLessThanOrEqual(7);
+diff --git a/__tests__/crafting/crafting-operations.test.js b/__tests__/crafting/crafting-operations.test.js
+index bfa6080..8fc2028 100644
+--- a/__tests__/crafting/crafting-operations.test.js
++++ b/__tests__/crafting/crafting-operations.test.js
+@@ -15,6 +15,7 @@ import ammoFile from '../../modules/fallout/data/recipes/ammo.json';
+ import chemsFile from '../../modules/fallout/data/recipes/chems.json';
+ import foodFile from '../../modules/fallout/data/recipes/food.json';
+ import explosivesFile from '../../modules/fallout/data/recipes/explosives.json';
++import armorRecipesFile from '../../modules/fallout/data/recipes/armor.json';
+ import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
+ 
+ const state = () => useCharacterStore.getState();
+@@ -50,7 +51,7 @@ const setSkill = (skillId, total) => {
+ describe('реестр — точка, откуда движок крафта видит данные', () => {
+   it('все файлы категории собраны индексом без потерь', () => {
+     const byFile = {
+-      'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'chems.json': chemsFile,
++      'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'armor.json': armorRecipesFile, 'chems.json': chemsFile,
+       'food.json': foodFile, 'drinks.json': drinksFile,
+     };
+     const declared = craftingIndex.recipes.reduce((sum, entry) => sum + entry.count, 0);
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+index 07082ae..6a38f07 100644
+--- a/__tests__/crafting/crafting-window-tiles.test.js
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -43,9 +43,11 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+     expect(byId.get('food').recipes).toBe(27);
+     expect(byId.get('explosives').recipes).toBe(9); // 325: вся взрывчатка переехала из «оружия»
+     expect(buildCategoryModel('explosives').length).toBe(9);
++    expect(byId.get('armor').recipes).toBe(44); // 341: крафт модов брони — квадрат «Броня» жив
++    expect(buildCategoryModel('armor').length).toBe(44);
+     // пустых данных квадраты видны, но рецептов внутри нет
+-    for (const empty of ['weapons', 'armor', 'powerArmor']) {
+-      expect(byId.get(empty).recipes).toBe(0); // «оружие» опустело после переезда взрывчатки (325)
++    for (const empty of ['weapons', 'powerArmor']) {
++      expect(byId.get(empty).recipes).toBe(0); // оружие/силовая броня — будущие серии модов
+       expect(buildCategoryModel(empty)).toEqual([]);
+     }
+   });
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3fcd3d6..98ca1e0 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **340** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–340 уехали, установка не подтверждена;
++· последний сданный патч: **341** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–341 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -160,6 +160,15 @@
+   брони ПОЛНЫ. Разграничение понятий записано в справочнике; судьба
+   четырёх рецептов (не выпускать / выпускать с пометкой) — при старте
+   серии крафта модов.
++- 341 — КРАФТ МОДОВ БРОНИ готов к проверке (слово владельца: «жду
++  тестирования»): квадрат «Броня» = 44 рецепта (BOOK_ARMOR_MOD_RECIPES в
++  генераторе, recipes/armor.json, корзина armor, категория armor);
++  материалы по ёмкости, ИНТ+Ремонт, перки-гейт, час, провал жжёт gear.
++  Мод-предмет падает в сумку с каталожным именем (findCatalogEntry
++  'armorMod' + префиксы uniq_/mod_std_ в hintByPrefix и addNewItem).
++  ВОПРОС владельцу: гейтить ли установку мода наличием в сумке (сейчас
++  установка свободна из каталога). Не начато: силовая броня, оружие,
++  редкие рецепты, 4 мода-рецепта (340).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a6fecea..be19ca4 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,28 @@
+ 
+ ---
+ 
+-## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
++## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
++
++Owner's word: "I'm waiting to test crafting armor mods." Patch 341 starts
++the series: mod crafting is ready for testing.
++
++- The "Armor" tile in the crafting window: 44 recipes — every mod-item
++  from your table (weave, vault-suit linings, raider/leather/metal/combat/
++  synth materials, generic body/arms/legs mods). Not emitted: the four
++  recipe-only mods (340) and the ambiguous "Lightweight (2)" row.
++- Materials follow material capacity (book): capacity 2 = Common ×3,
++  capacity 7 = Common ×8 + Uncommon ×6 + Rare ×4, etc.
++- Check: INT + Repair, difficulty = capacity − rank (rules 323); perks
++  (Armorer/Science!) gate like other recipes; one hour; failure burns
++  materials per the "gear" setting.
++- The crafted mod is an inventory item with its catalog name ("Вываренная
++  кожа", "Ballistic weave"…). The mod-install window still lists catalog
++  mods freely — QUESTION to the owner: should installing REQUIRE the
++  crafted mod in the bag (today it doesn't)?
++- Not in this patch: power armor and weapons (empty tiles), rare-recipe
++  learning (future series), applying the four recipe-only mods (340).
++
++## ## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
+ 
+ The owner checked the book: Pockets, Deep pockets, Lead-lined and
+ Ultra-light are mod-RECIPES, not mod-items ("different concepts, like a
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8d86952..d40b183 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,29 @@
+ 
+ ---
+ 
+-## Долг закрыт: «С карманами» и ещё три — моды-рецепты (патч 340)
++## КРАФТ МОДОВ БРОНИ — квадрат «Броня» работает (патч 341)
++
++Слово владельца: «жду, когда смогу протестировать создание модов на броню».
++Патч 341 — старт серии: крафт модов доступен для проверки.
++
++- Квадрат «Броня» в окне крафта: 44 рецепта — все моды-предметы из вашей
++  таблицы (плетение, подкладки, материалы рейдеров/кожи/металла/боевой/
++  синтов, общие моды тела/рук/ног). Не выпущены: четыре мода-рецепта без
++  предмета (340) и «Облегчённая (2)» — двусмысленная строка диктовки.
++- Материалы — по материалоёмкости (книга): ёмкость 2 = Обычные ×3,
++  ёмкость 7 = Обычные ×8 + Необычные ×6 + Редкие ×4, и т.д.
++- Проверка — ИНТ + Ремонт, сложность = ёмкость − ранг Ремонта (правила 323);
++  перки (Бронник/Наука!) — гейтом, как у остальных рецептов; время — час;
++  провал жжёт материалы по группе «gear» (настройка).
++- Созданный мод — предмет в сумке с каталожным именем («Вываренная кожа»,
++  «Ballistic weave»…). Окно установки модов пока берёт моды из каталога
++  свободно — ВОПРОС владельцу: требовать ли наличие созданного мода в сумке
++  для установки (сейчас — нет).
++- Не тестировать в этом патче: силовая броня и оружие (пустые квадраты),
++  редкие рецепты (система узнавания — будущая серия), «применение» четырёх
++  модов-рецептов (340, эррата).
++
++## ## Долг закрыт: «С карманами» и ещё три — моды-рецепты (патч 340)
+ 
+ Владелец сверился с книгой: С карманами, С глубокими карманами, Свинцовая
+ подкладка, Ультралёгкая — это моды-РЕЦЕПТЫ, а не моды-предметы («разные
+diff --git a/docs/reference-data/CRAFTING-MAPPING.md b/docs/reference-data/CRAFTING-MAPPING.md
+index 9033f98..94422ae 100644
+--- a/docs/reference-data/CRAFTING-MAPPING.md
++++ b/docs/reference-data/CRAFTING-MAPPING.md
+@@ -21,7 +21,7 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ ## Покрытие
+ 
+ - рецептов в источнике: **356**
+-- выпущено в данные: **93** (ammo: 28, explosives: 9, chems: 21, food: 27, drinks: 8)
++- выпущено в данные: **137** (ammo: 28, explosives: 9, armor: 44, chems: 21, food: 27, drinks: 8)
+ - не выпущено: **263**
+ - из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
+ 
+diff --git a/domain/registry.js b/domain/registry.js
+index 9dcf7a5..cd9ec1a 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -65,6 +65,7 @@ const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
+ const CRAFTING_FILES = {
+   'ammo.json': SETTING.data.recipes.sections.ammo,
+   'explosives.json': SETTING.data.recipes.sections.explosives,
++  'armor.json': SETTING.data.recipes.sections.armor,
+   'chems.json': SETTING.data.recipes.sections.chems,
+   'food.json': SETTING.data.recipes.sections.food,
+   'drinks.json': SETTING.data.recipes.sections.drinks,
+diff --git a/domain/resolveItem.js b/domain/resolveItem.js
+index 9d6da99..11e5b30 100644
+--- a/domain/resolveItem.js
++++ b/domain/resolveItem.js
+@@ -55,6 +55,9 @@ export const findCatalogEntry = (catalog, id, itemType) => {
+       return search(catalog.ammoTypes);
+     case 'armor':
+       return catalog.armorIndex?.byId?.get(id) || null;
++    case 'armorMod':
++      // Моды брони (341): стандартные и уникальные — плоские списки каталога.
++      return search(catalog.armorMods) || search(catalog.uniqArmorMods);
+     case 'clothing':
+     case 'outfit': {
+       const all = (catalog.clothes?.clothes || []).flatMap((g) => g.items || []);
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index c92bbe9..51846e7 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -68,6 +68,8 @@ const hintByPrefix = (id) => {
+   if (s.startsWith('food_')) return 'food';
+   if (s.startsWith('drink_')) return 'drinks';
+   if (s.startsWith('armor_')) return 'armor';
++  // Моды брони (341): крафт даёт мод-предмет; имена берутся из каталога модов.
++  if (s.startsWith('uniq_') || s.startsWith('mod_std_')) return 'armorMod';
+   return null;
+ };
+ 
+diff --git a/modules/fallout/data/recipes/armor.json b/modules/fallout/data/recipes/armor.json
+new file mode 100644
+index 0000000..8646f08
+--- /dev/null
++++ b/modules/fallout/data/recipes/armor.json
+@@ -0,0 +1,1062 @@
++[
++  {
++    "id": "uniq_weave_ballistic",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_weave_ballistic_mk2",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_weave_ballistic_mk3",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_weave_ballistic_mk4",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_weave_ballistic_mk5",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_vaultsuit_insulated",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_vaultsuit_processed",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_vaultsuit_sturdy",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_vaultsuit_protective",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        },
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_vaultsuit_shielded",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        },
++        {
++          "perkId": "science",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_raider_welded",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_raider_hardened",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_raider_reinforced",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_raider_bolstered",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_leather_boiled",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_leather_stitched",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_leather_tanned",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_leather_shadowed",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_leather_studded",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_metal_painted",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_metal_enameled",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_metal_shadowed",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_metal_alloy",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_metal_polished",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_combat_reinforced",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_combat_shadowed",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_combat_fiberglass",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_combat_polymer",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_synth_laminated",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_synth_rubberized",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_synth_microcarbon",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "uniq_synth_nanofiber",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 7,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 8
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 4
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_soft_padding",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_asbestos_lining",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_dense",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_biocomponents_mesh",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 7,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        },
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 8
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 4
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_pneumatic",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_melee",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_parrying",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_balanced",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_aerodynamic",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_lightweight_arms",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_soft_padding_legs",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_std_soundproofed",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "armorer",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  }
++]
+diff --git a/modules/fallout/data/recipes/categoryRules.json b/modules/fallout/data/recipes/categoryRules.json
+index 2739e46..6c49beb 100644
+--- a/modules/fallout/data/recipes/categoryRules.json
++++ b/modules/fallout/data/recipes/categoryRules.json
+@@ -1,7 +1,30 @@
+ {
+-  "ammo": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] },
+-  "chems": { "failBurnsMaterialsSkills": ["SCIENCE"] },
+-  "drinks": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
+-  "food": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
+-  "explosives": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] }
++  "ammo": {
++    "failBurnsMaterialsSkills": [
++      "EXPLOSIVES"
++    ]
++  },
++  "armor": {
++    "failBurnsMaterialsSkills": []
++  },
++  "chems": {
++    "failBurnsMaterialsSkills": [
++      "SCIENCE"
++    ]
++  },
++  "drinks": {
++    "failBurnsMaterialsSkills": [
++      "SURVIVAL"
++    ]
++  },
++  "explosives": {
++    "failBurnsMaterialsSkills": [
++      "EXPLOSIVES"
++    ]
++  },
++  "food": {
++    "failBurnsMaterialsSkills": [
++      "SURVIVAL"
++    ]
++  }
+ }
+diff --git a/modules/fallout/data/recipes/index.json b/modules/fallout/data/recipes/index.json
+index 74ca163..879273d 100644
+--- a/modules/fallout/data/recipes/index.json
++++ b/modules/fallout/data/recipes/index.json
+@@ -6,6 +6,11 @@
+       "category": "ammo",
+       "count": 28
+     },
++    {
++      "file": "armor.json",
++      "category": "armor",
++      "count": 44
++    },
+     {
+       "file": "chems.json",
+       "category": "chems",
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+index a5cdbee..226c0d4 100644
+--- a/modules/fallout/index.js
++++ b/modules/fallout/index.js
+@@ -93,6 +93,7 @@ import recipesManifest from './data/recipes/index.json';
+ import recipesCategoryRules from './data/recipes/categoryRules.json';
+ import recipesAmmo from './data/recipes/ammo.json';
+ import recipesExplosives from './data/recipes/explosives.json';
++import recipesArmor from './data/recipes/armor.json';
+ import recipesChems from './data/recipes/chems.json';
+ import recipesFood from './data/recipes/food.json';
+ import recipesDrinks from './data/recipes/drinks.json';
+@@ -258,6 +259,7 @@ export const SETTING = Object.freeze({
+       sections: {
+         ammo: recipesAmmo,
+         explosives: recipesExplosives,
++        armor: recipesArmor,
+         chems: recipesChems,
+         food: recipesFood,
+         drinks: recipesDrinks,
+diff --git a/public/version.json b/public/version.json
+index 9be11e7..2d9f3ae 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "340",
++  "version": "341",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/scripts/build-crafting-data.mjs b/scripts/build-crafting-data.mjs
+index 46b7fbd..9a558cf 100644
+--- a/scripts/build-crafting-data.mjs
++++ b/scripts/build-crafting-data.mjs
+@@ -177,22 +177,87 @@ export const FILE_BY_BUCKET = {
+   ammo: 'ammo.json',
+   weapons: 'weapons.json',
+   explosives: 'explosives.json',
++  armor: 'armor.json',
+   chems: 'chems.json',
+   food: 'food.json',
+   drinks: 'drinks.json',
+   items: 'items.json',
+ };
+-export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'chems', 'food', 'drinks', 'items'];
++export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'armor', 'chems', 'food', 'drinks', 'items'];
+ const BENCH_BY_BUCKET = {
+   ammo: 'weapons',
+   weapons: 'chemistry',
+   explosives: 'chemistry',
++  armor: 'armor',
+   chems: 'chemistry',
+   food: 'cooking',
+   drinks: 'cooking',
+   items: 'chemistry',
+ };
+ 
++// Патч 341 (слово владельца): крафт модов брони — по диктованной таблице
++// (патчи 327–340; источник истины: docs/reference-data/armor-mods-crafting.md).
++// Рецепт = id мода-предмета; сложность = материалоёмкость (материалы — по
++// кривой MATERIALS_BY_COMPLEXITY); навык Ремонт; перки — из таблицы.
++// НЕ выпускаются (340): четыре мода-рецепта без предмета (uniq-«карманы»,
++// свинец, ультралёгкая) и двусмысленная «Облегчённая (2)» — до эрраты/слова.
++export const BOOK_ARMOR_MOD_RECIPES = [
++  // Баллистическое плетение (костюмы + комбинезон Убежища)
++  { id: 'uniq_weave_ballistic', capacity: 3, perks: [] },
++  { id: 'uniq_weave_ballistic_mk2', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_weave_ballistic_mk3', capacity: 3, perks: [{ perkId: 'armorer', rank: 2 }] },
++  { id: 'uniq_weave_ballistic_mk4', capacity: 3, perks: [{ perkId: 'armorer', rank: 3 }] },
++  { id: 'uniq_weave_ballistic_mk5', capacity: 3, perks: [{ perkId: 'armorer', rank: 4 }] },
++  // Подкладки комбинезона Убежища
++  { id: 'uniq_vaultsuit_insulated', capacity: 2, perks: [] },
++  { id: 'uniq_vaultsuit_processed', capacity: 3, perks: [{ perkId: 'armorer', rank: 2 }] },
++  { id: 'uniq_vaultsuit_sturdy', capacity: 4, perks: [{ perkId: 'armorer', rank: 3 }] },
++  { id: 'uniq_vaultsuit_protective', capacity: 5, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 2 }] },
++  { id: 'uniq_vaultsuit_shielded', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 4 }] },
++  // Материалы брони рейдеров
++  { id: 'uniq_raider_welded', capacity: 2, perks: [] },
++  { id: 'uniq_raider_hardened', capacity: 3, perks: [] },
++  { id: 'uniq_raider_reinforced', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_raider_bolstered', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
++  // Материалы кожаной брони
++  { id: 'uniq_leather_boiled', capacity: 2, perks: [] },
++  { id: 'uniq_leather_stitched', capacity: 3, perks: [] },
++  { id: 'uniq_leather_tanned', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_leather_shadowed', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_leather_studded', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
++  // Материалы металлической брони
++  { id: 'uniq_metal_painted', capacity: 2, perks: [] },
++  { id: 'uniq_metal_enameled', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_metal_shadowed', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_metal_alloy', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_metal_polished', capacity: 6, perks: [{ perkId: 'armorer', rank: 2 }] },
++  // Материалы боевой брони
++  { id: 'uniq_combat_reinforced', capacity: 3, perks: [] },
++  { id: 'uniq_combat_shadowed', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_combat_fiberglass', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_combat_polymer', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
++  // Материалы брони синтов
++  { id: 'uniq_synth_laminated', capacity: 4, perks: [] },
++  { id: 'uniq_synth_rubberized', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_synth_microcarbon', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'uniq_synth_nanofiber', capacity: 7, perks: [{ perkId: 'armorer', rank: 1 }] },
++  // Общие модификации — тело
++  { id: 'mod_std_soft_padding', capacity: 3, perks: [] },
++  { id: 'mod_std_asbestos_lining', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'mod_std_dense', capacity: 6, perks: [{ perkId: 'armorer', rank: 3 }] },
++  { id: 'mod_std_biocomponents_mesh', capacity: 7, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 2 }] },
++  { id: 'mod_std_pneumatic', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }] },
++  // Общие модификации — руки
++  { id: 'mod_std_melee', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'mod_std_parrying', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'mod_std_balanced', capacity: 4, perks: [{ perkId: 'armorer', rank: 2 }] },
++  { id: 'mod_std_aerodynamic', capacity: 5, perks: [{ perkId: 'armorer', rank: 3 }] },
++  { id: 'mod_std_lightweight_arms', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }] },
++  // Общие модификации — ноги
++  { id: 'mod_std_soft_padding_legs', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
++  { id: 'mod_std_soundproofed', capacity: 4, perks: [{ perkId: 'armorer', rank: 2 }] },
++];
++
+ // Патч 325 (слово владельца): гранаты и мины — не «оружие», а «взрывчатка».
+ // Тип предмета в каталоге остаётся weapon (брошенное оружие), но рецепты
+ // таких результатов едут в отдельную корзину explosives.
+@@ -609,6 +674,31 @@ export function buildCraftingData() {
+     throw new Error(`BOOK_CORRECTIONS: для ключей ${deadFixes.join(', ')} нет строки в источнике — исправление мертво`);
+   }
+ 
++  // Патч 341: рецепты модов брони — из диктованной таблицы (BOOK_ARMOR_MOD_RECIPES).
++  // Материалы — по ёмкости (MATERIALS_BY_COMPLEXITY); навык Ремонт; выход — 1 мод.
++  for (const mod of BOOK_ARMOR_MOD_RECIPES) {
++    if (ids.has(mod.id)) throw new Error(`[armor-mod recipes] дубликат id ${mod.id}`);
++    ids.add(mod.id);
++    const curve = MATERIALS_BY_COMPLEXITY[Math.min(7, Math.max(1, Number(mod.capacity) || 1))];
++    const materials = [];
++    if (curve.common) materials.push({ itemId: MATERIAL_ITEM_IDS.common, count: curve.common });
++    if (curve.uncommon) materials.push({ itemId: MATERIAL_ITEM_IDS.uncommon, count: curve.uncommon });
++    if (curve.rare) materials.push({ itemId: MATERIAL_ITEM_IDS.rare, count: curve.rare });
++    entries.push({
++      bucket: 'armor',
++      record: {
++        id: mod.id,
++        requires: {
++          skill: 'REPAIR',
++          complexity: mod.capacity,
++          ...(mod.perks.length ? { perks: mod.perks } : {}),
++        },
++        materials,
++        outputQuantity: 1,
++      },
++    });
++  }
++
+   const byBucket = {};
+   // (BENCH_BURNS — печатное правило сгорания; объявлено рядом с картой верстаков.)
+   for (const bucket of BUCKET_ORDER) {
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index e6f98e2..e4652af 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -825,6 +825,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+           : idUpper.startsWith('food_') ? 'food'
+           : idUpper.startsWith('mag_') || idUpper.startsWith('magazine_') ? 'magazine'
+           : idUpper.startsWith('robot_') ? 'robotPart'
++          : idUpper.startsWith('uniq_') || idUpper.startsWith('mod_std_') ? 'armorMod'
+           : idUpper.startsWith('pa_') || idUpper.startsWith('power_') ? 'powerArmor'
+           : null;
+         const lookupTypes = [...new Set([
