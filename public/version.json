@@ -1,11 +1,24 @@
 {
-  "version": "334",
+  "version": "335",
+  "release": "1",
   "notes": {
     "ru-RU": [
-      "Крафт: материалы в спойлере — плоским списком «тип — есть/нужно», без заголовков"
+      "Крафт: новое окно — квадраты категорий как карточки персонажей на фоне сеттинга, спойлеры-карточки, материалы плоским списком «тип — есть/нужно»",
+      "Правила книги: час на изготовление (еда и напитки — 20 минут), проверка ИНТ + навык, осложнение добавляет время",
+      "Общий пул очков действий (6): успешные проверки пополняют, 2 ОД сокращают время вдвое",
+      "Взрывчатка — отдельная категория рецептов; потеря материалов при провале — настройка",
+      "Моды брони: книжная таблица и правила записаны; крафт модов — следующий шаг (ждём таблицу эффектов)",
+      "Из общих модов убраны три ошибочных «материала» синтов; старые сохранения чистятся автоматически",
+      "Окно «Что нового» теперь показывается один раз на релиз"
     ],
     "en-EN": [
-      "Crafting: materials in the spoiler as a flat list, no headers"
+      "Crafting: a new window — character-card style tiles over the setting background, perk-style spoiler cards, flat \"type — have/need\" material lines",
+      "Book rules: one hour per craft (food and drinks — 20 minutes), INT + skill check, complications add time",
+      "Group action-point pool (6): successful checks refill it, 2 AP halve the time",
+      "Explosives is its own recipe category; material loss on failure is a setting",
+      "Armor mods: the book table and rules are recorded; mod crafting is next (awaiting the effects table)",
+      "Three misplaced synth \"material\" mods removed from generic mods; old saves are cleaned automatically",
+      "The \"What's new\" window now shows once per release"
     ]
   }
 }

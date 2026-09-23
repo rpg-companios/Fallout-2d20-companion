@@ -2,7 +2,25 @@
 
 ---
 
-## Spoiler materials as a flat list (patch 334)
+## "What's new" — once per release, no checkbox (patch 335)
+
+Owner's word: the checkbox is excessive; show the window once per
+RELEASE — a release consists of many patches, not "every little step".
+
+- version.json now carries release (the release number) and notes = the
+  RELEASE description; version (the patch number, rule 321) updates as
+  before.
+- The window shows once per release: closing it remembers the release;
+  until the next release it stays quiet. The checkbox is gone (dictionaries
+  too).
+- Patches between releases don't raise the window. You declare a release —
+  on your word ("make a release") I bump the number and write the batch's
+  description.
+- Release #1 describes the whole batch since patch 315: the new crafting,
+  book rules, the AP pool, explosives, armor mods — references and the
+  duplicates cleanup.
+
+## ## Spoiler materials as a flat list (patch 334)
 
 Owner's word: material headers are excessive ("Materials", "Common
 materials", "Uncommon materials") — type and quantity are enough.
