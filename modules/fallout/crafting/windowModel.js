@@ -36,7 +36,6 @@ export const CRAFT_CATEGORIES = [
 // Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
 // Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
 // (мясо и пр.) редкости не имеют и в сводку не попадают.
-const RARITY_TYPES = ['common', 'uncommon', 'rare'];
 
 let materialTypeById = null;
 const materialRarityOf = (itemId) => {
@@ -90,11 +89,10 @@ export const formatCraftMinutes = (minutes) => {
  * Строки одной категории-квадрата: что получится, чем, сколько это времени,
  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
  * дефицитному материалу; для «можно» строк он ≥ 1.
- * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
- * группировка заголовков спойлера по обычным/необычным/редким (не требуемые
- * типы не попадают). Счётчиков видов в сводке больше нет (326, слово
- * владельца: «не раздуваем интерфейс» — достаточно счётчиков штук на строках
- * материалов).
+ * Редкость (патч 318): каждый материал знает свой тип. Заголовков по
+ * редкостям в спойлере больше нет (326 — без счётчиков видов; 334 — без
+ * заголовков вовсе): спойлер показывает плоский список «тип материала»
+ * + счётчик «есть N шт. · нужно M шт.».
  */
 const buildRowsForCategory = (category) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
@@ -140,9 +138,6 @@ const buildRowsForCategory = (category) => {
         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
         : status === 'missing-material' ? d.shortMaterials : null,
       materials,
-      materialGroups: RARITY_TYPES
-        .filter((type) => materials.some((m) => m.rarity === type))
-        .map((type) => ({ type })),
       labels: {
         materialsTitle: d.materialsTitle,
         craft: d.craft,

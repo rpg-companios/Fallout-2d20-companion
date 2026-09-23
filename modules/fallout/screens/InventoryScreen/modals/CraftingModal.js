@@ -38,12 +38,6 @@ const CATEGORY_ICONS = {
   ammo: 'ammo',
 };
 
-const RARITY_LABEL_KEYS = {
-  common: 'rarityCommon',
-  uncommon: 'rarityUncommon',
-  rare: 'rarityRare',
-};
-
 // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
 const chunkIntoRows = (items, perRow) => {
   const rows = [];
@@ -226,21 +220,9 @@ export default function CraftingModal({ visible, onClose }) {
                       <View style={styles.spoilerBody}>
                         <Text style={styles.rowMeta}>{item.metaLine}</Text>
                         {perkLocked && <Text style={styles.rowReason}>{item.reason}</Text>}
-                        <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
-                        {item.materialGroups.map((group) => (
-                          <View key={group.type}>
-                            <Text style={styles.rarityLine}>
-                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type}
-                            </Text>
-                            {item.materials.filter((m) => m.rarity === group.type).map((m) => (
-                              <View key={m.itemId} style={styles.materialLine}>
-                                <Text style={styles.materialName}>{m.name}</Text>
-                                <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        ))}
-                        {item.materials.filter((m) => !m.rarity).map((m) => (
+                        {/* 334 (слово владельца): заголовки по материалам излишни —
+                            плоский список: тип материала и количество. */}
+                        {item.materials.map((m) => (
                           <View key={m.itemId} style={styles.materialLine}>
                             <Text style={styles.materialName}>{m.name}</Text>
                             <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>

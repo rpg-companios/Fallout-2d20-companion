@@ -84,8 +84,6 @@ export default StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ddd',
   },
-  detailLabel: { color: '#777', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
-  rarityLine: { color: '#444', fontSize: 12, fontWeight: '700', marginTop: 6 },
   // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
   materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 3 },
   materialName: { color: '#000', fontSize: 13, flexShrink: 1 },

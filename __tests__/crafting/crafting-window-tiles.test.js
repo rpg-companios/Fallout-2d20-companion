@@ -62,7 +62,7 @@ describe('Модалка крафта (318): квадраты, спойлеры,
     expect(row.canCraft).toBe(true);
     expect(row.maxCraft).toBe(5); // 10 обычных материалов по 2 на попытку
     expect(row.materials[0].rarity).toBe('common');
-    expect(row.materialGroups).toEqual([{ type: 'common' }]); // 326: без счётчиков видов
+    expect(row.materialGroups).toBeUndefined(); // 334: заголовки редкости убраны — плоский список
 
     // без перка — спойлер серый: причина «нужен перк» с рангом
     useCharacterStore.setState({ selectedPerks: [] });
@@ -77,7 +77,6 @@ describe('Модалка крафта (318): квадраты, спойлеры,
     expect(row).toBeTruthy();
     expect(row.materials.length).toBeGreaterThan(0);
     expect(row.materials[0].rarity).toBeNull();
-    expect(row.materialGroups).toEqual([]);
   });
 
   it('словарь редкости и окна количества на месте (ru-файл; ключи — в активной локали)', () => {

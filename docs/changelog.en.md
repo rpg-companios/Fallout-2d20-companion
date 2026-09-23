@@ -2,7 +2,17 @@
 
 ---
 
-## Synth-material duplicates removed from generic mods (patch 333)
+## Spoiler materials as a flat list (patch 334)
+
+Owner's word: material headers are excessive ("Materials", "Common
+materials", "Uncommon materials") — type and quantity are enough.
+
+- A recipe's spoiler now shows materials as one flat line each: name on
+  the left, the "have N · need M" counter on the right.
+- The "Materials" section label and rarity group headers are gone;
+  complexity, skill and cooking time remain the spoiler's first line.
+
+## ## Synth-material duplicates removed from generic mods (patch 333)
 
 Owner's word: "Laminated, Rubberized, Microcarbon, Nanofiber are unique
 SYNTH armor mods." They must not exist in the generic mod list.
