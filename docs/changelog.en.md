@@ -2,7 +2,27 @@
 
 ---
 
-## Materials — piece counters only; capacity table documented (patch 326)
+## Armor-mod crafting table — recorded, cross-checked (patch 327)
+
+The owner dictated the book's armor-mods table (the "Armor" tile — the
+future mod crafting via material capacity). The app itself is unchanged.
+
+- The table is recorded verbatim in
+  `docs/reference-data/armor-mods-crafting.md`: 49 mods — ballistic weave,
+  vault-suit linings, raider/leather/metal/combat/synth armor materials,
+  generic mods.
+- Cross-check against our data: 34 of the table's mods exist, but the
+  capacity (complexity) differs in ALL 34 (offsets 1 to 3, no single
+  system). Perks and the Repair skill match.
+- 15 mods are missing from the data (weave — 5, linings — 5,
+  lightweight/pockets/lead-lined/ultra-light — 5), and there is no
+  "rarity" column.
+- 4 questions to the owner are recorded in the same file (whether to fix
+  complexity — it changes mod INSTALL cost; whether to add the missing
+  mods; what to do with three duplicate "material" mods; whether the
+  crafting window needs rarity).
+
+## ## Materials — piece counters only; capacity table documented (patch 326)
 
 Owner's word: "just a few kinds per recipe — piece counters are enough,
 don't bloat the interface", plus a clarification and a question about the
