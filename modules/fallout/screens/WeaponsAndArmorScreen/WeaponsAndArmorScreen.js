@@ -1069,9 +1069,28 @@ const WeaponsAndArmorScreen = () => {
     setArmorModalVisible(true);
   };
 
+  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
+  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;
     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
+    // 343 (слово владельца): при установке мод получает флаг «экипирован» и
+    // привязывается к предмету-носителю (невидим в сумке до снятия); при
+    // замене/снятии прежний мод освобождается и снова виден. Пункты «Без
+    // мода» = снятие (id нет в новом наборе — освобождаем).
+    const prevItem = equippedArmor?.[selectedArmorSlot]?.[field];
+    const idsOf = (item) => [
+      item?.appliedArmorModId || null,
+      item?.appliedUniqueArmorModId || null,
+      item?.appliedClothingModId || null,
+    ].filter(Boolean);
+    const prevIds = idsOf(prevItem);
+    const nextIds = idsOf(modifiedItem);
+    const hostKey = prevItem?.instanceId || prevItem?.stackKey
+      || `${selectedArmorSlot}.${field}`; // слот-идентификация без ключа экземпляра
+    prevIds.filter((id) => !nextIds.includes(id)).forEach((id) => uninstallArmorMod({ modId: id, hostKey }));
+    nextIds.filter((id) => !prevIds.includes(id)).forEach((id) => installArmorMod({ modId: id, hostKey }));
     // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
     // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
     setEquippedArmor((prev) => ({

@@ -150,3 +150,38 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
 Застрявшие клиенты: /sw.js меняется намеренно (compat-worker revision) —
 воркер переустанавливается и самоуничтожается, кэши чистятся.
 ```
+
+## 9. Моды брони: крафт → установка → снятие (патчи 341–343)
+
+```
+КРАФТ (окно «Крафт», квадрат «Броня»):
+  recipes/armor.json (генератор build-crafting-data.mjs)
+        │  domain/resolveItem.js case 'armorMod' (каталог armorMods/uniqArmorMods)
+        ▼
+  мод-ПРЕДМЕТ в сумке (items[instanceKey], weaponId = id мода)
+
+УСТАНОВКА (WeaponsAndArmorScreen → ArmorModificationModal):
+  выбор в окне → setEquippedArmor(slot, modifiedItem)  — запись id модов
+  на предмет брони (appliedUniqueArmorModId / appliedArmorModId /
+  appliedClothingModId; форма правды — см. §1 справочника armor-mods)
+        │  ПАРАЛЛЕЛЬНО (343, слово владельца):
+        ▼
+  installArmorMod({modId, hostKey}) — экземпляр мода в сумке:
+    equipped: true (невидим в сумке: selectItemsByEquipped(false),
+    вес не задваивается — вес брони уже включает weightModifier)
+    installedOn: hostKey (ключ экземпляра носителя, иначе «слот.слой»)
+    экземпляра в сумке нет (гейт ВЫКЛ) → null, просто запись на броне
+
+СНЯТИЕ/ЗАМЕНА (окно установки):
+  uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
+  стирается → мод снова виден в сумке
+
+УДАЛЕНИЕ НОСИТЕЛЯ (расход до нуля: spendItemStacks / spendAmmoForWeapon):
+  collectModsBoundTo(items, hostKey) — моды уходят вместе с предметом
+  («продали предмет с модом — ушли оба»); releaseModsBoundTo —
+  отдельное действие стора для будущих точек удаления.
+
+ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
+INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS
+(characterActions.ts, fuse action-passports).
+```

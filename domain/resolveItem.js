@@ -125,6 +125,7 @@ const INSTANCE_FIELDS = [
   'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
   'itemType',                                 // тип хранится на инстансе
   'quantity', 'equipped', 'locked',           // состояние инвентаря
+  'installedOn',                              // 343: мод установлен на предмет
   'appliedMods', 'stackKey',                  // моды и подпись стопки
   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',

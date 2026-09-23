@@ -2,6 +2,22 @@
 
 ---
 
+## An installed armor mod now becomes equipped (patch 343)
+
+Owner's word: selling the host item takes the mod with it; an equipped mod
+is invisible in the inventory; removing or replacing it makes the mod
+visible again. The owner's analogy — a robot arm with a built-in weapon.
+
+- On installation the mod item gets an "equipped" flag and is bound to the
+  armor piece it was installed on (`installedOn`).
+- When the host item is consumed away, its installed mods go with it.
+- Removing or replacing the mod in the install window returns the old mod
+  to the bag.
+- Free installation (the "require mod in bag" setting is off and no mod
+  item exists) is just a record on the armor — nothing to return.
+
+---
+
 ## Universal mod, Material vs Modification, bag gate (patch 342)
 
 Owner's words after the first snag of testing.

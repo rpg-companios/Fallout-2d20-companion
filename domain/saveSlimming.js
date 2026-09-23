@@ -35,6 +35,8 @@ export const SAVE_STATE_FIELDS = new Set([
   'id', 'instanceId', 'weaponId', 'code', 'Name',
   // тип и состояние инвентаря
   'itemType', 'quantity', 'equipped', 'locked', 'requiresMkII',
+  // 343: мод установлен на предмет (hostKey) — экипирован и невидим в сумке
+  'installedOn',
   // моды и подпись стопки
   'appliedMods', 'stackKey',
   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',

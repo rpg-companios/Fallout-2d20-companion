@@ -272,6 +272,14 @@ const withDerivedCascade = (config) => (set, get, api) => {
   return config(cascadedSet, get, api);
 };
 
+/**
+ * 343: ключи модов, установленных на предмет-носитель hostKey (чистый —
+ * используется и внутри транзакций, где set() должен случиться один раз).
+ */
+const collectModsBoundTo = (items, hostKey) => Object.entries(items || {})
+  .filter(([, item]) => item?.installedOn && item.installedOn === hostKey)
+  .map(([key]) => key);
+
 const useCharacterStore = create(withDerivedCascade(devtools(
   persist(
     (set, get) => ({
@@ -633,7 +641,12 @@ const useCharacterStore = create(withDerivedCascade(devtools(
           if (!remaining) break;
           const quantity = Number(ammo.quantity) || 1;
           const spent = Math.min(quantity, remaining);
-          if (quantity === spent) delete items[itemId];
+          if (quantity === spent) {
+            delete items[itemId];
+            // 343: моды уходят с предметом — удаляем из ЭТОЙ копии (set() ниже
+            // перезапишет стор целиком, отдельный set() внутри откатится)
+            for (const modKey of collectModsBoundTo(items, itemId)) delete items[modKey];
+          }
           else items[itemId] = { ...ammo, quantity: quantity - spent };
           remaining -= spent;
         }
@@ -691,6 +704,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
             const quantity = Number(items[key].quantity) || 1;
             if (quantity <= remaining) {
               delete items[key];
+              // 343: моды уходят с предметом — из этой же копии (см. выше)
+              for (const modKey of collectModsBoundTo(items, key)) delete items[modKey];
               remaining -= quantity;
               spent.push({ itemId: catalogId, count: quantity, instanceId: key });
             } else {
@@ -729,6 +744,65 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         items[itemId] = updatedItem;
 
         set({ items });
+      },
+
+      /**
+       * 343 (слово владельца): установить мод на предмет брони/одежды.
+       * Мод-экземпляр получает флаг «экипирован» (equipped: true — исчезает
+       * из сумки) и привязку к хосту (installedOn = ключ предмета-носителя).
+       * Если экземпляра в сумке нет (настройка «требовать мод в сумке»
+       * выключена) — ничего не делаем: мод «виртуальный», установка свободна.
+       * @returns {string|null} ключ экземпляра мода или null.
+       */
+      installArmorMod: ({ modId, hostKey }) => {
+        if (!modId) return null;
+        const items = { ...get().items };
+        const entry = Object.entries(items).find(([key, item]) => (
+          item?.weaponId === modId && !item.equipped && !item.installedOn
+        ));
+        if (!entry) return null;
+        const [key, item] = entry;
+        items[key] = { ...item, equipped: true, installedOn: hostKey || null };
+        set({ items });
+        debugLog('armorMod.installed', { modId, instanceKey: key, hostKey });
+        return key;
+      },
+
+      /**
+       * 343: снять мод с предмета (замена или «без мода») — теряет флаг
+       * «экипирован» и снова виден в сумке.
+       */
+      uninstallArmorMod: ({ modId, hostKey }) => {
+        if (!modId) return;
+        const items = { ...get().items };
+        const entry = Object.entries(items).find(([key, item]) => (
+          item?.weaponId === modId && item.installedOn
+          && (!hostKey || item.installedOn === hostKey)
+        ));
+        if (!entry) return;
+        const [key, item] = entry;
+        items[key] = { ...item, equipped: false };
+        delete items[key].installedOn;
+        set({ items });
+        debugLog('armorMod.uninstalled', { modId, instanceKey: key });
+      },
+
+      /**
+       * 343: предмет-носитель удалён (продан/потерян) — установленные на него
+       * моды уходят вместе с ним («продали предмет с модом — ушли оба»).
+       */
+      releaseModsBoundTo: (hostKey) => {
+        if (!hostKey) return;
+        const items = { ...get().items };
+        let changed = false;
+        for (const [key, item] of Object.entries(items)) {
+          if (item?.installedOn === hostKey) {
+            delete items[key];
+            changed = true;
+            debugLog('armorMod.releasedWithHost', { key, hostKey });
+          }
+        }
+        if (changed) set({ items });
       },
 
       /**

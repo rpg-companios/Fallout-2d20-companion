@@ -192,6 +192,13 @@ export interface CharacterActions {
   updateItem: (itemId: string, patch: Partial<StoreItem>) => void;
   equipItem: (itemId: string) => void;
   unequipItem: (itemId: string) => void;
+  /** 343: установить мод брони на предмет-носитель (флаг «экипирован» +
+   * привязка installedOn; мода нет в сумке — свободная установка, null). */
+  installArmorMod: (args: { modId: string; hostKey: string | null }) => string | null;
+  /** 343: снять мод — теряет «экипирован» и снова виден в сумке. */
+  uninstallArmorMod: (args: { modId: string; hostKey?: string | null }) => void;
+  /** 343: предмет-носитель удалён — установленные моды уходят с ним. */
+  releaseModsBoundTo: (hostKey: string) => void;
   repairWeapon: (itemId: string) => void;
   /** Списать патроны/износ при выстреле (инварианты в слайсе). */
   spendAmmoForWeapon: (args: {
@@ -362,6 +369,7 @@ export const CRUD_OP_KEYS = [
   'expireEffect',
   'initRobot',
   'initRobotFromKit',
+  'installArmorMod',
   'loadPowerArmorState',
   'loadRobotState',
   'markSkillsAsRewarded',
@@ -369,6 +377,7 @@ export const CRUD_OP_KEYS = [
   'removeAttributeModifier',
   'removeRobotModule',
   'removeSkillModifier',
+  'releaseModsBoundTo',
   'repairPowerArmorPieceAt',
   'repairPowerArmorStack',
   'repairWeapon',
@@ -381,6 +390,7 @@ export const CRUD_OP_KEYS = [
   'triggerDependentCalculations',
   'unequipHeldWeapon',
   'unequipItem',
+  'uninstallArmorMod',
   'unequipPowerArmorPackage',
   'unequipPowerArmorPieceAt',
   'updateAttribute',
