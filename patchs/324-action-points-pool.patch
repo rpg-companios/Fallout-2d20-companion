@@ -1,0 +1,1355 @@
+diff --git a/__tests__/crafting/action-points-324.test.js b/__tests__/crafting/action-points-324.test.js
+new file mode 100644
+index 0000000..4d0bcbf
+--- /dev/null
++++ b/__tests__/crafting/action-points-324.test.js
+@@ -0,0 +1,128 @@
++// ПРИЁМОЧНЫЙ (патч 324): общий пул ОД.
++//   • пул = 6, переполнение срезается, старт сессии — полный;
++//   • успешная проверка: +1 ОД за каждый успех СВЕРХ сложности (сложность 1,
++//     успехов 2 → +1; 3 успеха → +2 — пример владельца);
++//   • крит-кубик (1 или ≤ ранга отмеченного навыка) даёт 2 успеха — его
++//     прибавка попадает в «успехи сверх сложности» (владелец 324);
++//   • автоуспех (сложность 0, броска не было) и провал ОД не приносят;
++//   • трата «2 ОД: время крафта вдвое» требует пула; меньше 2 — отказ,
++//     время полное. Пул живёт в движке (domain/actionPoints), UI позже;
++//     пул ГРУППОВОЙ — к будущему экрану мастера подключится как есть.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  AP_POOL_MAX,
++  getActionPoints,
++  earnActionPoints,
++  spendActionPoints,
++  resetActionPoints,
++} from '../../domain/actionPoints';
++import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++  resetActionPoints();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const seedStack = (itemId, quantity) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++      weaponId: itemId, quantity,
++    } },
++  }));
++};
++
++const takeAmmo = (rolls) => {
++  seedStack('item_common_materials', 2);
++  useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
++  let i = 0;
++  return craftRecipe('ammo_38', { rollD20: () => rolls[Math.min(i++, rolls.length - 1)] }, { deferTime: true });
++};
++
++describe('Общий пул ОД (324): 6, пополнение проверками, трата', () => {
++  it('пул: старт полный, earn срезает по 6, spend отказывает при нехватке', () => {
++    expect(AP_POOL_MAX).toBe(6);
++    expect(getActionPoints()).toBe(6);
++    expect(earnActionPoints(3)).toBe(6); // переполнение срезано
++    expect(spendActionPoints(4)).toEqual({ ok: true, pool: 2 });
++    expect(spendActionPoints(3)).toEqual({ ok: false, pool: 2 }); // «больше не потратить»
++    expect(earnActionPoints(1)).toBe(3); // проверки вернули ОД в пул
++    expect(resetActionPoints()).toBe(6); // новая сессия — полный
++  });
++
++  it('успех со сложностью 1 и 2 успехами даёт +1 ОД (пример владельца)', () => {
++    // ИНТ 4 + навык 0 = цель 4: броски 3, 4 — два успеха; сложность 1−0 = 1.
++    const result = takeAmmo([3, 4]);
++    expect(result.done).toBe(true);
++    expect(result.check.difficulty).toBe(1);
++    expect(result.check.successes).toBe(2);
++    expect(result.apEarned).toEqual({ gained: 1, pool: 6 });
++  });
++
++  it('3 успеха при сложности 1 → +2 ОД; в пул сверх капа не лезет', () => {
++    spendActionPoints(5); // пул 1
++    // крит: натуральная 1 даёт 2 успеха + обычный успех = 3 успеха
++    const result = takeAmmo([1, 4]);
++    expect(result.check.successes).toBe(3);
++    expect(result.apEarned.gained).toBe(2);
++    expect(result.apEarned.pool).toBe(3); // 1 + 2
++  });
++
++  it('провал ОД не приносит', () => {
++    // цель 4: броски 19, 18 — ноль успехов, провал
++    const result = takeAmmo([19, 18]);
++    expect(result.done).toBe(false);
++    expect(result.stage).toBe('check');
++    expect(result.apEarned).toBeUndefined();
++    expect(getActionPoints()).toBe(6);
++  });
++
++  it('автоуспех (сложность 0) — броска не было, ОД нет', () => {
++    seedStack('item_common_materials', 2);
++    useCharacterStore.setState({
++      selectedPerks: [{ perkId: 'ammosmith', index: 0 }],
++      skills: { ...state().skills, REPAIR: { base: 2, total: 2 } }, // сложность 1−2 → 0
++    });
++    const result = craftRecipe('ammo_38', {}, { deferTime: true });
++    expect(result.done).toBe(true);
++    expect(result.auto).toBe(true);
++    expect(result.check).toBeNull();
++    expect(result.apEarned).toBeUndefined();
++  });
++
++  it('трата 2 ОД требует пула: хватило — время вдвое, не хватило — полное', () => {
++    spendActionPoints(4); // пул 2
++    seedStack('item_common_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
++
++    // проверка: 2 успеха при сложности 1 → сама приносит +1 (пул 3)
++    const result = takeAmmo([3, 3]);
++    expect(result.done).toBe(true);
++    expect(result.apEarned.pool).toBe(3);
++    expect(result.time.baseMinutes).toBe(60);
++
++    const settled = settleCraftTime('ammo_38', { attempts: [result] }, { spendActionPoints: true });
++    expect(settled.spendActionPoints).toBe(true);
++    expect(settled.pool).toBe(1); // 3 − 2
++    expect(settled.minutes).toBe(30); // вдвое
++
++    // пул 1 < 2: проверка без прибыли (1 успех = сложности) не пополняет —
++    // трата невозможна, время полное
++    const lean = takeAmmo([4, 5]);
++    expect(lean.done).toBe(true);
++    expect(lean.apEarned.gained).toBe(0);
++    expect(lean.apEarned.pool).toBe(1);
++    const full = settleCraftTime('ammo_38', { attempts: [lean] }, { spendActionPoints: true });
++    expect(full.spendActionPoints).toBe(false);
++    expect(full.pool).toBe(1);
++    expect(full.minutes).toBe(60);
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c2cc122..b820563 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **323** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–323 уехали, установка не подтверждена;
++· последний сданный патч: **324** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–324 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -74,6 +74,10 @@
+   аддитивно (×2 отменено), вопрос «2 ОД → время вдвое?» после успеха;
+   настройки раздела «Крафт» — потеря материалов при провале двумя группами
+   (consumables/gear). Ступени 259 и множитель отменены словом владельца.
++- 324 — общий пул ОД (domain/actionPoints.js, кап 6, в движке без UI):
++  успешные проверки дают +1 ОД за успех сверх сложности (криты = 2 успеха);
++  «2 ОД → время вдвое» тратит из пула. Групповой — мастер-экран подключится
++  как есть.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0e4749c..c76f298 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,24 @@
+ 
+ ---
+ 
++## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
++
++Owner's word: the group AP pool = 6; you can't spend more than 6, unless
++checks granted AP. AP lives inside the engine for now (a UI store comes
++later); the pool is group-wide — the future game-master screen will hook
++into it as is.
++
++- A successful crafting check refills the pool: +1 AP for each success
++  beyond the difficulty (difficulty 1 with 2 successes → +1; 3 successes
++  → +2). A critical die (1 or ≤ the tagged skill's rating) counts as
++  2 successes — its bonus flows in naturally.
++- Automatic success (difficulty 0, no roll) and failures grant no AP.
++- "Spend 2 AP — halve the time" now requires the pool: with fewer than 2
++  the question isn't asked and time runs full. The report shows
++  "AP: +N to the group pool (now M/6)" and the pool in the question.
++- Fuse: acceptance test (patch 324) — the cap of 6, the owner's example,
++  crits, failures, auto-success, refused spending when short.
++
+ ## Crafting — by the printed rules: times, complications, 2 AP and material loss (patch 323)
+ 
+ Owner's word — the rulebook text (pp. 210–211) plus two decisions:
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 39a1c55..e65bfc9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,24 @@
+ 
+ ---
+ 
++## Общий пул ОД — проверки пополняют, «2 ОД» тратит из пула (патч 324)
++
++Слово владельца: групповой пул ОД = 6; больше 6 потратить не выйдет,
++если только проверки не выдали ОД. Пока ОД живёт внутри движка
++(UI-хранилище будет позже); пул групповой — к экрану мастера подключится
++как есть.
++
++- Успешная проверка крафта пополняет пул: +1 ОД за каждый успех сверх
++  сложности (сложность 1, успехов 2 → +1; 3 успеха → +2). Крит-кубик
++  (1 или ≤ ранга отмеченного навыка) даёт 2 успеха — его прибавка
++  учитывается сама.
++- Автоуспех (сложность 0, броска не было) и провал ОД не приносят.
++- «Потратить 2 ОД — время вдвое» теперь требует пула: меньше 2 — вопрос
++  не задаётся, время идёт полное. Отчёт показывает «ОД: +N в общий пул
++  (сейчас M/6)» и остаток пула в вопросе.
++- Предохранитель: приёмочный тест (патч 324) — кап 6, пример владельца,
++  криты, провал, автоуспех, отказ траты при нехватке.
++
+ ## Крафт — по печатным правилам: времена, осложнения, 2 ОД и потеря материалов (патч 323)
+ 
+ Слово владельца — текст правил книги (с. 210–211) и два решения:
+diff --git a/domain/actionPoints.js b/domain/actionPoints.js
+new file mode 100644
+index 0000000..9640e04
+--- /dev/null
++++ b/domain/actionPoints.js
+@@ -0,0 +1,44 @@
++// domain/actionPoints.js
++// Общий пул ОД (патч 324, слово владельца) — групповой ресурс 2d20.
++//
++//   • Пул = 6; больше 6 не бывает (пополнение сверх — срезается);
++//   • старт каждой игровой сессии — полный (6);
++//   • пополняется успешными проверками: +1 ОД за каждый успех СВЕРХ
++//     сложности (крит-кубик даёт 2 успеха — уже считает d20Checks, поэтому
++//     «крит успех» вносит свою прибавку сам, слово владельца 324);
++//   • тратится на действия (сейчас — «2 ОД: время крафта вдвое», 323).
++//
++// ПОКА живёт внутри движка (модульная переменная, на сессию) — UI-хранилище
++// владелец придумает позже. Пул ГРУППОВОЙ: когда появится мастер и группа,
++// восполнять и тратить его смогут все игроки группы — интерфейс функций
++// уже это допускает (никакой привязки к персонажу нет).
++
++export const AP_POOL_MAX = 6;
++
++let pool = AP_POOL_MAX;
++
++export const getActionPoints = () => pool;
++
++/** Пополнить пул (проверка сработала). Сверх 6 — срезается. Возвращает пул. */
++export const earnActionPoints = (amount) => {
++  const gained = Math.max(0, Math.floor(Number(amount) || 0));
++  pool = Math.min(AP_POOL_MAX, pool + gained);
++  return pool;
++};
++
++/**
++ * Потратить ОД. Если в пуле меньше — отказ ({ ok: false }), пул не тронут:
++ * «больше 6 потратить не выйдет, если только проверки не выдали ОД».
++ */
++export const spendActionPoints = (amount) => {
++  const cost = Math.max(0, Math.floor(Number(amount) || 0));
++  if (pool < cost) return { ok: false, pool };
++  pool -= cost;
++  return { ok: true, pool };
++};
++
++/** Новая сессия: пул снова полный (книга — группа начинает с полным пулом). */
++export const resetActionPoints = () => {
++  pool = AP_POOL_MAX;
++  return pool;
++};
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 5392021..2bdfb09 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -22,6 +22,7 @@ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selec
+ import { CRAFT_RULES } from './rules';
+ import { applyActivityMinutes } from '../survival/operations';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
++import { earnActionPoints, getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
+ 
+ // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой
+ // addNewItem определяет «какой это предмет»). Надетое и запертое комплектом не
+@@ -205,20 +206,26 @@ export const complicationExtraMinutesFor = (recipe) =>
+  * при «да» идут за половину базы (осложнения добавляются поверх), неудачные
+  * — всегда полное время (ОД на провал не тратятся).
+  */
+-export const settleCraftTime = (recipeId, run, { spendActionPoints = false } = {}) => {
++const earned = (gained) => (gained > 0 ? earnActionPoints(gained) : getActionPoints());
++
++export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp = false } = {}) => {
+   const recipe = getCraftingRecipeById(recipeId);
++  // Решение о 2 ОД подтверждается ПУЛОМ: меньше 2 — трата невозможна,
++  // время идёт полное («больше 6 потратить не выйдет…», 324).
++  const apSpend = halveForAp ? spendActionPoints(2) : { ok: false, pool: getActionPoints() };
++  const halved = halveForAp && apSpend.ok;
+   let total = 0;
+   for (const attempt of run?.attempts ?? []) {
+     const t = attempt?.time;
+     if (!t?.pending) continue;
+     let minutes = t.baseMinutes;
+-    if (spendActionPoints && attempt.done) minutes /= 2;
++    if (halved && attempt.done) minutes /= 2;
+     total += minutes + (t.complicationMinutes ?? 0);
+   }
+   if (total > 0) {
+     applyActivityMinutes(total, `craft:${recipe?.category ?? 'any'}`);
+   }
+-  return { minutes: total, spendActionPoints };
++  return { minutes: total, spendActionPoints: halved, pool: apSpend.pool };
+ };
+ 
+ 
+@@ -287,6 +294,17 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) =>
+   }
+   if (timed) result.survival = timed;
+ 
++  // ОД (патч 324, слово владельца): успешная проверка пополняет ГРУППОВОЙ пул —
++  // +1 ОД за каждый успех сверх сложности (крит-кубик даёт 2 успеха — его
++  // прибавка уже внутри successes, d20Checks). Автоуспех (сложность 0,
++  // броска не было) и провал ОД не приносят. Пул живёт в domain/actionPoints
++  // (кап 6), UI-хранилище будет позже.
++  if (result.done === true && result.check) {
++    const gained = Math.max(0, (result.check.successes ?? 0) - (result.check.difficulty ?? 0));
++    const poolAfter = earned(gained);
++    result.apEarned = { gained, pool: poolAfter };
++  }
++
+   if (expandedSpend && Array.isArray(result.spent) && result.spent.length > 0) {
+     result.spent = expandedSpend;
+     if (Array.isArray(result.burned) && result.burned.length > 0) result.burned = expandedSpend;
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 512cc48..b30d513 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -263,6 +263,12 @@ export const buildCraftReport = (recipeId, run) => {
+     minutes > 0 ? fmt(d.timeSpent, { time: formatCraftMinutes(minutes) }) : null,
+   ].filter(Boolean).join('. ');
+   lines.push(tail);
++  // ОД (324): заработанное проверками — в общий пул (кап 6, дом движка).
++  const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
++  const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
++  if (apGained > 0 && apPool != null) {
++    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
++  }
+   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
+   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+   return { title: d.resultTitle, lines, recipeId, pendingTime };
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index bdf5eb3..a21bc35 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -51,10 +51,11 @@
+     "craftTitle": "Crafting",
+     "notAvailable": "Not available",
+     "done": "Done",
+-    "apQuestion": "Spend 2 AP to halve the crafting time?",
++    "apQuestion": "Spend 2 AP to halve the crafting time? (pool {pool}/6)",
+     "apYes": "Spend 2 AP",
+     "apNo": "Full time",
+-    "apHalvedNote": "Time halved for 2 AP"
++    "apHalvedNote": "Time halved for 2 AP",
++    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 8dc57f1..6566c43 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -51,10 +51,11 @@
+     "craftTitle": "Крафт",
+     "notAvailable": "Недоступно",
+     "done": "Готово",
+-    "apQuestion": "Потратить 2 ОД, чтобы сократить время вдвое?",
++    "apQuestion": "Потратить 2 ОД, чтобы сократить время вдвое? (в пуле {pool}/6)",
+     "apYes": "Потратить 2 ОД",
+     "apNo": "Полное время",
+-    "apHalvedNote": "Время сокращено за 2 ОД"
++    "apHalvedNote": "Время сокращено за 2 ОД",
++    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index cec112b..0a52f86 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -21,6 +21,7 @@ import {
+   formatCraftMinutes,
+ } from '../../../crafting/windowModel';
+ import { settleCraftTime } from '../../../crafting/operations';
++import { getActionPoints } from '../../../../../domain/actionPoints';
+ 
+ // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
+ const CATEGORY_ICONS = {
+@@ -94,8 +95,8 @@ export default function CraftingModal({ visible, onClose }) {
+     const run = craftBatch(row.recipeId, count, { deferTime: true });
+     const rep = buildCraftReport(row.recipeId, run);
+     let settled = null;
+-    if (rep.pendingTime && !rep.pendingTime.hasSuccess) {
+-      // успехов нет — решение об ОД не требуется, время списывается целиком.
++    // 324: вопрос про 2 ОД — только если в пуле хватает (иначе полное время).
++    if (rep.pendingTime && (!rep.pendingTime.hasSuccess || getActionPoints() < 2)) {
+       settled = settleCraftTime(row.recipeId, run, { spendActionPoints: false });
+     }
+     setQtyTarget(null);
+@@ -264,7 +265,9 @@ export default function CraftingModal({ visible, onClose }) {
+ 
+               {report.pendingTime && settledTime === null && (
+                 <View style={styles.apBox}>
+-                  <Text style={styles.apQuestion}>{ui.apQuestion ?? ''}</Text>
++                  <Text style={styles.apQuestion}>
++                    {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
++                  </Text>
+                   <View style={styles.qtyActions}>
+                     <TouchableOpacity
+                       style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+diff --git a/patchs/323-crafting-book-rules.patch b/patchs/323-crafting-book-rules.patch
+new file mode 100644
+index 0000000..59de814
+--- /dev/null
++++ b/patchs/323-crafting-book-rules.patch
+@@ -0,0 +1,909 @@
++diff --git a/__tests__/crafting/crafting-book-rules-323.test.js b/__tests__/crafting/crafting-book-rules-323.test.js
++new file mode 100644
++index 0000000..c9b784a
++--- /dev/null
+++++ b/__tests__/crafting/crafting-book-rules-323.test.js
++@@ -0,0 +1,131 @@
+++// ПРИЁМОЧНЫЙ (патч 323): крафт по печатным правилам (текст книги от владельца).
+++//   • проверка — ИНТ + навык; сложность = сложность рецепта − ранг (мин. 0);
+++//     0 — проверки нет (автоуспех) [движок 251, не менялся];
+++//   • время: час всем категориям, станция приготовления пищи (еда/напитки) —
+++//     20 минут; ступени 259 отменены;
+++//   • каждое осложнение: +30 минут (станция +10) — аддитивно, не множителем;
+++//   • успех — можно сократить время вдвое, потратив 2 ОД (выбор да/нет в окне);
+++//   • потеря материалов при провале — настройка раздела «Крафт», две группы:
+++//     consumables (еда, напитки, взрывчатка, препараты) и gear (броня, оружие,
+++//     патроны и прочее).
+++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+++
+++import useCharacterStore from '../../src/store/characterStore';
+++import useAppSettingsStore from '../../src/store/appSettingsStore';
+++import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
+++import {
+++  craftMinutesForRecipe,
+++  complicationExtraMinutesFor,
+++  craftRecipe,
+++  settleCraftTime,
+++} from '../../modules/fallout/crafting/operations';
+++import { getCraftingRecipeById } from '../../domain/registry';
+++
+++const state = () => useCharacterStore.getState();
+++
+++beforeEach(() => {
+++  state().resetCharacterStore();
+++  useAppSettingsStore.getState().setValue('craftFailLossConsumables', true);
+++  useAppSettingsStore.getState().setValue('craftFailLossGear', true);
+++});
+++
+++afterEach(async () => {
+++  state().resetCharacterStore();
+++  await useCharacterStore.persist.clearStorage();
+++});
+++
+++const seedStack = (itemId, quantity) => {
+++  useCharacterStore.setState((prev) => ({
+++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
+++      weaponId: itemId, quantity,
+++    } },
+++  }));
+++};
+++
+++// еда: без перков, материалы — 2× food_bloatfly_meat (станция, 20 мин)
+++const FOOD = 'food_grilled_bloatfly';
+++// патроны: перковый гейт ammosmith (потери — группа gear)
+++const AMMO = 'ammo_38';
+++
+++describe('Крафт по книге (323): времена, осложнения, ОД, потеря материалов', () => {
+++  it('время: час всем, еда/напитки — 20 минут (станция)', () => {
+++    expect(CRAFT_RULES.craftBaseMinutes).toBe(60);
+++    expect(CRAFT_RULES.stationMinutes).toBe(20);
+++    expect(craftMinutesForRecipe(getCraftingRecipeById(FOOD))).toBe(20);
+++    expect(craftMinutesForRecipe(getCraftingRecipeById(AMMO))).toBe(60);
+++    expect(CRAFT_RULES.craftTimeTiers).toBeUndefined(); // ступени 259 отменены
+++    expect(CRAFT_RULES.complicationDurationMultiplier).toBeUndefined();
+++  });
+++
+++  it('осложнение аддитивно: +30 минут, на станции +10', () => {
+++    expect(CRAFT_RULES.complicationExtraMinutes).toBe(30);
+++    expect(CRAFT_RULES.stationComplicationExtraMinutes).toBe(10);
+++    expect(complicationExtraMinutesFor(getCraftingRecipeById(FOOD))).toBe(10);
+++    expect(complicationExtraMinutesFor(getCraftingRecipeById(AMMO))).toBe(30);
+++  });
+++
+++  it('отложенное время: throw гейта не списывает часы; успех+осложнение = база+30', () => {
+++    seedStack('item_common_materials', 4);
+++    useCharacterStore.setState((prev) => ({
+++      selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
+++      // навык 0: сложность 1 − 0 = 1 → бросок БЫВАЕТ (при ранге 5+ была бы автоуспех)
+++    }));
+++    // успех с осложнением: выпало 3 (успех при ИНТ+навык=4) и 20 (осложнение)
+++    const result = craftRecipe(AMMO, { rollD20: (() => { let i = 0; return () => [3, 20][i++ % 2]; })() }, { deferTime: true });
+++    expect(result.done).toBe(true);
+++    expect(result.time.pending).toBe(true);
+++    expect(result.time.baseMinutes).toBe(60);
+++    expect(result.time.complicationMinutes).toBe(30);
+++    expect(result.time.minutes).toBe(90);
+++    expect(result.survival).toBeUndefined(); // часы ещё не тронуты
+++
+++    // решение «нет» — полное время; «да» — успех вдвое, осложнение поверх
+++    const run = { attempts: [result] };
+++    expect(settleCraftTime(AMMO, run, { spendActionPoints: false }).minutes).toBe(90);
+++    const second = craftRecipe(AMMO, { rollD20: () => 3 }, { deferTime: true }); // авто... нет: бросок 3 — успех без осложнений
+++    expect(settleCraftTime(AMMO, { attempts: [result, second] }, { spendActionPoints: true }).minutes)
+++      .toBe(30 + 30 + (60 / 2)); // провал? нет: оба успешны → (60/2+30) + (60/2)
+++  });
+++
+++  it('потеря материалов при провале — две настройки раздела «Крафт»', () => {
+++    // еда (consumables): провал → материалы сгорают (настройка включена)
+++    seedStack('food_bloatfly_meat', 2);
+++    const failFood = craftRecipe(FOOD, { rollD20: () => 20 });
+++    expect(failFood.stage).toBe('check');
+++    expect(failFood.burned.length).toBeGreaterThan(0);
+++
+++    // выключили группу consumables — еда при провале материалы сохраняет
+++    useAppSettingsStore.getState().setValue('craftFailLossConsumables', false);
+++    seedStack('food_bloatfly_meat', 2);
+++    const savedFood = craftRecipe(FOOD, { rollD20: () => 20 });
+++    expect(savedFood.stage).toBe('check');
+++    expect(savedFood.burned.length).toBe(0);
+++
+++    // патроны (gear): настройка OFF → при провале материалы целы
+++    useAppSettingsStore.getState().setValue('craftFailLossGear', false);
+++    seedStack('item_common_materials', 4);
+++    useCharacterStore.setState((prev) => ({
+++      selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
+++    }));
+++    const savedAmmo = craftRecipe(AMMO, { rollD20: () => 20 });
+++    expect(savedAmmo.stage).toBe('check');
+++    expect(savedAmmo.burned.length).toBe(0);
+++    // и снова ON — горят
+++    useAppSettingsStore.getState().setValue('craftFailLossGear', true);
+++    seedStack('item_common_materials', 4);
+++    const burnedAmmo = craftRecipe(AMMO, { rollD20: () => 20 });
+++    expect(burnedAmmo.burned.length).toBeGreaterThan(0);
+++  });
+++
+++  it('настройки существуют в каталоге и переведены (раздел «Крафт»)', () => {
+++    const ru = require('../../modules/fallout/i18n/ru-RU/data/system/settings.json');
+++    const en = require('../../modules/fallout/i18n/en-EN/data/system/settings.json');
+++    expect(ru.crafting).toBe('Крафт');
+++    expect(en.crafting).toBe('Crafting');
+++    for (const key of ['craftLossConsumablesTitle', 'craftLossGearTitle',
+++      'craftLossConsumablesDescription', 'craftLossGearDescription']) {
+++      expect(String(ru[key]).length).toBeGreaterThan(0);
+++      expect(String(en[key]).length).toBeGreaterThan(0);
+++    }
+++  });
+++});
++diff --git a/__tests__/crafting/crafting-operations.test.js b/__tests__/crafting/crafting-operations.test.js
++index d3e4c17..8042a76 100644
++--- a/__tests__/crafting/crafting-operations.test.js
+++++ b/__tests__/crafting/crafting-operations.test.js
++@@ -6,6 +6,7 @@
++ 
++ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++ import useCharacterStore from '../../src/store/characterStore';
+++import useAppSettingsStore from '../../src/store/appSettingsStore';
++ import { craftRecipe, craftingPreview } from '../../modules/fallout/crafting/operations';
++ import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
++ import { getCraftingRecipeById, getCraftingRecipes } from '../../domain/registry';
++@@ -140,21 +141,23 @@ describe('craftRecipe: провал проверки и цена проверк
++     expect(countStack('food_vegetable_soup')).toBe(0);
++   });
++ 
++-  it('рецепт без флага сгорания: провал не сжигает ничего', () => {
++-    // «Молотов» — не годится как пример: по книге взрывчатка делается в химии и
++-    // там провал жжёт. Берём .45: проверочный станок не «горячий», права сжигать нет.
+++  it('потеря материалов группы gear — настройка «Крафт» (патч 323)', () => {
+++    // 323 (слово владельца): навыковое правило заменено настройкой группы gear
+++    // (оружие/броня/патроны и прочее). По умолчанию включено — при провале
+++    // материалы расходуются; выключено — остаются.
++     const shell = getCraftingRecipeById('ammo_45');
++     expect(shell.category).toBe('ammo');
++-    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'станок не горит').toBe(false);
+++    useAppSettingsStore.getState().setValue('craftFailLossGear', false);
+++    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка выключена — не жжёт').toBe(false);
+++    useAppSettingsStore.getState().setValue('craftFailLossGear', true);
+++    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка включена — жжёт').toBe(true);
++     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }, { perkId: 'ammosmith' }] }); // ранг 2
++     for (const material of shell.materials) seedStack(material.itemId, material.count);
++-    const before = state().items;
++ 
++     const result = craftRecipe('ammo_45', { rollD20: () => bothDiceComplicate() });
++     expect(result.done).toBe(false);
++     expect(result.stage).toBe('check');
++-    expect(result.spent).toEqual([]);
++-    expect(state().items).toBe(before);
+++    expect(result.burned.length).toBeGreaterThan(0);
++   });
++ 
++   it('атрибут проверки берётся из правил модуля, не из данных рецептов', () => {
++diff --git a/__tests__/crafting/crafting-rules.test.js b/__tests__/crafting/crafting-rules.test.js
++index a723f09..9e5d8b1 100644
++--- a/__tests__/crafting/crafting-rules.test.js
+++++ b/__tests__/crafting/crafting-rules.test.js
++@@ -1,9 +1,8 @@
++-// Патч 259 (вместо правила 258 о «порче»): осложнение НЕ отменяет успех —
++-// корневая система 2d20 того требует. Наказанием становится время: при любом
++-// осложнении движок возвращает durationMultiplier из правила сеттинга
++-// (10 минут крафта → 20, час → 2, сутки → 2). Реформа 269: карты верстаков из
++-// правил убраны — сгорание при провале живёт флагом в самой recipe-записи,
++-// пачки заданы списком id; здесь же инварианты этих правил.
+++// Патч 259: осложнение НЕ отменяет успех — корневая система 2d20 того требует.
+++// Патч 323 (текст книги от владельца): наказание за осложнение — АДДИТИВНЫЕ
+++// минуты (+30, станция +10), прежний множитель ×2 отменён; времена по книге —
+++// час всем категориям, 20 минут на станции приготовления пищи (еда/напитки).
+++// Реформа 269: карты верстаков из правил убраны; здесь же инварианты правил.
++ 
++ import { describe, expect, it } from 'vitest';
++ import { readFileSync } from 'node:fs';
++@@ -67,7 +66,8 @@ const run = ({ rolls = [3, 20], failBurnsMaterials = false, recipe = recipeStub(
++     perkRanks: {},
++     inventoryCounts: { mat_plastic: 2 },
++     failBurnsMaterials,
++-    complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+++    // 323: сеттинг больше не множит — надбавка за осложнения аддитивная в адаптере.
+++    complicationDurationMultiplier: 1,
++     ...ports,
++   });
++   return { result, calls };
++@@ -78,7 +78,7 @@ describe('осложнение не отменяет успех — оно по
++     const { result, calls } = run({ rolls: [3, 20] });
++     expect(result.done).toBe(true);
++     expect(result.granted.itemId).toBe('food_result');
++-    expect(result.durationMultiplier).toBe(2);
+++    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
++     expect(result.check.complicationCount).toBe(1);
++     expect(calls.grant).toBe(1);
++     expect(calls.spend).toBe(1);
++@@ -94,7 +94,7 @@ describe('осложнение не отменяет успех — оно по
++     const { result } = run({ rolls: [15, 20], failBurnsMaterials: true });
++     expect(result.done).toBe(false);
++     expect(result.reason).toBe('check-failed');
++-    expect(result.durationMultiplier).toBe(2);
+++    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
++     expect(result.burned.length).toBe(1); // сгорание на горячем верстаке — как раньше
++   });
++ 
++@@ -102,7 +102,7 @@ describe('осложнение не отменяет успех — оно по
++     const { result } = run({ rolls: [20, 20], failBurnsMaterials: false });
++     expect(result.done).toBe(false);
++     expect(result.reason).toBe('check-failed');
++-    expect(result.durationMultiplier).toBe(2);
+++    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
++     expect(result.burned).toEqual([]); // верстак без флага сгорания — материалы целы
++   });
++ 
++@@ -117,8 +117,10 @@ describe('осложнение не отменяет успех — оно по
++     expect(result.check).toBeNull();
++   });
++ 
++-  it('настройка правила: множитель ровно 2, «порчи» больше нет', () => {
++-    expect(CRAFT_RULES.complicationDurationMultiplier).toBe(2);
+++  it('правило 323 (книга): осложнение — аддитивные минуты, не множитель', () => {
+++    expect(CRAFT_RULES.complicationDurationMultiplier).toBeUndefined();
+++    expect(CRAFT_RULES.complicationExtraMinutes).toBe(30);
+++    expect(CRAFT_RULES.stationComplicationExtraMinutes).toBe(10);
++     expect(CRAFT_RULES.spoilsMaterialsOnComplicationByBench).toBeUndefined();
++   });
++ });
++@@ -172,10 +174,10 @@ describe('правила крафта после реформы 269', () => {
++     ); // список — настройка: редактируется здесь, данные не трогаются
++   });
++ 
++-  it('ступени времени монотонны, множитель осложнения = 2', () => {
++-    expect(CRAFT_RULES.complicationDurationMultiplier).toBe(2);
++-    const minutes = CRAFT_RULES.craftTimeTiers.map((t) => t.minutes);
++-    expect(minutes).toEqual([...minutes].sort((a, b) => a - b));
+++  it('времена по книге (323): час всем, станция еды/напитков — 20 минут', () => {
+++    expect(CRAFT_RULES.craftBaseMinutes).toBe(60);
+++    expect(CRAFT_RULES.stationMinutes).toBe(20);
+++    expect(CRAFT_RULES.craftTimeTiers).toBeUndefined(); // ступени 259 отменены
++     expect(CRAFT_RULES.spoilsMaterialsOnComplicationByBench).toBeUndefined();
++   });
++ });
++diff --git a/docs/agents/state.md b/docs/agents/state.md
++index 6e893e5..c2cc122 100644
++--- a/docs/agents/state.md
+++++ b/docs/agents/state.md
++@@ -8,8 +8,8 @@
++ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
++ 
++ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++-· последний сданный патч: **322** · у владельца на main применено до **314**
++-(слово владельца: «всё шикарно»; 315–322 уехали, установка не подтверждена;
+++· последний сданный патч: **323** · у владельца на main применено до **314**
+++(слово владельца: «всё шикарно»; 315–323 уехали, установка не подтверждена;
++ владелец тестирует крафт).
++ 
++ ## Состав приложения (игровыми терминами)
++@@ -70,6 +70,10 @@
++ - 322 — правки окна крафта по тестированию владельца: прокрутка, квадраты
++   по 3 в ряд (остаток: 1 — центр, 2 — слева), «есть · нужно» рядом с
++   названием материала, явная подпись времени («время: 1 сут»).
+++- 323 — крафт по книге: час всем (еда/напитки 20 мин), осложнение +30/+10
+++  аддитивно (×2 отменено), вопрос «2 ОД → время вдвое?» после успеха;
+++  настройки раздела «Крафт» — потеря материалов при провале двумя группами
+++  (consumables/gear). Ступени 259 и множитель отменены словом владельца.
++ - Установщик патчей — «истина в содержимом файлов» (309), после установки
++   печатает готовую команду закрепления коммитом.
++ 
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 3cf95a9..0e4749c 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -2,6 +2,28 @@
++ 
++ ---
++ 
+++## Crafting — by the printed rules: times, complications, 2 AP and material loss (patch 323)
+++
+++Owner's word — the rulebook text (pp. 210–211) plus two decisions:
+++times strictly by the book; the ability to "lose materials" is optional.
+++
+++- Times: crafting takes one hour for all categories; a cooking station
+++  (food and drinks) — 20 minutes. The old complexity table (10 min/1 h/1 day,
+++  decision 259) is retired.
+++- A complication adds +30 minutes (station +10), additively. The old ×2
+++  time doubling is retired.
+++- After a successful craft the window asks: "Spend 2 AP to halve the time?"
+++  — "yes" spends half the base time (complications on top), "no" — full.
+++  Full AP arrive with the future game-master screen (a group resource);
+++  for now — an honest yes/no choice.
+++- The check is unchanged: INT + skill, difficulty = recipe complexity −
+++  skill rank (minimum 0), zero — no check needed.
+++- Settings: a new "Crafting" section with two independent material-loss
+++  switches — (1) food, drinks, explosives, chems; (2) armor, weapons, ammo
+++  components and other. Both on by default.
+++- Fuse: acceptance test (patch 323) — times, additive complications,
+++  deferred time and the AP choice, both loss settings, dictionaries.
+++
++ ## Crafting — window fixes from the owner's testing (patch 322)
++ 
++ - The category window now scrolls (it didn't scroll on desktop before).
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 4016597..39a1c55 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -2,6 +2,28 @@
++ 
++ ---
++ 
+++## Крафт — по печатным правилам: времена, осложнения, 2 ОД и потеря материалов (патч 323)
+++
+++Слово владельца — текст правил книги (с. 210–211) и два решения:
+++времена строго по книге; возможность «потерять материалы» — опциональная.
+++
+++- Времена: изготовление занимает час для всех категорий; станция
+++  приготовления пищи (еда и напитки) — 20 минут. Прежняя таблица
+++  (10 минут/час/сутки по сложности, решение 259) отменена.
+++- Осложнение добавляет +30 минут к работе (на станции +10), аддитивно.
+++  Прежнее удвоение времени (×2) отменено.
+++- После успешного крафта окно спрашивает: «Потратить 2 ОД, чтобы сократить
+++  время вдвое?» — «да» списывает половину базы времени (осложнения сверху),
+++  «нет» — полное. Полные ОД появятся вместе с экраном мастера (групповой
+++  ресурс); пока — честный выбор да/нет.
+++- Проверка не менялась: ИНТ + навык, сложность = сложность рецепта − ранг
+++  навыка (минимум 0), ноль — без проверки.
+++- Настройки: новый раздел «Крафт» с двумя независимыми выключателями
+++  потери материалов при провале — (1) еда, напитки, взрывчатка, препараты;
+++  (2) компоненты брони, оружия, патронов и прочее. Оба включены по умолчанию.
+++- Предохранитель: приёмочный тест (патч 323) — времена, аддитивные
+++  осложнения, отложенное время и выбор ОД, обе настройки потери, словари.
+++
++ ## Крафт — правки окна по тестированию владельца (патч 322)
++ 
++ - Окно категорий теперь прокручивается (на ПК раньше не прокручивалось).
++diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
++index 25cfa64..5392021 100644
++--- a/modules/fallout/crafting/operations.js
+++++ b/modules/fallout/crafting/operations.js
++@@ -21,6 +21,7 @@ import { rollByType } from '../../../domain/diceRollsLogic';
++ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
++ import { CRAFT_RULES } from './rules';
++ import { applyActivityMinutes } from '../survival/operations';
+++import useAppSettingsStore from '../../../src/store/appSettingsStore';
++ 
++ // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой
++ // addNewItem определяет «какой это предмет»). Надетое и запертое комплектом не
++@@ -63,11 +64,22 @@ const packIndex = () => {
++ 
++ const dualityEnabled = () => CRAFT_RULES.packSubstitutionByRarity === true;
++ 
++-// Цена провала — параметр категории из единого реестра. Рецепты остаются
++-// чистыми строками материалов: правила раздела не размножаются по записям.
++-const burnsOnFail = (recipe) =>
++-  (getCraftingCategoryRules(recipe?.category)?.failBurnsMaterialsSkills ?? [])
++-    .includes(recipe?.requires?.skill);
+++// Цена провала (патч 323, слово владельца): решение о потере материалов —
+++// настройка раздела «Крафт», две группы категорий (consumables/gear).
+++// Ранее — навыковое правило failBurnsMaterialsSkills из реестра категорий.
+++const lossGroupOf = (recipe) => {
+++  const cat = recipe?.category;
+++  if (CRAFT_RULES.lossGroups.consumables.includes(cat)) return 'consumables';
+++  if (CRAFT_RULES.lossGroups.gear.includes(cat)) return 'gear';
+++  return null;
+++};
+++
+++const burnsOnFail = (recipe) => {
+++  const group = lossGroupOf(recipe);
+++  if (!group) return false;
+++  const settingId = group === 'consumables' ? 'craftFailLossConsumables' : 'craftFailLossGear';
+++  return useAppSettingsStore.getState().getValue(settingId) === true;
+++};
++ 
++ // «Есть в наличии» для движка с учётом дуальности: к счётчику пачки прибавляется
++ // остаток именованных материалов той же редкости. Точные строки рецепта
++@@ -168,27 +180,54 @@ export const craftingPreview = (recipeId) => {
++     // материалы записано в самой строке (failBurnsMaterials), карт верстаков нет.
++     rulesView: {
++       failBurnsMaterials: burnsOnFail(recipe),
++-      complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+++      // 323: осложнение аддитивно (+30/+10 мин), не множителем.
+++      complicationDurationMultiplier: 1,
++     },
++   };
++ };
++ 
++-// Базовые минуты работы по ступеням CRAFT_RULES.craftTimeTiers (патч 262).
++-// Сложность берётся печатная (из рецепта), а не вычиточная: длительность в
++-// книге привязана к предмету, навык героя меняет проверку, не часы работы.
++-export const craftMinutesForRecipe = (recipe) => {
++-  const c = Number(recipe?.requires?.complexity ?? 0);
++-  const tiers = CRAFT_RULES.craftTimeTiers;
++-  const tier = tiers.find((t) => t.upToComplexity == null || c <= t.upToComplexity);
++-  return tier ? tier.minutes : tiers[tiers.length - 1].minutes;
+++// Базовые минуты работы по книге (патч 323): час для всех категорий,
+++// 20 минут — станция приготовления пищи (еда и напитки).
+++export const craftMinutesForRecipe = (recipe) =>
+++  CRAFT_RULES.stationCategories.includes(recipe?.category)
+++    ? CRAFT_RULES.stationMinutes
+++    : CRAFT_RULES.craftBaseMinutes;
+++
+++// Надбавка за КАЖДОЕ осложнение (книга, 323): +30 минут, на станции +10.
+++export const complicationExtraMinutesFor = (recipe) =>
+++  CRAFT_RULES.stationCategories.includes(recipe?.category)
+++    ? CRAFT_RULES.stationComplicationExtraMinutes
+++    : CRAFT_RULES.complicationExtraMinutes;
+++
+++/**
+++ * Списать отложенное время крафта (патч 323). Окно крафта спрашивает
+++ * после успеха: потратить 2 ОД и сократить время вдвое? Успешные попытки
+++ * при «да» идут за половину базы (осложнения добавляются поверх), неудачные
+++ * — всегда полное время (ОД на провал не тратятся).
+++ */
+++export const settleCraftTime = (recipeId, run, { spendActionPoints = false } = {}) => {
+++  const recipe = getCraftingRecipeById(recipeId);
+++  let total = 0;
+++  for (const attempt of run?.attempts ?? []) {
+++    const t = attempt?.time;
+++    if (!t?.pending) continue;
+++    let minutes = t.baseMinutes;
+++    if (spendActionPoints && attempt.done) minutes /= 2;
+++    total += minutes + (t.complicationMinutes ?? 0);
+++  }
+++  if (total > 0) {
+++    applyActivityMinutes(total, `craft:${recipe?.category ?? 'any'}`);
+++  }
+++  return { minutes: total, spendActionPoints };
++ };
++ 
+++
++ /**
++  * Совершить крафт. Возврат — контракт движка (см. domain/craftingEngine.js):
++  * { done:true, spent, granted, check } либо отказ с причиной. Порты кубиков
++  * переопределяемы (тесты; экраны зовут без портов — настоящие кости).
++  */
++-export const craftRecipe = (recipeId, ports = {}) => {
+++export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) => {
++   const recipe = getCraftingRecipeById(recipeId);
++   if (!recipe) {
++     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
++@@ -208,7 +247,8 @@ export const craftRecipe = (recipeId, ports = {}) => {
++     perkRanks,
++     inventoryCounts,
++     failBurnsMaterials: burnsOnFail(recipe),
++-    complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+++    // 323: множитель выключен — надбавка за осложнения аддитивная (ниже).
+++    complicationDurationMultiplier: 1,
++     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
++     rollCD: ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
++     spend: (plan) => {
++@@ -220,15 +260,30 @@ export const craftRecipe = (recipeId, ports = {}) => {
++     }),
++   });
++ 
++-  // Время (патч 262): любая работа, дошедшая до проверки, идёт по часам —
++-  // и удачная, и сорванная (провал = зря потраченный час). Отказ гейта или
++-  // стора — бросок не делался, время не тратится. Осложнение домножает.
+++  // Время (патч 262; книга — 323): любая работа, дошедшая до проверки, идёт
+++  // по часам — и удачная, и сорванная (провал = зря потраченное время). Отказ
+++  // гейта или стора — бросок не делался, время не тратится. Осложнение —
+++  // аддитивно: база + (число осложнений × надбавка: +30 мин, станция +10).
+++  // deferTime (323): время НЕ списывается сразу — окно спросит про 2 ОД
+++  // (успех можно сократить вдвое) и спишет через settleCraftTime.
++   let timed = null;
++   if (result.done === true || result.stage === 'check') {
++-    const minutes = craftMinutesForRecipe(recipe);
++-    const durationMultiplier = result.durationMultiplier ?? 1;
++-    timed = applyActivityMinutes(minutes * durationMultiplier, `craft:${recipe.category ?? 'any'}`);
++-    result.time = { minutes, durationMultiplier };
+++    const baseMinutes = craftMinutesForRecipe(recipe);
+++    const complicationMinutes = (result.check?.complicationCount ?? 0)
+++      * complicationExtraMinutesFor(recipe);
+++    const minutes = baseMinutes + complicationMinutes;
+++    if (deferTime) {
+++      result.time = {
+++        minutes,
+++        baseMinutes,
+++        complicationMinutes,
+++        durationMultiplier: 1,
+++        pending: true,
+++      };
+++    } else {
+++      timed = applyActivityMinutes(minutes, `craft:${recipe.category ?? 'any'}`);
+++      result.time = { minutes, durationMultiplier: 1 };
+++    }
++   }
++   if (timed) result.survival = timed;
++ 
++@@ -237,6 +292,7 @@ export const craftRecipe = (recipeId, ports = {}) => {
++     if (Array.isArray(result.burned) && result.burned.length > 0) result.burned = expandedSpend;
++   }
++ 
+++
++   debugLog('crafting.craft', {
++     recipeId,
++     done: result.done,
++diff --git a/modules/fallout/crafting/rules.js b/modules/fallout/crafting/rules.js
++index f9e2380..6cd25dd 100644
++--- a/modules/fallout/crafting/rules.js
+++++ b/modules/fallout/crafting/rules.js
++@@ -21,18 +21,28 @@ export const CRAFT_RULES = {
++     Object.values(getCraftingCategoryRuleRegistry())
++       .flatMap((rules) => rules?.failBurnsMaterialsSkills ?? []),
++   )],
++-  // Корневая система 2d20: осложнение не отменяет успех проверки (решение
++-  // владельца 2026-09-16 вместо правки 258 «порча при осложнении»). Когда
++-  // успех и осложнение случаются одновременно, наказанием становится время:
++-  // длительность работы (или негативного эффекта) умножается на этот множитель.
++-  // 10 минут крафта становятся 20, час — двумя, сутки — двумя. Сами времена —
++-  // ниже (часы выживания подключены патчем 262); правило включено с 259.
++-  complicationDurationMultiplier: 2,
++-  // Базовое время работы по печатной Complexity рецепта (книга с. 210: чем
++-  // сложнее — тем дольше; воля ГМ зафиксирована таблицей здесь). Ступени
++-  // владельца из 259: 10 минут / час / сутки. Minutes — granularity 5 минут
++-  // (12 сцен в игровом часу): крафт и разбор обязаны укладываться, иначе
++-  // мост эффектов всё равно округлит до сцены.
+++  // ── Время работы — по книге (патч 323, текст правил от владельца) ──────
+++  // «Изготовление предмета занимает час»; на станции приготовления пищи
+++  // (еда и напитки) — «всего двадцать минут». Ступени 259 (10 мин/час/сутки
+++  // по сложности) отменены решением владельца.
+++  craftBaseMinutes: 60,
+++  stationCategories: ['food', 'drinks'],
+++  stationMinutes: 20,
+++  // «Каждое осложнение добавляет ещё полчаса к этому времени» (на станции
+++  // «усложнение добавляет только десять минут») — аддитивно, минутами;
+++  // прежний множитель ×2 (259) отменён.
+++  complicationExtraMinutes: 30,
+++  stationComplicationExtraMinutes: 10,
+++  // ── Потеря материалов при провале — настройки (патч 323, слово владельца)
+++  // Книга: крафт на станции приготовления пищи / химической лаборатории —
+++  // при провале ингредиенты израсходованы. Владелец: возможность потери —
+++  // опциональная, двумя раздельными настройками (раздел «Крафт»).
+++  // consumables — еда, напитки, взрывчатка, препараты; gear — компоненты
+++  // брони, оружия, патронов и прочее.
+++  lossGroups: {
+++    consumables: ['food', 'drinks', 'explosives', 'chems'],
+++    gear: ['armor', 'powerArmor', 'weapons', 'ammo'],
+++  },
++   // Пачки материалов (263, реформа 269). Все материалы равны (решение
++   // владельца): справочник material.json не знает флагов «пачка/именованный» —
++   // пачками считаются ровно эти три id. Строку-пачку закрывает любой материал
++@@ -44,9 +54,4 @@ export const CRAFT_RULES = {
++   // просит (патч 265).
++   packMaterialIds: ['item_common_materials', 'item_uncommon_materials', 'item_rare_materials'],
++   packSubstitutionByRarity: true,
++-  craftTimeTiers: [
++-    { upToComplexity: 1, minutes: 10 },
++-    { upToComplexity: 3, minutes: 60 },
++-    { upToComplexity: null, minutes: 1440 }, // хвост: 4+
++-  ],
++-}
+++};
++diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
++index 91adb08..512cc48 100644
++--- a/modules/fallout/crafting/windowModel.js
+++++ b/modules/fallout/crafting/windowModel.js
++@@ -22,7 +22,7 @@ import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
++ import enPerks from '../i18n/en-EN/data/perks/perks.json';
++ import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
++ import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
++-import { craftMinutesForRecipe, craftRecipe, craftingPreview } from './operations';
+++import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime } from './operations';
++ import { CRAFT_RULES } from './rules';
++ 
++ // Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
++@@ -179,12 +179,12 @@ export const buildCategoryModel = (category) => buildRowsForCategory(category);
++  * count попыток подряд. Провал проверки — не стоп (следующая попытка
++  * обычная); нехватка материалов/стора — стоп, сколько успели, столько есть.
++  */
++-export const craftBatch = (recipeId, count = 1) => {
+++export const craftBatch = (recipeId, count = 1, options = {}) => {
++   const attempts = [];
++   const total = Math.max(1, Math.floor(count) || 1);
++   let stoppedEarly = 0;
++   for (let i = 0; i < total; i += 1) {
++-    const result = craftRecipe(recipeId);
+++    const result = craftRecipe(recipeId, {}, options);
++     if (result.stage === 'gate' || result.stage === 'store') {
++       if (attempts.length === 0) return { attempts: [result], stoppedEarly: 0, refusedFirst: true };
++       stoppedEarly = total - attempts.length;
++@@ -217,6 +217,7 @@ export const buildCraftReport = (recipeId, run) => {
++   const granted = new Map();
++   const spent = new Map();
++   let minutes = 0;
+++  let pendingTime = null;
++   run.attempts.forEach((attempt, index) => {
++     let line;
++     if (attempt.auto) {
++@@ -226,7 +227,11 @@ export const buildCraftReport = (recipeId, run) => {
++       line = attempt.check.passed
++         ? fmt(d.rollsSuccess, { rolls, n: attempt.check.successes })
++         : fmt(d.rollsFail, { rolls });
++-      if ((attempt.check.complicationCount ?? 0) > 0) line += `. ${d.complicationNote}`;
+++      if ((attempt.check.complicationCount ?? 0) > 0) {
+++        // 323: надбавка аддитивная — «осложнение: +30 мин к работе» (+10 на станции).
+++        const extra = (attempt.check.complicationCount ?? 0) * complicationExtraMinutesFor(recipe);
+++        line += `. ${fmt(d.complicationNote, { n: extra })}`;
+++      }
++     } else {
++       line = d.autoNote;
++     }
++@@ -239,7 +244,15 @@ export const buildCraftReport = (recipeId, run) => {
++     for (const row of attempt.spent ?? []) {
++       spent.set(row.itemId, (spent.get(row.itemId) ?? 0) + (Number(row.count) || 0));
++     }
++-    if (attempt.time) minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+++    // 323: отложенное время (окно ещё спросит про 2 ОД) в «потраченное» не идёт.
+++    if (attempt.time) {
+++      if (attempt.time.pending) {
+++        if (!pendingTime) pendingTime = { hasSuccess: false };
+++        if (attempt.done) pendingTime.hasSuccess = true;
+++      } else {
+++        minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+++      }
+++    }
++   });
++   const items = new Map([...granted, ...spent]); // имена общие для сумки
++   const render = (map) => [...map.entries()]
++@@ -251,5 +264,6 @@ export const buildCraftReport = (recipeId, run) => {
++   ].filter(Boolean).join('. ');
++   lines.push(tail);
++   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
++-  return { title: d.resultTitle, lines };
+++  // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+++  return { title: d.resultTitle, lines, recipeId, pendingTime };
++ };
++diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
++index c61f285..1db8963 100644
++--- a/modules/fallout/i18n/en-EN/data/system/settings.json
+++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
++@@ -28,5 +28,10 @@
++   },
++   "robots": "Robots",
++   "robotArmsStrictTitle": "Arm attachments: like-for-like only",
++-  "robotArmsStrictDescription": "On: an arm attachment can only be replaced by another attachment, a held weapon by another weapon; a limb’s built-in weapon requires replacing the limb itself. Off: any arms and weapons may be installed."
++-}
++\ No newline at end of file
+++  "robotArmsStrictDescription": "On: an arm attachment can only be replaced by another attachment, a held weapon by another weapon; a limb’s built-in weapon requires replacing the limb itself. Off: any arms and weapons may be installed.",
+++  "crafting": "Crafting",
+++  "craftLossConsumablesTitle": "Material loss on failure: food, drinks, explosives, chems",
+++  "craftLossConsumablesDescription": "By the book: a cooking station or chemical laboratory consumes all ingredients when the check fails. Off — materials are kept on failure.",
+++  "craftLossGearTitle": "Material loss on failure: weapons, armor, ammo",
+++  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure."
+++}
++diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++index 22dccb7..bdf5eb3 100644
++--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++@@ -47,10 +47,14 @@
++     "nothing": "Nothing gained",
++     "spent": "Spent: {items}",
++     "timeSpent": "Time: {time}",
++-    "complicationNote": "A complication doubled the time",
+++    "complicationNote": "Complication: +{n} min",
++     "craftTitle": "Crafting",
++     "notAvailable": "Not available",
++-    "done": "Done"
+++    "done": "Done",
+++    "apQuestion": "Spend 2 AP to halve the crafting time?",
+++    "apYes": "Spend 2 AP",
+++    "apNo": "Full time",
+++    "apHalvedNote": "Time halved for 2 AP"
++   },
++   "attributes": {
++     "INT": "Intelligence"
++diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
++index 3d3d564..54e5628 100644
++--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
+++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
++@@ -28,5 +28,10 @@
++   },
++   "robots": "Роботы",
++   "robotArmsStrictTitle": "Прикрепляемые части рук — только на аналогичные",
++-  "robotArmsStrictDescription": "Включено: навес руки заменяется только другим навесом, оружие в ладони — только оружием; встроенное оружие руки не сменить без замены самой руки. Выключено: в руку можно устанавливать любые руки и оружие."
++-}
++\ No newline at end of file
+++  "robotArmsStrictDescription": "Включено: навес руки заменяется только другим навесом, оружие в ладони — только оружием; встроенное оружие руки не сменить без замены самой руки. Выключено: в руку можно устанавливать любые руки и оружие.",
+++  "crafting": "Крафт",
+++  "craftLossConsumablesTitle": "Потеря материалов при провале: еда, напитки, взрывчатка, препараты",
+++  "craftLossConsumablesDescription": "По книге: станция приготовления пищи и химическая лаборатория — при провале проверки ингредиенты израсходованы. Выключено — материалы остаются при провале.",
+++  "craftLossGearTitle": "Потеря материалов при провале: оружие, броня, патроны",
+++  "craftLossGearDescription": "Провал компонентного крафта (оружие, броня, силовая броня, патроны и прочее) расходует материалы. Выключено — материалы остаются при провале."
+++}
++diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++index 2fa2f07..8dc57f1 100644
++--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++@@ -47,10 +47,14 @@
++     "nothing": "Не получено ничего",
++     "spent": "Потрачено: {items}",
++     "timeSpent": "Время: {time}",
++-    "complicationNote": "Осложнение удвоило время",
+++    "complicationNote": "Осложнение: +{n} мин к работе",
++     "craftTitle": "Крафт",
++     "notAvailable": "Недоступно",
++-    "done": "Готово"
+++    "done": "Готово",
+++    "apQuestion": "Потратить 2 ОД, чтобы сократить время вдвое?",
+++    "apYes": "Потратить 2 ОД",
+++    "apNo": "Полное время",
+++    "apHalvedNote": "Время сокращено за 2 ОД"
++   },
++   "attributes": {
++     "INT": "Интеллект"
++diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++index cca75f3..cec112b 100644
++--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++@@ -18,7 +18,9 @@ import {
++   buildCraftReport,
++   craftDict,
++   craftFormat,
+++  formatCraftMinutes,
++ } from '../../../crafting/windowModel';
+++import { settleCraftTime } from '../../../crafting/operations';
++ 
++ // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
++ const CATEGORY_ICONS = {
++@@ -52,6 +54,7 @@ export default function CraftingModal({ visible, onClose }) {
++   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
++   const [qty, setQty] = useState(1);
++   const [report, setReport] = useState(null);
+++  const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
++   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
++ 
++   const d = useMemo(() => (visible ? craftDict() : null), [visible]);
++@@ -87,10 +90,18 @@ export default function CraftingModal({ visible, onClose }) {
++   };
++ 
++   const create = (row, count) => {
++-    const run = craftBatch(row.recipeId, count);
+++    // 323: время откладывается — окно спросит про 2 ОД после успеха.
+++    const run = craftBatch(row.recipeId, count, { deferTime: true });
+++    const rep = buildCraftReport(row.recipeId, run);
+++    let settled = null;
+++    if (rep.pendingTime && !rep.pendingTime.hasSuccess) {
+++      // успехов нет — решение об ОД не требуется, время списывается целиком.
+++      settled = settleCraftTime(row.recipeId, run, { spendActionPoints: false });
+++    }
++     setQtyTarget(null);
++     setOpenId(null);
++-    setReport(buildCraftReport(row.recipeId, run));
+++    setSettledTime(settled);
+++    setReport({ ...rep, run }); // run — для решения про 2 ОД (323)
++   };
++   // Решение владельца (318): можно сделать больше одной — спросить количество
++   // отдельным окном (по умолчанию 1); одна — создать сразу.
++@@ -104,9 +115,17 @@ export default function CraftingModal({ visible, onClose }) {
++   };
++   const finishReport = () => {
++     setReport(null);
+++    setSettledTime(null);
++     setRefresh((tick) => tick + 1); // материалы ушли — модель пересобирается
++   };
++ 
+++  // Решение владельца (323): ОД — групповой ресурс будущего мастера; сейчас
+++  // выбор да/нет: «да» — время успеха вдвое, «нет» — полное по правилам.
+++  const settleTimeDecision = (spendActionPoints) => {
+++    const settled = settleCraftTime(report.recipeId, report.run, { spendActionPoints });
+++    setSettledTime(settled);
+++  };
+++
++   const headerTitle = report
++     ? (report.title || ui.resultTitle || '')
++     : view === 'category' ? categoryLabel : (ui.title ?? '');
++@@ -234,7 +253,33 @@ export default function CraftingModal({ visible, onClose }) {
++                 {report.lines.map((line, i) => (
++                   <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
++                 ))}
+++                {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
+++                {settledTime && (
+++                  <Text style={styles.resultLine}>
+++                    {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
+++                      + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
+++                  </Text>
+++                )}
++               </View>
+++
+++              {report.pendingTime && settledTime === null && (
+++                <View style={styles.apBox}>
+++                  <Text style={styles.apQuestion}>{ui.apQuestion ?? ''}</Text>
+++                  <View style={styles.qtyActions}>
+++                    <TouchableOpacity
+++                      style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+++                      onPress={() => settleTimeDecision(true)}>
+++                      <Text style={styles.bigCraftText}>{ui.apYes ?? ''}</Text>
+++                    </TouchableOpacity>
+++                    <TouchableOpacity
+++                      style={styles.qtyCancel}
+++                      onPress={() => settleTimeDecision(false)}>
+++                      <Text style={styles.qtyCancelText}>{ui.apNo ?? ''}</Text>
+++                    </TouchableOpacity>
+++                  </View>
+++                </View>
+++              )}
+++
++               <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
++                 <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
++               </TouchableOpacity>
++diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
++index c99fb24..f72d0f1 100644
++--- a/modules/fallout/settings.json
+++++ b/modules/fallout/settings.json
++@@ -70,8 +70,14 @@
++     "descriptionKey": "settings.cardsDescription",
++     "defaultValue": "cards",
++     "options": [
++-      { "value": "cards", "labelKey": "settings.cards.cards" },
++-      { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
+++      {
+++        "value": "cards",
+++        "labelKey": "settings.cards.cards"
+++      },
+++      {
+++        "value": "spoilers",
+++        "labelKey": "settings.cards.spoilers"
+++      }
++     ]
++   },
++   {
++@@ -82,5 +88,23 @@
++     "labelKey": "settings.robotArmsStrictTitle",
++     "descriptionKey": "settings.robotArmsStrictDescription",
++     "defaultValue": true
+++  },
+++  {
+++    "id": "craftFailLossConsumables",
+++    "type": "boolean",
+++    "controlSurface": "settings",
+++    "sectionKey": "crafting",
+++    "labelKey": "settings.craftLossConsumablesTitle",
+++    "descriptionKey": "settings.craftLossConsumablesDescription",
+++    "defaultValue": true
+++  },
+++  {
+++    "id": "craftFailLossGear",
+++    "type": "boolean",
+++    "controlSurface": "settings",
+++    "sectionKey": "crafting",
+++    "labelKey": "settings.craftLossGearTitle",
+++    "descriptionKey": "settings.craftLossGearDescription",
+++    "defaultValue": true
++   }
++ ]
++diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
++index bec08bf..9da1d48 100644
++--- a/modules/fallout/styles/CraftingModal.styles.js
+++++ b/modules/fallout/styles/CraftingModal.styles.js
++@@ -80,6 +80,10 @@ export default StyleSheet.create({
++   qtyCancelText: { color: '#c9c6b5', fontSize: 14 },
++   qtyActionsBigCraft: { flex: 1, marginTop: 0 },
++ 
+++  // Решение про 2 ОД (323)
+++  apBox: { marginTop: 12 },
+++  apQuestion: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
+++
++   // Отчёт (265, формат владельца)
++   resultBox: { backgroundColor: '#141714', borderRadius: 10, padding: 12, marginTop: 12 },
++   resultLine: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
++diff --git a/public/version.json b/public/version.json
++index 3b0a073..3ca81a1 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,15 +1,17 @@
++ {
++-  "version": "322",
+++  "version": "323",
++   "notes": {
++     "ru-RU": [
++-      "Крафт: окно категорий прокручивается, квадраты по 3 в ряд",
++-      "Крафт: «есть · нужно» теперь рядом с названием материала",
++-      "Крафт: время изготовления подписано явно («время: 1 сут»)"
+++      "Крафт: времена по книге — час, еда/напитки 20 минут",
+++      "Крафт: осложнение +30 минут (станция +10), прежнее удвоение отменено",
+++      "Крафт: после успеха окно спросит про 2 ОД (время вдвое)",
+++      "Настройки: раздел «Крафт» — потеря материалов при провале (2 группы)"
++     ],
++     "en-EN": [
++-      "Crafting: category window scrolls, tiles 3 per row",
++-      "Crafting: \"have · need\" now sits next to the material name",
++-      "Crafting: crafting time is labeled explicitly (\"time: 1 d\")"
+++      "Crafting: book times — one hour, food/drinks 20 minutes",
+++      "Crafting: complication +30 minutes (station +10), old doubling removed",
+++      "Crafting: after success the window asks about 2 AP (halve the time)",
+++      "Settings: new \"Crafting\" section — material loss on failure (2 groups)"
++     ]
++   }
++ }
+diff --git a/public/version.json b/public/version.json
+index 3ca81a1..f69a24c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,17 +1,11 @@
+ {
+-  "version": "323",
++  "version": "324",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: времена по книге — час, еда/напитки 20 минут",
+-      "Крафт: осложнение +30 минут (станция +10), прежнее удвоение отменено",
+-      "Крафт: после успеха окно спросит про 2 ОД (время вдвое)",
+-      "Настройки: раздел «Крафт» — потеря материалов при провале (2 группы)"
++      "Крафт: общий пул ОД (6) — проверки пополняют, «2 ОД за время вдвое» тратит из пула"
+     ],
+     "en-EN": [
+-      "Crafting: book times — one hour, food/drinks 20 minutes",
+-      "Crafting: complication +30 minutes (station +10), old doubling removed",
+-      "Crafting: after success the window asks about 2 AP (halve the time)",
+-      "Settings: new \"Crafting\" section — material loss on failure (2 groups)"
++      "Crafting: group AP pool (6) — checks refill it, \"2 AP to halve time\" spends from it"
+     ]
+   }
+ }
