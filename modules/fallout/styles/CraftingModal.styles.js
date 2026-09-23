@@ -80,6 +80,10 @@ export default StyleSheet.create({
   qtyCancelText: { color: '#c9c6b5', fontSize: 14 },
   qtyActionsBigCraft: { flex: 1, marginTop: 0 },
 
+  // Решение про 2 ОД (323)
+  apBox: { marginTop: 12 },
+  apQuestion: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
+
   // Отчёт (265, формат владельца)
   resultBox: { backgroundColor: '#141714', borderRadius: 10, padding: 12, marginTop: 12 },
   resultLine: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },

@@ -2,6 +2,28 @@
 
 ---
 
+## Crafting — by the printed rules: times, complications, 2 AP and material loss (patch 323)
+
+Owner's word — the rulebook text (pp. 210–211) plus two decisions:
+times strictly by the book; the ability to "lose materials" is optional.
+
+- Times: crafting takes one hour for all categories; a cooking station
+  (food and drinks) — 20 minutes. The old complexity table (10 min/1 h/1 day,
+  decision 259) is retired.
+- A complication adds +30 minutes (station +10), additively. The old ×2
+  time doubling is retired.
+- After a successful craft the window asks: "Spend 2 AP to halve the time?"
+  — "yes" spends half the base time (complications on top), "no" — full.
+  Full AP arrive with the future game-master screen (a group resource);
+  for now — an honest yes/no choice.
+- The check is unchanged: INT + skill, difficulty = recipe complexity −
+  skill rank (minimum 0), zero — no check needed.
+- Settings: a new "Crafting" section with two independent material-loss
+  switches — (1) food, drinks, explosives, chems; (2) armor, weapons, ammo
+  components and other. Both on by default.
+- Fuse: acceptance test (patch 323) — times, additive complications,
+  deferred time and the AP choice, both loss settings, dictionaries.
+
 ## Crafting — window fixes from the owner's testing (patch 322)
 
 - The category window now scrolls (it didn't scroll on desktop before).

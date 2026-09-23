@@ -22,7 +22,7 @@ import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
 import enPerks from '../i18n/en-EN/data/perks/perks.json';
 import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
-import { craftMinutesForRecipe, craftRecipe, craftingPreview } from './operations';
+import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime } from './operations';
 import { CRAFT_RULES } from './rules';
 
 // Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
@@ -179,12 +179,12 @@ export const buildCategoryModel = (category) => buildRowsForCategory(category);
  * count попыток подряд. Провал проверки — не стоп (следующая попытка
  * обычная); нехватка материалов/стора — стоп, сколько успели, столько есть.
  */
-export const craftBatch = (recipeId, count = 1) => {
+export const craftBatch = (recipeId, count = 1, options = {}) => {
   const attempts = [];
   const total = Math.max(1, Math.floor(count) || 1);
   let stoppedEarly = 0;
   for (let i = 0; i < total; i += 1) {
-    const result = craftRecipe(recipeId);
+    const result = craftRecipe(recipeId, {}, options);
     if (result.stage === 'gate' || result.stage === 'store') {
       if (attempts.length === 0) return { attempts: [result], stoppedEarly: 0, refusedFirst: true };
       stoppedEarly = total - attempts.length;
@@ -217,6 +217,7 @@ export const buildCraftReport = (recipeId, run) => {
   const granted = new Map();
   const spent = new Map();
   let minutes = 0;
+  let pendingTime = null;
   run.attempts.forEach((attempt, index) => {
     let line;
     if (attempt.auto) {
@@ -226,7 +227,11 @@ export const buildCraftReport = (recipeId, run) => {
       line = attempt.check.passed
         ? fmt(d.rollsSuccess, { rolls, n: attempt.check.successes })
         : fmt(d.rollsFail, { rolls });
-      if ((attempt.check.complicationCount ?? 0) > 0) line += `. ${d.complicationNote}`;
+      if ((attempt.check.complicationCount ?? 0) > 0) {
+        // 323: надбавка аддитивная — «осложнение: +30 мин к работе» (+10 на станции).
+        const extra = (attempt.check.complicationCount ?? 0) * complicationExtraMinutesFor(recipe);
+        line += `. ${fmt(d.complicationNote, { n: extra })}`;
+      }
     } else {
       line = d.autoNote;
     }
@@ -239,7 +244,15 @@ export const buildCraftReport = (recipeId, run) => {
     for (const row of attempt.spent ?? []) {
       spent.set(row.itemId, (spent.get(row.itemId) ?? 0) + (Number(row.count) || 0));
     }
-    if (attempt.time) minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+    // 323: отложенное время (окно ещё спросит про 2 ОД) в «потраченное» не идёт.
+    if (attempt.time) {
+      if (attempt.time.pending) {
+        if (!pendingTime) pendingTime = { hasSuccess: false };
+        if (attempt.done) pendingTime.hasSuccess = true;
+      } else {
+        minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+      }
+    }
   });
   const items = new Map([...granted, ...spent]); // имена общие для сумки
   const render = (map) => [...map.entries()]
@@ -251,5 +264,6 @@ export const buildCraftReport = (recipeId, run) => {
   ].filter(Boolean).join('. ');
   lines.push(tail);
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
-  return { title: d.resultTitle, lines };
+  // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+  return { title: d.resultTitle, lines, recipeId, pendingTime };
 };

@@ -28,5 +28,10 @@
   },
   "robots": "Robots",
   "robotArmsStrictTitle": "Arm attachments: like-for-like only",
-  "robotArmsStrictDescription": "On: an arm attachment can only be replaced by another attachment, a held weapon by another weapon; a limb’s built-in weapon requires replacing the limb itself. Off: any arms and weapons may be installed."
+  "robotArmsStrictDescription": "On: an arm attachment can only be replaced by another attachment, a held weapon by another weapon; a limb’s built-in weapon requires replacing the limb itself. Off: any arms and weapons may be installed.",
+  "crafting": "Crafting",
+  "craftLossConsumablesTitle": "Material loss on failure: food, drinks, explosives, chems",
+  "craftLossConsumablesDescription": "By the book: a cooking station or chemical laboratory consumes all ingredients when the check fails. Off — materials are kept on failure.",
+  "craftLossGearTitle": "Material loss on failure: weapons, armor, ammo",
+  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure."
 }

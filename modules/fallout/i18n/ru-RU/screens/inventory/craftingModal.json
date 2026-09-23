@@ -47,10 +47,14 @@
     "nothing": "Не получено ничего",
     "spent": "Потрачено: {items}",
     "timeSpent": "Время: {time}",
-    "complicationNote": "Осложнение удвоило время",
+    "complicationNote": "Осложнение: +{n} мин к работе",
     "craftTitle": "Крафт",
     "notAvailable": "Недоступно",
-    "done": "Готово"
+    "done": "Готово",
+    "apQuestion": "Потратить 2 ОД, чтобы сократить время вдвое?",
+    "apYes": "Потратить 2 ОД",
+    "apNo": "Полное время",
+    "apHalvedNote": "Время сокращено за 2 ОД"
   },
   "attributes": {
     "INT": "Интеллект"

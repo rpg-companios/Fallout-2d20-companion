@@ -47,10 +47,14 @@
     "nothing": "Nothing gained",
     "spent": "Spent: {items}",
     "timeSpent": "Time: {time}",
-    "complicationNote": "A complication doubled the time",
+    "complicationNote": "Complication: +{n} min",
     "craftTitle": "Crafting",
     "notAvailable": "Not available",
-    "done": "Done"
+    "done": "Done",
+    "apQuestion": "Spend 2 AP to halve the crafting time?",
+    "apYes": "Spend 2 AP",
+    "apNo": "Full time",
+    "apHalvedNote": "Time halved for 2 AP"
   },
   "attributes": {
     "INT": "Intelligence"

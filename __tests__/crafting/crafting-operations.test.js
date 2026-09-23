@@ -6,6 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
+import useAppSettingsStore from '../../src/store/appSettingsStore';
 import { craftRecipe, craftingPreview } from '../../modules/fallout/crafting/operations';
 import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
 import { getCraftingRecipeById, getCraftingRecipes } from '../../domain/registry';
@@ -140,21 +141,23 @@ describe('craftRecipe: провал проверки и цена проверк�
     expect(countStack('food_vegetable_soup')).toBe(0);
   });
 
-  it('рецепт без флага сгорания: провал не сжигает ничего', () => {
-    // «Молотов» — не годится как пример: по книге взрывчатка делается в химии и
-    // там провал жжёт. Берём .45: проверочный станок не «горячий», права сжигать нет.
+  it('потеря материалов группы gear — настройка «Крафт» (патч 323)', () => {
+    // 323 (слово владельца): навыковое правило заменено настройкой группы gear
+    // (оружие/броня/патроны и прочее). По умолчанию включено — при провале
+    // материалы расходуются; выключено — остаются.
     const shell = getCraftingRecipeById('ammo_45');
     expect(shell.category).toBe('ammo');
-    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'станок не горит').toBe(false);
+    useAppSettingsStore.getState().setValue('craftFailLossGear', false);
+    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка выключена — не жжёт').toBe(false);
+    useAppSettingsStore.getState().setValue('craftFailLossGear', true);
+    expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка включена — жжёт').toBe(true);
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }, { perkId: 'ammosmith' }] }); // ранг 2
     for (const material of shell.materials) seedStack(material.itemId, material.count);
-    const before = state().items;
 
     const result = craftRecipe('ammo_45', { rollD20: () => bothDiceComplicate() });
     expect(result.done).toBe(false);
     expect(result.stage).toBe('check');
-    expect(result.spent).toEqual([]);
-    expect(state().items).toBe(before);
+    expect(result.burned.length).toBeGreaterThan(0);
   });
 
   it('атрибут проверки берётся из правил модуля, не из данных рецептов', () => {

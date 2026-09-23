@@ -21,6 +21,7 @@ import { rollByType } from '../../../domain/diceRollsLogic';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
 import { CRAFT_RULES } from './rules';
 import { applyActivityMinutes } from '../survival/operations';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
 
 // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой
 // addNewItem определяет «какой это предмет»). Надетое и запертое комплектом не
@@ -63,11 +64,22 @@ const packIndex = () => {
 
 const dualityEnabled = () => CRAFT_RULES.packSubstitutionByRarity === true;
 
-// Цена провала — параметр категории из единого реестра. Рецепты остаются
-// чистыми строками материалов: правила раздела не размножаются по записям.
-const burnsOnFail = (recipe) =>
-  (getCraftingCategoryRules(recipe?.category)?.failBurnsMaterialsSkills ?? [])
-    .includes(recipe?.requires?.skill);
+// Цена провала (патч 323, слово владельца): решение о потере материалов —
+// настройка раздела «Крафт», две группы категорий (consumables/gear).
+// Ранее — навыковое правило failBurnsMaterialsSkills из реестра категорий.
+const lossGroupOf = (recipe) => {
+  const cat = recipe?.category;
+  if (CRAFT_RULES.lossGroups.consumables.includes(cat)) return 'consumables';
+  if (CRAFT_RULES.lossGroups.gear.includes(cat)) return 'gear';
+  return null;
+};
+
+const burnsOnFail = (recipe) => {
+  const group = lossGroupOf(recipe);
+  if (!group) return false;
+  const settingId = group === 'consumables' ? 'craftFailLossConsumables' : 'craftFailLossGear';
+  return useAppSettingsStore.getState().getValue(settingId) === true;
+};
 
 // «Есть в наличии» для движка с учётом дуальности: к счётчику пачки прибавляется
 // остаток именованных материалов той же редкости. Точные строки рецепта
@@ -168,27 +180,54 @@ export const craftingPreview = (recipeId) => {
     // материалы записано в самой строке (failBurnsMaterials), карт верстаков нет.
     rulesView: {
       failBurnsMaterials: burnsOnFail(recipe),
-      complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+      // 323: осложнение аддитивно (+30/+10 мин), не множителем.
+      complicationDurationMultiplier: 1,
     },
   };
 };
 
-// Базовые минуты работы по ступеням CRAFT_RULES.craftTimeTiers (патч 262).
-// Сложность берётся печатная (из рецепта), а не вычиточная: длительность в
-// книге привязана к предмету, навык героя меняет проверку, не часы работы.
-export const craftMinutesForRecipe = (recipe) => {
-  const c = Number(recipe?.requires?.complexity ?? 0);
-  const tiers = CRAFT_RULES.craftTimeTiers;
-  const tier = tiers.find((t) => t.upToComplexity == null || c <= t.upToComplexity);
-  return tier ? tier.minutes : tiers[tiers.length - 1].minutes;
+// Базовые минуты работы по книге (патч 323): час для всех категорий,
+// 20 минут — станция приготовления пищи (еда и напитки).
+export const craftMinutesForRecipe = (recipe) =>
+  CRAFT_RULES.stationCategories.includes(recipe?.category)
+    ? CRAFT_RULES.stationMinutes
+    : CRAFT_RULES.craftBaseMinutes;
+
+// Надбавка за КАЖДОЕ осложнение (книга, 323): +30 минут, на станции +10.
+export const complicationExtraMinutesFor = (recipe) =>
+  CRAFT_RULES.stationCategories.includes(recipe?.category)
+    ? CRAFT_RULES.stationComplicationExtraMinutes
+    : CRAFT_RULES.complicationExtraMinutes;
+
+/**
+ * Списать отложенное время крафта (патч 323). Окно крафта спрашивает
+ * после успеха: потратить 2 ОД и сократить время вдвое? Успешные попытки
+ * при «да» идут за половину базы (осложнения добавляются поверх), неудачные
+ * — всегда полное время (ОД на провал не тратятся).
+ */
+export const settleCraftTime = (recipeId, run, { spendActionPoints = false } = {}) => {
+  const recipe = getCraftingRecipeById(recipeId);
+  let total = 0;
+  for (const attempt of run?.attempts ?? []) {
+    const t = attempt?.time;
+    if (!t?.pending) continue;
+    let minutes = t.baseMinutes;
+    if (spendActionPoints && attempt.done) minutes /= 2;
+    total += minutes + (t.complicationMinutes ?? 0);
+  }
+  if (total > 0) {
+    applyActivityMinutes(total, `craft:${recipe?.category ?? 'any'}`);
+  }
+  return { minutes: total, spendActionPoints };
 };
+
 
 /**
  * Совершить крафт. Возврат — контракт движка (см. domain/craftingEngine.js):
  * { done:true, spent, granted, check } либо отказ с причиной. Порты кубиков
  * переопределяемы (тесты; экраны зовут без портов — настоящие кости).
  */
-export const craftRecipe = (recipeId, ports = {}) => {
+export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) => {
   const recipe = getCraftingRecipeById(recipeId);
   if (!recipe) {
     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
@@ -208,7 +247,8 @@ export const craftRecipe = (recipeId, ports = {}) => {
     perkRanks,
     inventoryCounts,
     failBurnsMaterials: burnsOnFail(recipe),
-    complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+    // 323: множитель выключен — надбавка за осложнения аддитивная (ниже).
+    complicationDurationMultiplier: 1,
     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
     rollCD: ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
     spend: (plan) => {
@@ -220,15 +260,30 @@ export const craftRecipe = (recipeId, ports = {}) => {
     }),
   });
 
-  // Время (патч 262): любая работа, дошедшая до проверки, идёт по часам —
-  // и удачная, и сорванная (провал = зря потраченный час). Отказ гейта или
-  // стора — бросок не делался, время не тратится. Осложнение домножает.
+  // Время (патч 262; книга — 323): любая работа, дошедшая до проверки, идёт
+  // по часам — и удачная, и сорванная (провал = зря потраченное время). Отказ
+  // гейта или стора — бросок не делался, время не тратится. Осложнение —
+  // аддитивно: база + (число осложнений × надбавка: +30 мин, станция +10).
+  // deferTime (323): время НЕ списывается сразу — окно спросит про 2 ОД
+  // (успех можно сократить вдвое) и спишет через settleCraftTime.
   let timed = null;
   if (result.done === true || result.stage === 'check') {
-    const minutes = craftMinutesForRecipe(recipe);
-    const durationMultiplier = result.durationMultiplier ?? 1;
-    timed = applyActivityMinutes(minutes * durationMultiplier, `craft:${recipe.category ?? 'any'}`);
-    result.time = { minutes, durationMultiplier };
+    const baseMinutes = craftMinutesForRecipe(recipe);
+    const complicationMinutes = (result.check?.complicationCount ?? 0)
+      * complicationExtraMinutesFor(recipe);
+    const minutes = baseMinutes + complicationMinutes;
+    if (deferTime) {
+      result.time = {
+        minutes,
+        baseMinutes,
+        complicationMinutes,
+        durationMultiplier: 1,
+        pending: true,
+      };
+    } else {
+      timed = applyActivityMinutes(minutes, `craft:${recipe.category ?? 'any'}`);
+      result.time = { minutes, durationMultiplier: 1 };
+    }
   }
   if (timed) result.survival = timed;
 
@@ -236,6 +291,7 @@ export const craftRecipe = (recipeId, ports = {}) => {
     result.spent = expandedSpend;
     if (Array.isArray(result.burned) && result.burned.length > 0) result.burned = expandedSpend;
   }
+
 
   debugLog('crafting.craft', {
     recipeId,

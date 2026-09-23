@@ -18,7 +18,9 @@ import {
   buildCraftReport,
   craftDict,
   craftFormat,
+  formatCraftMinutes,
 } from '../../../crafting/windowModel';
+import { settleCraftTime } from '../../../crafting/operations';
 
 // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
 const CATEGORY_ICONS = {
@@ -52,6 +54,7 @@ export default function CraftingModal({ visible, onClose }) {
   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
   const [qty, setQty] = useState(1);
   const [report, setReport] = useState(null);
+  const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
 
   const d = useMemo(() => (visible ? craftDict() : null), [visible]);
@@ -87,10 +90,18 @@ export default function CraftingModal({ visible, onClose }) {
   };
 
   const create = (row, count) => {
-    const run = craftBatch(row.recipeId, count);
+    // 323: время откладывается — окно спросит про 2 ОД после успеха.
+    const run = craftBatch(row.recipeId, count, { deferTime: true });
+    const rep = buildCraftReport(row.recipeId, run);
+    let settled = null;
+    if (rep.pendingTime && !rep.pendingTime.hasSuccess) {
+      // успехов нет — решение об ОД не требуется, время списывается целиком.
+      settled = settleCraftTime(row.recipeId, run, { spendActionPoints: false });
+    }
     setQtyTarget(null);
     setOpenId(null);
-    setReport(buildCraftReport(row.recipeId, run));
+    setSettledTime(settled);
+    setReport({ ...rep, run }); // run — для решения про 2 ОД (323)
   };
   // Решение владельца (318): можно сделать больше одной — спросить количество
   // отдельным окном (по умолчанию 1); одна — создать сразу.
@@ -104,7 +115,15 @@ export default function CraftingModal({ visible, onClose }) {
   };
   const finishReport = () => {
     setReport(null);
+    setSettledTime(null);
     setRefresh((tick) => tick + 1); // материалы ушли — модель пересобирается
+  };
+
+  // Решение владельца (323): ОД — групповой ресурс будущего мастера; сейчас
+  // выбор да/нет: «да» — время успеха вдвое, «нет» — полное по правилам.
+  const settleTimeDecision = (spendActionPoints) => {
+    const settled = settleCraftTime(report.recipeId, report.run, { spendActionPoints });
+    setSettledTime(settled);
   };
 
   const headerTitle = report
@@ -234,7 +253,33 @@ export default function CraftingModal({ visible, onClose }) {
                 {report.lines.map((line, i) => (
                   <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
                 ))}
+                {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
+                {settledTime && (
+                  <Text style={styles.resultLine}>
+                    {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
+                      + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
+                  </Text>
+                )}
               </View>
+
+              {report.pendingTime && settledTime === null && (
+                <View style={styles.apBox}>
+                  <Text style={styles.apQuestion}>{ui.apQuestion ?? ''}</Text>
+                  <View style={styles.qtyActions}>
+                    <TouchableOpacity
+                      style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+                      onPress={() => settleTimeDecision(true)}>
+                      <Text style={styles.bigCraftText}>{ui.apYes ?? ''}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.qtyCancel}
+                      onPress={() => settleTimeDecision(false)}>
+                      <Text style={styles.qtyCancelText}>{ui.apNo ?? ''}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
               <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
                 <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
               </TouchableOpacity>
