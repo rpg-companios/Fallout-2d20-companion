@@ -15,6 +15,9 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
+// Окно «Что нового» (патч 321): /version.json + чейнджлог с галочкой
+// «больше не показывать» (логика — src/utils/appVersion.js).
+import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
 // Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
 // с AlertHost; движок лишь рендерит, правила внутри модуля.
 import SurvivalClock from './modules/fallout/survival/SurvivalClock';
@@ -293,6 +296,7 @@ function App() {
           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
           <FusionCoreChoiceModal />
           <AlertHost />
+          <UpdateNoticeModal />
           <SurvivalClock />
       </SafeAreaProvider>
     </PaperProvider>

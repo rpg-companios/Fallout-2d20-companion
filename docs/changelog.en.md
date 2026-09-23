@@ -2,7 +2,25 @@
 
 ---
 
-## PWA — installation and long-installed app updates fixed (patch 320)
+## Update system: the app announces new versions and shows a changelog (patch 321)
+
+Owner's word: "the app should knock on the server, ask if there's an
+update, download it and show a changelog with a 'don't show again'
+checkbox".
+
+- A version file now lives next to the app: `version.json` (patch number +
+  2–4 changelog lines ru/en). Updated in the same patch as the journals.
+- On every launch the app reads the file always fresh; if the version is
+  newer than the one remembered on the device — a "What's new" window
+  appears.
+- The "Don't show again" checkbox remembers the version; without the
+  checkbox the window returns on the next launch. The update itself
+  downloads automatically (that already worked) — a user who sees the
+  window is already on the fresh version.
+- Fuse: acceptance test (patch 321) — the version file, show/hide logic,
+  device memory, resilience to bad network, and the window's wiring.
+
+## PWA — installation and long-installed app updates fixed (patch 320)## PWA — installation and long-installed app updates fixed (patch 320)
 
 Owner's word: "can't install from Yandex or Mi browser; it used to create
 a shortcut" and "many can't update their old PWAs".
