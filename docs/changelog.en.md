@@ -2,6 +2,22 @@
 
 ---
 
+## PWA — installation and long-installed app updates fixed (patch 320)
+
+Owner's word: "can't install from Yandex or Mi browser; it used to create
+a shortcut" and "many can't update their old PWAs".
+
+- Installation: the manifest now has a real 192×192 PNG icon (previously
+  only an SVG, which browsers don't count as an install icon) — the
+  Chromium install criterion is met again, the "Install" button returns.
+- Stuck updates: for some long-time users an old service worker served a
+  cached old version for years and never woke up (its file never changed).
+  The file is changed on purpose — the worker reinstalls, unregisters
+  itself and clears the caches; the next launch of a stuck client fetches
+  the fresh app (the "STR above 10" fix will finally reach them).
+- Fuse: acceptance test (patch 320) — icons are real PNGs of the required
+  sizes, the manifest is installable, the worker wake-up is in place.
+
 ## Crafting — the "Craft" button now opens the crafting window (patch 319)
 
 Behavior fix (the owner asked: "did you wire the modal to the button?" —
