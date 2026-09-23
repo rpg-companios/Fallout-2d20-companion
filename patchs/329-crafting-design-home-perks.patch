@@ -1,0 +1,346 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 903f2d6..4bb261f 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **328** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–328 уехали, установка не подтверждена;
++· последний сданный патч: **329** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–329 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -95,6 +95,14 @@
+   материалы» (MATERIALS_BY_COMPLEXITY в генераторе, кап 7+) сверена с
+   таблицей владельца — совпадает; выписана в CRAFTING-MAPPING.md (раздел
+   порождается генератором, руками не править).
++- 329 — дизайн окна крафта (слово владельца): фон окна категорий —
++  assets/bg.png (opacity 0.3, как экраны сеттинга); квадраты — как области
++  home screen (#111827 + рамка #d4af37, подпись #f0e68c); спойлеры рецептов —
++  карточки как в модалке перков (рамка #ddd, радиус 6, отступы);
++  доступные — светлые, недоступные по перку/рангу — серые (#f1f5f9, имя
++  #9aa1a9); доступность материалов — в скобках у названия («можно создать» /
++  «не хватает материалов» / «нужен перк»); сложность/навык/время — внутри
++  спойлера первой строкой.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 024839c..e48f41f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Rarity, capacity and item are independent (patch 328)
++## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
++
++Owner's design word: the categories window gets the setting windows'
++background, category areas styled like the home screen, spoilers as neat
++cards like the perks modal; availability by color and in parentheses.
++
++- The categories window now sits on the setting windows' background image
++  (assets/bg.png, dimmed like the Gear/Character screens).
++- Category tiles match the home-screen areas: dark panel, gold border,
++  rounded corners; warm-gold label, grey counter.
++- Recipe spoilers are cards modeled on the perks modal: border, radius,
++  padding, separator before the body — no more solid sheets.
++- An available recipe is a light card; perk/rank-locked is grey (grey name
++  too). Material availability sits next to the name in parentheses:
++  "(can craft)" / "(missing materials)" / "(needs a perk)".
++- Complexity, skill and cooking time moved inside the spoiler (first line);
++  the full missing-perk text is there as well.
++
++## ## Rarity, capacity and item are independent (patch 328)
+ 
+ Owner's clarification to the armor-mods table (327), recorded in
+ `docs/reference-data/armor-mods-crafting.md` (section 1.1). The app is
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 7fad639..dda3bc8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Редкость, ёмкость и предмет — независимы (патч 328)
++## Окно крафта — фон сеттинга, квадраты как дома, спойлеры-карточки (патч 329)
++
++Слово владельца о дизайне: общее окно категорий — с фоном окон сеттинга,
++области категорий — как на home screen, спойлеры — аккуратные карточки
++как у перков; доступность — цветом и в скобках у названия.
++
++- Окно категорий теперь на фоновом изображении окон сеттинга
++  (assets/bg.png, приглушено, как на экранах Снаряжения/Персонажа).
++- Квадраты категорий оформлены как области home screen: тёмная панель с
++  золотой рамкой и скруглением; подпись — тёпло-золотая, счётчик — серый.
++- Спойлеры рецептов — карточки по образцу модалки перков: рамка, скругление,
++  отступы, разделитель перед содержимым — не сплошное полотно.
++- Доступный рецепт — светлая карточка, недоступный по перку/рангу — серая
++  (и имя серое). Доступность материалов — рядом с названием в скобках:
++  «(можно создать)» / «(не хватает материалов)» / «(нужен перк)».
++- Сложность, навык и время приготовления переехали внутрь спойлера
++  (первой строкой); полный текст недостающего перка — тоже там.
++
++## ## Редкость, ёмкость и предмет — независимы (патч 328)
+ 
+ Уточнение владельца к таблице модов брони (327), записано в справочник
+ `docs/reference-data/armor-mods-crafting.md` (раздел 1.1). Приложение не
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index 714b38f..4e2f5da 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -30,8 +30,8 @@
+     "timeHours": "{n} hr",
+     "timeDays": "{n} d",
+     "needPerk": "Needs perk \"{perk}\" rank {rank}",
+-    "shortMaterials": "Missing materials",
+-    "ready": "Ready",
++    "shortMaterials": "missing materials",
++    "ready": "can craft",
+     "materialsTitle": "Materials",
+     "haveNeed": "have {have} · need {need}",
+     "quantity": "Attempts",
+@@ -55,7 +55,8 @@
+     "apYes": "Spend 2 AP",
+     "apNo": "Full time",
+     "apHalvedNote": "Time halved for 2 AP",
+-    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)"
++    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)",
++    "perkShort": "needs a perk"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index e2fc18a..c1bfd59 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -30,8 +30,8 @@
+     "timeHours": "{n} ч",
+     "timeDays": "{n} сут",
+     "needPerk": "Нужен перк «{perk}», ранг {rank}",
+-    "shortMaterials": "Не хватает материалов",
+-    "ready": "Можно крафтить",
++    "shortMaterials": "не хватает материалов",
++    "ready": "можно создать",
+     "materialsTitle": "Материалы",
+     "haveNeed": "есть {have} шт. · нужно {need} шт.",
+     "quantity": "Сколько раз",
+@@ -55,7 +55,8 @@
+     "apYes": "Потратить 2 ОД",
+     "apNo": "Полное время",
+     "apHalvedNote": "Время сокращено за 2 ОД",
+-    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
++    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)",
++    "perkShort": "нужен перк"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index 0abdeae..fb51427 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -8,9 +8,12 @@
+ // здесь только кнопки, списки и иконки квадратов.
+ 
+ import React, { useMemo, useState } from 'react';
+-import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
++import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView, ImageBackground } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import styles from '../../../styles/CraftingModal.styles';
++// 329 (слово владельца): фон окна категорий — фоновое изображение окон
++// сеттинга (как на экранах Снаряжения/Персонажа, opacity 0.3).
++const BG_IMAGE = require('../../../../../assets/bg.png');
+ import {
+   buildCraftTiles,
+   buildCategoryModel,
+@@ -151,6 +154,7 @@ export default function CraftingModal({ visible, onClose }) {
+           </View>
+ 
+           {!report && view === 'categories' && (
++            <ImageBackground source={BG_IMAGE} style={styles.bg} imageStyle={styles.bgImage}>
+             <ScrollView style={styles.body} contentContainerStyle={styles.tilesContent}>
+               {/* Патч 322: строки по 3 квадрата, прокрутка (владелец: окно на ПК
+                   не прокручивалось). Выравнивание остатка строки: одинокая — по
+@@ -180,6 +184,7 @@ export default function CraftingModal({ visible, onClose }) {
+                 <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
+               </TouchableOpacity>
+             </ScrollView>
++            </ImageBackground>
+           )}
+ 
+           {!report && view === 'category' && (
+@@ -190,27 +195,37 @@ export default function CraftingModal({ visible, onClose }) {
+               ListEmptyComponent={<Text style={styles.empty}>{ui.emptyCategory ?? '—'}</Text>}
+               renderItem={({ item }) => {
+                 const expanded = item.recipeId === openId;
++                // 329 (слово владельца): доступные — светлые, недоступные по
++                // перку/рангу — серые; доступность материалов — в скобках
++                // рядом с названием; сложность/навык/время — внутри спойлера.
++                const perkLocked = item.status === 'missing-perk';
++                const note = item.canCraft
++                  ? (ui.ready ?? '')
++                  : perkLocked ? (ui.perkShort ?? '') : (ui.shortMaterials ?? '');
+                 return (
+-                  <View style={[styles.row, !item.canCraft && styles.rowDisabled]}>
++                  <View style={[styles.row, perkLocked && styles.rowDisabled]}>
+                     <TouchableOpacity
+                       style={styles.spoilerHead}
+                       onPress={() => setOpenId(expanded ? null : item.recipeId)}>
+                       <View style={styles.rowTop}>
+-                        <Text style={[styles.rowName, item.canCraft && styles.rowNameReady]}>
++                        <Text style={[styles.rowName, perkLocked && styles.rowNameLocked]} numberOfLines={2}>
+                           {item.outputName}
+                         </Text>
++                        {/* 326: никаких сводок по видам — счётчики штук на строках материалов */}
++                        <Text style={[
++                          styles.rowNote,
++                          item.canCraft ? styles.rowNoteOk : perkLocked ? styles.rowNoteLocked : styles.rowNoteBad,
++                        ]}>
++                          ({note})
++                        </Text>
+                         <Text style={styles.spoilerArrow}>{expanded ? '▾' : '▸'}</Text>
+                       </View>
+-                      <Text style={styles.rowMeta}>{item.metaLine}</Text>
+-                      <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
+-                        {/* 326 (слово владельца): никаких сводок по видам —
+-                            счётчики штук живут на строках материалов. */}
+-                        {item.canCraft ? (ui.ready ?? '') : (item.reason || '')}
+-                      </Text>
+                     </TouchableOpacity>
+ 
+                     {expanded && (
+                       <View style={styles.spoilerBody}>
++                        <Text style={styles.rowMeta}>{item.metaLine}</Text>
++                        {perkLocked && <Text style={styles.rowReason}>{item.reason}</Text>}
+                         <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
+                         {item.materialGroups.map((group) => (
+                           <View key={group.type}>
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index 0c47ed5..5607bb1 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -1,6 +1,10 @@
+-// Стили модалки крафта (редизайн, патч 318: квадраты категорий, спойлеры
+-// рецептов, окно количества). Тёмная тема по образцу остальных модалок
+-// инвентаря; отдельных палитр не заводим — цвета редкостей придут своим слоем.
++// Стили модалки крафта (318: квадраты категорий, спойлеры; 325 — светлая
++// гамма; 329 — слово владельца: фон окна категорий = фон окон сеттинга
++// (assets/bg.png), квадраты — как области home screen (тёмная панель с
++// золотой рамкой), спойлеры рецептов — карточки по образцу модалки перков
++// (рамка, отступы, не сплошное полотно); доступные рецепты — светлые,
++// недоступные по перку/рангу — серые; доступность материалов — в скобках
++// рядом с названием; сложность/навык/время — внутри спойлера).
+ import { StyleSheet } from 'react-native';
+ 
+ export default StyleSheet.create({
+@@ -12,7 +16,11 @@ export default StyleSheet.create({
+   closeText: { color: '#444', fontSize: 20, paddingHorizontal: 8 },
+   backText: { color: '#444', fontSize: 14, paddingRight: 8 },
+ 
+-  // Квадраты категорий (318; 322 — прокрутка, строки по 3, выравнивание от центра)
++  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга
++  // и оформление областей как у home screen: folderCell — тёмная панель,
++  // золотая рамка, скругление 8)
++  bg: { flex: 1 },
++  bgImage: { opacity: 0.3 }, // как на экранах сеттинга (WeaponsAndArmor)
+   body: { flex: 1, paddingHorizontal: 12 },
+   tilesContent: { paddingBottom: 8 },
+   tileRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+@@ -21,19 +29,19 @@ export default StyleSheet.create({
+   tile: {
+     width: '30%',
+     aspectRatio: 1,
+-    borderRadius: 12,
+-    backgroundColor: '#fff',
++    borderRadius: 8,
++    backgroundColor: '#111827',
+     borderWidth: 1,
+-    borderColor: '#ddd',
++    borderColor: '#d4af37',
+     alignItems: 'center',
+     justifyContent: 'center',
+     gap: 6,
+     padding: 4,
+   },
+   tileIcon: { fontSize: 38, color: '#fff' },
+-  tileLabel: { color: '#000', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+-  tileCount: { color: '#16a34a', fontSize: 11 },
+-  tileCountZero: { color: '#777' },
++  tileLabel: { color: '#f0e68c', fontSize: 13, fontWeight: '600', textAlign: 'center' },
++  tileCount: { color: '#d1d5db', fontSize: 11 },
++  tileCountZero: { color: '#6b7280' },
+   closeBtn: {
+     backgroundColor: '#f1f5f9',
+     borderRadius: 10,
+@@ -44,19 +52,37 @@ export default StyleSheet.create({
+   },
+   closeBtnText: { color: '#444', fontSize: 15, fontWeight: '600' },
+ 
+-  // Список рецептов-спойлеров (318): доступные белые, недоступные серые
++  // Список рецептов (329): карточки-спойлеры по образцу модалки перков —
++  // рамка #ddd, скругление 6, отступы; доступные — светлые (белые),
++  // недоступные по перку/рангу — серые (#f1f5f9), материалы — текстом
++  // в скобках рядом с названием. Сложность/навык/время — внутри спойлера.
+   list: { flex: 1, paddingHorizontal: 12 },
+-  row: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
+-  rowDisabled: { backgroundColor: '#f1f5f9' },
+-  spoilerHead: { },
++  row: {
++    borderWidth: 1,
++    borderColor: '#ddd',
++    borderRadius: 6,
++    marginBottom: 8,
++    backgroundColor: '#fff',
++  },
++  rowDisabled: { backgroundColor: '#f1f5f9' }, // недоступен по перку/рангу
++  spoilerHead: { paddingHorizontal: 10, paddingVertical: 10 },
+   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+-  rowName: { color: '#000', fontSize: 15, fontWeight: '600', flex: 1 },
+-  rowNameReady: { color: '#000' },
++  rowName: { color: '#000', fontSize: 15, fontWeight: 'bold', flex: 1, flexShrink: 1 },
++  rowNameLocked: { color: '#9aa1a9' }, // серое имя как perkNameDisabled
++  rowNote: { fontSize: 12, flexShrink: 0 },
++  rowNoteOk: { color: '#16a34a' }, // «(можно создать)»
++  rowNoteBad: { color: '#dc2626' }, // «(не хватает материалов)»
++  rowNoteLocked: { color: '#9aa1a9' }, // «(нужен перк)»
+   spoilerArrow: { color: '#777', fontSize: 14 },
+-  rowMeta: { color: '#777', fontSize: 12, marginTop: 2 },
+-  rowReason: { color: '#dc2626', fontSize: 12, marginTop: 2 },
+-  rowReady: { color: '#16a34a', fontSize: 12, marginTop: 2 },
+-  spoilerBody: { paddingTop: 8 },
++  rowMeta: { color: '#777', fontSize: 12, marginBottom: 6 },
++  rowReason: { color: '#dc2626', fontSize: 12, marginBottom: 6 },
++  spoilerBody: {
++    paddingHorizontal: 10,
++    paddingBottom: 10,
++    paddingTop: 8,
++    borderTopWidth: 1,
++    borderTopColor: '#ddd',
++  },
+   detailLabel: { color: '#777', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
+   rarityLine: { color: '#444', fontSize: 12, fontWeight: '700', marginTop: 6 },
+   // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
+diff --git a/public/version.json b/public/version.json
+index dffc8ee..b51ccd8 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "328",
++  "version": "329",
+   "notes": {
+     "ru-RU": [
+-      "Крафт модов: записаны правила владельца — редкость рецепта, ёмкость и редкость предмета независимы"
++      "Крафт: фон окна категорий как у окон сеттинга, квадраты как на главном экране, спойлеры-карточки как у перков"
+     ],
+     "en-EN": [
+-      "Mod crafting: owner's rules recorded — recipe rarity, capacity and item rarity are independent"
++      "Crafting: setting-window background, home-screen style tiles, perk-style spoiler cards"
+     ]
+   }
+ }
