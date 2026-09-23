@@ -2,6 +2,19 @@
 
 ---
 
+## Work memory — a "where we are now" file for AI agents (patch 315)
+
+Owner's word: learn to remember what's done and what the app consists
+of, so the agent doesn't walk the whole tree over every question.
+
+- `docs/agents/state.md` — read FIRST: a snapshot of the current state
+  (latest patch, what the owner has applied), the app's composition in
+  game terms (heroes, screens, robots, weapons/mods/variants, misc),
+  the latest series in brief, open questions, lessons learned.
+- Maintenance rule — updated IN THE SAME PATCH as the change (2–3
+  lines); the `docs/agents/README.md` map lists the snapshot as step
+  zero of the reading order.
+
 ## Data — robot weapons that ARE human weapons: full variants, stats only from the base (patch 314)
 
 Owner's word: "a robot weapon that's a human weapon is 100% the human
