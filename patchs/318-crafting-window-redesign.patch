@@ -1,0 +1,909 @@
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+new file mode 100644
+index 0000000..d05eb38
+--- /dev/null
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -0,0 +1,103 @@
++// ПРИЁМОЧНЫЙ (патч 318): редизайн окна крафта — квадраты категорий (все 8,
++// даже без рецептов), списки-спойлеры, сводка материалов по редкости
++// (обычные/необычные/редкие — только требуемые типы), максимальная партия.
++// Механика (гейты перков, подсчёт сумки) — движок 251, не менялся.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  CRAFT_CATEGORIES,
++  buildCraftTiles,
++  buildCategoryModel,
++  craftDict,
++} from '../../modules/fallout/crafting/windowModel';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const seedStack = (itemId, quantity, extra = {}) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++      weaponId: itemId, quantity, ...extra,
++    } },
++  }));
++};
++
++describe('Модалка крафта (318): квадраты, спойлеры, редкость материалов', () => {
++  it('восемь квадратов в порядке владельца, включая пустые данными', () => {
++    expect(CRAFT_CATEGORIES).toEqual([
++      'food', 'drinks', 'chems', 'explosives', 'weapons', 'armor', 'powerArmor', 'ammo',
++    ]);
++    const tiles = buildCraftTiles();
++    expect(tiles.map((t) => t.category)).toEqual(CRAFT_CATEGORIES);
++    const byId = new Map(tiles.map((t) => [t.category, t]));
++    expect(byId.get('ammo').recipes).toBe(28);
++    expect(byId.get('food').recipes).toBe(27);
++    // пустых данных квадраты видны, но рецептов внутри нет
++    for (const empty of ['explosives', 'armor', 'powerArmor']) {
++      expect(byId.get(empty).recipes).toBe(0);
++      expect(buildCategoryModel(empty)).toEqual([]);
++    }
++  });
++
++  it('ammo_38: сводка редкости, максимальная партия, гейт перка', () => {
++    seedStack('item_common_materials', 10);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 5, total: 5 } },
++    }));
++
++    const row = buildCategoryModel('ammo').find((r) => r.recipeId === 'ammo_38');
++    expect(row).toBeTruthy();
++    expect(row.canCraft).toBe(true);
++    expect(row.maxCraft).toBe(5); // 10 обычных материалов по 2 на попытку
++    expect(row.materials[0].rarity).toBe('common');
++    expect(row.materialGroups).toEqual([{ type: 'common', have: 1, total: 1 }]);
++
++    // без перка — спойлер серый: причина «нужен перк» с рангом
++    useCharacterStore.setState({ selectedPerks: [] });
++    const blocked = buildCategoryModel('ammo').find((r) => r.recipeId === 'ammo_38');
++    expect(blocked.canCraft).toBe(false);
++    expect(blocked.status).toBe('missing-perk');
++    expect(String(blocked.reason)).toContain('1');
++  });
++
++  it('ингредиент вне материалов (мясо) — без редкости и без сводки', () => {
++    const row = buildCategoryModel('food').find((r) => r.recipeId === 'food_grilled_bloatfly');
++    expect(row).toBeTruthy();
++    expect(row.materials.length).toBeGreaterThan(0);
++    expect(row.materials[0].rarity).toBeNull();
++    expect(row.materialGroups).toEqual([]);
++  });
++
++  it('словарь редкости и окна количества на месте (ru-файл; ключи — в активной локали)', () => {
++    const ui = craftDict().ui;
++    // активная локаль в тестах может быть любой — проверяем структуру словаря
++    for (const key of ['create', 'close', 'emptyCategory', 'qtyPrompt', 'cancel',
++      'rarityCommon', 'rarityUncommon', 'rarityRare', 'components']) {
++      expect(typeof ui[key]).toBe('string');
++      expect(ui[key].length).toBeGreaterThan(0);
++    }
++    expect(ui.qtyPrompt).toContain('{max}');
++    expect(ui.qtyPrompt).toContain('{name}');
++    // русские формулировки — слово владельца (318)
++    const ru = require('../../modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json');
++    expect(ru.ui.create).toBe('Создать');
++    expect(ru.ui.close).toBe('Закрыть');
++    expect(ru.ui.rarityCommon).toBe('Обычные материалы');
++    expect(ru.ui.rarityUncommon).toBe('Необычные материалы');
++    expect(ru.ui.rarityRare).toBe('Редкие материалы');
++    expect(ru.ui.qtyPrompt).toBe('Вы можете создать {max} «{name}», сколько штук вы хотите создать?');
++    expect(ru.categoryNames.powerArmor).toBe('Силовая броня');
++    expect(ru.categoryNames.explosives).toBe('Взрывчатка');
++    expect(ru.categoryNames.ammo).toBe('Патроны');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 8645f04..c40ac57 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **317** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–317 уехали, установка не подтверждена).
++· последний сданный патч: **318** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–318 уехали, установка не подтверждена).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -30,9 +30,14 @@
+   Огнемёт Мистера Помощника = Огнемёт и т.д.). Моды: единая правда — список
+   id на экземпляре (311); заводские моды записи (`modIds`, 312 — Авто-10мм
+   с авто-ресивером); списание зарядов за выстрел (296/298).
+-- **Прочее.** Крафт и разбор хлама, выживание (голод/жажда/сон через
+-  расширение состояния), локали ru/en, PWA (обновление по кнопке),
+-  премиум-статус приложения.
++- **Прочее.** Крафт: из инвентаря — окно с квадратами категорий (еда,
++  напитки, препараты, взрывчатка, оружие, броня, силовая броня, патроны;
++  пустые данными видны), рецепты-спойлеры (доступные белые, недоступные
++  серые; внутри — материалы по редкости обычные/необычные/редкие и кнопка
++  «Создать»; если можно больше одной — окно «сколько штук», по умолчанию 1),
++  крафт с проверкой навыка и отчётом; «Назад» — к квадратам, «Закрыть» —
++  в инвентарь. Разбор хлама, выживание (голод/жажда/сон через расширение
++  состояния), локали ru/en, PWA (обновление по кнопке), премиум-статус.
+ 
+ ## Последняя серия (311–317, моды оружия → каскад МК-3)
+ 
+@@ -51,6 +56,9 @@
+ - 317 — МК-3 шаг 2: хранилище пересчитывает производные само после любого
+   изменения входов (каскад); 26 ручных вызовов удалены; поведение без
+   изменений.
++- 318 — новое окно крафта: квадраты категорий (8, пустые видны), рецепты-
++  спойлеры с материалами по редкости, окно «сколько штук», «Назад»/«Закрыть»;
++  механика (гейты, проверка навыка, отчёт) не менялась.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ed3e764..7d25745 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,28 @@
+ 
+ ---
+ 
++## Crafting — new window: category tiles, recipe spoilers, quantity picker (patch 318)
++
++Owner's word: a pleasant one — a convenient crafting window instead of
++bench tabs. Mechanics unchanged: same perk gates, bag counting, skill check
++and report (format of 265).
++
++- The "Craft" button in inventory opens a tile window: food, drinks, chems,
++  explosives, weapons, armor, power armor, ammo (owner's decision — the
++  8th tile). Each tile has an icon and an "available/total" counter.
++- A tile opens a list of recipe spoilers: unavailable gray, available white.
++  Inside a spoiler — materials by rarity (common/uncommon/rare, only
++  required types, each with "have · need") and a "Create" button.
++- If materials suffice for more than one — a separate window before
++  creation: "You can craft N „item". How many?" with − and + (default 1).
++- "Back" top-left returns to the tiles from any category; "Close" at the
++  bottom of the tile window returns to inventory. Any number of different
++  items can be crafted in one visit.
++- Categories without recipes (explosives, armor, power armor) are visible
++  with a "no recipes yet" note — they fill in as recipes arrive.
++- Fuse: acceptance test (patch 318) — tiles and order, material rarity on
++  ammo_38, perk gate, batch size, dictionary.
++
+ ## MK-3, step 2 — the store recalculates derived stats itself, manual calls are gone (patch 317)
+ 
+ Continuation of the "cascade into the store". Nothing changes for the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6389f1d..0be5a00 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,28 @@
+ 
+ ---
+ 
++## Крафт — новое окно: квадраты категорий, спойлеры рецептов, выбор количества (патч 318)
++
++Слово владельца: приятности — удобное окно крафта вместо вкладок-верстаков.
++Механика не менялась: те же гейты по перкам, подсчёт сумки, проверка навыка
++и отчёт (формат 265).
++
++- Кнопка «Крафт» в инвентаре открывает окно квадратов: еда, напитки,
++  препараты, взрывчатка, оружие, броня, силовая броня, патроны (решение
++  владельца — 8-й квадрат). У каждой — иконка и счётчик «доступно/всего».
++- Квадрат открывает список рецептов-спойлеров: недоступные серые, доступные
++  белые. Внутри спойлера — материалы по редкости (обычные/необычные/редкие,
++  только требуемые типы, у каждого «есть · нужно») и кнопка «Создать».
++- Если материалов хватает больше чем на одну штуку — перед созданием окно
++  «Вы можете создать N „предмет", сколько штук?» с − и + (по умолчанию 1).
++- «Назад» слева сверху — к квадратам из любой категории; «Закрыть» внизу
++  окна квадратов — в инвентарь. За один заход можно скрафтить сколько
++  угодно разных предметов.
++- Категории без рецептов (взрывчатка, броня, силовая броня) видны с пометкой
++  «рецептов пока нет» — заполнятся данными, когда появятся рецепты.
++- Предохранитель: приёмочный тест (патч 318) — квадраты и порядок, редкость
++  материалов на ammo_38, гейт перка, партия, словарь.
++
+ ## МК-3, шаг 2 — хранилище само пересчитывает производные, ручные вызовы умерли (патч 317)
+ 
+ Продолжение «каскада в хранилище». Для игрока — ничего не поменялось,
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 918aef5..bda3a69 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -12,7 +12,7 @@
+ // сумки попытки останавливаются, остальные не начинаются.
+ 
+ import useCharacterStore from '../../../src/store/characterStore';
+-import { getCraftingCategories, getCraftingRecipeById, getCraftingRecipes } from '../../../domain/registry';
++import { getCraftingRecipeById, getCraftingRecipes, getScrapMaterials } from '../../../domain/registry';
+ import { findCatalogEntry } from '../../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+ import { getCurrentModuleLocale } from '../../../i18n/locale';
+@@ -25,13 +25,37 @@ import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
+ import { craftMinutesForRecipe, craftRecipe, craftingPreview } from './operations';
+ import { CRAFT_RULES } from './rules';
+ 
+-// Порядок вкладок = категории манифеста рецептов (реформа 269): верстаков в
+-// данных нет, файл-раздел и есть категория. Движок категорий не знает.
++// Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
++// взрывчатка, оружие, броня, силовая броня + патроны (решение владельца —
++// 8-й квадрат). Пустые данными категории квадратами ВИДНЫ («рецептов пока
++// нет»); верстаков в данных нет, файл-раздел и есть категория (реформа 269).
++export const CRAFT_CATEGORIES = [
++  'food', 'drinks', 'chems', 'explosives', 'weapons', 'armor', 'powerArmor', 'ammo',
++];
++
++// Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
++// Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
++// (мясо и пр.) редкости не имеют и в сводку не попадают.
++const RARITY_TYPES = ['common', 'uncommon', 'rare'];
++
++let materialTypeById = null;
++const materialRarityOf = (itemId) => {
++  if (!materialTypeById) {
++    materialTypeById = new Map(
++      getScrapMaterials().map((m) => [m.id, m.materialType || null]),
++    );
++  }
++  return materialTypeById.get(itemId) ?? null;
++};
+ 
+ const dict = () => (getCurrentModuleLocale() === 'en-EN' ? enDict : ruDict);
+ const fmt = (template, params = {}) =>
+   String(template).replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? `{${key}}`));
+ 
++// Модалка (318) берёт словарь и форматирование строк отсюда — единственный дом строк.
++export const craftDict = () => dict();
++export const craftFormat = fmt;
++
+ const perkName = (id) => {
+   const perks = getCurrentModuleLocale() === 'en-EN' ? enPerks : ruPerks;
+   return perks.find((p) => p.id === id)?.name || id;
+@@ -63,24 +87,19 @@ export const formatCraftMinutes = (minutes) => {
+ };
+ 
+ /**
+- * Строк на вкладку верстака: что получится, чем, сколько это времени,
++ * Строки одной категории-квадрата: что получится, чем, сколько это времени,
+  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
+  * дефицитному материалу; для «можно» строк он ≥ 1.
++ * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
++ * сводка «сколько видов материала доступно / требуется» по обычным,
++ * необычным и редким (не требуемые типы в сводку не попадают).
+  */
+-export const buildCraftModel = () => {
++const buildRowsForCategory = (category) => {
+   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
+   const d = dict().ui;
+-  const labels = dict();
+-  const groups = getCraftingCategories()
+-    .map((category) => ({
+-      category,
+-      label: labels.categoryNames?.[category] ?? category,
+-      rows: [],
+-    }));
+-  const byCategory = new Map(groups.map((g) => [g.category, g]));
++  const rows = [];
+   for (const recipe of getCraftingRecipes()) {
+-    const group = byCategory.get(recipe.category);
+-    if (!group) continue; // категория вне манифеста — не выдумываем
++    if (recipe.category !== category) continue;
+     const { evaluation } = craftingPreview(recipe.id);
+     const missingPerk = evaluation.blocked.find((b) => b.code === 'missing-perk');
+     const status = evaluation.ready ? 'ready' : missingPerk ? 'missing-perk' : 'missing-material';
+@@ -88,7 +107,16 @@ export const buildCraftModel = () => {
+     const maxCraft = evaluation.ready
+       ? evaluation.materials.reduce((acc, row) => Math.min(acc, Math.floor(row.have / row.need)), Infinity)
+       : 0;
+-    group.rows.push({
++    const materials = evaluation.materials.map((row) => ({
++      itemId: row.itemId,
++      name: itemName(catalog, row.itemId, null),
++      rarity: materialRarityOf(row.itemId),
++      need: row.need,
++      have: row.have,
++      enough: row.enough,
++      haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
++    }));
++    rows.push({
+       recipeId: recipe.id,
+       category: recipe.category,
+       // id рецепта = id предмета результата (269): «output» в данных нет.
+@@ -107,14 +135,15 @@ export const buildCraftModel = () => {
+       reason: missingPerk
+         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
+         : status === 'missing-material' ? d.shortMaterials : null,
+-      materials: evaluation.materials.map((row) => ({
+-        itemId: row.itemId,
+-        name: itemName(catalog, row.itemId, null),
+-        need: row.need,
+-        have: row.have,
+-        enough: row.enough,
+-        haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
+-      })),
++      materials,
++      materialGroups: RARITY_TYPES
++        .map((type) => {
++          const group = materials.filter((m) => m.rarity === type);
++          return group.length
++            ? { type, have: group.filter((m) => m.enough).length, total: group.length }
++            : null;
++        })
++        .filter(Boolean),
+       labels: {
+         materialsTitle: d.materialsTitle,
+         craft: d.craft,
+@@ -124,9 +153,26 @@ export const buildCraftModel = () => {
+       },
+     });
+   }
+-  return groups.filter((g) => g.rows.length > 0);
++  return rows;
++};
++
++/** Квадраты категорий (318): все 8 — даже те, у кого рецептов пока нет. */
++export const buildCraftTiles = () => {
++  const labels = dict();
++  return CRAFT_CATEGORIES.map((category) => {
++    const rows = buildRowsForCategory(category);
++    return {
++      category,
++      label: labels.categoryNames?.[category] ?? category,
++      recipes: rows.length,
++      available: rows.filter((row) => row.canCraft).length,
++    };
++  });
+ };
+ 
++/** Список рецептов категории (спойлеры модалки, 318); пустая категория = []. */
++export const buildCategoryModel = (category) => buildRowsForCategory(category);
++
+ /**
+  * count попыток подряд. Провал проверки — не стоп (следующая попытка
+  * обычная); нехватка материалов/стора — стоп, сколько успели, столько есть.
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index 64b2004..f375c19 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -1,14 +1,26 @@
+ {
+   "categoryNames": {
+-    "ammo": "Ammo",
+-    "weapons": "Weapons",
+-    "chems": "Chems",
+     "food": "Food",
+-    "drinks": "Drinks"
++    "drinks": "Drinks",
++    "chems": "Chems",
++    "explosives": "Explosives",
++    "weapons": "Weapons",
++    "armor": "Armor",
++    "powerArmor": "Power armor",
++    "ammo": "Ammo"
+   },
+   "ui": {
+     "title": "Crafting",
+     "back": "← Back",
++    "close": "Close",
++    "emptyCategory": "No recipes yet",
++    "qtyPrompt": "You can craft {max} \"{name}\". How many do you want to create?",
++    "create": "Create",
++    "cancel": "Cancel",
++    "rarityCommon": "Common materials",
++    "rarityUncommon": "Uncommon materials",
++    "rarityRare": "Rare materials",
++    "components": "Components",
+     "craft": "Craft",
+     "craftN": "Craft ×{n}",
+     "complexity": "Complexity {n}",
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 874a0bc..cf35a67 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -1,14 +1,26 @@
+ {
+   "categoryNames": {
+-    "ammo": "Боеприпасы",
+-    "weapons": "Оружие",
+-    "chems": "Препараты",
+     "food": "Еда",
+-    "drinks": "Напитки"
++    "drinks": "Напитки",
++    "chems": "Препараты",
++    "explosives": "Взрывчатка",
++    "weapons": "Оружие",
++    "armor": "Броня",
++    "powerArmor": "Силовая броня",
++    "ammo": "Патроны"
+   },
+   "ui": {
+     "title": "Крафт",
+     "back": "← Назад",
++    "close": "Закрыть",
++    "emptyCategory": "Рецептов пока нет",
++    "qtyPrompt": "Вы можете создать {max} «{name}», сколько штук вы хотите создать?",
++    "create": "Создать",
++    "cancel": "Отмена",
++    "rarityCommon": "Обычные материалы",
++    "rarityUncommon": "Необычные материалы",
++    "rarityRare": "Редкие материалы",
++    "components": "Компоненты",
+     "craft": "Скрафтить",
+     "craftN": "Скрафтить ×{n}",
+     "complexity": "Сложность {n}",
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index 344cb23..8bb3943 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -1,135 +1,219 @@
+-// Модалка крафта (патч 265): вкладки верстаков → список рецептов → окно
+-// рецепта (материалы, количество) → прогон пакета → отчёт по формату владельца.
++// Модалка крафта (редизайн, патч 318, слово владельца): квадраты категорий
++// (8, включая пустые данными) → список рецептов-спойлеров (недоступные серые,
++// доступные белые) → кнопка «Создать» → (если можно больше одной — отдельное
++// окно количества) → прогон пакета → отчёт. «Назад» слева сверху ведёт к
++// квадратам; «Закрыть» внизу окна квадратов возвращает в инвентарь. За один
++// заход можно скрафтить сколько угодно разных предметов.
+ // Вся механика и все строки — в модели (modules/fallout/crafting/windowModel.js);
+-// здесь только кнопки и списки. Окно не объясняет замены пачек: рецепт знает,
+-// что просит, — остальное решает сумка (решение владельца 2026-09-17).
++// здесь только кнопки, списки и иконки квадратов.
+ 
+ import React, { useMemo, useState } from 'react';
+ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import styles from '../../../styles/CraftingModal.styles';
+-import { buildCraftModel, craftBatch, buildCraftReport } from '../../../crafting/windowModel';
++import {
++  buildCraftTiles,
++  buildCategoryModel,
++  craftBatch,
++  buildCraftReport,
++  craftDict,
++  craftFormat,
++} from '../../../crafting/windowModel';
++
++// Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
++const CATEGORY_ICONS = {
++  food: 'food',
++  drinks: 'cup',
++  chems: 'flask',
++  explosives: 'bomb',
++  weapons: 'sword',
++  armor: 'shield-outline',
++  powerArmor: 'shield-half-full',
++  ammo: 'ammo',
++};
++
++const RARITY_LABEL_KEYS = {
++  common: 'rarityCommon',
++  uncommon: 'rarityUncommon',
++  rare: 'rarityRare',
++};
+ 
+ export default function CraftingModal({ visible, onClose }) {
+-  const [benchIdx, setBenchIdx] = useState(0);
++  const [view, setView] = useState('categories'); // 'categories' | 'category'
++  const [category, setCategory] = useState(null);
+   const [openId, setOpenId] = useState(null);
++  const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
+   const [qty, setQty] = useState(1);
+   const [report, setReport] = useState(null);
++  const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
+ 
+-  const model = useMemo(() => (visible ? buildCraftModel() : []), [visible]);
+-  const allRows = useMemo(
+-    () => new Map(model.flatMap((g) => g.rows).map((r) => [r.recipeId, r])),
+-    [model],
++  const d = useMemo(() => (visible ? craftDict() : null), [visible]);
++  const ui = d?.ui ?? {};
++  const tiles = useMemo(() => (visible ? buildCraftTiles() : []), [visible, refresh]);
++  const rows = useMemo(
++    () => (visible && category ? buildCategoryModel(category) : []),
++    [visible, category, refresh],
+   );
+-  const bench = model[benchIdx] ?? model[0];
+-  const detail = openId ? allRows.get(openId) : null;
+-  const labels = detail?.labels ?? model[0]?.rows[0]?.labels ?? {};
++  const categoryLabel = d?.categoryNames?.[category] ?? '';
++  const detail = openId ? rows.find((row) => row.recipeId === openId) : null;
+ 
+-  const reset = () => {
++  const resetAll = () => {
++    setView('categories');
++    setCategory(null);
+     setOpenId(null);
++    setQtyTarget(null);
+     setQty(1);
+     setReport(null);
+   };
+-  const close = () => { reset(); onClose?.(); };
++  const close = () => { resetAll(); onClose?.(); };
+ 
+-  const openRecipe = (row) => {
+-    setOpenId(row.recipeId);
+-    setQty(Math.max(1, Math.min(row.maxCraft || 1, 1)));
++  const openCategory = (tile) => {
++    setCategory(tile.category);
++    setView('category');
++    setOpenId(null);
+     setReport(null);
+   };
++  const back = () => {
++    setView('categories');
++    setCategory(null);
++    setOpenId(null);
++  };
+ 
+-  const runCraft = (row) => {
+-    const run = craftBatch(row.recipeId, Math.max(1, Math.min(qty, row.maxCraft || 1)));
++  const create = (row, count) => {
++    const run = craftBatch(row.recipeId, count);
++    setQtyTarget(null);
++    setOpenId(null);
+     setReport(buildCraftReport(row.recipeId, run));
+   };
++  // Решение владельца (318): можно сделать больше одной — спросить количество
++  // отдельным окном (по умолчанию 1); одна — создать сразу.
++  const onPressCreate = (row) => {
++    if (row.maxCraft > 1) {
++      setQty(1);
++      setQtyTarget({ row, max: row.maxCraft });
++    } else {
++      create(row, 1);
++    }
++  };
++  const finishReport = () => {
++    setReport(null);
++    setRefresh((tick) => tick + 1); // материалы ушли — модель пересобирается
++  };
++
++  const headerTitle = report
++    ? (report.title || ui.resultTitle || '')
++    : view === 'category' ? categoryLabel : (ui.title ?? '');
+ 
+   return (
+     <Modal visible={visible} animationType="slide" transparent onRequestClose={close}>
+       <View style={styles.overlay}>
+         <SafeAreaView style={styles.sheet}>
+           <View style={styles.header}>
+-            {!!openId && (
+-              <TouchableOpacity onPress={reset}><Text style={styles.backText}>←</Text></TouchableOpacity>
++            {view === 'category' && !report && (
++              <TouchableOpacity onPress={back}>
++                <Text style={styles.backText}>{ui.back ?? '←'}</Text>
++              </TouchableOpacity>
+             )}
+-            <Text style={styles.headerTitle} numberOfLines={1}>
+-              {detail ? detail.outputName : labels.title ?? ''}
+-            </Text>
++            <Text style={styles.headerTitle} numberOfLines={1}>{headerTitle}</Text>
+             <View style={styles.headerSpacer} />
+-            <TouchableOpacity onPress={close}><Text style={styles.closeText}>✕</Text></TouchableOpacity>
++            {view === 'categories' && !report && (
++              <TouchableOpacity onPress={close}>
++                <Text style={styles.closeText}>✕</Text>
++              </TouchableOpacity>
++            )}
+           </View>
+ 
+-          {!openId && (
+-            <>
+-              <View style={styles.tabs}>
+-                {model.map((g, i) => (
++          {!report && view === 'categories' && (
++            <View style={styles.body}>
++              <View style={styles.tilesWrap}>
++                {tiles.map((tile) => (
+                   <TouchableOpacity
+-                    key={g.category}
+-                    style={[styles.tab, i === benchIdx && styles.tabActive]}
+-                    onPress={() => setBenchIdx(i)}>
+-                    <Text style={[styles.tabText, i === benchIdx && styles.tabTextActive]}>{g.label}</Text>
++                    key={tile.category}
++                    style={styles.tile}
++                    onPress={() => openCategory(tile)}>
++                    <MaterialCommunityIcons
++                      name={CATEGORY_ICONS[tile.category] ?? 'circle-outline'}
++                      style={styles.tileIcon}
++                    />
++                    <Text style={styles.tileLabel} numberOfLines={2}>{tile.label}</Text>
++                    <Text style={[styles.tileCount, tile.available === 0 && styles.tileCountZero]}>
++                      {tile.available}/{tile.recipes}
++                    </Text>
+                   </TouchableOpacity>
+                 ))}
+               </View>
+-              <FlatList
+-                style={styles.list}
+-                data={bench?.rows ?? []}
+-                keyExtractor={(row) => row.recipeId}
+-                ListEmptyComponent={<Text style={styles.empty}>—</Text>}
+-                renderItem={({ item }) => (
+-                  <TouchableOpacity
+-                    style={[styles.row, !item.canCraft && styles.rowDisabled]}
+-                    onPress={() => openRecipe(item)}>
+-                    <View style={styles.rowTop}>
+-                      <Text style={styles.rowName}>{item.outputName}</Text>
+-                      {item.canCraft && (
+-                        <View style={styles.craftBtn}>
+-                          <Text style={styles.craftBtnText}>{item.maxCraft > 1 ? `×${qty} ${item.timeLabel}` : item.timeLabel}</Text>
+-                        </View>
+-                      )}
+-                    </View>
+-                    <Text style={styles.rowMeta}>{item.metaLine}</Text>
+-                    {item.reason
+-                      ? <Text style={styles.rowReason}>{item.reason}</Text>
+-                      : <Text style={styles.rowReady}>{`${item.materials.filter((m) => m.enough).length}/${item.materials.length}`}</Text>}
+-                  </TouchableOpacity>
+-                )}
+-              />
+-            </>
+-          )}
+-
+-          {detail && !report && (
+-            <View style={styles.list}>
+-              <Text style={styles.detailLabel}>{detail.labels.materialsTitle}</Text>
+-              {detail.materials.map((m) => (
+-                <View key={m.itemId} style={styles.materialLine}>
+-                  <Text style={styles.materialName}>{m.name}</Text>
+-                  <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
+-                </View>
+-              ))}
+-              {detail.canCraft && detail.maxCraft > 1 && (
+-                <View style={styles.qtyRow}>
+-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.max(1, q - 1))}>
+-                    <Text style={styles.qtyBtnText}>−</Text>
+-                  </TouchableOpacity>
+-                  <Text style={styles.qtyValue}>{qty}</Text>
+-                  <TouchableOpacity style={styles.qtyBtn} onPress={() => setQty((q) => Math.min(detail.maxCraft, q + 1))}>
+-                    <Text style={styles.qtyBtnText}>+</Text>
+-                  </TouchableOpacity>
+-                </View>
+-              )}
+-              {detail.reason && <Text style={styles.rowReason}>{detail.reason}</Text>}
+-              <TouchableOpacity
+-                style={[styles.bigCraft, !detail.canCraft && styles.bigCraftDisabled]}
+-                disabled={!detail.canCraft}
+-                onPress={() => runCraft(detail)}>
+-                <Text style={styles.bigCraftText}>
+-                  {detail.canCraft
+-                    ? (qty > 1 ? `${detail.labels.craft} ×${qty}` : detail.labels.craft)
+-                    : detail.labels.notAvailable}
+-                </Text>
++              <TouchableOpacity style={styles.closeBtn} onPress={close}>
++                <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
+               </TouchableOpacity>
+             </View>
+           )}
+ 
++          {!report && view === 'category' && (
++            <FlatList
++              style={styles.list}
++              data={rows}
++              keyExtractor={(row) => row.recipeId}
++              ListEmptyComponent={<Text style={styles.empty}>{ui.emptyCategory ?? '—'}</Text>}
++              renderItem={({ item }) => {
++                const expanded = item.recipeId === openId;
++                return (
++                  <View style={[styles.row, !item.canCraft && styles.rowDisabled]}>
++                    <TouchableOpacity
++                      style={styles.spoilerHead}
++                      onPress={() => setOpenId(expanded ? null : item.recipeId)}>
++                      <View style={styles.rowTop}>
++                        <Text style={[styles.rowName, item.canCraft && styles.rowNameReady]}>
++                          {item.outputName}
++                        </Text>
++                        <Text style={styles.spoilerArrow}>{expanded ? '▾' : '▸'}</Text>
++                      </View>
++                      <Text style={styles.rowMeta}>{item.metaLine}</Text>
++                      <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
++                        {item.canCraft
++                          ? `${ui.materialsTitle}: ${item.materialGroups
++                            .map((g) => `${ui[RARITY_LABEL_KEYS[g.type]] ?? g.type} ${g.have}/${g.total}`)
++                            .join(', ')}`
++                          : (item.reason || '')}
++                      </Text>
++                    </TouchableOpacity>
++
++                    {expanded && (
++                      <View style={styles.spoilerBody}>
++                        <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
++                        {item.materialGroups.map((group) => (
++                          <View key={group.type}>
++                            <Text style={styles.rarityLine}>
++                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type} {group.have}/{group.total}
++                            </Text>
++                            {item.materials.filter((m) => m.rarity === group.type).map((m) => (
++                              <View key={m.itemId} style={styles.materialLine}>
++                                <Text style={styles.materialName}>{m.name}</Text>
++                                <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
++                              </View>
++                            ))}
++                          </View>
++                        ))}
++                        {item.materials.filter((m) => !m.rarity).map((m) => (
++                          <View key={m.itemId} style={styles.materialLine}>
++                            <Text style={styles.materialName}>{m.name}</Text>
++                            <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
++                          </View>
++                        ))}
++                        {item.canCraft && (
++                          <TouchableOpacity
++                            style={styles.bigCraft}
++                            onPress={() => onPressCreate(item)}>
++                            <Text style={styles.bigCraftText}>{ui.create ?? ''}</Text>
++                          </TouchableOpacity>
++                        )}
++                      </View>
++                    )}
++                  </View>
++                );
++              }}
++            />
++          )}
++
+           {report && (
+             <View style={styles.list}>
+               <View style={styles.resultBox}>
+@@ -137,12 +221,50 @@ export default function CraftingModal({ visible, onClose }) {
+                   <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
+                 ))}
+               </View>
+-              <TouchableOpacity style={styles.doneBtn} onPress={reset}>
+-                <Text style={styles.doneBtnText}>{labels.done}</Text>
++              <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
++                <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
+               </TouchableOpacity>
+             </View>
+           )}
+         </SafeAreaView>
++
++        {/* Окно количества (318): «сколько штук создать?» с − и +, по умолчанию 1. */}
++        <Modal visible={!!qtyTarget} transparent animationType="fade" onRequestClose={() => setQtyTarget(null)}>
++          <View style={styles.qtyOverlay}>
++            <View style={styles.qtyDialog}>
++              <Text style={styles.qtyText}>
++                {qtyTarget
++                  ? craftFormat(ui.qtyPrompt ?? '', { max: qtyTarget.max, name: qtyTarget.row.outputName })
++                  : ''}
++              </Text>
++              <View style={styles.qtyRow}>
++                <TouchableOpacity
++                  style={styles.qtyBtn}
++                  onPress={() => setQty((q) => Math.max(1, q - 1))}>
++                  <Text style={styles.qtyBtnText}>−</Text>
++                </TouchableOpacity>
++                <Text style={styles.qtyValue}>{qty}</Text>
++                <TouchableOpacity
++                  style={styles.qtyBtn}
++                  onPress={() => setQty((q) => Math.min(qtyTarget?.max ?? 1, q + 1))}>
++                  <Text style={styles.qtyBtnText}>+</Text>
++                </TouchableOpacity>
++              </View>
++              <View style={styles.qtyActions}>
++                <TouchableOpacity
++                  style={styles.qtyCancel}
++                  onPress={() => setQtyTarget(null)}>
++                  <Text style={styles.qtyCancelText}>{ui.cancel ?? ''}</Text>
++                </TouchableOpacity>
++                <TouchableOpacity
++                  style={[styles.bigCraft, styles.qtyActionsBigCraft]}
++                  onPress={() => qtyTarget && create(qtyTarget.row, qty)}>
++                  <Text style={styles.bigCraftText}>{ui.create ?? ''}</Text>
++                </TouchableOpacity>
++              </View>
++            </View>
++          </View>
++        </Modal>
+       </View>
+     </Modal>
+   );
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index fc984fa..8b9b9b9 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -1,4 +1,5 @@
+-// Стили модалки крафта (патч 265). Тёмная тема по образцу остальных модалок
++// Стили модалки крафта (редизайн, патч 318: квадраты категорий, спойлеры
++// рецептов, окно количества). Тёмная тема по образцу остальных модалок
+ // инвентаря; отдельных палитр не заводим — цвета редкостей придут своим слоем.
+ import { StyleSheet } from 'react-native';
+ 
+@@ -10,34 +11,72 @@ export default StyleSheet.create({
+   headerSpacer: { flex: 1 },
+   closeText: { color: '#c9c6b5', fontSize: 20, paddingHorizontal: 8 },
+   backText: { color: '#c9c6b5', fontSize: 14, paddingRight: 8 },
+-  tabs: { flexDirection: 'row', paddingHorizontal: 12, gap: 6, paddingBottom: 8 },
+-  tab: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: '#2a2e2a' },
+-  tabActive: { backgroundColor: '#3f4a3a' },
+-  tabText: { color: '#c9c6b5', fontSize: 12 },
+-  tabTextActive: { color: '#ffe9a8', fontWeight: '700' },
++
++  // Квадраты категорий (318)
++  body: { flex: 1, paddingHorizontal: 12 },
++  tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingTop: 4 },
++  tile: {
++    width: '48.5%',
++    aspectRatio: 1,
++    borderRadius: 12,
++    backgroundColor: '#232823',
++    borderWidth: 1,
++    borderColor: '#3f4a3a',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 6,
++    padding: 6,
++  },
++  tileIcon: { fontSize: 38, color: '#ffe9a8' },
++  tileLabel: { color: '#e8e6d9', fontSize: 13, fontWeight: '600', textAlign: 'center' },
++  tileCount: { color: '#7da769', fontSize: 11 },
++  tileCountZero: { color: '#8f9a86' },
++  closeBtn: {
++    backgroundColor: '#2a2e2a',
++    borderRadius: 10,
++    padding: 12,
++    alignItems: 'center',
++    marginTop: 12,
++    marginBottom: 8,
++  },
++  closeBtnText: { color: '#c9c6b5', fontSize: 15, fontWeight: '600' },
++
++  // Список рецептов-спойлеров (318): доступные белые, недоступные серые
+   list: { flex: 1, paddingHorizontal: 12 },
+   row: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2a2e2a' },
+-  rowDisabled: { opacity: 0.55 },
++  rowDisabled: { opacity: 0.45 },
++  spoilerHead: { },
+   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+   rowName: { color: '#e8e6d9', fontSize: 15, fontWeight: '600', flex: 1 },
++  rowNameReady: { color: '#f5f3e8' },
++  spoilerArrow: { color: '#8f9a86', fontSize: 14 },
+   rowMeta: { color: '#8f9a86', fontSize: 12, marginTop: 2 },
+   rowReason: { color: '#c76e6e', fontSize: 12, marginTop: 2 },
+   rowReady: { color: '#7da769', fontSize: 12, marginTop: 2 },
+-  craftBtn: { backgroundColor: '#3f4a3a', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+-  craftBtnText: { color: '#ffe9a8', fontSize: 12, fontWeight: '700' },
+-  detailSection: { marginTop: 10 },
++  spoilerBody: { paddingTop: 8 },
+   detailLabel: { color: '#8f9a86', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
++  rarityLine: { color: '#c9c6b5', fontSize: 12, fontWeight: '700', marginTop: 6 },
+   materialLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+   materialName: { color: '#e8e6d9', fontSize: 13, flex: 1 },
+   materialOk: { color: '#7da769', fontSize: 12 },
+   materialBad: { color: '#c76e6e', fontSize: 12 },
+-  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+-  qtyBtn: { borderWidth: 1, borderColor: '#3f4a3a', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
+-  qtyBtnText: { color: '#ffe9a8', fontSize: 16 },
+-  qtyValue: { color: '#e8e6d9', fontSize: 15, minWidth: 24, textAlign: 'center' },
+   bigCraft: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },
+-  bigCraftDisabled: { opacity: 0.5 },
+   bigCraftText: { color: '#ffe9a8', fontSize: 15, fontWeight: '700' },
++
++  // Окно количества (318): «сколько штук создать?»
++  qtyOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++  qtyDialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 16, width: '100%' },
++  qtyText: { color: '#e8e6d9', fontSize: 14, lineHeight: 20, textAlign: 'center' },
++  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14 },
++  qtyBtn: { borderWidth: 1, borderColor: '#3f4a3a', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 },
++  qtyBtnText: { color: '#ffe9a8', fontSize: 18 },
++  qtyValue: { color: '#e8e6d9', fontSize: 16, minWidth: 28, textAlign: 'center', fontWeight: '700' },
++  qtyActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
++  qtyCancel: { backgroundColor: '#2a2e2a', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
++  qtyCancelText: { color: '#c9c6b5', fontSize: 14 },
++  qtyActionsBigCraft: { flex: 1, marginTop: 0 },
++
++  // Отчёт (265, формат владельца)
+   resultBox: { backgroundColor: '#141714', borderRadius: 10, padding: 12, marginTop: 12 },
+   resultLine: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
+   doneBtn: { backgroundColor: '#2a2e2a', borderRadius: 10, padding: 10, marginTop: 12, alignItems: 'center' },
