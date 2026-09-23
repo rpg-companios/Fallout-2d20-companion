@@ -1,6 +1,20 @@
 # Changelog
 
 ---
+## Clarification: creation-kit clothing does have its own item (patch 345)
+
+The owner's question exposed an error in the previous report: creation
+kits put ALL items (clothing included) into the inventory as items with
+ids — the character equips them manually. There is no separate
+"creation cosmetic without an item".
+
+- The mod-to-item binding works the same for all clothing and armor.
+- A slot without an instance key is only possible in old saves and
+  file-imported characters — there the mod simply stays a visible item
+  in the bag (it is not lost).
+- Documentation-only changes; app behavior unchanged.
+
+---
 ## Selling and spending buttons now take installed mods along (patch 344)
 
 Owner's word: selling and spending items are buttons on items in the
