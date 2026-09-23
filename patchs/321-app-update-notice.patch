@@ -1,0 +1,441 @@
+diff --git a/App.js b/App.js
+index e6ff6ba..df6a2cd 100644
+--- a/App.js
++++ b/App.js
+@@ -15,6 +15,9 @@ import { Provider as PaperProvider } from 'react-native-paper';
+ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
++// Окно «Что нового» (патч 321): /version.json + чейнджлог с галочкой
++// «больше не показывать» (логика — src/utils/appVersion.js).
++import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
+ // Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
+ // с AlertHost; движок лишь рендерит, правила внутри модуля.
+ import SurvivalClock from './modules/fallout/survival/SurvivalClock';
+@@ -293,6 +296,7 @@ function App() {
+           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
+           <FusionCoreChoiceModal />
+           <AlertHost />
++          <UpdateNoticeModal />
+           <SurvivalClock />
+       </SafeAreaProvider>
+     </PaperProvider>
+diff --git a/__tests__/debug/app-update-notice.test.js b/__tests__/debug/app-update-notice.test.js
+new file mode 100644
+index 0000000..2d14cc1
+--- /dev/null
++++ b/__tests__/debug/app-update-notice.test.js
+@@ -0,0 +1,81 @@
++// ПРИЁМОЧНЫЙ (патч 321): система обновлений PWA — окно «Что нового».
++// Приложение читает /version.json свежим; версия новее запомненной → окно
++// с чейнджлогом; галочка «больше не показывать» запоминает версию; без
++// галочки окно появится снова. Файл version.json обновляется в том же
++// патче, что и changelogs (версия = номер последнего патча).
++import { describe, expect, it, vi } from 'vitest';
++
++import {
++  ACK_STORAGE_KEY,
++  readAckedVersion,
++  writeAckedVersion,
++  shouldShowUpdateNotice,
++  fetchLatestVersion,
++  notesForLocale,
++} from '../../src/utils/appVersion';
++import versionJson from '../../public/version.json';
++
++const memoryStorage = () => {
++  const map = new Map();
++  return {
++    getItem: (k) => (map.has(k) ? map.get(k) : null),
++    setItem: (k, v) => map.set(k, String(v)),
++  };
++};
++
++describe('Система обновлений (321): version.json, окно «Что нового»', () => {
++  it('version.json: версия — номер последнего патча, чейнджлог на обоих языках', () => {
++    expect(versionJson.version).toBe('321');
++    expect(versionJson.notes['ru-RU'].length).toBeGreaterThan(0);
++    expect(versionJson.notes['en-EN'].length).toBeGreaterThan(0);
++  });
++
++  it('галочка «больше не показывать»: показывать только неизвестную версию', () => {
++    expect(shouldShowUpdateNotice(null, null)).toBe(false);
++    expect(shouldShowUpdateNotice('321', '321')).toBe(false);
++    expect(shouldShowUpdateNotice('321', null)).toBe(true);
++    expect(shouldShowUpdateNotice('321', '319')).toBe(true);
++  });
++
++  it('память устройства: записали версию — прочитали ту же', () => {
++    const storage = memoryStorage();
++    expect(readAckedVersion(storage)).toBeNull();
++    writeAckedVersion(storage, '321');
++    expect(readAckedVersion(storage)).toBe('321');
++    expect(readAckedVersion(storage)).not.toBe('319');
++  });
++
++  it('ключ хранилища стабилен (смена ключа = окно всем заново)', () => {
++    expect(ACK_STORAGE_KEY).toBe('app_version_ack');
++  });
++
++  it('выкачка version.json: успех, 404 и битый JSON не роняют приложение', async () => {
++    const ok = await fetchLatestVersion(vi.fn().mockResolvedValue({
++      ok: true,
++      json: async () => ({ version: '321', notes: { 'ru-RU': ['а'] } }),
++    }));
++    expect(ok).toEqual({ version: '321', notes: { 'ru-RU': ['а'] } });
++
++    await expect(fetchLatestVersion(vi.fn().mockResolvedValue({ ok: false }))).resolves.toBeNull();
++    await expect(fetchLatestVersion(vi.fn().mockRejectedValue(new Error('offline')))).resolves.toBeNull();
++    await expect(fetchLatestVersion(vi.fn().mockResolvedValue({
++      ok: true,
++      json: async () => { throw new Error('bad json'); },
++    }))).resolves.toBeNull();
++  });
++
++  it('чейнджлог: язык приложения, фолбэк на ru, пустые notes', () => {
++    expect(notesForLocale(versionJson.notes, 'ru-RU')).toEqual(versionJson.notes['ru-RU']);
++    expect(notesForLocale(versionJson.notes, 'en-EN')).toEqual(versionJson.notes['en-EN']);
++    expect(notesForLocale({ 'ru-RU': ['а'] }, 'en-EN')).toEqual(['а']);
++    expect(notesForLocale({}, 'ru-RU')).toEqual([]);
++  });
++
++  it('окно смонтировано в приложении (проводка, урок патча 319)', () => {
++    const app = require('fs').readFileSync(
++      new URL('../../App.js', import.meta.url),
++      'utf-8',
++    );
++    expect(app).toContain('<UpdateNoticeModal />');
++  });
++});
+diff --git a/components/UpdateNotice/UpdateNoticeModal.js b/components/UpdateNotice/UpdateNoticeModal.js
+new file mode 100644
+index 0000000..269c68a
+--- /dev/null
++++ b/components/UpdateNotice/UpdateNoticeModal.js
+@@ -0,0 +1,85 @@
++// components/UpdateNotice/UpdateNoticeModal.js
++// Окно «Что нового» (патч 321, слово владельца): приложение при запуске
++// читает /version.json всегда свежим; если версия на сервере новее
++// запомненной на устройстве — показывает чейнджлог. Галочка «больше не
++// показывать» запоминает версию; без галочки окно появится снова при
++// следующем запуске. Логика и строки чейнджлога — src/utils/appVersion.js
++// и public/version.json; здесь только отрисовка.
++
++import React, { useEffect, useState } from 'react';
++import { Modal, View, Text, TouchableOpacity } from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { tApp } from '../../i18n/appI18n';
++import { useLocale } from '../../i18n/locale';
++import {
++  fetchLatestVersion,
++  readAckedVersion,
++  writeAckedVersion,
++  shouldShowUpdateNotice,
++  notesForLocale,
++} from '../../src/utils/appVersion';
++
++const storage = () => (typeof window !== 'undefined' ? window.localStorage : null);
++
++export default function UpdateNoticeModal() {
++  const [notice, setNotice] = useState(null);
++  const [dontShow, setDontShow] = useState(false);
++  const locale = useLocale();
++
++  useEffect(() => {
++    // Веб-платформа: localStorage и /version.json существуют только там.
++    if (typeof window === 'undefined' || !window.localStorage) return undefined;
++    let cancelled = false;
++    fetchLatestVersion().then((latest) => {
++      if (cancelled || !latest) return;
++      const acked = readAckedVersion(window.localStorage);
++      if (shouldShowUpdateNotice(latest.version, acked)) setNotice(latest);
++    });
++    return () => { cancelled = true; };
++  }, []);
++
++  if (!notice) return null;
++
++  const close = () => {
++    if (dontShow) writeAckedVersion(storage(), notice.version);
++    setNotice(null);
++    setDontShow(false);
++  };
++
++  const lines = notesForLocale(notice.notes, locale);
++
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={close}>
++      <View style={styles.overlay}>
++        <View style={styles.dialog}>
++          <Text style={styles.title}>{tApp('updateNotice.title')}</Text>
++          {lines.map((line, index) => (
++            <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
++          ))}
++          <TouchableOpacity style={styles.checkRow} onPress={() => setDontShow((v) => !v)}>
++            <MaterialCommunityIcons
++              name={dontShow ? 'checkbox-marked' : 'checkbox-blank-outline'}
++              size={20}
++              color="#d4af37"
++            />
++            <Text style={styles.checkText}>{tApp('updateNotice.dontShow')}</Text>
++          </TouchableOpacity>
++          <TouchableOpacity style={styles.closeBtn} onPress={close}>
++            <Text style={styles.closeText}>{tApp('updateNotice.close')}</Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </Modal>
++  );
++}
++
++const styles = {
++  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420 },
++  title: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginBottom: 10 },
++  line: { color: '#e8e6d9', fontSize: 13, lineHeight: 19, marginBottom: 6 },
++  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
++  checkText: { color: '#c9c6b5', fontSize: 13 },
++  closeBtn: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 14 },
++  closeText: { color: '#f0e68c', fontSize: 14, fontWeight: '700' },
++};
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+index a73cdf1..44a19e9 100644
+--- a/docs/agents/data-flows.md
++++ b/docs/agents/data-flows.md
+@@ -134,3 +134,19 @@ patchs/<N>-имя.patch  (файлы патчей в ветке Arena)
+ Ветки: правки программы — в ветку движка; правки данных/экранов
+ Fallout — по слову владельца (сеттинг пока живёт здесь).
+ ```
++
++## 8. Обновления PWA (патчи 320–321)
++
++```
++public/version.json   (версия = номер последнего патча, чейнджлог ru/en;
++                       обновляется В ТОМ ЖЕ ПАТЧЕ, что и changelogs)
++        │  fetch cache:'reload' при каждом запуске (веб)
++        ▼
++src/utils/appVersion.js  (чистая логика: версия новее запомненной?)
++        ▼
++components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
++  галочка «больше не показывать» → localStorage app_version_ack)
++Установка: manifest.json — PNG 192+512 обязательны (SVG не считается).
++Застрявшие клиенты: /sw.js меняется намеренно (compat-worker revision) —
++воркер переустанавливается и самоуничтожается, кэши чистятся.
++```
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 7380f3e..2bc1e5e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **319** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–319 уехали, установка не подтверждена).
++· последний сданный патч: **321** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–321 уехали, установка не подтверждена).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -61,6 +61,11 @@
+   механика (гейты, проверка навыка, отчёт) не менялась.
+ - 319 — фикс: кнопка «Крафт» открывает окно крафта (раньше — заглушка-алерт
+   с первого коммита, окно было недостижимо с кнопки).
++- 320 — PWA: PNG-иконка 192 (установка вернулась в Яндекс/Mi) + будильник
++  застрявшего воркера /sw.js (давние клиенты снова получают обновления).
++- 321 — система обновлений: version.json (версия = номер последнего патча,
++  чейнджлог ru/en; обновляется В ТОМ ЖЕ ПАТЧЕ) + окно «Что нового» с
++  галочкой «больше не показывать».
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 86674ad..23392cd 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## PWA — installation and long-installed app updates fixed (patch 320)
++## Update system: the app announces new versions and shows a changelog (patch 321)
++
++Owner's word: "the app should knock on the server, ask if there's an
++update, download it and show a changelog with a 'don't show again'
++checkbox".
++
++- A version file now lives next to the app: `version.json` (patch number +
++  2–4 changelog lines ru/en). Updated in the same patch as the journals.
++- On every launch the app reads the file always fresh; if the version is
++  newer than the one remembered on the device — a "What's new" window
++  appears.
++- The "Don't show again" checkbox remembers the version; without the
++  checkbox the window returns on the next launch. The update itself
++  downloads automatically (that already worked) — a user who sees the
++  window is already on the fresh version.
++- Fuse: acceptance test (patch 321) — the version file, show/hide logic,
++  device memory, resilience to bad network, and the window's wiring.
++
++## PWA — installation and long-installed app updates fixed (patch 320)## PWA — installation and long-installed app updates fixed (patch 320)
+ 
+ Owner's word: "can't install from Yandex or Mi browser; it used to create
+ a shortcut" and "many can't update their old PWAs".
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index cb6d1d6..6091bec 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,24 @@
+ 
+ ---
+ 
+-## PWA — починена установка и обновления давно установленных приложений (патч 320)
++## Система обновлений: приложение сообщает о новой версии и показывает чейнджлог (патч 321)
++
++Слово владельца: «чтобы приложение стучалось на сервер, спрашивало про
++апдейт, скачивало его и выводило чейнджлог с галочкой „больше не
++показывать"».
++
++- Рядом с приложением появился файл версии: `version.json` (номер патча +
++  2–4 строки чейнджлога ru/en). Обновляется в том же патче, что и журналы.
++- При каждом запуске приложение читает файл всегда свежим; если версия
++  новее запомненной на устройстве — показывает окно «Что нового».
++- Галочка «Больше не показывать» запоминает версию; без галочки окно
++  появится снова при следующем запуске. Само обновление скачивается
++  автоматически (это уже работало) — пользователь, увидевший окно, уже
++  на свежей версии.
++- Предохранитель: приёмочный тест (патч 321) — файл версии, показ/скрытие,
++  память устройства, живучесть к плохой сети, проводка окна в приложении.
++
++## PWA — починена установка и обновления давно установленных приложений (патч 320)## PWA — починена установка и обновления давно установленных приложений (патч 320)
+ 
+ Слово владельца: «не могу установить ни с Яндекс браузера, ни с Mi браузера;
+ раньше создавался ярлык» и «многие не могут обновить старые pwa».
+diff --git a/i18n/en-EN/App.json b/i18n/en-EN/App.json
+index 298842e..5628957 100644
+--- a/i18n/en-EN/App.json
++++ b/i18n/en-EN/App.json
+@@ -8,5 +8,10 @@
+     "cancel": "Cancel",
+     "yes": "Yes",
+     "no": "No"
++  },
++  "updateNotice": {
++    "title": "What's new",
++    "dontShow": "Don't show again",
++    "close": "Close"
+   }
+ }
+diff --git a/i18n/ru-RU/App.json b/i18n/ru-RU/App.json
+index 729b7de..1c3ec93 100644
+--- a/i18n/ru-RU/App.json
++++ b/i18n/ru-RU/App.json
+@@ -8,5 +8,10 @@
+     "cancel": "Отмена",
+     "yes": "Да",
+     "no": "Нет"
++  },
++  "updateNotice": {
++    "title": "Что нового",
++    "dontShow": "Больше не показывать",
++    "close": "Закрыть"
+   }
+ }
+diff --git a/public/version.json b/public/version.json
+new file mode 100644
+index 0000000..35e4ce9
+--- /dev/null
++++ b/public/version.json
+@@ -0,0 +1,17 @@
++{
++  "version": "321",
++  "notes": {
++    "ru-RU": [
++      "Крафт: новое окно — квадраты категорий, рецепты-спойлеры, выбор количества",
++      "Кнопка «Крафт» теперь открывает окно крафта",
++      "Персонажи: производные (ОЗ, инициатива, защита, вес) пересчитываются автоматически",
++      "Починена установка PWA и обновления давно установленных приложений"
++    ],
++    "en-EN": [
++      "Crafting: new window — category tiles, recipe spoilers, quantity picker",
++      "The \"Craft\" button now opens the crafting window",
++      "Characters: derived stats (HP, initiative, defense, carry) recalculate automatically",
++      "Fixed PWA installation and updates for long-installed apps"
++    ]
++  }
++}
+diff --git a/src/utils/appVersion.js b/src/utils/appVersion.js
+new file mode 100644
+index 0000000..9a86c26
+--- /dev/null
++++ b/src/utils/appVersion.js
+@@ -0,0 +1,70 @@
++// src/utils/appVersion.js
++// Система обновлений PWA (патч 321, слово владельца): приложение «стучится»
++// на сервер за /version.json и, если версия новее запомненной, показывает
++// окно «Что нового» с чейнджлогом и галочкой «больше не показывать».
++//
++// Как это работает (важно понимать честно): сама новая версия СКАЧИВАЕТСЯ
++// сама — навигация всегда сетевая (service-worker 265), бандлы с хэшами в
++// именах, воркер обновляется по visibilitychange. Пользователь, увидевший
++// окно, уже запускает свежую версию; окно объясняет, что изменилось.
++// version.json — статичный файл рядом с приложением, обновляется в том же
++// патче, что и changelogs (версия = номер последнего патча).
++//
++// Логика чистая и тестируемая: хранилище и fetch внедряются снаружи.
++
++export const VERSION_URL = '/version.json';
++export const ACK_STORAGE_KEY = 'app_version_ack';
++
++/** Прочитать запомненную версию (галочка «больше не показывать»). */
++export const readAckedVersion = (storage) => {
++  try {
++    return storage?.getItem?.(ACK_STORAGE_KEY) ?? null;
++  } catch (_) {
++    return null;
++  }
++};
++
++/** Запомнить версию (вызывается при закрытии окна с поставленной галочкой). */
++export const writeAckedVersion = (storage, version) => {
++  try {
++    storage?.setItem?.(ACK_STORAGE_KEY, String(version));
++  } catch (_) {
++    /* приватный режим и пр. — окно просто будет показываться снова */
++  }
++};
++
++/**
++ * Показывать ли окно: версия известна и не совпадает с запомненной.
++ * (Установленных «будущих» версий не бывает: версия только растёт,
++ * сравнение строк достаточно — номер патча монотонный.)
++ */
++export const shouldShowUpdateNotice = (version, ackedVersion) =>
++  Boolean(version) && version !== ackedVersion;
++
++/**
++ * Свежий /version.json с сервера. Любая неудача (нет файла, сеть, кривой
++ * JSON) → null: старые развёртывания без файла живут как раньше.
++ */
++export const fetchLatestVersion = async (fetchImpl = fetch, url = VERSION_URL) => {
++  try {
++    const response = await fetchImpl(url, { cache: 'reload' });
++    if (!response || !response.ok) return null;
++    const data = await response.json();
++    const version = data && typeof data.version === 'string' ? data.version : null;
++    if (!version) return null;
++    return {
++      version,
++      notes: (data.notes && typeof data.notes === 'object') ? data.notes : {},
++    };
++  } catch (_) {
++    return null;
++  }
++};
++
++/** Строки чейнджлога на языке приложения (фолбэк на ru — язык владельца). */
++export const notesForLocale = (notes, locale) => {
++  const lines = notes?.[locale];
++  if (Array.isArray(lines) && lines.length > 0) return lines;
++  const ru = notes?.['ru-RU'];
++  return Array.isArray(ru) ? ru : [];
++};
