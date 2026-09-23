@@ -1,6 +1,23 @@
 # Changelog
 
 ---
+## Selling and spending buttons now take installed mods along (patch 344)
+
+Owner's word: selling and spending items are buttons on items in the
+inventory; weapon mods will behave the same way — bound to the item,
+inventory visibility.
+
+- The "Sell"/"Spend"/"Discard" buttons now go through the store: when the
+  quantity reaches zero, installed mods leave together with the item (the
+  rule lives in a single copy — in the store).
+- A mod is bound to the ITEM (the bag instance): taking armor off and on
+  again no longer loses mods — they are "one whole" with the item.
+- Installing a mod on an item without a bag instance (kit clothing) is
+  virtual: the mod is not flagged and stays visible.
+- Recorded as law: weapon mods (once they become items — the "Weapons"
+  crafting square) behave the same — bound to the item, bag visibility.
+
+---
 
 ## An installed armor mod now becomes equipped (patch 343)
 

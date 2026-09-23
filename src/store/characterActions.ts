@@ -190,6 +190,9 @@ export interface CharacterActions {
   /** Добавить предмет, вернуть его id (стеки склеиваются по instanceId). */
   addNewItem: (item: StoreItem) => string;
   updateItem: (itemId: string, patch: Partial<StoreItem>) => void;
+  /** 344: количество (продажа/трата/выброс); удаление при нуле уводит
+   * установленные моды вместе с предметом (правило живёт в одной копии). */
+  adjustItemQuantity: (itemId: string, delta: number) => void;
   equipItem: (itemId: string) => void;
   unequipItem: (itemId: string) => void;
   /** 343: установить мод брони на предмет-носитель (флаг «экипирован» +
@@ -360,6 +363,7 @@ export const CRUD_OP_KEYS = [
   'addNewItem',
   'addSkillModifier',
   'addRobotModule',
+  'adjustItemQuantity',
   'adjustPowerArmorDurability',
   'applyMk2Driver',
   'equipHeldWeapon',

@@ -176,10 +176,16 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
   uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
   стирается → мод снова виден в сумке
 
-УДАЛЕНИЕ НОСИТЕЛЯ (расход до нуля: spendItemStacks / spendAmmoForWeapon):
-  collectModsBoundTo(items, hostKey) — моды уходят вместе с предметом
-  («продали предмет с модом — ушли оба»); releaseModsBoundTo —
-  отдельное действие стора для будущих точек удаления.
+УДАЛЕНИЕ НОСИТЕЛЯ — одна копия правила В СТОРЕ (344):
+  adjustItemQuantity(itemId, delta) — кнопки «Продать»/«Потратить»/
+  «Выбросить» инвентаря (UI-хелпер делегирует) и крафт-расход
+  (spendItemStacks, боеприпас spendAmmoForWeapon): при удалении предмета
+  collectModsBoundTo уводит его моды («продали предмет с модом —
+  ушли оба»); releaseModsBoundTo — действие для будущих точек.
+  ПРИВЯЗКА — К ПРЕДМЕТУ (344): id модов пишутся и на слот-копию, и на
+  ЭКЗЕМПЛЯР в сумке (updateItem в handleApplyArmorModification) —
+  снятие/надевание брони моды не теряет; носителя-экземпляра нет
+  (костюм кита) — установка виртуальная, мод не флагается.
 
 ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
 INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS

@@ -78,10 +78,13 @@ describe('ПРИЁМОЧНЫЙ (патч 343): мод брони — экипи�
     expect(useCharacterStore.getState().items).toEqual(before);
   });
 
-  it('мод без привязки не удаляется чужим hostKey (снятие точечно)', () => {
-    useCharacterStore.getState().installArmorMod({ modId, hostKey: 'body.armor' });
+  it('снятие точечно: чужой hostKey не снимает чужой мод', () => {
+    const host2 = grant(useCharacterStore.getState(), 'armor_leather_armor');
+    useCharacterStore.getState().installArmorMod({ modId, hostKey: host2 });
     useCharacterStore.getState().uninstallArmorMod({ modId, hostKey: 'head.armor' });
-    // привязка к другому слоту — мод остаётся экипированным
+    // привязка к другому носителю — мод остаётся экипированным
     expect(bagIds(useCharacterStore.getState())).not.toContain('mod_std_boiled_leather');
+    useCharacterStore.getState().uninstallArmorMod({ modId, hostKey: host2 });
+    expect(bagIds(useCharacterStore.getState())).toContain('mod_std_boiled_leather');
   });
 });

@@ -747,6 +747,29 @@ const useCharacterStore = create(withDerivedCascade(devtools(
       },
 
       /**
+       * 344: изменить количество предмета (кнопки «Продать»/«Потратить»/
+       * «Выбросить» в инвентаре, расход по одной штуке). Удаление при нуле —
+       * ТОЛЬКО здесь (одна копия правила): установленные моды уходят вместе
+       * с предметом (слово владельца, 343 — «продали предмет с модом — ушли
+       * оба»).
+       */
+      adjustItemQuantity: (itemId, delta) => {
+        const items = { ...get().items };
+        const item = items[itemId];
+        if (!item) return;
+        const newQty = (item.quantity || 1) + Number(delta) || 0;
+        if (newQty <= 0) {
+          delete items[itemId];
+          for (const modKey of collectModsBoundTo(items, itemId)) delete items[modKey];
+          set({ items });
+          debugLog('item.quantity.deleted', { itemId, releasedMods: true });
+          return;
+        }
+        items[itemId] = { ...item, quantity: newQty };
+        set({ items });
+      },
+
+      /**
        * 343 (слово владельца): установить мод на предмет брони/одежды.
        * Мод-экземпляр получает флаг «экипирован» (equipped: true — исчезает
        * из сумки) и привязку к хосту (installedOn = ключ предмета-носителя).
@@ -756,6 +779,10 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        */
       installArmorMod: ({ modId, hostKey }) => {
         if (!modId) return null;
+        // 344: привязка — к ПРЕДМЕТУ-носителю. Экземпляра нет (одежда кита,
+        // стартовая запись без ключа в сумке) — мод НЕ флагается: остаётся
+        // видимым в сумке, привязывать не к чему.
+        if (!hostKey || !get().items[hostKey]) return null;
         const items = { ...get().items };
         const entry = Object.entries(items).find(([key, item]) => (
           item?.weaponId === modId && !item.equipped && !item.installedOn

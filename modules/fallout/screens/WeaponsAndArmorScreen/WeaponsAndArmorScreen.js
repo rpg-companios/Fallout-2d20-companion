@@ -1087,8 +1087,10 @@ const WeaponsAndArmorScreen = () => {
     ].filter(Boolean);
     const prevIds = idsOf(prevItem);
     const nextIds = idsOf(modifiedItem);
-    const hostKey = prevItem?.instanceId || prevItem?.stackKey
-      || `${selectedArmorSlot}.${field}`; // слот-идентификация без ключа экземпляра
+    // 344: привязка — к ПРЕДМЕТУ (экземпляр в сумке; у инстанса id === ключу,
+    // id выживает в слот-копию через INSTANCE_FIELDS).
+    const hostKey = prevItem?.instanceId || prevItem?.id
+      || `${selectedArmorSlot}.${field}`;
     prevIds.filter((id) => !nextIds.includes(id)).forEach((id) => uninstallArmorMod({ modId: id, hostKey }));
     nextIds.filter((id) => !prevIds.includes(id)).forEach((id) => installArmorMod({ modId: id, hostKey }));
     // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
@@ -1100,6 +1102,17 @@ const WeaponsAndArmorScreen = () => {
         [field]: modifiedItem,
       },
     }));
+    // 344: id модов живут на ЭКЗЕМПЛЯРЕ («предмет с модом — одно целое»):
+    // синхронно пишем в сумку — снятие/надевание брони не теряет моды.
+    if (useCharacterStore.getState().items[hostKey]) {
+      const patch = {};
+      ['appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId'].forEach((key) => {
+        if ((prevItem?.[key] || null) !== (modifiedItem[key] || null)) {
+          patch[key] = modifiedItem[key] || null;
+        }
+      });
+      if (Object.keys(patch).length > 0) updateItem(hostKey, patch);
+    }
     setArmorModalVisible(false);
     setSelectedArmorSlot(null);
   };
