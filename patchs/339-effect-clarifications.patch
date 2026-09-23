@@ -1,0 +1,266 @@
+diff --git a/__tests__/equipment/armor-mod-descriptions-339.test.js b/__tests__/equipment/armor-mod-descriptions-339.test.js
+new file mode 100644
+index 0000000..617a3a4
+--- /dev/null
++++ b/__tests__/equipment/armor-mod-descriptions-339.test.js
+@@ -0,0 +1,40 @@
++// ПРИЁМОЧНЫЙ (патч 339): уточнения владельца по трём модам — эффекты
++// записаны ЕГО СЛОВАМИ и показываются в окне эффектов, колонки СУ пусты.
++//   • Парирующая: +2 Физ. СУ, только против атак с навыком «Ближний бой»;
++//   • Мягкая подкладка (ноги): +2 Физ. СУ, только когда персонаж падает;
++//   • Облегчённая (руки): надетая броня даёт держимому оружию
++//     (Ближний бой / Рукопашная) «Проникающий» 1, складывается.
++import { describe, expect, it } from 'vitest';
++
++import armorMods from '../../modules/fallout/data/equipment/armor_mods.json';
++import ruMods from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
++
++const byId = new Map(armorMods.map((m) => [m.id, m]));
++const ruById = new Map(ruMods.map((m) => [m.id, m]));
++
++describe('патч 339: условные эффекты — словами владельца, без плоских СУ', () => {
++  it('у всех трёх колонки СУ пустые (эффект живёт в спецэффектах)', () => {
++    for (const id of ['mod_std_parrying', 'mod_std_soft_padding_legs', 'mod_std_lightweight_arms']) {
++      const st = byId.get(id).statModifiers;
++      expect(st.physicalDamageRating.value, `${id}: физ`).toBe(0);
++      expect(st.energyDamageRating.value, `${id}: энерго`).toBe(0);
++      expect(st.radiationDamageRating.value, `${id}: рад`).toBe(0);
++      expect(byId.get(id).specialEffects.length, `${id}: эффект есть`).toBeGreaterThan(0);
++    }
++  });
++
++  it('описания — слова владельца (ru; их читает окно эффектов)', () => {
++    const desc = (id) => ruById.get(id).specialEffects[0].description;
++    expect(desc('mod_std_parrying')).toContain('навыка «Ближний бой»');
++    expect(desc('mod_std_parrying')).toContain('+2 Физ. СУ');
++    expect(desc('mod_std_soft_padding_legs')).toContain('падает');
++    expect(desc('mod_std_lightweight_arms')).toContain('«Проникающий» 1');
++    expect(desc('mod_std_lightweight_arms')).toContain('складывается');
++  });
++
++  it('id эффектов неизменны (механика цепляется к тем же ключам)', () => {
++    expect(byId.get('mod_std_parrying').specialEffects[0].id).toBe('effect_melee_damage_resistance_2');
++    expect(byId.get('mod_std_soft_padding_legs').specialEffects[0].id).toBe('effect_fall_damage_resistance');
++    expect(byId.get('mod_std_lightweight_arms').specialEffects[0].id).toBe('effect_melee_piercing_1');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c887b87..67c32a8 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **338** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–338 уехали, установка не подтверждена;
++· последний сданный патч: **339** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–339 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -146,6 +146,13 @@
+   владелец проверит категории и эффекты, пришлёт; до ответа в окна их не
+   ставим. Все прочие данные по модам брони полны (таблица крафта 327 +
+   таблица установки 337 + эффекты плетения/подкладок 336).
++- 339 — слова владельца по трём модам записаны в описания эффектов
++  (Парирующая: +2 Физ только против «Ближнего боя»; Мягкая подкладка ног:
++  +2 Физ только при падении; Облегчённая рук: держимое оружие
++  Ближний бой/Рукопашная получает «Проникающий» 1, складывается).
++  «Откуда взято» (4 мода): из диктовки 327 (цитата в справочнике);
++  «Облегчённая» resolved = мод рук; остальные 4 ждут слова — настоящие
++  или ошибка диктовки.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b909cf8..712823c 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Armor mod clarifications: synths, five mods owed (patch 338)
++## Three mod clarifications; origin of the four "owed" (patch 339)
++
++Owner's words recorded into effect descriptions (shown in the armor
++upgrade window's "Effects" line; DR columns empty for all three — 337):
++
++- Parrying: +2 Phys. DR, only when an attack using the Melee Weapons
++  skill targets you.
++- Soft lining (legs): +2 Phys. DR, only when the character falls.
++- Lightweight (arms): while worn, weapons using Melee Weapons or Unarmed
++  gain Piercing 1 (stacks with existing).
++
++Answer to "where did it come from": the four mods (Pockets, Deep pockets,
++Lead-lined, Ultra-light) are from the owner's own crafting-table dictation
++(patch 327, "Armor modifications" section, quote kept in the reference).
++"Lightweight" from that record is resolved — it's the arms mod. The other
++four await the owner's decision: real (then categories + effects) or a
++dictation error.
++
++## ## Armor mod clarifications: synths, five mods owed (patch 338)
+ 
+ Owner's words on patch 337's questions.
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8fded8f..f38f997 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,24 @@
+ 
+ ---
+ 
+-## Разъяснения по модам брони: синты, пять модов в долге (патч 338)
++## Уточнения по трём модам; происхождение четырёх «долговых» (патч 339)
++
++Слова владельца записаны в описания эффектов (видны в окне улучшения
++брони, строка «Эффекты»; колонки СУ у всех трёх пустые — 337):
++
++- Парирующая: +2 Физ. СУ, только если против персонажа идёт атака с
++  использованием навыка «Ближний бой».
++- Мягкая подкладка (ноги): +2 Физ. СУ, только когда персонаж падает.
++- Облегчённая (руки): пока броня надета, оружие с навыком «Ближний бой»
++  или «Рукопашная» получает «Проникающий» 1 (складывается с имеющимся).
++
++Ответ на «откуда взято»: четыре мода (С карманами, С глубокими карманами,
++Свинцовая подкладка, Ультралёгкая) — из диктовки таблицы крафта владельца
++(патч 327, раздел «Модификации брони», цитата сохранена в справочнике).
++«Облегчённая» из той записи resolved — это мод рук. Остальные четыре ждут
++решения: настоящие (нужны категории и эффекты) или ошибка диктовки.
++
++## ## Разъяснения по модам брони: синты, пять модов в долге (патч 338)
+ 
+ Слова владельца по вопросам патча 337.
+ 
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index f50093d..6b5fd07 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -282,19 +282,46 @@ uniq_synth_microcarbon (а «Нановолоконная» — uniq_synth_nanof
+ | Мягкая подкладка | — | — | +2 к сопротивлению физическому урону от падения | — | +1 | Бронник 1 |
+ | Звукоизолированная | — | — | Перебросьте 1d20 при проверке на скрытность | — | +2 | Бронник 2 |
+ 
++### Уточнения владельца (патч 339, дословно)
++
++- **Парирующая**: «+2 Физ. СУ, но только если против персонажа идёт атака
++  с использованием навыка "Ближний бой"». Записано ЭФФЕКТОМ (не плоским
++  статом — сверка 337), описание эффекта — словами владельца.
++- **Мягкая подкладка (ноги)**: «+2 Физ. СУ только в ситуации, когда
++  персонаж падает» — записать как эффект в окно эффектов; так и сделано
++  (спецэффект с описанием, видно в окне улучшения брони, строка «Эффекты»).
++- **Облегчённая (руки)**: «когда носишь броню с этим модом, оружие,
++  использующее навык Ближний бой или Рукопашная, получает дополнительно
++  эффект "Проникающий" 1; вроде стакаются (Проникающий 1 → Проникающий 2)».
++  Описание обновлено словами владельца. Стакание — слово владельца
++  («вроде»); механика стакания придёт с серией боевых эффектов.
++
+ Сверка с данными (патч 337): все 12 стандартных модов УЖЕ несли книжные
+ эффекты, веса, цены и перки (спецэффекты — из armor_effects.json). Найдены
+ и исправлены 2 двойных учёта: Парирующая имела +2 Энерго СУ сверх своего
+ эффекта «+2 от ближнего боя», Мягкая подкладка (ноги) — +2 Физ. СУ сверх
+ эффекта «+2 от падения» (колонки СУ в книге пустые).
+ 
+-### ДОЛГ (слово владельца, патч 338): 5 общих крафт-модов
++### ДОЛГ (патчи 338–339): «С карманами, С глубокими карманами, Свинцовая
++подкладка, Ультралёгкая» — откуда взяты
++
++Владелец спросил (339), откуда взяты эти четыре мода. ИСТОЧНИК — его же
++диктовка таблицы крафта (патч 327), раздел «МОДИФИКАЦИИ БРОНИ» (общие),
++дословно:
++
++| Мод | Ёмкость | Перки | Навык | Редкость |
++|---|---|---|---|---|
++| Облегчённая | 2 | — | Ремонт | Обычная |
++| С карманами | 2 | — | Ремонт | Необычная |
++| С глубокими карманами | 4 | Бронник 2 | Ремонт | Необычная |
++| Свинцовая подкладка | 5 | Бронник 2, Наука! 1 | Ремонт | Необычная |
++| Ультралёгкая | 5 | Бронник 3 | Ремонт | Необычная |
+ 
+-Облегчённая, С карманами, С глубокими карманами, Свинцовая подкладка,
+-Ультралёгкая — в таблице установки их нет; владельцу «пока непонятно, от
+-каких категорий брони они» — он ПРОВЕРИТ и пришлёт (категории + эффекты).
+-До ответа эти пять в окнах установки/крафта не появляются; крафт-рецепты
+-для них не пишутся.
++«Облегчённая» resolved (339): это мод РУК (mod_std_lightweight_arms, есть
++в данных; таблица установки 337 + уточнение владельца выше) — из долга
++исключена. Остальные четыре — в данных приложения их НЕТ; ждут слова
++владельца: настоящие (тогда — категории брони + эффекты) или ошибка
++диктовки (вычеркнуть из справочника). В окна до ответа не попадают.
+ 
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json b/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
+index e20cc71..bdd3e77 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
+@@ -65,7 +65,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_melee_damage_resistance_2",
+-        "description": "+2 resistance to melee damage."
++        "description": "+2 Phys. DR, only when the attacker uses the Melee Weapons skill against you."
+       }
+     ]
+   },
+@@ -95,7 +95,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_melee_piercing_1",
+-        "description": "Melee attacks gain the Piercing 1 quality."
++        "description": "While this armor is worn, weapons using the Melee Weapons or Unarmed skill gain the Piercing 1 effect (stacks with any existing)."
+       }
+     ]
+   },
+@@ -105,7 +105,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_fall_damage_resistance",
+-        "description": "+2 resistance to fall damage."
++        "description": "+2 Phys. DR, only when the character falls."
+       }
+     ]
+   },
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
+index 0ad720c..baa39bf 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
+@@ -65,7 +65,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_melee_damage_resistance_2",
+-        "description": "+2 к сопротивлению урону от атак ближнего боя."
++        "description": "+2 Физ. СУ, только если против персонажа идёт атака с использованием навыка «Ближний бой»."
+       }
+     ]
+   },
+@@ -95,7 +95,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_melee_piercing_1",
+-        "description": "Атаки ближнего боя и рукопашные атаки получают эффект 'Проникающий' 1."
++        "description": "Пока броня с этим модом надета, оружие с навыком «Ближний бой» или «Рукопашная» получает эффект «Проникающий» 1 (складывается с имеющимся)."
+       }
+     ]
+   },
+@@ -105,7 +105,7 @@
+     "specialEffects": [
+       {
+         "id": "effect_fall_damage_resistance",
+-        "description": "+2 к сопротивлению физическому урону от падения."
++        "description": "+2 Физ. СУ, только когда персонаж падает."
+       }
+     ]
+   },
+diff --git a/public/version.json b/public/version.json
+index 0510148..f6034a9 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "338",
++  "version": "339",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
