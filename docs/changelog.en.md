@@ -2,6 +2,18 @@
 
 ---
 
+## Crafting — the "Craft" button now opens the crafting window (patch 319)
+
+Behavior fix (the owner asked: "did you wire the modal to the button?" —
+the check showed it had never been wired).
+
+- Since the app's very first commit the "Craft" button showed a placeholder
+  alert instead of a window; the crafting window (neither the old 265 one
+  nor the new 318 one) was unreachable from the button. Now the button
+  opens the crafting window.
+- Fuse: acceptance test (patch 319) pins the "button → window" wiring so
+  this cannot get lost again.
+
 ## Crafting — new window: category tiles, recipe spoilers, quantity picker (patch 318)
 
 Owner's word: a pleasant one — a convenient crafting window instead of
