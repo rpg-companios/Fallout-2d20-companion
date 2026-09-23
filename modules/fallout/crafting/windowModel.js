@@ -12,7 +12,7 @@
 // сумки попытки останавливаются, остальные не начинаются.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import { getCraftingCategories, getCraftingRecipeById, getCraftingRecipes } from '../../../domain/registry';
+import { getCraftingRecipeById, getCraftingRecipes, getScrapMaterials } from '../../../domain/registry';
 import { findCatalogEntry } from '../../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
@@ -25,12 +25,36 @@ import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
 import { craftMinutesForRecipe, craftRecipe, craftingPreview } from './operations';
 import { CRAFT_RULES } from './rules';
 
-// Порядок вкладок = категории манифеста рецептов (реформа 269): верстаков в
-// данных нет, файл-раздел и есть категория. Движок категорий не знает.
+// Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
+// взрывчатка, оружие, броня, силовая броня + патроны (решение владельца —
+// 8-й квадрат). Пустые данными категории квадратами ВИДНЫ («рецептов пока
+// нет»); верстаков в данных нет, файл-раздел и есть категория (реформа 269).
+export const CRAFT_CATEGORIES = [
+  'food', 'drinks', 'chems', 'explosives', 'weapons', 'armor', 'powerArmor', 'ammo',
+];
+
+// Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
+// Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
+// (мясо и пр.) редкости не имеют и в сводку не попадают.
+const RARITY_TYPES = ['common', 'uncommon', 'rare'];
+
+let materialTypeById = null;
+const materialRarityOf = (itemId) => {
+  if (!materialTypeById) {
+    materialTypeById = new Map(
+      getScrapMaterials().map((m) => [m.id, m.materialType || null]),
+    );
+  }
+  return materialTypeById.get(itemId) ?? null;
+};
 
 const dict = () => (getCurrentModuleLocale() === 'en-EN' ? enDict : ruDict);
 const fmt = (template, params = {}) =>
   String(template).replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? `{${key}}`));
+
+// Модалка (318) берёт словарь и форматирование строк отсюда — единственный дом строк.
+export const craftDict = () => dict();
+export const craftFormat = fmt;
 
 const perkName = (id) => {
   const perks = getCurrentModuleLocale() === 'en-EN' ? enPerks : ruPerks;
@@ -63,24 +87,19 @@ export const formatCraftMinutes = (minutes) => {
 };
 
 /**
- * Строк на вкладку верстака: что получится, чем, сколько это времени,
+ * Строки одной категории-квадрата: что получится, чем, сколько это времени,
  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
  * дефицитному материалу; для «можно» строк он ≥ 1.
+ * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
+ * сводка «сколько видов материала доступно / требуется» по обычным,
+ * необычным и редким (не требуемые типы в сводку не попадают).
  */
-export const buildCraftModel = () => {
+const buildRowsForCategory = (category) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
   const d = dict().ui;
-  const labels = dict();
-  const groups = getCraftingCategories()
-    .map((category) => ({
-      category,
-      label: labels.categoryNames?.[category] ?? category,
-      rows: [],
-    }));
-  const byCategory = new Map(groups.map((g) => [g.category, g]));
+  const rows = [];
   for (const recipe of getCraftingRecipes()) {
-    const group = byCategory.get(recipe.category);
-    if (!group) continue; // категория вне манифеста — не выдумываем
+    if (recipe.category !== category) continue;
     const { evaluation } = craftingPreview(recipe.id);
     const missingPerk = evaluation.blocked.find((b) => b.code === 'missing-perk');
     const status = evaluation.ready ? 'ready' : missingPerk ? 'missing-perk' : 'missing-material';
@@ -88,7 +107,16 @@ export const buildCraftModel = () => {
     const maxCraft = evaluation.ready
       ? evaluation.materials.reduce((acc, row) => Math.min(acc, Math.floor(row.have / row.need)), Infinity)
       : 0;
-    group.rows.push({
+    const materials = evaluation.materials.map((row) => ({
+      itemId: row.itemId,
+      name: itemName(catalog, row.itemId, null),
+      rarity: materialRarityOf(row.itemId),
+      need: row.need,
+      have: row.have,
+      enough: row.enough,
+      haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
+    }));
+    rows.push({
       recipeId: recipe.id,
       category: recipe.category,
       // id рецепта = id предмета результата (269): «output» в данных нет.
@@ -107,14 +135,15 @@ export const buildCraftModel = () => {
       reason: missingPerk
         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
         : status === 'missing-material' ? d.shortMaterials : null,
-      materials: evaluation.materials.map((row) => ({
-        itemId: row.itemId,
-        name: itemName(catalog, row.itemId, null),
-        need: row.need,
-        have: row.have,
-        enough: row.enough,
-        haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
-      })),
+      materials,
+      materialGroups: RARITY_TYPES
+        .map((type) => {
+          const group = materials.filter((m) => m.rarity === type);
+          return group.length
+            ? { type, have: group.filter((m) => m.enough).length, total: group.length }
+            : null;
+        })
+        .filter(Boolean),
       labels: {
         materialsTitle: d.materialsTitle,
         craft: d.craft,
@@ -124,8 +153,25 @@ export const buildCraftModel = () => {
       },
     });
   }
-  return groups.filter((g) => g.rows.length > 0);
+  return rows;
 };
+
+/** Квадраты категорий (318): все 8 — даже те, у кого рецептов пока нет. */
+export const buildCraftTiles = () => {
+  const labels = dict();
+  return CRAFT_CATEGORIES.map((category) => {
+    const rows = buildRowsForCategory(category);
+    return {
+      category,
+      label: labels.categoryNames?.[category] ?? category,
+      recipes: rows.length,
+      available: rows.filter((row) => row.canCraft).length,
+    };
+  });
+};
+
+/** Список рецептов категории (спойлеры модалки, 318); пустая категория = []. */
+export const buildCategoryModel = (category) => buildRowsForCategory(category);
 
 /**
  * count попыток подряд. Провал проверки — не стоп (следующая попытка

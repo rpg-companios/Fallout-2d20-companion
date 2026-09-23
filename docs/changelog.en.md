@@ -2,6 +2,28 @@
 
 ---
 
+## Crafting — new window: category tiles, recipe spoilers, quantity picker (patch 318)
+
+Owner's word: a pleasant one — a convenient crafting window instead of
+bench tabs. Mechanics unchanged: same perk gates, bag counting, skill check
+and report (format of 265).
+
+- The "Craft" button in inventory opens a tile window: food, drinks, chems,
+  explosives, weapons, armor, power armor, ammo (owner's decision — the
+  8th tile). Each tile has an icon and an "available/total" counter.
+- A tile opens a list of recipe spoilers: unavailable gray, available white.
+  Inside a spoiler — materials by rarity (common/uncommon/rare, only
+  required types, each with "have · need") and a "Create" button.
+- If materials suffice for more than one — a separate window before
+  creation: "You can craft N „item". How many?" with − and + (default 1).
+- "Back" top-left returns to the tiles from any category; "Close" at the
+  bottom of the tile window returns to inventory. Any number of different
+  items can be crafted in one visit.
+- Categories without recipes (explosives, armor, power armor) are visible
+  with a "no recipes yet" note — they fill in as recipes arrive.
+- Fuse: acceptance test (patch 318) — tiles and order, material rarity on
+  ammo_38, perk gate, batch size, dictionary.
+
 ## MK-3, step 2 — the store recalculates derived stats itself, manual calls are gone (patch 317)
 
 Continuation of the "cascade into the store". Nothing changes for the

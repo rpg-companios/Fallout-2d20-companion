@@ -1,14 +1,26 @@
 {
   "categoryNames": {
-    "ammo": "Боеприпасы",
-    "weapons": "Оружие",
-    "chems": "Препараты",
     "food": "Еда",
-    "drinks": "Напитки"
+    "drinks": "Напитки",
+    "chems": "Препараты",
+    "explosives": "Взрывчатка",
+    "weapons": "Оружие",
+    "armor": "Броня",
+    "powerArmor": "Силовая броня",
+    "ammo": "Патроны"
   },
   "ui": {
     "title": "Крафт",
     "back": "← Назад",
+    "close": "Закрыть",
+    "emptyCategory": "Рецептов пока нет",
+    "qtyPrompt": "Вы можете создать {max} «{name}», сколько штук вы хотите создать?",
+    "create": "Создать",
+    "cancel": "Отмена",
+    "rarityCommon": "Обычные материалы",
+    "rarityUncommon": "Необычные материалы",
+    "rarityRare": "Редкие материалы",
+    "components": "Компоненты",
     "craft": "Скрафтить",
     "craftN": "Скрафтить ×{n}",
     "complexity": "Сложность {n}",

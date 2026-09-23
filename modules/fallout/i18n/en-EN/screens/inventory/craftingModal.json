@@ -1,14 +1,26 @@
 {
   "categoryNames": {
-    "ammo": "Ammo",
-    "weapons": "Weapons",
-    "chems": "Chems",
     "food": "Food",
-    "drinks": "Drinks"
+    "drinks": "Drinks",
+    "chems": "Chems",
+    "explosives": "Explosives",
+    "weapons": "Weapons",
+    "armor": "Armor",
+    "powerArmor": "Power armor",
+    "ammo": "Ammo"
   },
   "ui": {
     "title": "Crafting",
     "back": "← Back",
+    "close": "Close",
+    "emptyCategory": "No recipes yet",
+    "qtyPrompt": "You can craft {max} \"{name}\". How many do you want to create?",
+    "create": "Create",
+    "cancel": "Cancel",
+    "rarityCommon": "Common materials",
+    "rarityUncommon": "Uncommon materials",
+    "rarityRare": "Rare materials",
+    "components": "Components",
     "craft": "Craft",
     "craftN": "Craft ×{n}",
     "complexity": "Complexity {n}",
