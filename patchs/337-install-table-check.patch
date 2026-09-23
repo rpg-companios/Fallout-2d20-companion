@@ -1,0 +1,252 @@
+diff --git a/__tests__/equipment/armor-mod-install-table-337.test.js b/__tests__/equipment/armor-mod-install-table-337.test.js
+new file mode 100644
+index 0000000..f0fd9d1
+--- /dev/null
++++ b/__tests__/equipment/armor-mod-install-table-337.test.js
+@@ -0,0 +1,55 @@
++// ПРИЁМОЧНЫЙ (патч 337): таблица установки модов брони — данные совпадают.
++// Слово владельца (диктовка таблицы книги, «Модификации для улучшения брони»):
++//   1) у Парирующей и Мягкой подкладки (ноги) колонки СУ пустые — их эффекты
++//      («+2 от ближнего боя», «+2 от падения») живут ТОЛЬКО в спецэффектах
++//      (двойной учёт статов исправлен);
++//   2) спецэффекты/веса/цены/перки 12 стандартных модов — книжные.
++import { describe, expect, it } from 'vitest';
++
++import armorMods from '../../modules/fallout/data/equipment/armor_mods.json';
++import armorEffects from '../../modules/fallout/data/equipment/armor_effects.json';
++
++const byId = new Map(armorMods.map((m) => [m.id, m]));
++
++describe('патч 337: таблица установки модов — данные с книгой совпадают', () => {
++  it('Парирующая: +2 от ближнего боя — спецэффект, в колонках СУ нули', () => {
++    const m = byId.get('mod_std_parrying');
++    expect(m.statModifiers).toEqual({
++      physicalDamageRating: { op: '+', value: 0 },
++      energyDamageRating: { op: '+', value: 0 },
++      radiationDamageRating: { op: '+', value: 0 },
++    });
++    expect(m.specialEffects).toEqual([{ id: 'effect_melee_damage_resistance_2', value: 2 }]);
++    expect(armorEffects.effect_melee_damage_resistance_2).toEqual({
++      type: 'resistance', damageType: 'melee', value: 2,
++    });
++  });
++
++  it('Мягкая подкладка (ноги): +2 от падения — спецэффект, в колонках СУ нули', () => {
++    const m = byId.get('mod_std_soft_padding_legs');
++    expect(m.statModifiers.physicalDamageRating.value).toBe(0);
++    expect(m.specialEffects).toEqual([{ id: 'effect_fall_damage_resistance', value: 2 }]);
++  });
++
++  it('остальные 10 стандартных модов: книжные веса/цены/перки на месте', () => {
++    const book = {
++      mod_std_soft_padding:        { cost: 1, weight: 4, perk: '' },
++      mod_std_asbestos_lining:     { cost: 3, weight: 4, perk: 'Бронник 1' },
++      mod_std_dense:               { cost: 7, weight: 4, perk: 'Бронник 3' },
++      mod_std_biocomponents_mesh:  { cost: 9, weight: 2, perk: 'Бронник 4, Наука! 2' },
++      mod_std_pneumatic:           { cost: 9, weight: 2, perk: 'Бронник 4' },
++      mod_std_melee:               { cost: 1, weight: 1, perk: 'Бронник 1' },
++      mod_std_balanced:            { cost: 1, weight: 1, perk: 'Бронник 2' },
++      mod_std_aerodynamic:         { cost: 1, weight: 0, perk: 'Бронник 3' },
++      mod_std_lightweight_arms:    { cost: 3, weight: 1, perk: 'Бронник 4' },
++      mod_std_soundproofed:        { cost: 2, weight: 0, perk: 'Бронник 2' },
++    };
++    for (const [id, want] of Object.entries(book)) {
++      const m = byId.get(id);
++      expect(m, id).toBeTruthy();
++      expect(m.costModifier.value, `${id}: цена`).toBe(want.cost);
++      expect(m.weightModifier.value, `${id}: вес`).toBe(want.weight);
++      expect(m.requiredPerk, `${id}: перк`).toBe(want.perk);
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 716beb3..bc3272f 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **336** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–336 уехали, установка не подтверждена;
++· последний сданный патч: **337** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–337 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -130,6 +130,15 @@
+   uniq_vaultsuit_*; категории costumeUniqueMods/vaultSuitUniqueMods).
+   Релизы объявляет ВЛАДЕЛЕЦ (слово 336; патчи релиз не поднимают).
+   Ждём: эффекты 5 общих модов (Облегчённая/карманы/свинец/ультралёгкая).
++- 337 — таблица УСТАНОВКИ модов (диктовка владельца) записана в
++  справочник §2.7; сверка: все 12 стандартных модов уже книжные, исправлены
++  2 двойных учёта (Парирующая −2 Энерго СУ, Мягкая подкладка ног −2 Физ СУ —
++  эффекты уже в спецэффектах). ПРОТИВОРЕЧИЕ к 333: Ламинированная/
++  Прорезиненная/Микроуглеродистая в таблице установки — «всё тело» (в 333
++  убраны как «синтовские»); вопрос владельцу — вернуть ли; в данных их
++  пока нет. Вопрос №2: у 5 крафт-модов (карманы/свинец/ультралёгкая/
++  облегчённая/глубокие карманы) в таблице установки нет — эффектов нет
++  вообще или другая страница?
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 43fd4f9..91ccda0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## "What's new" — once per release, no checkbox (patch 335)
++## Armor mod install table — cross-checked, 2 double-counts fixed (patch 337)
++
++The owner dictated the book's "Armor improvement modifications" table
++(effects/weight/cost/perks). Cross-check: all 12 standard mods already
++carried book-accurate effects, weights, costs and perks; two double-counts
++found and fixed — "Parrying" granted +2 Energy DR on top of its "+2 vs
++melee attacks" effect, "Soft lining" (legs) — +2 Physical DR on top of the
++"+2 vs falling" effect. The book leaves both DR columns empty — now so
++does the data. Characters with these mods recompute automatically on the
++next load.
++
++The table is recorded in the reference doc (§2.7). Two questions to the
++owner (protocol 331): 1) "Laminated/Rubberized/Microcarbon" appear in the
++install table as all-body upgrades, though patch 333 removed them as
++"synth-only" — restore them? 2) five craft-only mods (pockets, lead-lined,
++ultra-light, lightweight, deep pockets) have no install-table row — no
++combat effects at all, or a different page?
++
++## ## "What's new" — once per release, no checkbox (patch 335)
+ 
+ Owner's word: the checkbox is excessive; show the window once per
+ RELEASE — a release consists of many patches, not "every little step".
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d28c06c..6834301 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## «Что нового» — один раз на релиз, без галочки (патч 335)
++## Таблица установки модов брони — сверена, 2 двойных учёта исправлены (патч 337)
++
++Владелец продиктовал книжную таблицу «Модификации для улучшения брони»
++(эффекты/вес/цена/перки). Сверка с данными: спецэффекты, веса, цены и
++перки всех 12 стандартных модов уже были книжными; нашлись и исправлены
++два двойных учёта — «Парирующая» давала +2 Энерго СУ сверх своего эффекта
++«+2 к сопротивлению урону от атак ближнего боя», «Мягкая подкладка» (ноги)
++— +2 Физ. СУ сверх эффекта «+2 от падения». По книге колонки СУ у обоих
++пустые — теперь и в данных. Персонажи с этими модами автоматически
++пересчитаются при следующей загрузке.
++
++Таблица записана в справочник §2.7. Два вопроса владельцу (протокол 331):
++1) «Ламинированная/Прорезиненная/Микроуглеродистая» в таблице установки —
++улучшения «всё тело», хотя в 333 мы убирали их как «синтовские» — вернуть
++в общие моды? 2) пяти крафт-модам (карманы, свинец, ультралёгкая,
++облегчённая, глубокие карманы) в таблице установки нет строки — у них нет
++боевых эффектов или это другая страница?
++
++## ## «Что нового» — один раз на релиз, без галочки (патч 335)
+ 
+ Слово владельца: галочка излишня; окно показывать один раз в релиз —
+ релиз состоит из кучи патчей, а не «каждый чих».
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index 768c8c8..a184519 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -236,6 +236,60 @@
+ Привязка заработает в серии крафта/установки модов: сейчас костюмы без
+ семейства (правило 2026-07-31), окно доступности модов для одежды закрыто.
+ 
++## 2.7. Таблица установки модов брони — диктовка владельца (2026-09-23, патч 337)
++
++Колонки книги: МОДИФИКАЦИЯ · Физ. СУ · Энерго СУ · ПРОЧИЕ ЭФФЕКТЫ · ВЕС ·
++ЦЕНА · ПЕРКИ. Эта таблица — про УСТАНОВКУ модов (не крафт).
++
++### ВСЁ ТЕЛО
++
++| Мод | Физ | Энер | Прочие эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|---|---|
++| Ламинированная | +1 | +1 | — | +1 | +5 | — |
++| Прорезиненная | +2 | +2 | — | +1 | +10 | Бронник 1 |
++| Микроуглеродистая | +3 | +3 | — | +2 | +15 | Бронник 1 |
++
++⚠ Противоречие с 333: эти три мы убрали из общих модов по слову владельца
++(«это уникальные моды брони синтов»), а таблица установки книги показывает
++их как улучшения «всё тело». Вопрос владельцу задан (восстановить или нет);
++в данных их пока нет.
++
++### УЛУЧШЕНИЯ ТОЛЬКО ДЛЯ ТЕЛА
++
++| Мод | Физ | Энер | Прочие эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|---|---|
++| Мягкая | — | — | +2 к сопротивлению всем повреждениям против взрывного оружия | +4 | +1 | — |
++| Асбестовая подкладка | — | +3 | Игнорируйте энергетический урон от эффекта «Стойкий урон» | +4 | +3 | Бронник 1 |
++| Плотная | — | — | +4 к сопротивлению урону против взрывного оружия | +4 | +7 | Бронник 3 |
++| Сеть биокомпонентов | — | — | Препараты действуют в два раза дольше (стр. 164) | +2 | +9 | Бронник 4, Наука! 2 |
++| Пневматическая | — | — | Эффект оглушения требует выпадения 2+ Эффектов при атаке, чтобы поразить вас | +2 | +9 | Бронник 4 |
++
++### УЛУЧШЕНИЯ ТОЛЬКО ДЛЯ РУК
++
++| Мод | Физ | Энер | Прочие эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|---|---|
++| Рукопашная | — | — | Рукопашные атаки наносят +1 DС урона | +1 | +1 | Бронник 1 |
++| Парирующая | — | — | +2 к сопротивлению урону от атак ближнего боя | +1 | +1 | Бронник 1 |
++| Сбалансированная | — | — | Прицелившись и совершив дальнобойную атаку, вы наносите +1 DС урона | +1 | +1 | Бронник 2 |
++| Аэродинамическая | — | — | Может потратить до 4 ОД на бонусный урон для атак ближнего боя | — | +1 | Бронник 3 |
++| Облегчённая | — | — | Атаки ближнего боя и рукопашные атаки получают эффект «Проникающий» 1 | +1 | +3 | Бронник 4 |
++
++### УЛУЧШЕНИЯ ТОЛЬКО ДЛЯ НОГ
++
++| Мод | Физ | Энер | Прочие эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|---|---|
++| Мягкая подкладка | — | — | +2 к сопротивлению физическому урону от падения | — | +1 | Бронник 1 |
++| Звукоизолированная | — | — | Перебросьте 1d20 при проверке на скрытность | — | +2 | Бронник 2 |
++
++Сверка с данными (патч 337): все 12 стандартных модов УЖЕ несли книжные
++эффекты, веса, цены и перки (спецэффекты — из armor_effects.json). Найдены
++и исправлены 2 двойных учёта: Парирующая имела +2 Энерго СУ сверх своего
++эффекта «+2 от ближнего боя», Мягкая подкладка (ноги) — +2 Физ. СУ сверх
++эффекта «+2 от падения» (колонки СУ в книге пустые). Пяти общих
++крафт-модов (Облегчённая, С карманами, С глубокими карманами, Свинцовая
++подкладка, Ультралёгкая) в таблице установки НЕТ — вопрос владельцу:
++у них нет боевых эффектов вообще или это другая страница?
++
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+ 1. **Ёмкость ≠ сложность предмета.** Владелец: «ты сравниваешь данные
+diff --git a/modules/fallout/data/equipment/armor_mods.json b/modules/fallout/data/equipment/armor_mods.json
+index e2d349f..b42ac42 100644
+--- a/modules/fallout/data/equipment/armor_mods.json
++++ b/modules/fallout/data/equipment/armor_mods.json
+@@ -258,7 +258,7 @@
+       },
+       "energyDamageRating": {
+         "op": "+",
+-        "value": 2
++        "value": 0
+       },
+       "radiationDamageRating": {
+         "op": "+",
+@@ -410,7 +410,7 @@
+     "statModifiers": {
+       "physicalDamageRating": {
+         "op": "+",
+-        "value": 2
++        "value": 0
+       },
+       "energyDamageRating": {
+         "op": "+",
+diff --git a/public/version.json b/public/version.json
+index ed34933..6149a17 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "336",
++  "version": "337",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
