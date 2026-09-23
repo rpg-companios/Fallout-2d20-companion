@@ -2,7 +2,22 @@
 
 ---
 
-## Armor-mod crafting table — recorded, cross-checked (patch 327)
+## Rarity, capacity and item are independent (patch 328)
+
+Owner's clarification to the armor-mods table (327), recorded in
+`docs/reference-data/armor-mods-crafting.md` (section 1.1). The app is
+unchanged — it does not violate the rules today.
+
+- A mod's rarity is NOT the recipe's material capacity: independent book
+  columns. A recipe's materials are set by the capacity; rarity does not
+  affect the material set (weave: capacity 3, rarity Rare; shielded
+  lining: capacity 6, rarity just Uncommon).
+- A recipe's rarity is NOT the created item's rarity: the label describes
+  the recipe; the crafted mod carries its own record's attributes.
+- If the crafting window ever shows rarity, it is a label of the recipe
+  row, separate from capacity, never transferred to the crafted item.
+
+## ## Armor-mod crafting table — recorded, cross-checked (patch 327)
 
 The owner dictated the book's armor-mods table (the "Armor" tile — the
 future mod crafting via material capacity). The app itself is unchanged.
