@@ -1,0 +1,346 @@
+diff --git a/__tests__/crafting/crafting-window-layout-322.test.js b/__tests__/crafting/crafting-window-layout-322.test.js
+new file mode 100644
+index 0000000..67e1559
+--- /dev/null
++++ b/__tests__/crafting/crafting-window-layout-322.test.js
+@@ -0,0 +1,54 @@
++// ПРИЁМОЧНЫЙ (патч 322): правки окна крафта по тестированию владельца.
++// 1) Окно категорий прокручивается (на ПК раньше не прокручивалось).
++// 2) Квадраты — по 3 в строке; остаток строки: одинокая — по центру,
++//    две — от левого края.
++// 3) «есть N · нужно M» — рядом с названием материала, не на другом конце.
++// 4) Время изготовления подписано явно («время: 1 сут»), вопрос владельца
++//    «что такое Выживание 1 сут?» — навык проверки + игровое время работы.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import { fileURLToPath } from 'node:url';
++
++import { buildCategoryModel, craftDict } from '../../modules/fallout/crafting/windowModel';
++import ruDict from '../../modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json';
++import enDict from '../../modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const modal = readFileSync(
++  join(ROOT, 'modules/fallout/screens/InventoryScreen/modals/CraftingModal.js'),
++  'utf-8',
++);
++const styles = readFileSync(
++  join(ROOT, 'modules/fallout/styles/CraftingModal.styles.js'),
++  'utf-8',
++);
++
++describe('Окно крафта — правки по тестированию владельца (322)', () => {
++  it('квадраты в ScrollView (окно прокручивается)', () => {
++    expect(modal).toContain('<ScrollView style={styles.body}');
++    expect(modal).toContain('chunkIntoRows(tiles, 3)');
++  });
++
++  it('выравнивание остатка строки: 1 — центр, 2 — от левого края', () => {
++    expect(modal).toContain("rowTiles.length === 1 && styles.tileRowCenter");
++    expect(modal).toContain("rowTiles.length === 2 && styles.tileRowLeft");
++    expect(styles).toContain("tileRowCenter: { justifyContent: 'center' }");
++    expect(styles).toContain("tileRowLeft: { justifyContent: 'flex-start' }");
++    expect(styles).toContain("tileRow: { flexDirection: 'row', gap: 10");
++  });
++
++  it('«есть · нужно» рядом с названием: без space-between, без flex:1 у имени', () => {
++    expect(styles).toContain("materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8");
++    expect(styles).not.toContain("materialName: { color: '#e8e6d9', fontSize: 13, flex: 1 }");
++  });
++
++  it('время изготовления подписано явно в обоих словарях', () => {
++    expect(ruDict.ui.craftTime).toBe('время: {t}');
++    expect(enDict.ui.craftTime).toBe('time: {t}');
++    const row = buildCategoryModel('food').find((r) => r.recipeId === 'food_grilled_bloatfly');
++    const timeLabel = craftDict().ui.craftTime.split('{t}')[0];
++    expect(row.metaLine).toContain(timeLabel);
++    expect(row.metaLine).toContain(row.timeLabel); // само значение времени на месте
++  });
++});
+diff --git a/__tests__/debug/app-update-notice.test.js b/__tests__/debug/app-update-notice.test.js
+index 2d14cc1..a0d0471 100644
+--- a/__tests__/debug/app-update-notice.test.js
++++ b/__tests__/debug/app-update-notice.test.js
+@@ -24,8 +24,11 @@ const memoryStorage = () => {
+ };
+ 
+ describe('Система обновлений (321): version.json, окно «Что нового»', () => {
+-  it('version.json: версия — номер последнего патча, чейнджлог на обоих языках', () => {
+-    expect(versionJson.version).toBe('321');
++  it('version.json: версия — номер патча (растёт), чейнджлог на обоих языках', () => {
++    // Правило 321: версия = номер последнего патча, обновляется В ТОМ ЖЕ
++    // ПАТЧЕ. Точное число не фиксируем — оно растёт каждым патчем.
++    expect(String(versionJson.version)).toMatch(/^\d+$/);
++    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(321);
+     expect(versionJson.notes['ru-RU'].length).toBeGreaterThan(0);
+     expect(versionJson.notes['en-EN'].length).toBeGreaterThan(0);
+   });
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 9926a6d..6e893e5 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,9 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **321** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–321 уехали, установка не подтверждена).
++· последний сданный патч: **322** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–322 уехали, установка не подтверждена;
++владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -66,6 +67,9 @@
+ - 321 — система обновлений: version.json (версия = номер последнего патча,
+   чейнджлог ru/en; обновляется В ТОМ ЖЕ ПАТЧЕ) + окно «Что нового» с
+   галочкой «больше не показывать».
++- 322 — правки окна крафта по тестированию владельца: прокрутка, квадраты
++  по 3 в ряд (остаток: 1 — центр, 2 — слева), «есть · нужно» рядом с
++  названием материала, явная подпись времени («время: 1 сут»).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 23392cd..3cf95a9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Crafting — window fixes from the owner's testing (patch 322)
++
++- The category window now scrolls (it didn't scroll on desktop before).
++- Tiles are 3 per row. Row remainder: a single tile is centered, two start
++  from the left edge (owner's word).
++- "Have N · need M" now sits next to the material name, not at the far end
++  of the row (it drifted to the edge on wide monitors).
++- The recipe line explains itself: "Complexity 1 · Survival · time: 1 d" —
++  the check's skill and the in-game crafting time (the owner's question
++  "what is 1 d?").
++- Fuse: acceptance test (patch 322) — scrolling, the 3-per-row grid with
++  alignment rules, materials next to names, the time label, dictionaries.
++
+ ## Update system: the app announces new versions and shows a changelog (patch 321)
+ 
+ Owner's word: "the app should knock on the server, ask if there's an
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6091bec..4016597 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,19 @@
+ 
+ ---
+ 
++## Крафт — правки окна по тестированию владельца (патч 322)
++
++- Окно категорий теперь прокручивается (на ПК раньше не прокручивалось).
++- Квадраты — по 3 в строке. Остаток строки: одинокая встаёт по центру,
++  две начинаются от левого края (слово владельца).
++- «Есть N · нужно M» теперь стоит рядом с названием материала, а не на
++  другом конце строки (на широком мониторе уезжала к краю).
++- Строка рецепта объясняет себя явно: «Сложность 1 · Выживание · время:
++  1 сут» — навык проверки и игровое время изготовления (вопрос владельца
++  «что такое 1 сут?»).
++- Предохранитель: приёмочный тест (патч 322) — прокрутка, сетка 3-в-ряд
++  с правилами выравнивания, материалы рядом, подпись времени, словари.
++
+ ## Система обновлений: приложение сообщает о новой версии и показывает чейнджлог (патч 321)
+ 
+ Слово владельца: «чтобы приложение стучалось на сервер, спрашивало про
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index bda3a69..91adb08 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -127,8 +127,10 @@ const buildRowsForCategory = (category) => {
+       skillLabel: getSkillDisplayName(recipe.requires.skill),
+       minutes,
+       timeLabel: formatCraftMinutes(minutes),
++      // 322 (вопрос владельца «что такое 1 сут?»): время изготовления подписано явно.
+       metaLine: fmt(d.complexity, { n: Number(recipe.requires.complexity) || 0 })
+-        + ' · ' + getSkillDisplayName(recipe.requires.skill) + ' · ' + formatCraftMinutes(minutes),
++        + ' · ' + getSkillDisplayName(recipe.requires.skill)
++        + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
+       status,
+       canCraft: evaluation.ready,
+       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index f375c19..22dccb7 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -24,6 +24,7 @@
+     "craft": "Craft",
+     "craftN": "Craft ×{n}",
+     "complexity": "Complexity {n}",
++    "craftTime": "time: {t}",
+     "rowMeta": "{skill} · {time}",
+     "timeMinutes": "{n} min",
+     "timeHours": "{n} hr",
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index cf35a67..2fa2f07 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -24,6 +24,7 @@
+     "craft": "Скрафтить",
+     "craftN": "Скрафтить ×{n}",
+     "complexity": "Сложность {n}",
++    "craftTime": "время: {t}",
+     "rowMeta": "{skill} · {time}",
+     "timeMinutes": "{n} мин",
+     "timeHours": "{n} ч",
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index 8bb3943..cca75f3 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -8,7 +8,7 @@
+ // здесь только кнопки, списки и иконки квадратов.
+ 
+ import React, { useMemo, useState } from 'react';
+-import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView } from 'react-native';
++import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import styles from '../../../styles/CraftingModal.styles';
+ import {
+@@ -38,6 +38,13 @@ const RARITY_LABEL_KEYS = {
+   rare: 'rarityRare',
+ };
+ 
++// Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
++const chunkIntoRows = (items, perRow) => {
++  const rows = [];
++  for (let i = 0; i < items.length; i += perRow) rows.push(items.slice(i, i + perRow));
++  return rows;
++};
++
+ export default function CraftingModal({ visible, onClose }) {
+   const [view, setView] = useState('categories'); // 'categories' | 'category'
+   const [category, setCategory] = useState(null);
+@@ -124,28 +131,35 @@ export default function CraftingModal({ visible, onClose }) {
+           </View>
+ 
+           {!report && view === 'categories' && (
+-            <View style={styles.body}>
+-              <View style={styles.tilesWrap}>
+-                {tiles.map((tile) => (
+-                  <TouchableOpacity
+-                    key={tile.category}
+-                    style={styles.tile}
+-                    onPress={() => openCategory(tile)}>
+-                    <MaterialCommunityIcons
+-                      name={CATEGORY_ICONS[tile.category] ?? 'circle-outline'}
+-                      style={styles.tileIcon}
+-                    />
+-                    <Text style={styles.tileLabel} numberOfLines={2}>{tile.label}</Text>
+-                    <Text style={[styles.tileCount, tile.available === 0 && styles.tileCountZero]}>
+-                      {tile.available}/{tile.recipes}
+-                    </Text>
+-                  </TouchableOpacity>
+-                ))}
+-              </View>
++            <ScrollView style={styles.body} contentContainerStyle={styles.tilesContent}>
++              {/* Патч 322: строки по 3 квадрата, прокрутка (владелец: окно на ПК
++                  не прокручивалось). Выравнивание остатка строки: одинокая — по
++                  центру; две — от левого края; полная — как есть. */}
++              {chunkIntoRows(tiles, 3).map((rowTiles, rowIdx) => (
++                <View
++                  key={`tileRow_${rowIdx}`}
++                  style={[styles.tileRow, rowTiles.length === 1 && styles.tileRowCenter, rowTiles.length === 2 && styles.tileRowLeft]}>
++                  {rowTiles.map((tile) => (
++                    <TouchableOpacity
++                      key={tile.category}
++                      style={styles.tile}
++                      onPress={() => openCategory(tile)}>
++                      <MaterialCommunityIcons
++                        name={CATEGORY_ICONS[tile.category] ?? 'circle-outline'}
++                        style={styles.tileIcon}
++                      />
++                      <Text style={styles.tileLabel} numberOfLines={2}>{tile.label}</Text>
++                      <Text style={[styles.tileCount, tile.available === 0 && styles.tileCountZero]}>
++                        {tile.available}/{tile.recipes}
++                      </Text>
++                    </TouchableOpacity>
++                  ))}
++                </View>
++              ))}
+               <TouchableOpacity style={styles.closeBtn} onPress={close}>
+                 <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
+               </TouchableOpacity>
+-            </View>
++            </ScrollView>
+           )}
+ 
+           {!report && view === 'category' && (
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index 8b9b9b9..bec08bf 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -12,11 +12,14 @@ export default StyleSheet.create({
+   closeText: { color: '#c9c6b5', fontSize: 20, paddingHorizontal: 8 },
+   backText: { color: '#c9c6b5', fontSize: 14, paddingRight: 8 },
+ 
+-  // Квадраты категорий (318)
++  // Квадраты категорий (318; 322 — прокрутка, строки по 3, выравнивание от центра)
+   body: { flex: 1, paddingHorizontal: 12 },
+-  tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingTop: 4 },
++  tilesContent: { paddingBottom: 8 },
++  tileRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
++  tileRowCenter: { justifyContent: 'center' },
++  tileRowLeft: { justifyContent: 'flex-start' },
+   tile: {
+-    width: '48.5%',
++    width: '30%',
+     aspectRatio: 1,
+     borderRadius: 12,
+     backgroundColor: '#232823',
+@@ -25,7 +28,7 @@ export default StyleSheet.create({
+     alignItems: 'center',
+     justifyContent: 'center',
+     gap: 6,
+-    padding: 6,
++    padding: 4,
+   },
+   tileIcon: { fontSize: 38, color: '#ffe9a8' },
+   tileLabel: { color: '#e8e6d9', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+@@ -56,8 +59,9 @@ export default StyleSheet.create({
+   spoilerBody: { paddingTop: 8 },
+   detailLabel: { color: '#8f9a86', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
+   rarityLine: { color: '#c9c6b5', fontSize: 12, fontWeight: '700', marginTop: 6 },
+-  materialLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
+-  materialName: { color: '#e8e6d9', fontSize: 13, flex: 1 },
++  // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
++  materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 3 },
++  materialName: { color: '#e8e6d9', fontSize: 13, flexShrink: 1 },
+   materialOk: { color: '#7da769', fontSize: 12 },
+   materialBad: { color: '#c76e6e', fontSize: 12 },
+   bigCraft: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },
+diff --git a/public/version.json b/public/version.json
+index 35e4ce9..3b0a073 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,17 +1,15 @@
+ {
+-  "version": "321",
++  "version": "322",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: новое окно — квадраты категорий, рецепты-спойлеры, выбор количества",
+-      "Кнопка «Крафт» теперь открывает окно крафта",
+-      "Персонажи: производные (ОЗ, инициатива, защита, вес) пересчитываются автоматически",
+-      "Починена установка PWA и обновления давно установленных приложений"
++      "Крафт: окно категорий прокручивается, квадраты по 3 в ряд",
++      "Крафт: «есть · нужно» теперь рядом с названием материала",
++      "Крафт: время изготовления подписано явно («время: 1 сут»)"
+     ],
+     "en-EN": [
+-      "Crafting: new window — category tiles, recipe spoilers, quantity picker",
+-      "The \"Craft\" button now opens the crafting window",
+-      "Characters: derived stats (HP, initiative, defense, carry) recalculate automatically",
+-      "Fixed PWA installation and updates for long-installed apps"
++      "Crafting: category window scrolls, tiles 3 per row",
++      "Crafting: \"have · need\" now sits next to the material name",
++      "Crafting: crafting time is labeled explicitly (\"time: 1 d\")"
+     ]
+   }
+ }
