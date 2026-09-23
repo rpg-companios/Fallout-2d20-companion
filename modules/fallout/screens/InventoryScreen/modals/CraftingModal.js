@@ -205,7 +205,11 @@ export default function CraftingModal({ visible, onClose }) {
                       <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
                         {item.canCraft
                           ? `${ui.materialsTitle}: ${item.materialGroups
-                            .map((g) => `${ui[RARITY_LABEL_KEYS[g.type]] ?? g.type} ${g.have}/${g.total}`)
+                            .map((g) => craftFormat(ui.raritySummary ?? '', {
+                              label: ui[RARITY_LABEL_KEYS[g.type]] ?? g.type,
+                              have: g.have,
+                              total: g.total,
+                            }))
                             .join(', ')}`
                           : (item.reason || '')}
                       </Text>
@@ -217,7 +221,11 @@ export default function CraftingModal({ visible, onClose }) {
                         {item.materialGroups.map((group) => (
                           <View key={group.type}>
                             <Text style={styles.rarityLine}>
-                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type} {group.have}/{group.total}
+                              {craftFormat(ui.raritySummary ?? '', {
+                                label: ui[RARITY_LABEL_KEYS[group.type]] ?? group.type,
+                                have: group.have,
+                                total: group.total,
+                              })}
                             </Text>
                             {item.materials.filter((m) => m.rarity === group.type).map((m) => (
                               <View key={m.itemId} style={styles.materialLine}>

@@ -155,8 +155,8 @@ describe('правила крафта после реформы 269', () => {
   it('сгорание — правило навыка в реестре; разрез совпадает с печатью (с. 210–211)', () => {
     // 270 (решение владельца): вместо 74 флагов в данных — две строки правила.
     // Гард: применённое к файлам, правило даёт ровно печатный разрез верстаков
-    // (кухня и химия горят: все chems/food/drinks + взрывчатка в ammo/weapons;
-    // станок оружейника — нет). И ни одной записи поле не принадлежит.
+    // (кухня и химия горят: все chems/food/drinks + вся взрывчатка в ammo и
+    // explosives (325); станок оружейника — нет). И ни одной записи поле не принадлежит.
     const burns = (r) => CRAFT_RULES.failBurnsMaterialsSkills.includes(r.requires.skill);
     const burnCount = {};
     for (const entry of craftingIndex.recipes) {
@@ -168,7 +168,7 @@ describe('правила крафта после реформы 269', () => {
     expect(burnCount.food).toBe(27);
     expect(burnCount.drinks).toBe(8);
     expect(burnCount.ammo).toBe(9);
-    expect(burnCount.weapons).toBe(9);
+    expect(burnCount.explosives).toBe(9); // 325: вся взрывчатка — своя категория
     expect(CRAFT_RULES.failBurnsMaterialsSkills.sort()).toEqual(
       [...CRAFT_RULES.failBurnsMaterialsSkills].sort(),
     ); // список — настройка: редактируется здесь, данные не трогаются

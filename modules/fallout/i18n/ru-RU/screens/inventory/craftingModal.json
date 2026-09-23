@@ -24,7 +24,7 @@
     "craft": "Скрафтить",
     "craftN": "Скрафтить ×{n}",
     "complexity": "Сложность {n}",
-    "craftTime": "время: {t}",
+    "craftTime": "время приготовления: {t}",
     "rowMeta": "{skill} · {time}",
     "timeMinutes": "{n} мин",
     "timeHours": "{n} ч",
@@ -33,7 +33,7 @@
     "shortMaterials": "Не хватает материалов",
     "ready": "Можно крафтить",
     "materialsTitle": "Материалы",
-    "haveNeed": "есть {have} · нужно {need}",
+    "haveNeed": "есть {have} шт. · нужно {need} шт.",
     "quantity": "Сколько раз",
     "resultTitle": "Крафт",
     "stopped": "Остановлено: материалов в сумке кончились, {n} попыток не началось",
@@ -46,7 +46,7 @@
     "granted": "Получено: {items}",
     "nothing": "Не получено ничего",
     "spent": "Потрачено: {items}",
-    "timeSpent": "Время: {time}",
+    "timeSpent": "Время приготовления: {time}",
     "complicationNote": "Осложнение: +{n} мин к работе",
     "craftTitle": "Крафт",
     "notAvailable": "Недоступно",
@@ -55,7 +55,8 @@
     "apYes": "Потратить 2 ОД",
     "apNo": "Полное время",
     "apHalvedNote": "Время сокращено за 2 ОД",
-    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
+    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)",
+    "raritySummary": "{label}: {have} из {total} видов"
   },
   "attributes": {
     "INT": "Интеллект"

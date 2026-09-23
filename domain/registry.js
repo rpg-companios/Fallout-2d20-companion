@@ -64,7 +64,7 @@ const moduleScrapTables = SETTING.data.junk.tables;
 const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
 const CRAFTING_FILES = {
   'ammo.json': SETTING.data.recipes.sections.ammo,
-  'weapons.json': SETTING.data.recipes.sections.weapons,
+  'explosives.json': SETTING.data.recipes.sections.explosives,
   'chems.json': SETTING.data.recipes.sections.chems,
   'food.json': SETTING.data.recipes.sections.food,
   'drinks.json': SETTING.data.recipes.sections.drinks,

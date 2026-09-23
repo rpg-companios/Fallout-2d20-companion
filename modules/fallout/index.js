@@ -92,7 +92,7 @@ import junkTables from './data/junk/tables.json';
 import recipesManifest from './data/recipes/index.json';
 import recipesCategoryRules from './data/recipes/categoryRules.json';
 import recipesAmmo from './data/recipes/ammo.json';
-import recipesWeapons from './data/recipes/weapons.json';
+import recipesExplosives from './data/recipes/explosives.json';
 import recipesChems from './data/recipes/chems.json';
 import recipesFood from './data/recipes/food.json';
 import recipesDrinks from './data/recipes/drinks.json';
@@ -257,7 +257,7 @@ export const SETTING = Object.freeze({
       categoryRules: recipesCategoryRules,
       sections: {
         ammo: recipesAmmo,
-        weapons: recipesWeapons,
+        explosives: recipesExplosives,
         chems: recipesChems,
         food: recipesFood,
         drinks: recipesDrinks,

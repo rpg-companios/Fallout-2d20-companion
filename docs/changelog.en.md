@@ -2,7 +2,25 @@
 
 ---
 
-## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
+## Crafting — light windows, explosives split out, honest labels (patch 325)
+
+Owner's word — four fixes from playtesting: window palette, where
+explosives live, confusing materials numbers and the time label.
+
+- Crafting windows recolored to the light palette used by the perk and
+  item-picker modals: white panels, green accents, dark text. No more
+  dark-themed crafting windows.
+- Grenades and mines (all 9 recipes) moved from "Weapons" into the new
+  "Explosives" category — its own file and tab. The "Weapons" tile stays
+  empty ("No recipes yet") for the future. Category order unchanged.
+- Materials no longer mix units: the rarity header counts KINDS —
+  "Common materials: 0 of 1 kinds" — while a material line counts PIECES —
+  "have 0 · need 2". Answer to the owner's question: the example needs
+  1 kind of material, none in the bag, and that kind takes 2 pieces.
+- Time is labeled explicitly: "crafting time: 20 min" on the recipe card
+  and "Crafting time: …" in the report.
+
+## ## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
 
 Owner's word: the group AP pool = 6; you can't spend more than 6, unless
 checks granted AP. AP lives inside the engine for now (a UI store comes
@@ -486,7 +504,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
 
 ---
 
-
 ## Architecture — Setting door and unified contract (patch 292)
 
 > Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
@@ -499,7 +516,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
 - test-setting: header aligned with the common setting standard.
 
 ---
-
 
 ## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
 

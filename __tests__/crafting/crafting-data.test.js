@@ -129,8 +129,8 @@ describe('данные крафта: файлы категории', () => {
       { file: 'ammo.json', category: 'ammo', count: 28 },
       { file: 'chems.json', category: 'chems', count: 21 },
       { file: 'drinks.json', category: 'drinks', count: 8 },
+      { file: 'explosives.json', category: 'explosives', count: 9 },
       { file: 'food.json', category: 'food', count: 27 },
-      { file: 'weapons.json', category: 'weapons', count: 9 },
     ]);
   });
 
@@ -200,7 +200,7 @@ describe('данные крафта: ссылки', () => {
   it('навык — канонический ключ, категория — из манифеста', () => {
     for (const { category, record } of allRecipes()) {
       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
-      expect(['ammo', 'weapons', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
+      expect(['ammo', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
       expect(Number.isInteger(record.requires.complexity)).toBe(true);
       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
       expect(record.requires.complexity).toBeLessThanOrEqual(7);

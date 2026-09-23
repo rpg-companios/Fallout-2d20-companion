@@ -5,6 +5,7 @@
 // 3) «есть N · нужно M» — рядом с названием материала, не на другом конце.
 // 4) Время изготовления подписано явно («время: 1 сут»), вопрос владельца
 //    «что такое Выживание 1 сут?» — навык проверки + игровое время работы.
+//    325: формулировка владельца — «время приготовления: …» вместо «время: …».
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -44,8 +45,9 @@ describe('Окно крафта — правки по тестированию �
   });
 
   it('время изготовления подписано явно в обоих словарях', () => {
-    expect(ruDict.ui.craftTime).toBe('время: {t}');
-    expect(enDict.ui.craftTime).toBe('time: {t}');
+    // 325: подпись владельца «время приготовления», а не просто «время»
+    expect(ruDict.ui.craftTime).toBe('время приготовления: {t}');
+    expect(enDict.ui.craftTime).toBe('crafting time: {t}');
     const row = buildCategoryModel('food').find((r) => r.recipeId === 'food_grilled_bloatfly');
     const timeLabel = craftDict().ui.craftTime.split('{t}')[0];
     expect(row.metaLine).toContain(timeLabel);
