@@ -84,5 +84,4 @@ export const syncTimedEffectsToStore = (nextEffects, store) => {
     });
   });
 
-  store.triggerDependentCalculations();
 };

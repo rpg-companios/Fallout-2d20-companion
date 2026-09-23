@@ -172,6 +172,8 @@ export interface CharacterActions {
   /** Смена комплекта; keepSkills — не чистить tagged-навыки (патч 241). */
   resetKitAndRewards: (opts?: { keepSkills?: boolean }) => void;
   recalculateAll: () => void;
+  /** МК-3 (317): каскад пересчитывает автоматически; действие — публичная
+   * точка форс-пересчёта (опции-переопределения — как раньше). */
   recalculateDerivedStats: (options?: {
     trait?: CatalogEntityRef | null;
     level?: number;
@@ -221,6 +223,7 @@ export interface CharacterActions {
   updateAttribute: (attrId: string, delta: number) => void;
   updateSkill: (skillId: string, delta: number) => void;
   markSkillsAsRewarded: (skills: string[]) => void;
+  /** Псевдоним recalculateDerivedStats (МК-3, 317: обычно избыточен — каскад). */
   triggerDependentCalculations: () => void;
 
   // ── Робот (robotSlice) ──

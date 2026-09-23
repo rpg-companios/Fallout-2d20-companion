@@ -2,6 +2,26 @@
 
 ---
 
+## MK-3, step 2 — the store recalculates derived stats itself, manual calls are gone (patch 317)
+
+Continuation of the "cascade into the store". Nothing changes for the
+player — all the numbers are the same. What changed is inside: it is no
+longer possible to "forget to recalculate".
+
+- Any store action that changes an input (attributes, effects, perks, trait,
+  level, origin, robot slots, equipment mirror) now updates the derived stats
+  (max health, initiative, defense, melee bonus, carry weight) automatically
+  and synchronously — one function, same formulas as 316.
+- All 26 manual recalculation calls removed (22 in the store, 3 in the robot
+  slice, 1 in effects sync); the recalculate action remains as a public
+  force-refresh entry point.
+- Fuse: acceptance test (patch 317) — 7 checks, none of them calls the
+  recalculation manually: attributes, effects, a perk, robot slots, the
+  equipment mirror, the force entry point, and no infinite looping.
+- This is the foundation for the future game master: when world states
+  arrive from a server, the cascade recalculates the numbers by itself —
+  nothing to forget.
+
 ## Refactor MK-3, step 1 — derived-stat formulas moved into the module (patch 316)
 
 First step of the "cascade into the store" plan (2026-09-18). Derived-stat

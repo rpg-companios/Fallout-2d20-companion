@@ -109,7 +109,6 @@ export const createRobotActions = (set, get) => ({
     const prev = robot.slots || {};
     const next = typeof updater === 'function' ? updater(prev) : (updater || {});
     set({ robot: { ...robot, slots: next || {} } });
-    get().recalculateDerivedStats?.();
   },
 
   /** Заменить модули робота целиком (значение или функция); остальное robot сохраняет. */
@@ -118,7 +117,6 @@ export const createRobotActions = (set, get) => ({
     const prev = Array.isArray(robot.modules) ? robot.modules : [];
     const next = typeof updater === 'function' ? updater(prev) : (updater || []);
     set({ robot: { ...robot, modules: next || [] } });
-    get().recalculateDerivedStats?.();
   },
 
   resetRobot: () => set(createInitialRobotState()),
@@ -155,7 +153,6 @@ export const createRobotActions = (set, get) => ({
       items[itemId] = { ...item, quantity: qty - 1 };
     }
     set({ items, robot: { ...robot, mk2Installed: true } });
-    get().recalculateDerivedStats?.();
     return { ok: true };
   },
 
