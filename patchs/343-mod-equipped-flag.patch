@@ -1,0 +1,466 @@
+diff --git a/__tests__/equipment/armor-mod-equipped-flag-343.test.js b/__tests__/equipment/armor-mod-equipped-flag-343.test.js
+new file mode 100644
+index 0000000..84b5d3b
+--- /dev/null
++++ b/__tests__/equipment/armor-mod-equipped-flag-343.test.js
+@@ -0,0 +1,87 @@
++// ПРИЁМОЧНЫЙ (патч 343)
++// Слово владельца: при установке мод получает флаг «экипирован» и привязывается
++// к предмету брони, на который встал. «Продали предмет с модом — ушли оба».
++// Экипированный мод невидим в инвентаре. Снятие/замена — мод снова виден.
++import { describe, it, expect, beforeEach } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { selectItemsByEquipped } from '../../src/store/selectors';
++
++const grant = (state, weaponId, extra = {}) => {
++  const { addNewItem } = state;
++  const instanceId = addNewItem({ weaponId, ...extra });
++  return instanceId;
++};
++
++const bagIds = (state) => selectItemsByEquipped({ items: state.items }, false)
++  .map((item) => item.weaponId);
++
++describe('ПРИЁМОЧНЫЙ (патч 343): мод брони — экипирован, привязан, невидим', () => {
++  let armorId;
++  let modId;
++
++  beforeEach(() => {
++    useCharacterStore.setState({ items: {} });
++    armorId = grant(useCharacterStore.getState(), 'armor_leather_armor');
++    modId = grant(useCharacterStore.getState(), 'mod_std_boiled_leather');
++  });
++
++  it('установка: мод получает equipped+installedOn и исчезает из сумки', () => {
++    const key = useCharacterStore.getState().installArmorMod({ modId, hostKey: armorId });
++    expect(key).toBeTruthy();
++
++    const mod = useCharacterStore.getState().items[key];
++    expect(mod.equipped).toBe(true);
++    expect(mod.installedOn).toBe(armorId);
++
++    // невидим в сумке (тот же селектор, что строит список инвентаря)
++    expect(bagIds(useCharacterStore.getState())).not.toContain('mod_std_boiled_leather');
++  });
++
++  it('снятие: флаг и привязка теряются, мод снова виден', () => {
++    const key = useCharacterStore.getState().installArmorMod({ modId, hostKey: armorId });
++    useCharacterStore.getState().uninstallArmorMod({ modId, hostKey: armorId });
++
++    const mod = useCharacterStore.getState().items[key];
++    expect(mod.equipped).toBe(false);
++    expect(mod.installedOn).toBeUndefined();
++    expect(bagIds(useCharacterStore.getState())).toContain('mod_std_boiled_leather');
++  });
++
++  it('замена: прежний мод освобождается при установке другого', () => {
++    const secondId = grant(useCharacterStore.getState(), 'mod_std_hardened_leather');
++    useCharacterStore.getState().installArmorMod({ modId, hostKey: armorId });
++    useCharacterStore.getState().uninstallArmorMod({ modId, hostKey: armorId });
++    useCharacterStore.getState().installArmorMod({ modId: secondId, hostKey: armorId });
++
++    // прежний — виден, новый — скрыт
++    expect(bagIds(useCharacterStore.getState())).toContain('mod_std_boiled_leather');
++    expect(bagIds(useCharacterStore.getState())).not.toContain('mod_std_hardened_leather');
++  });
++
++  it('продали предмет с модом — ушли оба', () => {
++    const modKey = useCharacterStore.getState().installArmorMod({ modId, hostKey: armorId });
++    // единственный путь удаления предмета — расход стопки до нуля
++    // (spendItemStacks — общий расходчик материалов/предметов)
++    useCharacterStore.getState().spendItemStacks({ spend: [{ itemId: 'armor_leather_armor', count: 1 }] });
++
++    expect(useCharacterStore.getState().items[armorId]).toBeUndefined();
++    expect(useCharacterStore.getState().items[modKey]).toBeUndefined();
++  });
++
++  it('свободная установка (мода в сумке нет): экземпляр не трогается, ошибки нет', () => {
++    const before = { ...useCharacterStore.getState().items };
++    const key = useCharacterStore.getState().installArmorMod({
++      modId: 'mod_std_not_owned',
++      hostKey: armorId,
++    });
++    expect(key).toBeNull();
++    expect(useCharacterStore.getState().items).toEqual(before);
++  });
++
++  it('мод без привязки не удаляется чужим hostKey (снятие точечно)', () => {
++    useCharacterStore.getState().installArmorMod({ modId, hostKey: 'body.armor' });
++    useCharacterStore.getState().uninstallArmorMod({ modId, hostKey: 'head.armor' });
++    // привязка к другому слоту — мод остаётся экипированным
++    expect(bagIds(useCharacterStore.getState())).not.toContain('mod_std_boiled_leather');
++  });
++});
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+index 44a19e9..a6fcc1f 100644
+--- a/docs/agents/data-flows.md
++++ b/docs/agents/data-flows.md
+@@ -150,3 +150,38 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
+ Застрявшие клиенты: /sw.js меняется намеренно (compat-worker revision) —
+ воркер переустанавливается и самоуничтожается, кэши чистятся.
+ ```
++
++## 9. Моды брони: крафт → установка → снятие (патчи 341–343)
++
++```
++КРАФТ (окно «Крафт», квадрат «Броня»):
++  recipes/armor.json (генератор build-crafting-data.mjs)
++        │  domain/resolveItem.js case 'armorMod' (каталог armorMods/uniqArmorMods)
++        ▼
++  мод-ПРЕДМЕТ в сумке (items[instanceKey], weaponId = id мода)
++
++УСТАНОВКА (WeaponsAndArmorScreen → ArmorModificationModal):
++  выбор в окне → setEquippedArmor(slot, modifiedItem)  — запись id модов
++  на предмет брони (appliedUniqueArmorModId / appliedArmorModId /
++  appliedClothingModId; форма правды — см. §1 справочника armor-mods)
++        │  ПАРАЛЛЕЛЬНО (343, слово владельца):
++        ▼
++  installArmorMod({modId, hostKey}) — экземпляр мода в сумке:
++    equipped: true (невидим в сумке: selectItemsByEquipped(false),
++    вес не задваивается — вес брони уже включает weightModifier)
++    installedOn: hostKey (ключ экземпляра носителя, иначе «слот.слой»)
++    экземпляра в сумке нет (гейт ВЫКЛ) → null, просто запись на броне
++
++СНЯТИЕ/ЗАМЕНА (окно установки):
++  uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
++  стирается → мод снова виден в сумке
++
++УДАЛЕНИЕ НОСИТЕЛЯ (расход до нуля: spendItemStacks / spendAmmoForWeapon):
++  collectModsBoundTo(items, hostKey) — моды уходят вместе с предметом
++  («продали предмет с модом — ушли оба»); releaseModsBoundTo —
++  отдельное действие стора для будущих точек удаления.
++
++ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
++INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS
++(characterActions.ts, fuse action-passports).
++```
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 44d4ae3..fa968c1 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **342** · у владельца на main применено до **314**
++· последний сданный патч: **343** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -176,8 +176,13 @@
+   «Модификации». Настройка «Требовать мод в сумке для установки»
+   (modsRequireInventoryItem, раздел «Крафт», дефолт ВЫКЛ = свободная
+   установка; ВКЛ — только моды из сумки, чистый фильтр
+-  filterModsByInventory в modsEquip). Открыто: расходуется ли мод
+-  при установке.
++  filterModsByInventory в modsEquip).
++- 343 — слово владельца: установленный мод-предмет — «экипирован» и
++  привязан к носителю (installedOn), невидим в сумке; снятие/замена
++  возвращает видимость; предмет-носитель удалён (расход до нуля) —
++  моды уходят с ним (releaseModsBoundTo; свободная установка без
++  экземпляра в сумке — просто запись на броне, возвращать нечего).
++  Расходование мода при установке решено: НЕ расходуется.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b8dcf68..af69426 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,22 @@
+ 
+ ---
+ 
++## An installed armor mod now becomes equipped (patch 343)
++
++Owner's word: selling the host item takes the mod with it; an equipped mod
++is invisible in the inventory; removing or replacing it makes the mod
++visible again. The owner's analogy — a robot arm with a built-in weapon.
++
++- On installation the mod item gets an "equipped" flag and is bound to the
++  armor piece it was installed on (`installedOn`).
++- When the host item is consumed away, its installed mods go with it.
++- Removing or replacing the mod in the install window returns the old mod
++  to the bag.
++- Free installation (the "require mod in bag" setting is off and no mod
++  item exists) is just a record on the armor — nothing to return.
++
++---
++
+ ## Universal mod, Material vs Modification, bag gate (patch 342)
+ 
+ Owner's words after the first snag of testing.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e885191..a308c0e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,22 @@
+ 
+ ---
+ 
++## Мод-предмет при установке становится экипированным (патч 343)
++
++Слово владельца: продали предмет с модом — ушли оба; экипированный мод
++невидим в инвентаре; сняли или заменили — мод снова видим. Аналог — рука
++робота со встроенным оружием.
++
++- При установке мод-предмет получает флаг «экипирован» и привязывается к
++  предмету брони, на который встал (`installedOn`).
++- «Продали» предмет-носитель (расход до нуля) — установленные на него
++  моды уходят вместе с ним.
++- Снятие или замена мода в окне установки возвращает прежний мод в сумку.
++- Свободная установка (настройка «требовать мод в сумке» выключена и
++  мода-предмета нет) — просто запись на броне, возвращать нечего.
++
++---
++
+ ## Универсальный мод, «Материал ≠ Модификация», гейт сумки (патч 342)
+ 
+ Слова владельца по итогам первого затыка тестирования.
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index bc54ef8..ef08913 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -348,8 +348,21 @@ uniq_synth_microcarbon (а «Нановолоконная» — uniq_synth_nanof
+ 3. **Настройка «Требовать мод в сумке для установки»** (раздел «Крафт»,
+    по умолчанию ВЫКЛ — установка свободна). Включена — ставятся только
+    моды, созданные/найденные (id присутствует в сумке); пустые группы
+-   помечены «Нет в сумке (создаются в окне „Крафт“)». Открытый вопрос:
+-   расходуется ли мод-предмет при установке (решение после тестирования).
++   помечены «Нет в сумке (создаются в окне „Крафт“)». Открытый вопрос
++   о расходовании закрыт словом владельца (патч 343, п. 4): мод НЕ
++   расходуется — становится экипированным.
++4. **Мод-предмет при установке получает флаг «экипирован»** (слово
++   владельца, патч 343). Слова владельца: «продали предмет с модом —
++   ушли оба»; «экипированный мод невидим в инвентаре»; снятие/замена —
++   флаг теряется, мод снова видим. Аналог владельца — рука робота со
++   встроенным оружием.
++   Механика: установленный мод привязывается к предмету-носителю
++   (`installedOn`), исчезает из инвентаря (флаг `equipped`) и весит на
++   броне; снятие/замена в окне установки возвращает его в сумку;
++   удаление предмета-носителя уводит установленные моды вместе с ним.
++   Аналог владельца — рука робота со встроенным оружием. При свободной
++   установке (гейт ВЫКЛ, мода-предмета в сумке нет) флага нет — просто
++   запись на броне, возвращать нечего.
+ 
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+diff --git a/domain/resolveItem.js b/domain/resolveItem.js
+index 11e5b30..70b7351 100644
+--- a/domain/resolveItem.js
++++ b/domain/resolveItem.js
+@@ -125,6 +125,7 @@ const INSTANCE_FIELDS = [
+   'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
+   'itemType',                                 // тип хранится на инстансе
+   'quantity', 'equipped', 'locked',           // состояние инвентаря
++  'installedOn',                              // 343: мод установлен на предмет
+   'appliedMods', 'stackKey',                  // моды и подпись стопки
+   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
+   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
+diff --git a/domain/saveSlimming.js b/domain/saveSlimming.js
+index 022402f..e968c08 100644
+--- a/domain/saveSlimming.js
++++ b/domain/saveSlimming.js
+@@ -35,6 +35,8 @@ export const SAVE_STATE_FIELDS = new Set([
+   'id', 'instanceId', 'weaponId', 'code', 'Name',
+   // тип и состояние инвентаря
+   'itemType', 'quantity', 'equipped', 'locked', 'requiresMkII',
++  // 343: мод установлен на предмет (hostKey) — экипирован и невидим в сумке
++  'installedOn',
+   // моды и подпись стопки
+   'appliedMods', 'stackKey',
+   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index c6f9e8e..bb2554d 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -1069,9 +1069,28 @@ const WeaponsAndArmorScreen = () => {
+     setArmorModalVisible(true);
+   };
+ 
++  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
++  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
++
+   const handleApplyArmorModification = (modifiedItem) => {
+     if (!selectedArmorSlot) return;
+     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
++    // 343 (слово владельца): при установке мод получает флаг «экипирован» и
++    // привязывается к предмету-носителю (невидим в сумке до снятия); при
++    // замене/снятии прежний мод освобождается и снова виден. Пункты «Без
++    // мода» = снятие (id нет в новом наборе — освобождаем).
++    const prevItem = equippedArmor?.[selectedArmorSlot]?.[field];
++    const idsOf = (item) => [
++      item?.appliedArmorModId || null,
++      item?.appliedUniqueArmorModId || null,
++      item?.appliedClothingModId || null,
++    ].filter(Boolean);
++    const prevIds = idsOf(prevItem);
++    const nextIds = idsOf(modifiedItem);
++    const hostKey = prevItem?.instanceId || prevItem?.stackKey
++      || `${selectedArmorSlot}.${field}`; // слот-идентификация без ключа экземпляра
++    prevIds.filter((id) => !nextIds.includes(id)).forEach((id) => uninstallArmorMod({ modId: id, hostKey }));
++    nextIds.filter((id) => !prevIds.includes(id)).forEach((id) => installArmorMod({ modId: id, hostKey }));
+     // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
+     // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
+     setEquippedArmor((prev) => ({
+diff --git a/public/version.json b/public/version.json
+index 0eb25da..fa9caae 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "342",
++  "version": "343",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index c80e7cd..d651133 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -192,6 +192,13 @@ export interface CharacterActions {
+   updateItem: (itemId: string, patch: Partial<StoreItem>) => void;
+   equipItem: (itemId: string) => void;
+   unequipItem: (itemId: string) => void;
++  /** 343: установить мод брони на предмет-носитель (флаг «экипирован» +
++   * привязка installedOn; мода нет в сумке — свободная установка, null). */
++  installArmorMod: (args: { modId: string; hostKey: string | null }) => string | null;
++  /** 343: снять мод — теряет «экипирован» и снова виден в сумке. */
++  uninstallArmorMod: (args: { modId: string; hostKey?: string | null }) => void;
++  /** 343: предмет-носитель удалён — установленные моды уходят с ним. */
++  releaseModsBoundTo: (hostKey: string) => void;
+   repairWeapon: (itemId: string) => void;
+   /** Списать патроны/износ при выстреле (инварианты в слайсе). */
+   spendAmmoForWeapon: (args: {
+@@ -362,6 +369,7 @@ export const CRUD_OP_KEYS = [
+   'expireEffect',
+   'initRobot',
+   'initRobotFromKit',
++  'installArmorMod',
+   'loadPowerArmorState',
+   'loadRobotState',
+   'markSkillsAsRewarded',
+@@ -369,6 +377,7 @@ export const CRUD_OP_KEYS = [
+   'removeAttributeModifier',
+   'removeRobotModule',
+   'removeSkillModifier',
++  'releaseModsBoundTo',
+   'repairPowerArmorPieceAt',
+   'repairPowerArmorStack',
+   'repairWeapon',
+@@ -381,6 +390,7 @@ export const CRUD_OP_KEYS = [
+   'triggerDependentCalculations',
+   'unequipHeldWeapon',
+   'unequipItem',
++  'uninstallArmorMod',
+   'unequipPowerArmorPackage',
+   'unequipPowerArmorPieceAt',
+   'updateAttribute',
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index e4652af..2f4578b 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -272,6 +272,14 @@ const withDerivedCascade = (config) => (set, get, api) => {
+   return config(cascadedSet, get, api);
+ };
+ 
++/**
++ * 343: ключи модов, установленных на предмет-носитель hostKey (чистый —
++ * используется и внутри транзакций, где set() должен случиться один раз).
++ */
++const collectModsBoundTo = (items, hostKey) => Object.entries(items || {})
++  .filter(([, item]) => item?.installedOn && item.installedOn === hostKey)
++  .map(([key]) => key);
++
+ const useCharacterStore = create(withDerivedCascade(devtools(
+   persist(
+     (set, get) => ({
+@@ -633,7 +641,12 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+           if (!remaining) break;
+           const quantity = Number(ammo.quantity) || 1;
+           const spent = Math.min(quantity, remaining);
+-          if (quantity === spent) delete items[itemId];
++          if (quantity === spent) {
++            delete items[itemId];
++            // 343: моды уходят с предметом — удаляем из ЭТОЙ копии (set() ниже
++            // перезапишет стор целиком, отдельный set() внутри откатится)
++            for (const modKey of collectModsBoundTo(items, itemId)) delete items[modKey];
++          }
+           else items[itemId] = { ...ammo, quantity: quantity - spent };
+           remaining -= spent;
+         }
+@@ -691,6 +704,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+             const quantity = Number(items[key].quantity) || 1;
+             if (quantity <= remaining) {
+               delete items[key];
++              // 343: моды уходят с предметом — из этой же копии (см. выше)
++              for (const modKey of collectModsBoundTo(items, key)) delete items[modKey];
+               remaining -= quantity;
+               spent.push({ itemId: catalogId, count: quantity, instanceId: key });
+             } else {
+@@ -731,6 +746,65 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         set({ items });
+       },
+ 
++      /**
++       * 343 (слово владельца): установить мод на предмет брони/одежды.
++       * Мод-экземпляр получает флаг «экипирован» (equipped: true — исчезает
++       * из сумки) и привязку к хосту (installedOn = ключ предмета-носителя).
++       * Если экземпляра в сумке нет (настройка «требовать мод в сумке»
++       * выключена) — ничего не делаем: мод «виртуальный», установка свободна.
++       * @returns {string|null} ключ экземпляра мода или null.
++       */
++      installArmorMod: ({ modId, hostKey }) => {
++        if (!modId) return null;
++        const items = { ...get().items };
++        const entry = Object.entries(items).find(([key, item]) => (
++          item?.weaponId === modId && !item.equipped && !item.installedOn
++        ));
++        if (!entry) return null;
++        const [key, item] = entry;
++        items[key] = { ...item, equipped: true, installedOn: hostKey || null };
++        set({ items });
++        debugLog('armorMod.installed', { modId, instanceKey: key, hostKey });
++        return key;
++      },
++
++      /**
++       * 343: снять мод с предмета (замена или «без мода») — теряет флаг
++       * «экипирован» и снова виден в сумке.
++       */
++      uninstallArmorMod: ({ modId, hostKey }) => {
++        if (!modId) return;
++        const items = { ...get().items };
++        const entry = Object.entries(items).find(([key, item]) => (
++          item?.weaponId === modId && item.installedOn
++          && (!hostKey || item.installedOn === hostKey)
++        ));
++        if (!entry) return;
++        const [key, item] = entry;
++        items[key] = { ...item, equipped: false };
++        delete items[key].installedOn;
++        set({ items });
++        debugLog('armorMod.uninstalled', { modId, instanceKey: key });
++      },
++
++      /**
++       * 343: предмет-носитель удалён (продан/потерян) — установленные на него
++       * моды уходят вместе с ним («продали предмет с модом — ушли оба»).
++       */
++      releaseModsBoundTo: (hostKey) => {
++        if (!hostKey) return;
++        const items = { ...get().items };
++        let changed = false;
++        for (const [key, item] of Object.entries(items)) {
++          if (item?.installedOn === hostKey) {
++            delete items[key];
++            changed = true;
++            debugLog('armorMod.releasedWithHost', { key, hostKey });
++          }
++        }
++        if (changed) set({ items });
++      },
++
+       /**
+        * Unequip an item (set equipped = false)
+        * @param {string} itemId - Item ID
