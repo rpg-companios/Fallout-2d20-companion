@@ -1,0 +1,432 @@
+diff --git a/App.js b/App.js
+index df6a2cd..c3d3525 100644
+--- a/App.js
++++ b/App.js
+@@ -15,8 +15,8 @@ import { Provider as PaperProvider } from 'react-native-paper';
+ import { startCharacterAutosave } from './src/saves/characterSaves';
+ import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
+ import AlertHost from './components/alerts/AlertHost';
+-// Окно «Что нового» (патч 321): /version.json + чейнджлог с галочкой
+-// «больше не показывать» (логика — src/utils/appVersion.js).
++// Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
++// /version.json + описание релиза (логика — src/utils/appVersion.js).
+ import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
+ // Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
+ // с AlertHost; движок лишь рендерит, правила внутри модуля.
+diff --git a/__tests__/debug/app-update-notice.test.js b/__tests__/debug/app-update-notice.test.js
+index a0d0471..0966c46 100644
+--- a/__tests__/debug/app-update-notice.test.js
++++ b/__tests__/debug/app-update-notice.test.js
+@@ -1,8 +1,9 @@
+-// ПРИЁМОЧНЫЙ (патч 321): система обновлений PWA — окно «Что нового».
+-// Приложение читает /version.json свежим; версия новее запомненной → окно
+-// с чейнджлогом; галочка «больше не показывать» запоминает версию; без
+-// галочки окно появится снова. Файл version.json обновляется в том же
+-// патче, что и changelogs (версия = номер последнего патча).
++// ПРИЁМОЧНЫЙ (патч 335): окно «Что нового» — один раз на РЕЛИЗ.
++// Слово владельца: «поле с галочкой убрать, показывать один раз в релиз.
++// Релиз может состоять из кучи патчей» — патчи между релизами окно не
++// показывают, notes в version.json описывают РЕЛИЗ, а не последний патч.
++// Правило 321 сохранено: version = номер последнего патча, файл обновляется
++// каждым патчем; release поднимает владелец.
+ import { describe, expect, it, vi } from 'vitest';
+ 
+ import {
+@@ -23,41 +24,49 @@ const memoryStorage = () => {
+   };
+ };
+ 
+-describe('Система обновлений (321): version.json, окно «Что нового»', () => {
+-  it('version.json: версия — номер патча (растёт), чейнджлог на обоих языках', () => {
+-    // Правило 321: версия = номер последнего патча, обновляется В ТОМ ЖЕ
+-    // ПАТЧЕ. Точное число не фиксируем — оно растёт каждым патчем.
++describe('Окно «Что нового» (335): один раз на релиз, без галочки', () => {
++  it('version.json: version = патч (растёт), release задан, notes = описание релиза', () => {
+     expect(String(versionJson.version)).toMatch(/^\d+$/);
+-    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(321);
++    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(335);
++    expect(versionJson.release, 'релиз объявлен в version.json').toBeTruthy();
+     expect(versionJson.notes['ru-RU'].length).toBeGreaterThan(0);
+     expect(versionJson.notes['en-EN'].length).toBeGreaterThan(0);
+   });
+ 
+-  it('галочка «больше не показывать»: показывать только неизвестную версию', () => {
++  it('галочки больше нет: показывать только незнакомый релиз', () => {
+     expect(shouldShowUpdateNotice(null, null)).toBe(false);
+-    expect(shouldShowUpdateNotice('321', '321')).toBe(false);
+-    expect(shouldShowUpdateNotice('321', null)).toBe(true);
+-    expect(shouldShowUpdateNotice('321', '319')).toBe(true);
++    expect(shouldShowUpdateNotice('1', '1')).toBe(false); // релиз уже показывали
++    expect(shouldShowUpdateNotice('1', null)).toBe(true);
++    expect(shouldShowUpdateNotice('2', '1')).toBe(true); // новый релиз — показываем
++    // патчи между релизами: release тот же — окно молчит
++    expect(shouldShowUpdateNotice('1', '1')).toBe(false);
+   });
+ 
+-  it('память устройства: записали версию — прочитали ту же', () => {
++  it('память устройства: записали релиз — прочитали тот же', () => {
+     const storage = memoryStorage();
+     expect(readAckedVersion(storage)).toBeNull();
+-    writeAckedVersion(storage, '321');
+-    expect(readAckedVersion(storage)).toBe('321');
+-    expect(readAckedVersion(storage)).not.toBe('319');
++    writeAckedVersion(storage, '1');
++    expect(readAckedVersion(storage)).toBe('1');
++    expect(readAckedVersion(storage)).not.toBe('2');
+   });
+ 
+   it('ключ хранилища стабилен (смена ключа = окно всем заново)', () => {
+     expect(ACK_STORAGE_KEY).toBe('app_version_ack');
+   });
+ 
+-  it('выкачка version.json: успех, 404 и битый JSON не роняют приложение', async () => {
++  it('выкачка version.json: release читается, без поля — фолбэк на патч', async () => {
+     const ok = await fetchLatestVersion(vi.fn().mockResolvedValue({
++      ok: true,
++      json: async () => ({ version: '335', release: '1', notes: { 'ru-RU': ['а'] } }),
++    }));
++    expect(ok).toEqual({ version: '335', release: '1', notes: { 'ru-RU': ['а'] } });
++
++    // старое развёртывание без release: релиз = версия (поведение 321)
++    const legacy = await fetchLatestVersion(vi.fn().mockResolvedValue({
+       ok: true,
+       json: async () => ({ version: '321', notes: { 'ru-RU': ['а'] } }),
+     }));
+-    expect(ok).toEqual({ version: '321', notes: { 'ru-RU': ['а'] } });
++    expect(legacy).toEqual({ version: '321', release: '321', notes: { 'ru-RU': ['а'] } });
+ 
+     await expect(fetchLatestVersion(vi.fn().mockResolvedValue({ ok: false }))).resolves.toBeNull();
+     await expect(fetchLatestVersion(vi.fn().mockRejectedValue(new Error('offline')))).resolves.toBeNull();
+@@ -67,13 +76,29 @@ describe('Система обновлений (321): version.json, окно «Ч
+     }))).resolves.toBeNull();
+   });
+ 
+-  it('чейнджлог: язык приложения, фолбэк на ru, пустые notes', () => {
++  it('описание релиза: язык приложения, фолбэк на ru, пустые notes', () => {
+     expect(notesForLocale(versionJson.notes, 'ru-RU')).toEqual(versionJson.notes['ru-RU']);
+     expect(notesForLocale(versionJson.notes, 'en-EN')).toEqual(versionJson.notes['en-EN']);
+     expect(notesForLocale({ 'ru-RU': ['а'] }, 'en-EN')).toEqual(['а']);
+     expect(notesForLocale({}, 'ru-RU')).toEqual([]);
+   });
+ 
++  it('галочка «больше не показывать» удалена из словарей и модалки', () => {
++    const ru = require('fs').readFileSync(
++      new URL('../../i18n/ru-RU/App.json', import.meta.url),
++      'utf-8',
++    );
++    expect(ru).not.toContain('dontShow');
++    const modal = require('fs').readFileSync(
++      new URL('../../components/UpdateNotice/UpdateNoticeModal.js', import.meta.url),
++      'utf-8',
++    );
++    expect(modal).not.toContain('dontShow');
++    expect(modal).not.toContain('MaterialCommunityIcons');
++    // закрытие окна запоминает релиз (автоматический ack)
++    expect(modal).toContain('writeAckedVersion(storage(), notice.release)');
++  });
++
+   it('окно смонтировано в приложении (проводка, урок патча 319)', () => {
+     const app = require('fs').readFileSync(
+       new URL('../../App.js', import.meta.url),
+diff --git a/components/UpdateNotice/UpdateNoticeModal.js b/components/UpdateNotice/UpdateNoticeModal.js
+index 269c68a..b784666 100644
+--- a/components/UpdateNotice/UpdateNoticeModal.js
++++ b/components/UpdateNotice/UpdateNoticeModal.js
+@@ -1,14 +1,13 @@
+ // components/UpdateNotice/UpdateNoticeModal.js
+-// Окно «Что нового» (патч 321, слово владельца): приложение при запуске
+-// читает /version.json всегда свежим; если версия на сервере новее
+-// запомненной на устройстве — показывает чейнджлог. Галочка «больше не
+-// показывать» запоминает версию; без галочки окно появится снова при
+-// следующем запуске. Логика и строки чейнджлога — src/utils/appVersion.js
+-// и public/version.json; здесь только отрисовка.
++// Окно «Что нового» (патч 321; 335 — один раз на релиз): приложение при
++// запуске читает /version.json всегда свежим; если РЕЛИЗ на сервере новее
++// запомненного — показывает описание релиза. Галочки нет: закрытие окна
++// само запоминает релиз — до следующего релиза окно не беспокоит.
++// Логика и строки описания — src/utils/appVersion.js и public/version.json;
++// здесь только отрисовка.
+ 
+ import React, { useEffect, useState } from 'react';
+ import { Modal, View, Text, TouchableOpacity } from 'react-native';
+-import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { tApp } from '../../i18n/appI18n';
+ import { useLocale } from '../../i18n/locale';
+ import {
+@@ -23,7 +22,6 @@ const storage = () => (typeof window !== 'undefined' ? window.localStorage : nul
+ 
+ export default function UpdateNoticeModal() {
+   const [notice, setNotice] = useState(null);
+-  const [dontShow, setDontShow] = useState(false);
+   const locale = useLocale();
+ 
+   useEffect(() => {
+@@ -33,17 +31,18 @@ export default function UpdateNoticeModal() {
+     fetchLatestVersion().then((latest) => {
+       if (cancelled || !latest) return;
+       const acked = readAckedVersion(window.localStorage);
+-      if (shouldShowUpdateNotice(latest.version, acked)) setNotice(latest);
++      if (shouldShowUpdateNotice(latest.release, acked)) setNotice(latest);
+     });
+     return () => { cancelled = true; };
+   }, []);
+ 
+   if (!notice) return null;
+ 
++  // 335 (слово владельца): один раз на релиз, без галочки — закрытие окна
++  // само запоминает релиз.
+   const close = () => {
+-    if (dontShow) writeAckedVersion(storage(), notice.version);
++    writeAckedVersion(storage(), notice.release);
+     setNotice(null);
+-    setDontShow(false);
+   };
+ 
+   const lines = notesForLocale(notice.notes, locale);
+@@ -56,14 +55,6 @@ export default function UpdateNoticeModal() {
+           {lines.map((line, index) => (
+             <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
+           ))}
+-          <TouchableOpacity style={styles.checkRow} onPress={() => setDontShow((v) => !v)}>
+-            <MaterialCommunityIcons
+-              name={dontShow ? 'checkbox-marked' : 'checkbox-blank-outline'}
+-              size={20}
+-              color="#d4af37"
+-            />
+-            <Text style={styles.checkText}>{tApp('updateNotice.dontShow')}</Text>
+-          </TouchableOpacity>
+           <TouchableOpacity style={styles.closeBtn} onPress={close}>
+             <Text style={styles.closeText}>{tApp('updateNotice.close')}</Text>
+           </TouchableOpacity>
+@@ -78,8 +69,6 @@ const styles = {
+   dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420 },
+   title: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginBottom: 10 },
+   line: { color: '#e8e6d9', fontSize: 13, lineHeight: 19, marginBottom: 6 },
+-  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+-  checkText: { color: '#c9c6b5', fontSize: 13 },
+   closeBtn: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 14 },
+   closeText: { color: '#f0e68c', fontSize: 14, fontWeight: '700' },
+ };
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index dfcd557..ae7a86f 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **334** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–334 уехали, установка не подтверждена;
++· последний сданный патч: **335** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–335 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -120,6 +120,11 @@
+   нужно M шт.»; materialGroups из модели убраны, ключи словаря
+   rarity*/materialsTitle остались (пригодятся редкости-подписи в крафте
+   модов).
++- 335 — окно обновлений «Что нового»: ОДИН РАЗ НА РЕЛИЗ, без галочки
++  (закрытие окна само запоминает релиз). version.json: version = патч
++  (правило 321), release = номер релиза (поднимает ВЛАДЕЛЕЦ словом
++  «делай релиз»), notes = описание релиза (не патча). Релиз №1 описывает
++  пачку 315+. Патчи между релизами окно не показывают.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b9c64da..43fd4f9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Spoiler materials as a flat list (patch 334)
++## "What's new" — once per release, no checkbox (patch 335)
++
++Owner's word: the checkbox is excessive; show the window once per
++RELEASE — a release consists of many patches, not "every little step".
++
++- version.json now carries release (the release number) and notes = the
++  RELEASE description; version (the patch number, rule 321) updates as
++  before.
++- The window shows once per release: closing it remembers the release;
++  until the next release it stays quiet. The checkbox is gone (dictionaries
++  too).
++- Patches between releases don't raise the window. You declare a release —
++  on your word ("make a release") I bump the number and write the batch's
++  description.
++- Release #1 describes the whole batch since patch 315: the new crafting,
++  book rules, the AP pool, explosives, armor mods — references and the
++  duplicates cleanup.
++
++## ## Spoiler materials as a flat list (patch 334)
+ 
+ Owner's word: material headers are excessive ("Materials", "Common
+ materials", "Uncommon materials") — type and quantity are enough.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c557af8..d28c06c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,21 @@
+ 
+ ---
+ 
+-## Материалы в спойлере — плоским списком (патч 334)
++## «Что нового» — один раз на релиз, без галочки (патч 335)
++
++Слово владельца: галочка излишня; окно показывать один раз в релиз —
++релиз состоит из кучи патчей, а не «каждый чих».
++
++- version.json теперь несёт release (номер релиза) и notes = описание
++  РЕЛИЗА; version (номер патча, правило 321) обновляется как раньше.
++- Окно показывается один раз на релиз: закрытие само запоминает релиз;
++  до следующего релиза окно не появляется. Галочка удалена (и из словарей).
++- Патчи между релизами окно не поднимают. Релиз объявляете вы — по слову
++  «делай релиз» я поднимаю номер и пишу описание пачки.
++- Первый релиз (№1) описывает всю пачку с патча 315: новый крафт, правила
++  книги, пул ОД, взрывчатка, моды брони — справочники и чистка дублей.
++
++## ## Материалы в спойлере — плоским списком (патч 334)
+ 
+ Слово владельца: заголовки по материалам излишни («Материалы», «Обычные
+ материалы», «Необычные материалы»), достаточно типа и количества.
+diff --git a/i18n/en-EN/App.json b/i18n/en-EN/App.json
+index 5628957..c62f746 100644
+--- a/i18n/en-EN/App.json
++++ b/i18n/en-EN/App.json
+@@ -11,7 +11,6 @@
+   },
+   "updateNotice": {
+     "title": "What's new",
+-    "dontShow": "Don't show again",
+     "close": "Close"
+   }
+ }
+diff --git a/i18n/ru-RU/App.json b/i18n/ru-RU/App.json
+index 1c3ec93..d7ba95b 100644
+--- a/i18n/ru-RU/App.json
++++ b/i18n/ru-RU/App.json
+@@ -11,7 +11,6 @@
+   },
+   "updateNotice": {
+     "title": "Что нового",
+-    "dontShow": "Больше не показывать",
+     "close": "Закрыть"
+   }
+ }
+diff --git a/public/version.json b/public/version.json
+index 9027050..d5d885c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,24 @@
+ {
+-  "version": "334",
++  "version": "335",
++  "release": "1",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: материалы в спойлере — плоским списком «тип — есть/нужно», без заголовков"
++      "Крафт: новое окно — квадраты категорий как карточки персонажей на фоне сеттинга, спойлеры-карточки, материалы плоским списком «тип — есть/нужно»",
++      "Правила книги: час на изготовление (еда и напитки — 20 минут), проверка ИНТ + навык, осложнение добавляет время",
++      "Общий пул очков действий (6): успешные проверки пополняют, 2 ОД сокращают время вдвое",
++      "Взрывчатка — отдельная категория рецептов; потеря материалов при провале — настройка",
++      "Моды брони: книжная таблица и правила записаны; крафт модов — следующий шаг (ждём таблицу эффектов)",
++      "Из общих модов убраны три ошибочных «материала» синтов; старые сохранения чистятся автоматически",
++      "Окно «Что нового» теперь показывается один раз на релиз"
+     ],
+     "en-EN": [
+-      "Crafting: materials in the spoiler as a flat list, no headers"
++      "Crafting: a new window — character-card style tiles over the setting background, perk-style spoiler cards, flat \"type — have/need\" material lines",
++      "Book rules: one hour per craft (food and drinks — 20 minutes), INT + skill check, complications add time",
++      "Group action-point pool (6): successful checks refill it, 2 AP halve the time",
++      "Explosives is its own recipe category; material loss on failure is a setting",
++      "Armor mods: the book table and rules are recorded; mod crafting is next (awaiting the effects table)",
++      "Three misplaced synth \"material\" mods removed from generic mods; old saves are cleaned automatically",
++      "The \"What's new\" window now shows once per release"
+     ]
+   }
+ }
+diff --git a/src/utils/appVersion.js b/src/utils/appVersion.js
+index 9a86c26..320d4d9 100644
+--- a/src/utils/appVersion.js
++++ b/src/utils/appVersion.js
+@@ -1,21 +1,28 @@
+ // src/utils/appVersion.js
+-// Система обновлений PWA (патч 321, слово владельца): приложение «стучится»
+-// на сервер за /version.json и, если версия новее запомненной, показывает
+-// окно «Что нового» с чейнджлогом и галочкой «больше не показывать».
++// Система обновлений PWA (патч 321; переосмыслена патчем 335 по слову
++// владельца): приложение «стучится» на сервер за /version.json и показывает
++// окно «Что нового» ОДИН РАЗ НА РЕЛИЗ. Галочки «больше не показывать» нет:
++// увидел окно — релиз запомнен, до следующего релиза окно не беспокоит.
++//
++// Релиз ≠ патч: релиз состоит из кучи патчей. version.json несёт
++//   version — номер последнего патча (правило 321, обновляется каждым патчем);
++//   release — номер релиза (поднимает ВЛАДЕЛЕЦ, слово «делай релиз»);
++//   notes  — описание РЕЛИЗА на обоих языках (не «каждый чих»).
++// Патчи между релизами окно не показывают. В старых развёртываниях поля
++// release нет — фолбэк: релиз = номер патча (ведёт себя как 321).
+ //
+ // Как это работает (важно понимать честно): сама новая версия СКАЧИВАЕТСЯ
+ // сама — навигация всегда сетевая (service-worker 265), бандлы с хэшами в
+ // именах, воркер обновляется по visibilitychange. Пользователь, увидевший
+ // окно, уже запускает свежую версию; окно объясняет, что изменилось.
+-// version.json — статичный файл рядом с приложением, обновляется в том же
+-// патче, что и changelogs (версия = номер последнего патча).
++// version.json — статичный файл рядом с приложением.
+ //
+ // Логика чистая и тестируемая: хранилище и fetch внедряются снаружи.
+ 
+ export const VERSION_URL = '/version.json';
+ export const ACK_STORAGE_KEY = 'app_version_ack';
+ 
+-/** Прочитать запомненную версию (галочка «больше не показывать»). */
++/** Прочитать запомненный релиз (окно уже показывали). */
+ export const readAckedVersion = (storage) => {
+   try {
+     return storage?.getItem?.(ACK_STORAGE_KEY) ?? null;
+@@ -24,22 +31,21 @@ export const readAckedVersion = (storage) => {
+   }
+ };
+ 
+-/** Запомнить версию (вызывается при закрытии окна с поставленной галочкой). */
+-export const writeAckedVersion = (storage, version) => {
++/** Запомнить релиз (вызывается автоматически при закрытии окна, 335). */
++export const writeAckedVersion = (storage, release) => {
+   try {
+-    storage?.setItem?.(ACK_STORAGE_KEY, String(version));
++    storage?.setItem?.(ACK_STORAGE_KEY, String(release));
+   } catch (_) {
+     /* приватный режим и пр. — окно просто будет показываться снова */
+   }
+ };
+ 
+ /**
+- * Показывать ли окно: версия известна и не совпадает с запомненной.
+- * (Установленных «будущих» версий не бывает: версия только растёт,
+- * сравнение строк достаточно — номер патча монотонный.)
++ * Показывать ли окно: релиз известен и не совпадает с запомненным.
++ * (Релизы только растут — сравнение строк достаточно.)
+  */
+-export const shouldShowUpdateNotice = (version, ackedVersion) =>
+-  Boolean(version) && version !== ackedVersion;
++export const shouldShowUpdateNotice = (release, ackedRelease) =>
++  Boolean(release) && release !== ackedRelease;
+ 
+ /**
+  * Свежий /version.json с сервера. Любая неудача (нет файла, сеть, кривой
+@@ -52,8 +58,12 @@ export const fetchLatestVersion = async (fetchImpl = fetch, url = VERSION_URL) =
+     const data = await response.json();
+     const version = data && typeof data.version === 'string' ? data.version : null;
+     if (!version) return null;
++    // Релиз (335): поле может отсутствовать в старом развёртывании —
++    // тогда релиз = номер патча (поведение как в 321).
++    const release = data.release != null ? String(data.release) : version;
+     return {
+       version,
++      release,
+       notes: (data.notes && typeof data.notes === 'object') ? data.notes : {},
+     };
+   } catch (_) {
