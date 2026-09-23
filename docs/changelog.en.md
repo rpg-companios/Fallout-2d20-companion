@@ -2,7 +2,21 @@
 
 ---
 
-## Armor mod install table — cross-checked, 2 double-counts fixed (patch 337)
+## Armor mod clarifications: synths, five mods owed (patch 338)
+
+Owner's words on patch 337's questions.
+
+- "All body" in the install table means "fits any body area", while these
+  mods install ONLY on synth armor. The patch 333 removal of the three
+  "materials" was correct — not restoring; uniq_synth_* records represent
+  them on synths.
+- The five generic craft mods (Lightweight, Pockets, Deep pockets,
+  Lead-lined, Ultra-light) are OWED: the owner will check which armor
+  categories they belong to and send effects. Until then they stay out of
+  the windows.
+- Bottom line: armor-mod data is complete except the five owed mods.
+
+## ## Armor mod install table — cross-checked, 2 double-counts fixed (patch 337)
 
 The owner dictated the book's "Armor improvement modifications" table
 (effects/weight/cost/perks). Cross-check: all 12 standard mods already
