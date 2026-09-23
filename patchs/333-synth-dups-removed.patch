@@ -1,0 +1,556 @@
+diff --git a/__tests__/robot/robot-arm-attachment-mode.test.js b/__tests__/robot/robot-arm-attachment-mode.test.js
+index ca5892e..c22dd33 100644
+--- a/__tests__/robot/robot-arm-attachment-mode.test.js
++++ b/__tests__/robot/robot-arm-attachment-mode.test.js
+@@ -227,7 +227,7 @@ describe('патч 191: навес — оружие на руке, а не ко
+   });
+ 
+   it('версия схемы — 25 (v22 навесы, v23 выживание, v24 каталог, v25 болезни)', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(25);
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
+   });
+ 
+   // ------------------------------------------------------------------ настройка
+diff --git a/__tests__/saves/character-folder-knowledge.test.js b/__tests__/saves/character-folder-knowledge.test.js
+index ffeeeb4..d0a86ae 100644
+--- a/__tests__/saves/character-folder-knowledge.test.js
++++ b/__tests__/saves/character-folder-knowledge.test.js
+@@ -105,7 +105,7 @@ describe('characterFolders: наложение при записи (overlayFolde
+ 
+ describe('characterFolders: схема v25 и миграция', () => {
+   it('текущая версия схемы — 25', () => {
+-    expect(CURRENT_SCHEMA_VERSION).toBe(25);
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
+   });
+ 
+   it('миграция v23→v24 идентична: поле folder проходит без изменений', () => {
+@@ -115,7 +115,7 @@ describe('characterFolders: схема v25 и миграция', () => {
+       folder: { id: 'folder_a', name: 'Рейдеры' },
+     };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+     expect(out.folder).toEqual({ id: 'folder_a', name: 'Рейдеры' });
+     expect(out.characterName).toBe('Курьер');
+   });
+@@ -123,14 +123,14 @@ describe('characterFolders: схема v25 и миграция', () => {
+   it('старый сейв без folder мигрирует без поля (корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер' };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+     expect(Object.hasOwn(out, 'folder')).toBe(false);
+   });
+ 
+   it('сейв с folder: null остаётся null (явный корневой список)', () => {
+     const v23 = { schemaVersion: 23, characterName: 'Курьер', folder: null };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+     expect(out.folder).toBeNull();
+   });
+ });
+diff --git a/__tests__/saves/disease-ranks.test.js b/__tests__/saves/disease-ranks.test.js
+index 2a1bfd7..5ba8944 100644
+--- a/__tests__/saves/disease-ranks.test.js
++++ b/__tests__/saves/disease-ranks.test.js
+@@ -39,6 +39,7 @@ import {
+ } from '../../modules/fallout/survival/survival';
+ import { migrateDiseaseRanks } from '../../modules/fallout/diseases/migration';
+ import { migrateCharacterState } from '../../src/store/migrations';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
+ 
+ const buzzBrain = {
+   id: 'disease_buzz_brain',
+@@ -270,7 +271,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
+       ],
+     };
+     const out = migrateCharacterState(v23);
+-    expect(out.schemaVersion).toBe(25);
++    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+     expect(out.activeTimedEffects[0].rank).toBe(4);
+   });
+ });
+diff --git a/__tests__/saves/synth-dup-mods-migration-333.test.js b/__tests__/saves/synth-dup-mods-migration-333.test.js
+new file mode 100644
+index 0000000..ab3263d
+--- /dev/null
++++ b/__tests__/saves/synth-dup-mods-migration-333.test.js
+@@ -0,0 +1,73 @@
++// ПРИЁМОЧНЫЙ (патч 333): снятие дублей-«материалов» синтов из общих модов.
++//
++// Что проверяет:
++//   1. из данных общих модов убраны ровно три записи
++//      (mod_std_laminate / mod_std_rubberized / mod_std_microcarbon),
++//      а остальные 12 и все uniq_synth_* на месте;
++//   2. миграция v25 → v26 аккуратно снимает ссылки на убранные id из
++//      инвентаря, альбома modifiedItems и надетой брони — и НЕ трогает
++//      другие моды (в т.ч. уникальные синтов и обычный mod_std_dense).
++
++import { describe, expect, it } from 'vitest';
++
++import armorMods from '../../modules/fallout/data/equipment/armor_mods.json';
++import ruArmorMods from '../../modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json';
++import uniqArmorMods from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
++import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
++import { migrateCharacterState } from '../../src/store/migrations';
++
++const REMOVED = ['mod_std_laminate', 'mod_std_rubberized', 'mod_std_microcarbon'];
++
++describe('патч 333: дубли-«материалы» синтов убраны из общих модов', () => {
++  it('в данных общих модов нет трёх дублей, остальное на месте', () => {
++    for (const id of REMOVED) {
++      expect(armorMods.some((m) => m.id === id), `${id} убран`).toBe(false);
++      expect(ruArmorMods.some((m) => m.id === id), `${id} убран из ru`).toBe(false);
++    }
++    expect(armorMods.length).toBe(12);
++    expect(ruArmorMods.length).toBe(12);
++    // уникальные моды синтов не тронуты (все четыре «материала» на месте)
++    for (const id of ['uniq_synth_laminated', 'uniq_synth_rubberized', 'uniq_synth_microcarbon', 'uniq_synth_nanofiber']) {
++      expect(uniqArmorMods.some((m) => m.id === id), `${id} на месте`).toBe(true);
++    }
++  });
++
++  it('миграция v25→v26 снимает ссылки на дубли и не трогает остальные', () => {
++    const save = {
++      schemaVersion: 25,
++      inventory: [
++        { id: 'armor_leather', itemType: 'armor', appliedArmorModId: 'mod_std_laminate' },
++        { id: 'clothes_casual', itemType: 'clothing', appliedClothingModId: 'mod_std_microcarbon' },
++        { id: 'armor_metal', itemType: 'armor', appliedArmorModId: 'mod_std_dense' }, // живой общий мод — остаётся
++        { id: 'armor_synth', itemType: 'armor', appliedUniqueArmorModId: 'uniq_synth_laminated' }, // уникальный — остаётся
++      ],
++      modifiedItems: {
++        armor_leather: { id: 'armor_leather', appliedArmorMod: { id: 'mod_std_rubberized' } },
++      },
++      equippedArmor: { id: 'armor_leather_2', appliedArmorModId: 'mod_std_laminate' },
++    };
++
++    const migrated = migrateCharacterState(save);
++
++    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
++    expect(CURRENT_SCHEMA_VERSION).toBe(26);
++
++    const [lam, micro, dense, synth] = migrated.inventory;
++    expect(lam.appliedArmorModId).toBeUndefined(); // дубль снят
++    expect(micro.appliedClothingModId).toBeUndefined(); // дубль снят с одежды
++    expect(dense.appliedArmorModId).toBe('mod_std_dense'); // живой мод не тронут
++    expect(synth.appliedUniqueArmorModId).toBe('uniq_synth_laminated'); // уникальный не тронут
++    expect(migrated.modifiedItems.armor_leather.appliedArmorMod).toBeUndefined();
++    expect(migrated.equippedArmor.appliedArmorModId).toBeUndefined();
++  });
++
++  it('миграция идемпотентна: повторный прогон ничего не ломает', () => {
++    const save = {
++      schemaVersion: 25,
++      inventory: [{ id: 'armor_leather', itemType: 'armor', appliedArmorModId: 'mod_std_laminate' }],
++    };
++    const once = migrateCharacterState(save);
++    expect(once.inventory[0].appliedArmorModId).toBeUndefined();
++    expect(migrateCharacterState(once).inventory[0].appliedArmorModId).toBeUndefined();
++  });
++});
+diff --git a/__tests__/survival/survival-migration.test.js b/__tests__/survival/survival-migration.test.js
+index 13f98fa..479e016 100644
+--- a/__tests__/survival/survival-migration.test.js
++++ b/__tests__/survival/survival-migration.test.js
+@@ -22,7 +22,7 @@ const maxState = () => ({
+ 
+ describe('survival: миграция v22 → v23', () => {
+     it('версия схемы — 25 (поле выживания добавляется переходом v22→v23)', () => {
+-        expect(CURRENT_SCHEMA_VERSION).toBe(25);
++        expect(CURRENT_SCHEMA_VERSION).toBe(26);
+     });
+ 
+     it.each([
+@@ -32,7 +32,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['shadow', 'mutant'],
+     ])('органику %s (%s) — начальные максимумы', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(25);
++        expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+         expect(out.survival).toEqual(maxState());
+     });
+ 
+@@ -42,7 +42,7 @@ describe('survival: миграция v22 → v23', () => {
+         ['synth', 'cyborg'],
+     ])('роботу/киборгу %s (%s) — null, шкал нет', (originId) => {
+         const out = migrateCharacterState(v22({ id: originId }));
+-        expect(out.schemaVersion).toBe(25);
++        expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+         expect(out.survival).toBeNull();
+     });
+ 
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 0e7467d..59a673d 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **332** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–332 уехали, установка не подтверждена;
++· последний сданный патч: **333** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–333 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -107,6 +107,14 @@
+   ПЕРСОНАЖЕЙ home screen (characterCell: светлая панель, рамка #5a5a5a,
+   радиус 8, имя #222, счётчик #555), а НЕ папок; урок — «как у home screen»
+   = карточки персонажей, папки не ориентир.
++- 333 — слово владельца про синтов: «Ламинированная, Прорезиненная,
++  Микроуглеродистая, Нановолоконная — уникальные моды брони синтов» →
++  из общих модов убраны mod_std_laminate/rubberized/microcarbon (15→12);
++  миграция сейвов v25→v26 снимает appliedArmorModId/appliedClothingModId/
++  appliedArmorMod с этими id (инвентарь, modifiedItems, equippedArmor).
++  Остальное по модам брони: эффекты костюмных модов пришлёт владелец;
++  предмет-рецепт расходуется при применении; система узнавания редких
++  рецептов — сразу для всего крафта (справочник §3.1).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4e42236..044d1b4 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,24 @@
+ 
+ ---
+ 
+-## Armor-mod answers — recorded, plan refined (patch 332)
++## Synth-material duplicates removed from generic mods (patch 333)
++
++Owner's word: "Laminated, Rubberized, Microcarbon, Nanofiber are unique
++SYNTH armor mods." They must not exist in the generic mod list.
++
++- Removed mod_std_laminate, mod_std_rubberized, mod_std_microcarbon from
++  generic mods (15 → 12); the unique synth mods (uniq_synth_*, including
++  Nanofiber) are untouched.
++- Save migration v25 → v26: if a character had one of the removed
++  duplicates installed on armor/clothing, it is gently uninstalled
++  (inventory, modified-items album, equipped piece); other mods are
++  untouched. No one loses bonuses: stats came from the catalog record
++  that no longer exists.
++- Owner's answers recorded (§2.5): costume-mod effects table is coming;
++  a recipe item is consumed on use; the rare-recipe learning system is
++  built for ALL crafting from the start.
++
++## ## Armor-mod answers — recorded, plan refined (patch 332)
+ 
+ The owner answered the four questions of 327. The app itself is
+ unchanged — records and code checks only.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e6ab326..f374148 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,24 @@
+ 
+ ---
+ 
+-## Ответы по модам брони — записаны, план уточнён (патч 332)
++## Дубли-«материалы» синтов убраны из общих модов (патч 333)
++
++Слово владельца: «Ламинированная, Прорезиненная, Микроуглеродистая,
++Нановолоконная — это уникальные моды брони синтов». В общем списке модов
++(для любой брони и одежды) такие имена существовать не должны.
++
++- Из общих модов убраны mod_std_laminate, mod_std_rubberized,
++  mod_std_microcarbon (было 15 общих — стало 12); уникальные моды синтов
++  (uniq_synth_*, включая Нановолоконную) не тронуты.
++- Миграция сейвов v25 → v26: если у персонажа на брони/одежде стоял один
++  из убранных дублей — мод аккуратно снят (инвентарь, альбом, надетое);
++  остальные моды не тронуты. Бонусов из-за снятия никто не теряет:
++  защита считалась из каталога, а запись убрана.
++- Ответы владельца записаны в справочник (§2.5): эффекты костюмных модов
++  владелец пришлёт; предмет-рецепт при применении расходуется; система
++  узнавания редких рецептов строится сразу для всего крафта.
++
++## ## Ответы по модам брони — записаны, план уточнён (патч 332)
+ 
+ Владелец ответил на четыре вопроса 327. Приложение не менялось — записи
+ и проверки.
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index 1e1b44a..0d0a987 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -238,14 +238,12 @@
+ > Это ВОПРОСЫ, а не констатации. Основные ответы даны (§2.5), остались
+ > узкие уточнения — см. §3.1; крафт модов не начат.
+ 
+-### 3.1. Узкие уточнения после ответов §2.5 (ждут ответа)
+-
+-1. **Эффекты 15 костюмных модов** (защита/цена/вес) — пришлёт владелец
+-   таблицей или отложить до начала крафта модов?
+-2. **Три общих дубля-синта** (`mod_std_laminate`, `mod_std_rubberized`,
+-   `mod_std_microcarbon`) — убрать (с проверкой сохранений на ссылки)
+-   или оставить до серии крафта модов?
+-3. **Предмет-рецепт при применении** — расходуется или остаётся у
+-   персонажа (как драйвер МК II)?
+-4. **Охват системы узнавания** — только моды брони или весь крафт
+-   (еда/напитки/препараты/патроны/взрывчатка — там тоже есть редкое)?
++### 3.1. Узкие уточнения — ОТВЕТЫ ПОЛУЧЕНЫ (2026-09-23, патч 333)
++
++1. **Эффекты 15 костюмных модов** — владелец ПРИШЛЁТ таблицу; добавление
++   модов ждёт её. (Единственное, что ещё ждём по модам брони.)
++2. **Три общих дубля-синта** — УБРАНЫ (патч 333, миграция сейвов
++   v25 → v26 аккуратно снимает ссылки).
++3. **Предмет-рецепт при применении** — РАСХОДУЕТСЯ.
++4. **Охват системы узнавания** — СРАЗУ ДЛЯ ВСЕГО КРАФТА (еда, напитки,
++   препараты, патроны, взрывчатка, моды — редкие появятся по мере данных).
+diff --git a/modules/fallout/data/equipment/armor_mods.json b/modules/fallout/data/equipment/armor_mods.json
+index 851175b..e2d349f 100644
+--- a/modules/fallout/data/equipment/armor_mods.json
++++ b/modules/fallout/data/equipment/armor_mods.json
+@@ -1,124 +1,4 @@
+ [
+-  {
+-    "modType": "armor",
+-    "id": "mod_std_laminate",
+-    "modCategory": "standardMods",
+-    "protectedAreas": [
+-      "Body",
+-      "Hand",
+-      "Leg",
+-      "Head"
+-    ],
+-    "targetArmorCategories": [
+-      "all"
+-    ],
+-    "complexity": 1,
+-    "requiredPerk": "",
+-    "requiredSkill": "REPAIR",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 5
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 1
+-    },
+-    "statModifiers": {
+-      "physicalDamageRating": {
+-        "op": "+",
+-        "value": 1
+-      },
+-      "energyDamageRating": {
+-        "op": "+",
+-        "value": 1
+-      },
+-      "radiationDamageRating": {
+-        "op": "+",
+-        "value": 0
+-      }
+-    },
+-    "specialEffects": []
+-  },
+-  {
+-    "modType": "armor",
+-    "id": "mod_std_rubberized",
+-    "modCategory": "standardMods",
+-    "protectedAreas": [
+-      "Body",
+-      "Hand",
+-      "Leg",
+-      "Head"
+-    ],
+-    "targetArmorCategories": [
+-      "all"
+-    ],
+-    "complexity": 2,
+-    "requiredPerk": "Бронник 1",
+-    "requiredSkill": "REPAIR",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 10
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 1
+-    },
+-    "statModifiers": {
+-      "physicalDamageRating": {
+-        "op": "+",
+-        "value": 2
+-      },
+-      "energyDamageRating": {
+-        "op": "+",
+-        "value": 2
+-      },
+-      "radiationDamageRating": {
+-        "op": "+",
+-        "value": 0
+-      }
+-    },
+-    "specialEffects": []
+-  },
+-  {
+-    "modType": "armor",
+-    "id": "mod_std_microcarbon",
+-    "modCategory": "standardMods",
+-    "protectedAreas": [
+-      "Body",
+-      "Hand",
+-      "Leg",
+-      "Head"
+-    ],
+-    "targetArmorCategories": [
+-      "all"
+-    ],
+-    "complexity": 3,
+-    "requiredPerk": "Бронник 1",
+-    "requiredSkill": "REPAIR",
+-    "costModifier": {
+-      "op": "+",
+-      "value": 15
+-    },
+-    "weightModifier": {
+-      "op": "+",
+-      "value": 2
+-    },
+-    "statModifiers": {
+-      "physicalDamageRating": {
+-        "op": "+",
+-        "value": 3
+-      },
+-      "energyDamageRating": {
+-        "op": "+",
+-        "value": 3
+-      },
+-      "radiationDamageRating": {
+-        "op": "+",
+-        "value": 0
+-      }
+-    },
+-    "specialEffects": []
+-  },
+   {
+     "modType": "armor",
+     "id": "mod_std_soft_padding",
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json b/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
+index 9e1aa33..e20cc71 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/armor/armor_mods.json
+@@ -1,16 +1,4 @@
+ [
+-  {
+-    "id": "mod_std_laminate",
+-    "name": "Laminate"
+-  },
+-  {
+-    "id": "mod_std_rubberized",
+-    "name": "Rubberized"
+-  },
+-  {
+-    "id": "mod_std_microcarbon",
+-    "name": "Microcarbon"
+-  },
+   {
+     "id": "mod_std_soft_padding",
+     "name": "Soft Padding",
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
+index 8007f56..0ad720c 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/armor/armor_mods.json
+@@ -1,16 +1,4 @@
+ [
+-  {
+-    "id": "mod_std_laminate",
+-    "name": "Ламинированная"
+-  },
+-  {
+-    "id": "mod_std_rubberized",
+-    "name": "Прорезиненная"
+-  },
+-  {
+-    "id": "mod_std_microcarbon",
+-    "name": "Микроуглеродистая"
+-  },
+   {
+     "id": "mod_std_soft_padding",
+     "name": "Мягкая",
+diff --git a/public/version.json b/public/version.json
+index 24ad7e9..de76194 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "332",
++  "version": "333",
+   "notes": {
+     "ru-RU": [
+-      "Ответы владельца по модам брони записаны: ёмкость ≠ сложность предмета, костюмные моды, дули синтов, система «узнавания» редких рецептов"
++      "Убраны три дубля-«материала» синтов из общих модов; старые сейвы чистятся миграцией"
+     ],
+     "en-EN": [
+-      "Owner's armor-mod answers recorded: capacity ≠ item complexity, costume mods, synth duplicates, rare-recipe learning system"
++      "Three synth-material duplicates removed from generic mods; old saves cleaned by migration"
+     ]
+   }
+ }
+diff --git a/src/store/migrations.js b/src/store/migrations.js
+index d859b46..3412c13 100644
+--- a/src/store/migrations.js
++++ b/src/store/migrations.js
+@@ -1270,6 +1270,44 @@ const MIGRATIONS = [
+   // же индекс, modules/fallout/diseases/migration.js).
+   (state) => state,
+ 
++  // v25 -> v26: патч 333 — из общих модов брони/одежды убраны три
++  // «материала»-дубля модов синтов (mod_std_laminate, mod_std_rubberized,
++  // mod_std_microcarbon; слово владельца: «Ламинированная, Прорезиненная,
++  // Микроуглеродистая, Нановолоконная — это уникальные моды брони синтов»).
++  // Ссылки на них в сейве аккуратно снимаются: appliedArmorModId,
++  // appliedClothingModId и встроенный appliedArmorMod старого формата.
++  // Остальные моды (включая все uniq_synth_*) не трогаются.
++  (state) => {
++    const REMOVED = new Set([
++      'mod_std_laminate',
++      'mod_std_rubberized',
++      'mod_std_microcarbon',
++    ]);
++    const strip = (item) => {
++      if (!item || typeof item !== 'object') return item;
++      const stdHit = REMOVED.has(item.appliedArmorModId)
++        || REMOVED.has(item.appliedClothingModId)
++        || REMOVED.has(item.appliedArmorMod?.id);
++      if (!stdHit) return item;
++      const next = { ...item };
++      delete next.appliedArmorModId;
++      delete next.appliedClothingModId;
++      delete next.appliedArmorMod;
++      return next;
++    };
++    const next = { ...state };
++    if (Array.isArray(next.inventory)) next.inventory = next.inventory.map(strip);
++    if (next.modifiedItems && typeof next.modifiedItems === 'object') {
++      const cleaned = {};
++      for (const [key, item] of Object.entries(next.modifiedItems)) {
++        cleaned[key] = strip(item);
++      }
++      next.modifiedItems = cleaned;
++    }
++    if (next.equippedArmor) next.equippedArmor = strip(next.equippedArmor);
++    return next;
++  },
++
+ ];
+ /**
+  * Мерж комплекта снаряжения при сохранении снапшота.
+diff --git a/src/store/saveSchema.js b/src/store/saveSchema.js
+index 724d4dd..529c84a 100644
+--- a/src/store/saveSchema.js
++++ b/src/store/saveSchema.js
+@@ -76,7 +76,10 @@
+ //       сопротивляться) и ранг на эффекте болезни (поле rank). Ранг старым
+ //       сейвам проставляет сетевая миграция modules/fallout/diseases/
+ //       migration.js (по каталогу); движковая миграция версии идентична.
+-export const CURRENT_SCHEMA_VERSION = 25;
++// v26 — патч 333: сняты ссылки на три убранных дубля-«материала» синтов
++//       (mod_std_laminate/rubberized/microcarbon): appliedArmorModId /
++//       appliedClothingModId / встроенный appliedArmorMod с такими id.
++export const CURRENT_SCHEMA_VERSION = 26;
+ 
+ // Версия, которая ставится при отсутствии schemaVersion в сохранении
+ // (старые сохранения без поля — считаем v0, текущим форматом).
