@@ -2,7 +2,25 @@
 
 ---
 
-## Question protocol — ask first, fix later never (patch 331)
+## Armor-mod answers — recorded, plan refined (patch 332)
+
+The owner answered the four questions of 327. The app itself is
+unchanged — records and code checks only.
+
+- Crafting capacity and item complexity are different things (the owner
+  was right, my comparison was wrong): the mods' complexity field is used
+  nowhere, the data stays untouched; capacity will come from the book
+  table as its own field.
+- The 15 missing mods are CLOTHING mods: the weave fits most costumes,
+  the vault suit takes the weave + linings; effects table awaited.
+- Laminated/Rubberized/Microcarbon/Nanofiber are unique SYNTH armor mods;
+  the generic duplicates are redundant.
+- Rarity: common recipes known to everyone; uncommon unlock via perks;
+  rare ones via recipe ITEMS (a new "Recipes" inventory category, MK II
+  driver principle: applying the item lifts the lock, item id = recipe
+  id). A separate patch series — spec recorded in the reference doc.
+
+## ## Question protocol — ask first, fix later never (patch 331)
 
 Owner's word after the 329→330 pair: "if there is any misunderstanding
 or ambiguity — push it onto me so I describe the details, instead of
