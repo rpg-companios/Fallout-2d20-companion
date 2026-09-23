@@ -1,0 +1,567 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index ae7a86f..716beb3 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **335** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–335 уехали, установка не подтверждена;
++· последний сданный патч: **336** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–336 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -125,6 +125,11 @@
+   (правило 321), release = номер релиза (поднимает ВЛАДЕЛЕЦ словом
+   «делай релиз»), notes = описание релиза (не патча). Релиз №1 описывает
+   пачку 315+. Патчи между релизами окно не показывают.
++- 336 — эффекты плетения и подкладок (таблица владельца) записаны в
++  справочник §2.6; 10 модов добавлены в данные (uniq_weave_*,
++  uniq_vaultsuit_*; категории costumeUniqueMods/vaultSuitUniqueMods).
++  Релизы объявляет ВЛАДЕЛЕЦ (слово 336; патчи релиз не поднимают).
++  Ждём: эффекты 5 общих модов (Облегчённая/карманы/свинец/ультралёгкая).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index 0d0a987..768c8c8 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -201,6 +201,41 @@
+ материалы брони СИНТОВ (см. 2.1), а общих модов с такими именами в таблице
+ нет. Похоже на дубли, попавшие в общие моды.
+ 
++## 2.6. Эффекты новых модов — таблица владельца (2026-09-23, патч 336)
++
++Записи добавлены в данные (`uniq_weave_*`, `uniq_vaultsuit_*`; категории
++`costumeUniqueMods` / `vaultSuitUniqueMods`, зоны Body/Hand/Leg, навык
++Ремонт; `complexity` = книжная ёмкость, поле справочное — см. §2.5 п.1).
++
++### Баллистическое плетение
++
++| Мод | Эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|
++| Баллистическое плетение | +2 Физ. СУ, +2 Энерго СУ | — | +20 | — |
++| Баллистическое плетение Mk II | +3 Физ. СУ, +3 Энерго СУ | — | +30 | Бронник 1 |
++| Баллистическое плетение Mk III | +4 Физ. СУ, +4 Энерго СУ | — | +40 | Бронник 2 |
++| Баллистическое плетение Mk IV | +5 Физ. СУ, +5 Энерго СУ | — | +50 | Бронник 3 |
++| Баллистическое плетение Mk V | +6 Физ. СУ, +6 Энерго СУ | — | +60 | Бронник 4 |
++
++### Подкладки комбинезона Убежища
++
++| Мод | Эффекты | Вес | Цена | Перки |
++|---|---|---|---|---|
++| Утеплённая подкладка | +1 Энерго СУ | — | +10 | — |
++| Обработанная подкладка | +1 Энерго СУ, +1 Рад. СУ | +1 | +20 | Бронник 2 |
++| Прочная подкладка | +2 Энерго СУ, +1 Рад. СУ | +1 | +30 | Бронник 3 |
++| Защитная подкладка | +2 Энерго СУ, +2 Рад. СУ | +1 | +40 | Бронник 4, Наука! 2 |
++| Экранированная подкладка | +3 Энерго СУ, +3 Рад. СУ | +1 | +50 | Бронник 4, Наука! 4 |
++
++Привязка к вещам (слово владельца, §2.5 п.2): плетение — костюмы
++(Униформа Братства Стали `clothing_bos_uniform`, Повседневная одежда
++`clothing_casual_clothes`, Портупея `clothing_harness`, Военная форма
++`clothing_military_fatigues`, Дорожная кожа `clothing_road_leathers`,
++Прочная одежда `clothing_sturdy_clothes`); комбинезон Убежища
++`clothing_vault_jumpsuit` — плетение И подкладки. Все вещи в данных есть.
++Привязка заработает в серии крафта/установки модов: сейчас костюмы без
++семейства (правило 2026-07-31), окно доступности модов для одежды закрыто.
++
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+ 1. **Ёмкость ≠ сложность предмета.** Владелец: «ты сравниваешь данные
+@@ -240,8 +275,10 @@
+ 
+ ### 3.1. Узкие уточнения — ОТВЕТЫ ПОЛУЧЕНЫ (2026-09-23, патч 333)
+ 
+-1. **Эффекты 15 костюмных модов** — владелец ПРИШЛЁТ таблицу; добавление
+-   модов ждёт её. (Единственное, что ещё ждём по модам брони.)
++1. **Эффекты 15 костюмных модов** — частично ПРИСЛАНЫ (патч 336: плетение
++   5 + подкладки 5 — записаны и добавлены в данные). Осталось 5 ОБЩИХ
++   модов (Облегчённая, С карманами, С глубокими карманами, Свинцовая
++   подкладка, Ультралёгкая) — жду их эффекты/цены/вес.
+ 2. **Три общих дубля-синта** — УБРАНЫ (патч 333, миграция сейвов
+    v25 → v26 аккуратно снимает ссылки).
+ 3. **Предмет-рецепт при применении** — РАСХОДУЕТСЯ.
+diff --git a/modules/fallout/data/equipment/uniq_armor_mods.json b/modules/fallout/data/equipment/uniq_armor_mods.json
+index 967e9c5..cca4146 100644
+--- a/modules/fallout/data/equipment/uniq_armor_mods.json
++++ b/modules/fallout/data/equipment/uniq_armor_mods.json
+@@ -827,5 +827,365 @@
+       }
+     },
+     "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_weave_ballistic",
++    "modCategory": "costumeUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 20
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 2
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 2
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_weave_ballistic_mk2",
++    "modCategory": "costumeUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "Бронник 1",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 30
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 3
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 3
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_weave_ballistic_mk3",
++    "modCategory": "costumeUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "Бронник 2",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 40
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 4
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 4
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_weave_ballistic_mk4",
++    "modCategory": "costumeUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "Бронник 3",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 50
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 5
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 5
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_weave_ballistic_mk5",
++    "modCategory": "costumeUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "Бронник 4",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 60
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 6
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 6
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_vaultsuit_insulated",
++    "modCategory": "vaultSuitUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 2,
++    "requiredPerk": "",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 10
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 0
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 0
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 1
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 0
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_vaultsuit_processed",
++    "modCategory": "vaultSuitUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 3,
++    "requiredPerk": "Бронник 2",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 20
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 0
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 1
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 1
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_vaultsuit_sturdy",
++    "modCategory": "vaultSuitUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 4,
++    "requiredPerk": "Бронник 3",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 30
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 0
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 2
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 1
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_vaultsuit_protective",
++    "modCategory": "vaultSuitUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 5,
++    "requiredPerk": "Бронник 4, Наука! 2",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 40
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 0
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 2
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 2
++      }
++    },
++    "specialEffects": []
++  },
++  {
++    "modType": "armorUnique",
++    "id": "uniq_vaultsuit_shielded",
++    "modCategory": "vaultSuitUniqueMods",
++    "protectedAreas": [
++      "Body",
++      "Hand",
++      "Leg"
++    ],
++    "complexity": 6,
++    "requiredPerk": "Бронник 4, Наука! 4",
++    "requiredSkill": "REPAIR",
++    "costModifier": {
++      "op": "+",
++      "value": 50
++    },
++    "weightModifier": {
++      "op": "+",
++      "value": 1
++    },
++    "statModifiers": {
++      "physicalDamageRating": {
++        "op": "+",
++        "value": 0
++      },
++      "energyDamageRating": {
++        "op": "+",
++        "value": 3
++      },
++      "radiationDamageRating": {
++        "op": "+",
++        "value": 3
++      }
++    },
++    "specialEffects": []
+   }
+ ]
+diff --git a/modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json b/modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json
+index 489a17b..2fbd6aa 100644
+--- a/modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json
++++ b/modules/fallout/i18n/en-EN/data/equipment/armor/uniq_armor_mods.json
+@@ -104,5 +104,45 @@
+   {
+     "id": "uniq_synth_nanofiber",
+     "name": "Nanofiber"
++  },
++  {
++    "id": "uniq_weave_ballistic",
++    "name": "Ballistic weave"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk2",
++    "name": "Ballistic weave Mk II"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk3",
++    "name": "Ballistic weave Mk III"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk4",
++    "name": "Ballistic weave Mk IV"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk5",
++    "name": "Ballistic weave Mk V"
++  },
++  {
++    "id": "uniq_vaultsuit_insulated",
++    "name": "Insulated lining"
++  },
++  {
++    "id": "uniq_vaultsuit_processed",
++    "name": "Processed lining"
++  },
++  {
++    "id": "uniq_vaultsuit_sturdy",
++    "name": "Sturdy lining"
++  },
++  {
++    "id": "uniq_vaultsuit_protective",
++    "name": "Protective lining"
++  },
++  {
++    "id": "uniq_vaultsuit_shielded",
++    "name": "Shielded lining"
+   }
+ ]
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json
+index 3b2337e..34c904f 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/armor/uniq_armor_mods.json
+@@ -104,5 +104,45 @@
+   {
+     "id": "uniq_synth_nanofiber",
+     "name": "Нановолоконная"
++  },
++  {
++    "id": "uniq_weave_ballistic",
++    "name": "Баллистическое плетение"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk2",
++    "name": "Баллистическое плетение Mk II"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk3",
++    "name": "Баллистическое плетение Mk III"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk4",
++    "name": "Баллистическое плетение Mk IV"
++  },
++  {
++    "id": "uniq_weave_ballistic_mk5",
++    "name": "Баллистическое плетение Mk V"
++  },
++  {
++    "id": "uniq_vaultsuit_insulated",
++    "name": "Утеплённая подкладка"
++  },
++  {
++    "id": "uniq_vaultsuit_processed",
++    "name": "Обработанная подкладка"
++  },
++  {
++    "id": "uniq_vaultsuit_sturdy",
++    "name": "Прочная подкладка"
++  },
++  {
++    "id": "uniq_vaultsuit_protective",
++    "name": "Защитная подкладка"
++  },
++  {
++    "id": "uniq_vaultsuit_shielded",
++    "name": "Экранированная подкладка"
+   }
+ ]
+diff --git a/public/version.json b/public/version.json
+index d5d885c..ed34933 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "335",
++  "version": "336",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
