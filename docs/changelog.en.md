@@ -2,7 +2,24 @@
 
 ---
 
-## Armor-mod answers — recorded, plan refined (patch 332)
+## Synth-material duplicates removed from generic mods (patch 333)
+
+Owner's word: "Laminated, Rubberized, Microcarbon, Nanofiber are unique
+SYNTH armor mods." They must not exist in the generic mod list.
+
+- Removed mod_std_laminate, mod_std_rubberized, mod_std_microcarbon from
+  generic mods (15 → 12); the unique synth mods (uniq_synth_*, including
+  Nanofiber) are untouched.
+- Save migration v25 → v26: if a character had one of the removed
+  duplicates installed on armor/clothing, it is gently uninstalled
+  (inventory, modified-items album, equipped piece); other mods are
+  untouched. No one loses bonuses: stats came from the catalog record
+  that no longer exists.
+- Owner's answers recorded (§2.5): costume-mod effects table is coming;
+  a recipe item is consumed on use; the rare-recipe learning system is
+  built for ALL crafting from the start.
+
+## ## Armor-mod answers — recorded, plan refined (patch 332)
 
 The owner answered the four questions of 327. The app itself is
 unchanged — records and code checks only.
