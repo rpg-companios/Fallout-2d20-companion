@@ -2,7 +2,21 @@
 
 ---
 
-## Three mod clarifications; origin of the four "owed" (patch 339)
+## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
+
+The owner checked the book: Pockets, Deep pockets, Lead-lined and
+Ultra-light are mod-RECIPES, not mod-items ("different concepts, like a
+byte and a kilobyte"). You can craft them, but you cannot apply them to
+armor yet: the book's mod-items section has no such entries — errata
+needed.
+
+- The crafting table (327) stays true; the reference doc records the
+  distinction: a mod-recipe ≠ a mod-item (linked by id, exist separately).
+- The armor-mod data is now considered COMPLETE. The fate of the four
+  recipes (skip them or emit with an "cannot be applied" note) is decided
+  when the mod-crafting series starts.
+
+## ## Three mod clarifications; origin of the four "owed" (patch 339)
 
 Owner's words recorded into effect descriptions (shown in the armor
 upgrade window's "Effects" line; DR columns empty for all three — 337):
