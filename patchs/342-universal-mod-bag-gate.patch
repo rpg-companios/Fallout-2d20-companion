@@ -1,0 +1,409 @@
+diff --git a/__tests__/equipment/armor-mod-inventory-gate-342.test.js b/__tests__/equipment/armor-mod-inventory-gate-342.test.js
+new file mode 100644
+index 0000000..304debf
+--- /dev/null
++++ b/__tests__/equipment/armor-mod-inventory-gate-342.test.js
+@@ -0,0 +1,81 @@
++// ПРИЁМОЧНЫЙ (патч 342): слова владельца о модах брони.
++//   1) «Мод универсальный, на любую часть тела, если не указано иное»:
++//      материал (Вываренная кожа) ставится на любой предмет своего семейства;
++//   2) «МАТЕРИАЛ БРОНИ ≠ МОДИФИКАЦИЯ БРОНИ»: броня принимает 1 материал
++//      + 1 модификацию (два независимых слота);
++//   3) настройка «Требовать мод в сумке»: выключена (по умолчанию) — установка
++//      свободна; включена — только моды, созданные/найденные (есть в сумке).
++import { describe, expect, it } from 'vitest';
++
++import settingsJson from '../../modules/fallout/settings.json';
++import ruSettings from '../../modules/fallout/i18n/ru-RU/data/system/settings.json';
++import enSettings from '../../modules/fallout/i18n/en-EN/data/system/settings.json';
++import ruScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
++import enScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
++import { filterModsByInventory } from '../../domain/modsEquip';
++import { readFileSync } from 'node:fs';
++
++const ROOT = new URL('../../', import.meta.url).pathname;
++const modalSource = () => readFileSync(
++  `${ROOT}modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js`, 'utf8');
++
++const syntheticCatalog = {
++  armorRaw: {
++    leatherArmor: {
++      allowedModCategories: ['standardMods'],
++      allowedUniqueModCategories: ['leatherUniqueMods'],
++    },
++  },
++  armorMods: [
++    { id: 'mod_std_dense', modCategory: 'standardMods', protectedAreas: ['Body'] },
++    { id: 'mod_std_melee', modCategory: 'standardMods', protectedAreas: ['Hand'] },
++  ],
++  uniqArmorMods: [
++    { id: 'uniq_leather_boiled', modCategory: 'leatherUniqueMods', protectedAreas: ['Body', 'Hand', 'Leg'] },
++    { id: 'uniq_metal_painted', modCategory: 'metalUniqueMods', protectedAreas: ['Body', 'Hand', 'Leg'] },
++  ],
++};
++const leatherItem = { itemType: 'armor', armorCategoryKey: 'leatherArmor', protectedAreas: ['Body', 'Hand', 'Leg'] };
++
++describe('патч 342: универсальный мод, 1 материал + 1 мод, гейт сумки', () => {
++  it('материал семейства подходит любой части брони семейства (универсальность)', async () => {
++    const { getAvailableArmorMods } = await import('../../domain/modsEquip');
++    const { standardMods, uniqueMods } = getAvailableArmorMods(leatherItem, syntheticCatalog);
++    // универсальный материал кожаного семейства — доступен (зоны пересекаются)
++    expect(uniqueMods.map((m) => m.id)).toContain('uniq_leather_boiled');
++    // чужое семейство не просачивается
++    expect(uniqueMods.map((m) => m.id)).not.toContain('uniq_metal_painted');
++    // зонные моды — по пересечению зон
++    expect(standardMods.map((m) => m.id)).toContain('mod_std_dense');
++    expect(standardMods.map((m) => m.id)).toContain('mod_std_melee');
++  });
++
++  it('настройка объявлена, по умолчанию ВЫКЛ (свободная установка), i18n на месте', () => {
++    const entry = settingsJson.find((s) => s.id === 'modsRequireInventoryItem');
++    expect(entry, 'настройка в settings.json').toBeTruthy();
++    expect(entry.sectionKey).toBe('crafting');
++    expect(entry.defaultValue).toBe(false); // выключена: установка свободна
++    expect(ruSettings.modsRequireInventoryTitle).toContain('сумке');
++    expect(enSettings.modsRequireInventoryTitle).toContain('bag');
++  });
++
++  it('гейт фильтрует по сумке: есть мод — виден, нет — скрыт с пометкой', () => {
++    const mods = syntheticCatalog.armorMods;
++    const owned = new Set(['mod_std_dense']);
++    expect(filterModsByInventory(mods, null).length).toBe(2); // гейт выключен — все
++    expect(filterModsByInventory(mods, owned).map((m) => m.id)).toEqual(['mod_std_dense']);
++    expect(filterModsByInventory(mods, new Set()).length).toBe(0);
++  });
++
++  it('окно установки подключено: настройка, фильтр, пометка, названия разделов', () => {
++    const src = modalSource();
++    expect(src).toContain("getSettingValue('modsRequireInventoryItem')");
++    expect(src).toContain('filterModsByInventory');
++    expect(src).toContain('modsNotInInventory');
++    // материал vs модификация — словами владельца, не «стандартные/уникальные»
++    expect(ruScreen.modals.standard).toBe('Модификации');
++    expect(ruScreen.modals.unique).toBe('Материал брони');
++    expect(enScreen.modals.standard).toBe('Modifications');
++    expect(enScreen.modals.unique).toBe('Armor material');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 98ca1e0..44d4ae3 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **341** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–341 уехали, установка не подтверждена;
++· последний сданный патч: **342** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -169,6 +169,15 @@
+   ВОПРОС владельцу: гейтить ли установку мода наличием в сумке (сейчас
+   установка свободна из каталога). Не начато: силовая броня, оружие,
+   редкие рецепты, 4 мода-рецепта (340).
++- 342 — слова владельца о модах: мод УНИВЕРСАЛЕН (если не указано иное) —
++  материал семейства встаёт на любую часть предмета брони семейства;
++  МАТЕРИАЛ ≠ МОДИФИКАЦИЯ (1+1, слоты appliedUniqueArmorModId /
++  appliedArmorModId); разделы окна установки — «Материал брони» /
++  «Модификации». Настройка «Требовать мод в сумке для установки»
++  (modsRequireInventoryItem, раздел «Крафт», дефолт ВЫКЛ = свободная
++  установка; ВКЛ — только моды из сумки, чистый фильтр
++  filterModsByInventory в modsEquip). Открыто: расходуется ли мод
++  при установке.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index be19ca4..b8dcf68 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,22 @@
+ 
+ ---
+ 
+-## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
++## Universal mod, Material vs Modification, bag gate (patch 342)
++
++Owner's words after the first snag of testing.
++
++- A mod is universal unless stated otherwise: "Boiled Leather" fits any
++  part of its armor family, "Shadowed Metal" — any metal armor piece.
++  The data already worked this way — recorded as law.
++- Armor material ≠ armor modification: armor takes 1 material + 1
++  modification. Install-window sections renamed in owner's words:
++  "Armor material" and "Modifications" (were "Unique/Standard").
++- New Crafting-section setting — "Require the mod in the bag to install"
++  (default OFF: free installation, as before). On — only created/found
++  mods can be installed; empty groups show "None in the bag (craft them
++  in the Crafting window)".
++
++## ## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
+ 
+ Owner's word: "I'm waiting to test crafting armor mods." Patch 341 starts
+ the series: mod crafting is ready for testing.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d40b183..e885191 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,22 @@
+ 
+ ---
+ 
+-## КРАФТ МОДОВ БРОНИ — квадрат «Броня» работает (патч 341)
++## Универсальный мод, «Материал ≠ Модификация», гейт сумки (патч 342)
++
++Слова владельца по итогам первого затыка тестирования.
++
++- Мод универсален, если не указано иное: «Вываренная Кожа» встаёт на любую
++  часть своей брони, «Затенённый Металл» — на любой предмет метал. брони.
++  Данные уже так устроены — записано законом.
++- Материал брони ≠ модификация брони: броня принимает 1 материал + 1
++  модификацию. Разделы окна установки переименованы словами владельца:
++  «Материал брони» и «Модификации» (были «Уникальные/Стандартные»).
++- Новая настройка раздела «Крафт» — «Требовать мод в сумке для установки»
++  (по умолчанию ВЫКЛ: установка свободна, как раньше). Включена — ставить
++  можно только созданные/найденные моды; пустые группы помечены
++  «Нет в сумке (создаются в окне „Крафт“)».
++
++## ## КРАФТ МОДОВ БРОНИ — квадрат «Броня» работает (патч 341)
+ 
+ Слово владельца: «жду, когда смогу протестировать создание модов на броню».
+ Патч 341 — старт серии: крафт модов доступен для проверки.
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index 86f1783..bc54ef8 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -334,6 +334,23 @@ uniq_synth_microcarbon (а «Нановолоконная» — uniq_synth_nanof
+ улучшения). У брони они связаны через id, но существуют отдельно, как
+ байт и килобайт.
+ 
++## 2.9. Законы установки (слово владельца, патч 342)
++
++1. **Мод универсален, если не указано иное.** «Скрафтил Вываренную Кожу —
++   мод может встать на любую часть своей брони; Затенённый Металл — на
++   любой предмет метал. брони». Материалы семейства и плетение — на
++   любую часть предмета брони своего семейства (зоны пересекаются);
++   зонные моды книги (тело/руки/ноги) — исключения «указано иное».
++2. **Материал брони ≠ модификация брони.** Броня принимает 1 материал
++   + 1 модификацию — два независимых слота установки (appliedUniqueArmorModId /
++   appliedArmorModId); в окне установки разделы названы словами владельца:
++   «Материал брони» и «Модификации».
++3. **Настройка «Требовать мод в сумке для установки»** (раздел «Крафт»,
++   по умолчанию ВЫКЛ — установка свободна). Включена — ставятся только
++   моды, созданные/найденные (id присутствует в сумке); пустые группы
++   помечены «Нет в сумке (создаются в окне „Крафт“)». Открытый вопрос:
++   расходуется ли мод-предмет при установке (решение после тестирования).
++
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+ 1. **Ёмкость ≠ сложность предмета.** Владелец: «ты сравниваешь данные
+diff --git a/domain/modsEquip.js b/domain/modsEquip.js
+index 7f77063..ccd127f 100644
+--- a/domain/modsEquip.js
++++ b/domain/modsEquip.js
+@@ -43,6 +43,14 @@ export const getAvailableArmorMods = (item, catalog) => {
+     return { standardMods, uniqueMods };
+ };
+ 
++/**
++ * Патч 342 (настройка «Требовать мод в сумке»): оставить только моды,
++ * созданные/найденные персонажем. ownedIds — Set id модов-предметов в сумке
++ * (weaponId экземпляров). Чистая функция — настройку читает UI.
++ */
++export const filterModsByInventory = (mods, ownedIds) =>
++  !ownedIds ? mods : (mods || []).filter((mod) => ownedIds.has(mod.id));
++
+ /** Return whether a unique mod belongs to the item's explicit armor category. */
+ export const isUniqueModAllowedForArmor = (mod, item, catalog) => {
+     if (!mod) return false;
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 7a24a67..c9ba0fd 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -67,8 +67,8 @@
+     "armorModification": "Upgrade armor",
+     "clothingModification": "Upgrade clothing",
+     "availableModifications": "Available modifications",
+-    "standard": "Standard",
+-    "unique": "Unique",
++    "standard": "Modifications",
++    "unique": "Armor material",
+     "removeStandard": "Remove standard mod",
+     "noStandard": "No standard mod",
+     "removeUnique": "Remove unique mod",
+@@ -96,7 +96,8 @@
+     "previewEffects": "Effects",
+     "previewQualities": "Qualities",
+     "errorTitle": "Error",
+-    "errorSelectMod": "Please select at least one modification"
++    "errorSelectMod": "Please select at least one modification",
++    "modsNotInInventory": "None in the bag (craft them in the Crafting window)"
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 157d3d5..23431d1 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -67,8 +67,8 @@
+     "armorModification": "Улучшить броню",
+     "clothingModification": "Улучшить одежду",
+     "availableModifications": "Доступные модификации",
+-    "standard": "Стандартные",
+-    "unique": "Уникальные",
++    "standard": "Модификации",
++    "unique": "Материал брони",
+     "removeStandard": "Снять стандартный мод",
+     "noStandard": "Без стандартного мода",
+     "removeUnique": "Снять уникальный мод",
+@@ -96,7 +96,8 @@
+     "previewEffects": "Эффекты",
+     "previewQualities": "Качества",
+     "errorTitle": "Ошибка",
+-    "errorSelectMod": "Выберите хотя бы одну модификацию"
++    "errorSelectMod": "Выберите хотя бы одну модификацию",
++    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)"
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
+index 1db8963..42c5137 100644
+--- a/modules/fallout/i18n/en-EN/data/system/settings.json
++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
+@@ -33,5 +33,7 @@
+   "craftLossConsumablesTitle": "Material loss on failure: food, drinks, explosives, chems",
+   "craftLossConsumablesDescription": "By the book: a cooking station or chemical laboratory consumes all ingredients when the check fails. Off — materials are kept on failure.",
+   "craftLossGearTitle": "Material loss on failure: weapons, armor, ammo",
+-  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure."
++  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure.",
++  "modsRequireInventoryTitle": "Require the mod in the bag to install",
++  "modsRequireInventoryDescription": "On — a material or modification can be installed only if the crafted (or found) mod item is in the bag. Off — installation is free: any mod available to this armor installs without the item."
+ }
+diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
+index 54e5628..f9c7327 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
+@@ -33,5 +33,7 @@
+   "craftLossConsumablesTitle": "Потеря материалов при провале: еда, напитки, взрывчатка, препараты",
+   "craftLossConsumablesDescription": "По книге: станция приготовления пищи и химическая лаборатория — при провале проверки ингредиенты израсходованы. Выключено — материалы остаются при провале.",
+   "craftLossGearTitle": "Потеря материалов при провале: оружие, броня, патроны",
+-  "craftLossGearDescription": "Провал компонентного крафта (оружие, броня, силовая броня, патроны и прочее) расходует материалы. Выключено — материалы остаются при провале."
++  "craftLossGearDescription": "Провал компонентного крафта (оружие, броня, силовая броня, патроны и прочее) расходует материалы. Выключено — материалы остаются при провале.",
++  "modsRequireInventoryTitle": "Требовать мод в сумке для установки",
++  "modsRequireInventoryDescription": "Включено — установить материал или модификацию можно только при наличии созданного (или найденного) мода в сумке. Выключено — установка свободна: любой мод, доступный этой броне, ставится без предмета."
+ }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
+index 0559655..e280fcd 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/ArmorModificationModal.js
+@@ -2,7 +2,9 @@ import React, { useMemo, useState, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+-import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
++import { applyArmorMods, filterModsByInventory, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
++import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
++import useCharacterStore from '../../../../../src/store/characterStore';
+ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
+ import styles from '../../../styles/ArmorModificationModal.styles';
+ 
+@@ -75,6 +77,18 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor',
+     setExpandedCategories({ standard: false, unique: false });
+   }, [visible, localizedTargetItem, stdKey, uniqKey]);
+ 
++  // 342 (настройка «Требовать мод в сумке», слово владельца): включена —
++  // ставить можно только созданные/найденные моды (есть в сумке); выключена
++  // (по умолчанию) — установка свободна, любой доступный броне мод.
++  const requireModInBag = useAppSettingsStore((s) => s.getSettingValue('modsRequireInventoryItem'));
++  const bagItems = useCharacterStore((s) => s.items);
++  const ownedModIds = useMemo(() => {
++    if (!requireModInBag) return null;
++    return new Set(Object.values(bagItems || {})
++      .map((item) => item?.weaponId)
++      .filter(Boolean));
++  }, [requireModInBag, bagItems]);
++
+   const { standardMods, uniqueMods } = useMemo(() => {
+     // Одежда не модифицируется модами брони.
+     if (isClothingMode || !localizedTargetItem) return { standardMods: [], uniqueMods: [] };
+@@ -82,8 +96,12 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor',
+     // ПРАВИЛО (от владельца): уникальные моды — строго по типу брони.
+     // См. domain/modsEquip.js — если категория брони неизвестна, уникальных
+     // модов нет вообще (а не «все моды всем»).
+-    return getAvailableArmorMods(localizedTargetItem, catalog);
+-  }, [localizedTargetItem, catalog, isClothingMode]);
++    const available = getAvailableArmorMods(localizedTargetItem, catalog);
++    return {
++      standardMods: filterModsByInventory(available.standardMods, ownedModIds),
++      uniqueMods: filterModsByInventory(available.uniqueMods, ownedModIds),
++    };
++  }, [localizedTargetItem, catalog, isClothingMode, ownedModIds]);
+ 
+   const previewItem = useMemo(() => {
+     if (!localizedTargetItem) return null;
+@@ -155,6 +173,9 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor',
+                     <Text style={styles.modificationName}>{selectedStd ? tWeaponsAndArmorScreen('modals.removeStandard') : tWeaponsAndArmorScreen('modals.noStandard')}</Text>
+                   </TouchableOpacity>
+                 )}
++                {requireModInBag && standardMods.length === 0 && (
++                  <Text style={styles.modsNotInInventory}>{tWeaponsAndArmorScreen('modals.modsNotInInventory')}</Text>
++                )}
+                 {standardMods.map((m) => (
+                   <ModRow key={m.id} mod={m} selected={selectedStd === m.id} onPress={() => setSelectedStd(m.id)} />
+                 ))}
+@@ -172,6 +193,9 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor',
+                   >
+                     <Text style={styles.modificationName}>{selectedUniq ? tWeaponsAndArmorScreen('modals.removeUnique') : tWeaponsAndArmorScreen('modals.noUnique')}</Text>
+                   </TouchableOpacity>
++                  {requireModInBag && uniqueMods.length === 0 && (
++                    <Text style={styles.modsNotInInventory}>{tWeaponsAndArmorScreen('modals.modsNotInInventory')}</Text>
++                  )}
+                   {uniqueMods.map((m) => (
+                     <ModRow key={m.id} mod={m} selected={selectedUniq === m.id} onPress={() => setSelectedUniq(m.id)} />
+                   ))}
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index f72d0f1..feed522 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -106,5 +106,14 @@
+     "labelKey": "settings.craftLossGearTitle",
+     "descriptionKey": "settings.craftLossGearDescription",
+     "defaultValue": true
++  },
++  {
++    "id": "modsRequireInventoryItem",
++    "type": "boolean",
++    "controlSurface": "settings",
++    "sectionKey": "crafting",
++    "labelKey": "settings.modsRequireInventoryTitle",
++    "descriptionKey": "settings.modsRequireInventoryDescription",
++    "defaultValue": false
+   }
+ ]
+diff --git a/modules/fallout/styles/ArmorModificationModal.styles.js b/modules/fallout/styles/ArmorModificationModal.styles.js
+index 75070ba..26ae064 100644
+--- a/modules/fallout/styles/ArmorModificationModal.styles.js
++++ b/modules/fallout/styles/ArmorModificationModal.styles.js
+@@ -1,6 +1,8 @@
+ import { StyleSheet } from 'react-native';
+ 
+ const styles = StyleSheet.create({
++  // 342: пометка «нет в сумке» при включённой настройке «Требовать мод в сумке»
++  modsNotInInventory: { color: '#9aa1a9', fontSize: 12, paddingVertical: 6, fontStyle: 'italic' },
+   modalOverlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+diff --git a/public/version.json b/public/version.json
+index 2d9f3ae..0eb25da 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "341",
++  "version": "342",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
