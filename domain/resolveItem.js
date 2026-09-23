@@ -55,6 +55,9 @@ export const findCatalogEntry = (catalog, id, itemType) => {
       return search(catalog.ammoTypes);
     case 'armor':
       return catalog.armorIndex?.byId?.get(id) || null;
+    case 'armorMod':
+      // Моды брони (341): стандартные и уникальные — плоские списки каталога.
+      return search(catalog.armorMods) || search(catalog.uniqArmorMods);
     case 'clothing':
     case 'outfit': {
       const all = (catalog.clothes?.clothes || []).flatMap((g) => g.items || []);

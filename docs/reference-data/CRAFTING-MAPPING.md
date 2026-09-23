@@ -21,7 +21,7 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
 ## Покрытие
 
 - рецептов в источнике: **356**
-- выпущено в данные: **93** (ammo: 28, explosives: 9, chems: 21, food: 27, drinks: 8)
+- выпущено в данные: **137** (ammo: 28, explosives: 9, armor: 44, chems: 21, food: 27, drinks: 8)
 - не выпущено: **263**
 - из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
 

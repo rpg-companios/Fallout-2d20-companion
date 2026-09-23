@@ -2,7 +2,28 @@
 
 ---
 
-## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
+## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
+
+Owner's word: "I'm waiting to test crafting armor mods." Patch 341 starts
+the series: mod crafting is ready for testing.
+
+- The "Armor" tile in the crafting window: 44 recipes — every mod-item
+  from your table (weave, vault-suit linings, raider/leather/metal/combat/
+  synth materials, generic body/arms/legs mods). Not emitted: the four
+  recipe-only mods (340) and the ambiguous "Lightweight (2)" row.
+- Materials follow material capacity (book): capacity 2 = Common ×3,
+  capacity 7 = Common ×8 + Uncommon ×6 + Rare ×4, etc.
+- Check: INT + Repair, difficulty = capacity − rank (rules 323); perks
+  (Armorer/Science!) gate like other recipes; one hour; failure burns
+  materials per the "gear" setting.
+- The crafted mod is an inventory item with its catalog name ("Вываренная
+  кожа", "Ballistic weave"…). The mod-install window still lists catalog
+  mods freely — QUESTION to the owner: should installing REQUIRE the
+  crafted mod in the bag (today it doesn't)?
+- Not in this patch: power armor and weapons (empty tiles), rare-recipe
+  learning (future series), applying the four recipe-only mods (340).
+
+## ## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
 
 The owner checked the book: Pockets, Deep pockets, Lead-lined and
 Ultra-light are mod-RECIPES, not mod-items ("different concepts, like a

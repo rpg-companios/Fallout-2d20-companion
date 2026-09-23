@@ -43,9 +43,11 @@ describe('Модалка крафта (318): квадраты, спойлеры,
     expect(byId.get('food').recipes).toBe(27);
     expect(byId.get('explosives').recipes).toBe(9); // 325: вся взрывчатка переехала из «оружия»
     expect(buildCategoryModel('explosives').length).toBe(9);
+    expect(byId.get('armor').recipes).toBe(44); // 341: крафт модов брони — квадрат «Броня» жив
+    expect(buildCategoryModel('armor').length).toBe(44);
     // пустых данных квадраты видны, но рецептов внутри нет
-    for (const empty of ['weapons', 'armor', 'powerArmor']) {
-      expect(byId.get(empty).recipes).toBe(0); // «оружие» опустело после переезда взрывчатки (325)
+    for (const empty of ['weapons', 'powerArmor']) {
+      expect(byId.get(empty).recipes).toBe(0); // оружие/силовая броня — будущие серии модов
       expect(buildCategoryModel(empty)).toEqual([]);
     }
   });

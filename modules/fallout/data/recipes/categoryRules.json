@@ -1,7 +1,30 @@
 {
-  "ammo": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] },
-  "chems": { "failBurnsMaterialsSkills": ["SCIENCE"] },
-  "drinks": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
-  "food": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
-  "explosives": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] }
+  "ammo": {
+    "failBurnsMaterialsSkills": [
+      "EXPLOSIVES"
+    ]
+  },
+  "armor": {
+    "failBurnsMaterialsSkills": []
+  },
+  "chems": {
+    "failBurnsMaterialsSkills": [
+      "SCIENCE"
+    ]
+  },
+  "drinks": {
+    "failBurnsMaterialsSkills": [
+      "SURVIVAL"
+    ]
+  },
+  "explosives": {
+    "failBurnsMaterialsSkills": [
+      "EXPLOSIVES"
+    ]
+  },
+  "food": {
+    "failBurnsMaterialsSkills": [
+      "SURVIVAL"
+    ]
+  }
 }

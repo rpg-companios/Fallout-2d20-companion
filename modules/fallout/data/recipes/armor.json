@@ -1,0 +1,1062 @@
+[
+  {
+    "id": "uniq_weave_ballistic",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_weave_ballistic_mk2",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_weave_ballistic_mk3",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_weave_ballistic_mk4",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_weave_ballistic_mk5",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_vaultsuit_insulated",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_vaultsuit_processed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_vaultsuit_sturdy",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_vaultsuit_protective",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_vaultsuit_shielded",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        },
+        {
+          "perkId": "science",
+          "rank": 4
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_raider_welded",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_raider_hardened",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_raider_reinforced",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_raider_bolstered",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_leather_boiled",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_leather_stitched",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_leather_tanned",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_leather_shadowed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_leather_studded",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_metal_painted",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_metal_enameled",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_metal_shadowed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_metal_alloy",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_metal_polished",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_combat_reinforced",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_combat_shadowed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_combat_fiberglass",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_combat_polymer",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_synth_laminated",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_synth_rubberized",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_synth_microcarbon",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "uniq_synth_nanofiber",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 7,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 8
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 4
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_soft_padding",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_asbestos_lining",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_dense",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_biocomponents_mesh",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 7,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 8
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 4
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_pneumatic",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_melee",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_parrying",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_balanced",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_aerodynamic",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_lightweight_arms",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 4
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_soft_padding_legs",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_std_soundproofed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "armorer",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  }
+]

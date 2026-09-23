@@ -177,21 +177,86 @@ export const FILE_BY_BUCKET = {
   ammo: 'ammo.json',
   weapons: 'weapons.json',
   explosives: 'explosives.json',
+  armor: 'armor.json',
   chems: 'chems.json',
   food: 'food.json',
   drinks: 'drinks.json',
   items: 'items.json',
 };
-export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'chems', 'food', 'drinks', 'items'];
+export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'armor', 'chems', 'food', 'drinks', 'items'];
 const BENCH_BY_BUCKET = {
   ammo: 'weapons',
   weapons: 'chemistry',
   explosives: 'chemistry',
+  armor: 'armor',
   chems: 'chemistry',
   food: 'cooking',
   drinks: 'cooking',
   items: 'chemistry',
 };
+
+// Патч 341 (слово владельца): крафт модов брони — по диктованной таблице
+// (патчи 327–340; источник истины: docs/reference-data/armor-mods-crafting.md).
+// Рецепт = id мода-предмета; сложность = материалоёмкость (материалы — по
+// кривой MATERIALS_BY_COMPLEXITY); навык Ремонт; перки — из таблицы.
+// НЕ выпускаются (340): четыре мода-рецепта без предмета (uniq-«карманы»,
+// свинец, ультралёгкая) и двусмысленная «Облегчённая (2)» — до эрраты/слова.
+export const BOOK_ARMOR_MOD_RECIPES = [
+  // Баллистическое плетение (костюмы + комбинезон Убежища)
+  { id: 'uniq_weave_ballistic', capacity: 3, perks: [] },
+  { id: 'uniq_weave_ballistic_mk2', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_weave_ballistic_mk3', capacity: 3, perks: [{ perkId: 'armorer', rank: 2 }] },
+  { id: 'uniq_weave_ballistic_mk4', capacity: 3, perks: [{ perkId: 'armorer', rank: 3 }] },
+  { id: 'uniq_weave_ballistic_mk5', capacity: 3, perks: [{ perkId: 'armorer', rank: 4 }] },
+  // Подкладки комбинезона Убежища
+  { id: 'uniq_vaultsuit_insulated', capacity: 2, perks: [] },
+  { id: 'uniq_vaultsuit_processed', capacity: 3, perks: [{ perkId: 'armorer', rank: 2 }] },
+  { id: 'uniq_vaultsuit_sturdy', capacity: 4, perks: [{ perkId: 'armorer', rank: 3 }] },
+  { id: 'uniq_vaultsuit_protective', capacity: 5, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 2 }] },
+  { id: 'uniq_vaultsuit_shielded', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 4 }] },
+  // Материалы брони рейдеров
+  { id: 'uniq_raider_welded', capacity: 2, perks: [] },
+  { id: 'uniq_raider_hardened', capacity: 3, perks: [] },
+  { id: 'uniq_raider_reinforced', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_raider_bolstered', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
+  // Материалы кожаной брони
+  { id: 'uniq_leather_boiled', capacity: 2, perks: [] },
+  { id: 'uniq_leather_stitched', capacity: 3, perks: [] },
+  { id: 'uniq_leather_tanned', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_leather_shadowed', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_leather_studded', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
+  // Материалы металлической брони
+  { id: 'uniq_metal_painted', capacity: 2, perks: [] },
+  { id: 'uniq_metal_enameled', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_metal_shadowed', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_metal_alloy', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_metal_polished', capacity: 6, perks: [{ perkId: 'armorer', rank: 2 }] },
+  // Материалы боевой брони
+  { id: 'uniq_combat_reinforced', capacity: 3, perks: [] },
+  { id: 'uniq_combat_shadowed', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_combat_fiberglass', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_combat_polymer', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
+  // Материалы брони синтов
+  { id: 'uniq_synth_laminated', capacity: 4, perks: [] },
+  { id: 'uniq_synth_rubberized', capacity: 5, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_synth_microcarbon', capacity: 6, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'uniq_synth_nanofiber', capacity: 7, perks: [{ perkId: 'armorer', rank: 1 }] },
+  // Общие модификации — тело
+  { id: 'mod_std_soft_padding', capacity: 3, perks: [] },
+  { id: 'mod_std_asbestos_lining', capacity: 4, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'mod_std_dense', capacity: 6, perks: [{ perkId: 'armorer', rank: 3 }] },
+  { id: 'mod_std_biocomponents_mesh', capacity: 7, perks: [{ perkId: 'armorer', rank: 4 }, { perkId: 'science', rank: 2 }] },
+  { id: 'mod_std_pneumatic', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }] },
+  // Общие модификации — руки
+  { id: 'mod_std_melee', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'mod_std_parrying', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'mod_std_balanced', capacity: 4, perks: [{ perkId: 'armorer', rank: 2 }] },
+  { id: 'mod_std_aerodynamic', capacity: 5, perks: [{ perkId: 'armorer', rank: 3 }] },
+  { id: 'mod_std_lightweight_arms', capacity: 6, perks: [{ perkId: 'armorer', rank: 4 }] },
+  // Общие модификации — ноги
+  { id: 'mod_std_soft_padding_legs', capacity: 3, perks: [{ perkId: 'armorer', rank: 1 }] },
+  { id: 'mod_std_soundproofed', capacity: 4, perks: [{ perkId: 'armorer', rank: 2 }] },
+];
 
 // Патч 325 (слово владельца): гранаты и мины — не «оружие», а «взрывчатка».
 // Тип предмета в каталоге остаётся weapon (брошенное оружие), но рецепты
@@ -607,6 +672,31 @@ export function buildCraftingData() {
   const deadFixes = Object.keys(BOOK_CORRECTIONS).filter((key) => !correctionsUsed.has(key));
   if (deadFixes.length) {
     throw new Error(`BOOK_CORRECTIONS: для ключей ${deadFixes.join(', ')} нет строки в источнике — исправление мертво`);
+  }
+
+  // Патч 341: рецепты модов брони — из диктованной таблицы (BOOK_ARMOR_MOD_RECIPES).
+  // Материалы — по ёмкости (MATERIALS_BY_COMPLEXITY); навык Ремонт; выход — 1 мод.
+  for (const mod of BOOK_ARMOR_MOD_RECIPES) {
+    if (ids.has(mod.id)) throw new Error(`[armor-mod recipes] дубликат id ${mod.id}`);
+    ids.add(mod.id);
+    const curve = MATERIALS_BY_COMPLEXITY[Math.min(7, Math.max(1, Number(mod.capacity) || 1))];
+    const materials = [];
+    if (curve.common) materials.push({ itemId: MATERIAL_ITEM_IDS.common, count: curve.common });
+    if (curve.uncommon) materials.push({ itemId: MATERIAL_ITEM_IDS.uncommon, count: curve.uncommon });
+    if (curve.rare) materials.push({ itemId: MATERIAL_ITEM_IDS.rare, count: curve.rare });
+    entries.push({
+      bucket: 'armor',
+      record: {
+        id: mod.id,
+        requires: {
+          skill: 'REPAIR',
+          complexity: mod.capacity,
+          ...(mod.perks.length ? { perks: mod.perks } : {}),
+        },
+        materials,
+        outputQuantity: 1,
+      },
+    });
   }
 
   const byBucket = {};
