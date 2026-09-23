@@ -2,6 +2,19 @@
 
 ---
 
+## Crafting — window fixes from the owner's testing (patch 322)
+
+- The category window now scrolls (it didn't scroll on desktop before).
+- Tiles are 3 per row. Row remainder: a single tile is centered, two start
+  from the left edge (owner's word).
+- "Have N · need M" now sits next to the material name, not at the far end
+  of the row (it drifted to the edge on wide monitors).
+- The recipe line explains itself: "Complexity 1 · Survival · time: 1 d" —
+  the check's skill and the in-game crafting time (the owner's question
+  "what is 1 d?").
+- Fuse: acceptance test (patch 322) — scrolling, the 3-per-row grid with
+  alignment rules, materials next to names, the time label, dictionaries.
+
 ## Update system: the app announces new versions and shows a changelog (patch 321)
 
 Owner's word: "the app should knock on the server, ask if there's an

@@ -127,8 +127,10 @@ const buildRowsForCategory = (category) => {
       skillLabel: getSkillDisplayName(recipe.requires.skill),
       minutes,
       timeLabel: formatCraftMinutes(minutes),
+      // 322 (вопрос владельца «что такое 1 сут?»): время изготовления подписано явно.
       metaLine: fmt(d.complexity, { n: Number(recipe.requires.complexity) || 0 })
-        + ' · ' + getSkillDisplayName(recipe.requires.skill) + ' · ' + formatCraftMinutes(minutes),
+        + ' · ' + getSkillDisplayName(recipe.requires.skill)
+        + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
       status,
       canCraft: evaluation.ready,
       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,

@@ -8,7 +8,7 @@
 // здесь только кнопки, списки и иконки квадратов.
 
 import React, { useMemo, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from '../../../styles/CraftingModal.styles';
 import {
@@ -36,6 +36,13 @@ const RARITY_LABEL_KEYS = {
   common: 'rarityCommon',
   uncommon: 'rarityUncommon',
   rare: 'rarityRare',
+};
+
+// Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
+const chunkIntoRows = (items, perRow) => {
+  const rows = [];
+  for (let i = 0; i < items.length; i += perRow) rows.push(items.slice(i, i + perRow));
+  return rows;
 };
 
 export default function CraftingModal({ visible, onClose }) {
@@ -124,28 +131,35 @@ export default function CraftingModal({ visible, onClose }) {
           </View>
 
           {!report && view === 'categories' && (
-            <View style={styles.body}>
-              <View style={styles.tilesWrap}>
-                {tiles.map((tile) => (
-                  <TouchableOpacity
-                    key={tile.category}
-                    style={styles.tile}
-                    onPress={() => openCategory(tile)}>
-                    <MaterialCommunityIcons
-                      name={CATEGORY_ICONS[tile.category] ?? 'circle-outline'}
-                      style={styles.tileIcon}
-                    />
-                    <Text style={styles.tileLabel} numberOfLines={2}>{tile.label}</Text>
-                    <Text style={[styles.tileCount, tile.available === 0 && styles.tileCountZero]}>
-                      {tile.available}/{tile.recipes}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+            <ScrollView style={styles.body} contentContainerStyle={styles.tilesContent}>
+              {/* Патч 322: строки по 3 квадрата, прокрутка (владелец: окно на ПК
+                  не прокручивалось). Выравнивание остатка строки: одинокая — по
+                  центру; две — от левого края; полная — как есть. */}
+              {chunkIntoRows(tiles, 3).map((rowTiles, rowIdx) => (
+                <View
+                  key={`tileRow_${rowIdx}`}
+                  style={[styles.tileRow, rowTiles.length === 1 && styles.tileRowCenter, rowTiles.length === 2 && styles.tileRowLeft]}>
+                  {rowTiles.map((tile) => (
+                    <TouchableOpacity
+                      key={tile.category}
+                      style={styles.tile}
+                      onPress={() => openCategory(tile)}>
+                      <MaterialCommunityIcons
+                        name={CATEGORY_ICONS[tile.category] ?? 'circle-outline'}
+                        style={styles.tileIcon}
+                      />
+                      <Text style={styles.tileLabel} numberOfLines={2}>{tile.label}</Text>
+                      <Text style={[styles.tileCount, tile.available === 0 && styles.tileCountZero]}>
+                        {tile.available}/{tile.recipes}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
               <TouchableOpacity style={styles.closeBtn} onPress={close}>
                 <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
               </TouchableOpacity>
-            </View>
+            </ScrollView>
           )}
 
           {!report && view === 'category' && (

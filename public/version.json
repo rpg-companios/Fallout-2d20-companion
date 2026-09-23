@@ -1,17 +1,15 @@
 {
-  "version": "321",
+  "version": "322",
   "notes": {
     "ru-RU": [
-      "Крафт: новое окно — квадраты категорий, рецепты-спойлеры, выбор количества",
-      "Кнопка «Крафт» теперь открывает окно крафта",
-      "Персонажи: производные (ОЗ, инициатива, защита, вес) пересчитываются автоматически",
-      "Починена установка PWA и обновления давно установленных приложений"
+      "Крафт: окно категорий прокручивается, квадраты по 3 в ряд",
+      "Крафт: «есть · нужно» теперь рядом с названием материала",
+      "Крафт: время изготовления подписано явно («время: 1 сут»)"
     ],
     "en-EN": [
-      "Crafting: new window — category tiles, recipe spoilers, quantity picker",
-      "The \"Craft\" button now opens the crafting window",
-      "Characters: derived stats (HP, initiative, defense, carry) recalculate automatically",
-      "Fixed PWA installation and updates for long-installed apps"
+      "Crafting: category window scrolls, tiles 3 per row",
+      "Crafting: \"have · need\" now sits next to the material name",
+      "Crafting: crafting time is labeled explicitly (\"time: 1 d\")"
     ]
   }
 }

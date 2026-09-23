@@ -12,11 +12,14 @@ export default StyleSheet.create({
   closeText: { color: '#c9c6b5', fontSize: 20, paddingHorizontal: 8 },
   backText: { color: '#c9c6b5', fontSize: 14, paddingRight: 8 },
 
-  // Квадраты категорий (318)
+  // Квадраты категорий (318; 322 — прокрутка, строки по 3, выравнивание от центра)
   body: { flex: 1, paddingHorizontal: 12 },
-  tilesWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10, paddingTop: 4 },
+  tilesContent: { paddingBottom: 8 },
+  tileRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  tileRowCenter: { justifyContent: 'center' },
+  tileRowLeft: { justifyContent: 'flex-start' },
   tile: {
-    width: '48.5%',
+    width: '30%',
     aspectRatio: 1,
     borderRadius: 12,
     backgroundColor: '#232823',
@@ -25,7 +28,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    padding: 6,
+    padding: 4,
   },
   tileIcon: { fontSize: 38, color: '#ffe9a8' },
   tileLabel: { color: '#e8e6d9', fontSize: 13, fontWeight: '600', textAlign: 'center' },
@@ -56,8 +59,9 @@ export default StyleSheet.create({
   spoilerBody: { paddingTop: 8 },
   detailLabel: { color: '#8f9a86', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
   rarityLine: { color: '#c9c6b5', fontSize: 12, fontWeight: '700', marginTop: 6 },
-  materialLine: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  materialName: { color: '#e8e6d9', fontSize: 13, flex: 1 },
+  // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
+  materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 3 },
+  materialName: { color: '#e8e6d9', fontSize: 13, flexShrink: 1 },
   materialOk: { color: '#7da769', fontSize: 12 },
   materialBad: { color: '#c76e6e', fontSize: 12 },
   bigCraft: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },

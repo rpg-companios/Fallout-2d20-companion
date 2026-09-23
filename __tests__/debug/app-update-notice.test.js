@@ -24,8 +24,11 @@ const memoryStorage = () => {
 };
 
 describe('Система обновлений (321): version.json, окно «Что нового»', () => {
-  it('version.json: версия — номер последнего патча, чейнджлог на обоих языках', () => {
-    expect(versionJson.version).toBe('321');
+  it('version.json: версия — номер патча (растёт), чейнджлог на обоих языках', () => {
+    // Правило 321: версия = номер последнего патча, обновляется В ТОМ ЖЕ
+    // ПАТЧЕ. Точное число не фиксируем — оно растёт каждым патчем.
+    expect(String(versionJson.version)).toMatch(/^\d+$/);
+    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(321);
     expect(versionJson.notes['ru-RU'].length).toBeGreaterThan(0);
     expect(versionJson.notes['en-EN'].length).toBeGreaterThan(0);
   });
