@@ -1,0 +1,136 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4bb261f..0ddd77e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **329** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–329 уехали, установка не подтверждена;
++· последний сданный патч: **330** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–330 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -103,6 +103,10 @@
+   #9aa1a9); доступность материалов — в скобках у названия («можно создать» /
+   «не хватает материалов» / «нужен перк»); сложность/навык/время — внутри
+   спойлера первой строкой.
++- 330 — поправка к 329: квадраты категорий — по образцу КАРТОЧЕК
++  ПЕРСОНАЖЕЙ home screen (characterCell: светлая панель, рамка #5a5a5a,
++  радиус 8, имя #222, счётчик #555), а НЕ папок; урок — «как у home screen»
++  = карточки персонажей, папки не ориентир.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e48f41f..30a2466 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,18 @@
+ 
+ ---
+ 
+-## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
++## Category tiles — like character cards (patch 330)
++
++Owner's correction to 329: "do character cards look like that?" — no.
++In 329 the tiles were styled after home-screen FOLDERS (dark panel, gold
++border) — the wrong reference.
++
++- Category tiles now follow the CHARACTER cards (characterCell): light
++  panel, grey border, radius 8; dark label, grey counter, icon in the
++  border's tone.
++- The window background (setting image) and the rest of 329 are untouched.
++
++## ## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
+ 
+ Owner's design word: the categories window gets the setting windows'
+ background, category areas styled like the home screen, spoilers as neat
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index dda3bc8..704e287 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,18 @@
+ 
+ ---
+ 
+-## Окно крафта — фон сеттинга, квадраты как дома, спойлеры-карточки (патч 329)
++## Квадраты категорий — как карточки персонажей (патч 330)
++
++Поправка владельца к 329: «разве карточки персонажей такое оформление
++имеют?» — нет. В 329 квадраты были оформлены по образцу ПАПОК home screen
++(тёмная панель, золотая рамка) — ошибка ориентира.
++
++- Квадраты категорий перекрашены по образцу карточек ПЕРСОНАЖЕЙ
++  (characterCell): светлая панель, серая рамка, скругление 8; название —
++  тёмное, счётчик — серый, значок — в тон рамке.
++- Фон окна (изображение сеттинга) и остальные правки 329 не тронуты.
++
++## ## Окно крафта — фон сеттинга, квадраты как дома, спойлеры-карточки (патч 329)
+ 
+ Слово владельца о дизайне: общее окно категорий — с фоном окон сеттинга,
+ области категорий — как на home screen, спойлеры — аккуратные карточки
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index 5607bb1..a4b5ef0 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -16,9 +16,10 @@ export default StyleSheet.create({
+   closeText: { color: '#444', fontSize: 20, paddingHorizontal: 8 },
+   backText: { color: '#444', fontSize: 14, paddingRight: 8 },
+ 
+-  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга
+-  // и оформление областей как у home screen: folderCell — тёмная панель,
+-  // золотая рамка, скругление 8)
++  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга;
++  // 330 — поправка владельца: оформление областей — как КАРТОЧКИ ПЕРСОНАЖЕЙ
++  // home screen (characterCell), а не папок: светлая панель, серая рамка,
++  // скругление 8; имя #222, подпись #555 — как characterName/characterLevel)
+   bg: { flex: 1 },
+   bgImage: { opacity: 0.3 }, // как на экранах сеттинга (WeaponsAndArmor)
+   body: { flex: 1, paddingHorizontal: 12 },
+@@ -30,18 +31,18 @@ export default StyleSheet.create({
+     width: '30%',
+     aspectRatio: 1,
+     borderRadius: 8,
+-    backgroundColor: '#111827',
++    backgroundColor: 'rgba(255,255,255,0.92)',
+     borderWidth: 1,
+-    borderColor: '#d4af37',
++    borderColor: '#5a5a5a',
+     alignItems: 'center',
+     justifyContent: 'center',
+     gap: 6,
+     padding: 4,
+   },
+-  tileIcon: { fontSize: 38, color: '#fff' },
+-  tileLabel: { color: '#f0e68c', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+-  tileCount: { color: '#d1d5db', fontSize: 11 },
+-  tileCountZero: { color: '#6b7280' },
++  tileIcon: { fontSize: 38, color: '#5a5a5a' },
++  tileLabel: { color: '#222', fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
++  tileCount: { color: '#555', fontSize: 11 },
++  tileCountZero: { color: '#9aa1a9' },
+   closeBtn: {
+     backgroundColor: '#f1f5f9',
+     borderRadius: 10,
+diff --git a/public/version.json b/public/version.json
+index b51ccd8..3802c7d 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "329",
++  "version": "330",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: фон окна категорий как у окон сеттинга, квадраты как на главном экране, спойлеры-карточки как у перков"
++      "Крафт: квадраты категорий перекрашены под карточки персонажей (светлая панель, серая рамка)"
+     ],
+     "en-EN": [
+-      "Crafting: setting-window background, home-screen style tiles, perk-style spoiler cards"
++      "Crafting: category tiles restyled to match character cards (light panel, grey border)"
+     ]
+   }
+ }
