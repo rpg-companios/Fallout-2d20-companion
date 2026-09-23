@@ -65,7 +65,7 @@
     "specialEffects": [
       {
         "id": "effect_melee_damage_resistance_2",
-        "description": "+2 resistance to melee damage."
+        "description": "+2 Phys. DR, only when the attacker uses the Melee Weapons skill against you."
       }
     ]
   },
@@ -95,7 +95,7 @@
     "specialEffects": [
       {
         "id": "effect_melee_piercing_1",
-        "description": "Melee attacks gain the Piercing 1 quality."
+        "description": "While this armor is worn, weapons using the Melee Weapons or Unarmed skill gain the Piercing 1 effect (stacks with any existing)."
       }
     ]
   },
@@ -105,7 +105,7 @@
     "specialEffects": [
       {
         "id": "effect_fall_damage_resistance",
-        "description": "+2 resistance to fall damage."
+        "description": "+2 Phys. DR, only when the character falls."
       }
     ]
   },

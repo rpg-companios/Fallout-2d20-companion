@@ -2,7 +2,25 @@
 
 ---
 
-## Armor mod clarifications: synths, five mods owed (patch 338)
+## Three mod clarifications; origin of the four "owed" (patch 339)
+
+Owner's words recorded into effect descriptions (shown in the armor
+upgrade window's "Effects" line; DR columns empty for all three — 337):
+
+- Parrying: +2 Phys. DR, only when an attack using the Melee Weapons
+  skill targets you.
+- Soft lining (legs): +2 Phys. DR, only when the character falls.
+- Lightweight (arms): while worn, weapons using Melee Weapons or Unarmed
+  gain Piercing 1 (stacks with existing).
+
+Answer to "where did it come from": the four mods (Pockets, Deep pockets,
+Lead-lined, Ultra-light) are from the owner's own crafting-table dictation
+(patch 327, "Armor modifications" section, quote kept in the reference).
+"Lightweight" from that record is resolved — it's the arms mod. The other
+four await the owner's decision: real (then categories + effects) or a
+dictation error.
+
+## ## Armor mod clarifications: synths, five mods owed (patch 338)
 
 Owner's words on patch 337's questions.
 
