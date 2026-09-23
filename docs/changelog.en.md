@@ -2,7 +2,21 @@
 
 ---
 
-## Category tiles — like character cards (patch 330)
+## Question protocol — ask first, fix later never (patch 331)
+
+Owner's word after the 329→330 pair: "if there is any misunderstanding
+or ambiguity — push it onto me so I describe the details, instead of
+patching the misunderstanding twice."
+
+- The rule is recorded in state.md Lessons as law: any ambiguity becomes
+  a question to the owner BEFORE work; questions in reports get an
+  explicit "QUESTIONS — awaiting answers by number" heading.
+- The four armor-mod questions (327) are restyled: the reference doc's
+  section header now shouts that these are questions and mod crafting
+  will not start without answers (the owner honestly missed them as
+  "statements").
+
+## ## Category tiles — like character cards (patch 330)
 
 Owner's correction to 329: "do character cards look like that?" — no.
 In 329 the tiles were styled after home-screen FOLDERS (dark panel, gold
