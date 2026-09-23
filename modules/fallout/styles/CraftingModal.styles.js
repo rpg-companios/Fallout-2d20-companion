@@ -16,9 +16,10 @@ export default StyleSheet.create({
   closeText: { color: '#444', fontSize: 20, paddingHorizontal: 8 },
   backText: { color: '#444', fontSize: 14, paddingRight: 8 },
 
-  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга
-  // и оформление областей как у home screen: folderCell — тёмная панель,
-  // золотая рамка, скругление 8)
+  // Квадраты категорий (318; 322 — прокрутка, строки по 3; 329 — фон сеттинга;
+  // 330 — поправка владельца: оформление областей — как КАРТОЧКИ ПЕРСОНАЖЕЙ
+  // home screen (characterCell), а не папок: светлая панель, серая рамка,
+  // скругление 8; имя #222, подпись #555 — как characterName/characterLevel)
   bg: { flex: 1 },
   bgImage: { opacity: 0.3 }, // как на экранах сеттинга (WeaponsAndArmor)
   body: { flex: 1, paddingHorizontal: 12 },
@@ -30,18 +31,18 @@ export default StyleSheet.create({
     width: '30%',
     aspectRatio: 1,
     borderRadius: 8,
-    backgroundColor: '#111827',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderWidth: 1,
-    borderColor: '#d4af37',
+    borderColor: '#5a5a5a',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
     padding: 4,
   },
-  tileIcon: { fontSize: 38, color: '#fff' },
-  tileLabel: { color: '#f0e68c', fontSize: 13, fontWeight: '600', textAlign: 'center' },
-  tileCount: { color: '#d1d5db', fontSize: 11 },
-  tileCountZero: { color: '#6b7280' },
+  tileIcon: { fontSize: 38, color: '#5a5a5a' },
+  tileLabel: { color: '#222', fontSize: 13, fontWeight: 'bold', textAlign: 'center' },
+  tileCount: { color: '#555', fontSize: 11 },
+  tileCountZero: { color: '#9aa1a9' },
   closeBtn: {
     backgroundColor: '#f1f5f9',
     borderRadius: 10,

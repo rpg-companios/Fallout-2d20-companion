@@ -2,7 +2,18 @@
 
 ---
 
-## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
+## Category tiles — like character cards (patch 330)
+
+Owner's correction to 329: "do character cards look like that?" — no.
+In 329 the tiles were styled after home-screen FOLDERS (dark panel, gold
+border) — the wrong reference.
+
+- Category tiles now follow the CHARACTER cards (characterCell): light
+  panel, grey border, radius 8; dark label, grey counter, icon in the
+  border's tone.
+- The window background (setting image) and the rest of 329 are untouched.
+
+## ## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
 
 Owner's design word: the categories window gets the setting windows'
 background, category areas styled like the home screen, spoilers as neat
