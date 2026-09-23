@@ -1,0 +1,122 @@
+diff --git a/__tests__/crafting/craft-button-wiring.test.js b/__tests__/crafting/craft-button-wiring.test.js
+new file mode 100644
+index 0000000..7170fb2
+--- /dev/null
++++ b/__tests__/crafting/craft-button-wiring.test.js
+@@ -0,0 +1,30 @@
++// ПРИЁМОЧНЫЙ (патч 319): кнопка «Крафт» в инвентаре обязана открывать окно
++// крафта. История: с первого коммита приложения кнопка показывала заглушку-
++// алерт (screen.craft.placeholder), а setCraftModalVisible(true) не вызывался
++// НИГДЕ — окно крафта (265, затем 318) с кнопки было недостижимо. Тест читает
++// код экрана как текст (экран не рендерится в vitest) и держит проводку:
++// тап по кнопке → setCraftModalVisible(true) → CraftingModal visible.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { fileURLToPath } from 'node:url';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const screen = readFileSync(
++  new URL('./components/screens/InventoryScreen/InventoryScreen.js', `file://${ROOT}/`),
++  'utf-8',
++);
++
++describe('Кнопка «Крафт» подключена к окну крафта (предохранитель 319)', () => {
++  it('обработчик кнопки включает окно (setCraftModalVisible(true))', () => {
++    expect(screen).toMatch(/handleCraftPress\s*=\s*\(\)\s*=>\s*setCraftModalVisible\(true\)/);
++  });
++
++  it('заглушка-алерт крафта удалена', () => {
++    expect(screen).not.toContain('screen.craft.placeholder');
++  });
++
++  it('CraftingModal рендерится от того же состояния', () => {
++    expect(screen).toMatch(/<CraftingModal\s*\n?\s*visible=\{isCraftModalVisible\}/);
++    expect(screen).toMatch(/onClose=\{\(\)\s*=>\s*setCraftModalVisible\(false\)\}/);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index c6cbe77..57aef1b 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -374,8 +374,10 @@ const InventoryScreen = () => {
+   // До перестройки (следующий крупный патч) крафт не открываем; модалка и
+   // модель на месте — 267 подключит их к новым вкладкам. Механика движка
+   // (251/262/263) от этого не менялась.
+-  const handleCraftPress = () =>
+-    showAlert(tInventory('screen.craft.label'), tInventory('screen.craft.placeholder'));
++  // Патч 319: кнопка «Крафт» открывает окно крафта (318). До сих пор здесь
++  // жила заглушка-алерт с самого первого коммита — окно крафта с кнопки
++  // было недостижимо (хвост незавершённого шага 265→267).
++  const handleCraftPress = () => setCraftModalVisible(true);
+ 
+   const showFoundItemBonusAlerts = (events) => {
+     (events || []).forEach((event) => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c40ac57..7380f3e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **318** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–318 уехали, установка не подтверждена).
++· последний сданный патч: **319** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–319 уехали, установка не подтверждена).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -59,6 +59,8 @@
+ - 318 — новое окно крафта: квадраты категорий (8, пустые видны), рецепты-
+   спойлеры с материалами по редкости, окно «сколько штук», «Назад»/«Закрыть»;
+   механика (гейты, проверка навыка, отчёт) не менялась.
++- 319 — фикс: кнопка «Крафт» открывает окно крафта (раньше — заглушка-алерт
++  с первого коммита, окно было недостижимо с кнопки).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7d25745..9819deb 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,18 @@
+ 
+ ---
+ 
++## Crafting — the "Craft" button now opens the crafting window (patch 319)
++
++Behavior fix (the owner asked: "did you wire the modal to the button?" —
++the check showed it had never been wired).
++
++- Since the app's very first commit the "Craft" button showed a placeholder
++  alert instead of a window; the crafting window (neither the old 265 one
++  nor the new 318 one) was unreachable from the button. Now the button
++  opens the crafting window.
++- Fuse: acceptance test (patch 319) pins the "button → window" wiring so
++  this cannot get lost again.
++
+ ## Crafting — new window: category tiles, recipe spoilers, quantity picker (patch 318)
+ 
+ Owner's word: a pleasant one — a convenient crafting window instead of
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 0be5a00..1bdf704 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,17 @@
+ 
+ ---
+ 
++## Крафт — кнопка «Крафт» теперь открывает окно крафта (патч 319)
++
++Правка поведения (владелец спросил: «а ты подключил модалку к кнопке?» —
++проверка показала: не была подключена никогда).
++
++- С первого коммита приложения кнопка «Крафт» показывала заглушку-алерт
++  вместо окна; окно крафта (ни старое 265, ни новое 318) с кнопки было
++  недостижимо. Теперь кнопка открывает окно крафта.
++- Предохранитель: приёмочный тест (патч 319) держит проводку «кнопка →
++  окно» — такое больше не потеряется.
++
+ ## Крафт — новое окно: квадраты категорий, спойлеры рецептов, выбор количества (патч 318)
+ 
+ Слово владельца: приятности — удобное окно крафта вместо вкладок-верстаков.
