@@ -2,7 +2,25 @@
 
 ---
 
-## Crafting — light windows, explosives split out, honest labels (patch 325)
+## Materials — piece counters only; capacity table documented (patch 326)
+
+Owner's word: "just a few kinds per recipe — piece counters are enough,
+don't bloat the interface", plus a clarification and a question about the
+materials scheme.
+
+- Removed the KIND counters: no more "Common materials 0/1" on the recipe
+  row and no "0 of 1 kinds" in the spoiler. A ready recipe row now simply
+  says "Ready"; spoiler rarity headers are plain labels, and each material
+  keeps its own "have N · need M" counter.
+- The "Armor", "Weapons", "Power armor" tiles are the future MOD-crafting
+  entries for those categories (material capacity); they stay.
+- The printed "capacity → materials" curve (1: Common ×2 … 7+: Common ×8,
+  Uncommon ×6, Rare ×4) already lived in the data generator and was checked
+  against the owner's table — no differences. It is now also written into
+  the reference doc `docs/reference-data/CRAFTING-MAPPING.md`, next to the
+  data it produced (the section is generator-produced, not hand-edited).
+
+## ## Crafting — light windows, explosives split out, honest labels (patch 325)
 
 Owner's word — four fixes from playtesting: window palette, where
 explosives live, confusing materials numbers and the time label.

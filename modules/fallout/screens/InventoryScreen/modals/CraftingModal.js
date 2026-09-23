@@ -203,15 +203,9 @@ export default function CraftingModal({ visible, onClose }) {
                       </View>
                       <Text style={styles.rowMeta}>{item.metaLine}</Text>
                       <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
-                        {item.canCraft
-                          ? `${ui.materialsTitle}: ${item.materialGroups
-                            .map((g) => craftFormat(ui.raritySummary ?? '', {
-                              label: ui[RARITY_LABEL_KEYS[g.type]] ?? g.type,
-                              have: g.have,
-                              total: g.total,
-                            }))
-                            .join(', ')}`
-                          : (item.reason || '')}
+                        {/* 326 (слово владельца): никаких сводок по видам —
+                            счётчики штук живут на строках материалов. */}
+                        {item.canCraft ? (ui.ready ?? '') : (item.reason || '')}
                       </Text>
                     </TouchableOpacity>
 
@@ -221,11 +215,7 @@ export default function CraftingModal({ visible, onClose }) {
                         {item.materialGroups.map((group) => (
                           <View key={group.type}>
                             <Text style={styles.rarityLine}>
-                              {craftFormat(ui.raritySummary ?? '', {
-                                label: ui[RARITY_LABEL_KEYS[group.type]] ?? group.type,
-                                have: group.have,
-                                total: group.total,
-                              })}
+                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type}
                             </Text>
                             {item.materials.filter((m) => m.rarity === group.type).map((m) => (
                               <View key={m.itemId} style={styles.materialLine}>

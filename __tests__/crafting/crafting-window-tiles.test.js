@@ -62,7 +62,7 @@ describe('Модалка крафта (318): квадраты, спойлеры,
     expect(row.canCraft).toBe(true);
     expect(row.maxCraft).toBe(5); // 10 обычных материалов по 2 на попытку
     expect(row.materials[0].rarity).toBe('common');
-    expect(row.materialGroups).toEqual([{ type: 'common', have: 1, total: 1 }]);
+    expect(row.materialGroups).toEqual([{ type: 'common' }]); // 326: без счётчиков видов
 
     // без перка — спойлер серый: причина «нужен перк» с рангом
     useCharacterStore.setState({ selectedPerks: [] });

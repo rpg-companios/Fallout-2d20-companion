@@ -91,8 +91,10 @@ export const formatCraftMinutes = (minutes) => {
  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
  * дефицитному материалу; для «можно» строк он ≥ 1.
  * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
- * сводка «сколько видов материала доступно / требуется» по обычным,
- * необычным и редким (не требуемые типы в сводку не попадают).
+ * группировка заголовков спойлера по обычным/необычным/редким (не требуемые
+ * типы не попадают). Счётчиков видов в сводке больше нет (326, слово
+ * владельца: «не раздуваем интерфейс» — достаточно счётчиков штук на строках
+ * материалов).
  */
 const buildRowsForCategory = (category) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
@@ -139,13 +141,8 @@ const buildRowsForCategory = (category) => {
         : status === 'missing-material' ? d.shortMaterials : null,
       materials,
       materialGroups: RARITY_TYPES
-        .map((type) => {
-          const group = materials.filter((m) => m.rarity === type);
-          return group.length
-            ? { type, have: group.filter((m) => m.enough).length, total: group.length }
-            : null;
-        })
-        .filter(Boolean),
+        .filter((type) => materials.some((m) => m.rarity === type))
+        .map((type) => ({ type })),
       labels: {
         materialsTitle: d.materialsTitle,
         craft: d.craft,
