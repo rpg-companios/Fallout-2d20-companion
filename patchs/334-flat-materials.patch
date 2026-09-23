@@ -1,0 +1,206 @@
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+index 8ddf6c6..07082ae 100644
+--- a/__tests__/crafting/crafting-window-tiles.test.js
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -62,7 +62,7 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+     expect(row.canCraft).toBe(true);
+     expect(row.maxCraft).toBe(5); // 10 обычных материалов по 2 на попытку
+     expect(row.materials[0].rarity).toBe('common');
+-    expect(row.materialGroups).toEqual([{ type: 'common' }]); // 326: без счётчиков видов
++    expect(row.materialGroups).toBeUndefined(); // 334: заголовки редкости убраны — плоский список
+ 
+     // без перка — спойлер серый: причина «нужен перк» с рангом
+     useCharacterStore.setState({ selectedPerks: [] });
+@@ -77,7 +77,6 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+     expect(row).toBeTruthy();
+     expect(row.materials.length).toBeGreaterThan(0);
+     expect(row.materials[0].rarity).toBeNull();
+-    expect(row.materialGroups).toEqual([]);
+   });
+ 
+   it('словарь редкости и окна количества на месте (ru-файл; ключи — в активной локали)', () => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 59a673d..dfcd557 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **333** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–333 уехали, установка не подтверждена;
++· последний сданный патч: **334** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–334 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -115,6 +115,11 @@
+   Остальное по модам брони: эффекты костюмных модов пришлёт владелец;
+   предмет-рецепт расходуется при применении; система узнавания редких
+   рецептов — сразу для всего крафта (справочник §3.1).
++- 334 — материалы в спойлере плоским списком (слово владельца: заголовки
++  «Материалы»/«Обычные материалы»/… излишни): строка «тип — есть N шт. ·
++  нужно M шт.»; materialGroups из модели убраны, ключи словаря
++  rarity*/materialsTitle остались (пригодятся редкости-подписи в крафте
++  модов).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 044d1b4..b9c64da 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,17 @@
+ 
+ ---
+ 
+-## Synth-material duplicates removed from generic mods (patch 333)
++## Spoiler materials as a flat list (patch 334)
++
++Owner's word: material headers are excessive ("Materials", "Common
++materials", "Uncommon materials") — type and quantity are enough.
++
++- A recipe's spoiler now shows materials as one flat line each: name on
++  the left, the "have N · need M" counter on the right.
++- The "Materials" section label and rarity group headers are gone;
++  complexity, skill and cooking time remain the spoiler's first line.
++
++## ## Synth-material duplicates removed from generic mods (patch 333)
+ 
+ Owner's word: "Laminated, Rubberized, Microcarbon, Nanofiber are unique
+ SYNTH armor mods." They must not exist in the generic mod list.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index f374148..c557af8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,17 @@
+ 
+ ---
+ 
+-## Дубли-«материалы» синтов убраны из общих модов (патч 333)
++## Материалы в спойлере — плоским списком (патч 334)
++
++Слово владельца: заголовки по материалам излишни («Материалы», «Обычные
++материалы», «Необычные материалы»), достаточно типа и количества.
++
++- Спойлер рецепта теперь показывает материалы одной плоской строкой на
++  материал: название слева, счётчик «есть N шт. · нужно M шт.» справа.
++- Раздел «Материалы» и групповые заголовки редкостей убраны; сложность,
++  навык и время приготовления остались первой строкой спойлера.
++
++## ## Дубли-«материалы» синтов убраны из общих модов (патч 333)
+ 
+ Слово владельца: «Ламинированная, Прорезиненная, Микроуглеродистая,
+ Нановолоконная — это уникальные моды брони синтов». В общем списке модов
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 4aa1192..c92bbe9 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -36,7 +36,6 @@ export const CRAFT_CATEGORIES = [
+ // Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
+ // Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
+ // (мясо и пр.) редкости не имеют и в сводку не попадают.
+-const RARITY_TYPES = ['common', 'uncommon', 'rare'];
+ 
+ let materialTypeById = null;
+ const materialRarityOf = (itemId) => {
+@@ -90,11 +89,10 @@ export const formatCraftMinutes = (minutes) => {
+  * Строки одной категории-квадрата: что получится, чем, сколько это времени,
+  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
+  * дефицитному материалу; для «можно» строк он ≥ 1.
+- * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
+- * группировка заголовков спойлера по обычным/необычным/редким (не требуемые
+- * типы не попадают). Счётчиков видов в сводке больше нет (326, слово
+- * владельца: «не раздуваем интерфейс» — достаточно счётчиков штук на строках
+- * материалов).
++ * Редкость (патч 318): каждый материал знает свой тип. Заголовков по
++ * редкостям в спойлере больше нет (326 — без счётчиков видов; 334 — без
++ * заголовков вовсе): спойлер показывает плоский список «тип материала»
++ * + счётчик «есть N шт. · нужно M шт.».
+  */
+ const buildRowsForCategory = (category) => {
+   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
+@@ -140,9 +138,6 @@ const buildRowsForCategory = (category) => {
+         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
+         : status === 'missing-material' ? d.shortMaterials : null,
+       materials,
+-      materialGroups: RARITY_TYPES
+-        .filter((type) => materials.some((m) => m.rarity === type))
+-        .map((type) => ({ type })),
+       labels: {
+         materialsTitle: d.materialsTitle,
+         craft: d.craft,
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index fb51427..d823c78 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -38,12 +38,6 @@ const CATEGORY_ICONS = {
+   ammo: 'ammo',
+ };
+ 
+-const RARITY_LABEL_KEYS = {
+-  common: 'rarityCommon',
+-  uncommon: 'rarityUncommon',
+-  rare: 'rarityRare',
+-};
+-
+ // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
+ const chunkIntoRows = (items, perRow) => {
+   const rows = [];
+@@ -226,21 +220,9 @@ export default function CraftingModal({ visible, onClose }) {
+                       <View style={styles.spoilerBody}>
+                         <Text style={styles.rowMeta}>{item.metaLine}</Text>
+                         {perkLocked && <Text style={styles.rowReason}>{item.reason}</Text>}
+-                        <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
+-                        {item.materialGroups.map((group) => (
+-                          <View key={group.type}>
+-                            <Text style={styles.rarityLine}>
+-                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type}
+-                            </Text>
+-                            {item.materials.filter((m) => m.rarity === group.type).map((m) => (
+-                              <View key={m.itemId} style={styles.materialLine}>
+-                                <Text style={styles.materialName}>{m.name}</Text>
+-                                <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
+-                              </View>
+-                            ))}
+-                          </View>
+-                        ))}
+-                        {item.materials.filter((m) => !m.rarity).map((m) => (
++                        {/* 334 (слово владельца): заголовки по материалам излишни —
++                            плоский список: тип материала и количество. */}
++                        {item.materials.map((m) => (
+                           <View key={m.itemId} style={styles.materialLine}>
+                             <Text style={styles.materialName}>{m.name}</Text>
+                             <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index a4b5ef0..74ab1d2 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -84,8 +84,6 @@ export default StyleSheet.create({
+     borderTopWidth: 1,
+     borderTopColor: '#ddd',
+   },
+-  detailLabel: { color: '#777', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
+-  rarityLine: { color: '#444', fontSize: 12, fontWeight: '700', marginTop: 6 },
+   // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
+   materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 3 },
+   materialName: { color: '#000', fontSize: 13, flexShrink: 1 },
+diff --git a/public/version.json b/public/version.json
+index de76194..9027050 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "333",
++  "version": "334",
+   "notes": {
+     "ru-RU": [
+-      "Убраны три дубля-«материала» синтов из общих модов; старые сейвы чистятся миграцией"
++      "Крафт: материалы в спойлере — плоским списком «тип — есть/нужно», без заголовков"
+     ],
+     "en-EN": [
+-      "Three synth-material duplicates removed from generic mods; old saves cleaned by migration"
++      "Crafting: materials in the spoiler as a flat list, no headers"
+     ]
+   }
+ }
