@@ -632,6 +632,11 @@ if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
   json_check || exit 1
   echo "Источник: $REMOTE/$ARENA_BRANCH"
   echo "Коммит:   $FETCHED_COMMIT"
+  if [[ ${#APPLIED[@]} -gt 0 ]]; then
+    echo
+    echo "Закрепите результат коммитом — это точка отката перед следующей установкой:"
+    echo "  git add -A && git commit -m \"Патчи применены: цель №$PATCH_ID\""
+  fi
   exit 0
 fi
 
