@@ -33,5 +33,7 @@
   "craftLossConsumablesTitle": "Material loss on failure: food, drinks, explosives, chems",
   "craftLossConsumablesDescription": "By the book: a cooking station or chemical laboratory consumes all ingredients when the check fails. Off — materials are kept on failure.",
   "craftLossGearTitle": "Material loss on failure: weapons, armor, ammo",
-  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure."
+  "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure.",
+  "modsRequireInventoryTitle": "Require the mod in the bag to install",
+  "modsRequireInventoryDescription": "On — a material or modification can be installed only if the crafted (or found) mod item is in the bag. Off — installation is free: any mod available to this armor installs without the item."
 }

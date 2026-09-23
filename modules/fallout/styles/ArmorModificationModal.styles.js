@@ -1,6 +1,8 @@
 import { StyleSheet } from 'react-native';
 
 const styles = StyleSheet.create({
+  // 342: пометка «нет в сумке» при включённой настройке «Требовать мод в сумке»
+  modsNotInInventory: { color: '#9aa1a9', fontSize: 12, paddingVertical: 6, fontStyle: 'italic' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

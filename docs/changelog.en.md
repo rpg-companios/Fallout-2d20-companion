@@ -2,7 +2,22 @@
 
 ---
 
-## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
+## Universal mod, Material vs Modification, bag gate (patch 342)
+
+Owner's words after the first snag of testing.
+
+- A mod is universal unless stated otherwise: "Boiled Leather" fits any
+  part of its armor family, "Shadowed Metal" — any metal armor piece.
+  The data already worked this way — recorded as law.
+- Armor material ≠ armor modification: armor takes 1 material + 1
+  modification. Install-window sections renamed in owner's words:
+  "Armor material" and "Modifications" (were "Unique/Standard").
+- New Crafting-section setting — "Require the mod in the bag to install"
+  (default OFF: free installation, as before). On — only created/found
+  mods can be installed; empty groups show "None in the bag (craft them
+  in the Crafting window)".
+
+## ## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
 
 Owner's word: "I'm waiting to test crafting armor mods." Patch 341 starts
 the series: mod crafting is ready for testing.

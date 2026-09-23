@@ -67,8 +67,8 @@
     "armorModification": "Улучшить броню",
     "clothingModification": "Улучшить одежду",
     "availableModifications": "Доступные модификации",
-    "standard": "Стандартные",
-    "unique": "Уникальные",
+    "standard": "Модификации",
+    "unique": "Материал брони",
     "removeStandard": "Снять стандартный мод",
     "noStandard": "Без стандартного мода",
     "removeUnique": "Снять уникальный мод",
@@ -96,7 +96,8 @@
     "previewEffects": "Эффекты",
     "previewQualities": "Качества",
     "errorTitle": "Ошибка",
-    "errorSelectMod": "Выберите хотя бы одну модификацию"
+    "errorSelectMod": "Выберите хотя бы одну модификацию",
+    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)"
   },
   "displayToggle": {
     "spoilers": "Список (спойлеры)",

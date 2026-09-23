@@ -43,6 +43,14 @@ export const getAvailableArmorMods = (item, catalog) => {
     return { standardMods, uniqueMods };
 };
 
+/**
+ * Патч 342 (настройка «Требовать мод в сумке»): оставить только моды,
+ * созданные/найденные персонажем. ownedIds — Set id модов-предметов в сумке
+ * (weaponId экземпляров). Чистая функция — настройку читает UI.
+ */
+export const filterModsByInventory = (mods, ownedIds) =>
+  !ownedIds ? mods : (mods || []).filter((mod) => ownedIds.has(mod.id));
+
 /** Return whether a unique mod belongs to the item's explicit armor category. */
 export const isUniqueModAllowedForArmor = (mod, item, catalog) => {
     if (!mod) return false;

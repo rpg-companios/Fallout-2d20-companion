@@ -106,5 +106,14 @@
     "labelKey": "settings.craftLossGearTitle",
     "descriptionKey": "settings.craftLossGearDescription",
     "defaultValue": true
+  },
+  {
+    "id": "modsRequireInventoryItem",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "crafting",
+    "labelKey": "settings.modsRequireInventoryTitle",
+    "descriptionKey": "settings.modsRequireInventoryDescription",
+    "defaultValue": false
   }
 ]
