@@ -1,0 +1,1392 @@
+diff --git a/__tests__/domain/derived-stats-module.test.js b/__tests__/domain/derived-stats-module.test.js
+new file mode 100644
+index 0000000..86f3f1c
+--- /dev/null
++++ b/__tests__/domain/derived-stats-module.test.js
+@@ -0,0 +1,142 @@
++// ПРИЁМОЧНЫЙ (патч 316): формулы производных параметров живут в сеттинге
++// (modules/fallout/logic/derivedStats.js), движок читает через дверь реестра.
++// Золотые константы — предохранитель переезда МК-3: правила НЕ менялись.
++import { describe, expect, it } from 'vitest';
++
++import {
++  calculateInitiative,
++  calculateDefense,
++  calculateMeleeBonusValue,
++  calculateMeleeBonus,
++  calculateMaxHealth,
++  calculateCarryWeight,
++  calculateRobotCarryWeight,
++  calculateDerivedStats,
++} from '../../modules/fallout/logic/derivedStats.js';
++import { getDerivedStatsLogic } from '../../domain/registry.js';
++
++// Примитивы едят legacy-массив [{ name, value }] (как в правилах и на входе сборки).
++const mkAttributes = (values) =>
++  Object.entries(values).map(([name, value]) => ({ name, value }));
++
++// calculateDerivedStats ест normalized-словарь стора: { id: { id, base } }.
++const mkDict = (values) =>
++  Object.fromEntries(
++    Object.entries(values).map(([id, base]) => [id, { id, base, modifiers: [], total: base }]),
++  );
++
++const HUMAN = mkAttributes({ STR: 5, PER: 6, END: 5, CHA: 4, INT: 4, AGI: 7, LCK: 4 });
++const HUMAN_DICT = mkDict({ STR: 5, PER: 6, END: 5, CHA: 4, INT: 4, AGI: 7, LCK: 4 });
++
++describe('МК-3: формулы производных переехали в модуль (золотые константы)', () => {
++  it('инициатива = PER + AGI', () => {
++    expect(calculateInitiative(HUMAN)).toBe(13);
++  });
++
++  it('защита = 1, а при ЛОВ 9+ — 2', () => {
++    expect(calculateDefense(HUMAN)).toBe(1);
++    expect(calculateDefense(mkAttributes({ AGI: 9 }))).toBe(2);
++  });
++
++  it('бонус ближнего боя: пороги СИЛ 7/9/11 и трейт-дельта', () => {
++    expect(calculateMeleeBonusValue(HUMAN, null)).toBe(0);
++    expect(calculateMeleeBonus(mkAttributes({ STR: 7 }), null)).toBe('+1 {CD}');
++    expect(calculateMeleeBonus(mkAttributes({ STR: 9 }), null)).toBe('+2 {CD}');
++    expect(calculateMeleeBonus(mkAttributes({ STR: 11 }), null)).toBe('+3 {CD}');
++    // Отрицательная дельта не уводит строку в минус: сумма <= 0 печатается как '0'.
++    expect(calculateMeleeBonus(mkAttributes({ STR: 5 }), { modifiers: { meleeBonusDelta: -1 } })).toBe('0');
++    expect(calculateMeleeBonus(mkAttributes({ STR: 9 }), { modifiers: { meleeBonusDelta: 1 } })).toBe('+3 {CD}');
++  });
++
++  it('макс. ОЗ = END + LCK + (уровень − 1)', () => {
++    expect(calculateMaxHealth(HUMAN, 1)).toBe(9);
++    expect(calculateMaxHealth(HUMAN, 3)).toBe(11);
++  });
++
++  it('грузоподъёмность людей: 150 + 10×СИЛ + трейт + снаряжение', () => {
++    expect(calculateCarryWeight(HUMAN, null, {})).toBe(200);
++    expect(
++      calculateCarryWeight(HUMAN, { modifiers: { carryWeight: 20, carryWeightFixed: 100 } }, {}),
++    ).toBe(170);
++    expect(
++      calculateCarryWeight(HUMAN, null, {
++        equippedArmor: { torso: { armor: { carryWeightModifier: 5 } } },
++        equippedRobotSlots: { head: { plating: { carryWeightModifier: 7 } } },
++      }),
++    ).toBe(212);
++  });
++
++  it('грузоподъёмность роботов: корпус + броня; СИЛ/перки не влияют', () => {
++    const slots = {
++      body: { limb: { carryWeight: 120 } },
++      head: { armor: { carryWeightModifier: 5 } },
++      chassis: { limb: { carryWeight: 999 } }, // body найден первым — chassis не читается
++    };
++    expect(calculateRobotCarryWeight(slots, null)).toBe(125);
++    expect(calculateRobotCarryWeight({}, null)).toBe(150);
++    expect(calculateRobotCarryWeight({}, { modifiers: { carryWeightFixed: 90 } })).toBe(90);
++  });
++
++  it('calculateDerivedStats: сборка без эффектов', () => {
++    const stats = calculateDerivedStats(HUMAN_DICT, {}, null, 1, {});
++    expect(stats.maxHealth.base).toBe(9);
++    expect(stats.maxHealth.total).toBe(9);
++    expect(stats.initiative.total).toBe(13);
++    expect(stats.defense.total).toBe(1);
++    expect(stats.meleeBonus.total).toBe(0);
++    expect(stats.carryWeight.total).toBe(200);
++    expect(stats.damageResistance.physical.total).toBe(0);
++  });
++
++  it('timed-эффекты: +2 ОЗ и +2 защиты попадают в modifiers', () => {
++    const effects = {
++      stim_buff: {
++        id: 'stim_buff',
++        active: true,
++        effectKind: 'positive',
++        maxHpModifier: { value: 2, op: '+' },
++        defenseModifier: { value: 2, op: '+' },
++      },
++    };
++    const stats = calculateDerivedStats(HUMAN_DICT, effects, null, 1, {});
++    expect(stats.maxHealth.base).toBe(9);
++    expect(stats.maxHealth.total).toBe(11);
++    expect(stats.defense.total).toBe(3);
++    expect(stats.maxHealth.modifiers).toEqual([{ source: 'timedEffects', value: 2, operation: '+' }]);
++  });
++
++  it('перки: Живучесть/Ходка и сопротивляемость; Ходка не действует на роботов', () => {
++    const perkBonuses = {
++      maxHealthBonus: 2,
++      carryWeightBonus: 20,
++      damageResistance: { physical: 1, energy: 2 },
++    };
++    const human = calculateDerivedStats(HUMAN_DICT, { perkBonuses }, null, 1, { isRobot: false });
++    expect(human.maxHealth.total).toBe(11);
++    expect(human.carryWeight.total).toBe(220);
++    expect(human.damageResistance.physical.total).toBe(1);
++    expect(human.damageResistance.energy.total).toBe(2);
++
++    const robot = calculateDerivedStats(HUMAN_DICT, { perkBonuses }, null, 1, {
++      isRobot: true,
++      robotSlots: { body: { limb: { carryWeight: 120 } } },
++    });
++    expect(robot.carryWeight.total).toBe(120); // strongBack проигнорирован
++  });
++
++  it('каркас СБ: СИЛ = set 11 → груз 260 и бонус ближнего боя +3', () => {
++    const stats = calculateDerivedStats(HUMAN_DICT, {}, null, 1, { powerArmorFrameId: 'power_armor_frame' });
++    expect(stats.carryWeight.base).toBe(260);
++    expect(stats.meleeBonus.total).toBe(3);
++    // Натуральные атрибуты не тронуты — база ОЗ считается до подмены? Нет: подмена
++    // касается СИЛ (каркас), END/LCK неизменны → ОЗ то же.
++    expect(stats.maxHealth.total).toBe(9);
++  });
++
++  it('дверь реестра отдаёт ТУ ЖЕ логику, что импортирует модуль', () => {
++    const logic = getDerivedStatsLogic();
++    expect(logic.calculateDerivedStats).toBe(calculateDerivedStats);
++    expect(logic.calculateMaxHealth).toBe(calculateMaxHealth);
++    expect(logic.calculateRobotCarryWeight).toBe(calculateRobotCarryWeight);
++  });
++});
+diff --git a/__tests__/settings/settings-boundary.test.js b/__tests__/settings/settings-boundary.test.js
+index 62ef06a..6d8e744 100644
+--- a/__tests__/settings/settings-boundary.test.js
++++ b/__tests__/settings/settings-boundary.test.js
+@@ -22,6 +22,8 @@ import { describe, expect, it } from 'vitest';
+ const ROOT = fileURLToPath(new URL('../../', import.meta.url));
+ 
+ // Долг границы на момент 292 (см. docs/architecture/domain-map.md).
++// 316: src/store/resolvers.js вычеркнут — файл стал чистой математикой параметров
++// (нарушение powerArmor.json уехало в modules/fallout/logic/derivedStats.js).
+ const DEBT = new Set([
+   'domain/effects.js',
+   'domain/skillCanonical.js',
+@@ -34,7 +36,6 @@ const DEBT = new Set([
+   'src/store/characterStore.js',
+   'src/store/migrations.js',
+   'src/store/powerArmorSlice.js',
+-  'src/store/resolvers.js',
+ ]);
+ 
+ const SKIP_DIRS = new Set([
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 06bd90f..c257788 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **314** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»).
++· последний сданный патч: **316** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–316 уехали, установка не подтверждена).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -34,7 +34,7 @@
+   расширение состояния), локали ru/en, PWA (обновление по кнопке),
+   премиум-статус приложения.
+ 
+-## Последняя серия (311–314, унификация модов оружия)
++## Последняя серия (311–316, унификация модов оружия → каскад МК-3)
+ 
+ - 311 — одна правда модов + один путь записи (контракт движка,
+   `src/engine/items/weaponMods.ts`); моды собственной атаки конечности
+@@ -43,6 +43,11 @@
+ - 313 — стартовая карта агента (`docs/agents/`).
+ - 314 — робо-версии = полные варианты людского (`trueItemId`), боевых
+   полей в робо-записях нет.
++- 315 — карта памяти агента (`state.md`, этот файл).
++- 316 — МК-3 шаг 1: формулы производных (ОЗ/инициатива/защита/ближний
++  бой/грузоподъёмность) переехали в модуль сеттинга
++  (`modules/fallout/logic/derivedStats.js`); движок — через дверь реестра;
++  поведение без изменений.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+@@ -52,7 +57,8 @@
+    `docs/reference-data/weapon-mods-open-questions.md` (патч 307).
+ 2. **Загрузчик `.trpg`** — дверь сеттинга есть (292), установки пакета из
+    окна игры ещё нет (`setting-contract.md`, дорожная карта п. 5–7).
+-3. **МК-3: каскад в хранилище** — следующий крупный шаг TS-серии
++3. **МК-3: каскад в хранилище** — идёт; шаг 1 сдан (патч 316, формулы
++   производных в модуле); дальше — ручные вызовы пересчёта в хранилище
+    (`docs/architecture/typescript-migration-plan.md`).
+ 
+ ## Уроки (не повторять)
+diff --git a/docs/architecture/domain-map.md b/docs/architecture/domain-map.md
+index 7bfa78c..758c3d8 100644
+--- a/docs/architecture/domain-map.md
++++ b/docs/architecture/domain-map.md
+@@ -119,7 +119,7 @@
+ | src/store/characterStore.js | data/perks/perks.json | Данные напрямую (→ геттер реестра) |
+ | src/store/migrations.js | data/equipment/robot/*.json | Данные напрямую (→ геттер реестра) |
+ | src/store/powerArmorSlice.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
+-| src/store/resolvers.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
++| ~~src/store/resolvers.js~~ | ~~data/equipment/powerArmor.json~~ | Закрыто в 316: нарушение уехало в modules/fallout/logic/derivedStats.js; resolvers — чистая математика без импортов |
+ 
+ Тесты: 26 файлов в `__tests__/` читают данные напрямую — из скана границы исключены,
+ гасятся по мере правки (новые киты/моды-тесты 292 уже идут через дверь).
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ce11cce..5374d80 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## Refactor MK-3, step 1 — derived-stat formulas moved into the module (patch 316)
++
++First step of the "cascade into the store" plan (2026-09-18). Derived-stat
++rules now live with the setting; the engine reads them through the door.
++Behavior is unchanged: full test suite green.
++
++- New: `modules/fallout/logic/derivedStats.js` — initiative (PER+AGI),
++  defense (AGI 9+ → 2), melee bonus (STR thresholds 7/9/11), max health
++  (END+LCK+level), human and robot carry weight, and the full assembly with
++  power armor frame, timed effects and perks (`calculateDerivedStats`).
++- The engine (store) reads the formulas only through the door:
++  `domain/registry.js` → `getDerivedStatsLogic()`.
++- Data boundary restored: `src/store/resolvers.js` no longer reads the power
++  armor data file — removed from the boundary test's debt list (11 entries).
++- Setting-agnostic math (SPECIAL key canon, equipment modifiers, frame
++  attribute modifiers) is consolidated in `resolvers.js` — a file with zero
++  imports, so module logic cannot create loading cycles.
++- Fuse: acceptance test with golden constants (patch 316) — thresholds,
++  assembly, perks, robots, PA frame, registry door.
++
+ ## Work memory — a "where we are now" file for AI agents (patch 315)
+ 
+ Owner's word: learn to remember what's done and what the app consists
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6ab7fb1..bb91d01 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,27 @@
+ 
+ ---
+ 
++## Рефакторинг МК-3, шаг 1 — формулы производных параметров переехали в модуль (патч 316)
++
++Первый шаг «каскада в хранилище» (план от 18.09). Правила производных
++параметров — теперь часть сеттинга, движок их читает через дверь.
++Поведение не изменилось ни на йоту: все тесты зелёные.
++
++- Новое: `modules/fallout/logic/derivedStats.js` — инициатива
++  (Восприятие+Ловкость), защита (Ловкость 9+ → 2), бонус ближнего боя
++  (пороги Силы 7/9/11), макс. ОЗ (Выносливость+Удача+уровень),
++  грузоподъёмность людей и роботов, сборка с каркасом силовой брони,
++  таймер-эффектами и перками (`calculateDerivedStats`).
++- Движок (хранилище) читает формулы только через дверь:
++  `domain/registry.js` → `getDerivedStatsLogic()`.
++- Восстановлена граница данных: `src/store/resolvers.js` больше не читает
++  файл силовой брони — вычеркнут из списка долга теста границы (11 позиций).
++- Чистая математика без знаний о сеттинге (канон ключей SPECIAL, модификаторы
++  снаряжения, атрибут-модификаторы каркаса) стянута в `resolvers.js` —
++  файл без единого импорта, чтобы логика модуля не создавала циклов загрузки.
++- Предохранитель: приёмочный тест с золотыми константами (патч 316) —
++  пороги, сборка, перки, роботы, каркас СБ, дверь реестра.
++
+ ## Память работы — файл «где мы сейчас» для ИИ-агентов (патч 315)
+ 
+ Слово владельца: научиться помнить сделанное и состав приложения, чтобы
+diff --git a/domain/characterCreation.js b/domain/characterCreation.js
+index 80f472b..d2ec4e2 100644
+--- a/domain/characterCreation.js
++++ b/domain/characterCreation.js
+@@ -5,28 +5,27 @@
+ 
+ import { getOrigins, getTraits } from './registry';
+ 
+-// ---------------------------------------------------------------------------
+-// Attribute key utilities (from attributeKeyUtils.js)
+-// ---------------------------------------------------------------------------
+-
+-// Слово владельца (2026-09-21): порядок атрибутов SPECIAL — как в правилах,
+-// и никак иначе: Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость,
+-// Удача. Это не сортировка, а канон показа: любой список атрибутов в программе
+-// обязан идти в этом порядке. Предохранитель — тест special-attribute-order.
+-export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
+-
+-const ATTRIBUTE_KEY_ALIASES = {
+-    STR: 'STR',
+-    END: 'END',
+-    PER: 'PER',
+-    AGI: 'AGI',
+-    INT: 'INT',
+-    CHA: 'CHA',
+-    LCK: 'LCK',
++// МК-3 (патч 316): универсальные параметровские хелперы переехали в
++// src/store/resolvers.js — чистый дом без импортов, чтобы файлы логики модуля
++// (modules/fallout/logic/*) могли их читать, не задевая реестр и этот файл.
++// Здесь — re-export для совместимости со всеми прежними потребителями.
++import {
++  CANONICAL_ATTRIBUTE_KEYS,
++  getCanonicalAttributeKey,
++  getAttributeValue,
++  getEquipmentCarryWeightModifier,
++} from '../src/store/resolvers.js';
++
++export {
++  CANONICAL_ATTRIBUTE_KEYS,
++  getCanonicalAttributeKey,
++  getAttributeValue,
++  getEquipmentCarryWeightModifier,
+ };
+ 
+-export const getCanonicalAttributeKey = (key) => ATTRIBUTE_KEY_ALIASES[key] || null;
++// ---------------------------------------------------------------------------
+ 
++// normalizeAttributeMap: приведение словаря атрибутов к каноническим ключам.
+ export const normalizeAttributeMap = (attributeMap = {}) =>
+     Object.entries(attributeMap).reduce((acc, [key, value]) => {
+         const canonical = getCanonicalAttributeKey(key);
+@@ -36,15 +35,6 @@ export const normalizeAttributeMap = (attributeMap = {}) =>
+         return acc;
+     }, {});
+ 
+-export const getAttributeValue = (attributes = [], key) => {
+-    const canonical = getCanonicalAttributeKey(key);
+-    if (!canonical) return null;
+-    const found = attributes.find(
+-        (attr) => getCanonicalAttributeKey(attr.name) === canonical,
+-    );
+-    return found?.value ?? 0;
+-};
+-
+ // ---------------------------------------------------------------------------
+ // Constants
+ // ---------------------------------------------------------------------------
+@@ -231,115 +221,10 @@ export function getLuckPoints(attributes, trait) {
+     return Math.max(0, luckAttr + luckDelta);
+ }
+ 
+-export const calculateInitiative = (attributes) => {
+-    const perception = getAttributeValue(attributes, 'PER');
+-    const agility = getAttributeValue(attributes, 'AGI');
+-    return perception + agility;
+-};
+-
+-export const calculateDefense = (attributes) => {
+-    const agility = getAttributeValue(attributes, 'AGI');
+-    return agility >= 9 ? 2 : 1;
+-};
+-
+-export const calculateMeleeBonusValue = (attributes, trait) => {
+-    const strength = getAttributeValue(attributes, 'STR');
+-    let baseBonus = 0;
+-    if (strength >= 11) baseBonus = 3;
+-    else if (strength >= 9) baseBonus = 2;
+-    else if (strength >= 7) baseBonus = 1;
+-
+-    const traitBonus = Number(trait?.modifiers?.meleeBonusDelta || 0);
+-    return baseBonus + traitBonus;
+-};
+-
+-export const calculateMeleeBonus = (attributes, trait) => {
+-    const totalBonus = calculateMeleeBonusValue(attributes, trait);
+-    return totalBonus > 0 ? `+${totalBonus} {CD}` : '0';
+-};
+-
+-export const calculateMaxHealth = (attributes, level = 1) => {
+-    const endurance = getAttributeValue(attributes, 'END');
+-    const luck = getAttributeValue(attributes, 'LCK');
+-    return endurance + luck + (level > 1 ? level - 1 : 0);
+-};
+-
+-const toNumber = (value) => Number(value) || 0;
+-
+-const sumCarryWeightModifierFromItem = (item) => {
+-    if (!item) return 0;
+-    return toNumber(item.carryWeightModifier);
+-};
+-
+-export const getEquipmentCarryWeightModifier = ({ equippedArmor, equippedRobotSlots } = {}) => {
+-    let total = 0;
+-
+-    if (equippedArmor && typeof equippedArmor === 'object') {
+-        Object.values(equippedArmor).forEach((slot) => {
+-            total += sumCarryWeightModifierFromItem(slot?.armor);
+-            total += sumCarryWeightModifierFromItem(slot?.clothing);
+-        });
+-    }
+-
+-    if (equippedRobotSlots && typeof equippedRobotSlots === 'object') {
+-        Object.values(equippedRobotSlots).forEach((slot) => {
+-            total += sumCarryWeightModifierFromItem(slot?.armor);
+-            total += sumCarryWeightModifierFromItem(slot?.plating);
+-            total += sumCarryWeightModifierFromItem(slot?.frame);
+-        });
+-    }
+-
+-    return total;
+-};
+-
+-export const calculateCarryWeight = (attributes, trait, equipmentState = {}) => {
+-    const strength = getAttributeValue(attributes, 'STR');
+-    const baseCarryWeight = trait?.modifiers?.carryWeightFixed ?? 150;
+-    const strengthMultiplier = trait?.modifiers?.carryWeightStrengthMultiplier ?? 10;
+-    const strengthBonus = strengthMultiplier * strength;
+-    const traitCarryWeightModifier = trait?.modifiers?.carryWeight || 0;
+-    return baseCarryWeight + strengthBonus + traitCarryWeightModifier + getEquipmentCarryWeightModifier(equipmentState);
+-};
+-
+-/**
+- * Robot carry-weight rule.
+- *
+- * Roboты считают переносимый вес ИНАЧЕ, чем люди:
+- *   carryWeight = базаТела + сумма(carryWeightModifier со всех слоёв брони)
+- * где базаТела — `carryWeight` установленного корпуса (слот body/chassis/thruster),
+- * с фоллбэком на trait.carryWeightFixed (по умолчанию 150).
+- *
+- * STR, перки и химия НЕ влияют на переносимый вес робота — только корпус и броня.
+- *
+- * @param {object} robotSlots - { [slotKey]: { limb, armor, plating, frame } }
+- * @param {object} trait
+- * @returns {number}
+- */
+-export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
+-    const fallbackBase = trait?.modifiers?.carryWeightFixed ?? 150;
+-
+-    // База от корпуса: ищем слот тела (body / chassis / thruster) с limb.carryWeight.
+-    let bodyBase = null;
+-    if (robotSlots && typeof robotSlots === 'object') {
+-        for (const [slotKey, slotData] of Object.entries(robotSlots)) {
+-            const key = String(slotKey).toLowerCase();
+-            const isBodySlot = key === 'body' || key === 'chassis' || key === 'thruster';
+-            const limbCarry = slotData?.limb?.carryWeight;
+-            if (isBodySlot && limbCarry != null && Number.isFinite(Number(limbCarry))) {
+-                bodyBase = toNumber(limbCarry);
+-                break;
+-            }
+-        }
+-    }
+-
+-    const base = bodyBase != null ? bodyBase : fallbackBase;
+-
+-    // Модификаторы только от брони/обшивки/рамы робо-слотов (без снаряжения людей).
+-    const armorModifier = getEquipmentCarryWeightModifier({ equippedRobotSlots: robotSlots });
+-
+-    return base + armorModifier;
+-};
+-
++// МК-3 (патч 316): формулы производных (инициатива, защита, бонус ближнего боя,
++// макс. ОЗ, грузоподъёмность людей и роботов) переехали в сеттинг —
++// modules/fallout/logic/derivedStats.js. Движку — через дверь: domain/registry.js →
++// getDerivedStatsLogic(). Правила не менялись, тела функций перенесены как есть.
+ 
+ // ---------------------------------------------------------------------------
+ // Origin utilities
+diff --git a/domain/powerArmor.js b/domain/powerArmor.js
+index b2a913a..49fb0d8 100644
+--- a/domain/powerArmor.js
++++ b/domain/powerArmor.js
+@@ -294,37 +294,13 @@ export const suppressesLayerAt = (equipped, slot) => Boolean(equipped?.pieces?.[
+ 
+ // ─── Модификаторы каркаса (§3.4/§5.6) ───────────────────────────────────────
+ 
+-/** attributeModifier каркаса из его каталожных данных (null, если не объявлен). */
+-export const getFrameAttributeModifiers = (catalogFrameItem) =>
+-  catalogFrameItem?.modifiers?.attributeModifier || null;
++// МК-3 (патч 316): чистые механизмы атрибут-модификаторов каркаса переехали в
++// src/store/resolvers.js (дом без импортов — доступен файлам логики модуля).
++// Здесь — re-export для совместимости; hasFrame/suppressesLayerAt и прочая
++// логика СБ остались в этом файле.
++export {
++  getFrameAttributeModifiers,
++  applyAttributeModifierValue,
++  applyFrameAttributeModifiers,
++} from '../src/store/resolvers.js';
+ 
+-/**
+- * Применить одну запись значения-модификатора. Семейство операций — белый список
+- * проекта { '+', '-', 'set' } (семантика как у модов оружия в modsEquip: set = строго).
+- * Неизвестная операция — ошибка данных, а НЕ «тихий minus».
+- */
+-export const applyAttributeModifierValue = (base, entry) => {
+-  const value = Number(entry?.value);
+-  if (!Number.isFinite(value)) throw new Error(`[powerArmor] attributeModifier value не число: ${entry?.value}`);
+-  if (entry?.op === 'set') return value;
+-  if (entry?.op === '+') return base + value;
+-  if (entry?.op === '-') return base - value;
+-  throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
+-};
+-
+-/**
+- * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
+- * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
+- * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
+- * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
+- */
+-export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
+-  const mods = getFrameAttributeModifiers(catalogFrameItem);
+-  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
+-  return attributesArray.map((attr) => {
+-    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
+-    const entry = key ? mods[key] : null;
+-    if (!entry) return attr;
+-    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
+-  });
+-};
+diff --git a/domain/registry.js b/domain/registry.js
+index 9788424..cf6f3bd 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -210,6 +210,16 @@ export function getModuleEquipmentKits() {
+   return moduleEquipmentKits;
+ }
+ 
++/**
++ * Логика сеттинга (МК-3, патч 316): формулы производных параметров
++ * (инициатива, защита, бонус ближнего боя, макс. ОЗ, грузоподъёмность,
++ * сборка calculateDerivedStats). Движку — только сюда, прямые импорты
++ * из modules/fallout/logic/* в src/store/** запрещены (тест границы).
++ */
++export function getDerivedStatsLogic() {
++  return SETTING.logic.derivedStats;
++}
++
+ /**
+  * Рецепты крафта, собранные из файлов категории по индексу (порядок — как в
+  * index.json). Собирается один раз; consumers обязаны относиться к записи как
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+index 9bb37b6..033e8c3 100644
+--- a/modules/fallout/index.js
++++ b/modules/fallout/index.js
+@@ -199,6 +199,10 @@ import enJunkItems from './i18n/en-EN/data/junk/junk.json';
+ import enJunkMaterials from './i18n/en-EN/data/junk/material.json';
+ import enJunkTableLabels from './i18n/en-EN/data/junk/tables.json';
+ 
++// Логика сеттинга (МК-3, патч 316): namespace* как `import *` — все формулы доступны
++// по SETTING.logic.derivedStats.
++import * as derivedStatsLogic from './logic/derivedStats.js';
++
+ export const SETTING = Object.freeze({
+   meta: {
+     id: 'fallout',
+@@ -282,6 +286,12 @@ export const SETTING = Object.freeze({
+     },
+   },
+ 
++  // Логика сеттинга (МК-3, патч 316): формулы производных параметров.
++  // Движок читает ТОЛЬКО через дверь — domain/registry.js → getDerivedStatsLogic().
++  logic: {
++    derivedStats: derivedStatsLogic,
++  },
++
+   names: {
+     'ru-RU': {
+       system: {
+diff --git a/modules/fallout/logic/derivedStats.js b/modules/fallout/logic/derivedStats.js
+new file mode 100644
+index 0000000..642a6e6
+--- /dev/null
++++ b/modules/fallout/logic/derivedStats.js
+@@ -0,0 +1,343 @@
++// modules/fallout/logic/derivedStats.js
++// ФОРМУЛЫ ПРОИЗВОДНЫХ ПАРАМЕТРОВ сеттинга Fallout (МК-3, патч 316).
++//
++// Сюда переехали БЕЗ изменения правил:
++//   • примитивы — из domain/characterCreation.js:
++//     calculateInitiative, calculateDefense, calculateMeleeBonusValue,
++//     calculateMeleeBonus, calculateMaxHealth, calculateCarryWeight,
++//     calculateRobotCarryWeight;
++//   • сборка с эффектами, перк-бонусами и каркасом СБ — из src/store/resolvers.js:
++//     PA_FRAME_CATALOG, calculateDerivedStats, applyEffectToStats.
++//
++// Правила едут ВМЕСТЕ с сеттингом: кросс-игровое ядро про ОЗ/инициативу не знает.
++// Универсальные механизмы остаются в движке и приходят импортом из чистого дома
++// src/store/resolvers.js (0 импортов — циклы с реестром невозможны), timed-эффекты —
++// из domain/effects.js, старый словарь эффектов — из src/store/effectsSync.js.
++//
++// Потребители:
++//   • модуль (экраны) — прямой импорт из этого файла;
++//   • движок (store и пр.) — ТОЛЬКО через дверь: domain/registry.js → getDerivedStatsLogic().
++
++import {
++  getAttributeValue,
++  calculateAttributeTotal,
++  getEquipmentCarryWeightModifier,
++  applyFrameAttributeModifiers,
++} from '../../../src/store/resolvers.js';
++
++import {
++  getTimedMaxHpBonus,
++  getTimedDamageResistanceBonus,
++  getTimedDefenseBonus,
++} from '../../../domain/effects.js';
++
++import { effectsDictToLegacyArray } from '../../../src/store/effectsSync.js';
++
++// Каркас силовой брони: каталог данных сеттинга (ранее читался из store — нарушение границы).
++import dataPowerArmor from '../data/equipment/powerArmor.json';
++
++const toNumber = (value) => Number(value) || 0;
++
++// Надетый каркас СБ (frame.pieces[0]) — единственный источник подмены атрибутов.
++export const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
++
++// ---------------------------------------------------------------------------
++// Примитивы формул
++// ---------------------------------------------------------------------------
++
++export const calculateInitiative = (attributes) => {
++    const perception = getAttributeValue(attributes, 'PER');
++    const agility = getAttributeValue(attributes, 'AGI');
++    return perception + agility;
++};
++
++export const calculateDefense = (attributes) => {
++    const agility = getAttributeValue(attributes, 'AGI');
++    return agility >= 9 ? 2 : 1;
++};
++
++export const calculateMeleeBonusValue = (attributes, trait) => {
++    const strength = getAttributeValue(attributes, 'STR');
++    let baseBonus = 0;
++    if (strength >= 11) baseBonus = 3;
++    else if (strength >= 9) baseBonus = 2;
++    else if (strength >= 7) baseBonus = 1;
++
++    const traitBonus = Number(trait?.modifiers?.meleeBonusDelta || 0);
++    return baseBonus + traitBonus;
++};
++
++export const calculateMeleeBonus = (attributes, trait) => {
++    const totalBonus = calculateMeleeBonusValue(attributes, trait);
++    return totalBonus > 0 ? `+${totalBonus} {CD}` : '0';
++};
++
++export const calculateMaxHealth = (attributes, level = 1) => {
++    const endurance = getAttributeValue(attributes, 'END');
++    const luck = getAttributeValue(attributes, 'LCK');
++    return endurance + luck + (level > 1 ? level - 1 : 0);
++};
++
++export const calculateCarryWeight = (attributes, trait, equipmentState = {}) => {
++    const strength = getAttributeValue(attributes, 'STR');
++    const baseCarryWeight = trait?.modifiers?.carryWeightFixed ?? 150;
++    const strengthMultiplier = trait?.modifiers?.carryWeightStrengthMultiplier ?? 10;
++    const strengthBonus = strengthMultiplier * strength;
++    const traitCarryWeightModifier = trait?.modifiers?.carryWeight || 0;
++    return baseCarryWeight + strengthBonus + traitCarryWeightModifier + getEquipmentCarryWeightModifier(equipmentState);
++};
++
++/**
++ * Robot carry-weight rule.
++ *
++ * Roboты считают переносимый вес ИНАЧЕ, чем люди:
++ *   carryWeight = базаТела + сумма(carryWeightModifier со всех слоёв брони)
++ * где базаТела — `carryWeight` установленного корпуса (слот body/chassis/thruster),
++ * с фоллбэком на trait.carryWeightFixed (по умолчанию 150).
++ *
++ * STR, перки и химия НЕ влияют на переносимый вес робота — только корпус и броня.
++ *
++ * @param {object} robotSlots - { [slotKey]: { limb, armor, plating, frame } }
++ * @param {object} trait
++ * @returns {number}
++ */
++export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
++    const fallbackBase = trait?.modifiers?.carryWeightFixed ?? 150;
++
++    // База от корпуса: ищем слот тела (body / chassis / thruster) с limb.carryWeight.
++    let bodyBase = null;
++    if (robotSlots && typeof robotSlots === 'object') {
++        for (const [slotKey, slotData] of Object.entries(robotSlots)) {
++            const key = String(slotKey).toLowerCase();
++            const isBodySlot = key === 'body' || key === 'chassis' || key === 'thruster';
++            const limbCarry = slotData?.limb?.carryWeight;
++            if (isBodySlot && limbCarry != null && Number.isFinite(Number(limbCarry))) {
++                bodyBase = toNumber(limbCarry);
++                break;
++            }
++        }
++    }
++
++    const base = bodyBase != null ? bodyBase : fallbackBase;
++
++    // Модификаторы только от брони/обшивки/рамы робо-слотов (без снаряжения людей).
++    const armorModifier = getEquipmentCarryWeightModifier({ equippedRobotSlots: robotSlots });
++
++    return base + armorModifier;
++};
++
++// ---------------------------------------------------------------------------
++// Сборка производных: атрибуты + каркас СБ + timed-эффекты + перки
++// ---------------------------------------------------------------------------
++
++// Силовая броня: модификаторы надетого каркаса (СИЛ=set 11 и др. — данные) применяются
++// К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
++// атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
++
++/**
++ * Calculate derived stats from attributes, effects, and trait
++ * @param {Object} attributes - Normalized attributes object
++ * @param {Object} effects - Normalized effects object
++ * @param {Object} trait - Character trait object
++ * @param {number} level - Character level
++ * @param {Object} equipmentState - Equipment state for carry weight calculation
++ * @returns {Object} Derived stats with base, modifiers, and total
++ */
++export const calculateDerivedStats = (attributes, effects, trait, level = 1, equipmentState = {}) => {
++  // Convert normalized attributes to array format for compatibility
++  const attributesArray = Object.values(attributes).map(attr => ({
++    name: attr.id,
++    value: attr.base,
++  }));
++
++  // Надетый каркас силовой брони подменяет атрибуты (set/add) для производных.
++  const attributesEffective = applyFrameAttributeModifiers(
++    attributesArray,
++    equipmentState?.powerArmorFrameId ? PA_FRAME_CATALOG : null,
++  );
++
++  const effectsArray = effectsDictToLegacyArray(effects);
++
++  const stats = {
++    maxHealth: { base: 0, modifiers: [], total: 0 },
++    initiative: { base: 0, modifiers: [], total: 0 },
++    defense: { base: 0, modifiers: [], total: 0 },
++    meleeBonus: { base: 0, modifiers: [], total: 0 },
++    carryWeight: { base: 0, modifiers: [], total: 0 },
++    damageResistance: {
++      physical: { base: 0, modifiers: [], total: 0 },
++      energy: { base: 0, modifiers: [], total: 0 },
++      radiation: { base: 0, modifiers: [], total: 0 },
++    },
++  };
++
++  // Max Health: END + LCK + level
++  stats.maxHealth.base = calculateMaxHealth(attributesEffective, level);
++  
++  // Timed effects: getTimedMaxHpBonus
++  const hpBonus = getTimedMaxHpBonus(effectsArray);
++  if (hpBonus !== 0) {
++    stats.maxHealth.modifiers.push({
++      source: 'timedEffects',
++      value: hpBonus,
++      operation: '+',
++    });
++  }
++  
++  stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
++
++  const drBonus = getTimedDamageResistanceBonus(effectsArray);
++  ['physical', 'energy', 'radiation'].forEach((type) => {
++    const bonus = drBonus[type] || 0;
++    if (bonus !== 0) {
++      stats.damageResistance[type].modifiers.push({
++        source: 'timedEffects',
++        value: bonus,
++        operation: '+',
++      });
++      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
++    }
++  });
++  
++  // Initiative: PER + AGI
++  stats.initiative.base = calculateInitiative(attributesEffective);
++  stats.initiative.total = calculateAttributeTotal(stats.initiative);
++  
++  // Defense: AGI >= 9 ? 2 : 1 (+ бонусы timed-эффектов, напр. Стелс-бой +2)
++  stats.defense.base = calculateDefense(attributesEffective);
++  const defenseBonus = getTimedDefenseBonus(effectsArray);
++  if (defenseBonus !== 0) {
++    stats.defense.modifiers.push({
++      source: 'timedEffects',
++      value: defenseBonus,
++      operation: '+',
++    });
++  }
++  stats.defense.total = calculateAttributeTotal(stats.defense);
++  
++  // Melee Bonus: STR-based
++  stats.meleeBonus.base = calculateMeleeBonusValue(attributesEffective, trait);
++  stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
++  
++  // Carry Weight:
++  //  - Roboты: база от корпуса + модификаторы брони (STR/перки/химия не влияют)
++  //  - Остальные: STR-based + trait + снаряжение
++  const robotSlots = equipmentState.robotSlots || equipmentState.equippedRobotSlots || null;
++  if (equipmentState.isRobot) {
++    stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
++  } else {
++    stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
++  }
++  stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
++
++  // --- Перк-бонусы (perkBonuses) ---
++  // perkBonuses попадает сюда через аргумент effects ({ ...effects, perkBonuses })
++  const perkBonuses = effects?.perkBonuses || {};
++
++  // maxHealthBonus (lifeGiver)
++  const maxHealthFromPerks = Number(perkBonuses.maxHealthBonus) || 0;
++  if (maxHealthFromPerks !== 0) {
++    stats.maxHealth.modifiers.push({
++      source: 'perks',
++      value: maxHealthFromPerks,
++      operation: '+',
++    });
++    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
++  }
++
++  // carryWeightBonus (strongBack)
++  const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
++  if (carryFromPerks !== 0 && !equipmentState.isRobot) {
++    stats.carryWeight.modifiers.push({
++      source: 'perks',
++      value: carryFromPerks,
++      operation: '+',
++    });
++    stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
++  }
++
++  // damageResistance (toughness / refractor / radResistant / barbarian)
++  const drFromPerks = perkBonuses.damageResistance || {};
++  ['physical', 'energy', 'radiation'].forEach((type) => {
++    const bonus = Number(drFromPerks[type]) || 0;
++    if (bonus !== 0) {
++      stats.damageResistance[type].modifiers.push({
++        source: 'perks',
++        value: bonus,
++        operation: '+',
++      });
++      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
++    }
++  });
++
++  return stats;
++};
++
++/**
++ * Apply effect parameters to stats
++ * @param {Object} stats - Current derived stats
++ * @param {Object} effect - Effect to apply
++ * @returns {Object} Updated stats with effect modifiers
++ */
++export const applyEffectToStats = (stats, effect) => {
++  const updatedStats = { ...stats };
++  
++  if (effect.maxHpModifier) {
++    const mod = effect.maxHpModifier;
++    updatedStats.maxHealth.modifiers = [
++      ...(updatedStats.maxHealth.modifiers || []),
++      {
++        source: effect.id,
++        value: Number(mod.value) || 0,
++        operation: mod.op || '+',
++      },
++    ];
++    updatedStats.maxHealth.total = calculateAttributeTotal(updatedStats.maxHealth);
++  }
++  
++  if (effect.damageResistanceModifier) {
++    // Initialize damage resistance if not present
++    if (!updatedStats.damageResistance) {
++      updatedStats.damageResistance = {
++        physical: { base: 0, modifiers: [], total: 0 },
++        energy: { base: 0, modifiers: [], total: 0 },
++        radiation: { base: 0, modifiers: [], total: 0 },
++      };
++    }
++    
++    const mod = effect.damageResistanceModifier;
++    const type = mod.type || 'physical';
++    
++    if (updatedStats.damageResistance[type]) {
++      updatedStats.damageResistance[type].modifiers = [
++        ...(updatedStats.damageResistance[type].modifiers || []),
++        {
++          source: effect.id,
++          value: Number(mod.value) || 0,
++          operation: mod.op || '+',
++        },
++      ];
++      updatedStats.damageResistance[type].total = calculateAttributeTotal(
++        updatedStats.damageResistance[type]
++      );
++    }
++  }
++
++  if (effect.defenseModifier) {
++    const mod = effect.defenseModifier;
++    if (!updatedStats.defense) {
++      updatedStats.defense = { base: 0, modifiers: [], total: 0 };
++    }
++    updatedStats.defense.modifiers = [
++      ...(updatedStats.defense.modifiers || []),
++      {
++        source: effect.id,
++        value: Number(mod.value) || 0,
++        operation: mod.op || '+',
++      },
++    ];
++    updatedStats.defense.total = calculateAttributeTotal(updatedStats.defense);
++  }
++  
++  return updatedStats;
++};
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index 4c6cd72..ac96d6c 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -38,7 +38,6 @@ import {
+   canChangeSkillValue,
+   getAttributeLimits,
+   validateSkills,
+-  calculateMaxHealth,
+   ALL_SKILLS,
+   isMultiTraitOrigin,
+   MAX_ATTRIBUTE,
+@@ -50,13 +49,12 @@ import {
+ // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
+ // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
+ import { applyFrameAttributeModifiers, hasFrame } from "../../../../domain/powerArmor";
+-import dataPowerArmor from "../../data/equipment/powerArmor.json";
++// МК-3 (патч 316): формула макс. ОЗ и каталог каркаса СБ — часть сеттинга, из логики модуля.
++import { calculateMaxHealth, PA_FRAME_CATALOG } from "../../logic/derivedStats";
+ import {
+   getSkillDisplayName,
+   tCharacterScreen,
+ } from "./logic/characterScreenI18n";
+-
+-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+ import { useLocale, useModuleLocale } from "../../../../i18n/locale";
+ import { AttributesSection } from "./AttributesSection";
+ import styles from '../../styles/CharacterScreen.styles';
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index d0c58a8..c6f9e8e 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -14,7 +14,9 @@ import {
+   selectLegacyAttributes,
+   selectLegacySkills,
+ } from '../../../../src/store/selectors';
+-import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../../domain/characterCreation';
++// МК-3 (патч 316): формулы производных — часть сеттинга, прямой импорт из логики модуля.
++import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth } from '../../logic/derivedStats';
++import { getAttributeValue } from '../../../../domain/characterCreation';
+ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
+ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+@@ -60,7 +62,8 @@ import dataPowerArmor from '../../data/equipment/powerArmor.json';
+ const PA_CATALOG_BY_ID = Object.fromEntries(
+   Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
+ );
+-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
++// МК-3 (патч 316): каркас СБ для производных читается из логики модуля (один срез данных).
++import { PA_FRAME_CATALOG } from '../../logic/derivedStats';
+ 
+ // Импортируем модальное окно модификаций
+ import WeaponModificationModal from './modal/WeaponModificationModal';
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+index 5281a19..4d901af 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modals/SleepModal.tsx
+@@ -11,7 +11,8 @@ import React, { useMemo, useState } from 'react';
+ import { Modal, Text, TouchableOpacity, View } from 'react-native';
+ import useCharacterStore from '../../../../../src/store/characterStore';
+ import { selectLegacyAttributes } from '../../../../../src/store/selectors';
+-import { calculateMaxHealth } from '../../../../../domain/characterCreation';
++// МК-3 (патч 316): формула макс. ОЗ — часть сеттинга.
++import { calculateMaxHealth } from '../../../logic/derivedStats';
+ import {
+     forecastSleep,
+     SURVIVAL_RULES,
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 11d3da4..0991999 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -45,10 +45,15 @@ import {
+   calculateAttributeTotal,
+   calculateSkillTotal,
+   normalizeItemParameters,
+-  calculateDerivedStats,
+   calculateParameterTotal
+ } from './resolvers.js';
+ 
++// МК-3 (патч 316): формулы производных уехали в сеттинг (modules/fallout/logic/derivedStats.js).
++// Движку — только через дверь реестра. Деструктуризация один раз при загрузке модуля.
++import { getDerivedStatsLogic } from '../../domain/registry.js';
++
++const { calculateDerivedStats, calculateMaxHealth } = getDerivedStatsLogic();
++
+ import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
+ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
+ import { legacyEffectToStore, effectsDictToLegacyArray, syncTimedEffectsToStore } from './effectsSync.js';
+@@ -68,7 +73,7 @@ import { generateItemId, generateStackKey, getItemId } from '../../domain/itemId
+ // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
+ // стор-словари единственный источник, производный legacy-массив обязан быть
+ // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
+-import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
++import { createInitialAttributes, ALL_SKILLS, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
+ import { isRobotCharacter } from '../../domain/origins';
+ // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
+ // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
+diff --git a/src/store/orchestratorsSlice.js b/src/store/orchestratorsSlice.js
+index 3be7b3a..735a8d3 100644
+--- a/src/store/orchestratorsSlice.js
++++ b/src/store/orchestratorsSlice.js
+@@ -39,8 +39,11 @@ import {
+ } from '../../domain/diseaseConditions';
+ import { createSceneRiskTracker, getSceneRiskEventForRule } from '../../domain/sceneRiskChecks';
+ import { isSkillTagged } from '../../domain/d20Checks';
+-import { getConditionCatalog, getSceneRiskRules } from '../../domain/registry';
+-import { calculateMaxHealth, getAttributeValue } from '../../domain/characterCreation';
++import { getConditionCatalog, getSceneRiskRules, getDerivedStatsLogic } from '../../domain/registry';
++import { getAttributeValue } from '../../domain/characterCreation';
++
++// МК-3 (патч 316): формула макс. ОЗ уехала в сеттинг — чтение через дверь.
++const { calculateMaxHealth } = getDerivedStatsLogic();
+ import { getCurrentModuleLocale } from '../../i18n/locale';
+ import { notifyConditionEvent, notifyConsumableApplied } from './stateExtensions';
+ 
+diff --git a/src/store/resolvers.js b/src/store/resolvers.js
+index e7330f9..3703a59 100644
+--- a/src/store/resolvers.js
++++ b/src/store/resolvers.js
+@@ -89,238 +89,107 @@ export const normalizeItemParameters = (item) => {
+   return normalized;
+ };
+ 
+-// --- Derived Stats Resolvers ---
+-
+-import {
+-  getAttributeValue,
+-  calculateMaxHealth,
+-  calculateInitiative,
+-  calculateDefense,
+-  calculateMeleeBonusValue,
+-  calculateCarryWeight,
+-  calculateRobotCarryWeight,
+-} from '../../domain/characterCreation.js';
+-
+-import {
+-  getTimedMaxHpBonus,
+-  getTimedDamageResistanceBonus,
+-  getTimedDefenseBonus,
+-} from '../../domain/effects.js';
+-
+-import { effectsDictToLegacyArray } from './effectsSync.js';
+-
+-// Силовая броня: модификаторы надетого каркаса (СИЛ=set 11 и др. — данные) применяются
+-// К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
+-// атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
+-import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
+-import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+-
+-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+ 
+-/**
+- * Calculate derived stats from attributes, effects, and trait
+- * @param {Object} attributes - Normalized attributes object
+- * @param {Object} effects - Normalized effects object
+- * @param {Object} trait - Character trait object
+- * @param {number} level - Character level
+- * @param {Object} equipmentState - Equipment state for carry weight calculation
+- * @returns {Object} Derived stats with base, modifiers, and total
+- */
+-export const calculateDerivedStats = (attributes, effects, trait, level = 1, equipmentState = {}) => {
+-  // Convert normalized attributes to array format for compatibility
+-  const attributesArray = Object.values(attributes).map(attr => ({
+-    name: attr.id,
+-    value: attr.base,
+-  }));
+-
+-  // Надетый каркас силовой брони подменяет атрибуты (set/add) для производных.
+-  const attributesEffective = applyFrameAttributeModifiers(
+-    attributesArray,
+-    equipmentState?.powerArmorFrameId ? PA_FRAME_CATALOG : null,
++// ---------------------------------------------------------------------------
++// Универсальные хелперы параметров (МК-3, патч 316).
++// Сюда стянуты чистые механизмы без знаний о сеттинге, чтобы файлы логики
++// модуля (modules/fallout/logic/*) могли импортировать их НЕ задевая ни
++// реестр, ни characterCreation — файл остаётся полностью чистым (0 импортов).
++// Прежние дома оставляют re-export для совместимости.
++// ---------------------------------------------------------------------------
++
++// --- Канонические ключи атрибутов (из domain/characterCreation.js) ---
++
++// Слово владельца (2026-09-21): порядок атрибутов SPECIAL — как в правилах,
++// и никак иначе: Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость,
++// Удача. Это не сортировка, а канон показа: любой список атрибутов в программе
++// обязан идти в этом порядке. Предохранитель — тест special-attribute-order.
++export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
++
++const ATTRIBUTE_KEY_ALIASES = {
++  STR: 'STR',
++  END: 'END',
++  PER: 'PER',
++  AGI: 'AGI',
++  INT: 'INT',
++  CHA: 'CHA',
++  LCK: 'LCK',
++};
++
++export const getCanonicalAttributeKey = (key) => ATTRIBUTE_KEY_ALIASES[key] || null;
++
++export const getAttributeValue = (attributes = [], key) => {
++  const canonical = getCanonicalAttributeKey(key);
++  if (!canonical) return null;
++  const found = attributes.find(
++    (attr) => getCanonicalAttributeKey(attr.name) === canonical,
+   );
++  return found?.value ?? 0;
++};
+ 
+-  const effectsArray = effectsDictToLegacyArray(effects);
+-
+-  const stats = {
+-    maxHealth: { base: 0, modifiers: [], total: 0 },
+-    initiative: { base: 0, modifiers: [], total: 0 },
+-    defense: { base: 0, modifiers: [], total: 0 },
+-    meleeBonus: { base: 0, modifiers: [], total: 0 },
+-    carryWeight: { base: 0, modifiers: [], total: 0 },
+-    damageResistance: {
+-      physical: { base: 0, modifiers: [], total: 0 },
+-      energy: { base: 0, modifiers: [], total: 0 },
+-      radiation: { base: 0, modifiers: [], total: 0 },
+-    },
+-  };
+-
+-  // Max Health: END + LCK + level
+-  stats.maxHealth.base = calculateMaxHealth(attributesEffective, level);
+-  
+-  // Timed effects: getTimedMaxHpBonus
+-  const hpBonus = getTimedMaxHpBonus(effectsArray);
+-  if (hpBonus !== 0) {
+-    stats.maxHealth.modifiers.push({
+-      source: 'timedEffects',
+-      value: hpBonus,
+-      operation: '+',
+-    });
+-  }
+-  
+-  stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+-
+-  const drBonus = getTimedDamageResistanceBonus(effectsArray);
+-  ['physical', 'energy', 'radiation'].forEach((type) => {
+-    const bonus = drBonus[type] || 0;
+-    if (bonus !== 0) {
+-      stats.damageResistance[type].modifiers.push({
+-        source: 'timedEffects',
+-        value: bonus,
+-        operation: '+',
+-      });
+-      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
+-    }
+-  });
+-  
+-  // Initiative: PER + AGI
+-  stats.initiative.base = calculateInitiative(attributesEffective);
+-  stats.initiative.total = calculateAttributeTotal(stats.initiative);
+-  
+-  // Defense: AGI >= 9 ? 2 : 1 (+ бонусы timed-эффектов, напр. Стелс-бой +2)
+-  stats.defense.base = calculateDefense(attributesEffective);
+-  const defenseBonus = getTimedDefenseBonus(effectsArray);
+-  if (defenseBonus !== 0) {
+-    stats.defense.modifiers.push({
+-      source: 'timedEffects',
+-      value: defenseBonus,
+-      operation: '+',
+-    });
+-  }
+-  stats.defense.total = calculateAttributeTotal(stats.defense);
+-  
+-  // Melee Bonus: STR-based
+-  stats.meleeBonus.base = calculateMeleeBonusValue(attributesEffective, trait);
+-  stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
+-  
+-  // Carry Weight:
+-  //  - Roboты: база от корпуса + модификаторы брони (STR/перки/химия не влияют)
+-  //  - Остальные: STR-based + trait + снаряжение
+-  const robotSlots = equipmentState.robotSlots || equipmentState.equippedRobotSlots || null;
+-  if (equipmentState.isRobot) {
+-    stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
+-  } else {
+-    stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
+-  }
+-  stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
+-
+-  // --- Перк-бонусы (perkBonuses) ---
+-  // perkBonuses попадает сюда через аргумент effects ({ ...effects, perkBonuses })
+-  const perkBonuses = effects?.perkBonuses || {};
+-
+-  // maxHealthBonus (lifeGiver)
+-  const maxHealthFromPerks = Number(perkBonuses.maxHealthBonus) || 0;
+-  if (maxHealthFromPerks !== 0) {
+-    stats.maxHealth.modifiers.push({
+-      source: 'perks',
+-      value: maxHealthFromPerks,
+-      operation: '+',
++// --- Модификаторы грузоподъёмности от снаряжения (из characterCreation.js) ---
++
++const toNumber = (value) => Number(value) || 0;
++
++const sumCarryWeightModifierFromItem = (item) => {
++  if (!item) return 0;
++  return toNumber(item.carryWeightModifier);
++};
++
++export const getEquipmentCarryWeightModifier = ({ equippedArmor, equippedRobotSlots } = {}) => {
++  let total = 0;
++
++  if (equippedArmor && typeof equippedArmor === 'object') {
++    Object.values(equippedArmor).forEach((slot) => {
++      total += sumCarryWeightModifierFromItem(slot?.armor);
++      total += sumCarryWeightModifierFromItem(slot?.clothing);
+     });
+-    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+   }
+ 
+-  // carryWeightBonus (strongBack)
+-  const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
+-  if (carryFromPerks !== 0 && !equipmentState.isRobot) {
+-    stats.carryWeight.modifiers.push({
+-      source: 'perks',
+-      value: carryFromPerks,
+-      operation: '+',
++  if (equippedRobotSlots && typeof equippedRobotSlots === 'object') {
++    Object.values(equippedRobotSlots).forEach((slot) => {
++      total += sumCarryWeightModifierFromItem(slot?.armor);
++      total += sumCarryWeightModifierFromItem(slot?.plating);
++      total += sumCarryWeightModifierFromItem(slot?.frame);
+     });
+-    stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
+   }
+ 
+-  // damageResistance (toughness / refractor / radResistant / barbarian)
+-  const drFromPerks = perkBonuses.damageResistance || {};
+-  ['physical', 'energy', 'radiation'].forEach((type) => {
+-    const bonus = Number(drFromPerks[type]) || 0;
+-    if (bonus !== 0) {
+-      stats.damageResistance[type].modifiers.push({
+-        source: 'perks',
+-        value: bonus,
+-        operation: '+',
+-      });
+-      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
+-    }
+-  });
+-
+-  return stats;
++  return total;
+ };
+ 
++// --- Атрибут-модификаторы каркаса силовой брони (из domain/powerArmor.js) ---
++
++/** attributeModifier каркаса из его каталожных данных (null, если не объявлен). */
++export const getFrameAttributeModifiers = (catalogFrameItem) =>
++  catalogFrameItem?.modifiers?.attributeModifier || null;
++
+ /**
+- * Apply effect parameters to stats
+- * @param {Object} stats - Current derived stats
+- * @param {Object} effect - Effect to apply
+- * @returns {Object} Updated stats with effect modifiers
++ * Применить одну запись значения-модификатора. Семейство операций — белый список
++ * проекта { '+', '-', 'set' } (семантика как у модов оружия в modsEquip: set = строго).
++ * Неизвестная операция — ошибка данных, а НЕ «тихий minus».
+  */
+-export const applyEffectToStats = (stats, effect) => {
+-  const updatedStats = { ...stats };
+-  
+-  if (effect.maxHpModifier) {
+-    const mod = effect.maxHpModifier;
+-    updatedStats.maxHealth.modifiers = [
+-      ...(updatedStats.maxHealth.modifiers || []),
+-      {
+-        source: effect.id,
+-        value: Number(mod.value) || 0,
+-        operation: mod.op || '+',
+-      },
+-    ];
+-    updatedStats.maxHealth.total = calculateAttributeTotal(updatedStats.maxHealth);
+-  }
+-  
+-  if (effect.damageResistanceModifier) {
+-    // Initialize damage resistance if not present
+-    if (!updatedStats.damageResistance) {
+-      updatedStats.damageResistance = {
+-        physical: { base: 0, modifiers: [], total: 0 },
+-        energy: { base: 0, modifiers: [], total: 0 },
+-        radiation: { base: 0, modifiers: [], total: 0 },
+-      };
+-    }
+-    
+-    const mod = effect.damageResistanceModifier;
+-    const type = mod.type || 'physical';
+-    
+-    if (updatedStats.damageResistance[type]) {
+-      updatedStats.damageResistance[type].modifiers = [
+-        ...(updatedStats.damageResistance[type].modifiers || []),
+-        {
+-          source: effect.id,
+-          value: Number(mod.value) || 0,
+-          operation: mod.op || '+',
+-        },
+-      ];
+-      updatedStats.damageResistance[type].total = calculateAttributeTotal(
+-        updatedStats.damageResistance[type]
+-      );
+-    }
+-  }
++export const applyAttributeModifierValue = (base, entry) => {
++  const value = Number(entry?.value);
++  if (!Number.isFinite(value)) throw new Error(`[powerArmor] attributeModifier value не число: ${entry?.value}`);
++  if (entry?.op === 'set') return value;
++  if (entry?.op === '+') return base + value;
++  if (entry?.op === '-') return base - value;
++  throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
++};
+ 
+-  if (effect.defenseModifier) {
+-    const mod = effect.defenseModifier;
+-    if (!updatedStats.defense) {
+-      updatedStats.defense = { base: 0, modifiers: [], total: 0 };
+-    }
+-    updatedStats.defense.modifiers = [
+-      ...(updatedStats.defense.modifiers || []),
+-      {
+-        source: effect.id,
+-        value: Number(mod.value) || 0,
+-        operation: mod.op || '+',
+-      },
+-    ];
+-    updatedStats.defense.total = calculateAttributeTotal(updatedStats.defense);
+-  }
+-  
+-  return updatedStats;
++/**
++ * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
++ * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
++ * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
++ * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
++ */
++export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
++  const mods = getFrameAttributeModifiers(catalogFrameItem);
++  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
++  return attributesArray.map((attr) => {
++    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
++    const entry = key ? mods[key] : null;
++    if (!entry) return attr;
++    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
++  });
+ };
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index c01ac34..bb36d2a 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -5,7 +5,12 @@ import { debugLog } from '../debug/falloutDebug';
+ import { effectsDictToLegacyArray } from './effectsSync.js';
+ import { resolveWeaponRangeFields } from '../../domain/range.js';
+ import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
+-import { ALL_SKILLS, calculateCarryWeight, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
++import { ALL_SKILLS, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
++
++// МК-3 (патч 316): формула грузоподъёмности уехала в сеттинг — чтение через дверь.
++import { getDerivedStatsLogic } from '../../domain/registry.js';
++
++const { calculateCarryWeight } = getDerivedStatsLogic();
+ 
+ // ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
+ // атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится
