@@ -2,7 +2,25 @@
 
 ---
 
-## "What's new" — once per release, no checkbox (patch 335)
+## Armor mod install table — cross-checked, 2 double-counts fixed (patch 337)
+
+The owner dictated the book's "Armor improvement modifications" table
+(effects/weight/cost/perks). Cross-check: all 12 standard mods already
+carried book-accurate effects, weights, costs and perks; two double-counts
+found and fixed — "Parrying" granted +2 Energy DR on top of its "+2 vs
+melee attacks" effect, "Soft lining" (legs) — +2 Physical DR on top of the
+"+2 vs falling" effect. The book leaves both DR columns empty — now so
+does the data. Characters with these mods recompute automatically on the
+next load.
+
+The table is recorded in the reference doc (§2.7). Two questions to the
+owner (protocol 331): 1) "Laminated/Rubberized/Microcarbon" appear in the
+install table as all-body upgrades, though patch 333 removed them as
+"synth-only" — restore them? 2) five craft-only mods (pockets, lead-lined,
+ultra-light, lightweight, deep pockets) have no install-table row — no
+combat effects at all, or a different page?
+
+## ## "What's new" — once per release, no checkbox (patch 335)
 
 Owner's word: the checkbox is excessive; show the window once per
 RELEASE — a release consists of many patches, not "every little step".
