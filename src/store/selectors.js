@@ -5,7 +5,12 @@ import { debugLog } from '../debug/falloutDebug';
 import { effectsDictToLegacyArray } from './effectsSync.js';
 import { resolveWeaponRangeFields } from '../../domain/range.js';
 import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
-import { ALL_SKILLS, calculateCarryWeight, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
+import { ALL_SKILLS, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
+
+// МК-3 (патч 316): формула грузоподъёмности уехала в сеттинг — чтение через дверь.
+import { getDerivedStatsLogic } from '../../domain/registry.js';
+
+const { calculateCarryWeight } = getDerivedStatsLogic();
 
 // ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
 // атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится

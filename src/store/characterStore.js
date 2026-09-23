@@ -45,9 +45,14 @@ import {
   calculateAttributeTotal,
   calculateSkillTotal,
   normalizeItemParameters,
-  calculateDerivedStats,
   calculateParameterTotal
 } from './resolvers.js';
+
+// МК-3 (патч 316): формулы производных уехали в сеттинг (modules/fallout/logic/derivedStats.js).
+// Движку — только через дверь реестра. Деструктуризация один раз при загрузке модуля.
+import { getDerivedStatsLogic } from '../../domain/registry.js';
+
+const { calculateDerivedStats, calculateMaxHealth } = getDerivedStatsLogic();
 
 import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
@@ -68,7 +73,7 @@ import { generateItemId, generateStackKey, getItemId } from '../../domain/itemId
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
-import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
+import { createInitialAttributes, ALL_SKILLS, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
 import { isRobotCharacter } from '../../domain/origins';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил

@@ -11,7 +11,8 @@ import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectLegacyAttributes } from '../../../../../src/store/selectors';
-import { calculateMaxHealth } from '../../../../../domain/characterCreation';
+// МК-3 (патч 316): формула макс. ОЗ — часть сеттинга.
+import { calculateMaxHealth } from '../../../logic/derivedStats';
 import {
     forecastSleep,
     SURVIVAL_RULES,

@@ -119,7 +119,7 @@
 | src/store/characterStore.js | data/perks/perks.json | Данные напрямую (→ геттер реестра) |
 | src/store/migrations.js | data/equipment/robot/*.json | Данные напрямую (→ геттер реестра) |
 | src/store/powerArmorSlice.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
-| src/store/resolvers.js | data/equipment/powerArmor.json | Данные напрямую (→ getPowerArmorData) |
+| ~~src/store/resolvers.js~~ | ~~data/equipment/powerArmor.json~~ | Закрыто в 316: нарушение уехало в modules/fallout/logic/derivedStats.js; resolvers — чистая математика без импортов |
 
 Тесты: 26 файлов в `__tests__/` читают данные напрямую — из скана границы исключены,
 гасятся по мере правки (новые киты/моды-тесты 292 уже идут через дверь).

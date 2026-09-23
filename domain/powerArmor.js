@@ -294,37 +294,13 @@ export const suppressesLayerAt = (equipped, slot) => Boolean(equipped?.pieces?.[
 
 // ─── Модификаторы каркаса (§3.4/§5.6) ───────────────────────────────────────
 
-/** attributeModifier каркаса из его каталожных данных (null, если не объявлен). */
-export const getFrameAttributeModifiers = (catalogFrameItem) =>
-  catalogFrameItem?.modifiers?.attributeModifier || null;
+// МК-3 (патч 316): чистые механизмы атрибут-модификаторов каркаса переехали в
+// src/store/resolvers.js (дом без импортов — доступен файлам логики модуля).
+// Здесь — re-export для совместимости; hasFrame/suppressesLayerAt и прочая
+// логика СБ остались в этом файле.
+export {
+  getFrameAttributeModifiers,
+  applyAttributeModifierValue,
+  applyFrameAttributeModifiers,
+} from '../src/store/resolvers.js';
 
-/**
- * Применить одну запись значения-модификатора. Семейство операций — белый список
- * проекта { '+', '-', 'set' } (семантика как у модов оружия в modsEquip: set = строго).
- * Неизвестная операция — ошибка данных, а НЕ «тихий minus».
- */
-export const applyAttributeModifierValue = (base, entry) => {
-  const value = Number(entry?.value);
-  if (!Number.isFinite(value)) throw new Error(`[powerArmor] attributeModifier value не число: ${entry?.value}`);
-  if (entry?.op === 'set') return value;
-  if (entry?.op === '+') return base + value;
-  if (entry?.op === '-') return base - value;
-  throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
-};
-
-/**
- * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
- * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
- * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
- * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
- */
-export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
-  const mods = getFrameAttributeModifiers(catalogFrameItem);
-  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
-  return attributesArray.map((attr) => {
-    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
-    const entry = key ? mods[key] : null;
-    if (!entry) return attr;
-    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
-  });
-};

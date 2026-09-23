@@ -22,6 +22,8 @@ import { describe, expect, it } from 'vitest';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 // Долг границы на момент 292 (см. docs/architecture/domain-map.md).
+// 316: src/store/resolvers.js вычеркнут — файл стал чистой математикой параметров
+// (нарушение powerArmor.json уехало в modules/fallout/logic/derivedStats.js).
 const DEBT = new Set([
   'domain/effects.js',
   'domain/skillCanonical.js',
@@ -34,7 +36,6 @@ const DEBT = new Set([
   'src/store/characterStore.js',
   'src/store/migrations.js',
   'src/store/powerArmorSlice.js',
-  'src/store/resolvers.js',
 ]);
 
 const SKIP_DIRS = new Set([

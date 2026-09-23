@@ -2,6 +2,26 @@
 
 ---
 
+## Refactor MK-3, step 1 — derived-stat formulas moved into the module (patch 316)
+
+First step of the "cascade into the store" plan (2026-09-18). Derived-stat
+rules now live with the setting; the engine reads them through the door.
+Behavior is unchanged: full test suite green.
+
+- New: `modules/fallout/logic/derivedStats.js` — initiative (PER+AGI),
+  defense (AGI 9+ → 2), melee bonus (STR thresholds 7/9/11), max health
+  (END+LCK+level), human and robot carry weight, and the full assembly with
+  power armor frame, timed effects and perks (`calculateDerivedStats`).
+- The engine (store) reads the formulas only through the door:
+  `domain/registry.js` → `getDerivedStatsLogic()`.
+- Data boundary restored: `src/store/resolvers.js` no longer reads the power
+  armor data file — removed from the boundary test's debt list (11 entries).
+- Setting-agnostic math (SPECIAL key canon, equipment modifiers, frame
+  attribute modifiers) is consolidated in `resolvers.js` — a file with zero
+  imports, so module logic cannot create loading cycles.
+- Fuse: acceptance test with golden constants (patch 316) — thresholds,
+  assembly, perks, robots, PA frame, registry door.
+
 ## Work memory — a "where we are now" file for AI agents (patch 315)
 
 Owner's word: learn to remember what's done and what the app consists

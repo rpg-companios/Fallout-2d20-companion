@@ -199,6 +199,10 @@ import enJunkItems from './i18n/en-EN/data/junk/junk.json';
 import enJunkMaterials from './i18n/en-EN/data/junk/material.json';
 import enJunkTableLabels from './i18n/en-EN/data/junk/tables.json';
 
+// Логика сеттинга (МК-3, патч 316): namespace* как `import *` — все формулы доступны
+// по SETTING.logic.derivedStats.
+import * as derivedStatsLogic from './logic/derivedStats.js';
+
 export const SETTING = Object.freeze({
   meta: {
     id: 'fallout',
@@ -280,6 +284,12 @@ export const SETTING = Object.freeze({
       ...kitVaultDweller,
       ...kitWastelander,
     },
+  },
+
+  // Логика сеттинга (МК-3, патч 316): формулы производных параметров.
+  // Движок читает ТОЛЬКО через дверь — domain/registry.js → getDerivedStatsLogic().
+  logic: {
+    derivedStats: derivedStatsLogic,
   },
 
   names: {

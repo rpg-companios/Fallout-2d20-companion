@@ -14,7 +14,9 @@ import {
   selectLegacyAttributes,
   selectLegacySkills,
 } from '../../../../src/store/selectors';
-import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth, getAttributeValue } from '../../../../domain/characterCreation';
+// МК-3 (патч 316): формулы производных — часть сеттинга, прямой импорт из логики модуля.
+import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth } from '../../logic/derivedStats';
+import { getAttributeValue } from '../../../../domain/characterCreation';
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
@@ -60,7 +62,8 @@ import dataPowerArmor from '../../data/equipment/powerArmor.json';
 const PA_CATALOG_BY_ID = Object.fromEntries(
   Object.values(dataPowerArmor).flatMap((set) => set.pieces).map((p) => [p.id, p]),
 );
-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+// МК-3 (патч 316): каркас СБ для производных читается из логики модуля (один срез данных).
+import { PA_FRAME_CATALOG } from '../../logic/derivedStats';
 
 // Импортируем модальное окно модификаций
 import WeaponModificationModal from './modal/WeaponModificationModal';
