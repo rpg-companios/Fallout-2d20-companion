@@ -1,0 +1,653 @@
+diff --git a/__tests__/domain/derived-cascade.test.js b/__tests__/domain/derived-cascade.test.js
+new file mode 100644
+index 0000000..5059897
+--- /dev/null
++++ b/__tests__/domain/derived-cascade.test.js
+@@ -0,0 +1,97 @@
++// ПРИЁМОЧНЫЙ (патч 317): каскад производных — МК-3, шаг 2.
++// Любое действие, меняющее вход пересчёта, обновляет derivedStats САМО,
++// синхронно. Ни один тест ниже НЕ вызывает recalculateDerivedStats вручную —
++// это и есть суть шага: ручные вызовы удалены из действий (26 штук).
++import { afterEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++
++afterEach(async () => {
++  useCharacterStore.getState().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('МК-3 шаг 2: каскад производных в хранилище', () => {
++  it('атрибут меняется действием → инициатива и ОЗ пересчитались сами', () => {
++    const store = useCharacterStore.getState();
++    const before = store.derivedStats;
++    store.updateAttribute('PER', 2);
++    const after = useCharacterStore.getState().derivedStats;
++    expect(after.initiative.total).toBe(before.initiative.total + 2);
++    store.updateAttribute('END', 2);
++    expect(useCharacterStore.getState().derivedStats.maxHealth.total).toBe(
++      before.maxHealth.total + 2,
++    );
++  });
++
++  it('таймер-эффект добавился/истёк действием → модификаторы ОЗ живут сами', () => {
++    const store = useCharacterStore.getState();
++    const base = store.derivedStats.maxHealth.total;
++    store.addEffect({
++      id: 'test_buff',
++      effectKind: 'positive',
++      maxHpModifier: { value: 3, op: '+' },
++    });
++    const withEffect = useCharacterStore.getState().derivedStats;
++    expect(withEffect.maxHealth.total).toBe(base + 3);
++    expect(withEffect.maxHealth.modifiers).toEqual([
++      { source: 'timedEffects', value: 3, operation: '+' },
++    ]);
++    store.expireEffect('test_buff');
++    expect(useCharacterStore.getState().derivedStats.maxHealth.total).toBe(base);
++  });
++
++  it('перк взят действием → perkBonuses и ОЗ пересчитались сами', () => {
++    const store = useCharacterStore.getState();
++    const base = store.derivedStats.maxHealth.total;
++    store.setSelectedPerks([{ perkId: 'lifeGiver', index: 0 }]);
++    const state = useCharacterStore.getState();
++    // lifeGiver: +ВЫН×ранг к ОЗ — бонус пришёл через perkBonuses, каскад подхватил.
++    expect(state.perkBonuses.maxHealthBonus).toBeGreaterThan(0);
++    expect(state.derivedStats.maxHealth.total).toBe(
++      base + state.perkBonuses.maxHealthBonus,
++    );
++    expect(state.derivedStats.maxHealth.modifiers).toEqual([
++      { source: 'perks', value: state.perkBonuses.maxHealthBonus, operation: '+' },
++    ]);
++  });
++
++  it('робо-слоты изменились действием → derivedStats пересчитались сами', () => {
++    const store = useCharacterStore.getState();
++    const before = store.derivedStats;
++    store.initRobot('protectron');
++    store.setEquippedRobotSlots({ body: { limb: { id: 'body1', carryWeight: 42 } } });
++    const after = useCharacterStore.getState().derivedStats;
++    expect(after).not.toBe(before); // каскад сработал от смены robot.slots
++  });
++
++  it('зеркало экипировки (setCharacterContext) → грузоподъёмность сама', () => {
++    const store = useCharacterStore.getState();
++    const base = store.derivedStats.carryWeight.total;
++    store.setCharacterContext({
++      equipmentState: {
++        equippedArmor: { torso: { armor: { carryWeightModifier: 5 } } },
++      },
++    });
++    expect(useCharacterStore.getState().derivedStats.carryWeight.total).toBe(base + 5);
++  });
++
++  it('ручной форс-пересчёт (публичный API) продолжает работать', () => {
++    const store = useCharacterStore.getState();
++    store.updateAttribute('AGI', 1);
++    const snapshot = useCharacterStore.getState().derivedStats;
++    store.recalculateDerivedStats();
++    // Тот же результат: форс-точка и каскад считают одной функцией.
++    expect(useCharacterStore.getState().derivedStats).toEqual(snapshot);
++  });
++
++  it('каскад не зацикливается: серия действий завершается синхронно', () => {
++    const store = useCharacterStore.getState();
++    for (let i = 0; i < 20; i += 1) {
++      store.updateAttribute('STR', 0); // «пустое» изменение того же входа
++      store.addEffect({ id: `loop_${i}`, effectKind: 'positive', maxHpModifier: { value: 1, op: '+' } });
++      store.expireEffect(`loop_${i}`);
++    }
++    expect(useCharacterStore.getState().derivedStats).toBeTruthy();
++  });
++});
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+index f555582..a73cdf1 100644
+--- a/docs/agents/data-flows.md
++++ b/docs/agents/data-flows.md
+@@ -104,7 +104,27 @@ modules/fallout/survival/  (голод/жажда/сон/усталость)
+ поля состояния — через этот же реестр, не прямо в стор.
+ ```
+ 
+-## 6. Установщик патчей (доставка правок владельцу)
++## 6. Производные параметры (МК-3: правила — в сеттинге, каскад — в хранилище)
++
++```
++modules/fallout/logic/derivedStats.js    (формулы: ОЗ, инициатива, защита,
++        │                                 ближний бой, грузоподъёмность; 316)
++        │
++        ▼
++domain/registry.js → getDerivedStatsLogic()   (дверь: движок не импортирует
++        │                                      модуль напрямую)
++        ▼
++src/store/characterStore.js
++  withDerivedCascade (317): любое действие, меняющее вход (атрибуты, эффекты,
++  перк-бонусы, трейт, уровень, ориджин, робо-слоты, зеркало экипировки),
++  пересчитывает derivedStats САМО — синхронно, единой функцией
++  deriveFromSnapshot. Ручных вызовов пересчёта больше нет (26 удалено);
++  recalculateDerivedStats — публичная точка форс-пересчёта.
++Экраны модуля читают формулы напрямую из logic/derivedStats (316),
++хранилище — только через дверь.
++```
++
++## 7. Установщик патчей (доставка правок владельцу)
+ 
+ ```
+ patchs/<N>-имя.patch  (файлы патчей в ветке Arena)
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c257788..8645f04 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **316** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–316 уехали, установка не подтверждена).
++· последний сданный патч: **317** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–317 уехали, установка не подтверждена).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -34,7 +34,7 @@
+   расширение состояния), локали ru/en, PWA (обновление по кнопке),
+   премиум-статус приложения.
+ 
+-## Последняя серия (311–316, унификация модов оружия → каскад МК-3)
++## Последняя серия (311–317, моды оружия → каскад МК-3)
+ 
+ - 311 — одна правда модов + один путь записи (контракт движка,
+   `src/engine/items/weaponMods.ts`); моды собственной атаки конечности
+@@ -48,6 +48,9 @@
+   бой/грузоподъёмность) переехали в модуль сеттинга
+   (`modules/fallout/logic/derivedStats.js`); движок — через дверь реестра;
+   поведение без изменений.
++- 317 — МК-3 шаг 2: хранилище пересчитывает производные само после любого
++  изменения входов (каскад); 26 ручных вызовов удалены; поведение без
++  изменений.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+@@ -57,9 +60,15 @@
+    `docs/reference-data/weapon-mods-open-questions.md` (патч 307).
+ 2. **Загрузчик `.trpg`** — дверь сеттинга есть (292), установки пакета из
+    окна игры ещё нет (`setting-contract.md`, дорожная карта п. 5–7).
+-3. **МК-3: каскад в хранилище** — идёт; шаг 1 сдан (патч 316, формулы
+-   производных в модуле); дальше — ручные вызовы пересчёта в хранилище
+-   (`docs/architecture/typescript-migration-plan.md`).
++3. **МК-3: каскад в хранилище** — идёт; шаги 1–2 сданы (316 — формулы в
++   модуле, 317 — автопересчёт вместо 26 ручных вызовов); дальше —
++   декларативный переезд формул в реестр выводимости
++   (`src/engine/derivations/registry.ts`) с паритет-тестом и смерть
++   подписки-зеркала 243 (`docs/architecture/typescript-migration-plan.md`).
++4. **Перки: работают 22 из 177** — взять перк можно, но у большинства нет
++   механики. План владельца: после МК-3 — перепись перков (таблица: кто
++   работает/чего не хватает), затем серия по семействам (боевые/социальные/
++   крафтовые; боевая треть нужна будущему экрану сражений).
+ 
+ ## Уроки (не повторять)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5374d80..ed3e764 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,6 +2,26 @@
+ 
+ ---
+ 
++## MK-3, step 2 — the store recalculates derived stats itself, manual calls are gone (patch 317)
++
++Continuation of the "cascade into the store". Nothing changes for the
++player — all the numbers are the same. What changed is inside: it is no
++longer possible to "forget to recalculate".
++
++- Any store action that changes an input (attributes, effects, perks, trait,
++  level, origin, robot slots, equipment mirror) now updates the derived stats
++  (max health, initiative, defense, melee bonus, carry weight) automatically
++  and synchronously — one function, same formulas as 316.
++- All 26 manual recalculation calls removed (22 in the store, 3 in the robot
++  slice, 1 in effects sync); the recalculate action remains as a public
++  force-refresh entry point.
++- Fuse: acceptance test (patch 317) — 7 checks, none of them calls the
++  recalculation manually: attributes, effects, a perk, robot slots, the
++  equipment mirror, the force entry point, and no infinite looping.
++- This is the foundation for the future game master: when world states
++  arrive from a server, the cascade recalculates the numbers by itself —
++  nothing to forget.
++
+ ## Refactor MK-3, step 1 — derived-stat formulas moved into the module (patch 316)
+ 
+ First step of the "cascade into the store" plan (2026-09-18). Derived-stat
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index bb91d01..6389f1d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,6 +2,24 @@
+ 
+ ---
+ 
++## МК-3, шаг 2 — хранилище само пересчитывает производные, ручные вызовы умерли (патч 317)
++
++Продолжение «каскада в хранилище». Для игрока — ничего не поменялось,
++все цифры те же. Изменилось внутри: теперь нельзя «забыть пересчитать».
++
++- Любое действие хранилища, меняющее вход (атрибуты, эффекты, перки, черта,
++  уровень, ориджин, робо-слоты, зеркало экипировки), автоматически и
++  синхронно обновляет производные (ОЗ, инициатива, защита, бонус ближнего
++  боя, грузоподъёмность) — одной функцией, теми же формулами 316.
++- Удалены все 26 ручных вызовов пересчёта (22 в хранилище, 3 в робо-срезе,
++  1 в синхронизации эффектов); действие пересчёта осталось как публичная
++  точка принудительного обновления.
++- Предохранитель: приёмочный тест (патч 317) — 7 проверок, и ни одна не
++  зовёт пересчёт руками: атрибуты, эффекты, перк, робо-слоты, зеркало
++  экипировки, форс-точка, отсутствие зацикливания.
++- Это фундамент для будущего мастера: когда состояния мира будут приходить
++  с сервера, каскад пересчитает цифры сам — забывать нечего.
++
+ ## Рефакторинг МК-3, шаг 1 — формулы производных параметров переехали в модуль (патч 316)
+ 
+ Первый шаг «каскада в хранилище» (план от 18.09). Правила производных
+diff --git a/src/engine/derivations/registry.ts b/src/engine/derivations/registry.ts
+index 17f7a3a..30a117d 100644
+--- a/src/engine/derivations/registry.ts
++++ b/src/engine/derivations/registry.ts
+@@ -4,8 +4,10 @@
+ // валидирует их, строит топологический порядок и вычисляет каскадом.
+ //
+ // ИЗОЛЯЦИЯ (важно): реестр НИЧЕГО не подменяет в работающей программе —
+-// его импортируют только тесты контракта. Подключение к стору и смерть
+-// 24 ручных вызовов — МК-3 (патчи 285+), после тестового сеттинга (284).
++// его импортируют только тесты контракта. МК-3, шаг 2 (патч 317): ручные
++// вызовы пересчёта в сторе умерли (каскад в withDerivedCascade, формулы —
++// модульные, 316); декларативный переезд формул сеттинга в ЭТОТ реестр —
++// следующий шаг МК-3, с паритет-тестом на реальных сейвах.
+ //
+ // ПРАВИЛА:
+ //   - id уникальны глобально и обязаны начинаться с префикса сеттинга
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index c8ca498..c80e7cd 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -172,6 +172,8 @@ export interface CharacterActions {
+   /** Смена комплекта; keepSkills — не чистить tagged-навыки (патч 241). */
+   resetKitAndRewards: (opts?: { keepSkills?: boolean }) => void;
+   recalculateAll: () => void;
++  /** МК-3 (317): каскад пересчитывает автоматически; действие — публичная
++   * точка форс-пересчёта (опции-переопределения — как раньше). */
+   recalculateDerivedStats: (options?: {
+     trait?: CatalogEntityRef | null;
+     level?: number;
+@@ -221,6 +223,7 @@ export interface CharacterActions {
+   updateAttribute: (attrId: string, delta: number) => void;
+   updateSkill: (skillId: string, delta: number) => void;
+   markSkillsAsRewarded: (skills: string[]) => void;
++  /** Псевдоним recalculateDerivedStats (МК-3, 317: обычно избыточен — каскад). */
+   triggerDependentCalculations: () => void;
+ 
+   // ── Робот (robotSlice) ──
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 0991999..e6f98e2 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -204,7 +204,75 @@ const applyModModifiers = (item, appliedMods = {}) => {
+ };
+ 
+ // Main store creation
+-const useCharacterStore = create(devtools(
++// ── МК-3, шаг 2 (патч 317): каскад производных ──────────────────────────────
++// Любое действие, меняющее вход пересчёта (атрибуты, эффекты, перк-бонусы,
++// трейт, уровень, ориджин, робо-слоты, зеркало экипировки), теперь САМО
++// пересчитывает derivedStats — синхронно, теми же формулами сеттинга (316).
++// Ручные вызовы recalculateDerivedStats/triggerDependentCalculations из
++// действий удалены (22 в characterStore, 3 в robotSlice, 1 в effectsSync);
++// действие recalculateDerivedStats оставлено как публичная точка
++// принудительного пересчёта, триггер-псевдоним — для совместимости.
++// Сравнение входов по ссылке корректно, потому что стор обновляется
++// иммутабельно; флаг deriving гасит повторный вход (set из самого каскада
++// не порождает новый каскад).
++
++// Входы вывода производных (все — иммутабельно заменяемые ключи состояния).
++const DERIVED_INPUT_KEYS = [
++  'attributes',
++  'effects',
++  'perkBonuses',
++  'trait',
++  'level',
++  'origin',
++  'robot',
++  '_characterContext',
++];
++
++// Единая функция вывода: снимок состояния (+ опции-переопределения) → derivedStats.
++// Тело повторяет прежний recalculateDerivedStats дословно (Fix #2: инъекция
++// isRobot/robotSlots; Fix #4: trait/level — из публичных полей стора).
++const deriveFromSnapshot = (state, options = {}) => {
++  const context = {
++    trait: state.trait,
++    level: state.level,
++    ...(state._characterContext || {}),
++    ...options,
++  };
++  const equipmentState = {
++    ...(context.equipmentState || {}),
++    isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
++    robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
++  };
++  return calculateDerivedStats(
++    state.attributes,
++    { ...state.effects, perkBonuses: state.perkBonuses },
++    context.trait,
++    context.level,
++    { ...equipmentState, perkBonuses: state.perkBonuses },
++  );
++};
++
++const withDerivedCascade = (config) => (set, get, api) => {
++  let deriving = false;
++  const cascadedSet = (partial, replace, actionName) => {
++    const prev = get();
++    set(partial, replace, actionName);
++    if (deriving) return;
++    const next = get();
++    const dirty = DERIVED_INPUT_KEYS.some((key) => prev[key] !== next[key]);
++    if (!dirty) return;
++    deriving = true;
++    try {
++      const derivedStats = deriveFromSnapshot(next);
++      if (next.derivedStats !== derivedStats) set({ derivedStats });
++    } finally {
++      deriving = false;
++    }
++  };
++  return config(cascadedSet, get, api);
++};
++
++const useCharacterStore = create(withDerivedCascade(devtools(
+   persist(
+     (set, get) => ({
+       // --- Initial State ---
+@@ -311,7 +379,6 @@ const useCharacterStore = create(devtools(
+         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
+         set({ selectedPerks: next });
+         get().recalculatePerkBonuses();
+-        get().recalculateDerivedStats();
+       },
+ 
+       markSkillsAsRewarded: (skills = []) => set((state) => ({
+@@ -356,7 +423,6 @@ const useCharacterStore = create(devtools(
+         attributes[attrId] = updatedAttribute;
+ 
+         set({ attributes });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -389,7 +455,6 @@ const useCharacterStore = create(devtools(
+         attributes[attrId] = updatedAttribute;
+ 
+         set({ attributes });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -418,7 +483,6 @@ const useCharacterStore = create(devtools(
+         attributes[attrId] = updatedAttribute;
+ 
+         set({ attributes });
+-        get().recalculateDerivedStats();
+       },
+ 
+       // --- Actions: Skills ---
+@@ -448,7 +512,6 @@ const useCharacterStore = create(devtools(
+         skills[skillId] = updatedSkill;
+ 
+         set({ skills });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -481,7 +544,6 @@ const useCharacterStore = create(devtools(
+         skills[skillId] = updatedSkill;
+ 
+         set({ skills });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -510,7 +572,6 @@ const useCharacterStore = create(devtools(
+         skills[skillId] = updatedSkill;
+ 
+         set({ skills });
+-        get().recalculateDerivedStats();
+       },
+ 
+       // --- Actions: Items ---
+@@ -539,7 +600,6 @@ const useCharacterStore = create(devtools(
+         items[itemId] = normalizedItem;
+ 
+         set({ items });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /** Spend ammunition and update weapon wear in one state transaction. */
+@@ -642,7 +702,6 @@ const useCharacterStore = create(devtools(
+         }
+ 
+         set({ items });
+-        get().recalculateDerivedStats();
+         return { ok: true, spent };
+       },
+ 
+@@ -670,7 +729,6 @@ const useCharacterStore = create(devtools(
+         items[itemId] = updatedItem;
+ 
+         set({ items });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -699,7 +757,6 @@ const useCharacterStore = create(devtools(
+         items[itemId] = updatedItem;
+ 
+         set({ items });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -924,7 +981,6 @@ const useCharacterStore = create(devtools(
+ 
+           debugLog('items.add.stacked', { key: existingItemKey, quantity: items[existingItemKey].quantity });
+           set({ items });
+-          get().recalculateDerivedStats();
+ 
+           return existingItemKey;
+         }
+@@ -934,7 +990,6 @@ const useCharacterStore = create(devtools(
+ 
+         debugLog('items.add.stored', { key: itemId, equipped: finalItem.equipped, itemType: finalItem.itemType });
+         set({ items });
+-        get().recalculateDerivedStats();
+ 
+         return itemId;
+       },
+@@ -961,7 +1016,6 @@ const useCharacterStore = create(devtools(
+         };
+ 
+         set({ effects });
+-        get().triggerDependentCalculations();
+       },
+ 
+       /**
+@@ -984,7 +1038,6 @@ const useCharacterStore = create(devtools(
+         };
+ 
+         set({ effects });
+-        get().triggerDependentCalculations();
+       },
+ 
+       /**
+@@ -1001,7 +1054,6 @@ const useCharacterStore = create(devtools(
+ 
+         effects[effectId] = { ...effects[effectId], ...patch };
+         set({ effects });
+-        get().triggerDependentCalculations();
+       },
+ 
+       /**
+@@ -1021,7 +1073,6 @@ const useCharacterStore = create(devtools(
+ 
+         if (Object.keys(activeEffects).length !== Object.keys(effects).length) {
+           set({ effects: activeEffects });
+-          get().triggerDependentCalculations();
+         }
+       },
+ 
+@@ -1081,7 +1132,6 @@ const useCharacterStore = create(devtools(
+         });
+ 
+         get().recalculatePerkBonuses();
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -1090,39 +1140,10 @@ const useCharacterStore = create(devtools(
+        * @param {Object} options - Optional: { trait, level, equipmentState }
+        */
+       recalculateDerivedStats: (options = {}) => {
+-        const state = get();
+-        const { attributes, effects, perkBonuses } = state;
+-
+-        // Merge provided options with the last context pushed via setCharacterContext,
+-        // falling back to defaults. (Previously this used a stub that always returned
+-        // trait:null/level:1 — see Fix #4.)
+-        // Шаг 7: trait/level/origin — публичные поля стора; зеркало
+-        // _characterContext хранит только equipmentState (эффект провайдера).
+-        const context = {
+-          trait: state.trait,
+-          level: state.level,
+-          ...(state._characterContext || {}),
+-          ...options,
+-        };
+-
+-        // Inject robot equipment so robot carry-weight is computed from the body/armor
+-        // (the robot slice is the single source of truth — Fix #2).
+-        const equipmentState = {
+-          ...(context.equipmentState || {}),
+-          isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
+-          robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+-        };
+-
+-        // Calculate derived stats
+-        const derivedStats = calculateDerivedStats(
+-          attributes,
+-          { ...effects, perkBonuses },
+-          context.trait,
+-          context.level,
+-          { ...equipmentState, perkBonuses }
+-        );
+-
+-        set({ derivedStats });
++        // МК-3 (патч 317): каскад пересчитывает автоматически после каждого
++        // изменения входов; действие — публичная точка форс-пересчёта
++        // (совместимость и явные опции-переопределения).
++        set({ derivedStats: deriveFromSnapshot(get(), options) });
+       },
+ 
+       /**
+@@ -1156,13 +1177,14 @@ const useCharacterStore = create(devtools(
+       setCharacterContext: (context = {}) => {
+         // Шаг 7: зеркалируются ТОЛЬКО производственные данные экипировки
+         // (переносимый вес/СБ); trait/level/origin — публичные поля стора,
+-        // читаются recalculateDerivedStats и characterRules напрямую.
++        // читаются deriveFromSnapshot и characterRules напрямую.
++        // МК-3 (317): явный пересчёт отсюда удалён — set выше меняет
++        // _characterContext, и каскад пересчитывает derivedStats сам.
+         set({
+           _characterContext: {
+             equipmentState: context.equipmentState || {},
+           }
+         });
+-        get().recalculateDerivedStats(context);
+       },
+ 
+       // --- Migration Actions ---
+@@ -1260,7 +1282,6 @@ const useCharacterStore = create(devtools(
+       setBaseAttributes: (legacyArray) => {
+         const normalized = normalizeForStore({ attributes: legacyArray });
+         set({ attributes: normalized.attributes });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -1270,7 +1291,6 @@ const useCharacterStore = create(devtools(
+       setBaseSkills: (legacyArray) => {
+         const normalized = normalizeForStore({ skills: legacyArray });
+         set({ skills: normalized.skills });
+-        get().recalculateDerivedStats();
+       },
+ 
+       /**
+@@ -1618,7 +1638,6 @@ const useCharacterStore = create(devtools(
+         });
+ 
+         set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
+-        get().triggerDependentCalculations();
+         return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+       },
+ 
+@@ -1858,13 +1877,13 @@ const useCharacterStore = create(devtools(
+     // Only enable devtools in development
+     enabled: process.env.NODE_ENV !== 'production',
+   }
+-));
++)));
+ 
+ // ── Шаг 8в (патч 243): derived-самосинхронизация стора ─────────────────────
+ // Эффект CharacterProvider (пуш equipmentState → setCharacterContext) снесён
+-// вместе с контекстом: стор сам следит за экипировкой/профилем и пересчитывает
+-// производные. Наблюдаемые ключи — deps бывшего эффекта провайдера (атрибуты
+-// не смотрим: их стор-действия зовут recalculateDerivedStats сами). Подписка
++// вместе с контекстом: стор сам следит за экипировкой/профилем. Наблюдаемые
++// ключи — deps бывшего эффекта провайдера (атрибуты не смотрим: их входы
++// каскад патча 317 подхватывает напрямую). Подписка
+ // срабатывает вне рендера (микрозадача патча 218 больше не нужна), повторный
+ // пуш с теми же ссылками гасится сравнением сигнатуры — цикла нет.
+ const derivedSnapshot = (state) => [
+diff --git a/src/store/effectsSync.js b/src/store/effectsSync.js
+index 00d676a..0c6180d 100644
+--- a/src/store/effectsSync.js
++++ b/src/store/effectsSync.js
+@@ -84,5 +84,4 @@ export const syncTimedEffectsToStore = (nextEffects, store) => {
+     });
+   });
+ 
+-  store.triggerDependentCalculations();
+ };
+diff --git a/src/store/robotSlice.js b/src/store/robotSlice.js
+index b1538b8..fed5b60 100644
+--- a/src/store/robotSlice.js
++++ b/src/store/robotSlice.js
+@@ -109,7 +109,6 @@ export const createRobotActions = (set, get) => ({
+     const prev = robot.slots || {};
+     const next = typeof updater === 'function' ? updater(prev) : (updater || {});
+     set({ robot: { ...robot, slots: next || {} } });
+-    get().recalculateDerivedStats?.();
+   },
+ 
+   /** Заменить модули робота целиком (значение или функция); остальное robot сохраняет. */
+@@ -118,7 +117,6 @@ export const createRobotActions = (set, get) => ({
+     const prev = Array.isArray(robot.modules) ? robot.modules : [];
+     const next = typeof updater === 'function' ? updater(prev) : (updater || []);
+     set({ robot: { ...robot, modules: next || [] } });
+-    get().recalculateDerivedStats?.();
+   },
+ 
+   resetRobot: () => set(createInitialRobotState()),
+@@ -155,7 +153,6 @@ export const createRobotActions = (set, get) => ({
+       items[itemId] = { ...item, quantity: qty - 1 };
+     }
+     set({ items, robot: { ...robot, mk2Installed: true } });
+-    get().recalculateDerivedStats?.();
+     return { ok: true };
+   },
+ 
