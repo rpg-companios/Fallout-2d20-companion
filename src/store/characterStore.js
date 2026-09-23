@@ -45,9 +45,14 @@ import {
   calculateAttributeTotal,
   calculateSkillTotal,
   normalizeItemParameters,
-  calculateDerivedStats,
   calculateParameterTotal
 } from './resolvers.js';
+
+// МК-3 (патч 316): формулы производных уехали в сеттинг (modules/fallout/logic/derivedStats.js).
+// Движку — только через дверь реестра. Деструктуризация один раз при загрузке модуля.
+import { getDerivedStatsLogic } from '../../domain/registry.js';
+
+const { calculateDerivedStats, calculateMaxHealth } = getDerivedStatsLogic();
 
 import { normalizeForStore, denormalizeForSave, migrateCharacterState } from './migrations.js';
 import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from './saveSchema.js';
@@ -68,7 +73,7 @@ import { generateItemId, generateStackKey, getItemId } from '../../domain/itemId
 // Дефолтные атрибуты/навыки: сеются в начальный стейт (Шаг 5 миграции —
 // стор-словари единственный источник, производный legacy-массив обязан быть
 // валиден всегда, «пустой словарь» больше не допустимое состояние UI).
-import { createInitialAttributes, ALL_SKILLS, calculateMaxHealth, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
+import { createInitialAttributes, ALL_SKILLS, getLuckPoints, getAttributeLimits } from '../../domain/characterCreation';
 import { isRobotCharacter } from '../../domain/origins';
 // Каунтеры ресурсов (domain/counters.js): персонажный счётный ресурс —
 // число с нижней границей 0 без потолка. Тот же паттерн, что раньше жил
@@ -199,7 +204,75 @@ const applyModModifiers = (item, appliedMods = {}) => {
 };
 
 // Main store creation
-const useCharacterStore = create(devtools(
+// ── МК-3, шаг 2 (патч 317): каскад производных ──────────────────────────────
+// Любое действие, меняющее вход пересчёта (атрибуты, эффекты, перк-бонусы,
+// трейт, уровень, ориджин, робо-слоты, зеркало экипировки), теперь САМО
+// пересчитывает derivedStats — синхронно, теми же формулами сеттинга (316).
+// Ручные вызовы recalculateDerivedStats/triggerDependentCalculations из
+// действий удалены (22 в characterStore, 3 в robotSlice, 1 в effectsSync);
+// действие recalculateDerivedStats оставлено как публичная точка
+// принудительного пересчёта, триггер-псевдоним — для совместимости.
+// Сравнение входов по ссылке корректно, потому что стор обновляется
+// иммутабельно; флаг deriving гасит повторный вход (set из самого каскада
+// не порождает новый каскад).
+
+// Входы вывода производных (все — иммутабельно заменяемые ключи состояния).
+const DERIVED_INPUT_KEYS = [
+  'attributes',
+  'effects',
+  'perkBonuses',
+  'trait',
+  'level',
+  'origin',
+  'robot',
+  '_characterContext',
+];
+
+// Единая функция вывода: снимок состояния (+ опции-переопределения) → derivedStats.
+// Тело повторяет прежний recalculateDerivedStats дословно (Fix #2: инъекция
+// isRobot/robotSlots; Fix #4: trait/level — из публичных полей стора).
+const deriveFromSnapshot = (state, options = {}) => {
+  const context = {
+    trait: state.trait,
+    level: state.level,
+    ...(state._characterContext || {}),
+    ...options,
+  };
+  const equipmentState = {
+    ...(context.equipmentState || {}),
+    isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
+    robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+  };
+  return calculateDerivedStats(
+    state.attributes,
+    { ...state.effects, perkBonuses: state.perkBonuses },
+    context.trait,
+    context.level,
+    { ...equipmentState, perkBonuses: state.perkBonuses },
+  );
+};
+
+const withDerivedCascade = (config) => (set, get, api) => {
+  let deriving = false;
+  const cascadedSet = (partial, replace, actionName) => {
+    const prev = get();
+    set(partial, replace, actionName);
+    if (deriving) return;
+    const next = get();
+    const dirty = DERIVED_INPUT_KEYS.some((key) => prev[key] !== next[key]);
+    if (!dirty) return;
+    deriving = true;
+    try {
+      const derivedStats = deriveFromSnapshot(next);
+      if (next.derivedStats !== derivedStats) set({ derivedStats });
+    } finally {
+      deriving = false;
+    }
+  };
+  return config(cascadedSet, get, api);
+};
+
+const useCharacterStore = create(withDerivedCascade(devtools(
   persist(
     (set, get) => ({
       // --- Initial State ---
@@ -306,7 +379,6 @@ const useCharacterStore = create(devtools(
         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
         set({ selectedPerks: next });
         get().recalculatePerkBonuses();
-        get().recalculateDerivedStats();
       },
 
       markSkillsAsRewarded: (skills = []) => set((state) => ({
@@ -351,7 +423,6 @@ const useCharacterStore = create(devtools(
         attributes[attrId] = updatedAttribute;
 
         set({ attributes });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -384,7 +455,6 @@ const useCharacterStore = create(devtools(
         attributes[attrId] = updatedAttribute;
 
         set({ attributes });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -413,7 +483,6 @@ const useCharacterStore = create(devtools(
         attributes[attrId] = updatedAttribute;
 
         set({ attributes });
-        get().recalculateDerivedStats();
       },
 
       // --- Actions: Skills ---
@@ -443,7 +512,6 @@ const useCharacterStore = create(devtools(
         skills[skillId] = updatedSkill;
 
         set({ skills });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -476,7 +544,6 @@ const useCharacterStore = create(devtools(
         skills[skillId] = updatedSkill;
 
         set({ skills });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -505,7 +572,6 @@ const useCharacterStore = create(devtools(
         skills[skillId] = updatedSkill;
 
         set({ skills });
-        get().recalculateDerivedStats();
       },
 
       // --- Actions: Items ---
@@ -534,7 +600,6 @@ const useCharacterStore = create(devtools(
         items[itemId] = normalizedItem;
 
         set({ items });
-        get().recalculateDerivedStats();
       },
 
       /** Spend ammunition and update weapon wear in one state transaction. */
@@ -637,7 +702,6 @@ const useCharacterStore = create(devtools(
         }
 
         set({ items });
-        get().recalculateDerivedStats();
         return { ok: true, spent };
       },
 
@@ -665,7 +729,6 @@ const useCharacterStore = create(devtools(
         items[itemId] = updatedItem;
 
         set({ items });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -694,7 +757,6 @@ const useCharacterStore = create(devtools(
         items[itemId] = updatedItem;
 
         set({ items });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -919,7 +981,6 @@ const useCharacterStore = create(devtools(
 
           debugLog('items.add.stacked', { key: existingItemKey, quantity: items[existingItemKey].quantity });
           set({ items });
-          get().recalculateDerivedStats();
 
           return existingItemKey;
         }
@@ -929,7 +990,6 @@ const useCharacterStore = create(devtools(
 
         debugLog('items.add.stored', { key: itemId, equipped: finalItem.equipped, itemType: finalItem.itemType });
         set({ items });
-        get().recalculateDerivedStats();
 
         return itemId;
       },
@@ -956,7 +1016,6 @@ const useCharacterStore = create(devtools(
         };
 
         set({ effects });
-        get().triggerDependentCalculations();
       },
 
       /**
@@ -979,7 +1038,6 @@ const useCharacterStore = create(devtools(
         };
 
         set({ effects });
-        get().triggerDependentCalculations();
       },
 
       /**
@@ -996,7 +1054,6 @@ const useCharacterStore = create(devtools(
 
         effects[effectId] = { ...effects[effectId], ...patch };
         set({ effects });
-        get().triggerDependentCalculations();
       },
 
       /**
@@ -1016,7 +1073,6 @@ const useCharacterStore = create(devtools(
 
         if (Object.keys(activeEffects).length !== Object.keys(effects).length) {
           set({ effects: activeEffects });
-          get().triggerDependentCalculations();
         }
       },
 
@@ -1076,7 +1132,6 @@ const useCharacterStore = create(devtools(
         });
 
         get().recalculatePerkBonuses();
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -1085,39 +1140,10 @@ const useCharacterStore = create(devtools(
        * @param {Object} options - Optional: { trait, level, equipmentState }
        */
       recalculateDerivedStats: (options = {}) => {
-        const state = get();
-        const { attributes, effects, perkBonuses } = state;
-
-        // Merge provided options with the last context pushed via setCharacterContext,
-        // falling back to defaults. (Previously this used a stub that always returned
-        // trait:null/level:1 — see Fix #4.)
-        // Шаг 7: trait/level/origin — публичные поля стора; зеркало
-        // _characterContext хранит только equipmentState (эффект провайдера).
-        const context = {
-          trait: state.trait,
-          level: state.level,
-          ...(state._characterContext || {}),
-          ...options,
-        };
-
-        // Inject robot equipment so robot carry-weight is computed from the body/armor
-        // (the robot slice is the single source of truth — Fix #2).
-        const equipmentState = {
-          ...(context.equipmentState || {}),
-          isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
-          robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
-        };
-
-        // Calculate derived stats
-        const derivedStats = calculateDerivedStats(
-          attributes,
-          { ...effects, perkBonuses },
-          context.trait,
-          context.level,
-          { ...equipmentState, perkBonuses }
-        );
-
-        set({ derivedStats });
+        // МК-3 (патч 317): каскад пересчитывает автоматически после каждого
+        // изменения входов; действие — публичная точка форс-пересчёта
+        // (совместимость и явные опции-переопределения).
+        set({ derivedStats: deriveFromSnapshot(get(), options) });
       },
 
       /**
@@ -1151,13 +1177,14 @@ const useCharacterStore = create(devtools(
       setCharacterContext: (context = {}) => {
         // Шаг 7: зеркалируются ТОЛЬКО производственные данные экипировки
         // (переносимый вес/СБ); trait/level/origin — публичные поля стора,
-        // читаются recalculateDerivedStats и characterRules напрямую.
+        // читаются deriveFromSnapshot и characterRules напрямую.
+        // МК-3 (317): явный пересчёт отсюда удалён — set выше меняет
+        // _characterContext, и каскад пересчитывает derivedStats сам.
         set({
           _characterContext: {
             equipmentState: context.equipmentState || {},
           }
         });
-        get().recalculateDerivedStats(context);
       },
 
       // --- Migration Actions ---
@@ -1255,7 +1282,6 @@ const useCharacterStore = create(devtools(
       setBaseAttributes: (legacyArray) => {
         const normalized = normalizeForStore({ attributes: legacyArray });
         set({ attributes: normalized.attributes });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -1265,7 +1291,6 @@ const useCharacterStore = create(devtools(
       setBaseSkills: (legacyArray) => {
         const normalized = normalizeForStore({ skills: legacyArray });
         set({ skills: normalized.skills });
-        get().recalculateDerivedStats();
       },
 
       /**
@@ -1613,7 +1638,6 @@ const useCharacterStore = create(devtools(
         });
 
         set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
-        get().triggerDependentCalculations();
         return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
       },
 
@@ -1853,13 +1877,13 @@ const useCharacterStore = create(devtools(
     // Only enable devtools in development
     enabled: process.env.NODE_ENV !== 'production',
   }
-));
+)));
 
 // ── Шаг 8в (патч 243): derived-самосинхронизация стора ─────────────────────
 // Эффект CharacterProvider (пуш equipmentState → setCharacterContext) снесён
-// вместе с контекстом: стор сам следит за экипировкой/профилем и пересчитывает
-// производные. Наблюдаемые ключи — deps бывшего эффекта провайдера (атрибуты
-// не смотрим: их стор-действия зовут recalculateDerivedStats сами). Подписка
+// вместе с контекстом: стор сам следит за экипировкой/профилем. Наблюдаемые
+// ключи — deps бывшего эффекта провайдера (атрибуты не смотрим: их входы
+// каскад патча 317 подхватывает напрямую). Подписка
 // срабатывает вне рендера (микрозадача патча 218 больше не нужна), повторный
 // пуш с теми же ссылками гасится сравнением сигнатуры — цикла нет.
 const derivedSnapshot = (state) => [

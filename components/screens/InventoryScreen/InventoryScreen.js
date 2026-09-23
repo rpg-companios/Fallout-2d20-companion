@@ -374,8 +374,10 @@ const InventoryScreen = () => {
   // До перестройки (следующий крупный патч) крафт не открываем; модалка и
   // модель на месте — 267 подключит их к новым вкладкам. Механика движка
   // (251/262/263) от этого не менялась.
-  const handleCraftPress = () =>
-    showAlert(tInventory('screen.craft.label'), tInventory('screen.craft.placeholder'));
+  // Патч 319: кнопка «Крафт» открывает окно крафта (318). До сих пор здесь
+  // жила заглушка-алерт с самого первого коммита — окно крафта с кнопки
+  // было недостижимо (хвост незавершённого шага 265→267).
+  const handleCraftPress = () => setCraftModalVisible(true);
 
   const showFoundItemBonusAlerts = (events) => {
     (events || []).forEach((event) => {

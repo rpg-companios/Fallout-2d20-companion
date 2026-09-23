@@ -1,17 +1,30 @@
 {
   "categoryNames": {
-    "ammo": "Боеприпасы",
-    "weapons": "Оружие",
-    "chems": "Препараты",
     "food": "Еда",
-    "drinks": "Напитки"
+    "drinks": "Напитки",
+    "chems": "Препараты",
+    "explosives": "Взрывчатка",
+    "weapons": "Оружие",
+    "armor": "Броня",
+    "powerArmor": "Силовая броня",
+    "ammo": "Патроны"
   },
   "ui": {
     "title": "Крафт",
     "back": "← Назад",
+    "close": "Закрыть",
+    "emptyCategory": "Рецептов пока нет",
+    "qtyPrompt": "Вы можете создать {max} «{name}», сколько штук вы хотите создать?",
+    "create": "Создать",
+    "cancel": "Отмена",
+    "rarityCommon": "Обычные материалы",
+    "rarityUncommon": "Необычные материалы",
+    "rarityRare": "Редкие материалы",
+    "components": "Компоненты",
     "craft": "Скрафтить",
     "craftN": "Скрафтить ×{n}",
     "complexity": "Сложность {n}",
+    "craftTime": "время приготовления: {t}",
     "rowMeta": "{skill} · {time}",
     "timeMinutes": "{n} мин",
     "timeHours": "{n} ч",
@@ -20,7 +33,7 @@
     "shortMaterials": "Не хватает материалов",
     "ready": "Можно крафтить",
     "materialsTitle": "Материалы",
-    "haveNeed": "есть {have} · нужно {need}",
+    "haveNeed": "есть {have} шт. · нужно {need} шт.",
     "quantity": "Сколько раз",
     "resultTitle": "Крафт",
     "stopped": "Остановлено: материалов в сумке кончились, {n} попыток не началось",
@@ -33,11 +46,16 @@
     "granted": "Получено: {items}",
     "nothing": "Не получено ничего",
     "spent": "Потрачено: {items}",
-    "timeSpent": "Время: {time}",
-    "complicationNote": "Осложнение удвоило время",
+    "timeSpent": "Время приготовления: {time}",
+    "complicationNote": "Осложнение: +{n} мин к работе",
     "craftTitle": "Крафт",
     "notAvailable": "Недоступно",
-    "done": "Готово"
+    "done": "Готово",
+    "apQuestion": "Потратить 2 ОД, чтобы сократить время вдвое? (в пуле {pool}/6)",
+    "apYes": "Потратить 2 ОД",
+    "apNo": "Полное время",
+    "apHalvedNote": "Время сокращено за 2 ОД",
+    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
   },
   "attributes": {
     "INT": "Интеллект"

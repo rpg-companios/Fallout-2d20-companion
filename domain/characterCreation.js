@@ -5,28 +5,27 @@
 
 import { getOrigins, getTraits } from './registry';
 
-// ---------------------------------------------------------------------------
-// Attribute key utilities (from attributeKeyUtils.js)
-// ---------------------------------------------------------------------------
+// МК-3 (патч 316): универсальные параметровские хелперы переехали в
+// src/store/resolvers.js — чистый дом без импортов, чтобы файлы логики модуля
+// (modules/fallout/logic/*) могли их читать, не задевая реестр и этот файл.
+// Здесь — re-export для совместимости со всеми прежними потребителями.
+import {
+  CANONICAL_ATTRIBUTE_KEYS,
+  getCanonicalAttributeKey,
+  getAttributeValue,
+  getEquipmentCarryWeightModifier,
+} from '../src/store/resolvers.js';
 
-// Слово владельца (2026-09-21): порядок атрибутов SPECIAL — как в правилах,
-// и никак иначе: Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость,
-// Удача. Это не сортировка, а канон показа: любой список атрибутов в программе
-// обязан идти в этом порядке. Предохранитель — тест special-attribute-order.
-export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
-
-const ATTRIBUTE_KEY_ALIASES = {
-    STR: 'STR',
-    END: 'END',
-    PER: 'PER',
-    AGI: 'AGI',
-    INT: 'INT',
-    CHA: 'CHA',
-    LCK: 'LCK',
+export {
+  CANONICAL_ATTRIBUTE_KEYS,
+  getCanonicalAttributeKey,
+  getAttributeValue,
+  getEquipmentCarryWeightModifier,
 };
 
-export const getCanonicalAttributeKey = (key) => ATTRIBUTE_KEY_ALIASES[key] || null;
+// ---------------------------------------------------------------------------
 
+// normalizeAttributeMap: приведение словаря атрибутов к каноническим ключам.
 export const normalizeAttributeMap = (attributeMap = {}) =>
     Object.entries(attributeMap).reduce((acc, [key, value]) => {
         const canonical = getCanonicalAttributeKey(key);
@@ -35,15 +34,6 @@ export const normalizeAttributeMap = (attributeMap = {}) =>
         }
         return acc;
     }, {});
-
-export const getAttributeValue = (attributes = [], key) => {
-    const canonical = getCanonicalAttributeKey(key);
-    if (!canonical) return null;
-    const found = attributes.find(
-        (attr) => getCanonicalAttributeKey(attr.name) === canonical,
-    );
-    return found?.value ?? 0;
-};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -231,115 +221,10 @@ export function getLuckPoints(attributes, trait) {
     return Math.max(0, luckAttr + luckDelta);
 }
 
-export const calculateInitiative = (attributes) => {
-    const perception = getAttributeValue(attributes, 'PER');
-    const agility = getAttributeValue(attributes, 'AGI');
-    return perception + agility;
-};
-
-export const calculateDefense = (attributes) => {
-    const agility = getAttributeValue(attributes, 'AGI');
-    return agility >= 9 ? 2 : 1;
-};
-
-export const calculateMeleeBonusValue = (attributes, trait) => {
-    const strength = getAttributeValue(attributes, 'STR');
-    let baseBonus = 0;
-    if (strength >= 11) baseBonus = 3;
-    else if (strength >= 9) baseBonus = 2;
-    else if (strength >= 7) baseBonus = 1;
-
-    const traitBonus = Number(trait?.modifiers?.meleeBonusDelta || 0);
-    return baseBonus + traitBonus;
-};
-
-export const calculateMeleeBonus = (attributes, trait) => {
-    const totalBonus = calculateMeleeBonusValue(attributes, trait);
-    return totalBonus > 0 ? `+${totalBonus} {CD}` : '0';
-};
-
-export const calculateMaxHealth = (attributes, level = 1) => {
-    const endurance = getAttributeValue(attributes, 'END');
-    const luck = getAttributeValue(attributes, 'LCK');
-    return endurance + luck + (level > 1 ? level - 1 : 0);
-};
-
-const toNumber = (value) => Number(value) || 0;
-
-const sumCarryWeightModifierFromItem = (item) => {
-    if (!item) return 0;
-    return toNumber(item.carryWeightModifier);
-};
-
-export const getEquipmentCarryWeightModifier = ({ equippedArmor, equippedRobotSlots } = {}) => {
-    let total = 0;
-
-    if (equippedArmor && typeof equippedArmor === 'object') {
-        Object.values(equippedArmor).forEach((slot) => {
-            total += sumCarryWeightModifierFromItem(slot?.armor);
-            total += sumCarryWeightModifierFromItem(slot?.clothing);
-        });
-    }
-
-    if (equippedRobotSlots && typeof equippedRobotSlots === 'object') {
-        Object.values(equippedRobotSlots).forEach((slot) => {
-            total += sumCarryWeightModifierFromItem(slot?.armor);
-            total += sumCarryWeightModifierFromItem(slot?.plating);
-            total += sumCarryWeightModifierFromItem(slot?.frame);
-        });
-    }
-
-    return total;
-};
-
-export const calculateCarryWeight = (attributes, trait, equipmentState = {}) => {
-    const strength = getAttributeValue(attributes, 'STR');
-    const baseCarryWeight = trait?.modifiers?.carryWeightFixed ?? 150;
-    const strengthMultiplier = trait?.modifiers?.carryWeightStrengthMultiplier ?? 10;
-    const strengthBonus = strengthMultiplier * strength;
-    const traitCarryWeightModifier = trait?.modifiers?.carryWeight || 0;
-    return baseCarryWeight + strengthBonus + traitCarryWeightModifier + getEquipmentCarryWeightModifier(equipmentState);
-};
-
-/**
- * Robot carry-weight rule.
- *
- * Roboты считают переносимый вес ИНАЧЕ, чем люди:
- *   carryWeight = базаТела + сумма(carryWeightModifier со всех слоёв брони)
- * где базаТела — `carryWeight` установленного корпуса (слот body/chassis/thruster),
- * с фоллбэком на trait.carryWeightFixed (по умолчанию 150).
- *
- * STR, перки и химия НЕ влияют на переносимый вес робота — только корпус и броня.
- *
- * @param {object} robotSlots - { [slotKey]: { limb, armor, plating, frame } }
- * @param {object} trait
- * @returns {number}
- */
-export const calculateRobotCarryWeight = (robotSlots = {}, trait = null) => {
-    const fallbackBase = trait?.modifiers?.carryWeightFixed ?? 150;
-
-    // База от корпуса: ищем слот тела (body / chassis / thruster) с limb.carryWeight.
-    let bodyBase = null;
-    if (robotSlots && typeof robotSlots === 'object') {
-        for (const [slotKey, slotData] of Object.entries(robotSlots)) {
-            const key = String(slotKey).toLowerCase();
-            const isBodySlot = key === 'body' || key === 'chassis' || key === 'thruster';
-            const limbCarry = slotData?.limb?.carryWeight;
-            if (isBodySlot && limbCarry != null && Number.isFinite(Number(limbCarry))) {
-                bodyBase = toNumber(limbCarry);
-                break;
-            }
-        }
-    }
-
-    const base = bodyBase != null ? bodyBase : fallbackBase;
-
-    // Модификаторы только от брони/обшивки/рамы робо-слотов (без снаряжения людей).
-    const armorModifier = getEquipmentCarryWeightModifier({ equippedRobotSlots: robotSlots });
-
-    return base + armorModifier;
-};
-
+// МК-3 (патч 316): формулы производных (инициатива, защита, бонус ближнего боя,
+// макс. ОЗ, грузоподъёмность людей и роботов) переехали в сеттинг —
+// modules/fallout/logic/derivedStats.js. Движку — через дверь: domain/registry.js →
+// getDerivedStatsLogic(). Правила не менялись, тела функций перенесены как есть.
 
 // ---------------------------------------------------------------------------
 // Origin utilities

@@ -176,20 +176,37 @@ const IMPORTED = new Set(IMPORTED_GROUPS);
 export const FILE_BY_BUCKET = {
   ammo: 'ammo.json',
   weapons: 'weapons.json',
+  explosives: 'explosives.json',
   chems: 'chems.json',
   food: 'food.json',
   drinks: 'drinks.json',
   items: 'items.json',
 };
-export const BUCKET_ORDER = ['ammo', 'weapons', 'chems', 'food', 'drinks', 'items'];
+export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'chems', 'food', 'drinks', 'items'];
 const BENCH_BY_BUCKET = {
   ammo: 'weapons',
   weapons: 'chemistry',
+  explosives: 'chemistry',
   chems: 'chemistry',
   food: 'cooking',
   drinks: 'cooking',
   items: 'chemistry',
 };
+
+// Патч 325 (слово владельца): гранаты и мины — не «оружие», а «взрывчатка».
+// Тип предмета в каталоге остаётся weapon (брошенное оружие), но рецепты
+// таких результатов едут в отдельную корзину explosives.
+export const EXPLOSIVE_OUTPUT_IDS = new Set([
+  'weapon_baseball_grenade',
+  'weapon_frag_grenade',
+  'weapon_frag_mine',
+  'weapon_molotov',
+  'weapon_plasma_grenade',
+  'weapon_plasma_mine',
+  'weapon_pulse_grenade',
+  'weapon_pulse_mine',
+  'weapon_bottlecap_mine',
+]);
 
 /**
  * Нормализация имени для сверки с каталогом. Скобки СОХРАНЯЕМ как слова:
@@ -509,7 +526,9 @@ export function buildCraftingData() {
       drop('в каталоге сеттинга нет такого предмета-результата');
       continue;
     }
-    if (!BUCKET_ORDER.includes(output.bucket)) {
+    // 325: взрывчатка уходит в свою корзину, тип предмета не трогается.
+    const bucket = EXPLOSIVE_OUTPUT_IDS.has(output.itemId) ? 'explosives' : output.bucket;
+    if (!BUCKET_ORDER.includes(bucket)) {
       drop(`тип результата «${output.itemType}» в срез предметного крафта не входит`);
       continue;
     }
@@ -564,12 +583,12 @@ export function buildCraftingData() {
     // навыком — правило живёт одной строкой в CRAFT_RULES (реестр модуля).
     // Генератор лишь сверяет: навык recipes обязан давать ровно тот же разрез,
     // что печатный верстак источника, — иначе молча потеряем число.
-    const bench = BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[output.bucket];
+    const bench = BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[bucket];
     if (Boolean(BENCH_BURNS[bench]) !== (BURN_SKILLS.has(skill))) {
       throw new Error(`${outputName}: верстак «${bench}» и навык «${skill}» расходятся в правиле сгорания — реши явно`);
     }
     entries.push({
-      bucket: output.bucket,
+      bucket,
       record: {
         id,
         requires: {
@@ -715,6 +734,30 @@ const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []
   L.push(`- выпущено в данные: **${stats.emitted}** (${Object.entries(stats.perBucket).map(([b, n]) => `${b}: ${n}`).join(', ')})`);
   L.push(`- не выпущено: **${stats.dropped}**`);
   L.push(`- из них упирается в дыры каталога и выгружено в обменник: **${stats.holes}** (${Object.entries(stats.holesByCategory).map(([c, n]) => `${c}: ${n}`).join(', ')})`);
+  L.push('');
+  // 326: печатная кривая материалов — словами владельца, в отчёте рядом с
+  // данными, которые она породила. Копий в данных нет (рецепты получают
+  // уже посчитанные наборы); единственная запись — MATERIALS_BY_COMPLEXITY.
+  L.push('## Материалоёмкость: наборы материалов по сложности (книга, с. 210)');
+  L.push('');
+  L.push('Для рецептов без собственной колонки материалов (и для будущего крафта');
+  L.push('модов брони/оружия/силовой брони) действует печатная кривая');
+  L.push('«материалоёмкость → требуемые материалы». Запись — константа');
+  L.push('`MATERIALS_BY_COMPLEXITY` в этом генераторе; предохранитель —');
+  L.push('`__tests__/crafting/crafting-data.test.js` («кривая "сложность → материалы"»).');
+  L.push('');
+  L.push('| Материалоёмкость | Требуемые материалы |');
+  L.push('|---|---|');
+  for (const [level, set] of Object.entries(MATERIALS_BY_COMPLEXITY)) {
+    const parts = [];
+    if (set.common) parts.push(`Обычные материалы ×${set.common}`);
+    if (set.uncommon) parts.push(`Необычные материалы ×${set.uncommon}`);
+    if (set.rare) parts.push(`Редкие материалы ×${set.rare}`);
+    L.push(`| ${level}${level === '7' ? '+' : ''} | ${parts.join(', ')} |`);
+  }
+  L.push('');
+  L.push('Сверено с таблицей владельца (2026-09-23): расхождений нет; «7+» = строка 7');
+  L.push('(сложность выше 7 в данных не встречается, кап `Math.min(7, …)`).');
   L.push('');
   L.push('## Какие таблицы книги вошли');
   L.push('');

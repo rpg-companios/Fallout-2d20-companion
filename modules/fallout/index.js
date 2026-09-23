@@ -92,7 +92,7 @@ import junkTables from './data/junk/tables.json';
 import recipesManifest from './data/recipes/index.json';
 import recipesCategoryRules from './data/recipes/categoryRules.json';
 import recipesAmmo from './data/recipes/ammo.json';
-import recipesWeapons from './data/recipes/weapons.json';
+import recipesExplosives from './data/recipes/explosives.json';
 import recipesChems from './data/recipes/chems.json';
 import recipesFood from './data/recipes/food.json';
 import recipesDrinks from './data/recipes/drinks.json';
@@ -199,6 +199,10 @@ import enJunkItems from './i18n/en-EN/data/junk/junk.json';
 import enJunkMaterials from './i18n/en-EN/data/junk/material.json';
 import enJunkTableLabels from './i18n/en-EN/data/junk/tables.json';
 
+// Логика сеттинга (МК-3, патч 316): namespace* как `import *` — все формулы доступны
+// по SETTING.logic.derivedStats.
+import * as derivedStatsLogic from './logic/derivedStats.js';
+
 export const SETTING = Object.freeze({
   meta: {
     id: 'fallout',
@@ -253,7 +257,7 @@ export const SETTING = Object.freeze({
       categoryRules: recipesCategoryRules,
       sections: {
         ammo: recipesAmmo,
-        weapons: recipesWeapons,
+        explosives: recipesExplosives,
         chems: recipesChems,
         food: recipesFood,
         drinks: recipesDrinks,
@@ -280,6 +284,12 @@ export const SETTING = Object.freeze({
       ...kitVaultDweller,
       ...kitWastelander,
     },
+  },
+
+  // Логика сеттинга (МК-3, патч 316): формулы производных параметров.
+  // Движок читает ТОЛЬКО через дверь — domain/registry.js → getDerivedStatsLogic().
+  logic: {
+    derivedStats: derivedStatsLogic,
   },
 
   names: {

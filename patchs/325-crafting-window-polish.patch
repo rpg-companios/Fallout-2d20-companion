@@ -1,0 +1,645 @@
+diff --git a/__tests__/crafting/crafting-data.test.js b/__tests__/crafting/crafting-data.test.js
+index a86cba1..7f6654c 100644
+--- a/__tests__/crafting/crafting-data.test.js
++++ b/__tests__/crafting/crafting-data.test.js
+@@ -129,8 +129,8 @@ describe('данные крафта: файлы категории', () => {
+       { file: 'ammo.json', category: 'ammo', count: 28 },
+       { file: 'chems.json', category: 'chems', count: 21 },
+       { file: 'drinks.json', category: 'drinks', count: 8 },
++      { file: 'explosives.json', category: 'explosives', count: 9 },
+       { file: 'food.json', category: 'food', count: 27 },
+-      { file: 'weapons.json', category: 'weapons', count: 9 },
+     ]);
+   });
+ 
+@@ -200,7 +200,7 @@ describe('данные крафта: ссылки', () => {
+   it('навык — канонический ключ, категория — из манифеста', () => {
+     for (const { category, record } of allRecipes()) {
+       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
+-      expect(['ammo', 'weapons', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
++      expect(['ammo', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
+       expect(Number.isInteger(record.requires.complexity)).toBe(true);
+       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
+       expect(record.requires.complexity).toBeLessThanOrEqual(7);
+diff --git a/__tests__/crafting/crafting-operations.test.js b/__tests__/crafting/crafting-operations.test.js
+index 8042a76..bfa6080 100644
+--- a/__tests__/crafting/crafting-operations.test.js
++++ b/__tests__/crafting/crafting-operations.test.js
+@@ -14,7 +14,7 @@ import craftingIndex from '../../modules/fallout/data/recipes/index.json';
+ import ammoFile from '../../modules/fallout/data/recipes/ammo.json';
+ import chemsFile from '../../modules/fallout/data/recipes/chems.json';
+ import foodFile from '../../modules/fallout/data/recipes/food.json';
+-import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
++import explosivesFile from '../../modules/fallout/data/recipes/explosives.json';
+ import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
+ 
+ const state = () => useCharacterStore.getState();
+@@ -50,7 +50,7 @@ const setSkill = (skillId, total) => {
+ describe('реестр — точка, откуда движок крафта видит данные', () => {
+   it('все файлы категории собраны индексом без потерь', () => {
+     const byFile = {
+-      'ammo.json': ammoFile, 'weapons.json': weaponsFile, 'chems.json': chemsFile,
++      'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'chems.json': chemsFile,
+       'food.json': foodFile, 'drinks.json': drinksFile,
+     };
+     const declared = craftingIndex.recipes.reduce((sum, entry) => sum + entry.count, 0);
+diff --git a/__tests__/crafting/crafting-rules.test.js b/__tests__/crafting/crafting-rules.test.js
+index 9e5d8b1..d4f5110 100644
+--- a/__tests__/crafting/crafting-rules.test.js
++++ b/__tests__/crafting/crafting-rules.test.js
+@@ -155,8 +155,8 @@ describe('правила крафта после реформы 269', () => {
+   it('сгорание — правило навыка в реестре; разрез совпадает с печатью (с. 210–211)', () => {
+     // 270 (решение владельца): вместо 74 флагов в данных — две строки правила.
+     // Гард: применённое к файлам, правило даёт ровно печатный разрез верстаков
+-    // (кухня и химия горят: все chems/food/drinks + взрывчатка в ammo/weapons;
+-    // станок оружейника — нет). И ни одной записи поле не принадлежит.
++    // (кухня и химия горят: все chems/food/drinks + вся взрывчатка в ammo и
++    // explosives (325); станок оружейника — нет). И ни одной записи поле не принадлежит.
+     const burns = (r) => CRAFT_RULES.failBurnsMaterialsSkills.includes(r.requires.skill);
+     const burnCount = {};
+     for (const entry of craftingIndex.recipes) {
+@@ -168,7 +168,7 @@ describe('правила крафта после реформы 269', () => {
+     expect(burnCount.food).toBe(27);
+     expect(burnCount.drinks).toBe(8);
+     expect(burnCount.ammo).toBe(9);
+-    expect(burnCount.weapons).toBe(9);
++    expect(burnCount.explosives).toBe(9); // 325: вся взрывчатка — своя категория
+     expect(CRAFT_RULES.failBurnsMaterialsSkills.sort()).toEqual(
+       [...CRAFT_RULES.failBurnsMaterialsSkills].sort(),
+     ); // список — настройка: редактируется здесь, данные не трогаются
+diff --git a/__tests__/crafting/crafting-window-layout-322.test.js b/__tests__/crafting/crafting-window-layout-322.test.js
+index 67e1559..f2b9301 100644
+--- a/__tests__/crafting/crafting-window-layout-322.test.js
++++ b/__tests__/crafting/crafting-window-layout-322.test.js
+@@ -5,6 +5,7 @@
+ // 3) «есть N · нужно M» — рядом с названием материала, не на другом конце.
+ // 4) Время изготовления подписано явно («время: 1 сут»), вопрос владельца
+ //    «что такое Выживание 1 сут?» — навык проверки + игровое время работы.
++//    325: формулировка владельца — «время приготовления: …» вместо «время: …».
+ import { describe, expect, it } from 'vitest';
+ import { readFileSync } from 'node:fs';
+ import { join } from 'node:path';
+@@ -44,8 +45,9 @@ describe('Окно крафта — правки по тестированию 
+   });
+ 
+   it('время изготовления подписано явно в обоих словарях', () => {
+-    expect(ruDict.ui.craftTime).toBe('время: {t}');
+-    expect(enDict.ui.craftTime).toBe('time: {t}');
++    // 325: подпись владельца «время приготовления», а не просто «время»
++    expect(ruDict.ui.craftTime).toBe('время приготовления: {t}');
++    expect(enDict.ui.craftTime).toBe('crafting time: {t}');
+     const row = buildCategoryModel('food').find((r) => r.recipeId === 'food_grilled_bloatfly');
+     const timeLabel = craftDict().ui.craftTime.split('{t}')[0];
+     expect(row.metaLine).toContain(timeLabel);
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+index d05eb38..6713b39 100644
+--- a/__tests__/crafting/crafting-window-tiles.test.js
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -41,9 +41,11 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+     const byId = new Map(tiles.map((t) => [t.category, t]));
+     expect(byId.get('ammo').recipes).toBe(28);
+     expect(byId.get('food').recipes).toBe(27);
++    expect(byId.get('explosives').recipes).toBe(9); // 325: вся взрывчатка переехала из «оружия»
++    expect(buildCategoryModel('explosives').length).toBe(9);
+     // пустых данных квадраты видны, но рецептов внутри нет
+-    for (const empty of ['explosives', 'armor', 'powerArmor']) {
+-      expect(byId.get(empty).recipes).toBe(0);
++    for (const empty of ['weapons', 'armor', 'powerArmor']) {
++      expect(byId.get(empty).recipes).toBe(0); // «оружие» опустело после переезда взрывчатки (325)
+       expect(buildCategoryModel(empty)).toEqual([]);
+     }
+   });
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b820563..81b123b 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **324** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–324 уехали, установка не подтверждена;
++· последний сданный патч: **325** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–325 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -78,6 +78,14 @@
+   успешные проверки дают +1 ОД за успех сверх сложности (криты = 2 успеха);
+   «2 ОД → время вдвое» тратит из пула. Групповой — мастер-экран подключится
+   как есть.
++- 325 — четыре правки окна крафта: светлая гамма как у модалок перков
++  (CraftingModal.styles.js перекрашен, inline-цветов в модалке нет);
++  взрывчатка (все 9 рецептов) — своя категория explosives, рецепты в
++  recipes/explosives.json, id сохранены (weapon_*), генератор знает корзину
++  (EXPLOSIVE_OUTPUT_IDS), квадрат «Оружие» пуст; материалы: заголовок
++  редкости — «{label}: X из Y видов», строка — «есть N шт. · нужно M шт.»
++  (виды ≠ штуки — вопрос владельца закрыт); подпись «время приготовления:
++  …» (крафт-время и отчёт).
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c76f298..e92bfa5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
++## Crafting — light windows, explosives split out, honest labels (patch 325)
++
++Owner's word — four fixes from playtesting: window palette, where
++explosives live, confusing materials numbers and the time label.
++
++- Crafting windows recolored to the light palette used by the perk and
++  item-picker modals: white panels, green accents, dark text. No more
++  dark-themed crafting windows.
++- Grenades and mines (all 9 recipes) moved from "Weapons" into the new
++  "Explosives" category — its own file and tab. The "Weapons" tile stays
++  empty ("No recipes yet") for the future. Category order unchanged.
++- Materials no longer mix units: the rarity header counts KINDS —
++  "Common materials: 0 of 1 kinds" — while a material line counts PIECES —
++  "have 0 · need 2". Answer to the owner's question: the example needs
++  1 kind of material, none in the bag, and that kind takes 2 pieces.
++- Time is labeled explicitly: "crafting time: 20 min" on the recipe card
++  and "Crafting time: …" in the report.
++
++## ## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
+ 
+ Owner's word: the group AP pool = 6; you can't spend more than 6, unless
+ checks granted AP. AP lives inside the engine for now (a UI store comes
+@@ -486,7 +504,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
+ 
+ ---
+ 
+-
+ ## Architecture — Setting door and unified contract (patch 292)
+ 
+ > Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
+@@ -500,7 +517,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
+ 
+ ---
+ 
+-
+ ## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
+ 
+ > Owner's question (2026-09-21): «does the registry know about the new data? Who and how will connect the mods to the weapon?» — No, it did not; the question exposed a gap in the 290 delivery.
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e65bfc9..f65579b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,25 @@
+ 
+ ---
+ 
+-## Общий пул ОД — проверки пополняют, «2 ОД» тратит из пула (патч 324)
++## Крафт — светлые окна, взрывчатка отдельно, честные подписи (патч 325)
++
++Слово владельца — четыре правки по тестированию: гамма окон крафта,
++место взрывчатки, путаница с материалами и подпись времени.
++
++- Окна крафта перекрашены в светлую гамму — как модалки перков и выбора
++  предметов: белые панели, зелёные акценты, тёмный текст. Тёмной темы
++  окна больше не показывают.
++- Гранаты и мины (все 9 рецептов) переехали из «Оружия» в новую категорию
++  «Взрывчатка» — свои рецепты, своя вкладка. Квадрат «Оружие» остался
++  пустым («Рецептов пока нет») — под будущее. Порядок категорий не менялся.
++- Материалы больше не путают: заголовок редкости считает ВИДЫ —
++  «Обычные материалы: 0 из 1 видов», а строка материала — ШТУКИ —
++  «есть 0 шт. · нужно 2 шт.». Ответ на вопрос владельца: в примере
++  нужен 1 вид материала, которого нет вовсе, а этого вида нужно 2 штуки.
++- Время в карточке рецепта и в отчёте подписано явно: «время
++  приготовления: 20 мин», в отчёте — «Время приготовления: …».
++
++## ## Общий пул ОД — проверки пополняют, «2 ОД» тратит из пула (патч 324)
+ 
+ Слово владельца: групповой пул ОД = 6; больше 6 потратить не выйдет,
+ если только проверки не выдали ОД. Пока ОД живёт внутри движка
+@@ -474,7 +492,6 @@ crank_x → запрос есть), без мода и после снятия (
+ 
+ ---
+ 
+-
+ ## Архитектура — Дверь сеттинга и единый контракт (патч 292)
+ 
+ > Слово владельца (2026-09-21): «не хочу плодить файлы ради индексов… вырезать папку modules, убрать в другой репозиторий, там сборщик файла-сеттинга, грузить в движок… в экранах сократить до "импорт реестр данных", а в реестре записано, что где лежит и чему принадлежит» + «вписать домен: что универсально, что под сеттинг — хрен пойми» + критерий: «механика универсальна: берём одни данные, проверяем наличие, выдаём другие, старые списываем; что это за данные — скажет сеттинг».
+@@ -488,7 +505,6 @@ crank_x → запрос есть), без мода и после снятия (
+ 
+ ---
+ 
+-
+ ## Данные — Реестр узнал о модах оружия роботов; форма полей — по конвенции конвейера (патч 291)
+ 
+ > Вопрос владельца (2026-09-21): «а реестр о новых данных знает? Кто и как будет подключать моды к оружию?» — Нет, не знал; вопрос вскрыл дыру доставки 290.
+diff --git a/docs/reference-data/CRAFTING-MAPPING.md b/docs/reference-data/CRAFTING-MAPPING.md
+index c3dff14..467faf2 100644
+--- a/docs/reference-data/CRAFTING-MAPPING.md
++++ b/docs/reference-data/CRAFTING-MAPPING.md
+@@ -21,7 +21,7 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ ## Покрытие
+ 
+ - рецептов в источнике: **356**
+-- выпущено в данные: **93** (ammo: 28, weapons: 9, chems: 21, food: 27, drinks: 8)
++- выпущено в данные: **93** (ammo: 28, explosives: 9, chems: 21, food: 27, drinks: 8)
+ - не выпущено: **263**
+ - из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
+ 
+diff --git a/domain/registry.js b/domain/registry.js
+index cf6f3bd..9dcf7a5 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -64,7 +64,7 @@ const moduleScrapTables = SETTING.data.junk.tables;
+ const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
+ const CRAFTING_FILES = {
+   'ammo.json': SETTING.data.recipes.sections.ammo,
+-  'weapons.json': SETTING.data.recipes.sections.weapons,
++  'explosives.json': SETTING.data.recipes.sections.explosives,
+   'chems.json': SETTING.data.recipes.sections.chems,
+   'food.json': SETTING.data.recipes.sections.food,
+   'drinks.json': SETTING.data.recipes.sections.drinks,
+diff --git a/modules/fallout/data/recipes/categoryRules.json b/modules/fallout/data/recipes/categoryRules.json
+index a38e3fa..2739e46 100644
+--- a/modules/fallout/data/recipes/categoryRules.json
++++ b/modules/fallout/data/recipes/categoryRules.json
+@@ -3,5 +3,5 @@
+   "chems": { "failBurnsMaterialsSkills": ["SCIENCE"] },
+   "drinks": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
+   "food": { "failBurnsMaterialsSkills": ["SURVIVAL"] },
+-  "weapons": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] }
++  "explosives": { "failBurnsMaterialsSkills": ["EXPLOSIVES"] }
+ }
+diff --git a/modules/fallout/data/recipes/weapons.json b/modules/fallout/data/recipes/explosives.json
+similarity index 100%
+rename from modules/fallout/data/recipes/weapons.json
+rename to modules/fallout/data/recipes/explosives.json
+diff --git a/modules/fallout/data/recipes/index.json b/modules/fallout/data/recipes/index.json
+index 3f8b0f4..74ca163 100644
+--- a/modules/fallout/data/recipes/index.json
++++ b/modules/fallout/data/recipes/index.json
+@@ -16,15 +16,15 @@
+       "category": "drinks",
+       "count": 8
+     },
++    {
++      "file": "explosives.json",
++      "category": "explosives",
++      "count": 9
++    },
+     {
+       "file": "food.json",
+       "category": "food",
+       "count": 27
+-    },
+-    {
+-      "file": "weapons.json",
+-      "category": "weapons",
+-      "count": 9
+     }
+   ]
+ }
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index a21bc35..d8c34f0 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -24,7 +24,7 @@
+     "craft": "Craft",
+     "craftN": "Craft ×{n}",
+     "complexity": "Complexity {n}",
+-    "craftTime": "time: {t}",
++    "craftTime": "crafting time: {t}",
+     "rowMeta": "{skill} · {time}",
+     "timeMinutes": "{n} min",
+     "timeHours": "{n} hr",
+@@ -46,7 +46,7 @@
+     "granted": "Gained: {items}",
+     "nothing": "Nothing gained",
+     "spent": "Spent: {items}",
+-    "timeSpent": "Time: {time}",
++    "timeSpent": "Crafting time: {time}",
+     "complicationNote": "Complication: +{n} min",
+     "craftTitle": "Crafting",
+     "notAvailable": "Not available",
+@@ -55,7 +55,8 @@
+     "apYes": "Spend 2 AP",
+     "apNo": "Full time",
+     "apHalvedNote": "Time halved for 2 AP",
+-    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)"
++    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)",
++    "raritySummary": "{label}: {have} of {total} kinds"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 6566c43..509cd1b 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -24,7 +24,7 @@
+     "craft": "Скрафтить",
+     "craftN": "Скрафтить ×{n}",
+     "complexity": "Сложность {n}",
+-    "craftTime": "время: {t}",
++    "craftTime": "время приготовления: {t}",
+     "rowMeta": "{skill} · {time}",
+     "timeMinutes": "{n} мин",
+     "timeHours": "{n} ч",
+@@ -33,7 +33,7 @@
+     "shortMaterials": "Не хватает материалов",
+     "ready": "Можно крафтить",
+     "materialsTitle": "Материалы",
+-    "haveNeed": "есть {have} · нужно {need}",
++    "haveNeed": "есть {have} шт. · нужно {need} шт.",
+     "quantity": "Сколько раз",
+     "resultTitle": "Крафт",
+     "stopped": "Остановлено: материалов в сумке кончились, {n} попыток не началось",
+@@ -46,7 +46,7 @@
+     "granted": "Получено: {items}",
+     "nothing": "Не получено ничего",
+     "spent": "Потрачено: {items}",
+-    "timeSpent": "Время: {time}",
++    "timeSpent": "Время приготовления: {time}",
+     "complicationNote": "Осложнение: +{n} мин к работе",
+     "craftTitle": "Крафт",
+     "notAvailable": "Недоступно",
+@@ -55,7 +55,8 @@
+     "apYes": "Потратить 2 ОД",
+     "apNo": "Полное время",
+     "apHalvedNote": "Время сокращено за 2 ОД",
+-    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)"
++    "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)",
++    "raritySummary": "{label}: {have} из {total} видов"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+index 033e8c3..a5cdbee 100644
+--- a/modules/fallout/index.js
++++ b/modules/fallout/index.js
+@@ -92,7 +92,7 @@ import junkTables from './data/junk/tables.json';
+ import recipesManifest from './data/recipes/index.json';
+ import recipesCategoryRules from './data/recipes/categoryRules.json';
+ import recipesAmmo from './data/recipes/ammo.json';
+-import recipesWeapons from './data/recipes/weapons.json';
++import recipesExplosives from './data/recipes/explosives.json';
+ import recipesChems from './data/recipes/chems.json';
+ import recipesFood from './data/recipes/food.json';
+ import recipesDrinks from './data/recipes/drinks.json';
+@@ -257,7 +257,7 @@ export const SETTING = Object.freeze({
+       categoryRules: recipesCategoryRules,
+       sections: {
+         ammo: recipesAmmo,
+-        weapons: recipesWeapons,
++        explosives: recipesExplosives,
+         chems: recipesChems,
+         food: recipesFood,
+         drinks: recipesDrinks,
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index 0a52f86..55d69bf 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -205,7 +205,11 @@ export default function CraftingModal({ visible, onClose }) {
+                       <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
+                         {item.canCraft
+                           ? `${ui.materialsTitle}: ${item.materialGroups
+-                            .map((g) => `${ui[RARITY_LABEL_KEYS[g.type]] ?? g.type} ${g.have}/${g.total}`)
++                            .map((g) => craftFormat(ui.raritySummary ?? '', {
++                              label: ui[RARITY_LABEL_KEYS[g.type]] ?? g.type,
++                              have: g.have,
++                              total: g.total,
++                            }))
+                             .join(', ')}`
+                           : (item.reason || '')}
+                       </Text>
+@@ -217,7 +221,11 @@ export default function CraftingModal({ visible, onClose }) {
+                         {item.materialGroups.map((group) => (
+                           <View key={group.type}>
+                             <Text style={styles.rarityLine}>
+-                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type} {group.have}/{group.total}
++                              {craftFormat(ui.raritySummary ?? '', {
++                                label: ui[RARITY_LABEL_KEYS[group.type]] ?? group.type,
++                                have: group.have,
++                                total: group.total,
++                              })}
+                             </Text>
+                             {item.materials.filter((m) => m.rarity === group.type).map((m) => (
+                               <View key={m.itemId} style={styles.materialLine}>
+diff --git a/modules/fallout/styles/CraftingModal.styles.js b/modules/fallout/styles/CraftingModal.styles.js
+index 9da1d48..0c47ed5 100644
+--- a/modules/fallout/styles/CraftingModal.styles.js
++++ b/modules/fallout/styles/CraftingModal.styles.js
+@@ -5,12 +5,12 @@ import { StyleSheet } from 'react-native';
+ 
+ export default StyleSheet.create({
+   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' },
+-  sheet: { flex: 1, backgroundColor: '#1a1d1a', paddingTop: 8 },
++  sheet: { flex: 1, backgroundColor: '#fff', paddingTop: 8 },
+   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
+-  headerTitle: { color: '#e8e6d9', fontSize: 18, fontWeight: '700', flexShrink: 1 },
++  headerTitle: { color: '#000', fontSize: 18, fontWeight: '700', flexShrink: 1 },
+   headerSpacer: { flex: 1 },
+-  closeText: { color: '#c9c6b5', fontSize: 20, paddingHorizontal: 8 },
+-  backText: { color: '#c9c6b5', fontSize: 14, paddingRight: 8 },
++  closeText: { color: '#444', fontSize: 20, paddingHorizontal: 8 },
++  backText: { color: '#444', fontSize: 14, paddingRight: 8 },
+ 
+   // Квадраты категорий (318; 322 — прокрутка, строки по 3, выравнивание от центра)
+   body: { flex: 1, paddingHorizontal: 12 },
+@@ -22,72 +22,72 @@ export default StyleSheet.create({
+     width: '30%',
+     aspectRatio: 1,
+     borderRadius: 12,
+-    backgroundColor: '#232823',
++    backgroundColor: '#fff',
+     borderWidth: 1,
+-    borderColor: '#3f4a3a',
++    borderColor: '#ddd',
+     alignItems: 'center',
+     justifyContent: 'center',
+     gap: 6,
+     padding: 4,
+   },
+-  tileIcon: { fontSize: 38, color: '#ffe9a8' },
+-  tileLabel: { color: '#e8e6d9', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+-  tileCount: { color: '#7da769', fontSize: 11 },
+-  tileCountZero: { color: '#8f9a86' },
++  tileIcon: { fontSize: 38, color: '#fff' },
++  tileLabel: { color: '#000', fontSize: 13, fontWeight: '600', textAlign: 'center' },
++  tileCount: { color: '#16a34a', fontSize: 11 },
++  tileCountZero: { color: '#777' },
+   closeBtn: {
+-    backgroundColor: '#2a2e2a',
++    backgroundColor: '#f1f5f9',
+     borderRadius: 10,
+     padding: 12,
+     alignItems: 'center',
+     marginTop: 12,
+     marginBottom: 8,
+   },
+-  closeBtnText: { color: '#c9c6b5', fontSize: 15, fontWeight: '600' },
++  closeBtnText: { color: '#444', fontSize: 15, fontWeight: '600' },
+ 
+   // Список рецептов-спойлеров (318): доступные белые, недоступные серые
+   list: { flex: 1, paddingHorizontal: 12 },
+-  row: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#2a2e2a' },
+-  rowDisabled: { opacity: 0.45 },
++  row: { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f5f9' },
++  rowDisabled: { backgroundColor: '#f1f5f9' },
+   spoilerHead: { },
+   rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+-  rowName: { color: '#e8e6d9', fontSize: 15, fontWeight: '600', flex: 1 },
+-  rowNameReady: { color: '#f5f3e8' },
+-  spoilerArrow: { color: '#8f9a86', fontSize: 14 },
+-  rowMeta: { color: '#8f9a86', fontSize: 12, marginTop: 2 },
+-  rowReason: { color: '#c76e6e', fontSize: 12, marginTop: 2 },
+-  rowReady: { color: '#7da769', fontSize: 12, marginTop: 2 },
++  rowName: { color: '#000', fontSize: 15, fontWeight: '600', flex: 1 },
++  rowNameReady: { color: '#000' },
++  spoilerArrow: { color: '#777', fontSize: 14 },
++  rowMeta: { color: '#777', fontSize: 12, marginTop: 2 },
++  rowReason: { color: '#dc2626', fontSize: 12, marginTop: 2 },
++  rowReady: { color: '#16a34a', fontSize: 12, marginTop: 2 },
+   spoilerBody: { paddingTop: 8 },
+-  detailLabel: { color: '#8f9a86', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
+-  rarityLine: { color: '#c9c6b5', fontSize: 12, fontWeight: '700', marginTop: 6 },
++  detailLabel: { color: '#777', fontSize: 12, marginBottom: 4, textTransform: 'uppercase' },
++  rarityLine: { color: '#444', fontSize: 12, fontWeight: '700', marginTop: 6 },
+   // 322: «есть · нужно» — рядом с названием материала, не на другом конце строки.
+   materialLine: { flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 3 },
+-  materialName: { color: '#e8e6d9', fontSize: 13, flexShrink: 1 },
+-  materialOk: { color: '#7da769', fontSize: 12 },
+-  materialBad: { color: '#c76e6e', fontSize: 12 },
+-  bigCraft: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },
+-  bigCraftText: { color: '#ffe9a8', fontSize: 15, fontWeight: '700' },
++  materialName: { color: '#000', fontSize: 13, flexShrink: 1 },
++  materialOk: { color: '#16a34a', fontSize: 12 },
++  materialBad: { color: '#dc2626', fontSize: 12 },
++  bigCraft: { backgroundColor: '#16a34a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },
++  bigCraftText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+ 
+   // Окно количества (318): «сколько штук создать?»
+   qtyOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+-  qtyDialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 16, width: '100%' },
+-  qtyText: { color: '#e8e6d9', fontSize: 14, lineHeight: 20, textAlign: 'center' },
++  qtyDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
++  qtyText: { color: '#000', fontSize: 14, lineHeight: 20, textAlign: 'center' },
+   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14 },
+-  qtyBtn: { borderWidth: 1, borderColor: '#3f4a3a', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 },
+-  qtyBtnText: { color: '#ffe9a8', fontSize: 18 },
+-  qtyValue: { color: '#e8e6d9', fontSize: 16, minWidth: 28, textAlign: 'center', fontWeight: '700' },
++  qtyBtn: { borderWidth: 1, borderColor: '#5a5a5a', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 6 },
++  qtyBtnText: { color: '#fff', fontSize: 18 },
++  qtyValue: { color: '#000', fontSize: 16, minWidth: 28, textAlign: 'center', fontWeight: '700' },
+   qtyActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+-  qtyCancel: { backgroundColor: '#2a2e2a', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
+-  qtyCancelText: { color: '#c9c6b5', fontSize: 14 },
++  qtyCancel: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
++  qtyCancelText: { color: '#444', fontSize: 14 },
+   qtyActionsBigCraft: { flex: 1, marginTop: 0 },
+ 
+   // Решение про 2 ОД (323)
+   apBox: { marginTop: 12 },
+-  apQuestion: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
++  apQuestion: { color: '#000', fontSize: 13, lineHeight: 19 },
+ 
+   // Отчёт (265, формат владельца)
+-  resultBox: { backgroundColor: '#141714', borderRadius: 10, padding: 12, marginTop: 12 },
+-  resultLine: { color: '#e8e6d9', fontSize: 13, lineHeight: 19 },
+-  doneBtn: { backgroundColor: '#2a2e2a', borderRadius: 10, padding: 10, marginTop: 12, alignItems: 'center' },
+-  doneBtnText: { color: '#c9c6b5', fontSize: 14 },
+-  empty: { color: '#8f9a86', fontSize: 13, textAlign: 'center', marginTop: 30 },
++  resultBox: { backgroundColor: 'rgb(245, 245, 245)', borderRadius: 10, padding: 12, marginTop: 12 },
++  resultLine: { color: '#000', fontSize: 13, lineHeight: 19 },
++  doneBtn: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 10, marginTop: 12, alignItems: 'center' },
++  doneBtnText: { color: '#444', fontSize: 14 },
++  empty: { color: '#777', fontSize: 13, textAlign: 'center', marginTop: 30 },
+ });
+diff --git a/public/version.json b/public/version.json
+index f69a24c..5b13d16 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "324",
++  "version": "325",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: общий пул ОД (6) — проверки пополняют, «2 ОД за время вдвое» тратит из пула"
++      "Крафт: светлые окна как у модалок перков; взрывчатка — своя категория; понятные материалы и «время приготовления»"
+     ],
+     "en-EN": [
+-      "Crafting: group AP pool (6) — checks refill it, \"2 AP to halve time\" spends from it"
++      "Crafting: light windows matching perk modals; explosives got its own category; clearer materials wording and \"cooking time\""
+     ]
+   }
+ }
+diff --git a/scripts/build-crafting-data.mjs b/scripts/build-crafting-data.mjs
+index 8cd2dde..c00c41b 100644
+--- a/scripts/build-crafting-data.mjs
++++ b/scripts/build-crafting-data.mjs
+@@ -176,21 +176,38 @@ const IMPORTED = new Set(IMPORTED_GROUPS);
+ export const FILE_BY_BUCKET = {
+   ammo: 'ammo.json',
+   weapons: 'weapons.json',
++  explosives: 'explosives.json',
+   chems: 'chems.json',
+   food: 'food.json',
+   drinks: 'drinks.json',
+   items: 'items.json',
+ };
+-export const BUCKET_ORDER = ['ammo', 'weapons', 'chems', 'food', 'drinks', 'items'];
++export const BUCKET_ORDER = ['ammo', 'weapons', 'explosives', 'chems', 'food', 'drinks', 'items'];
+ const BENCH_BY_BUCKET = {
+   ammo: 'weapons',
+   weapons: 'chemistry',
++  explosives: 'chemistry',
+   chems: 'chemistry',
+   food: 'cooking',
+   drinks: 'cooking',
+   items: 'chemistry',
+ };
+ 
++// Патч 325 (слово владельца): гранаты и мины — не «оружие», а «взрывчатка».
++// Тип предмета в каталоге остаётся weapon (брошенное оружие), но рецепты
++// таких результатов едут в отдельную корзину explosives.
++export const EXPLOSIVE_OUTPUT_IDS = new Set([
++  'weapon_baseball_grenade',
++  'weapon_frag_grenade',
++  'weapon_frag_mine',
++  'weapon_molotov',
++  'weapon_plasma_grenade',
++  'weapon_plasma_mine',
++  'weapon_pulse_grenade',
++  'weapon_pulse_mine',
++  'weapon_bottlecap_mine',
++]);
++
+ /**
+  * Нормализация имени для сверки с каталогом. Скобки СОХРАНЯЕМ как слова:
+  * «RadAway» и «RadAway (Diluted)» — разные предметы, склейка их в один ключ
+@@ -509,7 +526,9 @@ export function buildCraftingData() {
+       drop('в каталоге сеттинга нет такого предмета-результата');
+       continue;
+     }
+-    if (!BUCKET_ORDER.includes(output.bucket)) {
++    // 325: взрывчатка уходит в свою корзину, тип предмета не трогается.
++    const bucket = EXPLOSIVE_OUTPUT_IDS.has(output.itemId) ? 'explosives' : output.bucket;
++    if (!BUCKET_ORDER.includes(bucket)) {
+       drop(`тип результата «${output.itemType}» в срез предметного крафта не входит`);
+       continue;
+     }
+@@ -564,12 +583,12 @@ export function buildCraftingData() {
+     // навыком — правило живёт одной строкой в CRAFT_RULES (реестр модуля).
+     // Генератор лишь сверяет: навык recipes обязан давать ровно тот же разрез,
+     // что печатный верстак источника, — иначе молча потеряем число.
+-    const bench = BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[output.bucket];
++    const bench = BENCH_BY_SOURCE[source.workbench] || BENCH_BY_BUCKET[bucket];
+     if (Boolean(BENCH_BURNS[bench]) !== (BURN_SKILLS.has(skill))) {
+       throw new Error(`${outputName}: верстак «${bench}» и навык «${skill}» расходятся в правиле сгорания — реши явно`);
+     }
+     entries.push({
+-      bucket: output.bucket,
++      bucket,
+       record: {
+         id,
+         requires: {

@@ -2,6 +2,238 @@
 
 ---
 
+## Rarity, capacity and item are independent (patch 328)
+
+Owner's clarification to the armor-mods table (327), recorded in
+`docs/reference-data/armor-mods-crafting.md` (section 1.1). The app is
+unchanged — it does not violate the rules today.
+
+- A mod's rarity is NOT the recipe's material capacity: independent book
+  columns. A recipe's materials are set by the capacity; rarity does not
+  affect the material set (weave: capacity 3, rarity Rare; shielded
+  lining: capacity 6, rarity just Uncommon).
+- A recipe's rarity is NOT the created item's rarity: the label describes
+  the recipe; the crafted mod carries its own record's attributes.
+- If the crafting window ever shows rarity, it is a label of the recipe
+  row, separate from capacity, never transferred to the crafted item.
+
+## ## Armor-mod crafting table — recorded, cross-checked (patch 327)
+
+The owner dictated the book's armor-mods table (the "Armor" tile — the
+future mod crafting via material capacity). The app itself is unchanged.
+
+- The table is recorded verbatim in
+  `docs/reference-data/armor-mods-crafting.md`: 49 mods — ballistic weave,
+  vault-suit linings, raider/leather/metal/combat/synth armor materials,
+  generic mods.
+- Cross-check against our data: 34 of the table's mods exist, but the
+  capacity (complexity) differs in ALL 34 (offsets 1 to 3, no single
+  system). Perks and the Repair skill match.
+- 15 mods are missing from the data (weave — 5, linings — 5,
+  lightweight/pockets/lead-lined/ultra-light — 5), and there is no
+  "rarity" column.
+- 4 questions to the owner are recorded in the same file (whether to fix
+  complexity — it changes mod INSTALL cost; whether to add the missing
+  mods; what to do with three duplicate "material" mods; whether the
+  crafting window needs rarity).
+
+## ## Materials — piece counters only; capacity table documented (patch 326)
+
+Owner's word: "just a few kinds per recipe — piece counters are enough,
+don't bloat the interface", plus a clarification and a question about the
+materials scheme.
+
+- Removed the KIND counters: no more "Common materials 0/1" on the recipe
+  row and no "0 of 1 kinds" in the spoiler. A ready recipe row now simply
+  says "Ready"; spoiler rarity headers are plain labels, and each material
+  keeps its own "have N · need M" counter.
+- The "Armor", "Weapons", "Power armor" tiles are the future MOD-crafting
+  entries for those categories (material capacity); they stay.
+- The printed "capacity → materials" curve (1: Common ×2 … 7+: Common ×8,
+  Uncommon ×6, Rare ×4) already lived in the data generator and was checked
+  against the owner's table — no differences. It is now also written into
+  the reference doc `docs/reference-data/CRAFTING-MAPPING.md`, next to the
+  data it produced (the section is generator-produced, not hand-edited).
+
+## ## Crafting — light windows, explosives split out, honest labels (patch 325)
+
+Owner's word — four fixes from playtesting: window palette, where
+explosives live, confusing materials numbers and the time label.
+
+- Crafting windows recolored to the light palette used by the perk and
+  item-picker modals: white panels, green accents, dark text. No more
+  dark-themed crafting windows.
+- Grenades and mines (all 9 recipes) moved from "Weapons" into the new
+  "Explosives" category — its own file and tab. The "Weapons" tile stays
+  empty ("No recipes yet") for the future. Category order unchanged.
+- Materials no longer mix units: the rarity header counts KINDS —
+  "Common materials: 0 of 1 kinds" — while a material line counts PIECES —
+  "have 0 · need 2". Answer to the owner's question: the example needs
+  1 kind of material, none in the bag, and that kind takes 2 pieces.
+- Time is labeled explicitly: "crafting time: 20 min" on the recipe card
+  and "Crafting time: …" in the report.
+
+## ## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
+
+Owner's word: the group AP pool = 6; you can't spend more than 6, unless
+checks granted AP. AP lives inside the engine for now (a UI store comes
+later); the pool is group-wide — the future game-master screen will hook
+into it as is.
+
+- A successful crafting check refills the pool: +1 AP for each success
+  beyond the difficulty (difficulty 1 with 2 successes → +1; 3 successes
+  → +2). A critical die (1 or ≤ the tagged skill's rating) counts as
+  2 successes — its bonus flows in naturally.
+- Automatic success (difficulty 0, no roll) and failures grant no AP.
+- "Spend 2 AP — halve the time" now requires the pool: with fewer than 2
+  the question isn't asked and time runs full. The report shows
+  "AP: +N to the group pool (now M/6)" and the pool in the question.
+- Fuse: acceptance test (patch 324) — the cap of 6, the owner's example,
+  crits, failures, auto-success, refused spending when short.
+
+## Crafting — by the printed rules: times, complications, 2 AP and material loss (patch 323)
+
+Owner's word — the rulebook text (pp. 210–211) plus two decisions:
+times strictly by the book; the ability to "lose materials" is optional.
+
+- Times: crafting takes one hour for all categories; a cooking station
+  (food and drinks) — 20 minutes. The old complexity table (10 min/1 h/1 day,
+  decision 259) is retired.
+- A complication adds +30 minutes (station +10), additively. The old ×2
+  time doubling is retired.
+- After a successful craft the window asks: "Spend 2 AP to halve the time?"
+  — "yes" spends half the base time (complications on top), "no" — full.
+  Full AP arrive with the future game-master screen (a group resource);
+  for now — an honest yes/no choice.
+- The check is unchanged: INT + skill, difficulty = recipe complexity −
+  skill rank (minimum 0), zero — no check needed.
+- Settings: a new "Crafting" section with two independent material-loss
+  switches — (1) food, drinks, explosives, chems; (2) armor, weapons, ammo
+  components and other. Both on by default.
+- Fuse: acceptance test (patch 323) — times, additive complications,
+  deferred time and the AP choice, both loss settings, dictionaries.
+
+## Crafting — window fixes from the owner's testing (patch 322)
+
+- The category window now scrolls (it didn't scroll on desktop before).
+- Tiles are 3 per row. Row remainder: a single tile is centered, two start
+  from the left edge (owner's word).
+- "Have N · need M" now sits next to the material name, not at the far end
+  of the row (it drifted to the edge on wide monitors).
+- The recipe line explains itself: "Complexity 1 · Survival · time: 1 d" —
+  the check's skill and the in-game crafting time (the owner's question
+  "what is 1 d?").
+- Fuse: acceptance test (patch 322) — scrolling, the 3-per-row grid with
+  alignment rules, materials next to names, the time label, dictionaries.
+
+## Update system: the app announces new versions and shows a changelog (patch 321)
+
+Owner's word: "the app should knock on the server, ask if there's an
+update, download it and show a changelog with a 'don't show again'
+checkbox".
+
+- A version file now lives next to the app: `version.json` (patch number +
+  2–4 changelog lines ru/en). Updated in the same patch as the journals.
+- On every launch the app reads the file always fresh; if the version is
+  newer than the one remembered on the device — a "What's new" window
+  appears.
+- The "Don't show again" checkbox remembers the version; without the
+  checkbox the window returns on the next launch. The update itself
+  downloads automatically (that already worked) — a user who sees the
+  window is already on the fresh version.
+- Fuse: acceptance test (patch 321) — the version file, show/hide logic,
+  device memory, resilience to bad network, and the window's wiring.
+
+## PWA — installation and long-installed app updates fixed (patch 320)## PWA — installation and long-installed app updates fixed (patch 320)
+
+Owner's word: "can't install from Yandex or Mi browser; it used to create
+a shortcut" and "many can't update their old PWAs".
+
+- Installation: the manifest now has a real 192×192 PNG icon (previously
+  only an SVG, which browsers don't count as an install icon) — the
+  Chromium install criterion is met again, the "Install" button returns.
+- Stuck updates: for some long-time users an old service worker served a
+  cached old version for years and never woke up (its file never changed).
+  The file is changed on purpose — the worker reinstalls, unregisters
+  itself and clears the caches; the next launch of a stuck client fetches
+  the fresh app (the "STR above 10" fix will finally reach them).
+- Fuse: acceptance test (patch 320) — icons are real PNGs of the required
+  sizes, the manifest is installable, the worker wake-up is in place.
+
+## Crafting — the "Craft" button now opens the crafting window (patch 319)
+
+Behavior fix (the owner asked: "did you wire the modal to the button?" —
+the check showed it had never been wired).
+
+- Since the app's very first commit the "Craft" button showed a placeholder
+  alert instead of a window; the crafting window (neither the old 265 one
+  nor the new 318 one) was unreachable from the button. Now the button
+  opens the crafting window.
+- Fuse: acceptance test (patch 319) pins the "button → window" wiring so
+  this cannot get lost again.
+
+## Crafting — new window: category tiles, recipe spoilers, quantity picker (patch 318)
+
+Owner's word: a pleasant one — a convenient crafting window instead of
+bench tabs. Mechanics unchanged: same perk gates, bag counting, skill check
+and report (format of 265).
+
+- The "Craft" button in inventory opens a tile window: food, drinks, chems,
+  explosives, weapons, armor, power armor, ammo (owner's decision — the
+  8th tile). Each tile has an icon and an "available/total" counter.
+- A tile opens a list of recipe spoilers: unavailable gray, available white.
+  Inside a spoiler — materials by rarity (common/uncommon/rare, only
+  required types, each with "have · need") and a "Create" button.
+- If materials suffice for more than one — a separate window before
+  creation: "You can craft N „item". How many?" with − and + (default 1).
+- "Back" top-left returns to the tiles from any category; "Close" at the
+  bottom of the tile window returns to inventory. Any number of different
+  items can be crafted in one visit.
+- Categories without recipes (explosives, armor, power armor) are visible
+  with a "no recipes yet" note — they fill in as recipes arrive.
+- Fuse: acceptance test (patch 318) — tiles and order, material rarity on
+  ammo_38, perk gate, batch size, dictionary.
+
+## MK-3, step 2 — the store recalculates derived stats itself, manual calls are gone (patch 317)
+
+Continuation of the "cascade into the store". Nothing changes for the
+player — all the numbers are the same. What changed is inside: it is no
+longer possible to "forget to recalculate".
+
+- Any store action that changes an input (attributes, effects, perks, trait,
+  level, origin, robot slots, equipment mirror) now updates the derived stats
+  (max health, initiative, defense, melee bonus, carry weight) automatically
+  and synchronously — one function, same formulas as 316.
+- All 26 manual recalculation calls removed (22 in the store, 3 in the robot
+  slice, 1 in effects sync); the recalculate action remains as a public
+  force-refresh entry point.
+- Fuse: acceptance test (patch 317) — 7 checks, none of them calls the
+  recalculation manually: attributes, effects, a perk, robot slots, the
+  equipment mirror, the force entry point, and no infinite looping.
+- This is the foundation for the future game master: when world states
+  arrive from a server, the cascade recalculates the numbers by itself —
+  nothing to forget.
+
+## Refactor MK-3, step 1 — derived-stat formulas moved into the module (patch 316)
+
+First step of the "cascade into the store" plan (2026-09-18). Derived-stat
+rules now live with the setting; the engine reads them through the door.
+Behavior is unchanged: full test suite green.
+
+- New: `modules/fallout/logic/derivedStats.js` — initiative (PER+AGI),
+  defense (AGI 9+ → 2), melee bonus (STR thresholds 7/9/11), max health
+  (END+LCK+level), human and robot carry weight, and the full assembly with
+  power armor frame, timed effects and perks (`calculateDerivedStats`).
+- The engine (store) reads the formulas only through the door:
+  `domain/registry.js` → `getDerivedStatsLogic()`.
+- Data boundary restored: `src/store/resolvers.js` no longer reads the power
+  armor data file — removed from the boundary test's debt list (11 entries).
+- Setting-agnostic math (SPECIAL key canon, equipment modifiers, frame
+  attribute modifiers) is consolidated in `resolvers.js` — a file with zero
+  imports, so module logic cannot create loading cycles.
+- Fuse: acceptance test with golden constants (patch 316) — thresholds,
+  assembly, perks, robots, PA frame, registry door.
+
 ## Work memory — a "where we are now" file for AI agents (patch 315)
 
 Owner's word: learn to remember what's done and what the app consists
@@ -325,7 +557,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
 
 ---
 
-
 ## Architecture — Setting door and unified contract (patch 292)
 
 > Owner's direction (2026-09-21): one import point per setting ("import the data registry"), the module folder extractable to its own repo with a bundler; the domain must be mapped: what is universal, what is setting-specific. Split criterion: a mechanic is a universal formula ("take input data, check availability, produce output, consume inputs — the setting says what that data is").
@@ -338,7 +569,6 @@ full save → screen → modal → save → screen round-trip, and pipeline appl
 - test-setting: header aligned with the common setting standard.
 
 ---
-
 
 ## Data — The registry now knows about robot weapon mods; field shape follows the pipeline convention (patch 291)
 

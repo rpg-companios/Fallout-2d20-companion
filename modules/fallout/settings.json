@@ -70,8 +70,14 @@
     "descriptionKey": "settings.cardsDescription",
     "defaultValue": "cards",
     "options": [
-      { "value": "cards", "labelKey": "settings.cards.cards" },
-      { "value": "spoilers", "labelKey": "settings.cards.spoilers" }
+      {
+        "value": "cards",
+        "labelKey": "settings.cards.cards"
+      },
+      {
+        "value": "spoilers",
+        "labelKey": "settings.cards.spoilers"
+      }
     ]
   },
   {
@@ -81,6 +87,24 @@
     "sectionKey": "robots",
     "labelKey": "settings.robotArmsStrictTitle",
     "descriptionKey": "settings.robotArmsStrictDescription",
+    "defaultValue": true
+  },
+  {
+    "id": "craftFailLossConsumables",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "crafting",
+    "labelKey": "settings.craftLossConsumablesTitle",
+    "descriptionKey": "settings.craftLossConsumablesDescription",
+    "defaultValue": true
+  },
+  {
+    "id": "craftFailLossGear",
+    "type": "boolean",
+    "controlSurface": "settings",
+    "sectionKey": "crafting",
+    "labelKey": "settings.craftLossGearTitle",
+    "descriptionKey": "settings.craftLossGearDescription",
     "defaultValue": true
   }
 ]

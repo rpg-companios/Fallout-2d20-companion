@@ -39,8 +39,11 @@ import {
 } from '../../domain/diseaseConditions';
 import { createSceneRiskTracker, getSceneRiskEventForRule } from '../../domain/sceneRiskChecks';
 import { isSkillTagged } from '../../domain/d20Checks';
-import { getConditionCatalog, getSceneRiskRules } from '../../domain/registry';
-import { calculateMaxHealth, getAttributeValue } from '../../domain/characterCreation';
+import { getConditionCatalog, getSceneRiskRules, getDerivedStatsLogic } from '../../domain/registry';
+import { getAttributeValue } from '../../domain/characterCreation';
+
+// МК-3 (патч 316): формула макс. ОЗ уехала в сеттинг — чтение через дверь.
+const { calculateMaxHealth } = getDerivedStatsLogic();
 import { getCurrentModuleLocale } from '../../i18n/locale';
 import { notifyConditionEvent, notifyConsumableApplied } from './stateExtensions';
 

@@ -12,7 +12,7 @@
 // сумки попытки останавливаются, остальные не начинаются.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import { getCraftingCategories, getCraftingRecipeById, getCraftingRecipes } from '../../../domain/registry';
+import { getCraftingRecipeById, getCraftingRecipes, getScrapMaterials } from '../../../domain/registry';
 import { findCatalogEntry } from '../../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
@@ -22,15 +22,39 @@ import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
 import enPerks from '../i18n/en-EN/data/perks/perks.json';
 import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
-import { craftMinutesForRecipe, craftRecipe, craftingPreview } from './operations';
+import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime } from './operations';
 import { CRAFT_RULES } from './rules';
 
-// Порядок вкладок = категории манифеста рецептов (реформа 269): верстаков в
-// данных нет, файл-раздел и есть категория. Движок категорий не знает.
+// Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
+// взрывчатка, оружие, броня, силовая броня + патроны (решение владельца —
+// 8-й квадрат). Пустые данными категории квадратами ВИДНЫ («рецептов пока
+// нет»); верстаков в данных нет, файл-раздел и есть категория (реформа 269).
+export const CRAFT_CATEGORIES = [
+  'food', 'drinks', 'chems', 'explosives', 'weapons', 'armor', 'powerArmor', 'ammo',
+];
+
+// Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
+// Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
+// (мясо и пр.) редкости не имеют и в сводку не попадают.
+const RARITY_TYPES = ['common', 'uncommon', 'rare'];
+
+let materialTypeById = null;
+const materialRarityOf = (itemId) => {
+  if (!materialTypeById) {
+    materialTypeById = new Map(
+      getScrapMaterials().map((m) => [m.id, m.materialType || null]),
+    );
+  }
+  return materialTypeById.get(itemId) ?? null;
+};
 
 const dict = () => (getCurrentModuleLocale() === 'en-EN' ? enDict : ruDict);
 const fmt = (template, params = {}) =>
   String(template).replace(/\{(\w+)\}/g, (_, key) => String(params?.[key] ?? `{${key}}`));
+
+// Модалка (318) берёт словарь и форматирование строк отсюда — единственный дом строк.
+export const craftDict = () => dict();
+export const craftFormat = fmt;
 
 const perkName = (id) => {
   const perks = getCurrentModuleLocale() === 'en-EN' ? enPerks : ruPerks;
@@ -63,24 +87,21 @@ export const formatCraftMinutes = (minutes) => {
 };
 
 /**
- * Строк на вкладку верстака: что получится, чем, сколько это времени,
+ * Строки одной категории-квадрата: что получится, чем, сколько это времени,
  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
  * дефицитному материалу; для «можно» строк он ≥ 1.
+ * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
+ * группировка заголовков спойлера по обычным/необычным/редким (не требуемые
+ * типы не попадают). Счётчиков видов в сводке больше нет (326, слово
+ * владельца: «не раздуваем интерфейс» — достаточно счётчиков штук на строках
+ * материалов).
  */
-export const buildCraftModel = () => {
+const buildRowsForCategory = (category) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
   const d = dict().ui;
-  const labels = dict();
-  const groups = getCraftingCategories()
-    .map((category) => ({
-      category,
-      label: labels.categoryNames?.[category] ?? category,
-      rows: [],
-    }));
-  const byCategory = new Map(groups.map((g) => [g.category, g]));
+  const rows = [];
   for (const recipe of getCraftingRecipes()) {
-    const group = byCategory.get(recipe.category);
-    if (!group) continue; // категория вне манифеста — не выдумываем
+    if (recipe.category !== category) continue;
     const { evaluation } = craftingPreview(recipe.id);
     const missingPerk = evaluation.blocked.find((b) => b.code === 'missing-perk');
     const status = evaluation.ready ? 'ready' : missingPerk ? 'missing-perk' : 'missing-material';
@@ -88,7 +109,16 @@ export const buildCraftModel = () => {
     const maxCraft = evaluation.ready
       ? evaluation.materials.reduce((acc, row) => Math.min(acc, Math.floor(row.have / row.need)), Infinity)
       : 0;
-    group.rows.push({
+    const materials = evaluation.materials.map((row) => ({
+      itemId: row.itemId,
+      name: itemName(catalog, row.itemId, null),
+      rarity: materialRarityOf(row.itemId),
+      need: row.need,
+      have: row.have,
+      enough: row.enough,
+      haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
+    }));
+    rows.push({
       recipeId: recipe.id,
       category: recipe.category,
       // id рецепта = id предмета результата (269): «output» в данных нет.
@@ -99,22 +129,20 @@ export const buildCraftModel = () => {
       skillLabel: getSkillDisplayName(recipe.requires.skill),
       minutes,
       timeLabel: formatCraftMinutes(minutes),
+      // 322 (вопрос владельца «что такое 1 сут?»): время изготовления подписано явно.
       metaLine: fmt(d.complexity, { n: Number(recipe.requires.complexity) || 0 })
-        + ' · ' + getSkillDisplayName(recipe.requires.skill) + ' · ' + formatCraftMinutes(minutes),
+        + ' · ' + getSkillDisplayName(recipe.requires.skill)
+        + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
       status,
       canCraft: evaluation.ready,
       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,
       reason: missingPerk
         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
         : status === 'missing-material' ? d.shortMaterials : null,
-      materials: evaluation.materials.map((row) => ({
-        itemId: row.itemId,
-        name: itemName(catalog, row.itemId, null),
-        need: row.need,
-        have: row.have,
-        enough: row.enough,
-        haveLine: fmt(d.haveNeed, { have: row.have, need: row.need }),
-      })),
+      materials,
+      materialGroups: RARITY_TYPES
+        .filter((type) => materials.some((m) => m.rarity === type))
+        .map((type) => ({ type })),
       labels: {
         materialsTitle: d.materialsTitle,
         craft: d.craft,
@@ -124,19 +152,36 @@ export const buildCraftModel = () => {
       },
     });
   }
-  return groups.filter((g) => g.rows.length > 0);
+  return rows;
 };
+
+/** Квадраты категорий (318): все 8 — даже те, у кого рецептов пока нет. */
+export const buildCraftTiles = () => {
+  const labels = dict();
+  return CRAFT_CATEGORIES.map((category) => {
+    const rows = buildRowsForCategory(category);
+    return {
+      category,
+      label: labels.categoryNames?.[category] ?? category,
+      recipes: rows.length,
+      available: rows.filter((row) => row.canCraft).length,
+    };
+  });
+};
+
+/** Список рецептов категории (спойлеры модалки, 318); пустая категория = []. */
+export const buildCategoryModel = (category) => buildRowsForCategory(category);
 
 /**
  * count попыток подряд. Провал проверки — не стоп (следующая попытка
  * обычная); нехватка материалов/стора — стоп, сколько успели, столько есть.
  */
-export const craftBatch = (recipeId, count = 1) => {
+export const craftBatch = (recipeId, count = 1, options = {}) => {
   const attempts = [];
   const total = Math.max(1, Math.floor(count) || 1);
   let stoppedEarly = 0;
   for (let i = 0; i < total; i += 1) {
-    const result = craftRecipe(recipeId);
+    const result = craftRecipe(recipeId, {}, options);
     if (result.stage === 'gate' || result.stage === 'store') {
       if (attempts.length === 0) return { attempts: [result], stoppedEarly: 0, refusedFirst: true };
       stoppedEarly = total - attempts.length;
@@ -169,6 +214,7 @@ export const buildCraftReport = (recipeId, run) => {
   const granted = new Map();
   const spent = new Map();
   let minutes = 0;
+  let pendingTime = null;
   run.attempts.forEach((attempt, index) => {
     let line;
     if (attempt.auto) {
@@ -178,7 +224,11 @@ export const buildCraftReport = (recipeId, run) => {
       line = attempt.check.passed
         ? fmt(d.rollsSuccess, { rolls, n: attempt.check.successes })
         : fmt(d.rollsFail, { rolls });
-      if ((attempt.check.complicationCount ?? 0) > 0) line += `. ${d.complicationNote}`;
+      if ((attempt.check.complicationCount ?? 0) > 0) {
+        // 323: надбавка аддитивная — «осложнение: +30 мин к работе» (+10 на станции).
+        const extra = (attempt.check.complicationCount ?? 0) * complicationExtraMinutesFor(recipe);
+        line += `. ${fmt(d.complicationNote, { n: extra })}`;
+      }
     } else {
       line = d.autoNote;
     }
@@ -191,7 +241,15 @@ export const buildCraftReport = (recipeId, run) => {
     for (const row of attempt.spent ?? []) {
       spent.set(row.itemId, (spent.get(row.itemId) ?? 0) + (Number(row.count) || 0));
     }
-    if (attempt.time) minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+    // 323: отложенное время (окно ещё спросит про 2 ОД) в «потраченное» не идёт.
+    if (attempt.time) {
+      if (attempt.time.pending) {
+        if (!pendingTime) pendingTime = { hasSuccess: false };
+        if (attempt.done) pendingTime.hasSuccess = true;
+      } else {
+        minutes += attempt.time.minutes * attempt.time.durationMultiplier;
+      }
+    }
   });
   const items = new Map([...granted, ...spent]); // имена общие для сумки
   const render = (map) => [...map.entries()]
@@ -202,6 +260,13 @@ export const buildCraftReport = (recipeId, run) => {
     minutes > 0 ? fmt(d.timeSpent, { time: formatCraftMinutes(minutes) }) : null,
   ].filter(Boolean).join('. ');
   lines.push(tail);
+  // ОД (324): заработанное проверками — в общий пул (кап 6, дом движка).
+  const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
+  const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
+  if (apGained > 0 && apPool != null) {
+    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
+  }
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
-  return { title: d.resultTitle, lines };
+  // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+  return { title: d.resultTitle, lines, recipeId, pendingTime };
 };

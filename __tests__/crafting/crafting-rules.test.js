@@ -1,9 +1,8 @@
-// Патч 259 (вместо правила 258 о «порче»): осложнение НЕ отменяет успех —
-// корневая система 2d20 того требует. Наказанием становится время: при любом
-// осложнении движок возвращает durationMultiplier из правила сеттинга
-// (10 минут крафта → 20, час → 2, сутки → 2). Реформа 269: карты верстаков из
-// правил убраны — сгорание при провале живёт флагом в самой recipe-записи,
-// пачки заданы списком id; здесь же инварианты этих правил.
+// Патч 259: осложнение НЕ отменяет успех — корневая система 2d20 того требует.
+// Патч 323 (текст книги от владельца): наказание за осложнение — АДДИТИВНЫЕ
+// минуты (+30, станция +10), прежний множитель ×2 отменён; времена по книге —
+// час всем категориям, 20 минут на станции приготовления пищи (еда/напитки).
+// Реформа 269: карты верстаков из правил убраны; здесь же инварианты правил.
 
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -67,7 +66,8 @@ const run = ({ rolls = [3, 20], failBurnsMaterials = false, recipe = recipeStub(
     perkRanks: {},
     inventoryCounts: { mat_plastic: 2 },
     failBurnsMaterials,
-    complicationDurationMultiplier: CRAFT_RULES.complicationDurationMultiplier,
+    // 323: сеттинг больше не множит — надбавка за осложнения аддитивная в адаптере.
+    complicationDurationMultiplier: 1,
     ...ports,
   });
   return { result, calls };
@@ -78,7 +78,7 @@ describe('осложнение не отменяет успех — оно по�
     const { result, calls } = run({ rolls: [3, 20] });
     expect(result.done).toBe(true);
     expect(result.granted.itemId).toBe('food_result');
-    expect(result.durationMultiplier).toBe(2);
+    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
     expect(result.check.complicationCount).toBe(1);
     expect(calls.grant).toBe(1);
     expect(calls.spend).toBe(1);
@@ -94,7 +94,7 @@ describe('осложнение не отменяет успех — оно по�
     const { result } = run({ rolls: [15, 20], failBurnsMaterials: true });
     expect(result.done).toBe(false);
     expect(result.reason).toBe('check-failed');
-    expect(result.durationMultiplier).toBe(2);
+    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
     expect(result.burned.length).toBe(1); // сгорание на горячем верстаке — как раньше
   });
 
@@ -102,7 +102,7 @@ describe('осложнение не отменяет успех — оно по�
     const { result } = run({ rolls: [20, 20], failBurnsMaterials: false });
     expect(result.done).toBe(false);
     expect(result.reason).toBe('check-failed');
-    expect(result.durationMultiplier).toBe(2);
+    expect(result.durationMultiplier).toBe(1); // 323: аддитивные минуты — в адаптере
     expect(result.burned).toEqual([]); // верстак без флага сгорания — материалы целы
   });
 
@@ -117,8 +117,10 @@ describe('осложнение не отменяет успех — оно по�
     expect(result.check).toBeNull();
   });
 
-  it('настройка правила: множитель ровно 2, «порчи» больше нет', () => {
-    expect(CRAFT_RULES.complicationDurationMultiplier).toBe(2);
+  it('правило 323 (книга): осложнение — аддитивные минуты, не множитель', () => {
+    expect(CRAFT_RULES.complicationDurationMultiplier).toBeUndefined();
+    expect(CRAFT_RULES.complicationExtraMinutes).toBe(30);
+    expect(CRAFT_RULES.stationComplicationExtraMinutes).toBe(10);
     expect(CRAFT_RULES.spoilsMaterialsOnComplicationByBench).toBeUndefined();
   });
 });
@@ -153,8 +155,8 @@ describe('правила крафта после реформы 269', () => {
   it('сгорание — правило навыка в реестре; разрез совпадает с печатью (с. 210–211)', () => {
     // 270 (решение владельца): вместо 74 флагов в данных — две строки правила.
     // Гард: применённое к файлам, правило даёт ровно печатный разрез верстаков
-    // (кухня и химия горят: все chems/food/drinks + взрывчатка в ammo/weapons;
-    // станок оружейника — нет). И ни одной записи поле не принадлежит.
+    // (кухня и химия горят: все chems/food/drinks + вся взрывчатка в ammo и
+    // explosives (325); станок оружейника — нет). И ни одной записи поле не принадлежит.
     const burns = (r) => CRAFT_RULES.failBurnsMaterialsSkills.includes(r.requires.skill);
     const burnCount = {};
     for (const entry of craftingIndex.recipes) {
@@ -166,16 +168,16 @@ describe('правила крафта после реформы 269', () => {
     expect(burnCount.food).toBe(27);
     expect(burnCount.drinks).toBe(8);
     expect(burnCount.ammo).toBe(9);
-    expect(burnCount.weapons).toBe(9);
+    expect(burnCount.explosives).toBe(9); // 325: вся взрывчатка — своя категория
     expect(CRAFT_RULES.failBurnsMaterialsSkills.sort()).toEqual(
       [...CRAFT_RULES.failBurnsMaterialsSkills].sort(),
     ); // список — настройка: редактируется здесь, данные не трогаются
   });
 
-  it('ступени времени монотонны, множитель осложнения = 2', () => {
-    expect(CRAFT_RULES.complicationDurationMultiplier).toBe(2);
-    const minutes = CRAFT_RULES.craftTimeTiers.map((t) => t.minutes);
-    expect(minutes).toEqual([...minutes].sort((a, b) => a - b));
+  it('времена по книге (323): час всем, станция еды/напитков — 20 минут', () => {
+    expect(CRAFT_RULES.craftBaseMinutes).toBe(60);
+    expect(CRAFT_RULES.stationMinutes).toBe(20);
+    expect(CRAFT_RULES.craftTimeTiers).toBeUndefined(); // ступени 259 отменены
     expect(CRAFT_RULES.spoilsMaterialsOnComplicationByBench).toBeUndefined();
   });
 });

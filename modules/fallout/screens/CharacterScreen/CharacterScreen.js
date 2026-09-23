@@ -38,7 +38,6 @@ import {
   canChangeSkillValue,
   getAttributeLimits,
   validateSkills,
-  calculateMaxHealth,
   ALL_SKILLS,
   isMultiTraitOrigin,
   MAX_ATTRIBUTE,
@@ -50,13 +49,12 @@ import {
 // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
 // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
 import { applyFrameAttributeModifiers, hasFrame } from "../../../../domain/powerArmor";
-import dataPowerArmor from "../../data/equipment/powerArmor.json";
+// МК-3 (патч 316): формула макс. ОЗ и каталог каркаса СБ — часть сеттинга, из логики модуля.
+import { calculateMaxHealth, PA_FRAME_CATALOG } from "../../logic/derivedStats";
 import {
   getSkillDisplayName,
   tCharacterScreen,
 } from "./logic/characterScreenI18n";
-
-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
 import { useLocale, useModuleLocale } from "../../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from '../../styles/CharacterScreen.styles';

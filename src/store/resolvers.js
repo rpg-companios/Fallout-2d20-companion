@@ -89,238 +89,107 @@ export const normalizeItemParameters = (item) => {
   return normalized;
 };
 
-// --- Derived Stats Resolvers ---
 
-import {
-  getAttributeValue,
-  calculateMaxHealth,
-  calculateInitiative,
-  calculateDefense,
-  calculateMeleeBonusValue,
-  calculateCarryWeight,
-  calculateRobotCarryWeight,
-} from '../../domain/characterCreation.js';
+// ---------------------------------------------------------------------------
+// Универсальные хелперы параметров (МК-3, патч 316).
+// Сюда стянуты чистые механизмы без знаний о сеттинге, чтобы файлы логики
+// модуля (modules/fallout/logic/*) могли импортировать их НЕ задевая ни
+// реестр, ни characterCreation — файл остаётся полностью чистым (0 импортов).
+// Прежние дома оставляют re-export для совместимости.
+// ---------------------------------------------------------------------------
 
-import {
-  getTimedMaxHpBonus,
-  getTimedDamageResistanceBonus,
-  getTimedDefenseBonus,
-} from '../../domain/effects.js';
+// --- Канонические ключи атрибутов (из domain/characterCreation.js) ---
 
-import { effectsDictToLegacyArray } from './effectsSync.js';
+// Слово владельца (2026-09-21): порядок атрибутов SPECIAL — как в правилах,
+// и никак иначе: Сила, Восприятие, Выносливость, Харизма, Интеллект, Ловкость,
+// Удача. Это не сортировка, а канон показа: любой список атрибутов в программе
+// обязан идти в этом порядке. Предохранитель — тест special-attribute-order.
+export const CANONICAL_ATTRIBUTE_KEYS = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
 
-// Силовая броня: модификаторы надетого каркаса (СИЛ=set 11 и др. — данные) применяются
-// К БАЗЕ атрибутов до расчёта производных (carryWeight/melee и пр.). Натуральные
-// атрибуты в сторе при этом не трогаются. docs/architecture/power-armor-plan.md §5.6
-import { applyFrameAttributeModifiers } from '../../domain/powerArmor.js';
-import dataPowerArmor from '../../modules/fallout/data/equipment/powerArmor.json';
+const ATTRIBUTE_KEY_ALIASES = {
+  STR: 'STR',
+  END: 'END',
+  PER: 'PER',
+  AGI: 'AGI',
+  INT: 'INT',
+  CHA: 'CHA',
+  LCK: 'LCK',
+};
 
-const PA_FRAME_CATALOG = dataPowerArmor?.frame?.pieces?.[0] || null;
+export const getCanonicalAttributeKey = (key) => ATTRIBUTE_KEY_ALIASES[key] || null;
+
+export const getAttributeValue = (attributes = [], key) => {
+  const canonical = getCanonicalAttributeKey(key);
+  if (!canonical) return null;
+  const found = attributes.find(
+    (attr) => getCanonicalAttributeKey(attr.name) === canonical,
+  );
+  return found?.value ?? 0;
+};
+
+// --- Модификаторы грузоподъёмности от снаряжения (из characterCreation.js) ---
+
+const toNumber = (value) => Number(value) || 0;
+
+const sumCarryWeightModifierFromItem = (item) => {
+  if (!item) return 0;
+  return toNumber(item.carryWeightModifier);
+};
+
+export const getEquipmentCarryWeightModifier = ({ equippedArmor, equippedRobotSlots } = {}) => {
+  let total = 0;
+
+  if (equippedArmor && typeof equippedArmor === 'object') {
+    Object.values(equippedArmor).forEach((slot) => {
+      total += sumCarryWeightModifierFromItem(slot?.armor);
+      total += sumCarryWeightModifierFromItem(slot?.clothing);
+    });
+  }
+
+  if (equippedRobotSlots && typeof equippedRobotSlots === 'object') {
+    Object.values(equippedRobotSlots).forEach((slot) => {
+      total += sumCarryWeightModifierFromItem(slot?.armor);
+      total += sumCarryWeightModifierFromItem(slot?.plating);
+      total += sumCarryWeightModifierFromItem(slot?.frame);
+    });
+  }
+
+  return total;
+};
+
+// --- Атрибут-модификаторы каркаса силовой брони (из domain/powerArmor.js) ---
+
+/** attributeModifier каркаса из его каталожных данных (null, если не объявлен). */
+export const getFrameAttributeModifiers = (catalogFrameItem) =>
+  catalogFrameItem?.modifiers?.attributeModifier || null;
 
 /**
- * Calculate derived stats from attributes, effects, and trait
- * @param {Object} attributes - Normalized attributes object
- * @param {Object} effects - Normalized effects object
- * @param {Object} trait - Character trait object
- * @param {number} level - Character level
- * @param {Object} equipmentState - Equipment state for carry weight calculation
- * @returns {Object} Derived stats with base, modifiers, and total
+ * Применить одну запись значения-модификатора. Семейство операций — белый список
+ * проекта { '+', '-', 'set' } (семантика как у модов оружия в modsEquip: set = строго).
+ * Неизвестная операция — ошибка данных, а НЕ «тихий minus».
  */
-export const calculateDerivedStats = (attributes, effects, trait, level = 1, equipmentState = {}) => {
-  // Convert normalized attributes to array format for compatibility
-  const attributesArray = Object.values(attributes).map(attr => ({
-    name: attr.id,
-    value: attr.base,
-  }));
-
-  // Надетый каркас силовой брони подменяет атрибуты (set/add) для производных.
-  const attributesEffective = applyFrameAttributeModifiers(
-    attributesArray,
-    equipmentState?.powerArmorFrameId ? PA_FRAME_CATALOG : null,
-  );
-
-  const effectsArray = effectsDictToLegacyArray(effects);
-
-  const stats = {
-    maxHealth: { base: 0, modifiers: [], total: 0 },
-    initiative: { base: 0, modifiers: [], total: 0 },
-    defense: { base: 0, modifiers: [], total: 0 },
-    meleeBonus: { base: 0, modifiers: [], total: 0 },
-    carryWeight: { base: 0, modifiers: [], total: 0 },
-    damageResistance: {
-      physical: { base: 0, modifiers: [], total: 0 },
-      energy: { base: 0, modifiers: [], total: 0 },
-      radiation: { base: 0, modifiers: [], total: 0 },
-    },
-  };
-
-  // Max Health: END + LCK + level
-  stats.maxHealth.base = calculateMaxHealth(attributesEffective, level);
-  
-  // Timed effects: getTimedMaxHpBonus
-  const hpBonus = getTimedMaxHpBonus(effectsArray);
-  if (hpBonus !== 0) {
-    stats.maxHealth.modifiers.push({
-      source: 'timedEffects',
-      value: hpBonus,
-      operation: '+',
-    });
-  }
-  
-  stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
-
-  const drBonus = getTimedDamageResistanceBonus(effectsArray);
-  ['physical', 'energy', 'radiation'].forEach((type) => {
-    const bonus = drBonus[type] || 0;
-    if (bonus !== 0) {
-      stats.damageResistance[type].modifiers.push({
-        source: 'timedEffects',
-        value: bonus,
-        operation: '+',
-      });
-      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
-    }
-  });
-  
-  // Initiative: PER + AGI
-  stats.initiative.base = calculateInitiative(attributesEffective);
-  stats.initiative.total = calculateAttributeTotal(stats.initiative);
-  
-  // Defense: AGI >= 9 ? 2 : 1 (+ бонусы timed-эффектов, напр. Стелс-бой +2)
-  stats.defense.base = calculateDefense(attributesEffective);
-  const defenseBonus = getTimedDefenseBonus(effectsArray);
-  if (defenseBonus !== 0) {
-    stats.defense.modifiers.push({
-      source: 'timedEffects',
-      value: defenseBonus,
-      operation: '+',
-    });
-  }
-  stats.defense.total = calculateAttributeTotal(stats.defense);
-  
-  // Melee Bonus: STR-based
-  stats.meleeBonus.base = calculateMeleeBonusValue(attributesEffective, trait);
-  stats.meleeBonus.total = calculateAttributeTotal(stats.meleeBonus);
-  
-  // Carry Weight:
-  //  - Roboты: база от корпуса + модификаторы брони (STR/перки/химия не влияют)
-  //  - Остальные: STR-based + trait + снаряжение
-  const robotSlots = equipmentState.robotSlots || equipmentState.equippedRobotSlots || null;
-  if (equipmentState.isRobot) {
-    stats.carryWeight.base = calculateRobotCarryWeight(robotSlots || {}, trait);
-  } else {
-    stats.carryWeight.base = calculateCarryWeight(attributesEffective, trait, equipmentState);
-  }
-  stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
-
-  // --- Перк-бонусы (perkBonuses) ---
-  // perkBonuses попадает сюда через аргумент effects ({ ...effects, perkBonuses })
-  const perkBonuses = effects?.perkBonuses || {};
-
-  // maxHealthBonus (lifeGiver)
-  const maxHealthFromPerks = Number(perkBonuses.maxHealthBonus) || 0;
-  if (maxHealthFromPerks !== 0) {
-    stats.maxHealth.modifiers.push({
-      source: 'perks',
-      value: maxHealthFromPerks,
-      operation: '+',
-    });
-    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
-  }
-
-  // carryWeightBonus (strongBack)
-  const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
-  if (carryFromPerks !== 0 && !equipmentState.isRobot) {
-    stats.carryWeight.modifiers.push({
-      source: 'perks',
-      value: carryFromPerks,
-      operation: '+',
-    });
-    stats.carryWeight.total = calculateAttributeTotal(stats.carryWeight);
-  }
-
-  // damageResistance (toughness / refractor / radResistant / barbarian)
-  const drFromPerks = perkBonuses.damageResistance || {};
-  ['physical', 'energy', 'radiation'].forEach((type) => {
-    const bonus = Number(drFromPerks[type]) || 0;
-    if (bonus !== 0) {
-      stats.damageResistance[type].modifiers.push({
-        source: 'perks',
-        value: bonus,
-        operation: '+',
-      });
-      stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
-    }
-  });
-
-  return stats;
+export const applyAttributeModifierValue = (base, entry) => {
+  const value = Number(entry?.value);
+  if (!Number.isFinite(value)) throw new Error(`[powerArmor] attributeModifier value не число: ${entry?.value}`);
+  if (entry?.op === 'set') return value;
+  if (entry?.op === '+') return base + value;
+  if (entry?.op === '-') return base - value;
+  throw new Error(`[powerArmor] неизвестная операция атрибут-модификатора: ${entry?.op}`);
 };
 
 /**
- * Apply effect parameters to stats
- * @param {Object} stats - Current derived stats
- * @param {Object} effect - Effect to apply
- * @returns {Object} Updated stats with effect modifiers
+ * Эффективные атрибуты с применёнными модификаторами каркаса (§5.6):
+ * получает массив [{name, value}] и КАТАЛОЖНЫЙ предмет каркаса (с modifiers).
+ * Каркаса нет / атрибутов нет → возвращает массив как есть (та же ссылка).
+ * Ключи атрибутов канонизируются (STR/СИЛ) — совпадает только объявленное в данных.
  */
-export const applyEffectToStats = (stats, effect) => {
-  const updatedStats = { ...stats };
-  
-  if (effect.maxHpModifier) {
-    const mod = effect.maxHpModifier;
-    updatedStats.maxHealth.modifiers = [
-      ...(updatedStats.maxHealth.modifiers || []),
-      {
-        source: effect.id,
-        value: Number(mod.value) || 0,
-        operation: mod.op || '+',
-      },
-    ];
-    updatedStats.maxHealth.total = calculateAttributeTotal(updatedStats.maxHealth);
-  }
-  
-  if (effect.damageResistanceModifier) {
-    // Initialize damage resistance if not present
-    if (!updatedStats.damageResistance) {
-      updatedStats.damageResistance = {
-        physical: { base: 0, modifiers: [], total: 0 },
-        energy: { base: 0, modifiers: [], total: 0 },
-        radiation: { base: 0, modifiers: [], total: 0 },
-      };
-    }
-    
-    const mod = effect.damageResistanceModifier;
-    const type = mod.type || 'physical';
-    
-    if (updatedStats.damageResistance[type]) {
-      updatedStats.damageResistance[type].modifiers = [
-        ...(updatedStats.damageResistance[type].modifiers || []),
-        {
-          source: effect.id,
-          value: Number(mod.value) || 0,
-          operation: mod.op || '+',
-        },
-      ];
-      updatedStats.damageResistance[type].total = calculateAttributeTotal(
-        updatedStats.damageResistance[type]
-      );
-    }
-  }
-
-  if (effect.defenseModifier) {
-    const mod = effect.defenseModifier;
-    if (!updatedStats.defense) {
-      updatedStats.defense = { base: 0, modifiers: [], total: 0 };
-    }
-    updatedStats.defense.modifiers = [
-      ...(updatedStats.defense.modifiers || []),
-      {
-        source: effect.id,
-        value: Number(mod.value) || 0,
-        operation: mod.op || '+',
-      },
-    ];
-    updatedStats.defense.total = calculateAttributeTotal(updatedStats.defense);
-  }
-  
-  return updatedStats;
+export const applyFrameAttributeModifiers = (attributesArray, catalogFrameItem) => {
+  const mods = getFrameAttributeModifiers(catalogFrameItem);
+  if (!mods || !Array.isArray(attributesArray)) return attributesArray;
+  return attributesArray.map((attr) => {
+    const key = getCanonicalAttributeKey(attr?.name ?? attr?.id);
+    const entry = key ? mods[key] : null;
+    if (!entry) return attr;
+    return { ...attr, value: applyAttributeModifierValue(Number(attr.value) || 0, entry) };
+  });
 };

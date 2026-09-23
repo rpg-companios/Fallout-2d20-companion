@@ -64,7 +64,7 @@ const moduleScrapTables = SETTING.data.junk.tables;
 const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
 const CRAFTING_FILES = {
   'ammo.json': SETTING.data.recipes.sections.ammo,
-  'weapons.json': SETTING.data.recipes.sections.weapons,
+  'explosives.json': SETTING.data.recipes.sections.explosives,
   'chems.json': SETTING.data.recipes.sections.chems,
   'food.json': SETTING.data.recipes.sections.food,
   'drinks.json': SETTING.data.recipes.sections.drinks,
@@ -208,6 +208,16 @@ export function getPowerArmorData() {
 
 export function getModuleEquipmentKits() {
   return moduleEquipmentKits;
+}
+
+/**
+ * Логика сеттинга (МК-3, патч 316): формулы производных параметров
+ * (инициатива, защита, бонус ближнего боя, макс. ОЗ, грузоподъёмность,
+ * сборка calculateDerivedStats). Движку — только сюда, прямые импорты
+ * из modules/fallout/logic/* в src/store/** запрещены (тест границы).
+ */
+export function getDerivedStatsLogic() {
+  return SETTING.logic.derivedStats;
 }
 
 /**
