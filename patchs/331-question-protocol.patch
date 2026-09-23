@@ -1,0 +1,116 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 0ddd77e..9050326 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,8 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **330** · у владельца на main применено до **314**
+-(слово владельца: «всё шикарно»; 315–330 уехали, установка не подтверждена;
++· последний сданный патч: **331** · у владельца на main применено до **314**
++(слово владельца: «всё шикарно»; 315–331 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+ ## Состав приложения (игровыми терминами)
+@@ -136,6 +136,12 @@
+ 
+ ## Уроки (не повторять)
+ 
++- ПРОТОКОЛ ВОПРОСОВ (331, слово владельца после 329→330): любое
++  недопонимание или разночтение — СПРАШИВАТЬ владельца и «спихивать» на
++  него описание деталей, даже если ответ кажется очевидным. Два патча на
++  правку недопонимания хуже одного вопроса до работы. Вопросы в отчёте
++  выделять ЯВНО: заголовок «ВОПРОСЫ — жду ответа по номерам», не абзацем.
++
+ - Песочница агента периодически теряет историю коммитов (`.git` откатывается,
+   дерево живёт) — коммит и пуш после КАЖДОГО шага.
+ - Повреждение байта в файлах патчей после сбоя песочницы — сверять с
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 30a2466..b695e01 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -2,7 +2,21 @@
+ 
+ ---
+ 
+-## Category tiles — like character cards (patch 330)
++## Question protocol — ask first, fix later never (patch 331)
++
++Owner's word after the 329→330 pair: "if there is any misunderstanding
++or ambiguity — push it onto me so I describe the details, instead of
++patching the misunderstanding twice."
++
++- The rule is recorded in state.md Lessons as law: any ambiguity becomes
++  a question to the owner BEFORE work; questions in reports get an
++  explicit "QUESTIONS — awaiting answers by number" heading.
++- The four armor-mod questions (327) are restyled: the reference doc's
++  section header now shouts that these are questions and mod crafting
++  will not start without answers (the owner honestly missed them as
++  "statements").
++
++## ## Category tiles — like character cards (patch 330)
+ 
+ Owner's correction to 329: "do character cards look like that?" — no.
+ In 329 the tiles were styled after home-screen FOLDERS (dark panel, gold
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 704e287..94201b5 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -2,7 +2,20 @@
+ 
+ ---
+ 
+-## Квадраты категорий — как карточки персонажей (патч 330)
++## Протокол вопросов — спрашивать до, а не править после (патч 331)
++
++Слово владельца после пары 329→330: «если есть недопонимание или
++разночтение — спихни на меня, чтобы я описал детали, а не два патча
++потом править недопонимание».
++
++- Правило записано в Уроки state.md как закон: любая неоднозначность —
++  вопрос владельцу ДО работы; вопросы в отчётах — только явным
++  заголовком «ВОПРОСЫ — жду ответа по номерам».
++- Четыре вопроса по модам брони (327) переоформлены: заголовок раздела
++  в справочнике теперь кричит, что это вопросы и без них крафт модов
++  не начинается (владелец честно пропустил их как «констатации»).
++
++## ## Квадраты категорий — как карточки персонажей (патч 330)
+ 
+ Поправка владельца к 329: «разве карточки персонажей такое оформление
+ имеют?» — нет. В 329 квадраты были оформлены по образцу ПАПОК home screen
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index c2f327b..df912a2 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -201,7 +201,10 @@
+ материалы брони СИНТОВ (см. 2.1), а общих модов с такими именами в таблице
+ нет. Похоже на дубли, попавшие в общие моды.
+ 
+-## 3. Вопросы к владельцу (ждут слова, крафт модов не начат)
++## 3. ВОПРОСЫ К ВЛАДЕЛЬЦУ — ЖДУ ЯВНОГО ОТВЕТА ПО НОМЕРАМ
++
++> Это ВОПРОСЫ, а не констатации. Без ответов крафт модов НЕ НАЧИНАЕТСЯ.
++> Владелец: отвечать можно коротко, по номерам (327).
+ 
+ 1. **Чинить ли ёмкость в данных модов** (`complexity` 22+12 записей) по
+    книге? Правка меняет и стоимость УСТАНОВКИ модов в окне улучшения
+diff --git a/public/version.json b/public/version.json
+index 3802c7d..7803a0b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,11 +1,11 @@
+ {
+-  "version": "330",
++  "version": "331",
+   "notes": {
+     "ru-RU": [
+-      "Крафт: квадраты категорий перекрашены под карточки персонажей (светлая панель, серая рамка)"
++      "Протокол: любые разночтения — вопрос владельцу до работы; вопросы по модам брони переоформлены явно"
+     ],
+     "en-EN": [
+-      "Crafting: category tiles restyled to match character cards (light panel, grey border)"
++      "Protocol: any ambiguity goes to the owner as a question first; armor-mod questions restyled explicitly"
+     ]
+   }
+ }
