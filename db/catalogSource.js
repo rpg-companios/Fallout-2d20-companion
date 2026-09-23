@@ -31,11 +31,14 @@ const slugify = (str) => {
   return str.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '_').replace(/_+/g, '_').slice(0, 40);
 };
 
-const ROBOT_WEAPON_BASE_MAP = {
-  robot_weapon_flamethrower: 'weapon_022',
-  robot_weapon_laser_cutter: 'weapon_018',
-  robot_weapon_auto_10mm: 'weapon_002',
-};
+// Робо-оружие может быть ПОЛНЫМ вариантом людского (trueItemId в
+// robot/weapons.json, 314): личность робо-записи (id, имя, флаги монтажа),
+// характеристики и моды — от людской базы, как у «Опасной бритвы».
+// Раньше тройка связей была зашита картой в коде: она указывала на
+// номерные id, которых в данных нет, и никогда не срабатывала — удалена.
+const robotBaseAliases = (catalog) => (catalog.weapons || [])
+  .filter((w) => w?.isRobotWeapon && w?.trueItemId)
+  .map((w) => [w.id, w.trueItemId]);
 
 // ─── row builders (identical shape to seed.js INSERTs) ──────────────────────
 
@@ -75,9 +78,9 @@ const buildWeaponRow = (w) => {
   };
 };
 
-const buildWeaponModRow = (m) => {
+const buildWeaponModRow = (m, aliases = []) => {
   const baseIds = Array.isArray(m.applies_to_ids) ? m.applies_to_ids : [];
-  const robotAliases = Object.entries(ROBOT_WEAPON_BASE_MAP)
+  const robotAliases = aliases
     .filter(([, baseId]) => baseIds.includes(baseId))
     .map(([robotId]) => robotId);
   const appliesToIds = Array.from(new Set([...baseIds, ...robotAliases]));
@@ -202,12 +205,13 @@ const buildItemRows = (catalog) => {
 // Mod-slot overrides → list of { weapon_id, slot, mod_id } (mirrors seedWeaponModSlots)
 const buildModSlotRows = (catalog) => {
   const modsOverridesData = catalog.modsOverrides || {};
+  // Наследование слотов робо-оружия — из данных (trueItemId, 311).
   const robotSlotOverrides = {};
-  Object.entries(ROBOT_WEAPON_BASE_MAP).forEach(([robotWeaponId, baseWeaponId]) => {
+  robotBaseAliases(catalog).forEach(([robotWeaponId, baseWeaponId]) => {
     if (modsOverridesData[baseWeaponId]) robotSlotOverrides[robotWeaponId] = modsOverridesData[baseWeaponId];
   });
-  // Собственные слоты робо-оружия (293): robot/weapon_mod_slots.json — приоритетнее
-  // наследования от людской базы (у Головного лазера Штурмотрона — Capacitor).
+  // Собственные слоты робо-оружия (293): производные от самих модов —
+  // приоритетнее наследования от людской базы (у Головного лазера — Capacitor).
   const merged = { ...modsOverridesData, ...robotSlotOverrides, ...(catalog.robotWeaponModSlots || {}) };
   const rows = [];
   for (const [weaponId, slots] of Object.entries(merged)) {
@@ -226,13 +230,14 @@ const build = () => {
   const locale = getCurrentModuleLocale();
   if (_cache && _cacheLocale === locale) return _cache;
   const catalog = getEquipmentCatalog(locale);
+  const aliases = robotBaseAliases(catalog);
   _cache = {
     weapons: (catalog.weapons || []).map(buildWeaponRow),
     // Робо-моды оружия (293→301): полный пул модов собирает базовая сборка
     // (i18n/equipmentCatalog.weaponMods уже включает робо-моды) — здесь
     // только адаптация формы строки. Склейка «людские + робо» жила тут
     // отдельной копией знания и после 301 давала дубли.
-    weaponMods: (catalog.weaponMods || []).map(buildWeaponModRow),
+    weaponMods: (catalog.weaponMods || []).map((m) => buildWeaponModRow(m, aliases)),
     modSlots: buildModSlotRows(catalog),
     ammo: (catalog.ammoTypes || []).map(buildAmmoRow),
     qualities: (catalog.qualities || []).map(buildQualityRow),

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ARENA_BRANCH="arena/01a0b2bb-fallout-2d20-companion"
+ARENA_BRANCH="arena/01a0c8e2-fallout-2d20-companion"
 REMOTE="origin"
 
 ROOT_DIR="$(
@@ -11,10 +11,10 @@ ROOT_DIR="$(
   pwd
 )"
 
-# Цепочка может переписать сам apply-patch.sh (так делает патч 295): bash
-# читает сценарий по смещениям, и перезапись файла посреди выполнения ломает
-# поток команд. Работаем со стабильной копией себя; оригинальный каталог
-# передаём через окружение (копия живёт во временном каталоге).
+# Цепочка может переписать сам apply-patch.sh: bash читает сценарий по
+# смещениям, и перезапись файла посреди выполнения ломает поток команд.
+# Работаем со стабильной копией себя; оригинальный каталог передаём
+# через окружение (копия живёт во временном каталоге).
 if [[ "${APPLY_PATCH_STABLE:-}" != "1" ]]; then
   STABLE_SELF="$(mktemp "${TMPDIR:-/tmp}/apply-patch.stable.XXXXXX.sh")"
   cp -- "${BASH_SOURCE[0]}" "$STABLE_SELF"
@@ -29,73 +29,41 @@ ROOT_DIR="${APPLY_PATCH_ROOT:?}"
 usage() {
   cat <<'USAGE'
 Использование:
-  ./apply-patch.sh <номер>        применить патч и все недостающие до него
-  ./apply-patch.sh <номер> --only применить ровно один патч, без цепочки
-  ./apply-patch.sh <номер> --3way применить с трёхсторонним слиянием
-                                  (только если точно понимаешь, зачем:
-                                  3way может оставить конфликтные маркеры)
-  ./apply-patch.sh --status       показать, что стоит и чего не хватает
-  ./apply-patch.sh --list         то же, что --status
-  ./apply-patch.sh --mark-through <номер>
-                                  записать «всё до <номер> уже применено»
-                                  в локальное состояние (дерево не трогает)
-  ./apply-patch.sh --mark <номер>
-                                  записать в состояние ровно один патч
-                                  (симметрия --unmark; дерево не трогает)
-  ./apply-patch.sh --unmark <номер>
-                                  вычеркнуть <номер> из записи состояния
+  ./apply-patch.sh <номер>   применить патч и все недостающие до него
+  ./apply-patch.sh --status  показать, что стоит и чего не хватает
+  ./apply-patch.sh --list    то же, что --status
 
-Скрипт ведёт локальную запись применённого — файл arena-patches.state
-внутри .git (не коммитится, не пушится, переживает смену ветки).
-Состояние НЕ «вынюхивается» из дерева: локальные коммиты и правки между
-запусками не сбивают цепочку. Недостающие патчи либо встают начисто,
-либо скрипт останавливается с точным отчётом, ничего не ломая.
-Патч, который доказуемо уже стоит (полный обратный откат возможен),
-в запись заносится без применения — дерево не трогается.
+Единственный источник истины — реальное содержимое файлов прямо сейчас.
+При каждом запуске каждый патч ветки проверяется заново:
+  git apply --check           — патч ещё не стоит, может встать начисто;
+  git apply --reverse --check — патч уже стоит, откатывается начисто.
+Никакого журнала, которому доверяют без проверки: коммитил ты или нет,
+откатывал ли — скрипту не нужно знать историю, он смотрит на файлы.
 
-Первый запуск на дереве, где патчи уже стоят (записи ещё нет):
-  ./apply-patch.sh --mark-through <последний номер, который точно стоит>
+Патч, который не проходит ни одну проверку — не приговор: твои коммиты
+и правки закономерно уходят мимо старых патчей. Такой патч откладывается,
+очередь идёт дальше, а в конце каждый отложенный подтверждается более
+поздним патчем на тех же файлах. Нет подтверждения — громкое предупреждение
+с точным отчётом. Цель не достигнута — остановка с отчётом по первому
+не вставшему.
+
+Откат (git reset/checkout) не трогает новые файлы будущих патчей: скрипт
+узнаёт такие остатки (содержимое совпадает байт в байт) и даёт патчу
+воссоздать их.
 
 Примеры:
-  ./apply-patch.sh 144
-  ./apply-patch.sh 144 --only
+  ./apply-patch.sh 308
   ./apply-patch.sh --status
-  ./apply-patch.sh --mark-through 294
-
-Скрипт сам знает по записи, какие патчи уже применены, и ставит только
-недостающие, по возрастанию номера. Порядок соблюдается автоматически,
-помнить, на чём вы остановились, не нужно.
 USAGE
 }
 
 MODE="chain"
 PATCH_ID=""
-ALLOW_3WAY=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --status|--list)
       MODE="status"
-      shift
-      ;;
-    --only)
-      MODE="only"
-      shift
-      ;;
-    --3way)
-      ALLOW_3WAY=1
-      shift
-      ;;
-    --mark-through)
-      MODE="mark"
-      shift
-      ;;
-    --mark)
-      MODE="mark-one"
-      shift
-      ;;
-    --unmark)
-      MODE="unmark"
       shift
       ;;
     -h|--help)
@@ -135,44 +103,6 @@ if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-# --- локальная запись состояния ----------------------------------------------
-# Живёт внутри .git: не попадает в коммиты, не уходит при push, не мешает
-# смене ветки. «Между запусками не пушу» — этот файл и не нужно пушить.
-
-GIT_DIR="$(git -C "$ROOT_DIR" rev-parse --git-dir)"
-case "$GIT_DIR" in
-  /*) ;;
-  *)  GIT_DIR="$ROOT_DIR/$GIT_DIR" ;;
-esac
-STATE_FILE="$GIT_DIR/arena-patches.state"
-
-declare -a RECORDED=()
-state_load() {
-  RECORDED=()
-  [[ -f "$STATE_FILE" ]] || return 0
-  mapfile -t RECORDED < <(grep -Ev '^[[:space:]]*(#|$)' "$STATE_FILE" 2>/dev/null || true)
-}
-
-state_has() {
-  local needle="$1" item
-  for item in "${RECORDED[@]:-}"; do
-    [[ -n "$item" && "$item" == "$needle" ]] && return 0
-  done
-  return 1
-}
-
-state_add() {
-  {
-    grep -Ev '^[[:space:]]*(#|$)' "$STATE_FILE" 2>/dev/null || true
-    printf '%s\n' "$1"
-  } | sort -Vu >"${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
-}
-
-state_remove() {
-  grep -Fxv -- "$1" "$STATE_FILE" >"${STATE_FILE}.tmp" 2>/dev/null || true
-  mv "${STATE_FILE}.tmp" "$STATE_FILE"
-}
-
 echo "Загрузка Arena-ветки:"
 echo "  $REMOTE/$ARENA_BRANCH"
 
@@ -194,7 +124,6 @@ WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/arena-patches.XXXXXX")"
 
 cleanup() {
   rm -rf -- "$WORKDIR"
-  # Стабильная копия скрипта (см. блок APPLY_PATCH_STABLE выше).
   if [[ -n "${APPLY_PATCH_SELF:-}" ]]; then
     rm -f -- "$APPLY_PATCH_SELF"
   fi
@@ -234,6 +163,11 @@ number_le() {
   [[ "$first" == "$1" ]]
 }
 
+# Строго больше: a < b.
+number_lt() {
+  [[ "$1" != "$2" ]] && number_le "$1" "$2"
+}
+
 extract_patch() {
   local name="$1"
   local dest="$WORKDIR/$name"
@@ -243,149 +177,220 @@ extract_patch() {
   printf '%s' "$dest"
 }
 
-# Состояние патча по дереву (только для --status и стартовой проверки,
-# решения о применении принимает ТОЛЬКО локальная запись):
-#   pending  — применяется начисто
-#   applied  — откатывается начисто (по дереву стоит)
-#   conflict — ни то ни другое (влито в main / правлено локально)
-patch_state() {
-  local file="$1"
+# Файлы, которые патч изменяет (по строкам +++ b/...).
+patch_files() {
+  grep -E '^\+\+\+ b/' "$1" 2>/dev/null | sed -E 's/^\+\+\+ b\///' | grep -v '^/dev/null' || true
+}
 
-  if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" >/dev/null 2>&1; then
+# --- проверка патча по дереву, заново при каждом запуске ----------------------
+#   applied  — откатывается начисто: по дереву стоит
+#   pending  — применяется начисто: по дереву не стоит
+#   conflict — ни то ни другое: дерево разошлось с патчем
+
+check_forward() {
+  git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$1" 2>/dev/null
+}
+
+check_reverse() {
+  git -C "$ROOT_DIR" apply --reverse --check "$1" >/dev/null 2>&1
+}
+
+patch_state() {
+  # Порядок важен: сначала «может встать». На файлах с продублированным
+  # содержимым (склейка «два JSON подряд») обратная проверка способна
+  # ложно сказать «стоит», совпав с первой копией региона, — тогда патч
+  # никогда не починит склейку. Применение решает первым.
+  if check_forward "$1"; then
     printf 'pending'
     return
   fi
-
-  if git -C "$ROOT_DIR" apply --reverse --check "$file" >/dev/null 2>&1; then
+  if check_reverse "$1"; then
     printf 'applied'
     return
   fi
-
   printf 'conflict'
 }
 
-state_load
+# --- снимок состояния: каждый патч ветки проверяется по текущему дереву -------
 
-# --- режим записи/вычёркивания состояния -------------------------------------
+declare -A STATE
+for name in "${ALL_PATCHES[@]}"; do
+  STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
+done
 
-find_by_number() {
-  local want="$1" name
-  for name in "${ALL_PATCHES[@]}"; do
-    [[ "$(patch_number "$name")" == "$want" ]] && { printf '%s' "$name"; return 0; }
-  done
+# Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
+TOP_APPLIED=""
+for name in "${ALL_PATCHES[@]}"; do
+  [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
+done
+
+TOP_APPLIED_NUMBER=""
+[[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
+
+# Подтверждён ли отложенный патч. Два вида доказательства, любое:
+#   1) более поздний патч на тех же файлах (кроме чейнджлогов — их
+#      трогают все, это не доказательство) стоит или был применён;
+#   2) след строк: хотя бы одна добавленная патчем строка (в файле
+#      вне чейнджлогов) до сих пор лежит в дереве дословно.
+# Есть доказательство — дерево закономерно ушло мимо отложенного
+# (его строки изменило или унаследовало то, что встало позже).
+# Нет — файлы отложенного никем не подтверждены: возможно повреждение.
+is_changelog() {
+  [[ "$1" == "docs/changelog.ru.md" || "$1" == "docs/changelog.en.md" ]]
+}
+
+patch_files_strong() {
+  # файлы патча, кроме чейнджлогов
+  local f
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    is_changelog "$f" && continue
+    printf '%s\n' "$f"
+  done < <(patch_files "$1")
+}
+
+is_confirmed() {
+  # $1 = имя отложенного патча; $2... = имена стоящих/применённых
+  local dname="$1"
+  shift
+  local dnum dfile ok v f
+  dnum="$(patch_number "$dname")"
+  dfile="$(extract_patch "$dname")"
+  ok=0
+
+  # 0) патч самого установщика: установщик приходит бутстрапом (копия себя
+  # из ветки до цепочки), минуя промежуточные патчи 295→297→299 — их
+  # содержимое в дереве перекрыто самой программой установки. Такой патч
+  # подтверждён, если его единственный содержательный файл — apply-patch.sh.
+  local only_installer=1
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if [[ "$f" != "apply-patch.sh" ]]; then only_installer=0; break; fi
+  done < <(patch_files_strong "$dfile")
+  if [[ $only_installer -eq 1 ]]; then
+    return 0
+  fi
+
+  # 1) общий файл с более поздним стоящим/применённым
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    for v in "$@"; do
+      [[ -z "$v" ]] && continue
+      number_lt "$dnum" "$(patch_number "$v")" || continue
+      if patch_files_strong "$(extract_patch "$v")" | grep -Fxq -- "$f"; then
+        return 0
+      fi
+    done
+  done < <(patch_files_strong "$dfile")
+
+  # 2) след добавленных строк в дереве (файлы вне чейнджлогов)
+  local file line checked
+  while IFS=$'\t' read -r file line; do
+    [[ -z "$file" || -z "$line" ]] && continue
+    [[ -f "$ROOT_DIR/$file" ]] || continue
+    if grep -Fqx -- "$line" "$ROOT_DIR/$file" 2>/dev/null; then
+      return 0
+    fi
+  done < <(added_lines "$dfile")
   return 1
 }
 
-if [[ "$MODE" == "mark-one" ]]; then
-  TARGET="$(find_by_number "$PATCH_ID")" || {
-    echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
-    exit 1
-  }
-  if state_has "$TARGET"; then
-    echo "Патч $TARGET уже в записи состояния."
-  else
-    state_add "$TARGET"
-    echo "Записан ровно один: $TARGET (дерево не изменено)."
-  fi
-  echo "Файл записи: $STATE_FILE"
-  exit 0
-fi
+# Добавленные строки патча: «файл<TAB>строка», файлы вне чейнджлогов,
+# строка не короче 10 символов, не больше 15 на файл.
+added_lines() {
+  awk '
+    function flush() { n = 0 }
+    BEGIN { cur = ""; n = 0 }
+    /^diff --git / { flush(); cur = "" }
+    /^\+\+\+ b\// {
+      p = substr($0, 7)
+      if (p != "docs/changelog.ru.md" && p != "docs/changelog.en.md") cur = p
+      else cur = ""
+      flush()
+      next
+    }
+    cur != "" && /^\+/ && !/^\+\+\+/ {
+      if (n < 15) {
+        l = substr($0, 2)
+        if (length(l) >= 10) {
+          printf "%s\t%s\n", cur, l
+          n++
+        }
+      }
+    }
+  ' "$1"
+}
 
-if [[ "$MODE" == "mark" ]]; then
-  TARGET="$(find_by_number "$PATCH_ID")" || {
-    echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
-    exit 1
-  }
-  ADDED=0
-  for name in "${ALL_PATCHES[@]}"; do
-    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
-    if ! state_has "$name"; then
-      state_add "$name"
-      printf '  записан: %s\n' "$name"
-      ADDED=$((ADDED + 1))
-    fi
-  done
+# --- целостность файлов данных ------------------------------------------------
+# Склейки «два JSON подряд» ломают приложение на загрузке — ловим сразу
+# после применения и на повторных запусках. Лечение — tools/fix-double-json.js.
+json_check() {
+  command -v node >/dev/null 2>&1 || return 0
+  local out
+  if out="$(cd "$ROOT_DIR" && node -e '
+    const fs=require("fs"),path=require("path");const bad=[];
+    function walk(d){ if(!fs.existsSync(d))return; for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);if(s.isDirectory())walk(p);else if(p.endsWith(".json")){try{JSON.parse(fs.readFileSync(p,"utf8"))}catch(e){bad.push(p+" — "+e.message.slice(0,60))}}}}
+    walk("modules"); walk("i18n");
+    if(bad.length){console.log(bad.join("\n"));process.exit(1)}
+  ' 2>/dev/null)"; then
+    return 0
+  fi
+  echo "ВНИМАНИЕ: в файлах данных есть поломки формата (склейки и т.п.):"
+  printf '%s\n' "$out" | sed 's/^/  /'
   echo
-  echo "Записано: $ADDED (дерево не изменено)."
-  echo "Файл записи: $STATE_FILE"
-  exit 0
-fi
-
-if [[ "$MODE" == "unmark" ]]; then
-  TARGET="$(find_by_number "$PATCH_ID")" || {
-    echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
-    exit 1
-  }
-  if state_has "$TARGET"; then
-    state_remove "$TARGET"
-    echo "Вычеркнут из записи: $TARGET"
-  else
-    echo "Патч $TARGET в записи состояния не значится."
-  fi
-  echo "Файл записи: $STATE_FILE"
-  exit 0
-fi
+  echo "Лечение: node tools/fix-double-json.js  (резервные копии .bak)"
+  return 1
+}
 
 # --- режим статуса -----------------------------------------------------------
 
 if [[ "$MODE" == "status" ]]; then
-  echo "Состояние патчей:"
-  echo "  Запись состояния: $STATE_FILE"
-  if [[ ${#RECORDED[@]} -eq 0 ]]; then
-    echo "  (записи нет — первый запуск на уже пропатченном дереве:"
-    echo "   ./apply-patch.sh --mark-through <последний номер, который точно стоит>)"
-  fi
+  echo "Состояние патчей (проверка по содержимому дерева, заново):"
   echo
-
-  recorded_count=0
-  missing_list=()
-  sniff_applied_unrecorded=0
-  sniff_applied_max=""
-  conflict_count=0
-
+  STANDING=()
+  will_apply=()
+  confirmed=0
+  diverged=()
   for name in "${ALL_PATCHES[@]}"; do
-    if state_has "$name"; then
-      recorded_count=$((recorded_count + 1))
-      continue
-    fi
-    state="$(patch_state "$(extract_patch "$name")")"
+    state="${STATE[$name]}"
     case "$state" in
-      pending)
-        missing_list+=("$name")
-        ;;
       applied)
-        sniff_applied_unrecorded=$((sniff_applied_unrecorded + 1))
-        sniff_applied_max="$name"
+        printf '  [стоит]     %s\n' "$name"
+        STANDING+=("$name")
+        ;;
+      pending)
+        printf '  [будет]     %s\n' "$name"
+        will_apply+=("$name")
         ;;
       conflict)
-        conflict_count=$((conflict_count + 1))
+        if is_confirmed "$name" "${STANDING[@]}"; then
+          printf '  [перекрыт]  %s\n' "$name"
+          confirmed=$((confirmed + 1))
+        else
+          printf '  [разошлось] %s\n' "$name"
+          diverged+=("$name")
+        fi
         ;;
     esac
   done
-
-  echo "В записи (применено):  $recorded_count"
-
-  if [[ $sniff_applied_unrecorded -gt 0 ]]; then
-    echo "Стоит по дереву, но не в записи: $sniff_applied_unrecorded"
-    echo "  старший: $sniff_applied_max"
-    echo "  (ставил без этого скрипта — занеси: --mark-through <номер>)"
-  fi
-  if [[ $conflict_count -gt 0 ]]; then
-    echo "Контекст разошёлся:    $conflict_count (не в записи; влито в main либо правлено локально)"
-  fi
-
-  if [[ ${#missing_list[@]} -gt 0 ]]; then
-    echo
-    echo "Не хватает — будут поставлены:"
-    printf '  [ ] %s\n' "${missing_list[@]}"
-    echo
-    last="${missing_list[${#missing_list[@]} - 1]}"
-    echo "Поставить всё недостающее:  ./apply-patch.sh $(patch_number "$last")"
+  echo
+  echo "Стоит: ${#STANDING[@]}  Будет: ${#will_apply[@]}  Перекрыто: $confirmed  Разошлось: ${#diverged[@]}"
+  if [[ -n "$TOP_APPLIED" ]]; then
+    echo "Старший стоящий: $TOP_APPLIED"
   else
-    echo
+    echo "Стоящих патчей нет — дерево до самой первой цепочки."
+  fi
+  echo
+  if [[ ${#will_apply[@]} -gt 0 ]]; then
+    last="${will_apply[${#will_apply[@]} - 1]}"
+    echo "Поставить всё недостающее:  ./apply-patch.sh $(patch_number "$last")"
+  elif [[ ${#diverged[@]} -eq 0 ]]; then
     echo "Всё актуально."
   fi
-
+  echo
+  if json_check; then
+    echo "Формат файлов данных: чисто."
+  fi
   exit 0
 fi
 
@@ -409,80 +414,43 @@ if [[ -z "$TARGET" ]]; then
   exit 1
 fi
 
-# --- какие патчи ставить: только по записи состояния -------------------------
+# --- дерево уже новее запрошенного -------------------------------------------
 
-QUEUE=()
-
-if [[ "$MODE" == "only" ]]; then
-  if ! state_has "$TARGET"; then
-    QUEUE=("$TARGET")
-  fi
-else
-  for name in "${ALL_PATCHES[@]}"; do
-    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
-    state_has "$name" && continue
-    QUEUE+=("$name")
-  done
-fi
-
-# --- стартовая проверка: дерево без записи, но с признаками патчей -----------
-
-# Проверяем ПЕРВЫЙ патч цепочки, а не все: на свежем дереве поздние патчи
-# закономерно конфликтуют (их контекст создают предыдущие), а вот первый
-# обязан быть pending. Если он applied/conflict — дерево уже несёт патчи
-# (или их следы), и без записи состояния вслепую применять нельзя.
-if [[ ${#RECORDED[@]} -eq 0 && ${#QUEUE[@]} -gt 0 ]]; then
-  first_state="$(patch_state "$(extract_patch "${ALL_PATCHES[0]}")")"
-  if [[ "$first_state" != "pending" ]]; then
-    # Сводка по дереву: сколько патчей выглядит стоящими и какой старший
-    # обратимо стоящий — это подсказка для --mark-through, а не истина.
-    sniff_applied=0
-    sniff_applied_max=""
-    sniff_conflict=0
-    for name in "${ALL_PATCHES[@]}"; do
-      case "$(patch_state "$(extract_patch "$name")")" in
-        applied)
-          sniff_applied=$((sniff_applied + 1))
-          sniff_applied_max="$name"
-          ;;
-        conflict)
-          sniff_conflict=$((sniff_conflict + 1))
-          ;;
-      esac
-    done
-    echo "Остановка: первый патч цепочки (${ALL_PATCHES[0]}) на этом дереве"
-    case "$first_state" in
-      applied)  echo "уже стоит (откатывается начисто), " ;;
-      conflict) echo "не встаёт и не откатывается (правлен локально или влит), " ;;
-    esac
-    echo "а локальной записи состояния нет ($STATE_FILE). Применять вслепую —"
-    echo "значит риск положить патчи поверх твоих локальных правок."
-    echo
-    echo "По дереву видно:"
-    echo "  стоит обратимо:      $sniff_applied (старший: ${sniff_applied_max:-—})"
-    echo "  контекст разошёлся:  $sniff_conflict (правлено локально или влито)"
-    echo
-    if [[ -n "$sniff_applied_max" ]]; then
-      echo "Похоже, твоё дерево — до № $(patch_number "$sniff_applied_max") включительно."
-      echo "Если согласен:"
-      echo "  ./apply-patch.sh --mark-through $(patch_number "$sniff_applied_max")"
-      echo
-    fi
-    echo "Точечно записать/вычеркнуть один патч:"
-    echo "  ./apply-patch.sh --mark <номер>   |   ./apply-patch.sh --unmark <номер>"
-    echo
-    echo "Если дерево должно быть чистым от патчей — проверь ветку:"
-    echo "  git status && git log --oneline -5"
-    exit 1
-  fi
-fi
-
-if [[ ${#QUEUE[@]} -eq 0 ]]; then
-  echo "По локальной записи всё до №$PATCH_ID стоит. Ничего не нужно."
+if [[ -n "$TOP_APPLIED_NUMBER" ]] \
+  && ! number_le "$TOP_APPLIED_NUMBER" "$PATCH_ID"; then
+  echo "Дерево уже новее запрошенного: стоит $TOP_APPLIED (№$TOP_APPLIED_NUMBER >= №$PATCH_ID)."
+  echo "Ничего не делаю."
   exit 0
 fi
 
-echo "Будет применено: ${#QUEUE[@]}"
+# --- очередь: все патчи до целевого, по порядку, по состоянию дерева ----------
+# Наверх пропускаются только стоящие (откатываются начисто). Всё прочее —
+# в очередь: заранее отличить «цепочка ещё не дошла» от «дерево ушло мимо»
+# нельзя, вердикт каждому выносит применение.
+
+QUEUE=()
+UPFRONT_STANDING=()
+
+for name in "${ALL_PATCHES[@]}"; do
+  number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+  if [[ "${STATE[$name]}" == "applied" ]]; then
+    UPFRONT_STANDING+=("$name")
+  else
+    QUEUE+=("$name")
+  fi
+done
+
+if [[ ${#QUEUE[@]} -eq 0 ]]; then
+  echo "По содержимому дерева всё до №$PATCH_ID стоит."
+  echo "Ничего не нужно."
+  echo
+  json_check || exit 1
+  exit 0
+fi
+
+echo "По содержимому дерева стоит: ${#UPFRONT_STANDING[@]} (пропускаются молча)."
+echo
+echo "Очередь (вердикт каждому — при применении): ${#QUEUE[@]}"
 for name in "${QUEUE[@]}"; do
   printf '  %s\n' "$name"
 done
@@ -498,84 +466,187 @@ if [[ -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
   echo
 fi
 
+# Содержимое нового файла из патча (секция «--- /dev/null / +++ b/путь»):
+# нужно, чтобы узнать остатки отката — файлы будущего патча, которые
+# git reset не трогает (они несопровождаемые). Если содержимое остатка
+# совпадает с патчевым байт в байт — это след самого патча, а не чужой
+# файл: его можно убрать и дать патчу воссоздать.
+new_file_content() {
+  local patch_file="$1" want="$2"
+  awk -v path="$want" '
+    BEGIN { insec = 0; buf = "" }
+    /^diff --git / { if (insec) exit; insec = 0 }
+    /^\+\+\+ b\// {
+      p = substr($0, 7)
+      if (insec) exit
+      if (p == path) insec = 1
+      next
+    }
+    insec && /^\+/ { buf = buf substr($0, 2) "\n" }
+    END { printf "%s", buf }
+  ' "$patch_file"
+}
+
 # --- применение --------------------------------------------------------------
 
 APPLIED=()
+STANDING_LATE=()
+DEFERRED=()
 
 for name in "${QUEUE[@]}"; do
   file="$(extract_patch "$name")"
 
   printf 'Применение: %s ... ' "$name"
 
-  if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>"$WORKDIR/check.err"; then
+  if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>"$WORKDIR/fwd.err"; then
     git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
     echo "ок"
     APPLIED+=("$name")
-    state_add "$name"
     continue
   fi
 
-  # Патч не встаёт — но, может, он уже стоит: обратимая проверка доказывает
-  # это однозначно (полный обратный откат возможен только при точном
-  # совпадении). Тогда не применяем, а заносим в запись состояния —
-  # дерево не трогаем.
-  if git -C "$ROOT_DIR" apply --reverse --check "$file" >/dev/null 2>&1; then
-    echo "ок (уже стоит — занесено в запись)"
-    APPLIED+=("$name")
-    state_add "$name"
+  if check_reverse "$file"; then
+    echo "ок (по проверке уже стоит — дерево не тронуто)"
+    STANDING_LATE+=("$name")
     continue
   fi
 
-  # Явно разрешённое трёхстороннее слияние: только по флагу --3way.
-  if [[ $ALLOW_3WAY -eq 1 ]] \
-    && git -C "$ROOT_DIR" apply --3way --whitespace=nowarn "$file" >/dev/null 2>&1; then
-    if git -C "$ROOT_DIR" ls-files --unmerged | grep -q .; then
-      echo "КОНФЛИКТ"
-      echo
-      echo "Патч $name применён частично (3way), есть конфликтующие файлы:"
-      git -C "$ROOT_DIR" diff --name-only --diff-filter=U | sed 's|^|  |'
-      echo
-      echo "Разберите маркеры <<<<<<< / >>>>>>> в этих файлах."
-      echo "Откатить всё сделанное этим запуском:"
-      echo "  git checkout -- . && git reset"
-      if [[ ${#APPLIED[@]} -gt 0 ]]; then
-        echo
-        echo "До конфликта успешно применены:"
-        printf '  %s\n' "${APPLIED[@]}"
-      fi
-      exit 1
+  # Остатки отката: «file already exists» от несопровождаемых файлов,
+  # чьё содержимое совпадает с патчевым байт в байт.
+  moved=()
+  leftovers_ok=1
+  while IFS= read -r errline; do
+    p="${errline#error: }"
+    p="${p%: already exists*}"
+    [[ -n "$p" && -f "$ROOT_DIR/$p" ]] || { leftovers_ok=0; break; }
+    if [[ "$(new_file_content "$file" "$p")" == "$(cat "$ROOT_DIR/$p")" ]]; then
+      mkdir -p "$WORKDIR/leftovers/$(dirname "$p")"
+      mv "$ROOT_DIR/$p" "$WORKDIR/leftovers/$p"
+      moved+=("$p")
+    else
+      leftovers_ok=0
+      break
     fi
-    echo "ок (3way)"
-    APPLIED+=("$name")
-    state_add "$name"
+  done < <(grep 'already exists' "$WORKDIR/fwd.err" || true)
+
+  apply_done=0
+  if [[ $leftovers_ok -eq 1 && ${#moved[@]} -gt 0 ]]; then
+    if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>/dev/null; then
+      git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
+      echo "ок (остатки отката совпали байт в байт — воссозданы патчем)"
+      APPLIED+=("$name")
+      apply_done=1
+    fi
+  fi
+  if [[ $apply_done -ne 1 && ${#moved[@]} -gt 0 ]]; then
+    # Вернуть перемещённое на место ВСЕГДА: и когда очередной файл не
+    # совпал (leftovers_ok=0), и когда проверка с перемещённым не прошла.
+    # Раньше возврат был только во второй ветке — частично перемещённые
+    # файлы терялись из дерева (случай с приёмочным тестом тест-сеттинга).
+    for p in "${moved[@]}"; do
+      [[ -e "$WORKDIR/leftovers/$p" ]] && mv "$WORKDIR/leftovers/$p" "$ROOT_DIR/$p"
+    done
+  fi
+
+  if [[ $apply_done -eq 1 ]]; then
     continue
   fi
 
-  echo "НЕ ПРИМЕНЯЕТСЯ НАЧИСТО"
-  echo
-  echo "Патч $name не встаёт, дерево этим патчем НЕ изменено (применение"
-  echo "без 3way атомарно). Причины и места:"
-  sed 's|^|  |' "$WORKDIR/check.err" | head -20
-  echo
-  echo "Что дальше:"
-  echo "  — мешают локальные правки: закоммить/stash и повтори,"
-  echo "    либо правь файлы вручную по этому патчу;"
-  echo "  — патч по факту уже стоит: ./apply-patch.sh --mark-through $(patch_number "$name")"
-  echo "    (или точечно: --unmark $(patch_number "$name") при необходимости);"
-  echo "  — нужно переиздание патча под твоё дерево (без конфликтующих"
-  echo "    кусков) — скажи, соберу точечный вариант."
-  if [[ ${#APPLIED[@]} -gt 0 ]]; then
-    echo
-    echo "Успешно применены до остановки (они в записи состояния):"
-    printf '  %s\n' "${APPLIED[@]}"
-  fi
-  exit 1
+  echo "отложен (дерево разошлось — проверю по ходу цепочки)"
+  DEFERRED+=("$name")
 done
 
+# --- вердикт ------------------------------------------------------------------
+
+TARGET_OK=0
+if [[ "${STATE[$TARGET]}" == "applied" ]]; then
+  TARGET_OK=1
+fi
+for name in "${APPLIED[@]}" "${STANDING_LATE[@]}"; do
+  [[ "$name" == "$TARGET" ]] && TARGET_OK=1
+done
+
+if [[ $TARGET_OK -ne 1 ]]; then
+  echo
+  echo "ОСТАНОВКА: цель №$PATCH_ID ($TARGET) не достигнута."
+  if [[ ${#DEFERRED[@]} -gt 0 ]]; then
+    first="${DEFERRED[0]}"
+    echo "Первый не вставший: $first"
+    echo "Дерево этим патчем НЕ изменено (применение атомарно)."
+    echo
+    echo "Причины и места (сырой вывод проверки):"
+    git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$WORKDIR/$first" 2>&1 | sed 's|^|  |' | head -20
+    if [[ ${#DEFERRED[@]} -gt 1 ]]; then
+      echo
+      echo "И ещё не встали ($(( ${#DEFERRED[@]} - 1 ))), все ниже по цепочке:"
+      printf '  %s\n' "${DEFERRED[@]:1}"
+    fi
+  fi
+  echo
+  echo "Что дальше:"
+  echo "  — мешают локальные правки: закоммить или stash и повтори,"
+  echo "    либо правь файлы вручную по этому патчу;"
+  echo "  — нужно переиздание патча под твоё дерево — скажи, соберу."
+  if [[ ${#APPLIED[@]} -gt 0 ]]; then
+    echo
+    echo "До остановки этим запуском применены:"
+    printf '  %s\n' "${APPLIED[@]}"
+    echo
+    echo "Откатить сделанное этим запуском:"
+    echo "  git checkout -- . && git reset"
+  fi
+  exit 1
+fi
+
+# Цель достигнута. Отложенные должны подтверждаться более поздними патчами
+# на тех же файлах — иначе их файлы никем не проверены (возможно повреждение).
+
+VALIDATORS=()
+for name in "${APPLIED[@]}" "${STANDING_LATE[@]}" "${UPFRONT_STANDING[@]}"; do
+  VALIDATORS+=("$name")
+done
+
+UNVALIDATED=()
+if [[ ${#DEFERRED[@]} -gt 0 ]]; then
+  for name in "${DEFERRED[@]}"; do
+    if ! is_confirmed "$name" ${VALIDATORS+"${VALIDATORS[@]}"}; then
+      UNVALIDATED+=("$name")
+    fi
+  done
+fi
+
+if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
+  echo
+  if [[ ${#APPLIED[@]} -eq 0 ]]; then
+    echo "По содержимому дерева всё до №$PATCH_ID стоит. Ничего не нужно."
+  else
+    echo "Готово. Применено патчей: ${#APPLIED[@]}"
+    printf '  %s\n' "${APPLIED[@]}"
+  fi
+  if [[ ${#DEFERRED[@]} -gt 0 ]]; then
+    echo
+    echo "Отложено (дерево ушло мимо, подтверждено): ${#DEFERRED[@]}"
+    printf '  %s\n' "${DEFERRED[@]}"
+  fi
+  echo
+  json_check || exit 1
+  echo "Источник: $REMOTE/$ARENA_BRANCH"
+  echo "Коммит:   $FETCHED_COMMIT"
+  exit 0
+fi
+
 echo
-echo "Готово. Применено патчей: ${#APPLIED[@]}"
-printf '  %s\n' "${APPLIED[@]}"
+echo "ВНИМАНИЕ: цель №$PATCH_ID достигнута, но ${#UNVALIDATED[@]} патч(ей)"
+echo "разошлись с деревом БЕЗ подтверждения более поздних патчей —"
+echo "их файлы никем не проверены, приложение может быть повреждено."
 echo
-echo "Источник: $REMOTE/$ARENA_BRANCH"
-echo "Коммит:   $FETCHED_COMMIT"
-echo "Запись:   $STATE_FILE"
+for name in "${UNVALIDATED[@]}"; do
+  echo "  $name:"
+  git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$WORKDIR/$name" 2>&1 | sed 's|^|    |' | head -6
+done
+echo
+echo "Что дальше:"
+echo "  — покажи этот вывод мне — найду причину и соберу починку;"
+echo "  — файлы из отчёта выше могли быть повреждены локальными правками:"
+echo "    сравни с ожидаемым (git diff / скажи мне)."
+exit 1

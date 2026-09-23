@@ -8,9 +8,7 @@
     "perk1": "Robotics Expert 1",
     "perk2": "",
     "skill": "Science",
-    "applies_to_ids": [
-      "robot_weapon_assaultron_head_laser"
-    ],
+    "applies_to_ids": ["robot_weapon_assaultron_head_laser"],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -30,9 +28,7 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 1",
     "skill": "Science",
-    "applies_to_ids": [
-      "robot_weapon_assaultron_head_laser"
-    ],
+    "applies_to_ids": ["robot_weapon_assaultron_head_laser"],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -52,9 +48,7 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 2",
     "skill": "Science",
-    "applies_to_ids": [
-      "robot_weapon_assaultron_head_laser"
-    ],
+    "applies_to_ids": ["robot_weapon_assaultron_head_laser"],
     "damageModifier": {
       "op": "+",
       "value": 3
@@ -74,9 +68,7 @@
     "perk1": "Robotics Expert 1",
     "perk2": "Science! 3",
     "skill": "Science",
-    "applies_to_ids": [
-      "robot_weapon_assaultron_head_laser"
-    ],
+    "applies_to_ids": ["robot_weapon_assaultron_head_laser"],
     "damageModifier": {
       "op": "+",
       "value": 4

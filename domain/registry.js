@@ -23,7 +23,6 @@ const robotArmorJson = SETTING.data.equipment.robot.armor;
 const robotArmorPlatingJson = SETTING.data.equipment.robot.armorPlating;
 const robotFramesJson = SETTING.data.equipment.robot.frames;
 const robotWeaponModsJson = SETTING.data.equipment.robot.weaponMods;
-const robotWeaponModSlotsJson = SETTING.data.equipment.robot.modSlots;
 const moduleOrigins = SETTING.data.origins;
 const moduleFitProfiles = SETTING.data.fitProfiles;
 const moduleCategories = SETTING.data.equipment.categories;
@@ -151,10 +150,10 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
   // Головного лазера Штурмотрона живут в robot/weapon_mods.json и
   // восстанавливаются тем же конвейером.
   weaponMods: [...moduleWeaponMods, ...robotWeaponModsJson],
-  // Моды оружия роботов (290) отдельным списком и слоты для них: будущий
-  // экран установки читает «какие моды предлагать» отсюда, а не из пула.
+  // Моды оружия роботов (290) отдельным списком. Слоты — ПРОИЗВОДНЫЕ от
+  // самих модов (slot + applies_to_ids, патч 306): их собирает экранный
+  // каталог (i18n/equipmentCatalog), файл-дубль удалён.
   robotWeaponMods: robotWeaponModsJson,
-  robotWeaponModSlots: robotWeaponModSlotsJson,
   // Слои защиты плоским списком; принадлежность слою — в поле layer.
   armorLayers: [
     ...(robotArmorJson.armor || []),

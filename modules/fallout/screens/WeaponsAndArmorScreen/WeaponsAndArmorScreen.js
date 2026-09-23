@@ -18,7 +18,9 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
 import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
 import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
-import { normalizeSlot } from '../../../../domain/robotSlots';
+import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
+// Единый путь записи модов (311): классификация места хранения — движок.
+import { classifyModWritePlan } from '../../../../src/engine/items/weaponMods';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
@@ -952,49 +954,99 @@ const WeaponsAndArmorScreen = () => {
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
-    if (selectedWeaponForModification?.sourceSlot && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon) {
-      const sourceSlot = selectedWeaponForModification.sourceSlot;
-      setEquippedRobotSlots((prev) => {
-        const currentSlot = prev?.[sourceSlot];
-        const currentWeapon = currentSlot?.heldWeapon;
-        if (!currentWeapon) return prev;
-        const sameWeapon = currentWeapon.uniqueId === selectedWeaponForModification.uniqueId
-          || currentWeapon.stackKey === selectedWeaponForModification.stackKey
-          || currentWeapon.weaponId === selectedWeaponForModification.weaponId
-          || currentWeapon.id === selectedWeaponForModification.id;
-        if (!sameWeapon) return prev;
-        return {
-          ...prev,
-          [sourceSlot]: {
-            ...currentSlot,
-            heldWeapon: {
-              ...currentWeapon,
-              ...modifiedWeapon,
-              sourceSlot,
-              uniqueId: currentWeapon.uniqueId,
-              stackKey: currentWeapon.stackKey,
-              itemType: 'weapon',
+    // Единый путь записи модов (311): место хранения классифицирует движок
+    // (classifyModWritePlan), экран только исполняет план. Роли слота робота:
+    // ладонь / установленное в конечность / собственная атака конечности.
+    const modPlan = classifyModWritePlan(
+      {
+        sourceSlot: selectedWeaponForModification?.sourceSlot,
+        attackRole: selectedWeaponForModification?.attackRole,
+        isBuiltin: selectedWeaponForModification?.isBuiltin,
+        storeItemId: itemId || null,
+        uniqueId: selectedWeaponForModification?.uniqueId || null,
+        weaponId: selectedWeaponForModification?.weaponId || selectedWeaponForModification?.id || null,
+      },
+      {
+        slotHasHeldWeapon: Boolean(
+          selectedWeaponForModification?.sourceSlot
+          && equippedRobotSlots?.[selectedWeaponForModification.sourceSlot]?.heldWeapon,
+        ),
+      },
+    );
+    debugLog('weapon.mod.apply.screen.plan', { itemId, modPlan });
+
+    if (modPlan?.kind === 'robotSlot') {
+      if (modPlan.role === 'held') {
+        const sourceSlot = modPlan.slotKey;
+        setEquippedRobotSlots((prev) => {
+          const currentSlot = prev?.[sourceSlot];
+          const currentWeapon = currentSlot?.heldWeapon;
+          if (!currentWeapon) return prev;
+          const sameWeapon = currentWeapon.uniqueId === selectedWeaponForModification.uniqueId
+            || currentWeapon.stackKey === selectedWeaponForModification.stackKey
+            || currentWeapon.weaponId === selectedWeaponForModification.weaponId
+            || currentWeapon.id === selectedWeaponForModification.id;
+          if (!sameWeapon) return prev;
+          return {
+            ...prev,
+            [sourceSlot]: {
+              ...currentSlot,
+              heldWeapon: {
+                ...currentWeapon,
+                ...modifiedWeapon,
+                sourceSlot,
+                uniqueId: currentWeapon.uniqueId,
+                stackKey: currentWeapon.stackKey,
+                itemType: 'weapon',
+              },
             },
-          },
-        };
-      });
+          };
+        });
+        return;
+      }
+
+      if (modPlan.role === 'installed') {
+        // Оружие, УСТАНОВЛЕННОЕ в конечность (installTo: 'arm'/'head' из
+        // комплекта): живёт внутри конечности, моды пишутся в его запись.
+        const installedNext = setInstalledWeaponMods(
+          equippedRobotSlots,
+          modPlan.slotKey,
+          modPlan.weaponId,
+          modifiedWeapon?.appliedMods || {},
+        );
+        if (installedNext) {
+          setEquippedRobotSlots(installedNext);
+        }
+        return;
+      }
+
+      // Собственная атака конечности (коготь/Головной лазер): моды —
+      // состояние персонажа, пишутся на конечность и переживают сохранение.
+      const ownNext = setOwnWeaponMods(
+        equippedRobotSlots,
+        modPlan.slotKey,
+        modifiedWeapon?.appliedMods || {},
+      );
+      if (ownNext) {
+        setEquippedRobotSlots(ownNext);
+      }
       return;
     }
 
-    if (itemId) {
+    if (modPlan?.kind === 'storeItem') {
       const patch = weaponModPatchToStore(modifiedWeapon);
-      debugLog('weapon.mod.apply.screen.patch', { itemId, patch });
-      updateItem(itemId, patch);
+      debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
+      updateItem(modPlan.itemId, patch);
       return;
     }
 
-    // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
-    // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
-    setEquippedWeapons((prev) => prev.map((w) => (
-      w && selectedWeaponForModification && w.uniqueId === selectedWeaponForModification.uniqueId
-        ? modifiedWeapon
-        : w
-    )));
+    if (modPlan?.kind === 'equippedWeapon') {
+      // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+      // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
+      setEquippedWeapons((prev) => prev.map((w) => (
+        w && w.uniqueId === modPlan.uniqueId ? modifiedWeapon : w
+      )));
+    }
   }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
 
   const handleUnequipWeapon = useCallback((weapon) => {

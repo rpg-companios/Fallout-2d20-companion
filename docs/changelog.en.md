@@ -2,6 +2,236 @@
 
 ---
 
+## Data — robot weapons that ARE human weapons: full variants, stats only from the base (patch 314)
+
+Owner's word: "a robot weapon that's a human weapon is 100% the human
+one. Otherwise it would be a separate record with a separate id and
+separate stats."
+
+- The link moved onto the existing variant mechanism (like "The
+  Danger razor" being a variant of the switchblade): the robot weapon
+  record now carries trueItemId and NO combat fields at all — only its
+  identity (id, name, group, mounting flag) and factory mods. The Mister
+  Handy Flamer IS the human Flamer; the Laser Cutter IS the human Laser
+  Gun; the Automatic 10mm Pistol IS a 10mm Pistol with an auto receiver
+  out of the box.
+- On screen: the Flamer's fire rate 2 → 4 (as the human one), attack
+  attr STR (was AGI), damage type energy (was fire); the Laser Cutter's
+  fire rate 1 → 2; the Automatic 10mm unchanged (3 damage / 4 shots —
+  base 4/2 plus the auto receiver −1/+2). An edit to a human weapon now
+  reaches the robot version entirely: stats, effects, qualities, ammo,
+  mods.
+- The upgrade dialog offers all human mods to the robot versions (as in
+  312); the dialog preview computes from the base.
+- Locked by 14 checks — a variant must not own combat fields (the test
+  falls otherwise), the expanded catalog carries base stats and the
+  variant's OWN name ("Laser Cutter", not "Laser Gun"), the screen
+  catalog rows agree, the auto-receiver math on the card (replacement
+  and return of the factory mod), the slim save shape.
+  Suite 863/863, tsc clean.
+
+## Docs — an AI-agent starter map: how the app works, what flows from where to where (patch 313)
+
+Owner's word: maintain files describing how the app works and where the
+data flows, for AI agents — so they don't guess how things are built and
+read a couple of files instead of the whole stack.
+
+- `docs/agents/README.md` — the entry point: required reading order,
+  the repo map by layers, a "typical task → files to touch" table, a
+  short list of prohibitions.
+- `docs/agents/data-flows.md` — data flows across six mechanics: the
+  catalog (JSON → setting door → registry → screen catalog), weapon mods
+  (one truth and the write plan, 311), robot slots (robot anatomy from
+  data), saves (passports and migrations), survival (the extension
+  precedent), and the patch installer.
+- `replit.md` now points agents to `docs/agents/` first.
+- Maintenance rule: when a flow moves, the map is edited IN THE SAME
+  PATCH — the map must not lie.
+
+---
+
+## Data — robot weapons inherit human mods via a data link; weapons "with a mod out of the box" (patch 312)
+
+Owner's word: the Mister Handy Flamer IS the human Flamer; the Laser
+Cutter IS the human Laser Gun; the Automatic 10mm Pistol is a 10mm Pistol
+with an auto receiver pre-installed, like the kit weapon with a mod the
+super mutant gets.
+
+- The link lives in data: a baseWeaponId field on the robot weapon record
+  (Flamer → weapon_flamer, Laser Cutter → weapon_laser_gun, Automatic
+  10mm Pistol → weapon_10mm_pistol). The upgrade dialog now offers human
+  mods to robot weapons: Flamer — fuels and barrels (6 mods), Laser
+  Cutter — capacitors and barrels (21), Automatic 10mm — the full Pistol
+  set (28). An edit to a human mod reaches the robot version without
+  touching the program.
+- "Out of the box": a weapon record may carry modIds — factory mods. The
+  Automatic 10mm ships with the auto receiver mod_008: damage 4 → 3,
+  fire rate 3 → 5, the Inaccurate quality. The card shows the mod as
+  installed. A player mod in the same slot replaces the factory one;
+  removing all mods brings the factory one back — it is part of the
+  weapon's identity.
+- Locked by 10 checks in
+  `__tests__/weapons/robot-weapon-inheritance.test.js` — links point to
+  existing records (the dead-map lesson of 311), upgrade dialogs see the
+  human mods, the auto-receiver math on the card, replacement and return
+  of the factory mod, the slim save shape. Suite 859/859, tsc clean.
+
+---
+
+---
+
+## Unification — weapon mods: one truth, one write path; a limb's own-attack mods now survive saving (patch 311)
+
+Owner's rule: modifying items is a property of many games, so the shape
+of truth and the write place are decided by the engine (a universal
+TypeScript contract); the setting supplies the mod catalog and storage.
+
+- One shape of truth: a weapon instance carries a LIST of mod ids; the
+  "slot → id" map is a derived view for the screen (the mod knows its
+  slot). The "list or map" duality is gone: priority is unconditional,
+  an empty map means "no mods".
+- One write path: the upgrade dialog no longer chooses among four
+  branches by storage place. The engine classifies the place and returns
+  a plan (inventory item / human equipped weapon / robot palm / weapon
+  installed into a limb / the limb's own attack); the screen only
+  executes the plan.
+- New state: mods can be installed on a LIMB'S OWN ATTACK (the Assaultron
+  arm claw, the head's built-in Head Laser). The dialog used to offer
+  them, but the save had no place for them — mods vanished on reload.
+  Mods now live on the limb itself and survive saving; the slim save
+  shape gains an optional field (old saves read as before).
+- Data: the hardcoded "robot weapon inherits human mods" map is removed
+  from code — a check across all data files showed it pointed at numeric
+  ids that exist nowhere in the data and never fired (the Flamer, Laser
+  Cutter and Automatic 10mm pistol never inherited human mods). The
+  inheritance mechanism moved into the data (a link field on the robot
+  weapon record); the "robot weapon → human weapon" pairs are the
+  owner's decision.
+- The orphaned robot mod-slot list file is removed: the knowledge of
+  "which mods fit which slots" lives in the mods' own descriptions
+  (reissue of 306 — the manual removal step is no longer needed).
+- Locked by 15 checks in `__tests__/robot/weapon-mods-one-truth.test.js`
+  (truth shape, write plans for all five storage places, the Mk III
+  capacitor on the Head Laser: damage 5 → 6 and back, slim save shape,
+  card roles, no dead map). Suite 849/849, tsc clean.
+
+## Patch installer — rewritten on the "truth lives in the files" principle (patch 309)
+
+Owner's word: the single source of truth is the actual file content,
+verified fresh on every run for every patch. The state journal no
+longer decides (nor do the --3way, --mark-through, --mark, --unmark
+keys and all status-guessing heuristics — removed). A patch that
+passes neither check is deferred; the verdict comes from later patches
+on the same files or from traces of its added lines in the tree.
+Rollback leftovers (git reset does not touch future patches' new
+files) are recognized by byte-exact match and recreated by the patch.
+After applying — and on repeat runs — the integrity of all data files
+is checked: glues are caught immediately, with the cure attached.
+Rolling back a batch of patches and reinstalling works without
+touching history. No migration needed: .git/arena-patches.state is
+no longer used.
+
+## Tool — repair of "two JSONs in a row" gluing in data files (patch 308)
+
+Six data files in the owner's working tree turned out glued: after a
+complete JSON in each, another chunk of content follows. No patch in
+300–307 touched those files (except material.json, which patch 303
+repaired rather than broke); the patch applier is strict — it applies
+exactly or refuses entirely, it cannot glue anything to a file's end.
+The tool tools/fix-double-json.js finds glues, shows what got glued,
+saves a .bak backup and merges the chunks: on duplicates the later
+chunk wins. Run: node tools/fix-double-json.js
+
+## Decision list — 13 disputed weapon mods (patch 307)
+
+Moving knowledge from the slot list into mod descriptions is almost
+clean (295 additions, no behavior change), but 13 mods on six weapons
+claim applicability the list does not allow. The list with questions is
+in docs/reference-data/weapon-mods-open-questions.md; patches do not
+wait for the answer — the owner's decision will close the move.
+
+## Robots — Mod slots derived from the mods themselves, duplicate file removed (patch 306)
+
+Owner's rule: no point keeping a separate file listing which mods live
+in which slots of which weapon, when every mod record already says so
+itself — via its slot and its applicability list.
+
+- the robot/weapon_mod_slots.json file (a duplicate of the Head Laser
+  capacitor knowledge) is removed;
+- robot weapon slots are derived from the mods: slot + applicability;
+  mod order follows the data record order;
+- the mod-install dialog and ammo spending work as before — locked by
+  checks: the laser has one capacitor slot with all four mods, same as
+  the removed file had;
+- new fuse: every robot mod must declare a slot and applicability —
+  otherwise the derived slots would lose it, and the test fails before
+  the mod disappears from the install dialog.
+
+## Robots — Mods for weapons installed into a limb (patch 305)
+
+Owner's report: the laser gun from the "assaultron_us_military" kit
+(installTo: 'arm' — the weapon is part of the arm, the palm stays free)
+would not accept mods. The mod-install dialog opened, the selection went
+through — but the mod never stuck: the apply logic could only write mods
+to the palm or the inventory, while a weapon installed into a limb lives
+inside the limb itself.
+
+- mods for installed weapons are now written into the weapon's entry
+  inside the limb (both arm and head installs from kits);
+- the weapon card reads mods from that entry — damage and name include
+  the mod;
+- the entry with mods survives save and load (the save format did not
+  change — mods for installed weapons were already provided for there);
+- patch 304 closed the neighbouring case (a weapon held in the palm);
+  this one closes installed weapons — both carrying styles now accept
+  mods.
+
+Locked by checks in `__tests__/robot/robot-slot-model.test.js`: the card
+reads mods from the entry; the write function updates only the target
+entry and leaves the original map untouched; the save cycle keeps the
+mod. Suite 833/833, tsc clean.
+
+## Robots — Weapons held in a robot palm get their card (patch 304)
+
+Owner's report: "mods won't install on the assaultron laser in the hand".
+Equipping into a robot palm is allowed (weight and two-handed checks
+apply), but the weapon produced no card in the attack list: robot-mounted
+weapons ("not hand-held") were skipped — there was nothing to attach
+mods to.
+
+- the palm now shows everything it holds: human weapons, arm
+  attachments, and robot-mounted weapons (the Head Laser);
+- the only exception is the limb's own attack (claw/manipulator in an
+  old save): the limb itself provides that card, no palm duplicate
+  (also closes a long-standing duplicate claw card);
+- the chain after the fix: card → damage with the capacitor
+  (base + mod) → the ammo-spend plan sees the capacitor → mods install
+  and survive the save.
+
+Locked by checks in `__tests__/robot/assaultron-head-laser-mods.test.js`
+(laser in palm: card, damage 7, 4 charges per attack; no claw duplicate).
+Suite 831/831, tsc clean.
+
+## Weapons & materials — patches 300–303 summary
+
+- **300:** translation for the "Mod spend per attack" spend source (the
+  `weapon.ammoSpend.source.ammoPerAttack` key was missing from both
+  dictionaries — the dialog showed the raw key).
+- **301:** the Head Laser capacitors counted in the install dialog and
+  in the ammo-spend plan, but not on the weapon card — the card damage
+  fell back to base (5 instead of 5+2 for Mk IV). The screen catalog's
+  mod pool now matches the registry: robot mods are part of the shared
+  pool.
+- **302:** the knowledge "full mod pool = human + robot" lived in two
+  places; after 301 the adapter's merge became redundant (robot mods
+  arrived twice). The merge now lives in one place.
+- **303:** materials file repair (report: "App Error: Cannot read
+  properties of undefined (reading 'map')"): the materials list was
+  written into the file twice, the app received "no materials", and
+  junk salvaging crashed. The duplicate removed.
+
+---
+
 ## Architecture — Ammo-spend formulas moved into the module (patch 298)
 
 Owner's rule: a formula bound to a specific weapon quality is a MODULE

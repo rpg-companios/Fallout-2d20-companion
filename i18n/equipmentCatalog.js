@@ -85,7 +85,6 @@ const moduleChems = SETTING.data.consumables.chems;
 const moduleMagazines = SETTING.data.consumables.magazines;
 const moduleWeaponMods = SETTING.data.equipment.weaponMods;
 const moduleRobotWeaponMods = SETTING.data.equipment.robot.weaponMods;
-const moduleRobotWeaponModSlots = SETTING.data.equipment.robot.modSlots;
 const moduleRobotParts = SETTING.data.equipment.robotParts;
 const moduleWeaponModSlots = SETTING.data.equipment.weaponModSlots;
 const moduleRobotLimbs = SETTING.data.equipment.robot.limbs;
@@ -308,9 +307,12 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
       return w;
     })
     .map((w) => ({ ...w, itemType: 'weapon' }));
-  const robotWeapons = mergeById(
-    (moduleRobotWeapons || []).filter((item) => item.itemType === 'weapon'),
-    i18n.robotWeapons || [],
+  const robotWeapons = expandTrueItems(
+    mergeById(
+      (moduleRobotWeapons || []).filter((item) => item.itemType === 'weapon'),
+      i18n.robotWeapons || [],
+    ),
+    moduleWeaponsLocalized,
   )
     .map((w) => ({ ...w, itemType: 'weapon', isRobotWeapon: true }));
   // Конечности робота: источник один — limbs.json + weaponAsLimb.json.
@@ -414,6 +416,18 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const mergedRobotLegs = limbsOfType('mover');
   const mergedWeaponMods = mergeById(moduleWeaponMods, moduleI18n.weaponMods);
   const mergedRobotWeaponMods = mergeById(moduleRobotWeaponMods, moduleI18n.robotWeaponMods);
+  // Слоты модов робо-оружия — ПРОИЗВОДНЫЕ от самих модов (слово владельца,
+  // патч 306): мод заявляет слот (slot) и применимость (applies_to_ids);
+  // отдельный файл-дубль robot/weapon_mod_slots.json удалён. Порядок модов
+  // в слоте — порядок записей в данных.
+  const robotWeaponModSlots = {};
+  for (const mod of mergedRobotWeaponMods) {
+    if (!mod.slot) continue;
+    for (const weaponId of mod.applies_to_ids || []) {
+      (robotWeaponModSlots[weaponId] ??= {});
+      (robotWeaponModSlots[weaponId][mod.slot] ??= []).push(mod.id);
+    }
+  }
   const mergedArmorMods = mergeArmorModsById(moduleArmorMods, moduleI18n.armorMods);
   const mergedUniqArmorMods = mergeArmorModsById(moduleUniqArmorMods, moduleI18n.uniqArmorMods);
 
@@ -472,7 +486,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     // к базе, хотя превью модалки и план списания зарядов мод видели.
     weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods],
     robotWeaponMods: mergedRobotWeaponMods,
-    robotWeaponModSlots: moduleRobotWeaponModSlots,
+    robotWeaponModSlots,
     armorMods: mergedArmorMods,
     uniqArmorMods: mergedUniqArmorMods,
     modsOverrides: moduleWeaponModSlots,

@@ -230,6 +230,11 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
     .filter(Boolean);
   const displayName = getItemDisplayName({ baseName, modPrefixes, qualityNames });
 
+  // Имя варианта (trueItemId): у варианта СВОЁ имя (Лазерный резак, Опасная
+  // бритва) — оно важнее имени базы; сток-мод с переименованием всё ещё
+  // сильнее (пистолет → винтовка).
+  const variantName = catalogEntry !== base ? catalogEntry.name : undefined;
+
   return {
     ...weaponLike,
     ...effective,
