@@ -21,6 +21,7 @@ import {
   formatCraftMinutes,
 } from '../../../crafting/windowModel';
 import { settleCraftTime } from '../../../crafting/operations';
+import { getActionPoints } from '../../../../../domain/actionPoints';
 
 // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
 const CATEGORY_ICONS = {
@@ -94,8 +95,8 @@ export default function CraftingModal({ visible, onClose }) {
     const run = craftBatch(row.recipeId, count, { deferTime: true });
     const rep = buildCraftReport(row.recipeId, run);
     let settled = null;
-    if (rep.pendingTime && !rep.pendingTime.hasSuccess) {
-      // успехов нет — решение об ОД не требуется, время списывается целиком.
+    // 324: вопрос про 2 ОД — только если в пуле хватает (иначе полное время).
+    if (rep.pendingTime && (!rep.pendingTime.hasSuccess || getActionPoints() < 2)) {
       settled = settleCraftTime(row.recipeId, run, { spendActionPoints: false });
     }
     setQtyTarget(null);
@@ -264,7 +265,9 @@ export default function CraftingModal({ visible, onClose }) {
 
               {report.pendingTime && settledTime === null && (
                 <View style={styles.apBox}>
-                  <Text style={styles.apQuestion}>{ui.apQuestion ?? ''}</Text>
+                  <Text style={styles.apQuestion}>
+                    {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
+                  </Text>
                   <View style={styles.qtyActions}>
                     <TouchableOpacity
                       style={[styles.bigCraft, styles.qtyActionsBigCraft]}

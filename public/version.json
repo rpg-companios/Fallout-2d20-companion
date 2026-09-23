@@ -1,17 +1,11 @@
 {
-  "version": "323",
+  "version": "324",
   "notes": {
     "ru-RU": [
-      "Крафт: времена по книге — час, еда/напитки 20 минут",
-      "Крафт: осложнение +30 минут (станция +10), прежнее удвоение отменено",
-      "Крафт: после успеха окно спросит про 2 ОД (время вдвое)",
-      "Настройки: раздел «Крафт» — потеря материалов при провале (2 группы)"
+      "Крафт: общий пул ОД (6) — проверки пополняют, «2 ОД за время вдвое» тратит из пула"
     ],
     "en-EN": [
-      "Crafting: book times — one hour, food/drinks 20 minutes",
-      "Crafting: complication +30 minutes (station +10), old doubling removed",
-      "Crafting: after success the window asks about 2 AP (halve the time)",
-      "Settings: new \"Crafting\" section — material loss on failure (2 groups)"
+      "Crafting: group AP pool (6) — checks refill it, \"2 AP to halve time\" spends from it"
     ]
   }
 }

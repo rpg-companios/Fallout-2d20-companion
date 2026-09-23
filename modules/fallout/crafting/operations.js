@@ -22,6 +22,7 @@ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selec
 import { CRAFT_RULES } from './rules';
 import { applyActivityMinutes } from '../survival/operations';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import { earnActionPoints, getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
 
 // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой
 // addNewItem определяет «какой это предмет»). Надетое и запертое комплектом не
@@ -205,20 +206,26 @@ export const complicationExtraMinutesFor = (recipe) =>
  * при «да» идут за половину базы (осложнения добавляются поверх), неудачные
  * — всегда полное время (ОД на провал не тратятся).
  */
-export const settleCraftTime = (recipeId, run, { spendActionPoints = false } = {}) => {
+const earned = (gained) => (gained > 0 ? earnActionPoints(gained) : getActionPoints());
+
+export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp = false } = {}) => {
   const recipe = getCraftingRecipeById(recipeId);
+  // Решение о 2 ОД подтверждается ПУЛОМ: меньше 2 — трата невозможна,
+  // время идёт полное («больше 6 потратить не выйдет…», 324).
+  const apSpend = halveForAp ? spendActionPoints(2) : { ok: false, pool: getActionPoints() };
+  const halved = halveForAp && apSpend.ok;
   let total = 0;
   for (const attempt of run?.attempts ?? []) {
     const t = attempt?.time;
     if (!t?.pending) continue;
     let minutes = t.baseMinutes;
-    if (spendActionPoints && attempt.done) minutes /= 2;
+    if (halved && attempt.done) minutes /= 2;
     total += minutes + (t.complicationMinutes ?? 0);
   }
   if (total > 0) {
     applyActivityMinutes(total, `craft:${recipe?.category ?? 'any'}`);
   }
-  return { minutes: total, spendActionPoints };
+  return { minutes: total, spendActionPoints: halved, pool: apSpend.pool };
 };
 
 
@@ -286,6 +293,17 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) =>
     }
   }
   if (timed) result.survival = timed;
+
+  // ОД (патч 324, слово владельца): успешная проверка пополняет ГРУППОВОЙ пул —
+  // +1 ОД за каждый успех сверх сложности (крит-кубик даёт 2 успеха — его
+  // прибавка уже внутри successes, d20Checks). Автоуспех (сложность 0,
+  // броска не было) и провал ОД не приносят. Пул живёт в domain/actionPoints
+  // (кап 6), UI-хранилище будет позже.
+  if (result.done === true && result.check) {
+    const gained = Math.max(0, (result.check.successes ?? 0) - (result.check.difficulty ?? 0));
+    const poolAfter = earned(gained);
+    result.apEarned = { gained, pool: poolAfter };
+  }
 
   if (expandedSpend && Array.isArray(result.spent) && result.spent.length > 0) {
     result.spent = expandedSpend;

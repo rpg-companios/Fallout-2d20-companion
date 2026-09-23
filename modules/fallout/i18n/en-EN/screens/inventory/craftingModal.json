@@ -51,10 +51,11 @@
     "craftTitle": "Crafting",
     "notAvailable": "Not available",
     "done": "Done",
-    "apQuestion": "Spend 2 AP to halve the crafting time?",
+    "apQuestion": "Spend 2 AP to halve the crafting time? (pool {pool}/6)",
     "apYes": "Spend 2 AP",
     "apNo": "Full time",
-    "apHalvedNote": "Time halved for 2 AP"
+    "apHalvedNote": "Time halved for 2 AP",
+    "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)"
   },
   "attributes": {
     "INT": "Intelligence"

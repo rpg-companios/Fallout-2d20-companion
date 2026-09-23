@@ -2,6 +2,24 @@
 
 ---
 
+## Group AP pool — checks refill it, "2 AP" spends from it (patch 324)
+
+Owner's word: the group AP pool = 6; you can't spend more than 6, unless
+checks granted AP. AP lives inside the engine for now (a UI store comes
+later); the pool is group-wide — the future game-master screen will hook
+into it as is.
+
+- A successful crafting check refills the pool: +1 AP for each success
+  beyond the difficulty (difficulty 1 with 2 successes → +1; 3 successes
+  → +2). A critical die (1 or ≤ the tagged skill's rating) counts as
+  2 successes — its bonus flows in naturally.
+- Automatic success (difficulty 0, no roll) and failures grant no AP.
+- "Spend 2 AP — halve the time" now requires the pool: with fewer than 2
+  the question isn't asked and time runs full. The report shows
+  "AP: +N to the group pool (now M/6)" and the pool in the question.
+- Fuse: acceptance test (patch 324) — the cap of 6, the owner's example,
+  crits, failures, auto-success, refused spending when short.
+
 ## Crafting — by the printed rules: times, complications, 2 AP and material loss (patch 323)
 
 Owner's word — the rulebook text (pp. 210–211) plus two decisions:

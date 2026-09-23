@@ -263,6 +263,12 @@ export const buildCraftReport = (recipeId, run) => {
     minutes > 0 ? fmt(d.timeSpent, { time: formatCraftMinutes(minutes) }) : null,
   ].filter(Boolean).join('. ');
   lines.push(tail);
+  // ОД (324): заработанное проверками — в общий пул (кап 6, дом движка).
+  const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
+  const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
+  if (apGained > 0 && apPool != null) {
+    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
+  }
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
   return { title: d.resultTitle, lines, recipeId, pendingTime };
