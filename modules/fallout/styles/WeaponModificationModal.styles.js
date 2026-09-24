@@ -115,6 +115,11 @@ const styles = StyleSheet.create({
   },
   disabledButton: { backgroundColor: '#ccc' },
   applyButtonText: { color: 'white', fontWeight: 'bold' },
+
+  // 357: диалог отчёта о крафте — как окно количества в окне крафта (318).
+  reportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
+  reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
 });
 
 export default styles;

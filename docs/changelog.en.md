@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## Craft report in the mod installation modal (patch 357)
+
+Owner's feedback: crafting a mod with the "Create" button left it
+unclear what had happened. The same report as in the crafting window is
+now shown: the check arithmetic, rolled dice and outcome, what was
+gained and what happened to the materials (including "burned" on a
+failure), the time; on success — the 2 AP question. A refusal before
+the check (perk, materials) keeps the short message. Also fixed a rare
+crash when a check earned more successes than required.
+
 ## Difficulty 0: the game asks about rolling (patch 356)
 
 Owner's word: when difficulty is cleared by skill (difficulty 0), the

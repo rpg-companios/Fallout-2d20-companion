@@ -21,10 +21,11 @@ import {
   buildCraftReport,
   craftDict,
   craftFormat,
-  formatCraftMinutes,
 } from '../../../crafting/windowModel';
 import { settleCraftTime } from '../../../crafting/operations';
 import { getActionPoints } from '../../../../../domain/actionPoints';
+// 357: отчёт о крафте — общий компонент окна крафта и модалки установки модов.
+import CraftReportView from '../../../crafting/CraftReportView';
 
 // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
 const CATEGORY_ICONS = {
@@ -262,44 +263,12 @@ export default function CraftingModal({ visible, onClose }) {
           )}
 
           {report && (
-            <View style={styles.list}>
-              <View style={styles.resultBox}>
-                {report.lines.map((line, i) => (
-                  <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
-                ))}
-                {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
-                {settledTime && (
-                  <Text style={styles.resultLine}>
-                    {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
-                      + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
-                  </Text>
-                )}
-              </View>
-
-              {report.pendingTime && settledTime === null && (
-                <View style={styles.apBox}>
-                  <Text style={styles.apQuestion}>
-                    {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
-                  </Text>
-                  <View style={styles.qtyActions}>
-                    <TouchableOpacity
-                      style={[styles.bigCraft, styles.qtyActionsBigCraft]}
-                      onPress={() => settleTimeDecision(true)}>
-                      <Text style={styles.bigCraftText}>{ui.apYes ?? ''}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.qtyCancel}
-                      onPress={() => settleTimeDecision(false)}>
-                      <Text style={styles.qtyCancelText}>{ui.apNo ?? ''}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
-                <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
-              </TouchableOpacity>
-            </View>
+            <CraftReportView
+              report={report}
+              settledTime={settledTime}
+              onSettleTime={settleTimeDecision}
+              onDone={finishReport}
+            />
           )}
         </SafeAreaView>
 

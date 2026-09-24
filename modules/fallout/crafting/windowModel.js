@@ -312,7 +312,7 @@ export const buildCraftReport = (recipeId, run) => {
   const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
   const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
   if (apGained > 0 && apPool != null) {
-    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
+    lines.push(fmt(d.apEarnedLine, { n: apGained, pool: apPool }));
   }
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.

@@ -16,8 +16,12 @@ import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
 import useCharacterStore from '../../../../../src/store/characterStore';
-import { buildModCraftHint, formatCraftMinutes, craftBatch } from '../../../crafting/windowModel';
+import { buildModCraftHint, buildCraftReport } from '../../../crafting/windowModel';
 import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
+import { getActionPoints } from '../../../../../domain/actionPoints';
+// 357: отчёт о крафте — тот же компонент, что в окне крафта (кубики, исход,
+// сгоревшие материалы, время, вопрос про 2 ОД).
+import CraftReportView from '../../../crafting/CraftReportView';
 
 
 function toNumber(v) {
@@ -323,6 +327,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
   const storeItems = useCharacterStore((s) => s.items);
   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
 
+  const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
+  const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
+
   const handleCreateMod = (modId, modName) => {
     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
     // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
@@ -343,25 +350,37 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
   const runCreateMod = (modId, modName, zeroDifficulty) => {
     const run = craftRecipe(modId, {}, { deferTime: true, zeroDifficulty });
-    if (!run.done) {
-      // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
-      // missing-material), stage 'check' — непройденная проверка.
+    if (run.stage === 'gate' || run.stage === 'store') {
+      // 352: отказ ДО проверки — короткое объяснение (перк/материалы).
       const reasons = Array.isArray(run.reasons) ? run.reasons : [];
       const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
         ? 'modals.createFailMissingPerk'
-        : reasons.some((r) => r?.code === 'missing-material')
-          ? 'modals.createFailMaterials'
-          : run.stage === 'check' ? 'modals.createFailCheck' : 'modals.createFailTitle';
+        : 'modals.createFailMaterials';
       Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
       return;
     }
-    // 323: время готовки применяется сразу (полное; вопрос про 2 ОД — только
-    // в окне крафта с его отчётом, здесь — компактный сценарий).
-    const settled = settleCraftTime(modId, run, { spendActionPoints: false });
-    Alert.alert(
-      modName || modId,
-      `${tWeaponsAndArmorScreen('modals.createDone')} ${formatCraftMinutes(settled.minutes)}`,
-    );
+    // 357 (слово владельца: «не понятно, что произошло и из-за чего»):
+    // дальше — тот же отчёт, что в окне крафта: арифметика проверки, кубики
+    // и исход, что получено/сгорело, время; при успехе — вопрос про 2 ОД
+    // (324). Если ОД в пуле меньше двух — время списывается сразу, полное.
+    const rep = buildCraftReport(modId, { attempts: [run], stoppedEarly: 0 });
+    let settled = null;
+    if (rep.pendingTime && (!rep.pendingTime.hasSuccess || getActionPoints() < 2)) {
+      settled = settleCraftTime(modId, run, { spendActionPoints: false });
+    }
+    setSettledTime(settled);
+    setCraftReport({ ...rep, run, title: modName || rep.title });
+  };
+
+  // Решение про 2 ОД (323/324) — как в окне крафта.
+  const settleCraftTimeDecision = (spendActionPoints) => {
+    const settled = settleCraftTime(craftReport.recipeId, craftReport.run, { spendActionPoints });
+    setSettledTime(settled);
+  };
+
+  const finishCraftReport = () => {
+    setCraftReport(null);
+    setSettledTime(null);
   };
 
   // Обновляем modifiedWeapon при изменении weapon
@@ -640,6 +659,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           </View>
         </View>
       </View>
+
+      {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
+          короткий Alert: «Проверка навыка не пройдена» без кубиков и без
+          судьбы материалов). */}
+      <Modal visible={!!craftReport} transparent animationType="fade" onRequestClose={finishCraftReport}>
+        <View style={styles.reportOverlay}>
+          <View style={styles.reportDialog}>
+            <Text style={styles.reportTitle}>{craftReport?.title ?? ''}</Text>
+            <CraftReportView
+              report={craftReport}
+              settledTime={settledTime}
+              onSettleTime={settleCraftTimeDecision}
+              onDone={finishCraftReport}
+            />
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };
