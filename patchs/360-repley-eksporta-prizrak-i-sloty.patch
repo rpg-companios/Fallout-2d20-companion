@@ -1,0 +1,433 @@
+diff --git a/__tests__/equipment/robot-mod-load-replay-360.test.js b/__tests__/equipment/robot-mod-load-replay-360.test.js
+new file mode 100644
+index 0000000..f544fae
+--- /dev/null
++++ b/__tests__/equipment/robot-mod-load-replay-360.test.js
+@@ -0,0 +1,122 @@
++// ПРИЁМОЧНЫЙ (патч 360): реплей РЕАЛЬНОГО экспорта владельца (штурмомрон,
++// лазер-ган «Смешанный Снайперский ствол», скрафченный тюнер в сумке).
++// Жалоба: «Смешанный конденсатор не снимается, замена на тюнер — изменений
++// не происходит». Дефекты сейва, которые чинит патч:
++//   1) призрак робо-оружия в equippedWeapons с УСТАРЕВШИМИ appliedMods —
++//      вычищается при загрузке (правда о модах робо-оружия — только слоты);
++//   2) loadRobotState держал худые слоты как есть — ветки записи модов
++//      (limb.builtinWeapons) молча не срабатывали; теперь слоты всегда
++//      развёрнуты в полную форму.
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../db', () => {
++  const rows = new Map();
++  return {
++    saveCharacter: vi.fn(async () => 'char_replay'),
++    loadCharacterById: vi.fn(async (id) => rows.get(id) ?? null),
++    getCharactersList: vi.fn(async () => Array.from(rows.values())),
++    deleteCharacter: vi.fn(async () => {}),
++    clearCharacterRenameRequest: vi.fn(async () => {}),
++  };
++});
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn(async () => {}),
++}));
++vi.mock('../../db/Database', () => ({
++  getWeaponById: vi.fn(async () => null),
++  getWeaponModById: vi.fn(async () => null),
++  getAmmoById: vi.fn(async () => null),
++  getItemByName: vi.fn(async () => null),
++  getCharactersList: vi.fn(async () => []),
++}));
++
++import saveExport from '../fixtures/assaultron-ghost-export.json';
++import useCharacterStore from '../../src/store/characterStore';
++import { loadCharacter } from '../../src/saves/characterSaves';
++import { collectAttacks, serializeSlot, setInstalledWeaponMods } from '../../domain/robotSlots';
++import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
++import { diffModInstallPlan } from '../../domain/modsEquip';
++
++const state = () => useCharacterStore.getState();
++const CHAR_ID = 'char_1790055767985_l9qvxxsas';
++
++const loadExport = async () => {
++  const { loadCharacterById } = await import('../../db');
++  loadCharacterById.mockImplementation(async (id) => (id === CHAR_ID ? {
++    id: CHAR_ID,
++    name: 'вввв',
++    level: 1,
++    originName: 'assaultron',
++    data: saveExport.character.data,
++    folderId: null,
++    renamePending: false,
++  } : null));
++  expect(await loadCharacter(CHAR_ID)).toBe(true);
++};
++
++// Экранная проводка (robotSlot-ветка handleApplyModification, 359).
++const applyOnScreen = (modifiedWeapon) => {
++  const s = state();
++  const card = collectAttacks(s.robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
++  const plan = classifyModWritePlan({
++    sourceSlot: card.sourceSlot,
++    attackRole: card.attackRole,
++    isBuiltin: card.isBuiltin,
++    storeItemId: null,
++    uniqueId: null,
++    weaponId: card.weaponId || card.id,
++  }, { slotHasHeldWeapon: false });
++  expect(plan?.kind).toBe('robotSlot');
++  const hostKey = robotWeaponHostKey(plan.slotKey, plan.weaponId);
++  const diff = diffModInstallPlan(modIdList(card), modIdList(modifiedWeapon));
++  diff.uninstall.forEach((id) => s.uninstallArmorMod({ modId: id, hostKey }));
++  diff.install.forEach((id) => s.installRobotWeaponMod({ modId: id, hostKey }));
++  const next = setInstalledWeaponMods(s.robot.slots, plan.slotKey, plan.weaponId, modifiedWeapon.appliedMods);
++  expect(next).toBeTruthy(); // 360: запись на развёрнутых слотах НЕ молчит
++  state().setEquippedRobotSlots(next);
++};
++
++beforeEach(async () => {
++  state().resetCharacterStore();
++  await loadExport();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 360): реплей экспорта владельца', () => {
++  it('призрак вычищен из equippedWeapons при загрузке', () => {
++    const ghosts = state().equippedWeapons.filter((w) => w?.sourceSlot);
++    expect(ghosts).toEqual([]);
++  });
++
++  it('карточка из слотов: только «Снайперский ствол», без «Смешанного»', () => {
++    const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
++    expect(card.appliedMods).toEqual({ Barrel: 'mod_055' }); // конденсатора НЕТ
++  });
++
++  it('замена на скрафченный тюнер (mod_043) — запись срабатывает', () => {
++    // тюнер из сумки (в экспорте он есть) прячется по закону 343/344
++    const tunerKey = Object.keys(state().items).find((k) => state().items[k].weaponId === 'mod_043');
++    expect(tunerKey).toBeTruthy();
++
++    applyOnScreen({ appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' }, modIds: ['mod_043', 'mod_055'] });
++
++    expect(state().items[tunerKey].equipped).toBe(true);
++    expect(state().items[tunerKey].installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
++
++    const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
++    expect(card.appliedMods).toEqual({ Capacitor: 'mod_043', Barrel: 'mod_055' });
++  });
++
++  it('снятие ствола — тоже; круг через сейв держит результат', () => {
++    applyOnScreen({ appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' }, modIds: ['mod_043', 'mod_055'] });
++    applyOnScreen({ appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] });
++
++    const saved = Object.fromEntries(Object.entries(state().robot.slots).map(([k, v]) => [k, serializeSlot(v)]));
++    const restored = saved.leftArm.installedWeapons.find((w) => w.id === 'weapon_laser_gun');
++    expect(restored.modIds).toEqual(['mod_043']);
++  });
++});
+diff --git a/__tests__/fixtures/assaultron-ghost-export.json b/__tests__/fixtures/assaultron-ghost-export.json
+new file mode 100644
+index 0000000..b76be32
+--- /dev/null
++++ b/__tests__/fixtures/assaultron-ghost-export.json
+@@ -0,0 +1,160 @@
++{
++  "format": "rpg-companion-character",
++  "version": 1,
++  "exportedAt": "2026-09-24T08:26:54.858Z",
++  "character": {
++    "id": "char_1790055767985_l9qvxxsas",
++    "name": "вввв",
++    "level": 1,
++    "originName": "assaultron",
++    "data": {
++      "characterName": "вввв",
++      "level": 1,
++      "attributes": [
++        { "name": "STR", "value": 4 },
++        { "name": "PER", "value": 4 },
++        { "name": "END", "value": 10 },
++        { "name": "CHA", "value": 4 },
++        { "name": "INT", "value": 4 },
++        { "name": "AGI", "value": 4 },
++        { "name": "LCK", "value": 10 }
++      ],
++      "skills": [
++        { "name": "ATHLETICS", "value": 3 },
++        { "name": "BARTER", "value": 3 },
++        { "name": "BIG_GUNS", "value": 3 },
++        { "name": "ENERGY_WEAPONS", "value": 3 },
++        { "name": "EXPLOSIVES", "value": 3 },
++        { "name": "LOCKPICK", "value": 3 },
++        { "name": "MEDICINE", "value": 1 },
++        { "name": "MELEE_WEAPONS", "value": 0 },
++        { "name": "PILOT", "value": 0 },
++        { "name": "REPAIR", "value": 0 },
++        { "name": "SCIENCE", "value": 0 },
++        { "name": "SMALL_GUNS", "value": 0 },
++        { "name": "SNEAK", "value": 0 },
++        { "name": "SPEECH", "value": 0 },
++        { "name": "SURVIVAL", "value": 0 },
++        { "name": "THROWING", "value": 0 },
++        { "name": "UNARMED", "value": 0 }
++      ],
++      "selectedSkills": ["ATHLETICS", "BARTER", "BIG_GUNS"],
++      "extraTaggedSkills": [],
++      "forcedSelectedSkills": [],
++      "origin": { "id": "assaultron" },
++      "trait": {
++        "ids": ["assaultron-designed-for-frontline"],
++        "id": "assaultron-designed-for-frontline",
++        "name": "Designed for the Frontline",
++        "modifiers": {
++          "immunities": ["disease", "radiation", "poison"],
++          "carryWeightFixed": 150,
++          "carryWeightStrengthMultiplier": 0,
++          "meleeBonusDelta": 1,
++          "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
++        }
++      },
++      "equipment": {
++        "id": "assaultron_us_military",
++        "name": "US Military Model",
++        "weight": 4,
++        "price": 138,
++        "items": [
++          { "id": "ammo_energy_cell", "instanceId": "ammo_energy_cell", "weaponId": "ammo_energy_cell", "itemType": "ammo", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 12, "stackKey": "ammo_energy_cell", "appliedMods": {}, "durabilityTracked": false },
++          { "id": "clothing_casual_clothes", "instanceId": "clothing_casual_clothes", "weaponId": "clothing_casual_clothes", "itemType": "clothing", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "clothing_casual_clothes", "appliedMods": {}, "durabilityTracked": false },
++          { "id": "chem_buffout", "instanceId": "chem_buffout", "weaponId": "chem_buffout", "itemType": "chem", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "chem_buffout", "appliedMods": {}, "durabilityTracked": false },
++          { "id": "ammo_flamer_fuel", "instanceId": "ammo_flamer_fuel", "weaponId": "ammo_flamer_fuel", "itemType": "ammo", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 4, "stackKey": "ammo_flamer_fuel", "appliedMods": {}, "durabilityTracked": false },
++          { "id": "item_common_materials", "instanceId": "item_common_materials", "weaponId": "item_common_materials", "itemType": "misc", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 3, "stackKey": "item_common_materials", "appliedMods": {}, "durabilityTracked": false },
++          { "id": "mod_043", "instanceId": "mod_043", "weaponId": "mod_043", "itemType": "weaponMod", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "mod_043", "appliedMods": {}, "durabilityTracked": false }
++        ],
++        "purchaseMaxRarity": null
++      },
++      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"],
++      "activeTimedEffects": [],
++      "sceneCounter": 0,
++      "equippedWeapons": [
++        {
++          "id": "weapon_laser_gun",
++          "itemType": "weapon",
++          "appliedMods": { "capacitor": "mod_046", "barrel": "mod_055" },
++          "weaponId": "weapon_laser_gun",
++          "sourceSlot": "leftArm",
++          "isBuiltin": true
++        }
++      ],
++      "equippedRobotSlots": {
++        "leftArm": {
++          "content": "robot_arm_assaultron",
++          "armorLayers": { "frame": null, "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": ["mod_055"] }]
++        },
++        "head": {
++          "content": "robot_head_assaultron_laser",
++          "armorLayers": { "frame": null, "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": []
++        },
++        "rightArm": {
++          "content": "robot_arm_assaultron",
++          "armorLayers": { "frame": null, "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": []
++        },
++        "leftLeg": {
++          "content": "robot_legs_assaultron",
++          "armorLayers": { "frame": null, "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": []
++        },
++        "body": {
++          "content": "robot_body_assaultron",
++          "armorLayers": { "frame": "robot_frame_actuated_body", "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": []
++        },
++        "rightLeg": {
++          "content": "robot_legs_assaultron",
++          "armorLayers": { "frame": null, "plating": null, "armor": null },
++          "heldWeaponId": null,
++          "heldWeaponMods": [],
++          "installedWeapons": []
++        }
++      },
++      "equippedRobotModules": [
++        { "id": "robot_module_recon_sensors", "itemType": "module", "weight": 0, "cost": 0, "rarity": 0, "name": "Recon Sensors", "type": "fixed", "itemId": "robot_module_recon_sensors" }
++      ],
++      "mk2Installed": false,
++      "equippedArmor": {
++        "head": { "armor": null, "clothing": null },
++        "body": { "armor": null, "clothing": null },
++        "leftArm": { "armor": null, "clothing": null },
++        "rightArm": { "armor": null, "clothing": null },
++        "leftLeg": { "armor": null, "clothing": null },
++        "rightLeg": { "armor": null, "clothing": null }
++      },
++      "equippedPowerArmor": { "frame": null, "pieces": { "head": null, "body": null, "leftArm": null, "rightArm": null, "leftLeg": null, "rightLeg": null } },
++      "powerArmorRuntime": { "coreAccumulatorMs": 0 },
++      "caps": 45,
++      "currentHealth": 20,
++      "radiation": 0,
++      "availablePerkAttributePoints": 0,
++      "luckPoints": 10,
++      "attributesSaved": true,
++      "skillsSaved": true,
++      "selectedPerks": [],
++      "conditions": [],
++      "chemDosesLog": [],
++      "sceneRiskStates": {},
++      "lastDiseaseResistAt": null,
++      "survival": null,
++      "rewardedSkills": ["ATHLETICS", "BARTER", "BIG_GUNS"],
++      "schemaVersion": 26
++    }
++  }
++}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c8a9103..b13ff97 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **359** · у владельца на main применено до **314**
++· последний сданный патч: **360** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -309,6 +309,19 @@
+   installRobotWeaponMod (паспорт обновлён); replaceLimb/unequipHeldWeapon
+   слайса возвращают моды уходящего оружия в сумку. Карта потоков —
+   data-flows.md. Тест robot-weapon-mod-flag-359 (5).
++- 360 — РЕПЛЕЙ ЭКСПОРТА ВЛАДЕЛЬЦА (штурмомрон, «Смешанный Снайперский
++  ствол Лазерный пистолет», жалоба: «Смешанный не снимается, замена на
++  тюнер — изменений не происходит»; экспорт приложен к репорту и
++  сохранён в __tests__/fixtures/assaultron-ghost-export.json). Два
++  дефекта: (1) робо-оружие оседало копией-ПРИЗРАКОМ в equippedWeapons с
++  устаревшими appliedMods — при загрузке вычищается (правило «встроенное
++  оружие конечностей НЕ хранится в equippedWeapons» теперь исполняется);
++  (2) loadRobotState держал худые слоты из сейва как есть — ветки записи
++  модов (limb.builtinWeapons) на них молча не срабатывали; слоты теперь
++  разворачиваются в полную форму прямо в loadRobotState (в памяти —
++  всегда полная, как после комплекта). Запись модов робо-оружия после
++  ЛЮБОЙ загрузки работает. Тест robot-mod-load-replay-360 (4) — прогон
++  реального экспорта через настоящий loadCharacter.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ad0c910..626a6be 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,16 @@
+ # Changelog
+ 
+ ---
++## Robot weapon mods after loading a save: ghost cleanup and reliable writes (patch 360)
++
++From the owner's save export (an assaultron with a laser gun): old
++saves kept a second copy of robot weapons in the equipped list — a card
++with a stale mod set, which made an already-removed capacitor look
++stuck. The ghost copy is now purged on load. Also, writing mods to
++robot weapons no longer depends on the slot shape inside a save: slots
++are always expanded to the full form, so install/remove/replace works
++after any load.
++
+ ## Robot weapon mods follow the common law (patch 359)
+ 
+ Owner's report (a beta-wave tuner for the assaultron laser): a mod on a
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4841a4b..9392c1b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Моды робо-оружия после загрузки сейва: чистка призрака и надёжная запись (патч 360)
++
++По экспорту владельца (штурмомрон с лазер-ганом): в старых сейвах
++робо-оружие оседало второй копией в списке надетого — карточкой с
++устаревшим набором модов, из-за чего снятый «Смешанный» конденсатор
++продолжал висеть. Копия-призрак вычищается при загрузке. Заодно запись
++модов на оружие робота больше не зависит от формы слотов в сейве:
++слоты всегда разворачиваются в полную форму, установка/снятие/замена
++работают после любой загрузки.
++
+ ## Моды на оружии роботов: установка по общему закону (патч 359)
+ 
+ По репорту владельца (тюнер бета-волн для лазер-гана штурмотрона):
+diff --git a/public/version.json b/public/version.json
+index 499d887..0805df3 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "359",
++  "version": "360",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index 48282af..df8e50d 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -410,6 +410,16 @@ export const loadCharacter = async (id) => {
+     // Migrate old [null, null] format to dynamic array
+     const rawWeapons = data.equippedWeapons || [];
+     let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((w) => w !== null) : [];
++    // 360 (репорт владельца: «Смешанный конденсатор не снимается»): в старых
++    // сейвах робо-оружие оседало копией-призраком в equippedWeapons (карточка
++    // с устаревшими appliedMods). Правда о модах робо-оружия — только слоты
++    // (robot.slots), призрак при загрузке вычищается: иначе он всплывает
++    // устаревшим набором модов, который «не снимается».
++    const ghostCount = migratedWeapons.filter((w) => w?.sourceSlot).length;
++    if (ghostCount > 0) {
++      migratedWeapons = migratedWeapons.filter((w) => !w?.sourceSlot);
++      debugLog('character.load.robotGhostPurged', { count: ghostCount });
++    }
+     // Ensure the archetype's built-in unarmed weapon is present on load
+     // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
+     const loadedOrigin = resolveOrigin(data.origin);
+diff --git a/src/store/robotSlice.js b/src/store/robotSlice.js
+index fcd1e3d..4aa8820 100644
+--- a/src/store/robotSlice.js
++++ b/src/store/robotSlice.js
+@@ -29,6 +29,7 @@ import {
+   getBuiltinWeaponsFromSlots,
+ } from '../../domain/robotEquip';
+ import { modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
++import { deserializeSlot, isSlimSlot } from '../../domain/robotSlots';
+ 
+ /**
+  * 359 (закон 343/344 на робо-оружии): снять привязку модов с оружия, которое
+@@ -111,10 +112,18 @@ export const createRobotActions = (set, get) => ({
+    */
+   loadRobotState: (robotState) => {
+     if (!robotState) return;
++    // 360: худая форма слотов из сейва разворачивается здесь, а не только в
++    // deserializeState — в памяти слоты всегда ПОЛНЫЕ (как после комплекта).
++    // Иначе ветки записи модов (setInstalledWeaponMods: limb.builtinWeapons)
++    // молча не срабатывают на слоте, который пришёл худым.
++    const slots = {};
++    for (const [slotKey, slotData] of Object.entries(robotState.slots ?? {})) {
++      slots[slotKey] = isSlimSlot(slotData) ? deserializeSlot(slotData) : slotData;
++    }
+     set({
+       robot: {
+         bodyPlan: robotState.bodyPlan ?? get().robot?.bodyPlan ?? null,
+-        slots: robotState.slots ?? {},
++        slots,
+         modules: robotState.modules ?? [],
+         mk2Installed: robotState.mk2Installed ?? get().robot?.mk2Installed ?? false,
+       },
