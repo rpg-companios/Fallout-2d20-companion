@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+## Exact law of automatic check failure (patch 358)
+
+Owner's clarification on the check mechanism: an automatic failure is
+"a complication and no successes at all", not "two 20s rolled". A 20
+and a 20 fail by themselves (they give no successes), but a single 20
+with no successes fails too. On the usual two dice the outcomes are
+unchanged; the rule is now exact. Standing laws: each situation defines
+its own failure consequence (chems and alcohol — addiction, crafting —
+lost materials or time, disease — longer duration), and successes
+beyond the difficulty always refill the AP pool.
+
 ## Craft report in the mod installation modal (patch 357)
 
 Owner's feedback: crafting a mod with the "Create" button left it
@@ -16,7 +27,7 @@ crash when a check earned more successes than required.
 Owner's word: when difficulty is cleared by skill (difficulty 0), the
 game asks — "Roll the dice?". "Yes" — roll with the Success/Failure
 rules: a 1 is a critical (2 successes), a 20 is a complication (extra
-time), two 20s fail the check. "No" — auto-success without a roll, as
+time), a complication with no successes fails the check. "No" — auto-success without a roll, as
 before. The question appears in the crafting window (one per batch)
 and on the "Create" button in the weapon mod modal.
 

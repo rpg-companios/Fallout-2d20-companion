@@ -83,11 +83,14 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
     expect(result.check.complicationCount).toBe(0);
   });
 
-  it('движок: roll — осложнение на двадцатках: две = АВТОПРОВАЛ', () => {
+  it('движок: roll — осложнение без единого успеха = АВТОПРОВАЛ (358)', () => {
+    // слово владельца: автопровал — «нет успеха + осложнение», а не только
+    // «20 и 20»; обе двадцатки дают ноль успехов — проваливаются сами.
     const result = engineRun('roll', () => 20);
     expect(result.done).toBe(false);
     expect(result.stage).toBe('check');
     expect(result.check.complicationCount).toBe(2);
+    expect(result.check.automaticFailure).toBe(true);
   });
 
   it('движок: roll — одна двадцатка даёт осложнение при успехе (+время)', () => {

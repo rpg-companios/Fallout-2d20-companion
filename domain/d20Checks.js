@@ -2,7 +2,6 @@ import { rollDie } from './diceRollsLogic';
 
 const NATURAL_ONE = 1;
 const COMPLICATION_FACE = 20;
-const AUTOMATIC_FAILURE_COMPLICATIONS = 2;
 
 const assertNonNegativeInteger = (value, label) => {
   if (!Number.isInteger(value) || value < 0) {
@@ -112,9 +111,12 @@ export const resolveD20Check = ({
   }));
   const successes = dieResults.reduce((total, result) => total + result.successes, 0);
   const complicationCount = dieResults.filter((result) => result.isComplication).length;
-  const automaticFailure = complicationCount >= AUTOMATIC_FAILURE_COMPLICATIONS;
-  const noSuccessFailure = complicationCount > 0 && successes === 0;
-  const passed = !automaticFailure && !noSuccessFailure && successes >= difficulty;
+  // Автопровал (слово владельца, патч 358): осложнение БЕЗ единого успеха.
+  // Не «две двадцатки»: отдельного правила для числа двадцаток нет — кубик-
+  // осложнение успехов не приносит, поэтому 20 и 20 проваливаются сами
+  // (ноль успехов + осложнения), но и «20 + промах» — автопровал тоже.
+  const automaticFailure = complicationCount > 0 && successes === 0;
+  const passed = !automaticFailure && successes >= difficulty;
   const outcome = passed
     ? (complicationCount > 0 ? 'successWithComplication' : 'success')
     : 'failure';
@@ -131,7 +133,6 @@ export const resolveD20Check = ({
     successes,
     complicationCount,
     automaticFailure,
-    noSuccessFailure,
     passed,
     outcome,
   };
