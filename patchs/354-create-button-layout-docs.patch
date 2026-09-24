@@ -1,0 +1,79 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 99fc3de..440b340 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **352** · у владельца на main применено до **314**
++· последний сданный патч: **354** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -254,6 +254,12 @@
+   time.pending), отказы — Alert по кодам движка. Успех → мод в сумке,
+   кнопка скрыта. Настройка «Установка модификаций» включает кнопки.
+   Далее по §2.10: то же для модалок брони + разделы категорий.
++- 353/354 — ПРАВКА МАКЕТА (замечания владельца): кнопка «Создать» —
++  тёмный аналог applyButton модалки (#007AFF, borderRadius 5),
++  компактная справа в строке материалов; требования блоком —
++  «Требования: Перк N · Сложность M» и строка «есть/нужно» мелким
++  слева (matCommon/matUncommon/matRare в ui крафта; helper отдаёт
++  requirements + materialsLine).
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 046fad0..5875326 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,16 @@
+ # Changelog
+ 
++---
++## "Create" button: compact and darker, requirements per the mockup (patches 353–354)
++
++Fixes from the owner's interface testing feedback.
++
++- The "Create" button now matches this modal's "Apply" button style and
++  no longer stretches across the row: compact, on the right.
++- Requirements are shown as a block: a "Requirements: perk · complexity"
++  line, with materials as "have/need" (e.g. "Common material 2/4") in
++  small font to the left of the button.
++
+ ---
+ ## A "Create" button in the weapon modification modal (patch 352)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e6a78d7..ac93f59 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Кнопка «Создать»: компактнее и темнее, требования по макету (патчи 353–354)
++
++Правки по замечаниям владельца от тестирования интерфейса.
++
++- Кнопка «Создать» — в стиле кнопки «Применить» этой же модалки, уже
++  не растягивается на всю высоту строки: компактная, справа.
++- Требования показываются блоком: строка «Требования: перк · сложность»,
++  под ней материалы в формате «есть/нужно» (например «Обычный материал
++  2/4») мелким шрифтом слева от кнопки.
++
+ ---
+ ## Кнопка «Создать» в окне модификации оружия (патч 352)
+ 
+diff --git a/public/version.json b/public/version.json
+index e310ee4..ca37865 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "352",
++  "version": "354",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
