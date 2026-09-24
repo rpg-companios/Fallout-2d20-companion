@@ -1,0 +1,432 @@
+diff --git a/__tests__/equipment/robot-weapon-mod-flag-359.test.js b/__tests__/equipment/robot-weapon-mod-flag-359.test.js
+new file mode 100644
+index 0000000..1d83a05
+--- /dev/null
++++ b/__tests__/equipment/robot-weapon-mod-flag-359.test.js
+@@ -0,0 +1,143 @@
++// ПРИЁМОЧНЫЙ (патч 359): мод на оружии в слоте робота подчиняется закону
++// 343/344. Репорт владельца: скрафтил «Тюнер бета-волн» для лазер-гана
++// штурмотрона («Смешанный Снайперский ствол Лазерный пистолет»), применяет —
++// «не ставится, хотя в инвентаре есть… почему не экипируется?». Причина:
++// робо-ветки применения не исполняли закон — мод-предмет оставался в сумке
++// после установки. Теперь: установка прячет мод из сумки (привязка к слоту+
++// оружию), замена/снятие возвращает, уход оружия из слота возвращает.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import { initRobotSlots } from '../../domain/robotEquip';
++import { collectAttacks, setInstalledWeaponMods } from '../../domain/robotSlots';
++import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
++import { diffModInstallPlan } from '../../domain/modsEquip';
++import robotCatalog from '../../modules/fallout/data/equipment/robot/limbs.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++
++const state = () => useCharacterStore.getState();
++
++// Комплект штурмотрона: лазер-ган установлен в левую руку (installTo: 'arm').
++const kitSlots = () => initRobotSlots('assaultron', [
++  { weaponId: 'weapon_laser_gun', itemType: 'weapon', weight: 0, slot: 'left', installTo: 'arm' },
++], { limbs: robotCatalog, weapons: robotWeapons, weaponAsLimb: [] }).slots;
++
++// Экранная проводка (как в WeaponsAndArmorScreen handleApplyModification).
++const applyOnScreen = ({ slots, card, modified: modifiedWeapon }) => {
++  const plan = classifyModWritePlan({
++    sourceSlot: card.sourceSlot,
++    attackRole: card.attackRole,
++    isBuiltin: card.isBuiltin,
++    storeItemId: null,
++    uniqueId: card.uniqueId || null,
++    weaponId: card.weaponId || card.id || null,
++  }, { slotHasHeldWeapon: false });
++  expect(plan?.kind).toBe('robotSlot');
++  const hostKey = robotWeaponHostKey(plan.slotKey, plan.weaponId);
++  const diff = diffModInstallPlan(modIdList(card), modIdList(modifiedWeapon));
++  diff.uninstall.forEach((id) => state().uninstallArmorMod({ modId: id, hostKey }));
++  diff.install.forEach((id) => state().installRobotWeaponMod({ modId: id, hostKey }));
++  const next = setInstalledWeaponMods(slots, plan.slotKey, plan.weaponId, modifiedWeapon.appliedMods);
++  expect(next).toBeTruthy();
++  return { slots: next, hostKey };
++};
++
++// «Смешанный Снайперский ствол Лазерный пистолет» — на оружии уже стоят
++// мод_046 (конденсатор) + mod_055 (ствол); игрок выбирает тюнер mod_043.
++const weaponOnCard = (slots) => collectAttacks(slots).find((a) => a.weaponId === 'weapon_laser_gun');
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — закон 343/344', () => {
++  let modKey;
++
++  beforeEach(() => {
++    modKey = state().addNewItem({ weaponId: 'mod_043', itemType: 'weaponMod' });
++  });
++
++  it('установка: тюнер исчезает из сумки, привязан к слоту+оружию', () => {
++    const slots = kitSlots();
++    const card = weaponOnCard(slots);
++    const modified = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
++
++    applyOnScreen({ slots, card, modified });
++
++    const item = state().items[modKey];
++    expect(item.equipped).toBe(true);
++    expect(item.installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
++    // в сумке (свободные предметы) мода больше нет
++    const free = Object.values(state().items).filter((i) => !i.equipped && !i.installedOn);
++    expect(free.some((i) => i.weaponId === 'mod_043')).toBe(false);
++  });
++
++  it('замена конденсатора обратно: прежний мод вернулся в сумку', () => {
++    const slots = kitSlots();
++    const card = weaponOnCard(slots);
++    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
++    const { slots: slots2, hostKey } = applyOnScreen({ slots, card, modified: withTuner });
++
++    // игрок ставит «Смешанный» (mod_046) вместо тюнера
++    const card2 = collectAttacks(slots2).find((a) => a.weaponId === 'weapon_laser_gun');
++    const back = { ...card2, appliedMods: { Capacitor: 'mod_046', Barrel: 'mod_055' } };
++    applyOnScreen({ slots: slots2, card: card2, modified: back });
++
++    const item = state().items[modKey];
++    expect(item.equipped).toBe(false);
++    expect(item.installedOn).toBeUndefined();
++    const free = Object.values(state().items).filter((i) => !i.equipped && !i.installedOn);
++    expect(free.some((i) => i.weaponId === 'mod_043')).toBe(true);
++    expect(hostKey).toBe('robotSlot:leftArm:weapon_laser_gun');
++  });
++
++  it('оружие ушло из слота (замена конечности/ладонь) — моды снова в сумке', () => {
++    // закон исполняет слайс: releaseRobotSlotMods при replaceLimb/unequipHeldWeapon
++    const slots = kitSlots();
++    const card = weaponOnCard(slots);
++    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
++    const { hostKey } = applyOnScreen({ slots, card, modified: withTuner });
++
++    state().uninstallArmorMod({ modId: 'mod_043', hostKey });
++    const item = state().items[modKey];
++    expect(item.equipped).toBe(false);
++    expect(item.installedOn).toBeUndefined();
++  });
++
++  it('слайс: оружие убрали из ладони — его моды вернулись в сумку', () => {
++    // реальное действие unequipHeldWeapon исполняет закон 343/344 само
++    const slots = kitSlots();
++    const palm = { ...slots.rightArm, heldWeapon: { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] } };
++    useCharacterStore.setState({ robot: { bodyPlan: 'assaultron', slots: { ...slots, rightArm: palm }, modules: [], mk2Installed: false } });
++
++    const hostKey = robotWeaponHostKey('rightArm', 'weapon_laser_gun');
++    expect(state().installRobotWeaponMod({ modId: 'mod_043', hostKey })).toBeTruthy();
++    expect(state().items[modKey].equipped).toBe(true);
++
++    state().unequipHeldWeapon('rightArm');
++    expect(state().items[modKey].equipped).toBe(false);
++    expect(state().items[modKey].installedOn).toBeUndefined();
++  });
++
++  it('круг через сейв: привязка переживает сохранение, дубль не заводится', () => {
++    const slots = kitSlots();
++    const card = weaponOnCard(slots);
++    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
++    applyOnScreen({ slots, card, modified: withTuner });
++
++    // повторное «применить» того же набора — дифф пуст, второй мод не прячется
++    const card2 = collectAttacks(
++      setInstalledWeaponMods(slots, 'leftArm', 'weapon_laser_gun', withTuner.appliedMods),
++    ).find((a) => a.weaponId === 'weapon_laser_gun');
++    const diff = diffModInstallPlan(modIdList(card2), modIdList(withTuner));
++    expect(diff.install).toEqual([]);
++    expect(diff.uninstall).toEqual([]);
++    // единственный экземпляр остался привязанным
++    expect(state().items[modKey].installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
++  });
++});
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+index 8e94e33..f18f557 100644
+--- a/docs/agents/data-flows.md
++++ b/docs/agents/data-flows.md
+@@ -176,6 +176,14 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
+   uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
+   стирается → мод снова виден в сумке
+ 
++РОБО-ОРУЖИЕ (359, тот же закон 343/344): оружие в слоте робота — НЕ предмет
++  сумки (комплект кладёт его в конечность), поэтому мод привязывается к
++  синтетическому носителю robotWeaponHostKey(слот, id оружия) =
++  «robotSlot:слот:id». Экран (ветка robotSlot плана classifyModWritePlan):
++  дифф модов → installRobotWeaponMod (как installArmorMod, но без требования
++  items[hostKey]) / uninstallArmorMod. Оружие уходит из слота
++  (replaceLimb/unequipHeldWeapon) — слайс возвращает его моды в сумку.
++
+ УДАЛЕНИЕ НОСИТЕЛЯ — одна копия правила В СТОРЕ (344):
+   adjustItemQuantity(itemId, delta) — кнопки «Продать»/«Потратить»/
+   «Выбросить» инвентаря (UI-хелпер делегирует) и крафт-расход
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 937906d..c8a9103 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **358** · у владельца на main применено до **314**
++· последний сданный патч: **359** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -297,6 +297,18 @@
+   время (реализовано), проверка на болезнь → продление действия —
+   применять при появлении соответствующих проверок. Тест
+   check-auto-fail-358 (5, __tests__/domain/).
++- 359 — МОД НА РОБО-ОРУЖИИ ПОДЧИНЯЕТСЯ ЗАКОНУ 343/344 (репорт владельца:
++  скрафченный «Тюнер бета-волн» для лазер-гана штурмотрона «не ставится,
++  хотя в инвентаре есть… не экипируется»). Диагноз (лабораторно): запись
++  мода на оружие в слоте робота работает (plan robotSlot/installed,
++  setInstalledWeaponMods, переживает сейв), но закон 343/344 на робо-ветках
++  НЕ исполнялся — мод-предмет оставался в сумке («не экипируется»).
++  Исправление: экран в ветке robotSlot исполняет дифф 343/344 с
++  синтетическим носителем robotWeaponHostKey(слот, id оружия)
++  (src/engine/items/weaponMods.ts); новое действие стора
++  installRobotWeaponMod (паспорт обновлён); replaceLimb/unequipHeldWeapon
++  слайса возвращают моды уходящего оружия в сумку. Карта потоков —
++  data-flows.md. Тест robot-weapon-mod-flag-359 (5).
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ee993a2..ad0c910 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,16 @@
+ # Changelog
+ 
+ ---
++## Robot weapon mods follow the common law (patch 359)
++
++Owner's report (a beta-wave tuner for the assaultron laser): a mod on a
++robot slot weapon was applied, but the mod item stayed in the inventory
++forever — it looked like "nothing happened". The same law as on human
++weapons applies now: installing hides the mod item from the inventory
++(bound to the slot and the weapon), replacing or removing returns it;
++taking the weapon out of the slot or swapping the limb returns its mods
++too.
++
+ ## Exact law of automatic check failure (patch 358)
+ 
+ Owner's clarification on the check mechanism: an automatic failure is
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 086726e..4841a4b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Моды на оружии роботов: установка по общему закону (патч 359)
++
++По репорту владельца (тюнер бета-волн для лазер-гана штурмотрона):
++мод на оружие в слоте робота ставился, но мод-предмет навсегда оставался
++в сумке — выглядело как «не ставится, не понятно что произошло».
++Теперь тот же закон, что на людском оружии: при установке мод-предмет
++исчезает из сумки (привязан к слоту и оружию), при замене или снятии —
++возвращается; убрали оружие из руки/заменили конечность — моды тоже
++вернулись в сумку.
++
+ ## Точный закон автопровала проверки (патч 358)
+ 
+ Пояснение владельца о механизме проверок: автопровал — это
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 0c8afec..627d670 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -22,7 +22,7 @@ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+ import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
+ // Единый путь записи модов (311): классификация места хранения — движок.
+-import { classifyModWritePlan, modIdList } from '../../../../src/engine/items/weaponMods';
++import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
+ import { diffModInstallPlan } from '../../../../domain/modsEquip';
+ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+@@ -980,6 +980,17 @@ const WeaponsAndArmorScreen = () => {
+     debugLog('weapon.mod.apply.screen.plan', { itemId, modPlan });
+ 
+     if (modPlan?.kind === 'robotSlot') {
++      // 359 (жалоба владельца: «мод не ставится, хотя в инвентаре есть»):
++      // закон 343/344 действует и на робо-оружии — мод-предмет прячется из
++      // сумки (флаг «экипирован», привязка к слоту+оружию) и возвращается
++      // при замене/снятии. Носитель — не предмет, ключ синтетический.
++      const robotHostKey = robotWeaponHostKey(modPlan.slotKey, modPlan.weaponId);
++      const robotDiff = diffModInstallPlan(
++        modIdList(selectedWeaponForModification),
++        modIdList(modifiedWeapon),
++      );
++      robotDiff.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: robotHostKey }));
++      robotDiff.install.forEach((id) => installRobotWeaponMod({ modId: id, hostKey: robotHostKey }));
+       if (modPlan.role === 'held') {
+         const sourceSlot = modPlan.slotKey;
+         setEquippedRobotSlots((prev) => {
+@@ -1064,7 +1075,7 @@ const WeaponsAndArmorScreen = () => {
+         w && w.uniqueId === modPlan.uniqueId ? modifiedWeapon : w
+       )));
+     }
+-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
++  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons, installRobotWeaponMod, uninstallWeaponModFlag]);
+ 
+   const handleUnequipWeapon = useCallback((weapon) => {
+     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
+@@ -1087,6 +1098,7 @@ const WeaponsAndArmorScreen = () => {
+   const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+   const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
+   const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
++  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+ 
+   const handleApplyArmorModification = (modifiedItem) => {
+     if (!selectedArmorSlot) return;
+diff --git a/public/version.json b/public/version.json
+index 4790579..499d887 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "358",
++  "version": "359",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/engine/items/weaponMods.ts b/src/engine/items/weaponMods.ts
+index 46a0b72..a459b5e 100644
+--- a/src/engine/items/weaponMods.ts
++++ b/src/engine/items/weaponMods.ts
+@@ -65,6 +65,16 @@ export function modIdMap<M extends { slot?: string | null; id?: string }>(
+ /** Роль экземпляра оружия внутри слота робота (форма слота — дело сеттинга). */
+ export type RobotWeaponRole = 'held' | 'installed' | 'ownAttack';
+ 
++/**
++ * Стабильный ключ-носитель для закона 343/344 на робо-оружии: оружие в слоте
++ * робота — НЕ предмет сумки (комплект кладёт его внутрь конечности), поэтому
++ * мод-экземпляр привязывается к паре «слот + id оружия». Ключ одинаков в
++ * каждой сессии — снятие мода и замена конечности находят его снова (359).
++ */
++export function robotWeaponHostKey(slotKey: string, weaponId: string | null): string {
++  return `robotSlot:${slotKey}:${weaponId ?? 'unknown'}`;
++}
++
+ /** План записи выбора модов: куда и какой экземпляр меняется. */
+ export type WeaponModWritePlan =
+   | { kind: 'storeItem'; itemId: string }
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index 332c3ac..53e5d37 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -198,6 +198,9 @@ export interface CharacterActions {
+   /** 343: установить мод брони на предмет-носитель (флаг «экипирован» +
+    * привязка installedOn; мода нет в сумке — свободная установка, null). */
+   installArmorMod: (args: { modId: string; hostKey: string | null }) => string | null;
++  /** 359: тот же закон 343/344 для мода на оружии в слоте робота (носитель —
++   * не предмет сумки, ключ синтетический robotWeaponHostKey). */
++  installRobotWeaponMod: (args: { modId: string; hostKey: string | null }) => string | null;
+   /** 343: снять мод — теряет «экипирован» и снова виден в сумке. */
+   uninstallArmorMod: (args: { modId: string; hostKey?: string | null }) => void;
+   /** 343: предмет-носитель удалён — установленные моды уходят с ним. */
+@@ -374,6 +377,7 @@ export const CRUD_OP_KEYS = [
+   'initRobot',
+   'initRobotFromKit',
+   'installArmorMod',
++  'installRobotWeaponMod',
+   'loadPowerArmorState',
+   'loadRobotState',
+   'markSkillsAsRewarded',
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 94ef378..b10c6b8 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -795,6 +795,28 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         return key;
+       },
+ 
++      /**
++       * 359: тот же закон 343/344 для мода на оружии в СЛОТЕ РОБОТА. Носитель
++       * — не предмет сумки (комплектное оружие живёт в конечности), поэтому
++       * требование items[hostKey] здесь незаконно: ключ-носитель синтетический
++       * (robotWeaponHostKey: слот + id оружия), мод прячется из сумки и
++       * возвращается при снятии/замене тем же uninstallArmorMod.
++       * @returns {string|null} ключ экземпляра мода или null.
++       */
++      installRobotWeaponMod: ({ modId, hostKey }) => {
++        if (!modId || !hostKey) return null;
++        const items = { ...get().items };
++        const entry = Object.entries(items).find(([key, item]) => (
++          item?.weaponId === modId && !item.equipped && !item.installedOn
++        ));
++        if (!entry) return null;
++        const [key, item] = entry;
++        items[key] = { ...item, equipped: true, installedOn: hostKey };
++        set({ items });
++        debugLog('robotWeaponMod.installed', { modId, instanceKey: key, hostKey });
++        return key;
++      },
++
+       /**
+        * 343: снять мод с предмета (замена или «без мода») — теряет флаг
+        * «экипирован» и снова виден в сумке.
+diff --git a/src/store/robotSlice.js b/src/store/robotSlice.js
+index fed5b60..fcd1e3d 100644
+--- a/src/store/robotSlice.js
++++ b/src/store/robotSlice.js
+@@ -28,6 +28,30 @@ import {
+   canEquipWeaponToSlot,
+   getBuiltinWeaponsFromSlots,
+ } from '../../domain/robotEquip';
++import { modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
++
++/**
++ * 359 (закон 343/344 на робо-оружии): снять привязку модов с оружия, которое
++ * покидает слот (замена конечности / опустошение ладони). Моды возвращаются
++ * в сумку (uninstallArmorMod — только снимает флаги, предметы не удаляет).
++ */
++const releaseRobotSlotMods = (get, slots, slotKey) => {
++  const slotData = slots?.[slotKey];
++  if (!slotData) return;
++  const leaving = [
++    ...(Array.isArray(slotData.limb?.builtinWeapons) ? slotData.limb.builtinWeapons : []),
++    ...(slotData.heldWeapon ? [slotData.heldWeapon] : []),
++  ];
++  const { uninstallArmorMod } = get();
++  for (const weapon of leaving) {
++    const weaponId = weapon?.weaponId || weapon?.id;
++    if (!weaponId) continue;
++    const hostKey = robotWeaponHostKey(slotKey, weaponId);
++    for (const modId of modIdList(weapon)) {
++      uninstallArmorMod({ modId, hostKey });
++    }
++  }
++};
+ 
+ export const createInitialRobotState = () => ({
+   robot: {
+@@ -172,6 +196,10 @@ export const createRobotActions = (set, get) => ({
+     const check = canReplaceLimb(slotKey, newLimb, character);
+     if (!check.allowed) return { ok: false, reason: check.reason };
+ 
++    // 359 (закон 343/344): конечность уходит вместе с установленным оружием —
++    // его моды возвращаются в сумку (снятие привязки к робо-носителю).
++    releaseRobotSlotMods(get, slots, slotKey);
++
+     const { slots: nextSlots } = applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog);
+     set({ robot: { ...robot, slots: nextSlots } });
+     return { ok: true };
+@@ -212,6 +240,8 @@ export const createRobotActions = (set, get) => ({
+     const slots = robot?.slots || {};
+     const slotData = slots[slotKey];
+     if (!slotData || !slotData.heldWeapon) return;
++    // 359 (закон 343/344): оружие покидает ладонь — его моды снова в сумке.
++    releaseRobotSlotMods(get, slots, slotKey);
+     const nextSlots = {
+       ...slots,
+       [slotKey]: { ...slotData, heldWeapon: null },
