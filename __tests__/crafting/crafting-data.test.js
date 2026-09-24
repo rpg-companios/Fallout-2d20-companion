@@ -81,6 +81,8 @@ collectIds(junkData, 'junk', catalogIds);
 collectIds(materialsData, 'misc', catalogIds);
 collectIds(armorModsData, 'armorMod', catalogIds);
 collectIds(uniqArmorModsData, 'armorMod', catalogIds);
+// 348: моды оружия — предметы-результаты ветки «weapons».
+collectIds(weaponModsData, 'weaponMod', catalogIds);
 
 const perkIds = new Set(perksData.map((p) => p.id));
 
@@ -137,6 +139,7 @@ describe('данные крафта: файлы категории', () => {
       { file: 'drinks.json', category: 'drinks', count: 8 },
       { file: 'explosives.json', category: 'explosives', count: 9 },
       { file: 'food.json', category: 'food', count: 27 },
+      { file: 'weapons.json', category: 'weapons', count: 152 },
     ]);
   });
 
@@ -206,7 +209,7 @@ describe('данные крафта: ссылки', () => {
   it('навык — канонический ключ, категория — из манифеста', () => {
     for (const { category, record } of allRecipes()) {
       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
-      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
+      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks', 'weapons'], `${record.id}: категория ${category}`).toContain(category);
       expect(Number.isInteger(record.requires.complexity)).toBe(true);
       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
       expect(record.requires.complexity).toBeLessThanOrEqual(7);

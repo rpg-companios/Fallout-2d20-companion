@@ -1,6 +1,23 @@
 # Changelog
 
 ---
+## Weapon mod crafting: 152 recipes, the "Weapons" square is alive (patch 348)
+
+Per the owner's decisions (346/347): recipes are built from the weapon
+mod catalog columns — the audit of the book's printed tables. All mods
+with crafting columns are released, uniques included; capacitors as-is.
+
+- The crafting window's "Weapons" square: 152 recipes (289 in total).
+- The check skill is Repair or Science! (from the column); perk gates are
+  the same as for other recipes: "Gun Nut", "Science!", "Blacksmith".
+- A crafted mod lands in the bag as a regular item.
+- Failure burns materials by the gear rule (like armor mods).
+- A data typo fixed: "Serrated Blade" — the "Blacksmith 1" perk (was
+  "Blacksmtih").
+- Mods without crafting columns (53) stay recipe-less — the book has
+  none for them.
+
+---
 ## Capacitors confirmed, no doubt marks left in weapon mods (patch 347)
 
 Owner's word: leave the capacitors as they are — materials and

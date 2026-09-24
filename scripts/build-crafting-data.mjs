@@ -513,7 +513,13 @@ export function buildCraftingData() {
     // («Стелс-бой») притянется к предмету из чужой ветки — мод силовой брони
     // станет препаратом.
     if (!IMPORTED.has(group)) {
-      drop('не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена');
+      // 348: таблицы модификаций ОРУЖИЯ выпущены веткой крафт-модов — рецепты
+      // строятся из колонок каталога weapon_mods.json (аудит тех же таблиц).
+      const isWeaponModGroup = (group.includes('MODS') || group.endsWith(' MOD'))
+        && !group.startsWith('ARMOR') && !group.includes('POWER ARMOR') && !group.includes('ROBOT');
+      drop(isWeaponModGroup
+        ? 'модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348)'
+        : 'не предметный рецепт (броня, силовая броня, роботы) — ветка отложена');
       continue;
     }
 
@@ -699,6 +705,64 @@ export function buildCraftingData() {
     });
   }
 
+  // Патч 348 (решение владельца): крафт-ветка модов ОРУЖИЯ — рецепты из
+  // колонок каталога weapon_mods.json (аудит печатных таблиц, с. 211–225):
+  // сложность, материалы «Common x N …», перки «Gun Nut N»/«Science! N»,
+  // навык Ремонт/Наука!. Рецепт = id мода-предмета, выход 1. Моды БЕЗ
+  // колонок (в книгах для них рецептов нет) в обменник не попадают — их
+  // считает отдельной строкой отчёта. Решения владельца (346/347): выпускать
+  // ВСЕ мода с колонками, включая уникальные; конденсаторы — как есть.
+  const weaponModsData = (() => {
+    const raw = readRepoJson('modules/fallout/data/equipment/weapon_mods.json');
+    const arr = Array.isArray(raw) ? raw : Object.values(raw).find(Array.isArray);
+    if (!Array.isArray(arr)) throw new Error('[weapon-mod recipes] weapon_mods.json: не найден список модов');
+    return arr;
+  })();
+  const WEAPON_MOD_SKILLS = new Set(['REPAIR', 'SCIENCE']);
+  const parseWeaponModMaterials = (text) => {
+    const out = [];
+    for (const [, tier, count] of String(text ?? '').matchAll(/(Common|Uncommon|Rare)\s*x\s*(\d+)/gi)) {
+      const id = MATERIAL_ITEM_IDS[tier.toLowerCase()];
+      if (!id) throw new Error(`[weapon-mod recipes] неизвестный тип материалов «${tier}»`);
+      out.push({ itemId: id, count: Number(count) });
+    }
+    return out;
+  };
+  let weaponModsWithoutColumns = 0;
+  for (const mod of weaponModsData) {
+    if (mod.complexity == null) { weaponModsWithoutColumns += 1; continue; }
+    if (ids.has(mod.id)) throw new Error(`[weapon-mod recipes] дубликат id ${mod.id}`);
+    const skill = mod.skill || 'REPAIR'; // mod_112 «Extra Flame Jets»: колонка навыка пуста — верстак оружия, Ремонт
+    if (!WEAPON_MOD_SKILLS.has(skill)) {
+      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: `неизвестный навык «${mod.skill}»` });
+      continue;
+    }
+    const parsed = parsePerkRequirements([mod.perk1, mod.perk2].map((x) => String(x ?? '').trim()).filter(Boolean).join(', '), ctx.perks);
+    if (parsed.error) {
+      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: parsed.error });
+      continue;
+    }
+    const materials = parseWeaponModMaterials(mod.materials);
+    if (!materials.length) {
+      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: 'в колонке материалов нет ни одной позиции' });
+      continue;
+    }
+    ids.add(mod.id);
+    entries.push({
+      bucket: 'weapons',
+      record: {
+        id: mod.id,
+        requires: {
+          skill,
+          complexity: Math.min(7, Math.max(1, Number(mod.complexity))),
+          ...(parsed.perks.length ? { perks: parsed.perks } : {}),
+        },
+        materials,
+        outputQuantity: 1,
+      },
+    });
+  }
+
   const byBucket = {};
   // (BENCH_BURNS — печатное правило сгорания; объявлено рядом с картой верстаков.)
   for (const bucket of BUCKET_ORDER) {
@@ -732,6 +796,7 @@ export function buildCraftingData() {
     holes: holes.length,
     holesByCategory: Object.fromEntries(Object.entries(holesByCategory).map(([c, l]) => [c, l.length])),
     perBucket: Object.fromEntries(Object.entries(byBucket).map(([b, l]) => [b, l.length])),
+    weaponModsWithoutColumns,
   };
 
   return {
@@ -855,8 +920,10 @@ const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []
   L.push('|---|---|');
   for (const g of IMPORTED_GROUPS) L.push(`| ${g} | ${GROUP_MEANING[g] || '—'} |`);
   L.push('');
-  L.push('Всё остальное в источнике — таблицы модификаций (оружие, броня, силовая');
-  L.push('броня, роботы): они не выпускаются, пока не настроена ветка модов.');
+  L.push('Таблицы модификаций ОРУЖИЯ выпущены веткой крафт-модов (348): рецепты');
+  L.push('строятся из колонок каталога weapon_mods.json — аудита тех же таблиц.');
+  L.push('Остались отложенными: броня/силовая броня/роботы (броня выпущена по');
+  L.push('диктованным владельцем таблицам — 44 рецепта).');
   L.push('');
   L.push('## Не выпущено — по причинам');
   L.push('');
@@ -903,10 +970,11 @@ const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []
   L.push('позиции попадают только после того, как соответствия и числа переедут в');
   L.push('генератор (аллиас или явные ингредиенты) и рецепт пройдёт строгую сверку.');
   L.push('');
-  L.push('**Модификации** в обменник не попадают намеренно: это не дыра каталога, а');
-  L.push('отложенная ветка (решение владельца). Колонки сложности/перков/материалов');
-  L.push('уже проставлены на 205 модах оружия и на модах брони — когда ветку настроим,');
-  L.push('генератору останется переложить их в тот же формат.');
+  L.push(`**Модификации оружия** (348): ${stats.perBucket.weapons || 0} рецептов из колонок каталога;`);
+  L.push(`модов без колонок крафта (рецептов в книге нет): ${stats.weaponModsWithoutColumns || 0}.`);
+  L.push('**Броня/силовая броня/роботы** в обменник не попадают: не дыра каталога, а');
+  L.push('отложенная ветка (решение владельца); моды брони выпущены по диктованным');
+  L.push('таблицам (44 рецепта, патчи 341+).');
   L.push('');
   L.push('## Список непрошедших рецептов');
   L.push('');

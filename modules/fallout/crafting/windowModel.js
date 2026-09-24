@@ -70,6 +70,8 @@ const hintByPrefix = (id) => {
   if (s.startsWith('armor_')) return 'armor';
   // Моды брони (341): крафт даёт мод-предмет; имена берутся из каталога модов.
   if (s.startsWith('uniq_') || s.startsWith('mod_std_')) return 'armorMod';
+  // Моды оружия (348): id вида mod_0NN — имя из пула weaponMods каталога.
+  if (s.startsWith('mod_')) return 'weaponMod';
   return null;
 };
 

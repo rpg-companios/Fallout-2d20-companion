@@ -46,7 +46,9 @@ describe('Модалка крафта (318): квадраты, спойлеры,
     expect(byId.get('armor').recipes).toBe(44); // 341: крафт модов брони — квадрат «Броня» жив
     expect(buildCategoryModel('armor').length).toBe(44);
     // пустых данных квадраты видны, но рецептов внутри нет
-    for (const empty of ['weapons', 'powerArmor']) {
+    // (348: «Оружие» живо — 152 рецепта модов; пустыми остались силовая/патроны)
+    expect(byId.get('weapons').recipes).toBe(152);
+    for (const empty of ['powerArmor']) {
       expect(byId.get(empty).recipes).toBe(0); // оружие/силовая броня — будущие серии модов
       expect(buildCategoryModel(empty)).toEqual([]);
     }

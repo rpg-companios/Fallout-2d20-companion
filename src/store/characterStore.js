@@ -927,6 +927,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
           : idUpper.startsWith('mag_') || idUpper.startsWith('magazine_') ? 'magazine'
           : idUpper.startsWith('robot_') ? 'robotPart'
           : idUpper.startsWith('uniq_') || idUpper.startsWith('mod_std_') ? 'armorMod'
+          : idUpper.startsWith('mod_') ? 'weaponMod'
           : idUpper.startsWith('pa_') || idUpper.startsWith('power_') ? 'powerArmor'
           : null;
         const lookupTypes = [...new Set([
