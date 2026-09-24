@@ -1,0 +1,4521 @@
+diff --git a/__tests__/crafting/crafting-data.test.js b/__tests__/crafting/crafting-data.test.js
+index 77c5b18..ceea3bc 100644
+--- a/__tests__/crafting/crafting-data.test.js
++++ b/__tests__/crafting/crafting-data.test.js
+@@ -81,6 +81,8 @@ collectIds(junkData, 'junk', catalogIds);
+ collectIds(materialsData, 'misc', catalogIds);
+ collectIds(armorModsData, 'armorMod', catalogIds);
+ collectIds(uniqArmorModsData, 'armorMod', catalogIds);
++// 348: моды оружия — предметы-результаты ветки «weapons».
++collectIds(weaponModsData, 'weaponMod', catalogIds);
+ 
+ const perkIds = new Set(perksData.map((p) => p.id));
+ 
+@@ -137,6 +139,7 @@ describe('данные крафта: файлы категории', () => {
+       { file: 'drinks.json', category: 'drinks', count: 8 },
+       { file: 'explosives.json', category: 'explosives', count: 9 },
+       { file: 'food.json', category: 'food', count: 27 },
++      { file: 'weapons.json', category: 'weapons', count: 152 },
+     ]);
+   });
+ 
+@@ -206,7 +209,7 @@ describe('данные крафта: ссылки', () => {
+   it('навык — канонический ключ, категория — из манифеста', () => {
+     for (const { category, record } of allRecipes()) {
+       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
+-      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
++      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks', 'weapons'], `${record.id}: категория ${category}`).toContain(category);
+       expect(Number.isInteger(record.requires.complexity)).toBe(true);
+       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
+       expect(record.requires.complexity).toBeLessThanOrEqual(7);
+diff --git a/__tests__/crafting/crafting-operations.test.js b/__tests__/crafting/crafting-operations.test.js
+index 8fc2028..a2c79a3 100644
+--- a/__tests__/crafting/crafting-operations.test.js
++++ b/__tests__/crafting/crafting-operations.test.js
+@@ -16,6 +16,7 @@ import chemsFile from '../../modules/fallout/data/recipes/chems.json';
+ import foodFile from '../../modules/fallout/data/recipes/food.json';
+ import explosivesFile from '../../modules/fallout/data/recipes/explosives.json';
+ import armorRecipesFile from '../../modules/fallout/data/recipes/armor.json';
++import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
+ import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
+ 
+ const state = () => useCharacterStore.getState();
+@@ -52,7 +53,7 @@ describe('реестр — точка, откуда движок крафта в
+   it('все файлы категории собраны индексом без потерь', () => {
+     const byFile = {
+       'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'armor.json': armorRecipesFile, 'chems.json': chemsFile,
+-      'food.json': foodFile, 'drinks.json': drinksFile,
++      'food.json': foodFile, 'drinks.json': drinksFile, 'weapons.json': weaponsFile,
+     };
+     const declared = craftingIndex.recipes.reduce((sum, entry) => sum + entry.count, 0);
+     expect(getCraftingRecipes()).toHaveLength(declared);
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+index 6a38f07..4508dbf 100644
+--- a/__tests__/crafting/crafting-window-tiles.test.js
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -46,7 +46,9 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+     expect(byId.get('armor').recipes).toBe(44); // 341: крафт модов брони — квадрат «Броня» жив
+     expect(buildCategoryModel('armor').length).toBe(44);
+     // пустых данных квадраты видны, но рецептов внутри нет
+-    for (const empty of ['weapons', 'powerArmor']) {
++    // (348: «Оружие» живо — 152 рецепта модов; пустыми остались силовая/патроны)
++    expect(byId.get('weapons').recipes).toBe(152);
++    for (const empty of ['powerArmor']) {
+       expect(byId.get(empty).recipes).toBe(0); // оружие/силовая броня — будущие серии модов
+       expect(buildCategoryModel(empty)).toEqual([]);
+     }
+diff --git a/__tests__/crafting/weapon-mod-crafting-348.test.js b/__tests__/crafting/weapon-mod-crafting-348.test.js
+new file mode 100644
+index 0000000..7640ca5
+--- /dev/null
++++ b/__tests__/crafting/weapon-mod-crafting-348.test.js
+@@ -0,0 +1,157 @@
++// ПРИЁМОЧНЫЙ (патч 348): крафт модов ОРУЖИЯ — квадрат «Оружие» жив.
++//   • 152 рецепта из колонок каталога weapon_mods.json (аудит печатных
++//     таблиц, решения владельца 346/347: выпускаем все с колонками, включая
++//     уникальные; конденсаторы — как есть);
++//   • проверка — ИНТ + навык (Ремонт/Наука!), сложность из колонки;
++//   • перковый гейт («Фанатик оружия», «Наука!», «Кузнец») как у остальных;
++//   • верстак оружия материалы НЕ жжёт (как брони, правило 323/270);
++//   • созданный мод — предмет в сумке: тип weaponMod, каталожное имя,
++//     привязка при установке — по закону владельца 343/344.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { buildCraftTiles, buildCategoryModel } from '../../modules/fallout/crafting/windowModel';
++import { craftRecipe } from '../../modules/fallout/crafting/operations';
++import { getCraftingRecipeById, getCraftingCategoryRules } from '../../domain/registry';
++import { findCatalogEntry } from '../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++  useAppSettingsStore.getState().setValue('craftFailLossConsumables', true);
++  useAppSettingsStore.getState().setValue('craftFailLossGear', true);
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const seedStack = (itemId, quantity) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++      weaponId: itemId, quantity,
++    } },
++  }));
++};
++
++const inventoryList = () => Object.values(state().items || {});
++
++describe('Крафт модов оружия (348): квадрат «Оружие», проверка, мод в сумке', () => {
++  it('квадрат «Оружие»: 152 рецепта из колонок каталога; верстак не жжёт', () => {
++    const tiles = buildCraftTiles();
++    const weapons = tiles.find((t) => t.category === 'weapons');
++    expect(weapons.recipes).toBe(152);
++    expect(buildCategoryModel('weapons').length).toBe(152);
++    // правило верстака оружия (как у брони): провал не сжигает материалы
++    expect(getCraftingCategoryRules('weapons').failBurnsMaterialsSkills).toEqual([]);
++  });
++
++  it('«Скорострельный» (сложность 3, Фанатик оружия 1): успешен, мод-предмет в сумке', () => {
++    const recipe = getCraftingRecipeById('mod_001');
++    expect(recipe.requires).toEqual({
++      skill: 'REPAIR',
++      complexity: 3,
++      perks: [{ perkId: 'gunNut', rank: 1 }],
++    });
++    expect(recipe.materials).toEqual([
++      { itemId: 'item_common_materials', count: 4 },
++      { itemId: 'item_uncommon_materials', count: 2 },
++    ]);
++
++    // перковый гейт: без Фанатика оружия рецепт заблокирован
++    const blocked = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_001');
++    expect(blocked.status).toBe('missing-perk');
++
++    seedStack('item_common_materials', 4);
++    seedStack('item_uncommon_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++
++    const result = craftRecipe('mod_001', { rollD20: () => 3 }, { deferTime: true });
++    expect(result.done).toBe(true);
++    expect(result.granted.itemId).toBe('mod_001');
++
++    // мод в сумке: тип weaponMod, каталожное имя, обычный предмет инвентаря
++    const catalog = getEquipmentCatalog('en-EN');
++    const inBag = inventoryList().find((i) => i.weaponId === 'mod_001' && !i.installedOn);
++    expect(inBag).toBeTruthy();
++    expect(inBag.itemType).toBe('weaponMod');
++    expect(findCatalogEntry(catalog, 'mod_001', 'weaponMod')?.name).toBe('Rapid');
++  });
++
++  it('конденсаторы: пара перков книги (Фанатик 3 + Наука! 2), навык из колонки', () => {
++    const recipe = getCraftingRecipeById('mod_031');
++    expect(recipe.requires.skill).toBe('REPAIR'); // конденсаторы оставлены как есть (347)
++    expect(recipe.requires.complexity).toBe(5);
++    expect(recipe.requires.perks).toEqual([
++      { perkId: 'gunNut', rank: 3 },
++      { perkId: 'science', rank: 2 },
++    ]);
++
++    seedStack('item_common_materials', 6);
++    seedStack('item_uncommon_materials', 4);
++    seedStack('item_rare_materials', 2);
++    useCharacterStore.setState({
++      selectedPerks: [
++        { perkId: 'gunNut', index: 0 }, { perkId: 'gunNut', index: 1 }, { perkId: 'gunNut', index: 2 },
++        { perkId: 'science', index: 0 }, { perkId: 'science', index: 1 },
++      ],
++    });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++
++    const result = craftRecipe('mod_031', { rollD20: () => 2 }, { deferTime: true });
++    expect(result.done).toBe(true);
++    expect(result.granted.itemId).toBe('mod_031');
++    const inBag = inventoryList().find((i) => i.weaponId === 'mod_031' && !i.installedOn);
++    expect(inBag?.itemType).toBe('weaponMod');
++  });
++
++  it('наукоёмкий мод (прицел): навык Наука! из колонки работает так же', () => {
++    const recipe = getCraftingRecipeById('mod_045');
++    expect(recipe.requires).toEqual({
++      skill: 'SCIENCE',
++      complexity: 3,
++      perks: [{ perkId: 'science', rank: 1 }],
++    });
++
++    seedStack('item_common_materials', 4);
++    seedStack('item_uncommon_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'science', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, SCIENCE: { ...(prev.skills?.SCIENCE ?? {}), base: 6, total: 6 } },
++    }));
++
++    const result = craftRecipe('mod_045', { rollD20: () => 4 }, { deferTime: true });
++    expect(result.done).toBe(true);
++    const inBag = inventoryList().find((i) => i.weaponId === 'mod_045' && !i.installedOn);
++    expect(inBag?.itemType).toBe('weaponMod');
++  });
++
++  it('провал жжёт материалы по правилу gear (настройка 323, как у модов брони)', () => {
++    seedStack('item_common_materials', 4);
++    seedStack('item_uncommon_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    // ранг 0 против сложности 3 + провал на броске → крафт не удался
++    const failed = craftRecipe('mod_001', { rollD20: () => 20 });
++    expect(failed.stage).toBe('check');
++    expect(failed.burned.length).toBeGreaterThan(0);
++  });
++
++  it('моды без колонок крафта в рецептов не попадали (53 шт., их нет в книге)', () => {
++    const weaponMods = getEquipmentCatalog('en-EN').weaponMods || [];
++    const withColumns = weaponMods.filter((m) => m.complexity != null).length;
++    expect(withColumns).toBeGreaterThanOrEqual(152);
++    const crafted = new Set(buildCategoryModel('weapons').map((r) => r.recipeId));
++    for (const mod of weaponMods) {
++      if (mod.complexity == null) expect(crafted.has(mod.id)).toBe(false);
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 14636fe..ac38183 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **347** · у владельца на main применено до **314**
++· последний сданный патч: **348** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -216,7 +216,19 @@
+   «?Common»); «?» аудита снят со ВСЕХ полей weapon_mods.json — данных
+   со знаком сомнения больше нет. 9 «?»-редкостей были: Скорострельный,
+   Бронебойный, Настроенный, Экранированный, Большой, Быстросъёмный,
+-  Большой быстросъёмный, Полные конденсаторы, Катушка усиления.
++  Большой быстросъёмный, Полные конденсаторы, Катушка усиления
++  (знаки были служебными фразами парсинга референс-приложения).
++- 348 — КРАФТ МОДОВ ОРУЖИЯ ВКЛЮЧЁН (решения 346/347): генератор строит
++  152 рецепта из колонок weapon_mods.json → recipes/weapons.json,
++  квадрат «Оружие» жив (289 рецептов всего). Проводка: index.js
++  (sections.weapons), registry CRAFTING_FILES, resolveItem case
++  'weaponMod' (catalog.weaponMods), hintByPrefix/idPrefixType 'mod_' →
++  weaponMod, categoryRules weapons. Провал жжёт gear (как брони).
++  mod_113 «Serrated Blade»: опечатка аудита Blacksmtih→Blacksmith.
++  mod_112 Extra Flame Jets: пустой навык → Ремонт (верстак оружия).
++  Скрафченный мод — ПРЕДМЕТ в сумке (тип weaponMod). СЛЕДУЮЩИЙ ШАГ:
++  установка мода оружия из сумки с флагом «экипирован» и привязкой
++  (закон владельца 343/344) + гейт «требовать мод в сумке».
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e23c292..4f67742 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,22 @@
+ # Changelog
+ 
++---
++## Weapon mod crafting: 152 recipes, the "Weapons" square is alive (patch 348)
++
++Per the owner's decisions (346/347): recipes are built from the weapon
++mod catalog columns — the audit of the book's printed tables. All mods
++with crafting columns are released, uniques included; capacitors as-is.
++
++- The crafting window's "Weapons" square: 152 recipes (289 in total).
++- The check skill is Repair or Science! (from the column); perk gates are
++  the same as for other recipes: "Gun Nut", "Science!", "Blacksmith".
++- A crafted mod lands in the bag as a regular item.
++- Failure burns materials by the gear rule (like armor mods).
++- A data typo fixed: "Serrated Blade" — the "Blacksmith 1" perk (was
++  "Blacksmtih").
++- Mods without crafting columns (53) stay recipe-less — the book has
++  none for them.
++
+ ---
+ ## Capacitors confirmed, no doubt marks left in weapon mods (patch 347)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a9519e6..f62a4d3 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,21 @@
+ # История изменений
+ 
++---
++## Крафт модов оружия: 152 рецепта, квадрат «Оружие» жив (патч 348)
++
++По решениям владельца (346/347): рецепты строятся из колонок каталога
++модов оружия — аудита печатных таблиц книги. Выпущены все моды с
++колонками крафта, включая уникальные; конденсаторы — как есть.
++
++- В окне крафта квадрат «Оружие»: 152 рецепта (всего в крафте 289).
++- Навык проверки — Ремонт или Наука! (из колонки), перки-гейты те же,
++  что у остальных рецептов: «Фанатик оружия», «Наука!», «Кузнец».
++- Скрафченный мод ложится в сумку обычным предметом.
++- Провал жжёт материалы по правилу снаряжения (как у модов брони).
++- Исправлена опечатка данных: «Зазубренное лезвие» — перк «Кузнец 1»
++  (в данных был «Blacksmtih»).
++- Моды без колонок крафта (53) остаются без рецептов — в книге их нет.
++
+ ---
+ ## Конденсаторы подтверждены, знаков сомнения в модах оружия больше нет (патч 347)
+ 
+diff --git a/docs/reference-data/CRAFTING-MAPPING.md b/docs/reference-data/CRAFTING-MAPPING.md
+index 94422ae..64342ef 100644
+--- a/docs/reference-data/CRAFTING-MAPPING.md
++++ b/docs/reference-data/CRAFTING-MAPPING.md
+@@ -21,7 +21,7 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ ## Покрытие
+ 
+ - рецептов в источнике: **356**
+-- выпущено в данные: **137** (ammo: 28, explosives: 9, armor: 44, chems: 21, food: 27, drinks: 8)
++- выпущено в данные: **289** (ammo: 28, weapons: 152, explosives: 9, armor: 44, chems: 21, food: 27, drinks: 8)
+ - не выпущено: **263**
+ - из них упирается в дыры каталога и выгружено в обменник: **1** (chem: 0, food: 0, loot: 1, ammo: 0)
+ 
+@@ -60,14 +60,17 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ | UTILITY DEVICES | полезные устройства |
+ | WORKBENCH | сам верстак (кухня) |
+ 
+-Всё остальное в источнике — таблицы модификаций (оружие, броня, силовая
+-броня, роботы): они не выпускаются, пока не настроена ветка модов.
++Таблицы модификаций ОРУЖИЯ выпущены веткой крафт-модов (348): рецепты
++строятся из колонок каталога weapon_mods.json — аудита тех же таблиц.
++Остались отложенными: броня/силовая броня/роботы (броня выпущена по
++диктованным владельцем таблицам — 44 рецепта).
+ 
+ ## Не выпущено — по причинам
+ 
+ | Причина | Сколько |
+ |---|---|
+-| не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена | 260 |
++| не предметный рецепт (броня, силовая броня, роботы) — ветка отложена | 136 |
++| модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) | 124 |
+ | рецепт помечен в источнике как самодеятельность приложения (в книге нет) | 2 |
+ | в каталоге сеттинга нет такого предмета-результата | 1 |
+ 
+@@ -118,275 +121,276 @@ docs/reference-data/Missing_craft.json — обменник: то, где кат
+ позиции попадают только после того, как соответствия и числа переедут в
+ генератор (аллиас или явные ингредиенты) и рецепт пройдёт строгую сверку.
+ 
+-**Модификации** в обменник не попадают намеренно: это не дыра каталога, а
+-отложенная ветка (решение владельца). Колонки сложности/перков/материалов
+-уже проставлены на 205 модах оружия и на модах брони — когда ветку настроим,
+-генератору останется переложить их в тот же формат.
++**Модификации оружия** (348): 152 рецептов из колонок каталога;
++модов без колонок крафта (рецептов в книге нет): 53.
++**Броня/силовая броня/роботы** в обменник не попадают: не дыра каталога, а
++отложенная ветка (решение владельца); моды брони выпущены по диктованным
++таблицам (44 рецепта, патчи 341+).
+ 
+ ## Список непрошедших рецептов
+ 
+ | Рецепт | Группа источника | Верстак | Причина |
+ |---|---|---|---|
+-| Hardened | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Powerful | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Advanced | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Calibrated | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Automatic | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hair Trigger | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| .38 Receiver | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| .308 Receiver | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| .45 Receiver | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| .50 Receiver | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Automatic Piston | SMALL GUNS RECEIVER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Snubnose | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bull Barrel | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ported | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Vented | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sawed-Off | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Finned | SMALL GUNS BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Comfort Grip | SMALL GUNS GRIP MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharpshooter’s Grip | SMALL GUNS GRIP MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Full Stock | SMALL GUNS STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Marksman’s Stock | SMALL GUNS STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recoil Compensating Stock | SMALL GUNS STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Reflex Sight | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Short Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Short Night Vision Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Night Vision Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recon Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bayonet | SMALL GUNS MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Compensator | SMALL GUNS MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Muzzle Break | SMALL GUNS MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Suppressor | SMALL GUNS MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Beta Wave Tuner | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Boosted Capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Photon Exciter | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Photon Agitator | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Three-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Four-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Five-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Six-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bracketed Short Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Splitter | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Automatic Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bracketed Long Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Improved Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sniper Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Flamer Barrel | ENERGY WEAPON BARREL MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharpshooter’s Grip | ENERGY WEAPON GRIP MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Standard Stock | ENERGY WEAPON STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Full Stock | ENERGY WEAPON STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Marksman’s Stock | ENERGY WEAPON STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recoil Compensating Stock | ENERGY WEAPON STOCK MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Reflex Sight | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Short Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Short Night Vision Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Night Vision Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recon Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Beam Splitter | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Beam Focuser | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Gyro Compensating Lens | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Napalm Fuel | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Barrel | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Large Tank | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Huge Tank | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Compression Nozzle | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Vaporization Nozzle | FLAMER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Deep Dish | GAMMA GUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Electric Signal Carrier antennae | GAMMA GUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Signal Repeater | GAMMA GUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Photon Exciter | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Beta Wave Tuner | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Boosted Capacitor | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Photon Agitator | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Charging Barrels | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Reflex Sight | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Beam Focuser | GATLING LASER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Long Barrel | JUNK JET MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recoil Compensating Stock | JUNK JET MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Gunner Sight | JUNK JET MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Electrification Module | JUNK JET MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ignition Module | JUNK JET MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Accelerated Barrel | MINIGUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Tri-Barrel | MINIGUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Gunner Sight | MINIGUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Shredder | MINIGUN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Triple Barrel | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Quad Barrel | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Scope | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Night Vision Scope | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Targeting Computer | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bayonet | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stabilizer | MISSILE LAUNCHER MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Serrated Blade | SWORD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Electrified Blade | SWORD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Electrified Serrated Blade | SWORD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stun Pack | SWORD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Serrated Blade | COMBAT KNIFE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stealth Blade | COMBAT KNIFE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Serrated Blade | MACHETE MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Curved Blade | RIPPER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Extended Blade | RIPPER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Extra Flame Jets | SHISHKEBAB MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Serrated Blade | SWITCHBLADE MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Barbed | BASEBALL BAT MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | BASEBALL BAT MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharp | BASEBALL BAT MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Chain-Wrapped | BASEBALL BAT MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bladed | BASEBALL BAT MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | BOARD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | BOARD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bladed | BOARD MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | LEAD PIPE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Heavy | LEAD PIPE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hooked | PIPE WRENCH MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Heavy | PIPE WRENCH MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | PIPE WRENCH MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Extra Heavy | PIPE WRENCH MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Barbed | POOL CUE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharp | POOL CUE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | ROLLING PIN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharp | ROLLING PIN MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Electrified | BATON MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stun Pack | BATON MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | SLEDGEHAMMER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Heavy | SLEDGEHAMMER MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Heating Coil | SUPER SLEDGE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stun Pack | SUPER SLEDGE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bladed | TIRE IRON MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Barbed | WALKING CANE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | WALKING CANE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | BOXING GLOVE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | BOXING GLOVE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Lead lining | BOXING GLOVE MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Extra Claw | DEATHCLAW GAUNTLET MOD | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sharp | KNUCKLES MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Spiked | KNUCKLES MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | KNUCKLES MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Bladed | KNUCKLES MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Puncturing | POWER FIST MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Heating Coil | POWER FIST MODS | weapons | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ballistic Weave | BALLISTIC WEAVE | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ballistic Weave Mk II | BALLISTIC WEAVE | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ballistic Weave Mk III | BALLISTIC WEAVE | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ballistic Weave Mk IV | BALLISTIC WEAVE | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ballistic Weave Mk V | BALLISTIC WEAVE | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Insulated Lining | VAULT SUIT LINING | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Treated Lining | VAULT SUIT LINING | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Resistant Lining | VAULT SUIT LINING | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Protective Lining | VAULT SUIT LINING | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Shielded Lining | VAULT SUIT LINING | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Welded | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Tempered | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hardened | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Buttressed | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Boiled Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Girded Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Treated Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Shadowed Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Boiled Leather (Advanced) | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Painted Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Enameled Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Shadowed Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Alloyed Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Polished Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Reinforced | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Shadowed | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Fiberglass | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Polymer | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Laminated | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Resin | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Microcarbon | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Nanofilament | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Lighter Build | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Pocketed | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Deep Pocketed | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Lead Lined | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Ultra-Light Build | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Padded (Torso Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Asbestos Lining (Torso Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Dense (Torso Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| BioCommMesh (Torso Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Pneumatic (Torso Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Brawling (Arms Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Braced (Arms Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stabilized (Arms Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Aerodynamic (Arms Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Weighted (Arms Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Cushioned (Legs Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Muffled (Legs Only) | ARMOR MODS | armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Raider II | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-45b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-45c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-45d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-45e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-45f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-51b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-51c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-51d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-51e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-51f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-60b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-60c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-60d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-60e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| T-60f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| X-01 Mk II | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| X-01 Mk III | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| X-01 Mk IV | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| X-01 Mk V | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| X-01 Mk VI | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Rad Scrubber | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sensor Array | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Targeting HUD | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Internal Database | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Welded Rebar (Raider only) | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Core Assembly | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Blood Cleanser | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Emergency Protocols | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Motion-Assist Servos | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Kinetic Dynamo | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Medic Pump | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Reactive Plates | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Tesla Coils | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stealth Boy | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Jetpack | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Rusty Knuckles | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hydraulic Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Optimized Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Tesla Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Calibrated Shocks | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Explosive Vent | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Overdrive Servos | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Titanium Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Lead Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Photovoltaic Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Winterized Coating (not on X-01) | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Prism Shielding | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Explosive Shielding | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| EMP Shielding (X-01 only) | POWER ARMOR PLATING | power_armor | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Factory Armor | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Factory Storage Armor | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Primal Plate | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Serrated Plate | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Noxious Plate | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Toxic Plate | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Actuated Frame | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Voltaic Frame | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hydraulic Frame | ROBOT ARMOR | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Hacking Module | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Lockpick Module | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Radiation Coils | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Recon Sensors | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Regeneration Field | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Resistance Field | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Sensor Array | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Stealth Field | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
+-| Tesla Coils | ROBOT MODS | robot | не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена |
++| Hardened | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Powerful | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Advanced | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Calibrated | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Automatic | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Hair Trigger | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| .38 Receiver | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| .308 Receiver | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| .45 Receiver | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| .50 Receiver | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Automatic Piston | SMALL GUNS RECEIVER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Snubnose | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bull Barrel | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Long | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Ported | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Vented | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sawed-Off | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Finned | SMALL GUNS BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Comfort Grip | SMALL GUNS GRIP MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharpshooter’s Grip | SMALL GUNS GRIP MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Full Stock | SMALL GUNS STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Marksman’s Stock | SMALL GUNS STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Recoil Compensating Stock | SMALL GUNS STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Reflex Sight | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Short Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Long Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Short Night Vision Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Long Night Vision Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Recon Scope | SMALL GUNS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Bayonet | SMALL GUNS MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Compensator | SMALL GUNS MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Muzzle Break | SMALL GUNS MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Suppressor | SMALL GUNS MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Beta Wave Tuner | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Boosted Capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Photon Exciter | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Photon Agitator | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Three-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Four-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Five-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Six-crank capacitor | ENERGY WEAPON CAPACITOR MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bracketed Short Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Long Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Splitter | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Automatic Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bracketed Long Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Improved Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sniper Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Flamer Barrel | ENERGY WEAPON BARREL MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharpshooter’s Grip | ENERGY WEAPON GRIP MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Standard Stock | ENERGY WEAPON STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Full Stock | ENERGY WEAPON STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Marksman’s Stock | ENERGY WEAPON STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Recoil Compensating Stock | ENERGY WEAPON STOCK MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Reflex Sight | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Short Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Long Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Short Night Vision Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Long Night Vision Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Recon Scope | ENERGY WEAPONS SIGHTS | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Beam Splitter | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Beam Focuser | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Gyro Compensating Lens | ENERGY WEAPON MUZZLE | weapons | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Napalm Fuel | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Long Barrel | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Large Tank | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Huge Tank | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Compression Nozzle | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Vaporization Nozzle | FLAMER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Deep Dish | GAMMA GUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Electric Signal Carrier antennae | GAMMA GUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Signal Repeater | GAMMA GUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Photon Exciter | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Beta Wave Tuner | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Boosted Capacitor | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Photon Agitator | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Charging Barrels | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Reflex Sight | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Beam Focuser | GATLING LASER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Long Barrel | JUNK JET MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Recoil Compensating Stock | JUNK JET MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Gunner Sight | JUNK JET MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Electrification Module | JUNK JET MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Ignition Module | JUNK JET MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Accelerated Barrel | MINIGUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Tri-Barrel | MINIGUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Gunner Sight | MINIGUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Shredder | MINIGUN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Triple Barrel | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Quad Barrel | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Scope | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Night Vision Scope | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Targeting Computer | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bayonet | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Stabilizer | MISSILE LAUNCHER MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Serrated Blade | SWORD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Electrified Blade | SWORD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Electrified Serrated Blade | SWORD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Stun Pack | SWORD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Serrated Blade | COMBAT KNIFE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Stealth Blade | COMBAT KNIFE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Serrated Blade | MACHETE MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Curved Blade | RIPPER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Extended Blade | RIPPER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Extra Flame Jets | SHISHKEBAB MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Serrated Blade | SWITCHBLADE MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Barbed | BASEBALL BAT MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | BASEBALL BAT MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharp | BASEBALL BAT MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Chain-Wrapped | BASEBALL BAT MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bladed | BASEBALL BAT MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | BOARD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | BOARD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bladed | BOARD MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | LEAD PIPE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Heavy | LEAD PIPE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Hooked | PIPE WRENCH MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Heavy | PIPE WRENCH MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | PIPE WRENCH MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Extra Heavy | PIPE WRENCH MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Barbed | POOL CUE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharp | POOL CUE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | ROLLING PIN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharp | ROLLING PIN MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Electrified | BATON MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Stun Pack | BATON MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | SLEDGEHAMMER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Heavy | SLEDGEHAMMER MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Heating Coil | SUPER SLEDGE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Stun Pack | SUPER SLEDGE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bladed | TIRE IRON MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Barbed | WALKING CANE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | WALKING CANE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | BOXING GLOVE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | BOXING GLOVE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Lead lining | BOXING GLOVE MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Extra Claw | DEATHCLAW GAUNTLET MOD | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Sharp | KNUCKLES MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Spiked | KNUCKLES MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | KNUCKLES MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Bladed | KNUCKLES MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Puncturing | POWER FIST MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Heating Coil | POWER FIST MODS | weapons | модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348) |
++| Ballistic Weave | BALLISTIC WEAVE | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Ballistic Weave Mk II | BALLISTIC WEAVE | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Ballistic Weave Mk III | BALLISTIC WEAVE | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Ballistic Weave Mk IV | BALLISTIC WEAVE | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Ballistic Weave Mk V | BALLISTIC WEAVE | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Insulated Lining | VAULT SUIT LINING | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Treated Lining | VAULT SUIT LINING | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Resistant Lining | VAULT SUIT LINING | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Protective Lining | VAULT SUIT LINING | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Shielded Lining | VAULT SUIT LINING | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Welded | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Tempered | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Hardened | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Buttressed | RAIDER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Boiled Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Girded Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Treated Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Shadowed Leather | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Boiled Leather (Advanced) | LEATHER ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Painted Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Enameled Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Shadowed Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Alloyed Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Polished Metal | METAL ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Reinforced | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Shadowed | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Fiberglass | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Polymer | COMBAT ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Laminated | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Resin | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Microcarbon | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Nanofilament | SYNTH ARMOR MATERIAL | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Lighter Build | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Pocketed | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Deep Pocketed | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Lead Lined | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Ultra-Light Build | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Padded (Torso Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Asbestos Lining (Torso Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Dense (Torso Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| BioCommMesh (Torso Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Pneumatic (Torso Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Brawling (Arms Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Braced (Arms Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Stabilized (Arms Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Aerodynamic (Arms Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Weighted (Arms Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Cushioned (Legs Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Muffled (Legs Only) | ARMOR MODS | armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Raider II | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-45b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-45c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-45d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-45e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-45f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-51b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-51c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-51d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-51e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-51f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-60b | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-60c | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-60d | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-60e | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| T-60f | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| X-01 Mk II | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| X-01 Mk III | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| X-01 Mk IV | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| X-01 Mk V | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| X-01 Mk VI | POWER ARMOR UPGRADES | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Rad Scrubber | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Sensor Array | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Targeting HUD | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Internal Database | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Welded Rebar (Raider only) | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Core Assembly | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Blood Cleanser | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Emergency Protocols | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Motion-Assist Servos | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Kinetic Dynamo | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Medic Pump | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Reactive Plates | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Tesla Coils | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Stealth Boy | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Jetpack | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Rusty Knuckles | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Hydraulic Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Optimized Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Tesla Bracers | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Calibrated Shocks | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Explosive Vent | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Overdrive Servos | POWER ARMOR SYSTEMS | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Titanium Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Lead Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Photovoltaic Plating | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Winterized Coating (not on X-01) | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Prism Shielding | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Explosive Shielding | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| EMP Shielding (X-01 only) | POWER ARMOR PLATING | power_armor | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Factory Armor | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Factory Storage Armor | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Primal Plate | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Serrated Plate | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Noxious Plate | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Toxic Plate | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Actuated Frame | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Voltaic Frame | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Hydraulic Frame | ROBOT ARMOR | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Hacking Module | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Lockpick Module | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Radiation Coils | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Recon Sensors | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Regeneration Field | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Resistance Field | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Sensor Array | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Stealth Field | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
++| Tesla Coils | ROBOT MODS | robot | не предметный рецепт (броня, силовая броня, роботы) — ветка отложена |
+ | Cooking Station | WORKBENCH | cooking | в каталоге сеттинга нет такого предмета-результата |
+ | Robot Repair Kit | REPAIR KITS | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
+ | Stealth Boy | UTILITY DEVICES | chemistry | рецепт помечен в источнике как самодеятельность приложения (в книге нет) |
+diff --git a/domain/registry.js b/domain/registry.js
+index cd9ec1a..215f817 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -66,6 +66,7 @@ const CRAFTING_FILES = {
+   'ammo.json': SETTING.data.recipes.sections.ammo,
+   'explosives.json': SETTING.data.recipes.sections.explosives,
+   'armor.json': SETTING.data.recipes.sections.armor,
++  'weapons.json': SETTING.data.recipes.sections.weapons,
+   'chems.json': SETTING.data.recipes.sections.chems,
+   'food.json': SETTING.data.recipes.sections.food,
+   'drinks.json': SETTING.data.recipes.sections.drinks,
+diff --git a/domain/resolveItem.js b/domain/resolveItem.js
+index 70b7351..2ffd829 100644
+--- a/domain/resolveItem.js
++++ b/domain/resolveItem.js
+@@ -58,6 +58,9 @@ export const findCatalogEntry = (catalog, id, itemType) => {
+     case 'armorMod':
+       // Моды брони (341): стандартные и уникальные — плоские списки каталога.
+       return search(catalog.armorMods) || search(catalog.uniqArmorMods);
++    case 'weaponMod':
++      // Моды оружия (348): крафт даёт мод-предмет; пул включает и робо-моды (290).
++      return search(catalog.weaponMods) || null;
+     case 'clothing':
+     case 'outfit': {
+       const all = (catalog.clothes?.clothes || []).flatMap((g) => g.items || []);
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 51846e7..7647703 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -70,6 +70,8 @@ const hintByPrefix = (id) => {
+   if (s.startsWith('armor_')) return 'armor';
+   // Моды брони (341): крафт даёт мод-предмет; имена берутся из каталога модов.
+   if (s.startsWith('uniq_') || s.startsWith('mod_std_')) return 'armorMod';
++  // Моды оружия (348): id вида mod_0NN — имя из пула weaponMods каталога.
++  if (s.startsWith('mod_')) return 'weaponMod';
+   return null;
+ };
+ 
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index e6757a1..1b3421f 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -3338,7 +3338,7 @@
+     "id": "mod_113",
+     "slot": "Unique",
+     "complexity": 3,
+-    "perk1": "Blacksmtih 1",
++    "perk1": "Blacksmith 1",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "Uncommon",
+diff --git a/modules/fallout/data/recipes/categoryRules.json b/modules/fallout/data/recipes/categoryRules.json
+index 6c49beb..0a9d4cd 100644
+--- a/modules/fallout/data/recipes/categoryRules.json
++++ b/modules/fallout/data/recipes/categoryRules.json
+@@ -4,6 +4,9 @@
+       "EXPLOSIVES"
+     ]
+   },
++  "weapons": {
++    "failBurnsMaterialsSkills": []
++  },
+   "armor": {
+     "failBurnsMaterialsSkills": []
+   },
+diff --git a/modules/fallout/data/recipes/index.json b/modules/fallout/data/recipes/index.json
+index 879273d..a8ef2c6 100644
+--- a/modules/fallout/data/recipes/index.json
++++ b/modules/fallout/data/recipes/index.json
+@@ -30,6 +30,11 @@
+       "file": "food.json",
+       "category": "food",
+       "count": 27
++    },
++    {
++      "file": "weapons.json",
++      "category": "weapons",
++      "count": 152
+     }
+   ]
+ }
+diff --git a/modules/fallout/data/recipes/weapons.json b/modules/fallout/data/recipes/weapons.json
+new file mode 100644
+index 0000000..ed909f2
+--- /dev/null
++++ b/modules/fallout/data/recipes/weapons.json
+@@ -0,0 +1,3378 @@
++[
++  {
++    "id": "mod_001",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_002",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_003",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_004",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_005",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_006",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_007",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_008",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_009",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_010",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_011",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_012",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_013",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_014",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_015",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_016",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_017",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_018",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_019",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_020",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_021",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_022",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_023",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_024",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_025",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_026",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_027",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_028",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_029",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_030",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_031",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        },
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_032",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        },
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_033",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_034",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_035",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_036",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_037",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_038",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_039",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_040",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_041",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_042",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_043",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_044",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_045",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_046",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_047",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_048",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_049",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_050",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_051",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_052",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_053",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_054",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_055",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_056",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_057",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_058",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_059",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_060",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_061",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_062",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_063",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_064",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_065",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_066",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_067",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_068",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_069",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_070",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_071",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_072",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_073",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_074",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_075",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_076",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_077",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_078",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_079",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_080",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_081",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_082",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_083",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_084",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 7,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 8
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 4
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_085",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 7,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 8
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 4
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_086",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_087",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_088",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_089",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_090",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_091",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 7,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 8
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 4
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_092",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_093",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_094",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_095",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_096",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_097",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_098",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_099",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 4
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_100",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 6,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        },
++        {
++          "perkId": "science",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 7
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_101",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_102",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_103",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_104",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_105",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_106",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_107",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_108",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_109",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_110",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_111",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_112",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_113",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_114",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_115",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_116",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_117",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_118",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_119",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_120",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_121",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_122",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_123",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_124",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_125",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_126",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_127",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_128",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_129",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_130",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_131",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_132",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_133",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_134",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_135",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_136",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_137",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 5,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        },
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 6
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_rare_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_138",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_139",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_140",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_141",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_142",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_143",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_144",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_145",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_146",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 1
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_147",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_148",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 2,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_149",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 3,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 4
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 2
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_150",
++    "requires": {
++      "skill": "REPAIR",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "blacksmith",
++          "rank": 3
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_204",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "science",
++          "rank": 1
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  },
++  {
++    "id": "mod_205",
++    "requires": {
++      "skill": "SCIENCE",
++      "complexity": 4,
++      "perks": [
++        {
++          "perkId": "gunNut",
++          "rank": 2
++        }
++      ]
++    },
++    "materials": [
++      {
++        "itemId": "item_common_materials",
++        "count": 5
++      },
++      {
++        "itemId": "item_uncommon_materials",
++        "count": 3
++      }
++    ],
++    "outputQuantity": 1
++  }
++]
+diff --git a/modules/fallout/index.js b/modules/fallout/index.js
+index 226c0d4..0aec184 100644
+--- a/modules/fallout/index.js
++++ b/modules/fallout/index.js
+@@ -94,6 +94,7 @@ import recipesCategoryRules from './data/recipes/categoryRules.json';
+ import recipesAmmo from './data/recipes/ammo.json';
+ import recipesExplosives from './data/recipes/explosives.json';
+ import recipesArmor from './data/recipes/armor.json';
++import recipesWeapons from './data/recipes/weapons.json';
+ import recipesChems from './data/recipes/chems.json';
+ import recipesFood from './data/recipes/food.json';
+ import recipesDrinks from './data/recipes/drinks.json';
+@@ -260,6 +261,7 @@ export const SETTING = Object.freeze({
+         ammo: recipesAmmo,
+         explosives: recipesExplosives,
+         armor: recipesArmor,
++        weapons: recipesWeapons,
+         chems: recipesChems,
+         food: recipesFood,
+         drinks: recipesDrinks,
+diff --git a/public/version.json b/public/version.json
+index 4febde1..868cfb6 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "347",
++  "version": "348",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/scripts/build-crafting-data.mjs b/scripts/build-crafting-data.mjs
+index 9a558cf..ce09e00 100644
+--- a/scripts/build-crafting-data.mjs
++++ b/scripts/build-crafting-data.mjs
+@@ -513,7 +513,13 @@ export function buildCraftingData() {
+     // («Стелс-бой») притянется к предмету из чужой ветки — мод силовой брони
+     // станет препаратом.
+     if (!IMPORTED.has(group)) {
+-      drop('не предметный рецепт (модификации, броня, силовая броня, роботы) — ветка отложена');
++      // 348: таблицы модификаций ОРУЖИЯ выпущены веткой крафт-модов — рецепты
++      // строятся из колонок каталога weapon_mods.json (аудит тех же таблиц).
++      const isWeaponModGroup = (group.includes('MODS') || group.endsWith(' MOD'))
++        && !group.startsWith('ARMOR') && !group.includes('POWER ARMOR') && !group.includes('ROBOT');
++      drop(isWeaponModGroup
++        ? 'модификации оружия: рецепт выпущен веткой модов оружия (колонки каталога weapon_mods, 348)'
++        : 'не предметный рецепт (броня, силовая броня, роботы) — ветка отложена');
+       continue;
+     }
+ 
+@@ -699,6 +705,64 @@ export function buildCraftingData() {
+     });
+   }
+ 
++  // Патч 348 (решение владельца): крафт-ветка модов ОРУЖИЯ — рецепты из
++  // колонок каталога weapon_mods.json (аудит печатных таблиц, с. 211–225):
++  // сложность, материалы «Common x N …», перки «Gun Nut N»/«Science! N»,
++  // навык Ремонт/Наука!. Рецепт = id мода-предмета, выход 1. Моды БЕЗ
++  // колонок (в книгах для них рецептов нет) в обменник не попадают — их
++  // считает отдельной строкой отчёта. Решения владельца (346/347): выпускать
++  // ВСЕ мода с колонками, включая уникальные; конденсаторы — как есть.
++  const weaponModsData = (() => {
++    const raw = readRepoJson('modules/fallout/data/equipment/weapon_mods.json');
++    const arr = Array.isArray(raw) ? raw : Object.values(raw).find(Array.isArray);
++    if (!Array.isArray(arr)) throw new Error('[weapon-mod recipes] weapon_mods.json: не найден список модов');
++    return arr;
++  })();
++  const WEAPON_MOD_SKILLS = new Set(['REPAIR', 'SCIENCE']);
++  const parseWeaponModMaterials = (text) => {
++    const out = [];
++    for (const [, tier, count] of String(text ?? '').matchAll(/(Common|Uncommon|Rare)\s*x\s*(\d+)/gi)) {
++      const id = MATERIAL_ITEM_IDS[tier.toLowerCase()];
++      if (!id) throw new Error(`[weapon-mod recipes] неизвестный тип материалов «${tier}»`);
++      out.push({ itemId: id, count: Number(count) });
++    }
++    return out;
++  };
++  let weaponModsWithoutColumns = 0;
++  for (const mod of weaponModsData) {
++    if (mod.complexity == null) { weaponModsWithoutColumns += 1; continue; }
++    if (ids.has(mod.id)) throw new Error(`[weapon-mod recipes] дубликат id ${mod.id}`);
++    const skill = mod.skill || 'REPAIR'; // mod_112 «Extra Flame Jets»: колонка навыка пуста — верстак оружия, Ремонт
++    if (!WEAPON_MOD_SKILLS.has(skill)) {
++      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: `неизвестный навык «${mod.skill}»` });
++      continue;
++    }
++    const parsed = parsePerkRequirements([mod.perk1, mod.perk2].map((x) => String(x ?? '').trim()).filter(Boolean).join(', '), ctx.perks);
++    if (parsed.error) {
++      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: parsed.error });
++      continue;
++    }
++    const materials = parseWeaponModMaterials(mod.materials);
++    if (!materials.length) {
++      dropped.push({ name: mod.id, group: 'WEAPON MOD COLUMNS', workbench: 'weapons', reason: 'в колонке материалов нет ни одной позиции' });
++      continue;
++    }
++    ids.add(mod.id);
++    entries.push({
++      bucket: 'weapons',
++      record: {
++        id: mod.id,
++        requires: {
++          skill,
++          complexity: Math.min(7, Math.max(1, Number(mod.complexity))),
++          ...(parsed.perks.length ? { perks: parsed.perks } : {}),
++        },
++        materials,
++        outputQuantity: 1,
++      },
++    });
++  }
++
+   const byBucket = {};
+   // (BENCH_BURNS — печатное правило сгорания; объявлено рядом с картой верстаков.)
+   for (const bucket of BUCKET_ORDER) {
+@@ -732,6 +796,7 @@ export function buildCraftingData() {
+     holes: holes.length,
+     holesByCategory: Object.fromEntries(Object.entries(holesByCategory).map(([c, l]) => [c, l.length])),
+     perBucket: Object.fromEntries(Object.entries(byBucket).map(([b, l]) => [b, l.length])),
++    weaponModsWithoutColumns,
+   };
+ 
+   return {
+@@ -855,8 +920,10 @@ const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []
+   L.push('|---|---|');
+   for (const g of IMPORTED_GROUPS) L.push(`| ${g} | ${GROUP_MEANING[g] || '—'} |`);
+   L.push('');
+-  L.push('Всё остальное в источнике — таблицы модификаций (оружие, броня, силовая');
+-  L.push('броня, роботы): они не выпускаются, пока не настроена ветка модов.');
++  L.push('Таблицы модификаций ОРУЖИЯ выпущены веткой крафт-модов (348): рецепты');
++  L.push('строятся из колонок каталога weapon_mods.json — аудита тех же таблиц.');
++  L.push('Остались отложенными: броня/силовая броня/роботы (броня выпущена по');
++  L.push('диктованным владельцем таблицам — 44 рецепта).');
+   L.push('');
+   L.push('## Не выпущено — по причинам');
+   L.push('');
+@@ -903,10 +970,11 @@ const renderReport = (stats, dropped, aliases, holesByCategory, corrections = []
+   L.push('позиции попадают только после того, как соответствия и числа переедут в');
+   L.push('генератор (аллиас или явные ингредиенты) и рецепт пройдёт строгую сверку.');
+   L.push('');
+-  L.push('**Модификации** в обменник не попадают намеренно: это не дыра каталога, а');
+-  L.push('отложенная ветка (решение владельца). Колонки сложности/перков/материалов');
+-  L.push('уже проставлены на 205 модах оружия и на модах брони — когда ветку настроим,');
+-  L.push('генератору останется переложить их в тот же формат.');
++  L.push(`**Модификации оружия** (348): ${stats.perBucket.weapons || 0} рецептов из колонок каталога;`);
++  L.push(`модов без колонок крафта (рецептов в книге нет): ${stats.weaponModsWithoutColumns || 0}.`);
++  L.push('**Броня/силовая броня/роботы** в обменник не попадают: не дыра каталога, а');
++  L.push('отложенная ветка (решение владельца); моды брони выпущены по диктованным');
++  L.push('таблицам (44 рецепта, патчи 341+).');
+   L.push('');
+   L.push('## Список непрошедших рецептов');
+   L.push('');
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index f148688..94ef378 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -927,6 +927,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+           : idUpper.startsWith('mag_') || idUpper.startsWith('magazine_') ? 'magazine'
+           : idUpper.startsWith('robot_') ? 'robotPart'
+           : idUpper.startsWith('uniq_') || idUpper.startsWith('mod_std_') ? 'armorMod'
++          : idUpper.startsWith('mod_') ? 'weaponMod'
+           : idUpper.startsWith('pa_') || idUpper.startsWith('power_') ? 'powerArmor'
+           : null;
+         const lookupTypes = [...new Set([
