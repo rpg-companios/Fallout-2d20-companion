@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## Robot weapon mods after loading a save: ghost cleanup and reliable writes (patch 360)
+
+From the owner's save export (an assaultron with a laser gun): old
+saves kept a second copy of robot weapons in the equipped list — a card
+with a stale mod set, which made an already-removed capacitor look
+stuck. The ghost copy is now purged on load. Also, writing mods to
+robot weapons no longer depends on the slot shape inside a save: slots
+are always expanded to the full form, so install/remove/replace works
+after any load.
+
 ## Robot weapon mods follow the common law (patch 359)
 
 Owner's report (a beta-wave tuner for the assaultron laser): a mod on a

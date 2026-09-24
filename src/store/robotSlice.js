@@ -29,6 +29,7 @@ import {
   getBuiltinWeaponsFromSlots,
 } from '../../domain/robotEquip';
 import { modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
+import { deserializeSlot, isSlimSlot } from '../../domain/robotSlots';
 
 /**
  * 359 (закон 343/344 на робо-оружии): снять привязку модов с оружия, которое
@@ -111,10 +112,18 @@ export const createRobotActions = (set, get) => ({
    */
   loadRobotState: (robotState) => {
     if (!robotState) return;
+    // 360: худая форма слотов из сейва разворачивается здесь, а не только в
+    // deserializeState — в памяти слоты всегда ПОЛНЫЕ (как после комплекта).
+    // Иначе ветки записи модов (setInstalledWeaponMods: limb.builtinWeapons)
+    // молча не срабатывают на слоте, который пришёл худым.
+    const slots = {};
+    for (const [slotKey, slotData] of Object.entries(robotState.slots ?? {})) {
+      slots[slotKey] = isSlimSlot(slotData) ? deserializeSlot(slotData) : slotData;
+    }
     set({
       robot: {
         bodyPlan: robotState.bodyPlan ?? get().robot?.bodyPlan ?? null,
-        slots: robotState.slots ?? {},
+        slots,
         modules: robotState.modules ?? [],
         mk2Installed: robotState.mk2Installed ?? get().robot?.mk2Installed ?? false,
       },
