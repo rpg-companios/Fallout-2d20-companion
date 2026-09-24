@@ -1,0 +1,155 @@
+diff --git a/__tests__/equipment/screen-selector-order-362.test.js b/__tests__/equipment/screen-selector-order-362.test.js
+new file mode 100644
+index 0000000..eecf98b
+--- /dev/null
++++ b/__tests__/equipment/screen-selector-order-362.test.js
+@@ -0,0 +1,37 @@
++// ПРИЁМОЧНЫЙ (патч 362): исправление краша «ReferenceError: Cannot access
++// 'installRobotWeaponMod' before initialization» (репорт владельца, Web).
++// Причина: в 359 селекторы действий стора стояли НИЖЕ handleApplyModification,
++// а массив зависимостей useCallback читает их СРАЗУ при рендере → TDZ.
++// Проводка: селекторы действий стора обязаны быть объявлены ВЫШЕ колбэков,
++// чьи массивы зависимостей их упоминают. Статическая проверка порядка.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const SRC = 'modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js';
++
++const lineOf = (src, needle) => {
++  const i = src.indexOf(needle);
++  return i === -1 ? null : src.slice(0, i).split('\n').length;
++};
++
++describe('ПРИЁМОЧНЫЙ (патч 362): порядок объявлений — селекторы выше колбэков', () => {
++  const src = readFileSync(SRC, 'utf8');
++
++  it('installRobotWeaponMod и uninstallWeaponModFlag объявлены до handleApplyModification', () => {
++    const callback = lineOf(src, 'const handleApplyModification = useCallback');
++    expect(callback).toBeTruthy();
++    for (const sel of [
++      'const installRobotWeaponMod = useCharacterStore',
++      'const uninstallWeaponModFlag = useCharacterStore',
++      'const installWeaponModFlag = useCharacterStore',
++    ]) {
++      const at = lineOf(src, sel);
++      expect(at, sel).toBeTruthy();
++      expect(at, `${sel} должен быть выше handleApplyModification (TDZ)`).toBeLessThan(callback);
++    }
++  });
++
++  it('селекторы внутри компонента, колбэк их получает (deps не пустые)', () => {
++    expect(src).toMatch(/installRobotWeaponMod, uninstallWeaponModFlag\]\);/);
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 6d47497..912a706 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **361** · у владельца на main применено до **314**
++· последний сданный патч: **362** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -334,6 +334,15 @@
+   Тест export-equals-save-361 (3): тело файла байт в байт = телу сейва;
+   круг экспорт→импорт→экспорт не меняет тело; жирный сейв v18-
+   экспортируется как есть.
++- 362 — ХОТФИКС КРАША ЭКРАНА (репорт владельца, Web: «ReferenceError:
++  Cannot access 'installRobotWeaponMod' before initialization» в
++  WeaponsAndArmorScreen.js:1078). Причина — моя, из 359: селекторы
++  действий стора стояли НИЖЕ handleApplyModification, а массив
++  зависимостей useCallback читает их сразу при рендере → TDZ.
++  Объявления перенесены выше колбэка (порядок: селекторы → колбэки);
++  проводка — статический тест screen-selector-order-362 (2): селектор
++  обязан быть объявлен выше колбэка с ним в deps. node_modules в
++  песочнице снова исчезал — восстановлен npm ci.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d91045d..a7fcffc 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,13 @@
+ # Changelog
+ 
+ ---
++## Fixed the equipment screen crash (patch 362)
++
++The "Cannot access before initialization" error when opening the
++Weapons and Armor screen — a regression from patch 359 where store
++action selectors were declared below the code using them. Moved above;
++a test now guards the declaration order.
++
+ ## Export = save, byte for byte (patch 361)
+ 
+ Per the owner's request "export always equals the save": the source of
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 0d1cbaa..00c9ec9 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,13 @@
+ # История изменений
+ 
+ ---
++## Исправлен краш экрана снаряжения (патч 362)
++
++Ошибка «Cannot access before initialization» при открытии экрана
++Оружие и броня — следствие патча 359, объявления действий хранилища
++стояли ниже использующего их кода. Перенесены выше; на будущее — тест,
++следящий за порядком объявлений.
++
+ ## Экспорт = сейв, байт в байт (патч 361)
+ 
+ По слову владельца «экспорт всегда = сейву» устранён источник
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 627d670..b67b38c 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -953,6 +953,15 @@ const WeaponsAndArmorScreen = () => {
+     setSelectedWeaponForModification(null);
+   };
+ 
++  // Селекторы действий стора — ВЫШЕ колбэков, чьи массивы зависимостей их
++  // читают при рендере (362: TDZ «Cannot access before initialization» —
++  // объявления стояли ниже handleApplyModification).
++  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
++  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
++  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
++  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
++  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
++
+   const handleApplyModification = useCallback((modifiedWeapon) => {
+     handleCloseModificationModal();
+     const itemId = resolveStoreItemId(selectedWeaponForModification);
+@@ -1094,12 +1103,6 @@ const WeaponsAndArmorScreen = () => {
+     setArmorModalVisible(true);
+   };
+ 
+-  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
+-  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+-  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
+-  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
+-  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+-
+   const handleApplyArmorModification = (modifiedItem) => {
+     if (!selectedArmorSlot) return;
+     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
+diff --git a/patchs/362-hotfix-tdz-poryadok-obyavleniy.patch b/patchs/362-hotfix-tdz-poryadok-obyavleniy.patch
+new file mode 100644
+index 0000000..e69de29
+diff --git a/public/version.json b/public/version.json
+index b74e176..09815be 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "361",
++  "version": "362",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
