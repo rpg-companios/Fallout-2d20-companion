@@ -1,0 +1,305 @@
+diff --git a/__tests__/equipment/weapon-mod-install-from-bag-351.test.js b/__tests__/equipment/weapon-mod-install-from-bag-351.test.js
+new file mode 100644
+index 0000000..96a4e21
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-install-from-bag-351.test.js
+@@ -0,0 +1,80 @@
++// ПРИЁМОЧНЫЙ (патч 351): моды ОРУЖИЯ — тот же закон владельца 343/344.
++//   • скрафченный мод-предмет ставится на оружие: флаг «экипирован» +
++//     привязка к предмету оружия (installedOn), мод невидим в сумке;
++//   • снятие/замена — прежний мод снова виден;
++//   • «продали оружие с модом — ушли оба» (adjustItemQuantity);
++//   • дифф установки (diffModInstallPlan) — чистая функция проводки экрана;
++//   • гейт «Установка модификаций» — тот же filterModsByInventory (342).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import { diffModInstallPlan } from '../../domain/modsEquip';
++import { filterModsByInventory } from '../../domain/modsEquip';
++import { modIdList } from '../../src/engine/items/weaponMods';
++
++const state = () => useCharacterStore.getState();
++const bagIds = (s) => Object.values(s.items)
++  .filter((i) => !i.equipped && !i.installedOn)
++  .map((i) => i.weaponId);
++
++beforeEach(() => {
++  useCharacterStore.setState({ items: {} });
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 351): мод оружия привязан к оружию', () => {
++  let weaponId;
++  let modId;
++
++  beforeEach(() => {
++    weaponId = state().addNewItem({ weaponId: 'weapon_10mm_pistol', itemType: 'weapon' });
++    modId = state().addNewItem({ weaponId: 'mod_001', itemType: 'weaponMod' });
++  });
++
++  it('установка: мод оружия — equipped+installedOn, невидим в сумке; снятие возвращает', () => {
++    const key = state().installArmorMod({ modId, hostKey: weaponId });
++    expect(key).toBeTruthy();
++    expect(state().items[key].equipped).toBe(true);
++    expect(state().items[key].installedOn).toBe(weaponId);
++    expect(bagIds(state())).not.toContain('mod_001');
++
++    state().uninstallArmorMod({ modId, hostKey: weaponId });
++    expect(bagIds(state())).toContain('mod_001');
++    expect(state().items[key].installedOn).toBeUndefined();
++  });
++
++  it('продали оружие с модом — ушли оба', () => {
++    state().installArmorMod({ modId, hostKey: weaponId });
++    state().adjustItemQuantity(weaponId, -1);
++    expect(state().items[weaponId]).toBeUndefined();
++    expect(state().items[modId]).toBeUndefined();
++  });
++
++  it('форма правды modIdList: appliedMods приоритетнее modIds', () => {
++    expect(modIdList({ appliedMods: { Receiver: 'mod_001' }, modIds: ['mod_002'] }))
++      .toEqual(['mod_001']);
++    expect(modIdList({ modIds: ['mod_002'] })).toEqual(['mod_002']);
++    expect(modIdList({})).toEqual([]);
++  });
++
++  it('дифф проводки: замена слота = снятие старого + установка нового', () => {
++    const plan = diffModInstallPlan(['mod_001'], ['mod_002']);
++    expect(plan).toEqual({ install: ['mod_002'], uninstall: ['mod_001'] });
++    expect(diffModInstallPlan([], [])).toEqual({ install: [], uninstall: [] });
++  });
++
++  it('гейт: filterModsByInventory скрывает моды не из сумки (моды оружия — те же id)', () => {
++    const mods = [
++      { id: 'mod_001', slot: 'Receiver' },
++      { id: 'mod_004', slot: 'Barrel' },
++    ];
++    const owned = new Set(['mod_001']);
++    expect(filterModsByInventory(mods, owned)).toEqual([{ id: 'mod_001', slot: 'Receiver' }]);
++    // настройка выключена — список без изменений
++    expect(filterModsByInventory(mods, null)).toEqual(mods);
++  });
++});
+diff --git a/docs/agents/data-flows.md b/docs/agents/data-flows.md
+index 27712fb..8e94e33 100644
+--- a/docs/agents/data-flows.md
++++ b/docs/agents/data-flows.md
+@@ -191,4 +191,14 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
+ ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
+ INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS
+ (characterActions.ts, fuse action-passports).
++
++МОДЫ ОРУЖИЯ (351): тот же закон. Экран модификации оружия исполняет
++план classifyModWritePlan; ветки storeItem/equippedWeapon дополнительно
++проводят дифф (diffModInstallPlan в domain/modsEquip) через те же
++store actions (modIdList — форма правды, appliedMods приоритетен).
++Кулаки/isBuiltin без экземпляра в сумке — виртуальный носитель, флага
++нет. Робо-ветки (held/installed/ownAttack) флага НЕ получают.
++Гейт «Установка модификаций» в WeaponModificationModal: фильтр
++modsBySlot по ownedModIds (bag weaponIds) + моды, уже установленные
++на этом оружии (иначе не снять).
+ ```
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b584fe5..19807df 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **350** · у владельца на main применено до **314**
++· последний сданный патч: **351** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -240,6 +240,13 @@
+   установка мода оружия из сумки, редизайн §2.10 — после него.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
++- 351 — УСТАНОВКА МОДА ОРУЖИЯ ИЗ СУМКИ (закон 343/344 на оружии):
++  проводка handleApplyModification (ветки storeItem/equippedWeapon —
++  дифф diffModInstallPlan в modsEquip, флаг/привязка через store
++  actions, кулаки — виртуальный носитель); гейт «Установка модификаций»
++  в WeaponModificationModal (фильтр modsBySlot; моды, УЖЕ установленные
++  на этом оружии, видимы — иначе не снять). Робо-ветки НЕ тронуты.
++  Осталась от 348→349: редизайн §2.10 (кнопка «Создать», разделы).
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ae0fe03..5f80681 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,21 @@
+ # Changelog
+ 
++---
++## Weapon mods: installation from the bag, same binding law (patch 351)
++
++Law 343/344 now covers weapons too: a crafted or found weapon mod, once
++installed, gets the "equipped" flag and binds to the weapon item.
++
++- "Sold the weapon with the mod — both are gone"; removing or replacing
++  makes the old mod visible in the bag again.
++- With the "Modification installation" setting on, the weapon modification
++  modal shows only mods from the inventory (mods already installed on this
++  weapon stay visible — otherwise they could not be removed).
++- Built-in weapons (fists) without a bag item are a virtual host: the mod
++  is not flagged.
++- Robot built-in weapons (limbs) are untouched — they have their own
++  limb-swap mechanics.
++
+ ---
+ ## Setting renamed: "Modification installation" (patch 350)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 5c0e650..5e01e13 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## Моды оружия: установка из сумки, тот же закон привязки (патч 351)
++
++Закон 343/344 теперь действует и для оружия: скрафченный или найденный
++мод оружия при установке получает флаг «экипирован» и привязывается
++к предмету оружия.
++
++- «Продали оружие с модом — ушли оба»; сняли/заменили — прежний мод
++  снова виден в сумке.
++- Окно модификации оружия при включённой настройке «Установка
++  модификаций» показывает только моды из инвентаря (уже установленные
++  на этом оружии видны — иначе их не снять).
++- Встроенное оружие (кулаки) без предмета в сумке — виртуальный носитель:
++  мод не флагается.
++- Встроенное оружие роботов (конечности) не затронуто — там своя
++  механика замены конечностей.
++
+ ---
+ ## Настройка переименована: «Установка модификаций» (патч 350)
+ 
+diff --git a/domain/modsEquip.js b/domain/modsEquip.js
+index ccd127f..711083a 100644
+--- a/domain/modsEquip.js
++++ b/domain/modsEquip.js
+@@ -141,3 +141,17 @@ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
+ 
+     return { item: modified, effects: { bonusEffects, rules: bonusEffects } };
+ };
++
++/**
++ * 351 (продолжение 343/344): дифф списков модов при применении окна
++ * модификации. «Сняли — мод снова видим; заменили — старый видим».
++ * Чистая функция: установка/снятие флага экземпляров делает стор.
++ */
++export const diffModInstallPlan = (prevIds, nextIds) => {
++  const prev = Array.isArray(prevIds) ? prevIds : [];
++  const next = Array.isArray(nextIds) ? nextIds : [];
++  return {
++    install: next.filter((id) => !prev.includes(id)),
++    uninstall: prev.filter((id) => !next.includes(id)),
++  };
++};
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 8ae86f4..0c8afec 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -22,7 +22,8 @@ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+ import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
+ // Единый путь записи модов (311): классификация места хранения — движок.
+-import { classifyModWritePlan } from '../../../../src/engine/items/weaponMods';
++import { classifyModWritePlan, modIdList } from '../../../../src/engine/items/weaponMods';
++import { diffModInstallPlan } from '../../../../domain/modsEquip';
+ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+ import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
+@@ -1037,6 +1038,12 @@ const WeaponsAndArmorScreen = () => {
+     }
+ 
+     if (modPlan?.kind === 'storeItem') {
++      // 351 (закон владельца 343/344): мод-предмет оружия при установке
++      // получает флаг «экипирован» и привязывается к предмету оружия;
++      // снятие/замена возвращает прежние моды в сумку. Дифф — чистый.
++      const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
++      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
++      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+       const patch = weaponModPatchToStore(modifiedWeapon);
+       debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
+       updateItem(modPlan.itemId, patch);
+@@ -1044,6 +1051,13 @@ const WeaponsAndArmorScreen = () => {
+     }
+ 
+     if (modPlan?.kind === 'equippedWeapon') {
++      // 351: флаг «экипирован» — на экземпляр в сумке (если он есть; кулаки —
++      // виртуальный носитель, флага нет). Снятие/замена — прежние моды видны.
++      if (itemId) {
++        const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
++        plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: itemId }));
++        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId }));
++      }
+       // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+       // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
+       setEquippedWeapons((prev) => prev.map((w) => (
+@@ -1071,6 +1085,8 @@ const WeaponsAndArmorScreen = () => {
+ 
+   const installArmorMod = useCharacterStore((state) => state.installArmorMod);
+   const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
++  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
++  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
+ 
+   const handleApplyArmorModification = (modifiedItem) => {
+     if (!selectedArmorSlot) return;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 2c2c865..564f0d5 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -14,6 +14,8 @@ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
+ import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
+ import styles from '../../../styles/WeaponModificationModal.styles';
+ import { debugLog } from '../../../../../src/debug/falloutDebug';
++import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
++import useCharacterStore from '../../../../../src/store/characterStore';
+ 
+ 
+ function toNumber(v) {
+@@ -376,7 +378,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+           }
+         }
+ 
++        // 350/351 (настройка «Установка модификаций»): включена — ставить можно
++        // только моды, созданные/найденные (есть в инвентаре). Моды, УЖЕ
++        // установленные на этом оружии, остаются видимыми — иначе их не снять.
+         if (cancelled) return;
++        if (useAppSettingsStore.getState().getSettingValue('modsRequireInventoryItem')) {
++          const owned = new Set(Object.values(useCharacterStore.getState().items || {})
++            .map((it) => it?.weaponId)
++            .filter(Boolean));
++          Object.values(weaponWithBase.appliedMods || {}).forEach((id) => owned.add(id));
++          for (const slot of Object.keys(bySlot)) {
++            const before = bySlot[slot].length;
++            bySlot[slot] = bySlot[slot].filter((m) => owned.has(m.id));
++            if (bySlot[slot].length !== before) {
++              debugLog('weapon.mod.gate.filtered', { weaponId: resolvedWeaponId, slot, before, after: bySlot[slot].length });
++            }
++          }
++        }
+         setModsBySlot(bySlot);
+         setSelectedModifications(selected);
+ 
+diff --git a/public/version.json b/public/version.json
+index f621012..e822ad1 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "350",
++  "version": "351",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
