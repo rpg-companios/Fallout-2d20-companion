@@ -1,0 +1,478 @@
+diff --git a/__tests__/equipment/weapon-mod-create-button-352.test.js b/__tests__/equipment/weapon-mod-create-button-352.test.js
+new file mode 100644
+index 0000000..45c459b
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-create-button-352.test.js
+@@ -0,0 +1,107 @@
++// ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» на позиции мода в модалке оружия
++// (первая очередь плана §2.10 — для тестирования интерфейса владельцем).
++//   • helper buildModCraftHint: зелёная (enabled) когда материалов хватает,
++//     притенённая (dimmed) когда нет — правило владельца;
++//   • требования в одну строку: Перк N · материалы по редкостям · Сложность M;
++//   • кнопка и строка скрыты, если мод уже в инвентаре (hint.inInventory);
++//   • у мода без рецепта помощник вернёт null (кнопки не будет);
++//   • проводка модалки: настройка «Установка модификаций», кнопка в строке,
++//     крафт при нажатии (craftRecipe + settleCraftTime).
++import { describe, it, expect } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import useCharacterStore from '../../src/store/characterStore';
++import { buildModCraftHint } from '../../modules/fallout/crafting/windowModel';
++import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
++
++const state = () => useCharacterStore.getState();
++const seed = (weaponId, quantity = 1) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId, quantity } },
++  }));
++};
++
++describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» в модалке оружия', () => {
++  it('материалов хватает → enabled (зелёная); не хватает → dimmed', () => {
++    useCharacterStore.setState({ items: {}, selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    // «Скорострельный»: Обычные ×4 + Необычные ×2
++    const ok = buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks });
++    expect(ok.enabled).toBe(false); // пустая сумка
++
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    const green = buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks });
++    expect(green.enabled).toBe(true);
++
++    seed('item_common_materials', 1); // обычных 5, но необычных 2 — всё ещё хватает
++    expect(buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks }).enabled).toBe(true);
++  });
++
++  it('требования в одну строку: перк · материалы по редкостям · сложность', () => {
++    useCharacterStore.setState({ items: {} });
++    const hint = buildModCraftHint('mod_001', { items: {}, selectedPerks: [] });
++    expect(hint.line).toContain('Gun Nut 1');
++    expect(hint.line).toContain('×4'); // Common ×4
++    expect(hint.line).toContain('×2'); // Uncommon ×2
++    expect(hint.line).toContain('Complexity 3');
++    expect(hint.line.split(' · ').length).toBeGreaterThanOrEqual(4); // одна строка, части через «·»
++  });
++
++  it('мод уже в инвентаре → hint.inInventory (кнопка и требования скрыты)', () => {
++    useCharacterStore.setState({ items: {} });
++    seed('mod_001', 1);
++    const hint = buildModCraftHint('mod_001', { items: state().items, selectedPerks: [] });
++    expect(hint.inInventory).toBe(true);
++  });
++
++  it('установленный (installedOn) мод не считается ни материалом, ни инвентарём', () => {
++    useCharacterStore.setState({ items: {} });
++    useCharacterStore.setState((prev) => ({
++      items: { ...prev.items, k1: { weaponId: 'item_common_materials', quantity: 4, installedOn: 'weapon_x' } },
++    }));
++    const hint = buildModCraftHint('mod_001', { items: state().items, selectedPerks: [] });
++    expect(hint.enabled).toBe(false); // надетые/установленные материалыми не являются
++  });
++
++  it('мод без колонок (без рецепта) — null: кнопки нет', () => {
++    const hint = buildModCraftHint('mod_999', { items: {}, selectedPerks: [] });
++    expect(hint).toBeNull();
++  });
++
++  it('крафт по кнопке: успех кладёт мод в сумку; отказ на перке — stage gate', () => {
++    useCharacterStore.setState({ items: {}, selectedPerks: [] });
++    const blocked = craftRecipe('mod_001', {}, { deferTime: true });
++    expect(blocked.done).toBe(false);
++    expect(blocked.stage).toBe('gate');
++    expect(blocked.reasons.some((r) => r.code === 'missing-perk')).toBe(true);
++
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++    const run = craftRecipe('mod_001', { rollD20: () => 3 }, { deferTime: true });
++    expect(run.done).toBe(true);
++    const settled = settleCraftTime('mod_001', run, { spendActionPoints: false });
++    expect(settled.minutes).toBeGreaterThan(0);
++    const inBag = Object.values(state().items).some((i) => i.weaponId === 'mod_001');
++    expect(inBag).toBe(true);
++  });
++
++  it('проводка модалки: настройка, подписки, кнопка, скрытие, крафт', () => {
++    const src = readFileSync(
++      'modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js',
++      'utf8',
++    );
++    expect(src).toContain("getSettingValue('modsRequireInventoryItem')");
++    expect(src).toContain('buildModCraftHint');
++    expect(src).toContain('craftRecipe');
++    expect(src).toContain('settleCraftTime');
++    expect(src).toContain('styles.createButton');
++    expect(src).toContain('!hint.inInventory'); // скрытие, если мод в инвентаре
++    expect(src).toContain('!hint.enabled'); // dimmed по материалам
++    // список не фильтруется (352): у строк кнопки, а не удаление модов
++    expect(src).not.toContain('weapon.mod.gate.filtered');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 19807df..99fc3de 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **351** · у владельца на main применено до **314**
++· последний сданный патч: **352** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -243,10 +243,17 @@
+ - 351 — УСТАНОВКА МОДА ОРУЖИЯ ИЗ СУМКИ (закон 343/344 на оружии):
+   проводка handleApplyModification (ветки storeItem/equippedWeapon —
+   дифф diffModInstallPlan в modsEquip, флаг/привязка через store
+-  actions, кулаки — виртуальный носитель); гейт «Установка модификаций»
+-  в WeaponModificationModal (фильтр modsBySlot; моды, УЖЕ установленные
+-  на этом оружии, видимы — иначе не снять). Робо-ветки НЕ тронуты.
+-  Осталась от 348→349: редизайн §2.10 (кнопка «Создать», разделы).
++  actions, кулаки — виртуальный носитель). Робо-ветки НЕ тронуты.
++- 352 — КНОПКА «СОЗДАТЬ» В МОДАЛКЕ ОРУЖИЯ (первая очередь §2.10, для
++  тестирования владельцем): список НЕ фильтруется (гейт 351 в модалке
++  снят); у не установленного мода без предмета в сумке — кнопка справа
++  (зелёная, если материалов хватает; dimmed opacity, если нет) и
++  требования одной строкой «Перк N · материалы × · Сложность M»
++  (buildModCraftHint в windowModel, чистая). Нажатие: craftRecipe +
++  settleCraftTime (учит обе формы прогона: attempts[] и одиночный
++  time.pending), отказы — Alert по кодам движка. Успех → мод в сумке,
++  кнопка скрыта. Настройка «Установка модификаций» включает кнопки.
++  Далее по §2.10: то же для модалок брони + разделы категорий.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5f80681..046fad0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,19 @@
+ # Changelog
+ 
++---
++## A "Create" button in the weapon modification modal (patch 352)
++
++The first slice of the owner's plan (§2.10) — for interface testing.
++With the "Modification installation" setting on, every mod position that
++is not in the inventory shows a "Create" button and a requirements line.
++
++- The button is green when there are enough materials; dimmed otherwise.
++- Requirements in one line: perk(s) with ranks, materials by rarity,
++  complexity.
++- Pressing creates the mod (it lands in the inventory and the button
++  disappears); missing perk or materials is explained.
++- The mod list is no longer filtered by the setting — buttons instead.
++
+ ---
+ ## Weapon mods: installation from the bag, same binding law (patch 351)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 5e01e13..e6a78d7 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Кнопка «Создать» в окне модификации оружия (патч 352)
++
++Первая очередь плана владельца (§2.10) — для проверки интерфейса.
++При включённой настройке «Установка модификаций» у каждой позиции мода,
++которого нет в инвентаре, — кнопка «Создать» и строка требований.
++
++- Кнопка зелёная, когда материалов хватает; притенена, когда не хватает.
++- Требования одной строкой: перк(и) с рангами, материалы по редкостям,
++  сложность.
++- Нажатие создаёт мод (он падает в инвентарь, кнопка исчезает); при
++  нехватке перка или материалов — объяснение.
++- Список модов больше не фильтруется настройкой — вместо этого кнопки.
++
+ ---
+ ## Моды оружия: установка из сумки, тот же закон привязки (патч 351)
+ 
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index c9ba0fd..87ee5ab 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -97,7 +97,13 @@
+     "previewQualities": "Qualities",
+     "errorTitle": "Error",
+     "errorSelectMod": "Please select at least one modification",
+-    "modsNotInInventory": "None in the bag (craft them in the Crafting window)"
++    "modsNotInInventory": "None in the bag (craft them in the Crafting window)",
++    "create": "Create",
++    "createDone": "Created. Time spent:",
++    "createFailTitle": "Cannot create",
++    "createFailMissingPerk": "A perk from the requirements line is required",
++    "createFailMaterials": "Not enough materials",
++    "createFailCheck": "Skill check failed"
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 23431d1..4a29807 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -97,7 +97,13 @@
+     "previewQualities": "Качества",
+     "errorTitle": "Ошибка",
+     "errorSelectMod": "Выберите хотя бы одну модификацию",
+-    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)"
++    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)",
++    "create": "Создать",
++    "createDone": "Создано. Времени прошло:",
++    "createFailTitle": "Не удалось создать",
++    "createFailMissingPerk": "Требуется перк из строки требований",
++    "createFailMaterials": "Не хватает материалов",
++    "createFailCheck": "Проверка навыка не пройдена"
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 2bdfb09..42ff72f 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -214,8 +214,13 @@ export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp =
+   // время идёт полное («больше 6 потратить не выйдет…», 324).
+   const apSpend = halveForAp ? spendActionPoints(2) : { ok: false, pool: getActionPoints() };
+   const halved = halveForAp && apSpend.ok;
++  // 352: обе формы прогона — пачка (attempts[]) и одиночный craftRecipe
++  // (time.pending на верхнем уровне); поведение для пачки прежнее.
++  const attempts = run?.attempts ?? (run?.time?.pending
++    ? [{ done: run.done === true, time: run.time }]
++    : []);
+   let total = 0;
+-  for (const attempt of run?.attempts ?? []) {
++  for (const attempt of attempts) {
+     const t = attempt?.time;
+     if (!t?.pending) continue;
+     let minutes = t.baseMinutes;
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 7647703..6f3469d 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -82,6 +82,49 @@ const itemName = (catalog, id, typeHint) => {
+   return entry?.name ?? id;
+ };
+ 
++/**
++ * 352 (план §2.10, первая очередь — модалка оружия): состояние кнопки
++ * «Создать» на позиции мода. Чистая функция: рецепт из данных, наличие в
++ * сумке и «хватает ли материалов» считаются из инвентаря (только свободные
++ * предметы — установленные/надетые материалами не являются). Кнопка зелёная
++ * (enabled) когда материалов хватает — правило владельца; перк проверяется
++ * при нажатии (движок), но его требование видно в строке.
++ * null — рецепта у мода нет (безколоночный): кнопки не будет.
++ */
++export const buildModCraftHint = (modId, { items = {}, selectedPerks = [] } = {}) => {
++  const recipe = getCraftingRecipeById(modId);
++  if (!recipe) return null;
++  const have = new Map();
++  for (const item of Object.values(items || {})) {
++    if (!item || item.installedOn || item.equipped) continue;
++    const id = item.weaponId || item.id;
++    if (!id) continue;
++    have.set(id, (have.get(id) || 0) + (Number(item.quantity) || 1));
++  }
++  const d = dict().ui;
++  const parts = [];
++  for (const perk of recipe.requires.perks || []) {
++    parts.push(`${perkName(perk.perkId)} ${perk.rank}`);
++  }
++  const rarityLabel = {
++    item_common_materials: d.rarityCommon,
++    item_uncommon_materials: d.rarityUncommon,
++    item_rare_materials: d.rarityRare,
++  };
++  let enabled = true;
++  for (const material of recipe.materials) {
++    const owned = have.get(material.itemId) || 0;
++    parts.push(`${rarityLabel[material.itemId] || material.itemId} ×${material.count}`);
++    if (owned < material.count) enabled = false;
++  }
++  parts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
++  return {
++    inInventory: (have.get(modId) || 0) > 0,
++    enabled,
++    line: parts.join(' · '),
++  };
++};
++
+ export const formatCraftMinutes = (minutes) => {
+   const d = dict().ui;
+   if (minutes % 1440 === 0) return fmt(d.timeDays, { n: minutes / 1440 });
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 564f0d5..ef6265a 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -16,6 +16,8 @@ import styles from '../../../styles/WeaponModificationModal.styles';
+ import { debugLog } from '../../../../../src/debug/falloutDebug';
+ import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+ import useCharacterStore from '../../../../../src/store/characterStore';
++import { buildModCraftHint, formatCraftMinutes } from '../../../crafting/windowModel';
++import { craftRecipe, settleCraftTime } from '../../../crafting/operations';
+ 
+ 
+ function toNumber(v) {
+@@ -315,6 +317,35 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+   const [expandedCategories, setExpandedCategories] = useState({}); // slot -> boolean
+   const [modsBySlot, setModsBySlot] = useState({}); // slot -> modRow[]
+ 
++  // 352 (план §2.10): кнопка «Создать» на позиции мода — при включённой
++  // настройке «Установка модификаций»; скрыта, если мод уже в инвентаре.
++  const modsViaCraft = useAppSettingsStore((s) => s.getSettingValue('modsRequireInventoryItem'));
++  const storeItems = useCharacterStore((s) => s.items);
++  const selectedPerks = useCharacterStore((s) => s.selectedPerks);
++
++  const handleCreateMod = (modId, modName) => {
++    const run = craftRecipe(modId, {}, { deferTime: true });
++    if (!run.done) {
++      // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
++      // missing-material), stage 'check' — непройденная проверка.
++      const reasons = Array.isArray(run.reasons) ? run.reasons : [];
++      const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
++        ? 'modals.createFailMissingPerk'
++        : reasons.some((r) => r?.code === 'missing-material')
++          ? 'modals.createFailMaterials'
++          : run.stage === 'check' ? 'modals.createFailCheck' : 'modals.createFailTitle';
++      Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
++      return;
++    }
++    // 323: время готовки применяется сразу (полное; вопрос про 2 ОД — только
++    // в окне крафта с его отчётом, здесь — компактный сценарий).
++    const settled = settleCraftTime(modId, run, { spendActionPoints: false });
++    Alert.alert(
++      modName || modId,
++      `${tWeaponsAndArmorScreen('modals.createDone')} ${formatCraftMinutes(settled.minutes)}`,
++    );
++  };
++
+   // Обновляем modifiedWeapon при изменении weapon
+   React.useEffect(() => {
+     let cancelled = false;
+@@ -378,23 +409,10 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+           }
+         }
+ 
+-        // 350/351 (настройка «Установка модификаций»): включена — ставить можно
+-        // только моды, созданные/найденные (есть в инвентаре). Моды, УЖЕ
+-        // установленные на этом оружии, остаются видимыми — иначе их не снять.
++        // 350–352 (настройка «Установка модификаций»): список НЕ фильтруется —
++        // у каждой позиции кнопка «Создать» (352); моды, УЖЕ установленные на
++        // этом оружии, тоже видны — иначе их не снять.
+         if (cancelled) return;
+-        if (useAppSettingsStore.getState().getSettingValue('modsRequireInventoryItem')) {
+-          const owned = new Set(Object.values(useCharacterStore.getState().items || {})
+-            .map((it) => it?.weaponId)
+-            .filter(Boolean));
+-          Object.values(weaponWithBase.appliedMods || {}).forEach((id) => owned.add(id));
+-          for (const slot of Object.keys(bySlot)) {
+-            const before = bySlot[slot].length;
+-            bySlot[slot] = bySlot[slot].filter((m) => owned.has(m.id));
+-            if (bySlot[slot].length !== before) {
+-              debugLog('weapon.mod.gate.filtered', { weaponId: resolvedWeaponId, slot, before, after: bySlot[slot].length });
+-            }
+-          }
+-        }
+         setModsBySlot(bySlot);
+         setSelectedModifications(selected);
+ 
+@@ -516,24 +534,47 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+                         : tWeaponsAndArmorScreen('modals.noWeaponMod')}
+                     </Text>
+                   </TouchableOpacity>
+-                  {mods.map((mod, index) => (
+-                    <TouchableOpacity
++                  {mods.map((mod, index) => {
++                    // 352: кнопка и требования — у НЕ установленного (на этом
++                    // оружии) мода, без своего предмета в инвентаре.
++                    const hint = buildModCraftHint(mod.id, { items: storeItems, selectedPerks });
++                    const isInstalledHere = selectedModifications[slot]?.id === mod.id;
++                    const showCreate = modsViaCraft && hint && !hint.inInventory && !isInstalledHere;
++                    return (
++                    <View
+                       key={index}
+                       style={[
+                         styles.modificationItem,
+                         selectedModifications[slot]?.id === mod.id && styles.selectedModification
+                       ]}
+-                      onPress={() => handleSelectModification(slot, mod)}
+                     >
+-                      <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
+-                      <Text style={styles.modificationEffects}>
+-                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
+-                      </Text>
+-                      <Text style={styles.modificationStats}>
+-                        {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  ))}
++                      <TouchableOpacity
++                        style={styles.modItemMain}
++                        onPress={() => handleSelectModification(slot, mod)}
++                      >
++                        <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
++                        <Text style={styles.modificationEffects}>
++                          {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
++                        </Text>
++                        <Text style={styles.modificationStats}>
++                          {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
++                        </Text>
++                        {showCreate && (
++                          <Text style={styles.modificationRequirements}>{hint.line}</Text>
++                        )}
++                      </TouchableOpacity>
++                      {showCreate && (
++                        <TouchableOpacity
++                          style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
++                          disabled={!hint.enabled}
++                          onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
++                        >
++                          <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
++                        </TouchableOpacity>
++                      )}
++                    </View>
++                    );
++                  })}
+                 </CollapsibleSection>
+                 );
+               })}
+diff --git a/modules/fallout/styles/WeaponModificationModal.styles.js b/modules/fallout/styles/WeaponModificationModal.styles.js
+index c4d6313..4c79712 100644
+--- a/modules/fallout/styles/WeaponModificationModal.styles.js
++++ b/modules/fallout/styles/WeaponModificationModal.styles.js
+@@ -48,6 +48,19 @@ const styles = StyleSheet.create({
+   },
+   expandIcon: { fontSize: 16, color: '#666' },
+   sectionContent: { paddingLeft: 10, paddingTop: 5 },
++  // 352: строка мода — слева тексты (тап = выбор), справа кнопка «Создать»
++  modItemMain: { flex: 1 },
++  createButton: {
++    backgroundColor: '#2e7d32',
++    borderRadius: 8,
++    paddingHorizontal: 10,
++    paddingVertical: 6,
++    marginLeft: 8,
++    justifyContent: 'center',
++  },
++  createButtonDimmed: { opacity: 0.4 },
++  createButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
++  modificationRequirements: { fontSize: 11, color: '#555', marginTop: 2 },
+   modificationItem: {
+     padding: 10,
+     borderWidth: 1,
+diff --git a/public/version.json b/public/version.json
+index e822ad1..e310ee4 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "351",
++  "version": "352",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
