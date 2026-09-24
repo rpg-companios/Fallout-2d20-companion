@@ -1,0 +1,162 @@
+diff --git a/__tests__/equipment/armor-mod-inventory-gate-342.test.js b/__tests__/equipment/armor-mod-inventory-gate-342.test.js
+index 304debf..6368ac3 100644
+--- a/__tests__/equipment/armor-mod-inventory-gate-342.test.js
++++ b/__tests__/equipment/armor-mod-inventory-gate-342.test.js
+@@ -55,8 +55,10 @@ describe('патч 342: универсальный мод, 1 материал +
+     expect(entry, 'настройка в settings.json').toBeTruthy();
+     expect(entry.sectionKey).toBe('crafting');
+     expect(entry.defaultValue).toBe(false); // выключена: установка свободна
+-    expect(ruSettings.modsRequireInventoryTitle).toContain('сумке');
+-    expect(enSettings.modsRequireInventoryTitle).toContain('bag');
++    // 350 (слово владельца): настройка описана как «Установка модификаций»
++    expect(ruSettings.modsRequireInventoryTitle).toBe('Установка модификаций');
++    expect(ruSettings.modsRequireInventoryDescription).toContain('только при наличии');
++    expect(enSettings.modsRequireInventoryTitle).toBe('Modification installation');
+   });
+ 
+   it('гейт фильтрует по сумке: есть мод — виден, нет — скрыт с пометкой', () => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 03c7292..b584fe5 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **349** · у владельца на main применено до **314**
++· последний сданный патч: **350** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -233,8 +233,11 @@
+   §2.10): в модалках установки модов — кнопка «Создать» и требования
+   на позиции (режим «моды через крафт»; скрыты, если мод в инвентаре);
+   в категориях крафта — разделы по категории брони / слоту оружия
+-  («Кожаная броня», «Ресивер»). Открыто: «моды через крафт» — новая
+-  настройка или существующая «Требовать мод в сумке» (342).
++  («Кожаная броня», «Ресивер»).
++- 350 — ОТКРЫТАЯ ТОЧКА 349 ЗАКРЫТА: режим «моды через крафт» = настройка
++  «Установка модификаций» (быв. «Требовать мод в сумке», i18n ru/en
++  переименованы словами владельца). Порядок подтверждён: следующий шаг —
++  установка мода оружия из сумки, редизайн §2.10 — после него.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c131d2d..ae0fe03 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,18 @@
+ # Changelog
+ 
++---
++## Setting renamed: "Modification installation" (patch 350)
++
++Owner's word: the "mods via crafting" mode is the existing setting,
++named and described as: "Modification installation. A modification can
++be installed only if the modification itself is in the inventory."
++
++- The setting's title and description updated (ru and en); behavior
++  unchanged: off — free installation, on — the mod must be in the
++  inventory.
++- The open point of plan §2.10 is closed; work order confirmed: next —
++  weapon mod installation from the bag.
++
+ ---
+ ## Plan recorded: "Create" in install modals and crafting sections (patch 349)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6a7c098..5c0e650 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## Настройка переименована: «Установка модификаций» (патч 350)
++
++Слово владельца: режим «моды через крафт» — это существующая настройка,
++назвать и описать её так: «Установка модификаций. Установка модификаций
++осуществляется только при наличии самой модификации в инвентаре».
++
++- Название и описание настройки обновлены (ru и en); поведение прежнее:
++  выключено — установка свободна, включено — мод должен быть в инвентаре.
++- Открытая точка плана §2.10 закрыта; порядок работ подтверждён: дальше —
++  установка мода оружия из сумки.
++
+ ---
+ ## Записан план: «Создать» в модалках установки и разделы в крафте (патч 349)
+ 
+diff --git a/docs/reference-data/armor-mods-crafting.md b/docs/reference-data/armor-mods-crafting.md
+index 63f5066..2a664e5 100644
+--- a/docs/reference-data/armor-mods-crafting.md
++++ b/docs/reference-data/armor-mods-crafting.md
+@@ -345,12 +345,16 @@ uniq_synth_microcarbon (а «Нановолоконная» — uniq_synth_nanof
+    + 1 модификацию — два независимых слота установки (appliedUniqueArmorModId /
+    appliedArmorModId); в окне установки разделы названы словами владельца:
+    «Материал брони» и «Модификации».
+-3. **Настройка «Требовать мод в сумке для установки»** (раздел «Крафт»,
+-   по умолчанию ВЫКЛ — установка свободна). Включена — ставятся только
++3. **Настройка «Установка модификаций»** (раздел «Крафт», по умолчанию
++   ВЫКЛ — установка свободна; переименована словами владельца, 350:
++   было «Требовать мод в сумке для установки»). Описание словами
++   владельца: «Установка модификаций осуществляется только при наличии
++   самой модификации в инвентаре». Включена — ставятся только
+    моды, созданные/найденные (id присутствует в сумке); пустые группы
+    помечены «Нет в сумке (создаются в окне „Крафт“)». Открытый вопрос
+    о расходовании закрыт словом владельца (патч 343, п. 4): мод НЕ
+-   расходуется — становится экипированным.
++   расходуется — становится экипированным. ЭТА ЖЕ настройка — режим
++   «моды через крафт» плана §2.10 (закрыто владельцем, 350).
+ 4. **Мод-предмет при установке получает флаг «экипирован»** (слово
+    владельца, патч 343). Слова владельца: «продали предмет с модом —
+    ушли оба»; «экипированный мод невидим в инвентаре»; снятие/замена —
+@@ -402,6 +406,11 @@ uniq_synth_microcarbon (а «Нановолоконная» — uniq_synth_nanof
+    у модов оружия — колонка slot; у модов брони — семейство через
+    категории (categories.json/матчеры, как в окне установки).
+ 
++ОТКРЫТАЯ ТОЧКА ЗАКРЫТА (350, слово владельца): режим «моды через крафт»
++в п.1 — ЭТО существующая настройка «Установка модификаций» (закон §2.9
++п.3), а не новая настройка. Порядок работ подтверждён: сначала установка
++мода оружия из сумки (продолжение 348), редизайн этого раздела — после.
++
+ ## 2.5. Ответы владельца (2026-09-23, патч 332)
+ 
+ 1. **Ёмкость ≠ сложность предмета.** Владелец: «ты сравниваешь данные
+diff --git a/modules/fallout/i18n/en-EN/data/system/settings.json b/modules/fallout/i18n/en-EN/data/system/settings.json
+index 42c5137..eee86b2 100644
+--- a/modules/fallout/i18n/en-EN/data/system/settings.json
++++ b/modules/fallout/i18n/en-EN/data/system/settings.json
+@@ -34,6 +34,6 @@
+   "craftLossConsumablesDescription": "By the book: a cooking station or chemical laboratory consumes all ingredients when the check fails. Off — materials are kept on failure.",
+   "craftLossGearTitle": "Material loss on failure: weapons, armor, ammo",
+   "craftLossGearDescription": "A failed component craft (weapons, armor, power armor, ammo and other) spends the materials. Off — materials are kept on failure.",
+-  "modsRequireInventoryTitle": "Require the mod in the bag to install",
+-  "modsRequireInventoryDescription": "On — a material or modification can be installed only if the crafted (or found) mod item is in the bag. Off — installation is free: any mod available to this armor installs without the item."
++  "modsRequireInventoryTitle": "Modification installation",
++  "modsRequireInventoryDescription": "A modification can be installed only if the modification itself is in the inventory. Off — installation is free: any mod available to the armor or weapon installs without the item."
+ }
+diff --git a/modules/fallout/i18n/ru-RU/data/system/settings.json b/modules/fallout/i18n/ru-RU/data/system/settings.json
+index f9c7327..fc33e6e 100644
+--- a/modules/fallout/i18n/ru-RU/data/system/settings.json
++++ b/modules/fallout/i18n/ru-RU/data/system/settings.json
+@@ -34,6 +34,6 @@
+   "craftLossConsumablesDescription": "По книге: станция приготовления пищи и химическая лаборатория — при провале проверки ингредиенты израсходованы. Выключено — материалы остаются при провале.",
+   "craftLossGearTitle": "Потеря материалов при провале: оружие, броня, патроны",
+   "craftLossGearDescription": "Провал компонентного крафта (оружие, броня, силовая броня, патроны и прочее) расходует материалы. Выключено — материалы остаются при провале.",
+-  "modsRequireInventoryTitle": "Требовать мод в сумке для установки",
+-  "modsRequireInventoryDescription": "Включено — установить материал или модификацию можно только при наличии созданного (или найденного) мода в сумке. Выключено — установка свободна: любой мод, доступный этой броне, ставится без предмета."
++  "modsRequireInventoryTitle": "Установка модификаций",
++  "modsRequireInventoryDescription": "Установка модификаций осуществляется только при наличии самой модификации в инвентаре. Выключено — установка свободна: любой мод, доступный броне или оружию, ставится без предмета."
+ }
+diff --git a/public/version.json b/public/version.json
+index e12f5d4..f621012 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "349",
++  "version": "350",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
