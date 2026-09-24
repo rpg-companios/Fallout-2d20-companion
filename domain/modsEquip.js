@@ -141,3 +141,17 @@ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
 
     return { item: modified, effects: { bonusEffects, rules: bonusEffects } };
 };
+
+/**
+ * 351 (продолжение 343/344): дифф списков модов при применении окна
+ * модификации. «Сняли — мод снова видим; заменили — старый видим».
+ * Чистая функция: установка/снятие флага экземпляров делает стор.
+ */
+export const diffModInstallPlan = (prevIds, nextIds) => {
+  const prev = Array.isArray(prevIds) ? prevIds : [];
+  const next = Array.isArray(nextIds) ? nextIds : [];
+  return {
+    install: next.filter((id) => !prev.includes(id)),
+    uninstall: prev.filter((id) => !next.includes(id)),
+  };
+};

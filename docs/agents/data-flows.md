@@ -191,4 +191,14 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
 ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
 INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS
 (characterActions.ts, fuse action-passports).
+
+МОДЫ ОРУЖИЯ (351): тот же закон. Экран модификации оружия исполняет
+план classifyModWritePlan; ветки storeItem/equippedWeapon дополнительно
+проводят дифф (diffModInstallPlan в domain/modsEquip) через те же
+store actions (modIdList — форма правды, appliedMods приоритетен).
+Кулаки/isBuiltin без экземпляра в сумке — виртуальный носитель, флага
+нет. Робо-ветки (held/installed/ownAttack) флага НЕ получают.
+Гейт «Установка модификаций» в WeaponModificationModal: фильтр
+modsBySlot по ownedModIds (bag weaponIds) + моды, уже установленные
+на этом оружии (иначе не снять).
 ```

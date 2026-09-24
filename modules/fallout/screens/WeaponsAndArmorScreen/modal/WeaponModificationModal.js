@@ -14,6 +14,8 @@ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
 import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
+import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+import useCharacterStore from '../../../../../src/store/characterStore';
 
 
 function toNumber(v) {
@@ -376,7 +378,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           }
         }
 
+        // 350/351 (настройка «Установка модификаций»): включена — ставить можно
+        // только моды, созданные/найденные (есть в инвентаре). Моды, УЖЕ
+        // установленные на этом оружии, остаются видимыми — иначе их не снять.
         if (cancelled) return;
+        if (useAppSettingsStore.getState().getSettingValue('modsRequireInventoryItem')) {
+          const owned = new Set(Object.values(useCharacterStore.getState().items || {})
+            .map((it) => it?.weaponId)
+            .filter(Boolean));
+          Object.values(weaponWithBase.appliedMods || {}).forEach((id) => owned.add(id));
+          for (const slot of Object.keys(bySlot)) {
+            const before = bySlot[slot].length;
+            bySlot[slot] = bySlot[slot].filter((m) => owned.has(m.id));
+            if (bySlot[slot].length !== before) {
+              debugLog('weapon.mod.gate.filtered', { weaponId: resolvedWeaponId, slot, before, after: bySlot[slot].length });
+            }
+          }
+        }
         setModsBySlot(bySlot);
         setSelectedModifications(selected);
 

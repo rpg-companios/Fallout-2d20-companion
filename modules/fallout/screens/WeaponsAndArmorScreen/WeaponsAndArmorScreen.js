@@ -22,7 +22,8 @@ import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
 // Единый путь записи модов (311): классификация места хранения — движок.
-import { classifyModWritePlan } from '../../../../src/engine/items/weaponMods';
+import { classifyModWritePlan, modIdList } from '../../../../src/engine/items/weaponMods';
+import { diffModInstallPlan } from '../../../../domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
@@ -1037,6 +1038,12 @@ const WeaponsAndArmorScreen = () => {
     }
 
     if (modPlan?.kind === 'storeItem') {
+      // 351 (закон владельца 343/344): мод-предмет оружия при установке
+      // получает флаг «экипирован» и привязывается к предмету оружия;
+      // снятие/замена возвращает прежние моды в сумку. Дифф — чистый.
+      const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
       const patch = weaponModPatchToStore(modifiedWeapon);
       debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
       updateItem(modPlan.itemId, patch);
@@ -1044,6 +1051,13 @@ const WeaponsAndArmorScreen = () => {
     }
 
     if (modPlan?.kind === 'equippedWeapon') {
+      // 351: флаг «экипирован» — на экземпляр в сумке (если он есть; кулаки —
+      // виртуальный носитель, флага нет). Снятие/замена — прежние моды видны.
+      if (itemId) {
+        const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+        plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: itemId }));
+        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId }));
+      }
       // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
       // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
       setEquippedWeapons((prev) => prev.map((w) => (
@@ -1071,6 +1085,8 @@ const WeaponsAndArmorScreen = () => {
 
   const installArmorMod = useCharacterStore((state) => state.installArmorMod);
   const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
+  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
 
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;

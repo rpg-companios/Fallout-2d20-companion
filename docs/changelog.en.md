@@ -1,6 +1,22 @@
 # Changelog
 
 ---
+## Weapon mods: installation from the bag, same binding law (patch 351)
+
+Law 343/344 now covers weapons too: a crafted or found weapon mod, once
+installed, gets the "equipped" flag and binds to the weapon item.
+
+- "Sold the weapon with the mod — both are gone"; removing or replacing
+  makes the old mod visible in the bag again.
+- With the "Modification installation" setting on, the weapon modification
+  modal shows only mods from the inventory (mods already installed on this
+  weapon stay visible — otherwise they could not be removed).
+- Built-in weapons (fists) without a bag item are a virtual host: the mod
+  is not flagged.
+- Robot built-in weapons (limbs) are untouched — they have their own
+  limb-swap mechanics.
+
+---
 ## Setting renamed: "Modification installation" (patch 350)
 
 Owner's word: the "mods via crafting" mode is the existing setting,
