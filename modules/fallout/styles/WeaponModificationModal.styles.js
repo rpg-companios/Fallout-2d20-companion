@@ -48,19 +48,22 @@ const styles = StyleSheet.create({
   },
   expandIcon: { fontSize: 16, color: '#666' },
   sectionContent: { paddingLeft: 10, paddingTop: 5 },
-  // 352: строка мода — слева тексты (тап = выбор), справа кнопка «Создать»
+  // 352/353: строка мода — тап по текстам выбирает мод; кнопка «Создать» —
+  // компактная справа в строке материалов (макет владельца), стиль — аналог
+  // applyButton этой же модалки (#007AFF, borderRadius 5).
   modItemMain: { flex: 1 },
   createButton: {
-    backgroundColor: '#2e7d32',
-    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     marginLeft: 8,
-    justifyContent: 'center',
   },
   createButtonDimmed: { opacity: 0.4 },
   createButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-  modificationRequirements: { fontSize: 11, color: '#555', marginTop: 2 },
+  modificationRequirements: { fontSize: 12, fontWeight: '600', color: '#333', marginTop: 4 },
+  requirementsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  requirementsMaterials: { flex: 1, fontSize: 11, color: '#555' },
   modificationItem: {
     padding: 10,
     borderWidth: 1,

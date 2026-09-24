@@ -559,18 +559,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                         <Text style={styles.modificationStats}>
                           {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
                         </Text>
-                        {showCreate && (
-                          <Text style={styles.modificationRequirements}>{hint.line}</Text>
-                        )}
                       </TouchableOpacity>
                       {showCreate && (
-                        <TouchableOpacity
-                          style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
-                          disabled={!hint.enabled}
-                          onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
-                        >
-                          <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
-                        </TouchableOpacity>
+                        <View>
+                          <Text style={styles.modificationRequirements}>
+                            {`${tWeaponsAndArmorScreen('modals.requirements')}: ${hint.requirements}`}
+                          </Text>
+                          <View style={styles.requirementsRow}>
+                            <Text style={styles.requirementsMaterials}>{hint.materialsLine}</Text>
+                            <TouchableOpacity
+                              style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
+                              disabled={!hint.enabled}
+                              onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
+                            >
+                              <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       )}
                     </View>
                     );

@@ -102,26 +102,30 @@ export const buildModCraftHint = (modId, { items = {}, selectedPerks = [] } = {}
     have.set(id, (have.get(id) || 0) + (Number(item.quantity) || 1));
   }
   const d = dict().ui;
-  const parts = [];
+  // строка «Требования: …» — перки и сложность (352, макет владельца 353)
+  const requirementParts = [];
   for (const perk of recipe.requires.perks || []) {
-    parts.push(`${perkName(perk.perkId)} ${perk.rank}`);
+    requirementParts.push(`${perkName(perk.perkId)} ${perk.rank}`);
   }
-  const rarityLabel = {
-    item_common_materials: d.rarityCommon,
-    item_uncommon_materials: d.rarityUncommon,
-    item_rare_materials: d.rarityRare,
+  requirementParts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
+  // строка материалов — «есть/нужно» мелким шрифтом слева от кнопки
+  const shortLabel = {
+    item_common_materials: d.matCommon,
+    item_uncommon_materials: d.matUncommon,
+    item_rare_materials: d.matRare,
   };
   let enabled = true;
+  const materialParts = [];
   for (const material of recipe.materials) {
     const owned = have.get(material.itemId) || 0;
-    parts.push(`${rarityLabel[material.itemId] || material.itemId} ×${material.count}`);
+    materialParts.push(`${shortLabel[material.itemId] || material.itemId} ${owned}/${material.count}`);
     if (owned < material.count) enabled = false;
   }
-  parts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
   return {
     inInventory: (have.get(modId) || 0) > 0,
     enabled,
-    line: parts.join(' · '),
+    requirements: requirementParts.join(' · '),
+    materialsLine: materialParts.join(', '),
   };
 };
 

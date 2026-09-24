@@ -37,14 +37,20 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
     expect(buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks }).enabled).toBe(true);
   });
 
-  it('требования в одну строку: перк · материалы по редкостям · сложность', () => {
+  it('требования блоком: «Требования» (перк · сложность) + материалы «есть/нужно»', () => {
     useCharacterStore.setState({ items: {} });
     const hint = buildModCraftHint('mod_001', { items: {}, selectedPerks: [] });
-    expect(hint.line).toContain('Gun Nut 1');
-    expect(hint.line).toContain('×4'); // Common ×4
-    expect(hint.line).toContain('×2'); // Uncommon ×2
-    expect(hint.line).toContain('Complexity 3');
-    expect(hint.line.split(' · ').length).toBeGreaterThanOrEqual(4); // одна строка, части через «·»
+    // строка требований: перк и сложность
+    expect(hint.requirements).toBe('Gun Nut 1 · Complexity 3');
+    // строка материалов: «есть/нужно» мелким слева от кнопки (макет 353)
+    expect(hint.materialsLine).toBe('Common material 0/4, Uncommon material 0/2');
+
+    useCharacterStore.setState((prev) => ({
+      items: { ...prev.items, k1: { weaponId: 'item_common_materials', quantity: 2 } },
+    }));
+    const partial = buildModCraftHint('mod_001', { items: useCharacterStore.getState().items, selectedPerks: [] });
+    expect(partial.materialsLine).toBe('Common material 2/4, Uncommon material 0/2');
+    expect(partial.enabled).toBe(false);
   });
 
   it('мод уже в инвентаре → hint.inInventory (кнопка и требования скрыты)', () => {
