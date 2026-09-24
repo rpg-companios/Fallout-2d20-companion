@@ -1,0 +1,178 @@
+diff --git a/__tests__/equipment/weapon-mod-create-button-352.test.js b/__tests__/equipment/weapon-mod-create-button-352.test.js
+index 45c459b..305a1ed 100644
+--- a/__tests__/equipment/weapon-mod-create-button-352.test.js
++++ b/__tests__/equipment/weapon-mod-create-button-352.test.js
+@@ -37,14 +37,20 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» 
+     expect(buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks }).enabled).toBe(true);
+   });
+ 
+-  it('требования в одну строку: перк · материалы по редкостям · сложность', () => {
++  it('требования блоком: «Требования» (перк · сложность) + материалы «есть/нужно»', () => {
+     useCharacterStore.setState({ items: {} });
+     const hint = buildModCraftHint('mod_001', { items: {}, selectedPerks: [] });
+-    expect(hint.line).toContain('Gun Nut 1');
+-    expect(hint.line).toContain('×4'); // Common ×4
+-    expect(hint.line).toContain('×2'); // Uncommon ×2
+-    expect(hint.line).toContain('Complexity 3');
+-    expect(hint.line.split(' · ').length).toBeGreaterThanOrEqual(4); // одна строка, части через «·»
++    // строка требований: перк и сложность
++    expect(hint.requirements).toBe('Gun Nut 1 · Complexity 3');
++    // строка материалов: «есть/нужно» мелким слева от кнопки (макет 353)
++    expect(hint.materialsLine).toBe('Common material 0/4, Uncommon material 0/2');
++
++    useCharacterStore.setState((prev) => ({
++      items: { ...prev.items, k1: { weaponId: 'item_common_materials', quantity: 2 } },
++    }));
++    const partial = buildModCraftHint('mod_001', { items: useCharacterStore.getState().items, selectedPerks: [] });
++    expect(partial.materialsLine).toBe('Common material 2/4, Uncommon material 0/2');
++    expect(partial.enabled).toBe(false);
+   });
+ 
+   it('мод уже в инвентаре → hint.inInventory (кнопка и требования скрыты)', () => {
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 6f3469d..e31eac9 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -102,26 +102,30 @@ export const buildModCraftHint = (modId, { items = {}, selectedPerks = [] } = {}
+     have.set(id, (have.get(id) || 0) + (Number(item.quantity) || 1));
+   }
+   const d = dict().ui;
+-  const parts = [];
++  // строка «Требования: …» — перки и сложность (352, макет владельца 353)
++  const requirementParts = [];
+   for (const perk of recipe.requires.perks || []) {
+-    parts.push(`${perkName(perk.perkId)} ${perk.rank}`);
++    requirementParts.push(`${perkName(perk.perkId)} ${perk.rank}`);
+   }
+-  const rarityLabel = {
+-    item_common_materials: d.rarityCommon,
+-    item_uncommon_materials: d.rarityUncommon,
+-    item_rare_materials: d.rarityRare,
++  requirementParts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
++  // строка материалов — «есть/нужно» мелким шрифтом слева от кнопки
++  const shortLabel = {
++    item_common_materials: d.matCommon,
++    item_uncommon_materials: d.matUncommon,
++    item_rare_materials: d.matRare,
+   };
+   let enabled = true;
++  const materialParts = [];
+   for (const material of recipe.materials) {
+     const owned = have.get(material.itemId) || 0;
+-    parts.push(`${rarityLabel[material.itemId] || material.itemId} ×${material.count}`);
++    materialParts.push(`${shortLabel[material.itemId] || material.itemId} ${owned}/${material.count}`);
+     if (owned < material.count) enabled = false;
+   }
+-  parts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
+   return {
+     inInventory: (have.get(modId) || 0) > 0,
+     enabled,
+-    line: parts.join(' · '),
++    requirements: requirementParts.join(' · '),
++    materialsLine: materialParts.join(', '),
+   };
+ };
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index 4e2f5da..b16ba18 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -56,7 +56,10 @@
+     "apNo": "Full time",
+     "apHalvedNote": "Time halved for 2 AP",
+     "apEarnedLine": "AP: +{n} to the group pool (now {pool}/6)",
+-    "perkShort": "needs a perk"
++    "perkShort": "needs a perk",
++    "matCommon": "Common material",
++    "matUncommon": "Uncommon material",
++    "matRare": "Rare material"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index c1bfd59..0e56be0 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -56,7 +56,10 @@
+     "apNo": "Полное время",
+     "apHalvedNote": "Время сокращено за 2 ОД",
+     "apEarnedLine": "ОД: +{n} в общий пул (сейчас {pool}/6)",
+-    "perkShort": "нужен перк"
++    "perkShort": "нужен перк",
++    "matCommon": "Обычный материал",
++    "matUncommon": "Необычный материал",
++    "matRare": "Редкий материал"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index ef6265a..c25200e 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -559,18 +559,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+                         <Text style={styles.modificationStats}>
+                           {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
+                         </Text>
+-                        {showCreate && (
+-                          <Text style={styles.modificationRequirements}>{hint.line}</Text>
+-                        )}
+                       </TouchableOpacity>
+                       {showCreate && (
+-                        <TouchableOpacity
+-                          style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
+-                          disabled={!hint.enabled}
+-                          onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
+-                        >
+-                          <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
+-                        </TouchableOpacity>
++                        <View>
++                          <Text style={styles.modificationRequirements}>
++                            {`${tWeaponsAndArmorScreen('modals.requirements')}: ${hint.requirements}`}
++                          </Text>
++                          <View style={styles.requirementsRow}>
++                            <Text style={styles.requirementsMaterials}>{hint.materialsLine}</Text>
++                            <TouchableOpacity
++                              style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
++                              disabled={!hint.enabled}
++                              onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
++                            >
++                              <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
++                            </TouchableOpacity>
++                          </View>
++                        </View>
+                       )}
+                     </View>
+                     );
+diff --git a/modules/fallout/styles/WeaponModificationModal.styles.js b/modules/fallout/styles/WeaponModificationModal.styles.js
+index 4c79712..b804dd0 100644
+--- a/modules/fallout/styles/WeaponModificationModal.styles.js
++++ b/modules/fallout/styles/WeaponModificationModal.styles.js
+@@ -48,19 +48,22 @@ const styles = StyleSheet.create({
+   },
+   expandIcon: { fontSize: 16, color: '#666' },
+   sectionContent: { paddingLeft: 10, paddingTop: 5 },
+-  // 352: строка мода — слева тексты (тап = выбор), справа кнопка «Создать»
++  // 352/353: строка мода — тап по текстам выбирает мод; кнопка «Создать» —
++  // компактная справа в строке материалов (макет владельца), стиль — аналог
++  // applyButton этой же модалки (#007AFF, borderRadius 5).
+   modItemMain: { flex: 1 },
+   createButton: {
+-    backgroundColor: '#2e7d32',
+-    borderRadius: 8,
++    backgroundColor: '#007AFF',
++    borderRadius: 5,
+     paddingHorizontal: 10,
+-    paddingVertical: 6,
++    paddingVertical: 5,
+     marginLeft: 8,
+-    justifyContent: 'center',
+   },
+   createButtonDimmed: { opacity: 0.4 },
+   createButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+-  modificationRequirements: { fontSize: 11, color: '#555', marginTop: 2 },
++  modificationRequirements: { fontSize: 12, fontWeight: '600', color: '#333', marginTop: 4 },
++  requirementsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
++  requirementsMaterials: { flex: 1, fontSize: 11, color: '#555' },
+   modificationItem: {
+     padding: 10,
+     borderWidth: 1,
