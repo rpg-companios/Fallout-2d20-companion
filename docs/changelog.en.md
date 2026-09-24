@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+## "Create" button: compact and darker, requirements per the mockup (patches 353–354)
+
+Fixes from the owner's interface testing feedback.
+
+- The "Create" button now matches this modal's "Apply" button style and
+  no longer stretches across the row: compact, on the right.
+- Requirements are shown as a block: a "Requirements: perk · complexity"
+  line, with materials as "have/need" (e.g. "Common material 2/4") in
+  small font to the left of the button.
+
+---
 ## A "Create" button in the weapon modification modal (patch 352)
 
 The first slice of the owner's plan (§2.10) — for interface testing.
