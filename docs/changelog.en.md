@@ -1,6 +1,20 @@
 # Changelog
 
 ---
+## Plan recorded: "Create" in install modals and crafting sections (patch 349)
+
+The owner's idea recorded in the owner's own words (reference, §2.10);
+timing — "perhaps toward the end of crafting". No code changed.
+
+- Install modals get a per-position "Create" button and requirements
+  (perks, materials, complexity) when the "mods via crafting" mode is on;
+  hidden when the mod is already in the inventory.
+- Crafting categories get sections by armor family and weapon slot
+  ("Leather Armor", "Receiver").
+- Open question: is "mods via crafting" a new setting or the existing
+  "Require mod in bag"?
+
+---
 ## Weapon mod crafting: 152 recipes, the "Weapons" square is alive (patch 348)
 
 Per the owner's decisions (346/347): recipes are built from the weapon
