@@ -17,11 +17,7 @@
 3. `docs/architecture/engine-charter.md` — устав: один шаг = один патч,
    паспорта стора/сейва, политика тестов, протокол отчёта об ошибке.
 4. `setting-contract.md` — контракт пакета сеттинга (`.trpg`).
-5. `docs/agents/mechanisms.md` — ШПАРГАЛКА МЕХАНИЗМОВ (364, слово
-   владельца): диалоги (alertService/AlertHost — единая точка, Alert на
-   Web молчит), крафт, законы модов 343/344+359, робо-слоты и сейвы,
-   экспорт=сейв, настройки/i18n/стор. Дополняется в патче изменения.
-6. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
+5. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
    (каталог, моды оружия, робо-слоты, сейвы, выживание).
 
 ## Карта репозитория по слоям
@@ -52,6 +48,59 @@
 | Новое поле состояния стора | паспорт `src/store/characterState.ts` В ТОМ ЖЕ ПАТЧЕ (тест `data-passports` упадёт иначе) |
 | Новый формат сейва | версия в `src/store/saveSchema.js` + миграция в конец цепочки `migrations.js` |
 | Универсальная механика | `domain/` (JS) или `src/engine/` (TS для новых контрактов); сеттинг подставляет данные через реестр |
+
+## Как работают ключевые механизмы (шпаргалка, дополняется в патче изменения)
+
+**Диалоги — единая точка (урок 363/364).** Единственный способ показа
+всплывающих окон — `components/alerts/alertService.js` + `AlertHost.js`
+(монтируется раз в App.js; веб = натив, любые кнопки, Promise).
+`showAlert(alertId)` — по каталогу `components/alerts/catalog.js`
+(info/confirm/choice), `confirmAlert` — да/нет, `showRawAlert({title,
+message, buttons})` — текст вне каталога (кнопки в формате системного
+Alert, промис резолвится индексом, закрытие без выбора = null; «Ок»
+у info переведён общим словарём). `Alert.alert` из react-native на
+Web — ПУСТАЯ ФУНКЦИЯ: молчит; прямые вызовы в игровых окнах — дефект.
+Домен диалоги не зовёт: движок возвращает событие/код, экран показывает.
+
+**Крафт.** Экран (CraftingModal / кнопка «Создать» модалки оружия) →
+`modules/fallout/crafting/operations.js` (`craftRecipe`, `craftingPreview`,
+`craftBatch`, `settleCraftTime`) → движок `domain/craftingEngine.js`
+(`evaluateCraft`, `runCraft`) + `domain/d20Checks.js` (`resolveD20Check`).
+Порты (rollD20/rollCD/spend/grant) переопределяемы — тесты; экраны зовут
+без портов. Время (323): час, еда/напитки 20 мин, осложнение +30/+10
+аддитивно; `deferTime` — вопрос про 2 ОД (324: пул 6, +1 за успех сверх
+сложности — всегда, закон 358). `zeroDifficulty` (356): 'auto'|'roll',
+сложность 0 → вопрос про бросок через AlertHost. Автопровал = осложнение
+без единого успеха (358, не «две двадцатки»). Потери при провале —
+настройки craftFailLoss*. Отчёт — `buildCraftReport` → общий
+`CraftReportView` (обоих окон, 357).
+
+**Моды — закон 343/344 (+359).** Установка: мод-предмет получает
+`equipped: true` + `installedOn` (курсив в сумке = установлен), снятие/
+замена возвращает, продали носитель — ушли оба. Броня — `installArmorMod`
+(hostKey = ключ предмета). Робо-оружие (359): носитель — не предмет,
+ключ синтетический `robotWeaponHostKey(слот, id)`; стор-действие
+`installRobotWeaponMod`; уход оружия из слота возвращает моды. Запись
+выбора — ветки `classifyModWritePlan` (storeItem/equippedWeapon/robotSlot)
+в `WeaponsAndArmorScreen.handleApplyModification`. Гейт — настройка
+`modsRequireInventoryItem` (ВЫКЛ); список не фильтруется; кнопка
+«Создать» — 352–355 (#22c55e, требования блоком).
+
+**Робо-слоты и сейвы (360).** Правда о робо-оружии — слоты стора
+(`robot.slots`); `loadRobotState` разворачивает худые слоты в полную
+форму (в памяти всегда полная — иначе ветки записи модов молча не
+срабатывают: им нужен `limb.builtinWeapons`). Робо-оружие НЕ живёт в
+`equippedWeapons` (загрузка вычищает призраков); карточки — из слотов
+(`collectAttacks`). Формы слотов — `domain/robotSlots.js`.
+
+**Экспорт = сейв (361).** `createCharacterExportPayload` отдаёт тело
+записи БД без обработки; единственный владелец сжатия — `saveCharacter`
+(`slimSaveData` до записи); импорт — `restoreSaveData`.
+
+**Паспорта/версии.** Новое действие стора = паспорт
+`src/store/characterActions.ts` в том же патче (тест action-passports).
+`public/version.json`: version = номер последнего патча; release трогает
+только владелец; «Что нового» — раз на релиз.
 
 ## Правила, которые нельзя нарушать (короткий список)
 

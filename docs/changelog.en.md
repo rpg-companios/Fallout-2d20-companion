@@ -7,8 +7,9 @@ Per the owner's word: the app has a single popup mechanism that works
 everywhere — the roll-dice question and refusal messages now use it
 (the custom dialog window from the previous patch is gone). Same
 behavior: "Roll dice"/"Auto-success" at zero difficulty, "Done" on
-refusals, the green "Applied" note for mods. Also added a mechanisms
-cheat sheet for faster future work (docs/agents/mechanisms.md).
+refusals, the green "Applied" note for mods. The mechanisms cheat sheet is merged into the agent map
+docs/agents/README.md (no separate file — amended in patch 365 per
+the owner's word).
 
 ## Craft and mod buttons respond on the web (patch 363)
 
