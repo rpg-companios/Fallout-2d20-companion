@@ -55,8 +55,10 @@ describe('патч 342: универсальный мод, 1 материал + 
     expect(entry, 'настройка в settings.json').toBeTruthy();
     expect(entry.sectionKey).toBe('crafting');
     expect(entry.defaultValue).toBe(false); // выключена: установка свободна
-    expect(ruSettings.modsRequireInventoryTitle).toContain('сумке');
-    expect(enSettings.modsRequireInventoryTitle).toContain('bag');
+    // 350 (слово владельца): настройка описана как «Установка модификаций»
+    expect(ruSettings.modsRequireInventoryTitle).toBe('Установка модификаций');
+    expect(ruSettings.modsRequireInventoryDescription).toContain('только при наличии');
+    expect(enSettings.modsRequireInventoryTitle).toBe('Modification installation');
   });
 
   it('гейт фильтрует по сумке: есть мод — виден, нет — скрыт с пометкой', () => {

@@ -1,6 +1,19 @@
 # Changelog
 
 ---
+## Setting renamed: "Modification installation" (patch 350)
+
+Owner's word: the "mods via crafting" mode is the existing setting,
+named and described as: "Modification installation. A modification can
+be installed only if the modification itself is in the inventory."
+
+- The setting's title and description updated (ru and en); behavior
+  unchanged: off — free installation, on — the mod must be in the
+  inventory.
+- The open point of plan §2.10 is closed; work order confirmed: next —
+  weapon mod installation from the bag.
+
+---
 ## Plan recorded: "Create" in install modals and crafting sections (patch 349)
 
 The owner's idea recorded in the owner's own words (reference, §2.10);
