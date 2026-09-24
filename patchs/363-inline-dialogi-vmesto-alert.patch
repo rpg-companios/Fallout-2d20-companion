@@ -1,0 +1,390 @@
+diff --git a/__tests__/equipment/inline-feedback-363.test.js b/__tests__/equipment/inline-feedback-363.test.js
+new file mode 100644
+index 0000000..80322d4
+--- /dev/null
++++ b/__tests__/equipment/inline-feedback-363.test.js
+@@ -0,0 +1,55 @@
++// ПРИЁМОЧНЫЙ (патч 363): «мёртвые кнопки» крафта/модов на Web. Репорт
++// владельца: ресивер — «нет отклика у кнопки», тюнер — «прикрепляю — ui не
++// меняется». Корень доказан: Alert.alert в react-native-web — ПУСТАЯ
++// функция (`alert() {}`), а 352/356 повесили на него вопрос «бросить
++// кубики?» при снятой сложности и сообщения об отказе — на Web они молчали.
++// Теперь: вопрос про бросок — inline-диалог в обоих окнах, отказ гейта —
++// inline-диалог модалки, применение мода — зелёная отметка (окно не
++// закрывается молча).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const read = (p) => readFileSync(p, 'utf8');
++
++const CRAFTING = 'modules/fallout/screens/InventoryScreen/modals/CraftingModal.js';
++const MODAL = 'modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js';
++const SCREEN = 'modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js';
++
++describe('ПРИЁМОЧНЫЙ (патч 363): никаких молчащих Alert в крафте и модах', () => {
++  it('Alert.alert исчез из окна крафта и модалки модов', () => {
++    expect(read(CRAFTING)).not.toContain('Alert.alert');
++    expect(read(MODAL)).not.toContain('Alert.alert');
++  });
++
++  it('вопрос про бросок — inline-диалог в ОБОИХ окнах', () => {
++    const crafting = read(CRAFTING);
++    expect(crafting).toContain('askZeroTarget'); // состояние inline-диалога
++    expect(crafting).toContain('ui.askZeroRoll'); // кнопка «Бросить кубики»
++    expect(crafting).toContain("proceedCreate(t.row, 'roll')");
++
++    const modal = read(MODAL);
++    expect(modal).toContain('craftNotice'); // состояние inline-диалога
++    expect(modal).toContain('createAskZeroRoll');
++    expect(modal).toContain("runCreateMod(modId, modName, 'roll')");
++  });
++
++  it('отказ гейта (перк/материалы) — inline-диалог модалки, не Alert', () => {
++    const modal = read(MODAL);
++    expect(modal).toContain('createFailTitle');
++    expect(modal).toContain('createNoticeDone'); // кнопка «Готово»
++  });
++
++  it('применение модов видно: зелёная отметка, окно не закрывается молча', () => {
++    const screen = read(SCREEN);
++    const start = screen.indexOf('const handleApplyModification = useCallback');
++    const end = screen.indexOf('const handleUnequipWeapon', start);
++    const body = screen.slice(start, end);
++    // модалка остаётся открытой с обновлённой карточкой (было: молчаливое закрытие)
++    expect(body).not.toContain('handleCloseModificationModal');
++    expect(body).toContain('setSelectedWeaponForModification(modifiedWeapon)');
++
++    const modal = read(MODAL);
++    expect(modal).toContain('installNote'); // зелёная отметка
++    expect(modal).toContain('installApplied');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 912a706..3678121 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **362** · у владельца на main применено до **314**
++· последний сданный патч: **363** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -343,6 +343,21 @@
+   проводка — статический тест screen-selector-order-362 (2): селектор
+   обязан быть объявлен выше колбэка с ним в deps. node_modules в
+   песочнице снова исчезал — восстановлен npm ci.
++- 363 — «МЁРТВЫЕ КНОПКИ» НА WEB (пачка репортов владельца: ресивер —
++  «нет отклика у кнопки», тюнер — «прикрепляю — ui не меняется»,
++  «Создать» горит у уже установленного). КОРЕНЬ ДОКАЗАН: Alert.alert в
++  react-native-web — пустая функция (`alert() {}`); 352/356 повесили на
++  него вопрос «бросить кубики?» (снятая сложность — владелец попал
++  именно в него с ресивером) и сообщения об отказе гейта. Прикрепление
++  мода при этом РАБОТАЛО (курсив = флаг 359). Исправление: вопрос про
++  бросок — inline-диалог в ОБОИХ окнах (CraftingModal askZeroTarget,
++  модалка craftNotice); отказ гейта — inline-диалог модалки; применение
++  модов больше не закрывает окно молча — экран обновляет карточку
++  (setSelectedWeaponForModification(modifiedWeapon) вместо
++  handleCloseModificationModal), модалка показывает зелёную отметку
++  «Применено: …». i18n: modals.installApplied, modals.createNoticeDone.
++  Тест inline-feedback-363 (4): Alert-вызовов в двух окнах нет;
++  inline-диалоги на месте; отметка применения на месте.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a7fcffc..a5b9462 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,17 @@
+ # Changelog
+ 
+ ---
++## Craft and mod buttons respond on the web (patch 363)
++
++From the owner's bug batch, the root of the "silent" buttons: on the
++web build the system popups are silent stubs — and the "Roll the
++dice?" question at zero difficulty and the "missing perk/materials"
++messages relied on them. Both now ask inline in the window
++("Roll dice"/"Auto-success", "Done"), and applying mods no longer
++closes the window silently: the card updates in place and a green
++"Applied: …" note appears. Mod installation itself worked before (the
++italic bag items were installed mods).
++
+ ## Fixed the equipment screen crash (patch 362)
+ 
+ The "Cannot access before initialization" error when opening the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 00c9ec9..d3a9aa6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,17 @@
+ # История изменений
+ 
+ ---
++## Кнопки крафта и модов отвечают на вебе (патч 363)
++
++По пачке репортов владельца найден корень «молчащих» кнопок: на вебе
++системные всплывающие окна приложения не показываются — а на них были
++завязаны вопрос «Бросить кубики?» при снятой сложности и сообщения
++«не хватает перка/материалов». Теперь оба вопроса задаются прямо в
++окне (кнопки «Бросить кубики»/«Автоуспех», «Готово»), а применение
++модов перестало закрывать окно молча: карточка обновляется на глазах и
++появляется зелёная отметка «Применено: …». Само прикрепление модов
++работало и раньше (курсив в сумке — установленный мод).
++
+ ## Исправлен краш экрана снаряжения (патч 362)
+ 
+ Ошибка «Cannot access before initialization» при открытии экрана
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 4d3d0d7..db9b1e0 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -107,7 +107,9 @@
+     "createAskZeroTitle": "Difficulty cleared by skill",
+     "createAskZeroText": "Roll the dice? Success/Failure rules apply.",
+     "createAskZeroRoll": "Roll dice",
+-    "createAskZeroAuto": "Auto-success"
++    "createAskZeroAuto": "Auto-success",
++    "installApplied": "Applied",
++    "createNoticeDone": "Done"
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 428d360..6f9d5c9 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -107,7 +107,9 @@
+     "createAskZeroTitle": "Сложность снята навыком",
+     "createAskZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
+     "createAskZeroRoll": "Бросить кубики",
+-    "createAskZeroAuto": "Автоуспех"
++    "createAskZeroAuto": "Автоуспех",
++    "installApplied": "Применено",
++    "createNoticeDone": "Готово"
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index 925c683..b17088a 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -53,6 +53,7 @@ export default function CraftingModal({ visible, onClose }) {
+   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
+   const [qty, setQty] = useState(1);
+   const [report, setReport] = useState(null);
++  const [askZeroTarget, setAskZeroTarget] = useState(null); // 363: inline-вопрос про бросок
+   const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
+   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
+ 
+@@ -108,16 +109,10 @@ export default function CraftingModal({ visible, onClose }) {
+   // отдельным окном (по умолчанию 1); одна — создать сразу.
+   const onPressCreate = (row) => {
+     // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
+-    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
++    // 363: системный Alert на Web — тихая заглушка, вопрос задаёт inline-диалог
++    // (как окно количества): «да» — бросаем, «нет» — автоуспех.
+     if (row.zeroDifficulty) {
+-      Alert.alert(
+-        ui.askZeroTitle ?? '',
+-        ui.askZeroText ?? '',
+-        [
+-          { text: ui.askZeroRoll ?? '', onPress: () => proceedCreate(row, 'roll') },
+-          { text: ui.askZeroAuto ?? '', onPress: () => proceedCreate(row, 'auto') },
+-        ],
+-      );
++      setAskZeroTarget({ row });
+       return;
+     }
+     proceedCreate(row, 'auto');
+@@ -272,6 +267,29 @@ export default function CraftingModal({ visible, onClose }) {
+           )}
+         </SafeAreaView>
+ 
++        {/* 363: вопрос про бросок при снятой сложности — inline-диалог
++            (системный Alert на Web молчит, кнопка выглядела мёртвой). */}
++        <Modal visible={!!askZeroTarget} transparent animationType="fade" onRequestClose={() => setAskZeroTarget(null)}>
++          <View style={styles.qtyOverlay}>
++            <View style={styles.qtyDialog}>
++              <Text style={styles.qtyText}>{ui.askZeroTitle ?? ''}</Text>
++              <Text style={styles.qtyText}>{ui.askZeroText ?? ''}</Text>
++              <View style={styles.qtyActions}>
++                <TouchableOpacity
++                  style={styles.qtyCancel}
++                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'auto'); }}>
++                  <Text style={styles.qtyCancelText}>{ui.askZeroAuto ?? ''}</Text>
++                </TouchableOpacity>
++                <TouchableOpacity
++                  style={[styles.bigCraft, styles.qtyActionsBigCraft]}
++                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'roll'); }}>
++                  <Text style={styles.bigCraftText}>{ui.askZeroRoll ?? ''}</Text>
++                </TouchableOpacity>
++              </View>
++            </View>
++          </View>
++        </Modal>
++
+         {/* Окно количества (318): «сколько штук создать?» с − и +, по умолчанию 1. */}
+         <Modal visible={!!qtyTarget} transparent animationType="fade" onRequestClose={() => setQtyTarget(null)}>
+           <View style={styles.qtyOverlay}>
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index b67b38c..0e9fceb 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -963,7 +963,10 @@ const WeaponsAndArmorScreen = () => {
+   const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+ 
+   const handleApplyModification = useCallback((modifiedWeapon) => {
+-    handleCloseModificationModal();
++    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно НЕ
++    // закрывается молча — обновляем карточку, модалка перечитает выбор и
++    // покажет зелёную отметку применения; закрытие — крестиком.
++    setSelectedWeaponForModification(modifiedWeapon);
+     const itemId = resolveStoreItemId(selectedWeaponForModification);
+     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
+ 
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index b932f7f..493551a 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -4,8 +4,7 @@ import {
+   Text,
+   Modal,
+   TouchableOpacity,
+-  ScrollView,
+-  Alert
++  ScrollView
+ } from 'react-native';
+ import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
+ import { shiftRange } from '../../../../../domain/range';
+@@ -329,20 +328,24 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+ 
+   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
+   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
++  // 363: inline-вопрос/отказ (системный Alert на Web — тихая заглушка:
++  // «бросить кубики?» и «не хватает перка/материалов» молчали).
++  const [craftNotice, setCraftNotice] = useState(null); // {title, text, actions:[{label, primary, onPress}]}
++  const [installNote, setInstallNote] = useState(null); // видимая отметка установки
+ 
+   const handleCreateMod = (modId, modName) => {
+     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
+     // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+     const evaluation = craftingPreview(modId)?.evaluation;
+     if (evaluation?.auto) {
+-      Alert.alert(
+-        tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
+-        tWeaponsAndArmorScreen('modals.createAskZeroText'),
+-        [
+-          { text: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), onPress: () => runCreateMod(modId, modName, 'roll') },
+-          { text: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => runCreateMod(modId, modName, 'auto') },
++      setCraftNotice({
++        title: tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
++        text: tWeaponsAndArmorScreen('modals.createAskZeroText'),
++        actions: [
++          { label: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'auto'); } },
++          { label: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), primary: true, onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'roll'); } },
+         ],
+-      );
++      });
+       return;
+     }
+     runCreateMod(modId, modName, 'auto');
+@@ -356,7 +359,11 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+       const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
+         ? 'modals.createFailMissingPerk'
+         : 'modals.createFailMaterials';
+-      Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
++      setCraftNotice({
++        title: tWeaponsAndArmorScreen('modals.createFailTitle'),
++        text: tWeaponsAndArmorScreen(reasonKey),
++        actions: [{ label: tWeaponsAndArmorScreen('modals.createNoticeDone'), onPress: () => setCraftNotice(null) }],
++      });
+       return;
+     }
+     // 357 (слово владельца: «не понятно, что произошло и из-за чего»):
+@@ -502,6 +509,14 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+     debugLog('weapon.mod.apply.modal', { modificationsArray: modificationsArray.map((m) => ({ id: m.id, slot: m.slot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier })), modifiedWeapon });
+     // Разрешаем применить даже с нулём модов — это означает снятие всех модов с оружия
+     onApplyModification(modifiedWeapon);
++    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно не
++    // закрывается молча — свежий weapon приходит с экрана, выбор
++    // перечитывается, а зелёная отметка показывает, что применилось.
++    const names = modificationsArray
++      .map((m) => getModDisplayName(m, weapon?.baseWeaponName ?? weapon?.name) || m.name)
++      .filter(Boolean);
++    setInstallNote(names.join(', ') || null);
++    setCraftReport(null);
+   };
+ 
+   const handleClose = () => {
+@@ -645,6 +660,13 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+             )}
+           </ScrollView>
+ 
++          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
++          {installNote && (
++            <Text style={styles.installNote}>
++              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
++            </Text>
++          )}
++
+           {/* Кнопки действий */}
+           <View style={styles.modalFooter}>
+             <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
+@@ -660,6 +682,26 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+         </View>
+       </View>
+ 
++      {/* 363: inline-вопрос/отказ — системный Alert на Web молчал. */}
++      <Modal visible={!!craftNotice} transparent animationType="fade" onRequestClose={() => setCraftNotice(null)}>
++        <View style={styles.reportOverlay}>
++          <View style={styles.reportDialog}>
++            <Text style={styles.reportTitle}>{craftNotice?.title ?? ''}</Text>
++            <Text style={styles.reportText}>{craftNotice?.text ?? ''}</Text>
++            <View style={styles.noticeActions}>
++              {(craftNotice?.actions ?? []).map((a, i) => (
++                <TouchableOpacity
++                  key={`a_${i}`}
++                  style={a.primary ? [styles.bigCraft, styles.noticeActionsBigCraft] : styles.qtyCancel}
++                  onPress={a.onPress}>
++                  <Text style={a.primary ? styles.bigCraftText : styles.qtyCancelText}>{a.label}</Text>
++                </TouchableOpacity>
++              ))}
++            </View>
++          </View>
++        </View>
++      </Modal>
++
+       {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
+           короткий Alert: «Проверка навыка не пройдена» без кубиков и без
+           судьбы материалов). */}
+diff --git a/modules/fallout/styles/WeaponModificationModal.styles.js b/modules/fallout/styles/WeaponModificationModal.styles.js
+index 84060a0..21190fc 100644
+--- a/modules/fallout/styles/WeaponModificationModal.styles.js
++++ b/modules/fallout/styles/WeaponModificationModal.styles.js
+@@ -120,6 +120,11 @@ const styles = StyleSheet.create({
+   reportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+   reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
+   reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
++  // 363: текст inline-вопроса/отказа, кнопки, зелёная отметка применения.
++  reportText: { color: '#000', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
++  noticeActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
++  noticeActionsBigCraft: { flex: 1, marginTop: 0 },
++  installNote: { color: '#16a34a', fontSize: 12, textAlign: 'center', paddingVertical: 6 },
+ });
+ 
+ export default styles;
+diff --git a/public/version.json b/public/version.json
+index 09815be..bd02c83 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "362",
++  "version": "363",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
