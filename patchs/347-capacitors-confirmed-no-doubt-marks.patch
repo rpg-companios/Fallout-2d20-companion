@@ -1,0 +1,228 @@
+diff --git a/__tests__/equipment/weapon-mod-craft-columns-346.test.js b/__tests__/equipment/weapon-mod-craft-columns-346.test.js
+index 0f7cfaf..c0667fa 100644
+--- a/__tests__/equipment/weapon-mod-craft-columns-346.test.js
++++ b/__tests__/equipment/weapon-mod-craft-columns-346.test.js
+@@ -39,9 +39,9 @@ describe('ПРИЁМОЧНЫЙ (патч 346): колонки крафта мо
+     expect(m.perk2).toBe('Science! 3');
+   });
+ 
+-  it('«?» аудита снят со всех материалов, кроме двух конденсаторных (вопрос 1)', () => {
++  it('«?» аудита снят со всех материалов (347: конденсаторы владелец оставил как есть)', () => {
+     const withQ = mods.filter((m) => typeof m.materials === 'string' && m.materials.includes('?'));
+-    expect(withQ.map((m) => m.id).sort()).toEqual(['mod_031', 'mod_032']);
++    expect(withQ).toEqual([]);
+   });
+ 
+   it('перки без «?» во всех 205 модах', () => {
+diff --git a/__tests__/equipment/weapon-mod-rarity-347.test.js b/__tests__/equipment/weapon-mod-rarity-347.test.js
+new file mode 100644
+index 0000000..9fd8085
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-rarity-347.test.js
+@@ -0,0 +1,34 @@
++// ПРИЁМОЧНЫЙ (патч 347)
++// Слово владельца: конденсаторы оставить как есть («?» снят с их материалов).
++// Ревизия редкости по присланным таблицам (с. 222): Large Mag и
++// Quick-Eject Mag — Uncommon (было «?Common»); «?» аудита снят со всех
++// колонок файла — знаков сомнения в данных модов оружия больше нет.
++import { describe, it, expect } from 'vitest';
++import data from '../../modules/fallout/data/equipment/weapon_mods.json';
++import en from '../../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
++
++const mods = Array.isArray(data) ? data : Object.values(data).find(Array.isArray);
++const enList = Array.isArray(en) ? en : Object.values(en).find(Array.isArray);
++const mod = (name) => mods.find((m) => m.id === enList.find((x) => x.name === name)?.id);
++
++describe('ПРИЁМОЧНЫЙ (патч 347): редкость по книге, «?» в данных нет', () => {
++  it('«Большой» и «Быстросъёмный» магазины — редкость Uncommon (было «?Common»)', () => {
++    expect(mod('Large Magazine').rarity).toBe('Uncommon');
++    expect(mod('Quick-Eject Mag').rarity).toBe('Uncommon');
++  });
++
++  it('конденсаторы оставлены как есть: материалы без «?», прежние числа', () => {
++    expect(mod('Full Capacitors').materials).toBe('Common x 6 Uncommon x 4 Rare x 2');
++    expect(mod('Capacitor Boosting Coil').materials).toBe('Common x 3');
++    expect(mod('Full Capacitors').complexity).toBe(5);
++    expect(mod('Capacitor Boosting Coil').complexity).toBe(2);
++  });
++
++  it('ни одного «?» ни в одном поле всех 205 модов', () => {
++    for (const m of mods) {
++      for (const [key, value] of Object.entries(m)) {
++        if (typeof value === 'string') expect(value.includes('?'), `${m.id}.${key}`).toBe(false);
++      }
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 6c67cdb..14636fe 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **346** · у владельца на main применено до **314**
++· последний сданный патч: **347** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -210,6 +210,13 @@
+   для конденсаторов колонки сложности НЕТ). Редкость «?»×9 — вне реви-
+   зии, зачистить при ветке. Далее: генератор рецептов → квадрат
+   «Оружие» → установка предмета с законом 343/344.
++- 347 — слово владельца: конденсаторы ОСТАВИТЬ КАК ЕСТЬ (сложности 5 и 2,
++  материалы подтверждены — «?» снят). Ревизия редкости по тем же табли-
++  цам (с. 222): Большой и Быстросъёмный магазины — Uncommon (было
++  «?Common»); «?» аудита снят со ВСЕХ полей weapon_mods.json — данных
++  со знаком сомнения больше нет. 9 «?»-редкостей были: Скорострельный,
++  Бронебойный, Настроенный, Экранированный, Большой, Быстросъёмный,
++  Большой быстросъёмный, Полные конденсаторы, Катушка усиления.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5360bbc..e23c292 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,18 @@
+ # Changelog
+ 
++---
++## Capacitors confirmed, no doubt marks left in weapon mods (patch 347)
++
++Owner's word: leave the capacitors as they are — materials and
++complexities are confirmed. Rarity was also checked against the same
++book tables.
++
++- "Large Magazine" and "Quick-Eject Mag": rarity Uncommon (the data said
++  Common — a mismatch with the table, now fixed).
++- The audit's doubt mark "?" was removed from all remaining fields: none
++  of the 205 weapon mods carry it any more.
++- Capacitors: complexities 5 and 2, materials unchanged.
++
+ ---
+ ## Weapon mod crafting columns revised against the book (patch 346)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 347be19..a9519e6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## Конденсаторы подтверждены, знаков сомнения в модах оружия больше нет (патч 347)
++
++Слово владельца: конденсаторы оставить как есть — материалы и сложности
++подтверждены. Заодно сверена редкость по тем же таблицам книги.
++
++- «Большой» и «Быстросъёмный» магазины: редкость Uncommon (в данных было
++  Common — расхождение с таблицей, исправлено).
++- Знак сомнения аудита «?» снят со всех оставшихся полей: в данных
++  205 модов оружия не осталось ни одного.
++- Конденсаторы: сложности 5 и 2, материалы прежние.
++
+ ---
+ ## Ревизия колонок крафта модов оружия по книге (патч 346)
+ 
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index 543e374..e6757a1 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -7,7 +7,7 @@
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
++    "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+     "weight": 1,
+@@ -34,7 +34,7 @@
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
++    "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 35,
+     "weight": 1,
+@@ -63,7 +63,7 @@
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
++    "rarity": "Uncommon",
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 27,
+     "weight": 1,
+@@ -625,7 +625,7 @@
+     "perk1": "Gun Nut 3",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
++    "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 37,
+     "weight": null,
+@@ -677,7 +677,7 @@
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Common",
++    "rarity": "Uncommon",
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": -3,
+     "weight": 1,
+@@ -716,7 +716,7 @@
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Common",
++    "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 8,
+     "weight": null,
+@@ -748,7 +748,7 @@
+     "perk1": "Gun Nut 2",
+     "perk2": "",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
++    "rarity": "Uncommon",
+     "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 23,
+     "weight": 1,
+@@ -960,8 +960,8 @@
+     "perk1": "Gun Nut 3",
+     "perk2": "Science! 2",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
+-    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
++    "rarity": "Uncommon",
++    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 40,
+     "weight": 3,
+     "applies_to_ids": [
+@@ -989,8 +989,8 @@
+     "perk1": "Gun Nut 4",
+     "perk2": "Science! 3",
+     "skill": "REPAIR",
+-    "rarity": "?Uncommon",
+-    "materials": "?Common x 3",
++    "rarity": "Uncommon",
++    "materials": "Common x 3",
+     "cost": 35,
+     "weight": 1,
+     "applies_to_ids": [
+diff --git a/public/version.json b/public/version.json
+index 29984dc..4febde1 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "346",
++  "version": "347",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
