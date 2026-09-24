@@ -53,6 +53,7 @@ export default function CraftingModal({ visible, onClose }) {
   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
   const [qty, setQty] = useState(1);
   const [report, setReport] = useState(null);
+  const [askZeroTarget, setAskZeroTarget] = useState(null); // 363: inline-вопрос про бросок
   const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
 
@@ -108,16 +109,10 @@ export default function CraftingModal({ visible, onClose }) {
   // отдельным окном (по умолчанию 1); одна — создать сразу.
   const onPressCreate = (row) => {
     // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
-    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+    // 363: системный Alert на Web — тихая заглушка, вопрос задаёт inline-диалог
+    // (как окно количества): «да» — бросаем, «нет» — автоуспех.
     if (row.zeroDifficulty) {
-      Alert.alert(
-        ui.askZeroTitle ?? '',
-        ui.askZeroText ?? '',
-        [
-          { text: ui.askZeroRoll ?? '', onPress: () => proceedCreate(row, 'roll') },
-          { text: ui.askZeroAuto ?? '', onPress: () => proceedCreate(row, 'auto') },
-        ],
-      );
+      setAskZeroTarget({ row });
       return;
     }
     proceedCreate(row, 'auto');
@@ -271,6 +266,29 @@ export default function CraftingModal({ visible, onClose }) {
             />
           )}
         </SafeAreaView>
+
+        {/* 363: вопрос про бросок при снятой сложности — inline-диалог
+            (системный Alert на Web молчит, кнопка выглядела мёртвой). */}
+        <Modal visible={!!askZeroTarget} transparent animationType="fade" onRequestClose={() => setAskZeroTarget(null)}>
+          <View style={styles.qtyOverlay}>
+            <View style={styles.qtyDialog}>
+              <Text style={styles.qtyText}>{ui.askZeroTitle ?? ''}</Text>
+              <Text style={styles.qtyText}>{ui.askZeroText ?? ''}</Text>
+              <View style={styles.qtyActions}>
+                <TouchableOpacity
+                  style={styles.qtyCancel}
+                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'auto'); }}>
+                  <Text style={styles.qtyCancelText}>{ui.askZeroAuto ?? ''}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'roll'); }}>
+                  <Text style={styles.bigCraftText}>{ui.askZeroRoll ?? ''}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Окно количества (318): «сколько штук создать?» с − и +, по умолчанию 1. */}
         <Modal visible={!!qtyTarget} transparent animationType="fade" onRequestClose={() => setQtyTarget(null)}>

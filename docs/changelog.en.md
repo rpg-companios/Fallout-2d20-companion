@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+## Craft and mod buttons respond on the web (patch 363)
+
+From the owner's bug batch, the root of the "silent" buttons: on the
+web build the system popups are silent stubs — and the "Roll the
+dice?" question at zero difficulty and the "missing perk/materials"
+messages relied on them. Both now ask inline in the window
+("Roll dice"/"Auto-success", "Done"), and applying mods no longer
+closes the window silently: the card updates in place and a green
+"Applied: …" note appears. Mod installation itself worked before (the
+italic bag items were installed mods).
+
 ## Fixed the equipment screen crash (patch 362)
 
 The "Cannot access before initialization" error when opening the

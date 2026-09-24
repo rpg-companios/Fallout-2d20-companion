@@ -963,7 +963,10 @@ const WeaponsAndArmorScreen = () => {
   const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
 
   const handleApplyModification = useCallback((modifiedWeapon) => {
-    handleCloseModificationModal();
+    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно НЕ
+    // закрывается молча — обновляем карточку, модалка перечитает выбор и
+    // покажет зелёную отметку применения; закрытие — крестиком.
+    setSelectedWeaponForModification(modifiedWeapon);
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 

@@ -120,6 +120,11 @@ const styles = StyleSheet.create({
   reportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
   reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
   reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  // 363: текст inline-вопроса/отказа, кнопки, зелёная отметка применения.
+  reportText: { color: '#000', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  noticeActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  noticeActionsBigCraft: { flex: 1, marginTop: 0 },
+  installNote: { color: '#16a34a', fontSize: 12, textAlign: 'center', paddingVertical: 6 },
 });
 
 export default styles;

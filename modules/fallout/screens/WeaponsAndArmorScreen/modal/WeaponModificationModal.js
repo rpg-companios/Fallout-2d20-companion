@@ -4,8 +4,7 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  ScrollView,
-  Alert
+  ScrollView
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
 import { shiftRange } from '../../../../../domain/range';
@@ -329,20 +328,24 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
+  // 363: inline-вопрос/отказ (системный Alert на Web — тихая заглушка:
+  // «бросить кубики?» и «не хватает перка/материалов» молчали).
+  const [craftNotice, setCraftNotice] = useState(null); // {title, text, actions:[{label, primary, onPress}]}
+  const [installNote, setInstallNote] = useState(null); // видимая отметка установки
 
   const handleCreateMod = (modId, modName) => {
     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
     // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
     const evaluation = craftingPreview(modId)?.evaluation;
     if (evaluation?.auto) {
-      Alert.alert(
-        tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
-        tWeaponsAndArmorScreen('modals.createAskZeroText'),
-        [
-          { text: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), onPress: () => runCreateMod(modId, modName, 'roll') },
-          { text: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => runCreateMod(modId, modName, 'auto') },
+      setCraftNotice({
+        title: tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
+        text: tWeaponsAndArmorScreen('modals.createAskZeroText'),
+        actions: [
+          { label: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'auto'); } },
+          { label: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), primary: true, onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'roll'); } },
         ],
-      );
+      });
       return;
     }
     runCreateMod(modId, modName, 'auto');
@@ -356,7 +359,11 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
       const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
         ? 'modals.createFailMissingPerk'
         : 'modals.createFailMaterials';
-      Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
+      setCraftNotice({
+        title: tWeaponsAndArmorScreen('modals.createFailTitle'),
+        text: tWeaponsAndArmorScreen(reasonKey),
+        actions: [{ label: tWeaponsAndArmorScreen('modals.createNoticeDone'), onPress: () => setCraftNotice(null) }],
+      });
       return;
     }
     // 357 (слово владельца: «не понятно, что произошло и из-за чего»):
@@ -502,6 +509,14 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
     debugLog('weapon.mod.apply.modal', { modificationsArray: modificationsArray.map((m) => ({ id: m.id, slot: m.slot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier })), modifiedWeapon });
     // Разрешаем применить даже с нулём модов — это означает снятие всех модов с оружия
     onApplyModification(modifiedWeapon);
+    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно не
+    // закрывается молча — свежий weapon приходит с экрана, выбор
+    // перечитывается, а зелёная отметка показывает, что применилось.
+    const names = modificationsArray
+      .map((m) => getModDisplayName(m, weapon?.baseWeaponName ?? weapon?.name) || m.name)
+      .filter(Boolean);
+    setInstallNote(names.join(', ') || null);
+    setCraftReport(null);
   };
 
   const handleClose = () => {
@@ -645,6 +660,13 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             )}
           </ScrollView>
 
+          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
+          {installNote && (
+            <Text style={styles.installNote}>
+              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
+            </Text>
+          )}
+
           {/* Кнопки действий */}
           <View style={styles.modalFooter}>
             <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
@@ -659,6 +681,26 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           </View>
         </View>
       </View>
+
+      {/* 363: inline-вопрос/отказ — системный Alert на Web молчал. */}
+      <Modal visible={!!craftNotice} transparent animationType="fade" onRequestClose={() => setCraftNotice(null)}>
+        <View style={styles.reportOverlay}>
+          <View style={styles.reportDialog}>
+            <Text style={styles.reportTitle}>{craftNotice?.title ?? ''}</Text>
+            <Text style={styles.reportText}>{craftNotice?.text ?? ''}</Text>
+            <View style={styles.noticeActions}>
+              {(craftNotice?.actions ?? []).map((a, i) => (
+                <TouchableOpacity
+                  key={`a_${i}`}
+                  style={a.primary ? [styles.bigCraft, styles.noticeActionsBigCraft] : styles.qtyCancel}
+                  onPress={a.onPress}>
+                  <Text style={a.primary ? styles.bigCraftText : styles.qtyCancelText}>{a.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
           короткий Alert: «Проверка навыка не пройдена» без кубиков и без
