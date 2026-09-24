@@ -1,0 +1,496 @@
+diff --git a/__tests__/equipment/weapon-mod-craft-report-357.test.js b/__tests__/equipment/weapon-mod-craft-report-357.test.js
+new file mode 100644
+index 0000000..132e62a
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-craft-report-357.test.js
+@@ -0,0 +1,111 @@
++// ПРИЁМОЧНЫЙ (патч 357): отчёт о крафте в модалке установки модов — тот же,
++// что в окне крафта. Слово владельца: «не хватает отчёта о крафте… Materials
++// списались, кнопка потускнела и всё. И в этой ситуации не понятно, что
++// произошло и из-за чего?!» — теперь любой исход (провал проверки со сгоревшими
++// материалами, успех, осложнения) показывается отчётом buildCraftReport:
++// арифметика проверки, кубики и исход, судьба материалов, время.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
++import { buildCraftReport } from '../../modules/fallout/crafting/windowModel';
++
++const state = () => useCharacterStore.getState();
++const seed = (id, quantity = 1) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId: id, quantity } },
++  }));
++};
++
++// mod_001: сложность 3, Gun Nut 1, REPAIR, обычный ×4 + необычный ×2.
++const singleReport = ({ skill, rolls, zeroDifficulty }) => {
++  const run = craftRecipe('mod_001', { rollD20: () => rolls.shift() ?? 1 }, {
++    deferTime: true,
++    ...(zeroDifficulty ? { zeroDifficulty } : {}),
++  });
++  return { run, report: buildCraftReport('mod_001', { attempts: [run], stoppedEarly: 0 }) };
++};
++
++beforeEach(() => {
++  state().resetCharacterStore();
++  useAppSettingsStore.getState().setValue('craftFailLossGear', true);
++  useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++  useCharacterStore.setState((prev) => ({
++    skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 2, total: 2 } },
++  }));
++});
++
++afterEach(async () => {
++  useAppSettingsStore.getState().setValue('craftFailLossGear', false);
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 357): отчёт о крафте в модалке установки модов', () => {
++  it('провал проверки со сгоревшими материалами объясняется отчётом', () => {
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    // сложность 3 − навык 2 = 1; две двадцатки = автопровал + осложнения
++    const { run, report } = singleReport({ skill: 2, rolls: [20, 20] });
++    expect(run.done).toBe(false);
++    expect(run.stage).toBe('check');
++
++    const text = report.lines.join('\n');
++    expect(text).toContain('= '); // строка арифметики проверки (цель)
++    expect(text).toContain('Rolled 20, 20. Failed'); // кубики и исход
++    expect(text).toContain('Materials burned'); // судьба материалов — ГЛАВНОЕ
++    expect(text).toContain('Spent:'); // что именно списано
++    expect(report.pendingTime).toBeTruthy();
++    expect(report.pendingTime.hasSuccess).toBe(false);
++  });
++
++  it('успех: кубики, что получено; время ждёт решения про 2 ОД', () => {
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    // сложность снята навыком (REPAIR 6 ≥ 3) — добровольный бросок, криты
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++    const { run, report } = singleReport({ skill: 6, rolls: [1, 1], zeroDifficulty: 'roll' });
++    expect(run.done).toBe(true);
++
++    const text = report.lines.join('\n');
++    expect(text).toContain('Rolled 1, 1. Successes 4'); // 1 = крит, 2 успеха за кубик
++    expect(text).toContain('Gained:'); // что положено в сумку
++    expect(report.pendingTime?.hasSuccess).toBe(true);
++
++    // как в модалке: «да» на 2 ОД — время успеха вдвое (60 → 30 минут)
++    const settled = settleCraftTime('mod_001', run, { spendActionPoints: true });
++    expect(settled.minutes).toBe(30);
++  });
++
++  it('провал без успеха: 2 ОД не спрашиваются — полное время сразу', () => {
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    const { run, report } = singleReport({ skill: 2, rolls: [20, 20] });
++    expect(report.pendingTime.hasSuccess).toBe(false);
++    const settled = settleCraftTime('mod_001', run, { spendActionPoints: false });
++    expect(settled.minutes).toBe(120); // базовый час + 2 × 30 за осложнения
++  });
++
++  it('оба окна используют один компонент отчёта; отказы до проверки — прежние Alert', () => {
++    const modal = readFileSync('modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js', 'utf8');
++    const windowSrc = readFileSync('modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
++    const shared = readFileSync('modules/fallout/crafting/CraftReportView.js', 'utf8');
++
++    expect(modal).toContain('CraftReportView');
++    expect(modal).toContain('buildCraftReport');
++    expect(modal).toContain('reportOverlay');
++    expect(windowSrc).toContain('CraftReportView');
++    expect(shared).toContain('apQuestion'); // вопрос про 2 ОД в общем виде
++    expect(shared).toContain('doneBtn');
++
++    // 352: отказ ДО проверки (перк/материалы) — короткий Alert, как был
++    expect(modal).toContain('createFailMissingPerk');
++    expect(modal).toContain('createFailMaterials');
++    // провал ПРОВЕРКИ больше не молчаливый Alert — идёт в отчёт с кубиками
++    expect(modal).not.toContain('createFailCheck');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index ea0227d..60ede58 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **356** · у владельца на main применено до **314**
++· последний сданный патч: **357** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -270,6 +270,20 @@
+   «броска не было»; craftRecipe проксирует опцию. UI: вопрос в окне
+   крафта (CraftingModal, один на пачку) и у кнопки «Создать» модалки
+   оружия (craftingPreview → evaluation.auto). Тест zero-difficulty-ask-356.
++- 357 — ОТЧЁТ О КРАФТЕ В МОДАЛКЕ УСТАНОВКИ МОДОВ (жалоба владельца:
++  «материалы списались, кнопка потускнела и всё… не понятно, что
++  произошло»). Общий компонент CraftReportView
++  (modules/fallout/crafting/, стили styles/CraftReportView.styles — копия
++  отчёта окна крафта 265/318/323); окно крафта рисует отчёт им же
++  (разметка 1:1). Модалка оружия: отказ ДО проверки (перк/материалы) —
++  прежние Alert 352; провал проверки и успех — отчёт buildCraftReport
++  (одиночный прогон оборачивается {attempts:[run], stoppedEarly:0}):
++  арифметика, кубики, сгоревшие материалы, время + вопрос про 2 ОД
++  (324: спрашивается только при успехе и пуле ≥ 2, иначе полное время
++  сразу). Заголовок отчёта — имя мода. Попутно исправлен скрытый краш
++  buildCraftReport: «ОД: +N» читал d.ui.apEarnedLine вместо
++  d.apEarnedLine (любой успех с лишними успехами ронял отчёт — и в окне
++  крафта тоже). Тест weapon-mod-craft-report-357 (4).
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7f503cd..7076142 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,16 @@
+ # Changelog
+ 
+ ---
++## Craft report in the mod installation modal (patch 357)
++
++Owner's feedback: crafting a mod with the "Create" button left it
++unclear what had happened. The same report as in the crafting window is
++now shown: the check arithmetic, rolled dice and outcome, what was
++gained and what happened to the materials (including "burned" on a
++failure), the time; on success — the 2 AP question. A refusal before
++the check (perk, materials) keeps the short message. Also fixed a rare
++crash when a check earned more successes than required.
++
+ ## Difficulty 0: the game asks about rolling (patch 356)
+ 
+ Owner's word: when difficulty is cleared by skill (difficulty 0), the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 41c1143..7c0576e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Отчёт о крафте в модалке установки модов (патч 357)
++
++По замечанию владельца: при создании мода кнопкой «Создать» было не
++понятно, что произошло. Теперь показывается тот же отчёт, что и в окне
++крафта: арифметика проверки, выпавшие кубики и исход, что получено и
++что случилось с материалами (в том числе «сгорели» при провале),
++время; при успехе — вопрос про 2 ОД. Отказ до проверки (перк,
++материалы) — прежнее короткое сообщение. Исправлен редкий сбой, когда
++отчёт падал, если проверка давала больше успехов, чем требовалось.
++
+ ## Сложность 0: игра спрашивает про бросок кубиков (патч 356)
+ 
+ Слово владельца: если сложность снята навыком (сложность 0), игра
+diff --git a/modules/fallout/crafting/CraftReportView.js b/modules/fallout/crafting/CraftReportView.js
+new file mode 100644
+index 0000000..08ac294
+--- /dev/null
++++ b/modules/fallout/crafting/CraftReportView.js
+@@ -0,0 +1,60 @@
++// Общий отчёт о крафте (патч 357, слово владельца: «не хватает отчёта о
++// крафте» в модалке установки модов). Один и тот же вид в окне крафта и в
++// модалке установки модов: строка арифметики проверки, исход с кубиками
++// (или автоуспех), что получено/потрачено/сгорело, время и вопрос про 2 ОД
++// (323/324). Данные считает buildCraftReport (windowModel) — здесь только
++// отрисовка; строки берутся из словаря крафта (ru/en).
++import React from 'react';
++import { View, Text, TouchableOpacity } from 'react-native';
++import { craftDict, craftFormat, formatCraftMinutes } from './windowModel';
++import { getActionPoints } from '../../../domain/actionPoints';
++import s from '../styles/CraftReportView.styles';
++
++// report — результат buildCraftReport (плюс run для решения про 2 ОД);
++// settledTime — итог applyActivityMinutes после решения про ОД;
++// onSettleTime(spendActionPoints) — «да/нет» на вопрос про 2 ОД;
++// onDone — «Готово», закрыть отчёт.
++export default function CraftReportView({ report, settledTime, onSettleTime, onDone }) {
++  const ui = craftDict().ui;
++  if (!report) return null;
++  return (
++    <View style={s.list}>
++      <View style={s.resultBox}>
++        {report.lines.map((line, i) => (
++          <Text key={`r_${i}`} style={s.resultLine}>{line}</Text>
++        ))}
++        {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
++        {settledTime && (
++          <Text style={s.resultLine}>
++            {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
++              + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
++          </Text>
++        )}
++      </View>
++
++      {report.pendingTime && settledTime === null && (
++        <View style={s.apBox}>
++          <Text style={s.apQuestion}>
++            {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
++          </Text>
++          <View style={s.qtyActions}>
++            <TouchableOpacity
++              style={[s.bigCraft, s.qtyActionsBigCraft]}
++              onPress={() => onSettleTime(true)}>
++              <Text style={s.bigCraftText}>{ui.apYes ?? ''}</Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              style={s.qtyCancel}
++              onPress={() => onSettleTime(false)}>
++              <Text style={s.qtyCancelText}>{ui.apNo ?? ''}</Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      )}
++
++      <TouchableOpacity style={s.doneBtn} onPress={onDone}>
++        <Text style={s.doneBtnText}>{ui.done ?? ''}</Text>
++      </TouchableOpacity>
++    </View>
++  );
++}
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index fbf9117..42c06aa 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -312,7 +312,7 @@ export const buildCraftReport = (recipeId, run) => {
+   const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
+   const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
+   if (apGained > 0 && apPool != null) {
+-    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
++    lines.push(fmt(d.apEarnedLine, { n: apGained, pool: apPool }));
+   }
+   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
+   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index cb52144..925c683 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -21,10 +21,11 @@ import {
+   buildCraftReport,
+   craftDict,
+   craftFormat,
+-  formatCraftMinutes,
+ } from '../../../crafting/windowModel';
+ import { settleCraftTime } from '../../../crafting/operations';
+ import { getActionPoints } from '../../../../../domain/actionPoints';
++// 357: отчёт о крафте — общий компонент окна крафта и модалки установки модов.
++import CraftReportView from '../../../crafting/CraftReportView';
+ 
+ // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
+ const CATEGORY_ICONS = {
+@@ -262,44 +263,12 @@ export default function CraftingModal({ visible, onClose }) {
+           )}
+ 
+           {report && (
+-            <View style={styles.list}>
+-              <View style={styles.resultBox}>
+-                {report.lines.map((line, i) => (
+-                  <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
+-                ))}
+-                {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
+-                {settledTime && (
+-                  <Text style={styles.resultLine}>
+-                    {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
+-                      + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
+-                  </Text>
+-                )}
+-              </View>
+-
+-              {report.pendingTime && settledTime === null && (
+-                <View style={styles.apBox}>
+-                  <Text style={styles.apQuestion}>
+-                    {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
+-                  </Text>
+-                  <View style={styles.qtyActions}>
+-                    <TouchableOpacity
+-                      style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+-                      onPress={() => settleTimeDecision(true)}>
+-                      <Text style={styles.bigCraftText}>{ui.apYes ?? ''}</Text>
+-                    </TouchableOpacity>
+-                    <TouchableOpacity
+-                      style={styles.qtyCancel}
+-                      onPress={() => settleTimeDecision(false)}>
+-                      <Text style={styles.qtyCancelText}>{ui.apNo ?? ''}</Text>
+-                    </TouchableOpacity>
+-                  </View>
+-                </View>
+-              )}
+-
+-              <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
+-                <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
+-              </TouchableOpacity>
+-            </View>
++            <CraftReportView
++              report={report}
++              settledTime={settledTime}
++              onSettleTime={settleTimeDecision}
++              onDone={finishReport}
++            />
+           )}
+         </SafeAreaView>
+ 
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 469a75a..b932f7f 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -16,8 +16,12 @@ import styles from '../../../styles/WeaponModificationModal.styles';
+ import { debugLog } from '../../../../../src/debug/falloutDebug';
+ import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+ import useCharacterStore from '../../../../../src/store/characterStore';
+-import { buildModCraftHint, formatCraftMinutes, craftBatch } from '../../../crafting/windowModel';
++import { buildModCraftHint, buildCraftReport } from '../../../crafting/windowModel';
+ import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
++import { getActionPoints } from '../../../../../domain/actionPoints';
++// 357: отчёт о крафте — тот же компонент, что в окне крафта (кубики, исход,
++// сгоревшие материалы, время, вопрос про 2 ОД).
++import CraftReportView from '../../../crafting/CraftReportView';
+ 
+ 
+ function toNumber(v) {
+@@ -323,6 +327,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+   const storeItems = useCharacterStore((s) => s.items);
+   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+ 
++  const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
++  const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
++
+   const handleCreateMod = (modId, modName) => {
+     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
+     // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+@@ -343,25 +350,37 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+ 
+   const runCreateMod = (modId, modName, zeroDifficulty) => {
+     const run = craftRecipe(modId, {}, { deferTime: true, zeroDifficulty });
+-    if (!run.done) {
+-      // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
+-      // missing-material), stage 'check' — непройденная проверка.
++    if (run.stage === 'gate' || run.stage === 'store') {
++      // 352: отказ ДО проверки — короткое объяснение (перк/материалы).
+       const reasons = Array.isArray(run.reasons) ? run.reasons : [];
+       const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
+         ? 'modals.createFailMissingPerk'
+-        : reasons.some((r) => r?.code === 'missing-material')
+-          ? 'modals.createFailMaterials'
+-          : run.stage === 'check' ? 'modals.createFailCheck' : 'modals.createFailTitle';
++        : 'modals.createFailMaterials';
+       Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
+       return;
+     }
+-    // 323: время готовки применяется сразу (полное; вопрос про 2 ОД — только
+-    // в окне крафта с его отчётом, здесь — компактный сценарий).
+-    const settled = settleCraftTime(modId, run, { spendActionPoints: false });
+-    Alert.alert(
+-      modName || modId,
+-      `${tWeaponsAndArmorScreen('modals.createDone')} ${formatCraftMinutes(settled.minutes)}`,
+-    );
++    // 357 (слово владельца: «не понятно, что произошло и из-за чего»):
++    // дальше — тот же отчёт, что в окне крафта: арифметика проверки, кубики
++    // и исход, что получено/сгорело, время; при успехе — вопрос про 2 ОД
++    // (324). Если ОД в пуле меньше двух — время списывается сразу, полное.
++    const rep = buildCraftReport(modId, { attempts: [run], stoppedEarly: 0 });
++    let settled = null;
++    if (rep.pendingTime && (!rep.pendingTime.hasSuccess || getActionPoints() < 2)) {
++      settled = settleCraftTime(modId, run, { spendActionPoints: false });
++    }
++    setSettledTime(settled);
++    setCraftReport({ ...rep, run, title: modName || rep.title });
++  };
++
++  // Решение про 2 ОД (323/324) — как в окне крафта.
++  const settleCraftTimeDecision = (spendActionPoints) => {
++    const settled = settleCraftTime(craftReport.recipeId, craftReport.run, { spendActionPoints });
++    setSettledTime(settled);
++  };
++
++  const finishCraftReport = () => {
++    setCraftReport(null);
++    setSettledTime(null);
+   };
+ 
+   // Обновляем modifiedWeapon при изменении weapon
+@@ -640,6 +659,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+           </View>
+         </View>
+       </View>
++
++      {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
++          короткий Alert: «Проверка навыка не пройдена» без кубиков и без
++          судьбы материалов). */}
++      <Modal visible={!!craftReport} transparent animationType="fade" onRequestClose={finishCraftReport}>
++        <View style={styles.reportOverlay}>
++          <View style={styles.reportDialog}>
++            <Text style={styles.reportTitle}>{craftReport?.title ?? ''}</Text>
++            <CraftReportView
++              report={craftReport}
++              settledTime={settledTime}
++              onSettleTime={settleCraftTimeDecision}
++              onDone={finishCraftReport}
++            />
++          </View>
++        </View>
++      </Modal>
+     </Modal>
+   );
+ };
+diff --git a/modules/fallout/styles/CraftReportView.styles.js b/modules/fallout/styles/CraftReportView.styles.js
+new file mode 100644
+index 0000000..8e6303e
+--- /dev/null
++++ b/modules/fallout/styles/CraftReportView.styles.js
+@@ -0,0 +1,20 @@
++// Стили общего отчёта о крафте (патч 357). Значения — точная копия отчёта
++// окна крафта (styles/CraftingModal.styles.js, патчи 265/318/323): модалка
++// установки модов показывает ровно тот же отчёт, что и окно крафта.
++import { StyleSheet } from 'react-native';
++
++export default StyleSheet.create({
++  list: { flex: 1, paddingHorizontal: 12 },
++  resultBox: { backgroundColor: 'rgb(245, 245, 245)', borderRadius: 10, padding: 12, marginTop: 12 },
++  resultLine: { color: '#000', fontSize: 13, lineHeight: 19 },
++  apBox: { marginTop: 12 },
++  apQuestion: { color: '#000', fontSize: 13, lineHeight: 19 },
++  qtyActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
++  bigCraft: { backgroundColor: '#16a34a', borderRadius: 10, padding: 12, marginTop: 14, alignItems: 'center' },
++  bigCraftText: { color: '#fff', fontSize: 15, fontWeight: '700' },
++  qtyActionsBigCraft: { flex: 1, marginTop: 0 },
++  qtyCancel: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
++  qtyCancelText: { color: '#444', fontSize: 14 },
++  doneBtn: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 10, marginTop: 12, alignItems: 'center' },
++  doneBtnText: { color: '#444', fontSize: 14 },
++});
+diff --git a/modules/fallout/styles/WeaponModificationModal.styles.js b/modules/fallout/styles/WeaponModificationModal.styles.js
+index 1e5cf41..84060a0 100644
+--- a/modules/fallout/styles/WeaponModificationModal.styles.js
++++ b/modules/fallout/styles/WeaponModificationModal.styles.js
+@@ -115,6 +115,11 @@ const styles = StyleSheet.create({
+   },
+   disabledButton: { backgroundColor: '#ccc' },
+   applyButtonText: { color: 'white', fontWeight: 'bold' },
++
++  // 357: диалог отчёта о крафте — как окно количества в окне крафта (318).
++  reportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++  reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
++  reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+ });
+ 
+ export default styles;
+diff --git a/public/version.json b/public/version.json
+index 7469c9c..7e4d3b4 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "356",
++  "version": "357",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
