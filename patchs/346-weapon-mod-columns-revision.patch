@@ -1,0 +1,274 @@
+diff --git a/__tests__/equipment/weapon-mod-craft-columns-346.test.js b/__tests__/equipment/weapon-mod-craft-columns-346.test.js
+new file mode 100644
+index 0000000..0f7cfaf
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-craft-columns-346.test.js
+@@ -0,0 +1,53 @@
++// ПРИЁМОЧНЫЙ (патч 346)
++// Ревизия колонок крафта модов оружия по присланным владельцем таблицам книги
++// (стр. 222–223): Большой магазин, Быстросъёмный магазин, конденсаторы.
++// Знак «?» аудита снят со всех подтверждённых колонок; конденсаторные
++// материалы остаются под «?» до слова владельца о их сложности.
++import { describe, it, expect } from 'vitest';
++import data from '../../modules/fallout/data/equipment/weapon_mods.json';
++import en from '../../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
++
++const mods = Array.isArray(data) ? data : Object.values(data).find(Array.isArray);
++const enList = Array.isArray(en) ? en : Object.values(en).find(Array.isArray);
++const idByName = (name) => enList.find((m) => m.name === name)?.id;
++const mod = (name) => mods.find((m) => m.id === idByName(name));
++
++describe('ПРИЁМОЧНЫЙ (патч 346): колонки крафта модов оружия — по книге', () => {
++  it('«Большой» магазин: сложность 4, Фанатик оружия 1 (было 3 и Фанатик 2)', () => {
++    const m = mod('Large Magazine');
++    expect(m.complexity).toBe(4);
++    expect(m.perk1).toBe('Gun Nut 1');
++    expect(m.materials).toBe('Common x 5 Uncommon x 3'); // кривая сложности 4
++  });
++
++  it('«Быстросъёмный» магазин: сложность 5, материалы — кривая 5', () => {
++    const m = mod('Quick-Eject Mag');
++    expect(m.complexity).toBe(5);
++    expect(m.materials).toBe('Common x 6 Uncommon x 4 Rare x 2');
++    expect(m.perk1).toBe('Gun Nut 1');
++  });
++
++  it('«Полные конденсаторы»: оба перка книги (Фанатик оружия 3 + Наука! 2)', () => {
++    const m = mod('Full Capacitors');
++    expect(m.perk1).toBe('Gun Nut 3');
++    expect(m.perk2).toBe('Science! 2');
++  });
++
++  it('«Катушка усиления конденсатора»: Фанатик оружия 4 + Наука! 3', () => {
++    const m = mod('Capacitor Boosting Coil');
++    expect(m.perk1).toBe('Gun Nut 4');
++    expect(m.perk2).toBe('Science! 3');
++  });
++
++  it('«?» аудита снят со всех материалов, кроме двух конденсаторных (вопрос 1)', () => {
++    const withQ = mods.filter((m) => typeof m.materials === 'string' && m.materials.includes('?'));
++    expect(withQ.map((m) => m.id).sort()).toEqual(['mod_031', 'mod_032']);
++  });
++
++  it('перки без «?» во всех 205 модах', () => {
++    for (const m of mods) {
++      expect(String(m.perk1 || '')).not.toContain('?');
++      expect(String(m.perk2 || '')).not.toContain('?');
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 49bb7f8..6c67cdb 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **345** · у владельца на main применено до **314**
++· последний сданный патч: **346** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -200,6 +200,16 @@
+   надевает сам) — «виртуального костюма кита» НЕТ. Реальный случай
+   слота без ключа экземпляра — только старые сохранения/перенос файлом.
+   Правки ТОЛЬКО в документах, код не менялся.
++- 346 — НАЧАТО КРАФТ-ВЕТКА МОДОВ ОРУЖИЯ (решения владельца: выпускать 152
++  мода с готовыми колонками, включая 48 уникальных; 53 без колонок — в
++  обменник; «?»-строки — на ревизию). Владелец прислал таблицы книги
++  (с. 222–223) — ревизия проведена: Большой магазин (сложность 4, Фанатик
++  оружия 1), Быстросъёмный (сложность 5, кривая 5), конденсаторы (пер-
++  ки Gun Nut + Science! парой). «?» снят с перков всех 205 и материалов
++  кроме конденсаторных (mod_031/032 — ждут слова о сложности: в книге
++  для конденсаторов колонки сложности НЕТ). Редкость «?»×9 — вне реви-
++  зии, зачистить при ветке. Далее: генератор рецептов → квадрат
++  «Оружие» → установка предмета с законом 343/344.
+ - Установщик патчей — «истина в содержимом файлов» (309), после установки
+   печатает готовую команду закрепления коммитом.
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 6c7d60d..5360bbc 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,20 @@
+ # Changelog
+ 
++---
++## Weapon mod crafting columns revised against the book (patch 346)
++
++The owner provided the printed tables (pp. 222–223); the data was checked
++row by row and four mismatches were fixed.
++
++- "Large Magazine": complexity 4 (was 3), "Gun Nut 1" (was 2).
++- "Quick-Eject Mag": complexity 5 (was 3), materials follow the
++  complexity-5 curve — Common ×6, Uncommon ×4, Rare ×2.
++- "Full Capacitors" and "Capacitor Boosting Coil": the book's perk
++  requirements are pairs, "Gun Nut" + "Science!" (3+2 and 4+3).
++- The audit's doubt mark "?" was removed from confirmed rows; the
++  materials of the two capacitor mods await the owner's word (the book
++  has no complexity column for capacitors).
++
+ ---
+ ## Clarification: creation-kit clothing does have its own item (patch 345)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2b3eec6..347be19 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,20 @@
+ # История изменений
+ 
++---
++## Ревизия колонок крафта модов оружия по книге (патч 346)
++
++Владелец прислал печатные таблицы (стр. 222–223) — данные сверены
++построчно, четыре расхождения исправлены.
++
++- «Большой» магазин: сложность 4 (было 3), «Фанатик оружия 1» (было 2).
++- «Быстросъёмный» магазин: сложность 5 (было 3), материалы по кривой
++  сложности 5 — Обычные ×6, Необычные ×4, Редкие ×2.
++- «Полные конденсаторы» и «Катушка усиления»: perk-требования книги —
++  парой, «Фанатик оружия» + «Наука!» (3+2 и 4+3).
++- Знак сомнения аудита «?» снят с подтверждённых строк; материалы двух
++  конденсаторных модов ждут слова владельца (в книге для конденсаторов
++  колонки сложности нет).
++
+ ---
+ ## Уточнение: у одежды из комплекта создания есть свой предмет (патч 345)
+ 
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index fcf8af0..543e374 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -4,11 +4,11 @@
+     "id": "mod_001",
+     "slot": "Receiver",
+     "complexity": 3,
+-    "perk1": "?Gun Nut 1",
++    "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+-    "materials": "?Common x 4 Uncommon x 2",
++    "materials": "Common x 4 Uncommon x 2",
+     "cost": 30,
+     "weight": 1,
+     "applies_to_ids": [
+@@ -31,11 +31,11 @@
+     "id": "mod_002",
+     "slot": "Receiver",
+     "complexity": 4,
+-    "perk1": "?Gun Nut 2",
++    "perk1": "Gun Nut 2",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+-    "materials": "?Common x 5 Uncommon x 3",
++    "materials": "Common x 5 Uncommon x 3",
+     "cost": 35,
+     "weight": 1,
+     "applies_to_ids": [
+@@ -60,11 +60,11 @@
+     "id": "mod_003",
+     "slot": "Receiver",
+     "complexity": 3,
+-    "perk1": "?Gun Nut 1",
++    "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+-    "materials": "?Common x 4 Uncommon x 2",
++    "materials": "Common x 4 Uncommon x 2",
+     "cost": 27,
+     "weight": 1,
+     "applies_to_ids": [
+@@ -626,7 +626,7 @@
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+-    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
++    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 37,
+     "weight": null,
+     "applies_to_ids": [
+@@ -673,12 +673,12 @@
+     "modType": "weapon",
+     "id": "mod_023",
+     "slot": "Magazine",
+-    "complexity": 3,
+-    "perk1": "Gun Nut 2",
++    "complexity": 4,
++    "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Common",
+-    "materials": "?Common x 5 Uncommon x 3",
++    "materials": "Common x 5 Uncommon x 3",
+     "cost": -3,
+     "weight": 1,
+     "applies_to_ids": [
+@@ -712,12 +712,12 @@
+     "modType": "weapon",
+     "id": "mod_024",
+     "slot": "Magazine",
+-    "complexity": 3,
++    "complexity": 5,
+     "perk1": "Gun Nut 1",
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Common",
+-    "materials": "?Common x 4 Uncommon x 2",
++    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 8,
+     "weight": null,
+     "applies_to_ids": [
+@@ -749,7 +749,7 @@
+     "perk2": "",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+-    "materials": "?Common x 6 Uncommon x 4 Rare x 2",
++    "materials": "Common x 6 Uncommon x 4 Rare x 2",
+     "cost": 23,
+     "weight": 1,
+     "applies_to_ids": [
+@@ -957,8 +957,8 @@
+     "id": "mod_031",
+     "slot": "Capacitor",
+     "complexity": 5,
+-    "perk1": "?Science! 2",
+-    "perk2": "",
++    "perk1": "Gun Nut 3",
++    "perk2": "Science! 2",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 6 Uncommon x 4 Rare x 2",
+@@ -986,8 +986,8 @@
+     "id": "mod_032",
+     "slot": "Capacitor",
+     "complexity": 2,
+-    "perk1": "?Science! 1",
+-    "perk2": "",
++    "perk1": "Gun Nut 4",
++    "perk2": "Science! 3",
+     "skill": "REPAIR",
+     "rarity": "?Uncommon",
+     "materials": "?Common x 3",
+@@ -5723,4 +5723,4 @@
+       }
+     ]
+   }
+-]
+\ No newline at end of file
++]
+diff --git a/public/version.json b/public/version.json
+index b5c4e24..29984dc 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "345",
++  "version": "346",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
