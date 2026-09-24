@@ -97,7 +97,13 @@
     "previewQualities": "Качества",
     "errorTitle": "Ошибка",
     "errorSelectMod": "Выберите хотя бы одну модификацию",
-    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)"
+    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)",
+    "create": "Создать",
+    "createDone": "Создано. Времени прошло:",
+    "createFailTitle": "Не удалось создать",
+    "createFailMissingPerk": "Требуется перк из строки требований",
+    "createFailMaterials": "Не хватает материалов",
+    "createFailCheck": "Проверка навыка не пройдена"
   },
   "displayToggle": {
     "spoilers": "Список (спойлеры)",

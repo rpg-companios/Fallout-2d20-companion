@@ -82,6 +82,49 @@ const itemName = (catalog, id, typeHint) => {
   return entry?.name ?? id;
 };
 
+/**
+ * 352 (план §2.10, первая очередь — модалка оружия): состояние кнопки
+ * «Создать» на позиции мода. Чистая функция: рецепт из данных, наличие в
+ * сумке и «хватает ли материалов» считаются из инвентаря (только свободные
+ * предметы — установленные/надетые материалами не являются). Кнопка зелёная
+ * (enabled) когда материалов хватает — правило владельца; перк проверяется
+ * при нажатии (движок), но его требование видно в строке.
+ * null — рецепта у мода нет (безколоночный): кнопки не будет.
+ */
+export const buildModCraftHint = (modId, { items = {}, selectedPerks = [] } = {}) => {
+  const recipe = getCraftingRecipeById(modId);
+  if (!recipe) return null;
+  const have = new Map();
+  for (const item of Object.values(items || {})) {
+    if (!item || item.installedOn || item.equipped) continue;
+    const id = item.weaponId || item.id;
+    if (!id) continue;
+    have.set(id, (have.get(id) || 0) + (Number(item.quantity) || 1));
+  }
+  const d = dict().ui;
+  const parts = [];
+  for (const perk of recipe.requires.perks || []) {
+    parts.push(`${perkName(perk.perkId)} ${perk.rank}`);
+  }
+  const rarityLabel = {
+    item_common_materials: d.rarityCommon,
+    item_uncommon_materials: d.rarityUncommon,
+    item_rare_materials: d.rarityRare,
+  };
+  let enabled = true;
+  for (const material of recipe.materials) {
+    const owned = have.get(material.itemId) || 0;
+    parts.push(`${rarityLabel[material.itemId] || material.itemId} ×${material.count}`);
+    if (owned < material.count) enabled = false;
+  }
+  parts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
+  return {
+    inInventory: (have.get(modId) || 0) > 0,
+    enabled,
+    line: parts.join(' · '),
+  };
+};
+
 export const formatCraftMinutes = (minutes) => {
   const d = dict().ui;
   if (minutes % 1440 === 0) return fmt(d.timeDays, { n: minutes / 1440 });

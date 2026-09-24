@@ -214,8 +214,13 @@ export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp =
   // время идёт полное («больше 6 потратить не выйдет…», 324).
   const apSpend = halveForAp ? spendActionPoints(2) : { ok: false, pool: getActionPoints() };
   const halved = halveForAp && apSpend.ok;
+  // 352: обе формы прогона — пачка (attempts[]) и одиночный craftRecipe
+  // (time.pending на верхнем уровне); поведение для пачки прежнее.
+  const attempts = run?.attempts ?? (run?.time?.pending
+    ? [{ done: run.done === true, time: run.time }]
+    : []);
   let total = 0;
-  for (const attempt of run?.attempts ?? []) {
+  for (const attempt of attempts) {
     const t = attempt?.time;
     if (!t?.pending) continue;
     let minutes = t.baseMinutes;

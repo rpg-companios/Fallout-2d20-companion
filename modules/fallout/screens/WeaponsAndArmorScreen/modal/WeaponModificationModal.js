@@ -16,6 +16,8 @@ import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
 import useCharacterStore from '../../../../../src/store/characterStore';
+import { buildModCraftHint, formatCraftMinutes } from '../../../crafting/windowModel';
+import { craftRecipe, settleCraftTime } from '../../../crafting/operations';
 
 
 function toNumber(v) {
@@ -315,6 +317,35 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
   const [expandedCategories, setExpandedCategories] = useState({}); // slot -> boolean
   const [modsBySlot, setModsBySlot] = useState({}); // slot -> modRow[]
 
+  // 352 (план §2.10): кнопка «Создать» на позиции мода — при включённой
+  // настройке «Установка модификаций»; скрыта, если мод уже в инвентаре.
+  const modsViaCraft = useAppSettingsStore((s) => s.getSettingValue('modsRequireInventoryItem'));
+  const storeItems = useCharacterStore((s) => s.items);
+  const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+
+  const handleCreateMod = (modId, modName) => {
+    const run = craftRecipe(modId, {}, { deferTime: true });
+    if (!run.done) {
+      // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
+      // missing-material), stage 'check' — непройденная проверка.
+      const reasons = Array.isArray(run.reasons) ? run.reasons : [];
+      const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
+        ? 'modals.createFailMissingPerk'
+        : reasons.some((r) => r?.code === 'missing-material')
+          ? 'modals.createFailMaterials'
+          : run.stage === 'check' ? 'modals.createFailCheck' : 'modals.createFailTitle';
+      Alert.alert(tWeaponsAndArmorScreen('modals.createFailTitle'), tWeaponsAndArmorScreen(reasonKey));
+      return;
+    }
+    // 323: время готовки применяется сразу (полное; вопрос про 2 ОД — только
+    // в окне крафта с его отчётом, здесь — компактный сценарий).
+    const settled = settleCraftTime(modId, run, { spendActionPoints: false });
+    Alert.alert(
+      modName || modId,
+      `${tWeaponsAndArmorScreen('modals.createDone')} ${formatCraftMinutes(settled.minutes)}`,
+    );
+  };
+
   // Обновляем modifiedWeapon при изменении weapon
   React.useEffect(() => {
     let cancelled = false;
@@ -378,23 +409,10 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           }
         }
 
-        // 350/351 (настройка «Установка модификаций»): включена — ставить можно
-        // только моды, созданные/найденные (есть в инвентаре). Моды, УЖЕ
-        // установленные на этом оружии, остаются видимыми — иначе их не снять.
+        // 350–352 (настройка «Установка модификаций»): список НЕ фильтруется —
+        // у каждой позиции кнопка «Создать» (352); моды, УЖЕ установленные на
+        // этом оружии, тоже видны — иначе их не снять.
         if (cancelled) return;
-        if (useAppSettingsStore.getState().getSettingValue('modsRequireInventoryItem')) {
-          const owned = new Set(Object.values(useCharacterStore.getState().items || {})
-            .map((it) => it?.weaponId)
-            .filter(Boolean));
-          Object.values(weaponWithBase.appliedMods || {}).forEach((id) => owned.add(id));
-          for (const slot of Object.keys(bySlot)) {
-            const before = bySlot[slot].length;
-            bySlot[slot] = bySlot[slot].filter((m) => owned.has(m.id));
-            if (bySlot[slot].length !== before) {
-              debugLog('weapon.mod.gate.filtered', { weaponId: resolvedWeaponId, slot, before, after: bySlot[slot].length });
-            }
-          }
-        }
         setModsBySlot(bySlot);
         setSelectedModifications(selected);
 
@@ -516,24 +534,47 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                         : tWeaponsAndArmorScreen('modals.noWeaponMod')}
                     </Text>
                   </TouchableOpacity>
-                  {mods.map((mod, index) => (
-                    <TouchableOpacity
+                  {mods.map((mod, index) => {
+                    // 352: кнопка и требования — у НЕ установленного (на этом
+                    // оружии) мода, без своего предмета в инвентаре.
+                    const hint = buildModCraftHint(mod.id, { items: storeItems, selectedPerks });
+                    const isInstalledHere = selectedModifications[slot]?.id === mod.id;
+                    const showCreate = modsViaCraft && hint && !hint.inInventory && !isInstalledHere;
+                    return (
+                    <View
                       key={index}
                       style={[
                         styles.modificationItem,
                         selectedModifications[slot]?.id === mod.id && styles.selectedModification
                       ]}
-                      onPress={() => handleSelectModification(slot, mod)}
                     >
-                      <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
-                      <Text style={styles.modificationEffects}>
-                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
-                      </Text>
-                      <Text style={styles.modificationStats}>
-                        {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                      <TouchableOpacity
+                        style={styles.modItemMain}
+                        onPress={() => handleSelectModification(slot, mod)}
+                      >
+                        <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
+                        <Text style={styles.modificationEffects}>
+                          {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
+                        </Text>
+                        <Text style={styles.modificationStats}>
+                          {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
+                        </Text>
+                        {showCreate && (
+                          <Text style={styles.modificationRequirements}>{hint.line}</Text>
+                        )}
+                      </TouchableOpacity>
+                      {showCreate && (
+                        <TouchableOpacity
+                          style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
+                          disabled={!hint.enabled}
+                          onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
+                        >
+                          <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    );
+                  })}
                 </CollapsibleSection>
                 );
               })}

@@ -48,6 +48,19 @@ const styles = StyleSheet.create({
   },
   expandIcon: { fontSize: 16, color: '#666' },
   sectionContent: { paddingLeft: 10, paddingTop: 5 },
+  // 352: строка мода — слева тексты (тап = выбор), справа кнопка «Создать»
+  modItemMain: { flex: 1 },
+  createButton: {
+    backgroundColor: '#2e7d32',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 8,
+    justifyContent: 'center',
+  },
+  createButtonDimmed: { opacity: 0.4 },
+  createButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+  modificationRequirements: { fontSize: 11, color: '#555', marginTop: 2 },
   modificationItem: {
     padding: 10,
     borderWidth: 1,

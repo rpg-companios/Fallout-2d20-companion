@@ -1,6 +1,20 @@
 # Changelog
 
 ---
+## A "Create" button in the weapon modification modal (patch 352)
+
+The first slice of the owner's plan (§2.10) — for interface testing.
+With the "Modification installation" setting on, every mod position that
+is not in the inventory shows a "Create" button and a requirements line.
+
+- The button is green when there are enough materials; dimmed otherwise.
+- Requirements in one line: perk(s) with ranks, materials by rarity,
+  complexity.
+- Pressing creates the mod (it lands in the inventory and the button
+  disappears); missing perk or materials is explained.
+- The mod list is no longer filtered by the setting — buttons instead.
+
+---
 ## Weapon mods: installation from the bag, same binding law (patch 351)
 
 Law 343/344 now covers weapons too: a crafted or found weapon mod, once

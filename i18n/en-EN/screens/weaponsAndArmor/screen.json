@@ -97,7 +97,13 @@
     "previewQualities": "Qualities",
     "errorTitle": "Error",
     "errorSelectMod": "Please select at least one modification",
-    "modsNotInInventory": "None in the bag (craft them in the Crafting window)"
+    "modsNotInInventory": "None in the bag (craft them in the Crafting window)",
+    "create": "Create",
+    "createDone": "Created. Time spent:",
+    "createFailTitle": "Cannot create",
+    "createFailMissingPerk": "A perk from the requirements line is required",
+    "createFailMaterials": "Not enough materials",
+    "createFailCheck": "Skill check failed"
   },
   "displayToggle": {
     "spoilers": "List (spoilers)",
