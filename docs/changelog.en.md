@@ -1,6 +1,19 @@
 # Changelog
 
 ---
+## Capacitors confirmed, no doubt marks left in weapon mods (patch 347)
+
+Owner's word: leave the capacitors as they are — materials and
+complexities are confirmed. Rarity was also checked against the same
+book tables.
+
+- "Large Magazine" and "Quick-Eject Mag": rarity Uncommon (the data said
+  Common — a mismatch with the table, now fixed).
+- The audit's doubt mark "?" was removed from all remaining fields: none
+  of the 205 weapon mods carry it any more.
+- Capacitors: complexities 5 and 2, materials unchanged.
+
+---
 ## Weapon mod crafting columns revised against the book (patch 346)
 
 The owner provided the printed tables (pp. 222–223); the data was checked

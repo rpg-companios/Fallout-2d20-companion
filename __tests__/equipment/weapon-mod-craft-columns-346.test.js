@@ -39,9 +39,9 @@ describe('ПРИЁМОЧНЫЙ (патч 346): колонки крафта мо�
     expect(m.perk2).toBe('Science! 3');
   });
 
-  it('«?» аудита снят со всех материалов, кроме двух конденсаторных (вопрос 1)', () => {
+  it('«?» аудита снят со всех материалов (347: конденсаторы владелец оставил как есть)', () => {
     const withQ = mods.filter((m) => typeof m.materials === 'string' && m.materials.includes('?'));
-    expect(withQ.map((m) => m.id).sort()).toEqual(['mod_031', 'mod_032']);
+    expect(withQ).toEqual([]);
   });
 
   it('перки без «?» во всех 205 модах', () => {
