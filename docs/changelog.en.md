@@ -1,6 +1,13 @@
 # Changelog
 
 ---
+## The "Create" button is green (patch 355)
+
+Per the owner's feedback: the button color is green rgb(34, 197, 94),
+already used in the app styles (the perk selection modal). The blue from
+the previous fix was a mistake.
+
+---
 ## "Create" button: compact and darker, requirements per the mockup (patches 353–354)
 
 Fixes from the owner's interface testing feedback.

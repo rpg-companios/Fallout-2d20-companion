@@ -53,7 +53,9 @@ const styles = StyleSheet.create({
   // applyButton этой же модалки (#007AFF, borderRadius 5).
   modItemMain: { flex: 1 },
   createButton: {
-    backgroundColor: '#007AFF',
+    // 355 (замечание владельца): зелёная — rgb(34, 197, 94) из стилей
+    // (PerkSelectModal.styles #22c55e); синяя была ошибкой 353.
+    backgroundColor: '#22c55e',
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
