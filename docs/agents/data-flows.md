@@ -176,6 +176,14 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
   uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
   стирается → мод снова виден в сумке
 
+РОБО-ОРУЖИЕ (359, тот же закон 343/344): оружие в слоте робота — НЕ предмет
+  сумки (комплект кладёт его в конечность), поэтому мод привязывается к
+  синтетическому носителю robotWeaponHostKey(слот, id оружия) =
+  «robotSlot:слот:id». Экран (ветка robotSlot плана classifyModWritePlan):
+  дифф модов → installRobotWeaponMod (как installArmorMod, но без требования
+  items[hostKey]) / uninstallArmorMod. Оружие уходит из слота
+  (replaceLimb/unequipHeldWeapon) — слайс возвращает его моды в сумку.
+
 УДАЛЕНИЕ НОСИТЕЛЯ — одна копия правила В СТОРЕ (344):
   adjustItemQuantity(itemId, delta) — кнопки «Продать»/«Потратить»/
   «Выбросить» инвентаря (UI-хелпер делегирует) и крафт-расход

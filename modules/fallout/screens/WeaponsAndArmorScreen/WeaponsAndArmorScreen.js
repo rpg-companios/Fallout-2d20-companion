@@ -22,7 +22,7 @@ import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
 // Единый путь записи модов (311): классификация места хранения — движок.
-import { classifyModWritePlan, modIdList } from '../../../../src/engine/items/weaponMods';
+import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
 import { diffModInstallPlan } from '../../../../domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
@@ -980,6 +980,17 @@ const WeaponsAndArmorScreen = () => {
     debugLog('weapon.mod.apply.screen.plan', { itemId, modPlan });
 
     if (modPlan?.kind === 'robotSlot') {
+      // 359 (жалоба владельца: «мод не ставится, хотя в инвентаре есть»):
+      // закон 343/344 действует и на робо-оружии — мод-предмет прячется из
+      // сумки (флаг «экипирован», привязка к слоту+оружию) и возвращается
+      // при замене/снятии. Носитель — не предмет, ключ синтетический.
+      const robotHostKey = robotWeaponHostKey(modPlan.slotKey, modPlan.weaponId);
+      const robotDiff = diffModInstallPlan(
+        modIdList(selectedWeaponForModification),
+        modIdList(modifiedWeapon),
+      );
+      robotDiff.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: robotHostKey }));
+      robotDiff.install.forEach((id) => installRobotWeaponMod({ modId: id, hostKey: robotHostKey }));
       if (modPlan.role === 'held') {
         const sourceSlot = modPlan.slotKey;
         setEquippedRobotSlots((prev) => {
@@ -1064,7 +1075,7 @@ const WeaponsAndArmorScreen = () => {
         w && w.uniqueId === modPlan.uniqueId ? modifiedWeapon : w
       )));
     }
-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
+  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons, installRobotWeaponMod, uninstallWeaponModFlag]);
 
   const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
@@ -1087,6 +1098,7 @@ const WeaponsAndArmorScreen = () => {
   const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
   const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
   const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
+  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
 
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;

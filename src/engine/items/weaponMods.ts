@@ -65,6 +65,16 @@ export function modIdMap<M extends { slot?: string | null; id?: string }>(
 /** Роль экземпляра оружия внутри слота робота (форма слота — дело сеттинга). */
 export type RobotWeaponRole = 'held' | 'installed' | 'ownAttack';
 
+/**
+ * Стабильный ключ-носитель для закона 343/344 на робо-оружии: оружие в слоте
+ * робота — НЕ предмет сумки (комплект кладёт его внутрь конечности), поэтому
+ * мод-экземпляр привязывается к паре «слот + id оружия». Ключ одинаков в
+ * каждой сессии — снятие мода и замена конечности находят его снова (359).
+ */
+export function robotWeaponHostKey(slotKey: string, weaponId: string | null): string {
+  return `robotSlot:${slotKey}:${weaponId ?? 'unknown'}`;
+}
+
 /** План записи выбора модов: куда и какой экземпляр меняется. */
 export type WeaponModWritePlan =
   | { kind: 'storeItem'; itemId: string }

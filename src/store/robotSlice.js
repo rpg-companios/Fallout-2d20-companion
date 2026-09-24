@@ -28,6 +28,30 @@ import {
   canEquipWeaponToSlot,
   getBuiltinWeaponsFromSlots,
 } from '../../domain/robotEquip';
+import { modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
+
+/**
+ * 359 (закон 343/344 на робо-оружии): снять привязку модов с оружия, которое
+ * покидает слот (замена конечности / опустошение ладони). Моды возвращаются
+ * в сумку (uninstallArmorMod — только снимает флаги, предметы не удаляет).
+ */
+const releaseRobotSlotMods = (get, slots, slotKey) => {
+  const slotData = slots?.[slotKey];
+  if (!slotData) return;
+  const leaving = [
+    ...(Array.isArray(slotData.limb?.builtinWeapons) ? slotData.limb.builtinWeapons : []),
+    ...(slotData.heldWeapon ? [slotData.heldWeapon] : []),
+  ];
+  const { uninstallArmorMod } = get();
+  for (const weapon of leaving) {
+    const weaponId = weapon?.weaponId || weapon?.id;
+    if (!weaponId) continue;
+    const hostKey = robotWeaponHostKey(slotKey, weaponId);
+    for (const modId of modIdList(weapon)) {
+      uninstallArmorMod({ modId, hostKey });
+    }
+  }
+};
 
 export const createInitialRobotState = () => ({
   robot: {
@@ -172,6 +196,10 @@ export const createRobotActions = (set, get) => ({
     const check = canReplaceLimb(slotKey, newLimb, character);
     if (!check.allowed) return { ok: false, reason: check.reason };
 
+    // 359 (закон 343/344): конечность уходит вместе с установленным оружием —
+    // его моды возвращаются в сумку (снятие привязки к робо-носителю).
+    releaseRobotSlotMods(get, slots, slotKey);
+
     const { slots: nextSlots } = applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog);
     set({ robot: { ...robot, slots: nextSlots } });
     return { ok: true };
@@ -212,6 +240,8 @@ export const createRobotActions = (set, get) => ({
     const slots = robot?.slots || {};
     const slotData = slots[slotKey];
     if (!slotData || !slotData.heldWeapon) return;
+    // 359 (закон 343/344): оружие покидает ладонь — его моды снова в сумке.
+    releaseRobotSlotMods(get, slots, slotKey);
     const nextSlots = {
       ...slots,
       [slotKey]: { ...slotData, heldWeapon: null },

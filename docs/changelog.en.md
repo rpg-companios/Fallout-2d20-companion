@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## Robot weapon mods follow the common law (patch 359)
+
+Owner's report (a beta-wave tuner for the assaultron laser): a mod on a
+robot slot weapon was applied, but the mod item stayed in the inventory
+forever — it looked like "nothing happened". The same law as on human
+weapons applies now: installing hides the mod item from the inventory
+(bound to the slot and the weapon), replacing or removing returns it;
+taking the weapon out of the slot or swapping the limb returns its mods
+too.
+
 ## Exact law of automatic check failure (patch 358)
 
 Owner's clarification on the check mechanism: an automatic failure is

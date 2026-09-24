@@ -796,6 +796,28 @@ const useCharacterStore = create(withDerivedCascade(devtools(
       },
 
       /**
+       * 359: тот же закон 343/344 для мода на оружии в СЛОТЕ РОБОТА. Носитель
+       * — не предмет сумки (комплектное оружие живёт в конечности), поэтому
+       * требование items[hostKey] здесь незаконно: ключ-носитель синтетический
+       * (robotWeaponHostKey: слот + id оружия), мод прячется из сумки и
+       * возвращается при снятии/замене тем же uninstallArmorMod.
+       * @returns {string|null} ключ экземпляра мода или null.
+       */
+      installRobotWeaponMod: ({ modId, hostKey }) => {
+        if (!modId || !hostKey) return null;
+        const items = { ...get().items };
+        const entry = Object.entries(items).find(([key, item]) => (
+          item?.weaponId === modId && !item.equipped && !item.installedOn
+        ));
+        if (!entry) return null;
+        const [key, item] = entry;
+        items[key] = { ...item, equipped: true, installedOn: hostKey };
+        set({ items });
+        debugLog('robotWeaponMod.installed', { modId, instanceKey: key, hostKey });
+        return key;
+      },
+
+      /**
        * 343: снять мод с предмета (замена или «без мода») — теряет флаг
        * «экипирован» и снова виден в сумке.
        */

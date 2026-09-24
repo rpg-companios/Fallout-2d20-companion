@@ -198,6 +198,9 @@ export interface CharacterActions {
   /** 343: установить мод брони на предмет-носитель (флаг «экипирован» +
    * привязка installedOn; мода нет в сумке — свободная установка, null). */
   installArmorMod: (args: { modId: string; hostKey: string | null }) => string | null;
+  /** 359: тот же закон 343/344 для мода на оружии в слоте робота (носитель —
+   * не предмет сумки, ключ синтетический robotWeaponHostKey). */
+  installRobotWeaponMod: (args: { modId: string; hostKey: string | null }) => string | null;
   /** 343: снять мод — теряет «экипирован» и снова виден в сумке. */
   uninstallArmorMod: (args: { modId: string; hostKey?: string | null }) => void;
   /** 343: предмет-носитель удалён — установленные моды уходят с ним. */
@@ -374,6 +377,7 @@ export const CRUD_OP_KEYS = [
   'initRobot',
   'initRobotFromKit',
   'installArmorMod',
+  'installRobotWeaponMod',
   'loadPowerArmorState',
   'loadRobotState',
   'markSkillsAsRewarded',
