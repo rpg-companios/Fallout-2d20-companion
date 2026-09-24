@@ -1,0 +1,469 @@
+diff --git a/__tests__/crafting/zero-difficulty-ask-356.test.js b/__tests__/crafting/zero-difficulty-ask-356.test.js
+new file mode 100644
+index 0000000..76057a1
+--- /dev/null
++++ b/__tests__/crafting/zero-difficulty-ask-356.test.js
+@@ -0,0 +1,139 @@
++// ПРИЁМОЧНЫЙ (патч 356): механизм проверок — сложность 0 спрашивает про бросок.
++// Слово владельца: «Если сложность 0, то спросить пользователя хочет ли он
++// бросить кубики. Если "да" бросаем и действуют правила Успехов/Провалов,
++// "нет" = автоуспех, без броска». Механизм — на уровне движка проверок
++// (runCraft, опция zeroDifficulty), потребители: крафт (окно + кнопка модалки).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++
++import useCharacterStore from '../../src/store/characterStore';
++import { runCraft, evaluateCraft } from '../../domain/craftingEngine';
++import { getCraftingRecipeById } from '../../domain/registry';
++import { craftRecipe } from '../../modules/fallout/crafting/operations';
++import { buildCategoryModel } from '../../modules/fallout/crafting/windowModel';
++import { readFileSync } from 'node:fs';
++
++const state = () => useCharacterStore.getState();
++const seed = (weaponId, quantity = 1) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId, quantity } },
++  }));
++};
++
++const RECIPE = () => getCraftingRecipeById('mod_001'); // сложность 3, Фанатик оружия 1
++
++const engineRun = (zeroDifficulty, rollD20) => runCraft({
++  recipe: RECIPE(),
++  skillRank: 6, // навык снимает сложность → difficulty 0, evaluation.auto
++  perkRanks: { gunNut: 1 },
++  inventoryCounts: { item_common_materials: 4, item_uncommon_materials: 2 },
++  zeroDifficulty,
++  ...(rollD20 ? { rollD20 } : {}),
++  rollCD: () => 0,
++  spend: () => ({ ok: true }),
++  grant: () => ({ instanceId: 'g1' }),
++});
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — бросок по выбору игрока', () => {
++  it('движок: сложность снята навыком → evaluation.auto (как раньше)', () => {
++    const evaluation = evaluateCraft({
++      recipe: RECIPE(),
++      skillRank: 6,
++      perkRanks: { gunNut: 1 },
++      inventoryCounts: { item_common_materials: 4, item_uncommon_materials: 2 },
++    });
++    expect(evaluation.auto).toBe(true);
++    expect(evaluation.difficulty).toBe(0);
++  });
++
++  it('движок: по умолчанию (auto) — автоуспех БЕЗ броска, check null', () => {
++    let rolled = 0;
++    const result = engineRun('auto', () => { rolled += 1; return 10; });
++    expect(result.done).toBe(true);
++    expect(result.auto).toBe(true); // «броска не было»
++    expect(result.check).toBeNull();
++    expect(rolled).toBe(0); // кубики не звались
++  });
++
++  it('движок: roll — кубики брошены, правила Успехов/Провалов действуют', () => {
++    // канон 2d20 (см. scoreD20): 1 = крит (2 успеха), 20 = осложнение,
++    // успех кубика — roll ≤ target (ИНТ + навык).
++    const result = engineRun('roll', () => 15);
++    expect(result.done).toBe(true);
++    expect(result.auto).toBe(false); // бросок был — отчёт покажет кубики
++    expect(result.check).toBeTruthy();
++    expect(result.check.passed).toBe(true);
++    expect(result.check.rolls).toEqual([15, 15]);
++    expect(result.check.successes).toBe(0); // 15 > 6 (цель) — успеха кубики не дали
++    expect(result.check.complicationCount).toBe(0);
++  });
++
++  it('движок: roll — крит на единицах (2 успеха за кубик)', () => {
++    const result = engineRun('roll', () => 1);
++    expect(result.done).toBe(true);
++    expect(result.check.successes).toBe(4); // оба кубика — криты
++    expect(result.check.complicationCount).toBe(0);
++  });
++
++  it('движок: roll — осложнение на двадцатках: две = АВТОПРОВАЛ', () => {
++    const result = engineRun('roll', () => 20);
++    expect(result.done).toBe(false);
++    expect(result.stage).toBe('check');
++    expect(result.check.complicationCount).toBe(2);
++  });
++
++  it('движок: roll — одна двадцатка даёт осложнение при успехе (+время)', () => {
++    const rolls = [20, 1]; // двадцатка = осложнение, единица = крит (2 успеха)
++    const result = engineRun('roll', () => rolls.shift() ?? 1);
++    expect(result.done).toBe(true);
++    expect(result.check.complicationCount).toBe(1);
++    expect(result.check.successes).toBe(2);
++    expect(result.durationMultiplier).toBe(1); // 323: надбавка аддитивная у вызывающего
++  });
++
++  it('крафт по кнопке: craftRecipe проксирует zeroDifficulty в движок', () => {
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++    const rolled = craftRecipe('mod_001', { rollD20: () => 1 }, { deferTime: true, zeroDifficulty: 'roll' });
++    expect(rolled.done).toBe(true);
++    expect(rolled.auto).toBe(false);
++    expect(rolled.check).toBeTruthy();
++
++    // первый крафт потратил материалы — пересеиваем на второй
++    seed('item_common_materials', 4);
++    seed('item_uncommon_materials', 2);
++    const auto = craftRecipe('mod_001', {}, { deferTime: true });
++    expect(auto.done).toBe(true);
++    expect(auto.auto).toBe(true);
++    expect(auto.check).toBeNull();
++  });
++
++  it('строки окна крафта знают zeroDifficulty; оба UI спрашивают игрока', () => {
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
++    }));
++    const row = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_001');
++    expect(row.zeroDifficulty).toBe(true);
++
++    const crafting = readFileSync('modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
++    expect(crafting).toContain('askZeroRoll');
++    expect(crafting).toContain("zeroDifficulty");
++    const modal = readFileSync('modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js', 'utf8');
++    expect(modal).toContain('craftingPreview');
++    expect(modal).toContain('createAskZeroRoll');
++    expect(modal).toContain("zeroDifficulty");
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 44d1eae..ea0227d 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **355** · у владельца на main применено до **314**
++· последний сданный патч: **356** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -262,6 +262,14 @@
+   requirements + materialsLine).
+ - 355 — ЦВЕТ КНОПКИ: зелёная rgb(34,197,94) = #22c55e из стилей
+   (PerkSelectModal.styles); синяя #007AFF в 353 была ошибкой агента.
++- 356 — МЕХАНИЗМ ПРОВЕРОК: сложность 0 (снята навыком) спрашивает
++  «Бросить кубики?» — «да» = бросок resolveD20Check с правилами
++  Успехов/Провалов (1 = крит, 20 = осложнение, две двадцатки =
++  автопровал), «нет» = автоуспех без броска (прежнее поведение).
++  Движок: runCraft-опция zeroDifficulty ('auto'|'roll'), result.auto =
++  «броска не было»; craftRecipe проксирует опцию. UI: вопрос в окне
++  крафта (CraftingModal, один на пачку) и у кнопки «Создать» модалки
++  оружия (craftingPreview → evaluation.auto). Тест zero-difficulty-ask-356.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 57cb49b..7f503cd 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,15 @@
+ # Changelog
+ 
+ ---
++## Difficulty 0: the game asks about rolling (patch 356)
++
++Owner's word: when difficulty is cleared by skill (difficulty 0), the
++game asks — "Roll the dice?". "Yes" — roll with the Success/Failure
++rules: a 1 is a critical (2 successes), a 20 is a complication (extra
++time), two 20s fail the check. "No" — auto-success without a roll, as
++before. The question appears in the crafting window (one per batch)
++and on the "Create" button in the weapon mod modal.
++
+ ## The "Create" button is green (patch 355)
+ 
+ Per the owner's feedback: the button color is green rgb(34, 197, 94),
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 29fbba0..41c1143 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,15 @@
+ # История изменений
+ 
+ ---
++## Сложность 0: игра спрашивает про бросок кубиков (патч 356)
++
++Слово владельца: если сложность снята навыком (сложность 0), игра
++спрашивает — «Бросить кубики?». «Да» — бросаем по правилам Успехов/
++Провалов: единица = крит (2 успеха), двадцатка = осложнение (+время),
++две двадцатки = провал. «Нет» — автоуспех без броска, как раньше.
++Вопрос появляется и в окне крафта (один на пачку), и у кнопки
++«Создать» в модалке оружия.
++
+ ## Кнопка «Создать» — зелёная (патч 355)
+ 
+ Правка по замечанию владельца: цвет кнопки — зелёный rgb(34, 197, 94),
+diff --git a/domain/craftingEngine.js b/domain/craftingEngine.js
+index 2a818ae..b0a88a9 100644
+--- a/domain/craftingEngine.js
++++ b/domain/craftingEngine.js
+@@ -176,6 +176,11 @@ export const runCraft = ({
+   inventoryCounts = {},
+   failBurnsMaterials = false,
+   complicationDurationMultiplier = 1,
++  // 356 (слово владельца, механизм проверок в целом): сложность 0 —
++  // 'auto' (прежнее поведение: автоуспех без броска) или 'roll' (кубики
++  // брошены, действуют правила Успехов/Провалов — включая автоматический
++  // провал на двух осложнениях). Выбор спрашивает UI; движок только исполняет.
++  zeroDifficulty = 'auto',
+   rollD20,
+   rollCD,
+   spend,
+@@ -195,7 +200,7 @@ export const runCraft = ({
+   const quantity = resolveOutputQuantity(recipe.outputQuantity ?? 1, rollCD);
+ 
+   let check = null;
+-  if (!evaluation.auto) {
++  if (!evaluation.auto || zeroDifficulty === 'roll') {
+     check = resolveD20Check({
+       attributeValue,
+       skillValue: Math.max(0, Number(skillRank) || 0),
+@@ -205,7 +210,7 @@ export const runCraft = ({
+       ...(rollD20 ? { rollD20 } : {}),
+     });
+   }
+-  const passed = evaluation.auto || check.passed;
++  const passed = (evaluation.auto && !check) || check.passed;
+   const plan = evaluation.materials.map(({ itemId, need }) => ({ itemId, count: need }));
+ 
+   // Осложнение не отменяет успех (корневая система 2d20): оно помножает
+@@ -231,7 +236,8 @@ export const runCraft = ({
+     const grantResult = grant({ itemId: recipe.id, quantity });
+     return {
+       done: true,
+-      auto: evaluation.auto,
++      // 356: auto = «броска не было» — отчёт печатает кубики, если бросили.
++      auto: evaluation.auto && !check,
+       durationMultiplier,
+       spent: plan,
+       granted: {
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 87ee5ab..4d3d0d7 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -103,7 +103,11 @@
+     "createFailTitle": "Cannot create",
+     "createFailMissingPerk": "A perk from the requirements line is required",
+     "createFailMaterials": "Not enough materials",
+-    "createFailCheck": "Skill check failed"
++    "createFailCheck": "Skill check failed",
++    "createAskZeroTitle": "Difficulty cleared by skill",
++    "createAskZeroText": "Roll the dice? Success/Failure rules apply.",
++    "createAskZeroRoll": "Roll dice",
++    "createAskZeroAuto": "Auto-success"
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index 4a29807..428d360 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -103,7 +103,11 @@
+     "createFailTitle": "Не удалось создать",
+     "createFailMissingPerk": "Требуется перк из строки требований",
+     "createFailMaterials": "Не хватает материалов",
+-    "createFailCheck": "Проверка навыка не пройдена"
++    "createFailCheck": "Проверка навыка не пройдена",
++    "createAskZeroTitle": "Сложность снята навыком",
++    "createAskZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
++    "createAskZeroRoll": "Бросить кубики",
++    "createAskZeroAuto": "Автоуспех"
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 42ff72f..13d7104 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -239,7 +239,7 @@ export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp =
+  * { done:true, spent, granted, check } либо отказ с причиной. Порты кубиков
+  * переопределяемы (тесты; экраны зовут без портов — настоящие кости).
+  */
+-export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) => {
++export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDifficulty } = {}) => {
+   const recipe = getCraftingRecipeById(recipeId);
+   if (!recipe) {
+     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
+@@ -259,6 +259,7 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) =>
+     perkRanks,
+     inventoryCounts,
+     failBurnsMaterials: burnsOnFail(recipe),
++    ...(zeroDifficulty ? { zeroDifficulty } : {}),
+     // 323: множитель выключен — надбавка за осложнения аддитивная (ниже).
+     complicationDurationMultiplier: 1,
+     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index e31eac9..fbf9117 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -183,6 +183,8 @@ const buildRowsForCategory = (category) => {
+         + ' · ' + getSkillDisplayName(recipe.requires.skill)
+         + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
+       status,
++      // 356: сложность снята навыком — окно спросит про бросок кубиков.
++      zeroDifficulty: evaluation.auto,
+       canCraft: evaluation.ready,
+       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,
+       reason: missingPerk
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index b16ba18..6d0725d 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -59,7 +59,11 @@
+     "perkShort": "needs a perk",
+     "matCommon": "Common material",
+     "matUncommon": "Uncommon material",
+-    "matRare": "Rare material"
++    "matRare": "Rare material",
++    "askZeroTitle": "Difficulty cleared by skill",
++    "askZeroText": "Roll the dice? Success/Failure rules apply.",
++    "askZeroRoll": "Roll dice",
++    "askZeroAuto": "Auto-success"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 0e56be0..6a5296c 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -59,7 +59,11 @@
+     "perkShort": "нужен перк",
+     "matCommon": "Обычный материал",
+     "matUncommon": "Необычный материал",
+-    "matRare": "Редкий материал"
++    "matRare": "Редкий материал",
++    "askZeroTitle": "Сложность снята навыком",
++    "askZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
++    "askZeroRoll": "Бросить кубики",
++    "askZeroAuto": "Автоуспех"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index d823c78..cb52144 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -87,9 +87,11 @@ export default function CraftingModal({ visible, onClose }) {
+     setOpenId(null);
+   };
+ 
+-  const create = (row, count) => {
++  // 356: выбор «сложность снята навыком» для текущего создания (спросили —
++  // применили ко всей пачке; ответ движка честный: бросок или автоуспех).
++  const create = (row, count, zeroDifficulty = 'auto') => {
+     // 323: время откладывается — окно спросит про 2 ОД после успеха.
+-    const run = craftBatch(row.recipeId, count, { deferTime: true });
++    const run = craftBatch(row.recipeId, count, { deferTime: true, zeroDifficulty });
+     const rep = buildCraftReport(row.recipeId, run);
+     let settled = null;
+     // 324: вопрос про 2 ОД — только если в пуле хватает (иначе полное время).
+@@ -104,11 +106,27 @@ export default function CraftingModal({ visible, onClose }) {
+   // Решение владельца (318): можно сделать больше одной — спросить количество
+   // отдельным окном (по умолчанию 1); одна — создать сразу.
+   const onPressCreate = (row) => {
++    // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
++    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
++    if (row.zeroDifficulty) {
++      Alert.alert(
++        ui.askZeroTitle ?? '',
++        ui.askZeroText ?? '',
++        [
++          { text: ui.askZeroRoll ?? '', onPress: () => proceedCreate(row, 'roll') },
++          { text: ui.askZeroAuto ?? '', onPress: () => proceedCreate(row, 'auto') },
++        ],
++      );
++      return;
++    }
++    proceedCreate(row, 'auto');
++  };
++  const proceedCreate = (row, zeroDifficulty) => {
+     if (row.maxCraft > 1) {
+       setQty(1);
+-      setQtyTarget({ row, max: row.maxCraft });
++      setQtyTarget({ row, max: row.maxCraft, zeroDifficulty });
+     } else {
+-      create(row, 1);
++      create(row, 1, zeroDifficulty);
+     }
+   };
+   const finishReport = () => {
+@@ -315,7 +333,7 @@ export default function CraftingModal({ visible, onClose }) {
+                 </TouchableOpacity>
+                 <TouchableOpacity
+                   style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+-                  onPress={() => qtyTarget && create(qtyTarget.row, qty)}>
++                  onPress={() => qtyTarget && create(qtyTarget.row, qty, qtyTarget.zeroDifficulty)}>
+                   <Text style={styles.bigCraftText}>{ui.create ?? ''}</Text>
+                 </TouchableOpacity>
+               </View>
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index c25200e..469a75a 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -16,8 +16,8 @@ import styles from '../../../styles/WeaponModificationModal.styles';
+ import { debugLog } from '../../../../../src/debug/falloutDebug';
+ import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+ import useCharacterStore from '../../../../../src/store/characterStore';
+-import { buildModCraftHint, formatCraftMinutes } from '../../../crafting/windowModel';
+-import { craftRecipe, settleCraftTime } from '../../../crafting/operations';
++import { buildModCraftHint, formatCraftMinutes, craftBatch } from '../../../crafting/windowModel';
++import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
+ 
+ 
+ function toNumber(v) {
+@@ -324,7 +324,25 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+ 
+   const handleCreateMod = (modId, modName) => {
+-    const run = craftRecipe(modId, {}, { deferTime: true });
++    // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
++    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
++    const evaluation = craftingPreview(modId)?.evaluation;
++    if (evaluation?.auto) {
++      Alert.alert(
++        tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
++        tWeaponsAndArmorScreen('modals.createAskZeroText'),
++        [
++          { text: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), onPress: () => runCreateMod(modId, modName, 'roll') },
++          { text: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => runCreateMod(modId, modName, 'auto') },
++        ],
++      );
++      return;
++    }
++    runCreateMod(modId, modName, 'auto');
++  };
++
++  const runCreateMod = (modId, modName, zeroDifficulty) => {
++    const run = craftRecipe(modId, {}, { deferTime: true, zeroDifficulty });
+     if (!run.done) {
+       // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
+       // missing-material), stage 'check' — непройденная проверка.
+diff --git a/public/version.json b/public/version.json
+index 3ce01db..7469c9c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "355",
++  "version": "356",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
