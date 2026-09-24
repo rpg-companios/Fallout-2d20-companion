@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## Update installer fix (patch 366)
+
+Update #364 failed to install after #363: the update file was built
+against the wrong base. Rebuilt — installing 364–366 now works on the
+first try. Gameplay is unaffected; this fixes the installer itself.
+
 ## Dialogs go through the app-wide unified mechanism (patch 364)
 
 Per the owner's word: the app has a single popup mechanism that works
