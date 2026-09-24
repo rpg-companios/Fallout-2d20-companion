@@ -1,0 +1,310 @@
+diff --git a/__tests__/saves/export-equals-save-361.test.js b/__tests__/saves/export-equals-save-361.test.js
+new file mode 100644
+index 0000000..7e60ebb
+--- /dev/null
++++ b/__tests__/saves/export-equals-save-361.test.js
+@@ -0,0 +1,115 @@
++// ПРИЁМОЧНЫЙ (патч 361): экспорт ВСЕГДА = сейву (слово владельца: «хорошо
++// бы, чтобы экспорт всегда = сейву… когда-то были расхождения»). Тело файла
++// — тело записи БД БЕЗ повторной обработки: сжатие делает один владелец —
++// saveCharacter. Раньше экспорт ре-слаймил тело каталогом экрана: другая
++// локаль/обновившиеся правила слайма/двойной прогон давали тело, отличное
++// от сейва, — источник исторических расхождений.
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../db', () => {
++  const rows = new Map();
++  return {
++    saveCharacter: vi.fn(async (id, name, level, originName, data) => {
++      rows.set(id, { id, name, level, originName, data, folderId: null, renamePending: false });
++      return id;
++    }),
++    loadCharacterById: vi.fn(async (id) => rows.get(id) ?? null),
++    getCharactersList: vi.fn(async () => Array.from(rows.values())),
++    deleteCharacter: vi.fn(async () => {}),
++    clearCharacterRenameRequest: vi.fn(async () => {}),
++    duplicateCharacter: vi.fn(async () => ({ id: 'copy' })),
++  };
++});
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn(async () => {}),
++}));
++vi.mock('../../db/Database', () => ({
++  getWeaponById: vi.fn(async () => null),
++  getWeaponModById: vi.fn(async () => null),
++  getAmmoById: vi.fn(async () => null),
++  getItemByName: vi.fn(async () => null),
++  getCharactersList: vi.fn(async () => []),
++}));
++
++import useCharacterStore from '../../src/store/characterStore';
++import { saveCharacter, loadCharacter } from '../../src/saves/characterSaves';
++import { createCharacterExportPayload, parseCharacterImportPayload } from '../../domain/characterTransfer';
++
++const state = () => useCharacterStore.getState();
++const db = () => import('../../db');
++
++beforeEach(async () => {
++  state().resetCharacterStore();
++  useCharacterStore.setState({ currentCharacterId: null, isSaved: false });
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 361): экспорт = сейв', () => {
++  it('тело файла байт в байт = тело записи БД после saveCharacter', async () => {
++    // персонаж-робот с оружием и модами: тело проходит полный путь сейва
++    useCharacterStore.setState({
++      origin: { id: 'assaultron', characterType: 'robot', bodyPlan: 'assaultron' },
++      characterName: 'экспортный',
++    });
++    state().loadRobotState({
++      bodyPlan: 'assaultron',
++      slots: {
++        leftArm: {
++          limb: {
++            id: 'robot_arm_assaultron', itemCategory: 'limb', limbType: 'arm', canHoldWeapons: true, weaponSlots: 1,
++            builtinWeapons: [
++              { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] },
++            ],
++          },
++          armorLayers: { frame: null, plating: null, armor: null }, heldWeapon: null,
++        },
++      },
++      modules: [], mk2Installed: false,
++    });
++
++    const id = await saveCharacter('экспортный');
++    expect(id).toBeTruthy();
++
++    const row = (await (await db()).loadCharacterById(id));
++    expect(row?.data).toBeTruthy();
++
++    const payload = createCharacterExportPayload(row);
++    expect(payload.format).toBe('rpg-companion-character');
++    // ГЛАВНОЕ: тело файла = тело сейва БЕЗ изменения (байт в байт)
++    expect(JSON.stringify(payload.character.data)).toBe(JSON.stringify(row.data));
++  });
++
++  it('круг экспорт → импорт → экспорт: тело не меняется', async () => {
++    useCharacterStore.setState({
++      origin: { id: 'assaultron', characterType: 'robot', bodyPlan: 'assaultron' },
++    });
++    state().loadRobotState({
++      bodyPlan: 'assaultron',
++      slots: { leftArm: { limb: { id: 'robot_arm_assaultron' }, armorLayers: { frame: null, plating: null, armor: null }, heldWeapon: null } },
++      modules: [], mk2Installed: false,
++    });
++    await saveCharacter('круг');
++
++    const first = createCharacterExportPayload(await (await db()).loadCharacterById('char_1') ?? await (await db()).getCharactersList().then((l) => l[0]));
++    const parsed = parseCharacterImportPayload(JSON.stringify(first));
++    expect(parsed.error).toBeUndefined();
++    expect(parsed.character.data).toEqual(first.character.data); // импорт берёт тело как есть
++
++    // повторный «экспорт той же строки» — то же самое тело (идемпотентность)
++    const again = createCharacterExportPayload(await (await db()).getCharactersList().then((l) => l[0]));
++    expect(JSON.stringify(again.character.data)).toBe(JSON.stringify(first.character.data));
++  });
++
++  it('экспортироваться может и старый ЖИРНЫЙ сейв (v18-) — тело не перекраивается', () => {
++    const fatRow = {
++      id: 'old', name: 'Старый', level: 3, originName: 'assaultron',
++      data: { schemaVersion: 18, equippedRobotSlots: { leftArm: { limb: { id: 'robot_arm_assaultron', builtinWeapons: [{ id: 'weapon_laser_gun', name: 'Лазерный пистолет', damage: 4 }] } } } },
++    };
++    const payload = createCharacterExportPayload(fatRow);
++    expect(payload.character.data).toBe(fatRow.data); // тот же объект, без копий-обработок
++  });
++});
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 16a6b6f..efb473f 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -7,7 +7,6 @@ import { getActiveModuleId } from '../../domain/moduleLocale';
+ import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
+ import { validateAvatarDataUrl } from '../../domain/characterAvatar';
+ import * as avatarCache from '../../db/avatarCache';
+-import { getCurrentCatalogEntry } from '../../src/saves/characterSaves';
+ 
+ // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
+ // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
+@@ -439,7 +438,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+     report('upload', uploadIndex, uploads.length);
+     const full = await db.loadCharacterById(character.id);
+     if (!full) continue;
+-    const payload = JSON.stringify(createCharacterExportPayload(full, { getEntry: getCurrentCatalogEntry }));
++    const payload = JSON.stringify(createCharacterExportPayload(full)); // 361: тело сейва как есть
+     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
+   }
+ 
+@@ -533,7 +532,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
+     const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${characterId}__`));
+     const character = await db.loadCharacterById(characterId);
+     if (!character) return;
+-    const payload = JSON.stringify(createCharacterExportPayload(character, { getEntry: getCurrentCatalogEntry }));
++    const payload = JSON.stringify(createCharacterExportPayload(character)); // 361: тело сейва как есть
+ 
+     await uploadCharacterFile({ token, folderId, fileId: remote?.id, filename: makeRemoteFilename(character), payload });
+     debugLog('sync.auto:done', { characterId });
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 31b36c9..04468f8 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -1,5 +1,3 @@
+-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+-import { findCatalogEntry } from '../../../domain/resolveItem';
+ import React, { useState, useCallback, useEffect, useRef } from 'react';
+ import {
+   View,
+@@ -533,18 +531,9 @@ export default function HomeScreen({ navigation }) {
+         return;
+       }
+ 
+-      // Экспорт худым телом (слайм): имя/цена/вес/статы восстанавливаются
+-      // из каталога на импорте — файл не тащит дубли каталога.
+-      let exportCatalog = null;
+-      try { exportCatalog = getEquipmentCatalog(moduleLocale); } catch (e) { exportCatalog = null; }
+-      const payload = createCharacterExportPayload(row, {
+-        getEntry: exportCatalog
+-          ? (id, itemType) => {
+-              try { return findCatalogEntry(exportCatalog, id, itemType); }
+-              catch (e) { return null; }
+-            }
+-          : undefined,
+-      });
++      // 361: экспорт = тело сейва байт в байт (слайм — только в saveCharacter,
++      // повторная обработка тела на экспорте давала расхождения «экспорт ≠ сейв»).
++      const payload = createCharacterExportPayload(row);
+       const result = await downloadCharacterPayload(payload, row.name);
+       
+       if (!result.success && !result.aborted) {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b13ff97..6d47497 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **360** · у владельца на main применено до **314**
++· последний сданный патч: **361** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -322,6 +322,18 @@
+   всегда полная, как после комплекта). Запись модов робо-оружия после
+   ЛЮБОЙ загрузки работает. Тест robot-mod-load-replay-360 (4) — прогон
+   реального экспорта через настоящий loadCharacter.
++- 361 — ЭКСПОРТ = СЕЙВ (слово владельца: «хорошо бы, чтобы экспорт
++  всегда = сейву… когда-то были расхождения»). Причина расхождений
++  найдена: экспорт ПОСТОЯННО ре-слаймил тело сейва каталогом экрана
++  (createCharacterExportPayload, getEntry по moduleLocale) — другая
++  локаль, обновившиеся правила слайма или двойной прогон давали тело,
++  отличное от тела сейва. Теперь тело файла = тело записи БД БЕЗ
++  повторной обработки; единственный владелец сжатия — saveCharacter
++  (slimSaveData по каталогу активной локали до записи в БД).
++  Вызывающие очищены от getEntry (HomeScreen, googleDriveSync ×2).
++  Тест export-equals-save-361 (3): тело файла байт в байт = телу сейва;
++  круг экспорт→импорт→экспорт не меняет тело; жирный сейв v18-
++  экспортируется как есть.
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 626a6be..d91045d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,15 @@
+ # Changelog
+ 
+ ---
++## Export = save, byte for byte (patch 361)
++
++Per the owner's request "export always equals the save": the source of
++historical drift is gone — on export the save body was re-compressed
++with the screen's catalog, so the file could differ from the save
++(different locale, updated compression rules, double pass). The export
++file now carries exactly the body stored in the save, with no
++reprocessing. Import and old "fat" files work as before.
++
+ ## Robot weapon mods after loading a save: ghost cleanup and reliable writes (patch 360)
+ 
+ From the owner's save export (an assaultron with a laser gun): old
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9392c1b..0d1cbaa 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Экспорт = сейв, байт в байт (патч 361)
++
++По слову владельца «экспорт всегда = сейву» устранён источник
++исторических расхождений: при экспорте тело сохранения повторно
++сжималось каталогом экрана, из-за чего файл мог отличаться от сейва
++(другая локаль, обновившиеся правила сжатия, двойной прогон). Теперь
++файл экспорта содержит ровно то тело, что записано в сохранении, —
++без повторной обработки. Импорт и старые «жирные» файлы работают как
++раньше.
++
+ ## Моды робо-оружия после загрузки сейва: чистка призрака и надёжная запись (патч 360)
+ 
+ По экспорту владельца (штурмомрон с лазер-ганом): в старых сейвах
+diff --git a/domain/characterTransfer.js b/domain/characterTransfer.js
+index 42ce915..c3bc1b4 100644
+--- a/domain/characterTransfer.js
++++ b/domain/characterTransfer.js
+@@ -1,4 +1,3 @@
+-import { slimSaveData } from './saveSlimming';
+ /**
+  * domain/characterTransfer.js
+  * Чистая доменная логика импорта/экспорта персонажей.
+@@ -59,8 +58,15 @@ export const sanitizeFileName = (name) => {
+ /**
+  * Создает payload для экспорта.
+  * @param {Object} characterRow - строка из БД: {id, name, level, origin_name, data}
++ *
++ * 361 (слово владельца: «экспорт всегда = сейву»): тело файла — тело сейва
++ * БЕЗ ПОВТОРНОЙ ОБРАБОТКИ. Сжатие выполняет один-единственный владелец —
++ * saveCharacter (slimSaveData по каталогу активной локали, до записи в БД).
++ * Раньше экспорт ре-слаймил тело каталогом экрана: другая локаль, обновившиеся
++ * правила слайма или двойной прогон давали тело, отличное от сейва, —
++ * источник исторических расхождений «экспорт ≠ сейв».
+  */
+-export const createCharacterExportPayload = (characterRow, { getEntry } = {}) => ({
++export const createCharacterExportPayload = (characterRow) => ({
+   format: 'rpg-companion-character',
+   version: EXPORT_FORMAT_VERSION,
+   exportedAt: new Date().toISOString(),
+@@ -69,13 +75,9 @@ export const createCharacterExportPayload = (characterRow, { getEntry } = {}) =>
+     name: characterRow.name,
+     level: characterRow.level ?? 1,
+     originName: characterRow.origin_name ?? null,
+-    // «Оземпик» тела сейва (слайм): в файл идёт только состояние экземпляров
+-    // предметов (id, quantity, equipped, моды, прочность/заряды) — имя/цену/вес/
+-    // статы импорт восстанавливает из каталога (restoreSaveData на загрузке).
+-    // Формат не меняется: жирные (v18-) и худые экспорты грузятся одним кодом.
+-    data: typeof getEntry === 'function'
+-      ? slimSaveData(characterRow.data, { getEntry })
+-      : characterRow.data,
++    // Формат прежний: жирные (v18-) и худые тела грузятся одним кодом
++    // (restoreSaveData на импорте достраивает имя/цену/вес/статы из каталога).
++    data: characterRow.data,
+   },
+ });
+ 
+diff --git a/public/version.json b/public/version.json
+index 0805df3..b74e176 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "360",
++  "version": "361",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
