@@ -87,9 +87,11 @@ export default function CraftingModal({ visible, onClose }) {
     setOpenId(null);
   };
 
-  const create = (row, count) => {
+  // 356: выбор «сложность снята навыком» для текущего создания (спросили —
+  // применили ко всей пачке; ответ движка честный: бросок или автоуспех).
+  const create = (row, count, zeroDifficulty = 'auto') => {
     // 323: время откладывается — окно спросит про 2 ОД после успеха.
-    const run = craftBatch(row.recipeId, count, { deferTime: true });
+    const run = craftBatch(row.recipeId, count, { deferTime: true, zeroDifficulty });
     const rep = buildCraftReport(row.recipeId, run);
     let settled = null;
     // 324: вопрос про 2 ОД — только если в пуле хватает (иначе полное время).
@@ -104,11 +106,27 @@ export default function CraftingModal({ visible, onClose }) {
   // Решение владельца (318): можно сделать больше одной — спросить количество
   // отдельным окном (по умолчанию 1); одна — создать сразу.
   const onPressCreate = (row) => {
+    // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
+    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+    if (row.zeroDifficulty) {
+      Alert.alert(
+        ui.askZeroTitle ?? '',
+        ui.askZeroText ?? '',
+        [
+          { text: ui.askZeroRoll ?? '', onPress: () => proceedCreate(row, 'roll') },
+          { text: ui.askZeroAuto ?? '', onPress: () => proceedCreate(row, 'auto') },
+        ],
+      );
+      return;
+    }
+    proceedCreate(row, 'auto');
+  };
+  const proceedCreate = (row, zeroDifficulty) => {
     if (row.maxCraft > 1) {
       setQty(1);
-      setQtyTarget({ row, max: row.maxCraft });
+      setQtyTarget({ row, max: row.maxCraft, zeroDifficulty });
     } else {
-      create(row, 1);
+      create(row, 1, zeroDifficulty);
     }
   };
   const finishReport = () => {
@@ -315,7 +333,7 @@ export default function CraftingModal({ visible, onClose }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.bigCraft, styles.qtyActionsBigCraft]}
-                  onPress={() => qtyTarget && create(qtyTarget.row, qty)}>
+                  onPress={() => qtyTarget && create(qtyTarget.row, qty, qtyTarget.zeroDifficulty)}>
                   <Text style={styles.bigCraftText}>{ui.create ?? ''}</Text>
                 </TouchableOpacity>
               </View>

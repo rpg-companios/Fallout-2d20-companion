@@ -1,6 +1,15 @@
 # Changelog
 
 ---
+## Difficulty 0: the game asks about rolling (patch 356)
+
+Owner's word: when difficulty is cleared by skill (difficulty 0), the
+game asks — "Roll the dice?". "Yes" — roll with the Success/Failure
+rules: a 1 is a critical (2 successes), a 20 is a complication (extra
+time), two 20s fail the check. "No" — auto-success without a roll, as
+before. The question appears in the crafting window (one per batch)
+and on the "Create" button in the weapon mod modal.
+
 ## The "Create" button is green (patch 355)
 
 Per the owner's feedback: the button color is green rgb(34, 197, 94),

@@ -16,8 +16,8 @@ import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
 import useCharacterStore from '../../../../../src/store/characterStore';
-import { buildModCraftHint, formatCraftMinutes } from '../../../crafting/windowModel';
-import { craftRecipe, settleCraftTime } from '../../../crafting/operations';
+import { buildModCraftHint, formatCraftMinutes, craftBatch } from '../../../crafting/windowModel';
+import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
 
 
 function toNumber(v) {
@@ -324,7 +324,25 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
 
   const handleCreateMod = (modId, modName) => {
-    const run = craftRecipe(modId, {}, { deferTime: true });
+    // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
+    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+    const evaluation = craftingPreview(modId)?.evaluation;
+    if (evaluation?.auto) {
+      Alert.alert(
+        tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
+        tWeaponsAndArmorScreen('modals.createAskZeroText'),
+        [
+          { text: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), onPress: () => runCreateMod(modId, modName, 'roll') },
+          { text: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => runCreateMod(modId, modName, 'auto') },
+        ],
+      );
+      return;
+    }
+    runCreateMod(modId, modName, 'auto');
+  };
+
+  const runCreateMod = (modId, modName, zeroDifficulty) => {
+    const run = craftRecipe(modId, {}, { deferTime: true, zeroDifficulty });
     if (!run.done) {
       // форма отказа движка: stage 'gate' с reasons[] (missing-perk /
       // missing-material), stage 'check' — непройденная проверка.

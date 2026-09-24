@@ -103,7 +103,11 @@
     "createFailTitle": "Cannot create",
     "createFailMissingPerk": "A perk from the requirements line is required",
     "createFailMaterials": "Not enough materials",
-    "createFailCheck": "Skill check failed"
+    "createFailCheck": "Skill check failed",
+    "createAskZeroTitle": "Difficulty cleared by skill",
+    "createAskZeroText": "Roll the dice? Success/Failure rules apply.",
+    "createAskZeroRoll": "Roll dice",
+    "createAskZeroAuto": "Auto-success"
   },
   "displayToggle": {
     "spoilers": "List (spoilers)",

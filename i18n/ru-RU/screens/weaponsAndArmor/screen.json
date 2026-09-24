@@ -103,7 +103,11 @@
     "createFailTitle": "Не удалось создать",
     "createFailMissingPerk": "Требуется перк из строки требований",
     "createFailMaterials": "Не хватает материалов",
-    "createFailCheck": "Проверка навыка не пройдена"
+    "createFailCheck": "Проверка навыка не пройдена",
+    "createAskZeroTitle": "Сложность снята навыком",
+    "createAskZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
+    "createAskZeroRoll": "Бросить кубики",
+    "createAskZeroAuto": "Автоуспех"
   },
   "displayToggle": {
     "spoilers": "Список (спойлеры)",

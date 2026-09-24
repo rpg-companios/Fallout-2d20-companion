@@ -183,6 +183,8 @@ const buildRowsForCategory = (category) => {
         + ' · ' + getSkillDisplayName(recipe.requires.skill)
         + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
       status,
+      // 356: сложность снята навыком — окно спросит про бросок кубиков.
+      zeroDifficulty: evaluation.auto,
       canCraft: evaluation.ready,
       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,
       reason: missingPerk

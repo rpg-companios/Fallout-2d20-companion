@@ -239,7 +239,7 @@ export const settleCraftTime = (recipeId, run, { spendActionPoints: halveForAp =
  * { done:true, spent, granted, check } либо отказ с причиной. Порты кубиков
  * переопределяемы (тесты; экраны зовут без портов — настоящие кости).
  */
-export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) => {
+export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDifficulty } = {}) => {
   const recipe = getCraftingRecipeById(recipeId);
   if (!recipe) {
     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
@@ -259,6 +259,7 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false } = {}) =>
     perkRanks,
     inventoryCounts,
     failBurnsMaterials: burnsOnFail(recipe),
+    ...(zeroDifficulty ? { zeroDifficulty } : {}),
     // 323: множитель выключен — надбавка за осложнения аддитивная (ниже).
     complicationDurationMultiplier: 1,
     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
