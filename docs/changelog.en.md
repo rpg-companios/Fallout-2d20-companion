@@ -1,6 +1,21 @@
 # Changelog
 
 ---
+## Weapon mod crafting columns revised against the book (patch 346)
+
+The owner provided the printed tables (pp. 222–223); the data was checked
+row by row and four mismatches were fixed.
+
+- "Large Magazine": complexity 4 (was 3), "Gun Nut 1" (was 2).
+- "Quick-Eject Mag": complexity 5 (was 3), materials follow the
+  complexity-5 curve — Common ×6, Uncommon ×4, Rare ×2.
+- "Full Capacitors" and "Capacitor Boosting Coil": the book's perk
+  requirements are pairs, "Gun Nut" + "Science!" (3+2 and 4+3).
+- The audit's doubt mark "?" was removed from confirmed rows; the
+  materials of the two capacitor mods await the owner's word (the book
+  has no complexity column for capacitors).
+
+---
 ## Clarification: creation-kit clothing does have its own item (patch 345)
 
 The owner's question exposed an error in the previous report: creation
