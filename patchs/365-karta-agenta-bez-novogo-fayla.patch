@@ -1,0 +1,268 @@
+diff --git a/docs/agents/README.md b/docs/agents/README.md
+index e777caf..90708db 100644
+--- a/docs/agents/README.md
++++ b/docs/agents/README.md
+@@ -17,11 +17,7 @@
+ 3. `docs/architecture/engine-charter.md` — устав: один шаг = один патч,
+    паспорта стора/сейва, политика тестов, протокол отчёта об ошибке.
+ 4. `setting-contract.md` — контракт пакета сеттинга (`.trpg`).
+-5. `docs/agents/mechanisms.md` — ШПАРГАЛКА МЕХАНИЗМОВ (364, слово
+-   владельца): диалоги (alertService/AlertHost — единая точка, Alert на
+-   Web молчит), крафт, законы модов 343/344+359, робо-слоты и сейвы,
+-   экспорт=сейв, настройки/i18n/стор. Дополняется в патче изменения.
+-6. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
++5. `docs/agents/data-flows.md` — потоки данных по ключевым механикам
+    (каталог, моды оружия, робо-слоты, сейвы, выживание).
+ 
+ ## Карта репозитория по слоям
+@@ -53,6 +49,59 @@
+ | Новый формат сейва | версия в `src/store/saveSchema.js` + миграция в конец цепочки `migrations.js` |
+ | Универсальная механика | `domain/` (JS) или `src/engine/` (TS для новых контрактов); сеттинг подставляет данные через реестр |
+ 
++## Как работают ключевые механизмы (шпаргалка, дополняется в патче изменения)
++
++**Диалоги — единая точка (урок 363/364).** Единственный способ показа
++всплывающих окон — `components/alerts/alertService.js` + `AlertHost.js`
++(монтируется раз в App.js; веб = натив, любые кнопки, Promise).
++`showAlert(alertId)` — по каталогу `components/alerts/catalog.js`
++(info/confirm/choice), `confirmAlert` — да/нет, `showRawAlert({title,
++message, buttons})` — текст вне каталога (кнопки в формате системного
++Alert, промис резолвится индексом, закрытие без выбора = null; «Ок»
++у info переведён общим словарём). `Alert.alert` из react-native на
++Web — ПУСТАЯ ФУНКЦИЯ: молчит; прямые вызовы в игровых окнах — дефект.
++Домен диалоги не зовёт: движок возвращает событие/код, экран показывает.
++
++**Крафт.** Экран (CraftingModal / кнопка «Создать» модалки оружия) →
++`modules/fallout/crafting/operations.js` (`craftRecipe`, `craftingPreview`,
++`craftBatch`, `settleCraftTime`) → движок `domain/craftingEngine.js`
++(`evaluateCraft`, `runCraft`) + `domain/d20Checks.js` (`resolveD20Check`).
++Порты (rollD20/rollCD/spend/grant) переопределяемы — тесты; экраны зовут
++без портов. Время (323): час, еда/напитки 20 мин, осложнение +30/+10
++аддитивно; `deferTime` — вопрос про 2 ОД (324: пул 6, +1 за успех сверх
++сложности — всегда, закон 358). `zeroDifficulty` (356): 'auto'|'roll',
++сложность 0 → вопрос про бросок через AlertHost. Автопровал = осложнение
++без единого успеха (358, не «две двадцатки»). Потери при провале —
++настройки craftFailLoss*. Отчёт — `buildCraftReport` → общий
++`CraftReportView` (обоих окон, 357).
++
++**Моды — закон 343/344 (+359).** Установка: мод-предмет получает
++`equipped: true` + `installedOn` (курсив в сумке = установлен), снятие/
++замена возвращает, продали носитель — ушли оба. Броня — `installArmorMod`
++(hostKey = ключ предмета). Робо-оружие (359): носитель — не предмет,
++ключ синтетический `robotWeaponHostKey(слот, id)`; стор-действие
++`installRobotWeaponMod`; уход оружия из слота возвращает моды. Запись
++выбора — ветки `classifyModWritePlan` (storeItem/equippedWeapon/robotSlot)
++в `WeaponsAndArmorScreen.handleApplyModification`. Гейт — настройка
++`modsRequireInventoryItem` (ВЫКЛ); список не фильтруется; кнопка
++«Создать» — 352–355 (#22c55e, требования блоком).
++
++**Робо-слоты и сейвы (360).** Правда о робо-оружии — слоты стора
++(`robot.slots`); `loadRobotState` разворачивает худые слоты в полную
++форму (в памяти всегда полная — иначе ветки записи модов молча не
++срабатывают: им нужен `limb.builtinWeapons`). Робо-оружие НЕ живёт в
++`equippedWeapons` (загрузка вычищает призраков); карточки — из слотов
++(`collectAttacks`). Формы слотов — `domain/robotSlots.js`.
++
++**Экспорт = сейв (361).** `createCharacterExportPayload` отдаёт тело
++записи БД без обработки; единственный владелец сжатия — `saveCharacter`
++(`slimSaveData` до записи); импорт — `restoreSaveData`.
++
++**Паспорта/версии.** Новое действие стора = паспорт
++`src/store/characterActions.ts` в том же патче (тест action-passports).
++`public/version.json`: version = номер последнего патча; release трогает
++только владелец; «Что нового» — раз на релиз.
++
+ ## Правила, которые нельзя нарушать (короткий список)
+ 
+ - Движок не импортирует `modules/...` — граница проверяется тестом
+diff --git a/docs/agents/mechanisms.md b/docs/agents/mechanisms.md
+deleted file mode 100644
+index 906aa8d..0000000
+--- a/docs/agents/mechanisms.md
++++ /dev/null
+@@ -1,99 +0,0 @@
+-# Как устроено приложение — шпаргалка агента
+-
+-> ЧИТАТЬ ПЕРЕД ЛЮБОЙ РАБОТОЙ ВНУТРИ ЭТИХ МЕХАНИЗМОВ. Здесь — только то, что
+-> проверено кодом (пути файлов точные). Цель: не пересматривать приложение
+-> заново в каждой сессии. Дополнять В ТОМ ЖЕ ПАТЧЕ, что и изменение механизма.
+-
+-## Диалоги — единая точка (УРОК 363/364)
+-
+-- **Единственный способ показа всплывающих окон** — `components/alerts/alertService.js`
+-  + `components/alerts/AlertHost.js` (монтируется один раз в App.js). Работает
+-  одинаково на вебе и нативе, любое число кнопок, Promise-ответ.
+-- `Alert.alert` из react-native **на Web — ПУСТАЯ ФУНКЦИЯ** (`alert() {}`):
+-  молчит без ошибок. Прямые вызовы Alert.alert в игровых окнах — дефект
+-  (см. тест inline-feedback-363).
+-- API: `showAlert(alertId, params)` — по каталогу `components/alerts/catalog.js`
+-  (kinds: info/confirm/choice; подписи кнопок — labelKey + scope экрана);
+-  `confirmAlert(alertId, params)` — да/нет; `showRawAlert({title, message, kind,
+-  buttons})` — текст вне каталога. У raw-кнопок формат Alert.alert
+-  `[{ text, onPress, style }]`, промис резолвится ИНДЕКСОМ кнопки; закрытие
+-  без выбора → null. У info «Ок» уже переведён общим словарём приложения.
+-- Домен диалоги НЕ зовёт (чистая логика): движок возвращает событие/код отказа,
+-  экран сопоставляет с записью каталога и показывает диалог.
+-
+-## Крафт (323–357, 356)
+-
+-- Пайплайн: экран (CraftingModal / кнопка «Создать» модалки оружия) →
+-  `modules/fallout/crafting/operations.js` (`craftRecipe`, `craftingPreview`,
+-  `craftBatch`, `settleCraftTime`) → движок `domain/craftingEngine.js`
+-  (`evaluateCraft`, `runCraft`) + `domain/d20Checks.js` (`resolveD20Check`).
+-- Порты движка (rollD20/rollCD/spend/grand) переопределяемы — тесты; экраны
+-  зовут без портов (настоящие кости). `craftBatch` = пачка попыток; отчёт —
+-  `buildCraftReport` (windowModel) → общий `CraftReportView` (обоих окон).
+-- Время (323): час всем, еда/напитки 20 мин; осложнение +30/+10 мин аддитивно;
+-  `deferTime` — окно спросит про 2 ОД (324: пул ОД 6, +1 за успех сверх
+-  сложности, всегда — закон 358).
+-- `zeroDifficulty` (356): опция runCraft/craftRecipe 'auto'|'roll'; сложность 0
+-  (снята навыком) → вопрос про бросок через AlertHost. Автопровал = осложнение
+-  без единого успеха (358; не «две двадцатки»).
+-- Потери при провале: настройки craftFailLoss* (consumables/gear группы).
+-
+-## Моды (закон 343/344 + 359)
+-
+-- Установка мода: мод-предмет получает `equipped: true` + `installedOn`
+-  (невидим в сумке — курсив это и есть установленный); снятие/замена возвращает;
+-  продали носитель — ушли оба (`releaseModsBoundTo`).
+-- Броня: `installArmorMod` (hostKey — ключ предмета). **Робо-оружие** (359):
+-  носитель — не предмет сумки, ключ синтетический
+-  `robotWeaponHostKey(слот, id)` = `robotSlot:слот:id`; стор-действие
+-  `installRobotWeaponMod`; уход оружия из слота (replaceLimb/unequipHeldWeapon)
+-  возвращает моды в сумку. Запись выбора — ветки плана
+-  `classifyModWritePlan` (storeItem/equippedWeapon/robotSlot) в
+-  WeaponsAndArmorScreen.handleApplyModification.
+-- Гейт «требовать мод в сумке» — настройка `modsRequireInventoryItem`
+-  (ВЫКЛ по 342); список модов НЕ фильтруется (350), кнопка «Создать» — 352–355
+-  (зелёная #22c55e, компактная справа; требования блоком).
+-- Отчёт о крафте в модалке (357): `CraftReportView` + `buildCraftReport`;
+-  отказ ДО проверки (перк/материалы) — короткий диалог AlertHost.
+-
+-## Робо-слоты и сейвы (360)
+-
+-- Правда о робо-оружии — слоты стора (`robot.slots`); `loadRobotState`
+-  разворачивает худые слоты сейва в полную форму (в памяти всегда полная —
+-  иначе ветки записи модов молча не срабатывают: им нужен `limb.builtinWeapons`).
+-- Робо-оружие НЕ живёт в `equippedWeapons` (загрузка вычищает призраков) —
+-  экран собирает карточки из слотов (`collectAttacks`).
+-- Худая/полная форма слотов — `domain/robotSlots.js` (`serializeSlot`/
+-  `deserializeSlot`); карта потоков — `docs/agents/data-flows.md`.
+-
+-## Экспорт = сейв (361)
+-
+-- `createCharacterExportPayload` (domain/characterTransfer.js) отдаёт тело
+-  записи БД БЕЗ обработки. Единственный владелец сжатия — `saveCharacter`
+-  (`slimSaveData` до записи). Импорт — `restoreSaveData` достраивает каталожное.
+-- Экспорт персонажа владельца = файл `format: 'rpg-companion-character'`;
+-  пример разбора — фикстура `__tests__/fixtures/assaultron-ghost-export.json`,
+-  приёмочный реплей — `robot-mod-load-replay-360`.
+-
+-## Настройки/каталог/данные
+-
+-- Каталог JSON = источник истины; модули сеттинга не знают движок, движок —
+-  не сеттинг; единая дверь `domain/registry.js` (SETTING). UI зовёт только
+-  стор-действия/операции.
+-- i18n: экраны держат свои словари (modules/fallout/i18n/<loc>/... + корневые
+-  i18n/<loc>/screens/...), t-функции по экранам; каталог оборудования —
+-  `i18n/equipmentCatalog.js` (по локали).
+-- Стор: zustand; новое действие = паспорт `src/store/characterActions.ts` +
+-  тест `action-passports` (иначе падает). `src/engine/items/weaponMods.ts` —
+-  движковый контракт модов.
+-- Версия: `public/version.json` (version = номер последнего патча; release
+-  трогает только владелец); «Что нового» — раз на релиз.
+-
+-## Инфраструктура сессии
+-
+-- Патчи: `patchs/N-имя.patch`, установка `./apply-patch.sh N`; один шаг =
+-  один патч; после каждого — полный `npx vitest run` + `tsc --noEmit`.
+-- Песочница: node_modules может исчезать → `npm ci` (tsc только локальный);
+-  `.git` может откатываться → `git fetch origin <branch> && git reset
+-  FETCH_HEAD`; e2e — worktree от предыдущего HEAD + apply --check + полный
+-  прогон + diff (лишним правом только сам файл патча).
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 7997542..ee30410 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,7 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-23** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **364** · у владельца на main применено до **314**
++· последний сданный патч: **365** · у владельца на main применено до **314**
+ (слово владельца: «всё шикарно»; 315–342 уехали, установка не подтверждена;
+ владелец тестирует крафт).
+ 
+@@ -368,12 +368,13 @@
+   null. Вопрос про бросок (356) в обоих окнах и отказ гейта (352) —
+   showRawAlert; своё inline-окно 363 снесено (askZeroTarget/craftNotice),
+   ключ createNoticeDone удалён (у info «Ок» из общего словаря).
+-  НОВАЯ ДОКУМЕНТ-ПАМЯТЬ: docs/agents/mechanisms.md — шпаргалка
+-  механизмов (диалоги, крафт, законы модов, робо-слоты/сейвы,
+-  экспорт=сейв, настройки/i18n/стор, инфраструктура сессии);
+-  README п.5 ссылается. Тест inline-feedback-363 переписан (5):
+-  Alert-вызовов нет, оба окна зовут alertService, своих диалоговых
+-  окон нет, отметка применения на месте.
++  Тест inline-feedback-363 переписан (5): Alert-вызовов нет, оба окна
++  зовут alertService, своих диалоговых окон нет, отметка на месте.
++- 365 — ПРАВКА ПО СЛОВУ ВЛАДЕЛЬЦА: для «документа-памяти, как работает
++  приложение» НОВЫЙ файл не заводить — он есть с патча 313:
++  `docs/agents/README.md` (стартовая карта ИИ-агента, дополняется при
++  каждом переезде). mechanisms.md из 364 удалён, содержимое влито в
++  README разделом «Как работают ключевые механизмы». Урок в «Уроках».
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+@@ -405,6 +406,10 @@
+ 
+ ## Уроки (не повторять)
+ 
++- (365) Новые агентские документы НЕ заводить без слова владельца:
++  документ-память «как работает приложение» уже есть —
++  `docs/agents/README.md` (патч 313); дополнения — разделами внутрь неё.
++
+ - ПРОТОКОЛ ВОПРОСОВ (331, слово владельца после 329→330): любое
+   недопонимание или разночтение — СПРАШИВАТЬ владельца и «спихивать» на
+   него описание деталей, даже если ответ кажется очевидным. Два патча на
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index eff87e6..29457fc 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -7,8 +7,9 @@ Per the owner's word: the app has a single popup mechanism that works
+ everywhere — the roll-dice question and refusal messages now use it
+ (the custom dialog window from the previous patch is gone). Same
+ behavior: "Roll dice"/"Auto-success" at zero difficulty, "Done" on
+-refusals, the green "Applied" note for mods. Also added a mechanisms
+-cheat sheet for faster future work (docs/agents/mechanisms.md).
++refusals, the green "Applied" note for mods. The mechanisms cheat sheet is merged into the agent map
++docs/agents/README.md (no separate file — amended in patch 365 per
++the owner's word).
+ 
+ ## Craft and mod buttons respond on the web (patch 363)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 3988dd0..611c70d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -8,8 +8,8 @@
+ переведены на него (своё отдельное окно из прошлого патча снесено).
+ Поведение то же: «Бросить кубики»/«Автоуспех» при снятой сложности,
+ «Готово» у сообщений об отказе, зелёная отметка «Применено» у модов.
+-Также заведена шпаргалка механизмов приложения для быстрой работы
+-будущих изменений (docs/agents/mechanisms.md).
++Шпаргалка механизмов влита в карту агента docs/agents/README.md
++(отдельный файл не заводился — правка 365 по слову владельца).
+ 
+ ## Кнопки крафта и модов отвечают на вебе (патч 363)
+ 
+diff --git a/public/version.json b/public/version.json
+index 19ea018..894acd8 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "364",
++  "version": "365",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
