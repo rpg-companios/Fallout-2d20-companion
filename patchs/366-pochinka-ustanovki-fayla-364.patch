@@ -1,0 +1,70 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index ee30410..a55e566 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -406,6 +406,12 @@
+ 
+ ## Уроки (не повторять)
+ 
++- (366) Файл патча N генерировать СТРОГО от предыдущего «файл патча»-
++  коммита: `git diff <prev-файл-патча> <контент-N>`; 364 собрал от базы
++  до-363 — патч не вставал ровно после 363 (двойные правки), а e2e
++  «поверх 12ad784» это маскировал. Перед сдачей — прогон цепочки
++  `git apply --check` подряд (N−1→N→N+1) на копии предыдущего состояния.
++
+ - (365) Новые агентские документы НЕ заводить без слова владельца:
+   документ-память «как работает приложение» уже есть —
+   `docs/agents/README.md` (патч 313); дополнения — разделами внутрь неё.
+@@ -430,3 +436,7 @@
+   падает с «cannot apply binary patch» (320).
+ - Проводка «кнопка → окно» проверяется приёмочным тестом (урок 319: модалка
+   жила в коде, но кнопка годами звала заглушку).
++й diff молча выбрасывает бинарь, установщик
++  падает с «cannot apply binary patch» (320).
++- Проводка «кнопка → окно» проверяется приёмочным тестом (урок 319: модалка
++  жила в коде, но кнопка годами звала заглушку).
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 29457fc..385c5a5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,12 @@
+ # Changelog
+ 
+ ---
++## Update installer fix (patch 366)
++
++Update #364 failed to install after #363: the update file was built
++against the wrong base. Rebuilt — installing 364–366 now works on the
++first try. Gameplay is unaffected; this fixes the installer itself.
++
+ ## Dialogs go through the app-wide unified mechanism (patch 364)
+ 
+ Per the owner's word: the app has a single popup mechanism that works
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 611c70d..584c649 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,12 @@
+ # История изменений
+ 
+ ---
++## Починка установки обновлений (патч 366)
++
++Обновление №364 не устанавливалось после №363: файл обновления был
++собран не от той основы. Пересобран — установка 364–366 проходит
++с первого раза. На игру правка не влияет, она чинит саму установку.
++
+ ## Диалоги — через единый механизм приложения (патч 364)
+ 
+ По слову владельца: в приложении единый механизм всплывающих окон,
+diff --git a/public/version.json b/public/version.json
+index 894acd8..cd2ad0b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "365",
++  "version": "366",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
