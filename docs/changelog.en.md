@@ -1,6 +1,15 @@
 # Changelog
 
 ---
+## Dialogs go through the app-wide unified mechanism (patch 364)
+
+Per the owner's word: the app has a single popup mechanism that works
+everywhere — the roll-dice question and refusal messages now use it
+(the custom dialog window from the previous patch is gone). Same
+behavior: "Roll dice"/"Auto-success" at zero difficulty, "Done" on
+refusals, the green "Applied" note for mods. Also added a mechanisms
+cheat sheet for faster future work (docs/agents/mechanisms.md).
+
 ## Craft and mod buttons respond on the web (patch 363)
 
 From the owner's bug batch, the root of the "silent" buttons: on the

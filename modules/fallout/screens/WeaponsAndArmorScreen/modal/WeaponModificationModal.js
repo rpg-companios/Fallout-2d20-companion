@@ -21,6 +21,9 @@ import { getActionPoints } from '../../../../../domain/actionPoints';
 // 357: отчёт о крафте — тот же компонент, что в окне крафта (кубики, исход,
 // сгоревшие материалы, время, вопрос про 2 ОД).
 import CraftReportView from '../../../crafting/CraftReportView';
+// 364: вопросы/отказы — через ЕДИНУЮ точку диалогов (AlertHost работает
+// везде; системный Alert на Web — тихая заглушка).
+import { showRawAlert } from '../../../../../components/alerts/alertService';
 
 
 function toNumber(v) {
@@ -328,24 +331,23 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
-  // 363: inline-вопрос/отказ (системный Alert на Web — тихая заглушка:
-  // «бросить кубики?» и «не хватает перка/материалов» молчали).
-  const [craftNotice, setCraftNotice] = useState(null); // {title, text, actions:[{label, primary, onPress}]}
-  const [installNote, setInstallNote] = useState(null); // видимая отметка установки
+  const [installNote, setInstallNote] = useState(null); // 363: видимая отметка установки
 
   const handleCreateMod = (modId, modName) => {
     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
     // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
     const evaluation = craftingPreview(modId)?.evaluation;
     if (evaluation?.auto) {
-      setCraftNotice({
+      // 364: вопрос через единую точку диалогов; закрытие без выбора = автоуспех.
+      showRawAlert({
         title: tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
-        text: tWeaponsAndArmorScreen('modals.createAskZeroText'),
-        actions: [
-          { label: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'auto'); } },
-          { label: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), primary: true, onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'roll'); } },
+        message: tWeaponsAndArmorScreen('modals.createAskZeroText'),
+        kind: 'choice',
+        buttons: [
+          { text: tWeaponsAndArmorScreen('modals.createAskZeroRoll') },
+          { text: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), style: 'cancel' },
         ],
-      });
+      }).then((index) => runCreateMod(modId, modName, index === 0 ? 'roll' : 'auto'));
       return;
     }
     runCreateMod(modId, modName, 'auto');
@@ -359,10 +361,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
       const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
         ? 'modals.createFailMissingPerk'
         : 'modals.createFailMaterials';
-      setCraftNotice({
+      showRawAlert({
         title: tWeaponsAndArmorScreen('modals.createFailTitle'),
-        text: tWeaponsAndArmorScreen(reasonKey),
-        actions: [{ label: tWeaponsAndArmorScreen('modals.createNoticeDone'), onPress: () => setCraftNotice(null) }],
+        message: tWeaponsAndArmorScreen(reasonKey),
       });
       return;
     }
@@ -681,26 +682,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           </View>
         </View>
       </View>
-
-      {/* 363: inline-вопрос/отказ — системный Alert на Web молчал. */}
-      <Modal visible={!!craftNotice} transparent animationType="fade" onRequestClose={() => setCraftNotice(null)}>
-        <View style={styles.reportOverlay}>
-          <View style={styles.reportDialog}>
-            <Text style={styles.reportTitle}>{craftNotice?.title ?? ''}</Text>
-            <Text style={styles.reportText}>{craftNotice?.text ?? ''}</Text>
-            <View style={styles.noticeActions}>
-              {(craftNotice?.actions ?? []).map((a, i) => (
-                <TouchableOpacity
-                  key={`a_${i}`}
-                  style={a.primary ? [styles.bigCraft, styles.noticeActionsBigCraft] : styles.qtyCancel}
-                  onPress={a.onPress}>
-                  <Text style={a.primary ? styles.bigCraftText : styles.qtyCancelText}>{a.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
           короткий Alert: «Проверка навыка не пройдена» без кубиков и без
