@@ -953,6 +953,15 @@ const WeaponsAndArmorScreen = () => {
     setSelectedWeaponForModification(null);
   };
 
+  // Селекторы действий стора — ВЫШЕ колбэков, чьи массивы зависимостей их
+  // читают при рендере (362: TDZ «Cannot access before initialization» —
+  // объявления стояли ниже handleApplyModification).
+  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
+  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
+  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
+  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+
   const handleApplyModification = useCallback((modifiedWeapon) => {
     handleCloseModificationModal();
     const itemId = resolveStoreItemId(selectedWeaponForModification);
@@ -1093,12 +1102,6 @@ const WeaponsAndArmorScreen = () => {
     setArmorModalMode(mode);
     setArmorModalVisible(true);
   };
-
-  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
-  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
-  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
-  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
-  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
 
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;

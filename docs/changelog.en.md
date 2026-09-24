@@ -1,6 +1,13 @@
 # Changelog
 
 ---
+## Fixed the equipment screen crash (patch 362)
+
+The "Cannot access before initialization" error when opening the
+Weapons and Armor screen — a regression from patch 359 where store
+action selectors were declared below the code using them. Moved above;
+a test now guards the declaration order.
+
 ## Export = save, byte for byte (patch 361)
 
 Per the owner's request "export always equals the save": the source of
