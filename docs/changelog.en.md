@@ -1,6 +1,15 @@
 # Changelog
 
 ---
+## Export = save, byte for byte (patch 361)
+
+Per the owner's request "export always equals the save": the source of
+historical drift is gone — on export the save body was re-compressed
+with the screen's catalog, so the file could differ from the save
+(different locale, updated compression rules, double pass). The export
+file now carries exactly the body stored in the save, with no
+reprocessing. Import and old "fat" files work as before.
+
 ## Robot weapon mods after loading a save: ghost cleanup and reliable writes (patch 360)
 
 From the owner's save export (an assaultron with a laser gun): old
