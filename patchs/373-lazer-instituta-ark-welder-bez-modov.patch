@@ -1,0 +1,3648 @@
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 239a411..243dce4 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,15 +8,16 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **372** · у владельца закоммичено до **365**
++· последний сданный патч: **373** · у владельца закоммичено до **365**
+ (экспорты файлов патчей на main: 364+365); ревизия модов: материал
+ собран — 369 (имена оружия), 370–371 (141 пара дальнего боя, 13 новых
+-модов одобрены), 372 (мили: 38 оружий, 53 пары 1:1, поддержка уже
+-совпадает, 9 новых строк, 14 переименований оружия; остались без списков
+-4 ствола: Дуговая сварка, Лазер института, 10-мм ПП, Плазменная мина).
+-Робо-моды не трогаем (отдельный контур, работает). Данные не тронуты.
+-Дальше: серия патчей ревизии (канон-id, слияние фантомов, названия по
+-владельцу, новые 22 строки, перенос сохранений).
++модов), 372 (мили: 53 пары 1:1, 9 новых строк, 14 переименований),
++373 (Лазер института: референс владельца совпал 17/17; Электросварка =
++arc welder без модов — снять 24 лишние привязки). Счёт: совпали 539,
++добавить 580, снять 147; без списков только 10-мм ПП и Плазменная мина
++(не трогаем). Робо-моды не трогаем (отдельный контур, работает).
++Данные не тронуты. Дальше: серия патчей ревизии (канон-id, слияние
++фантомов, названия по владельцу, новые 22 строки, перенос сохранений).
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e9a70aa..9729741 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -4,6 +4,16 @@
+ ---
+ ---
+ ---
++---
++## Institute laser confirmed by the reference, arc welder has no mods (patch 373)
++
++The Institute Laser reference you sent matches the app on all 17 mods and
++stats — no divergence. Arc welder is recorded as one weapon (= "Дуговая
++сварка", "Сварочная горелка") with no mods — its 24 catalog bindings are
++extra and will be removed in the revision. Final tally: 539 bindings match,
++580 to add, 147 to remove; only the 10mm SMG and plasma mine remain without
++your lists — left untouched.
++
+ ## Melee mods cross-checked against your catalog (patch 372)
+ 
+ The melee catalog you sent (38 weapons) is resolved: 35 exist in the game
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a0cb412..cade094 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Лазер института подтверждён референсом, Электросварка — без модов (патч 373)
++
++Присланный референс Институтского лазера совпал с программой по всем 17
++улучшениям и статам — расхождений нет, список просто подтверждён. По
++Электросварке зафиксировано: это одно оружие (она же «Дуговая сварка» и
++«Сварочная горелка»), улучшений у неё не предусмотрено — 24 привязки в
++каталоге лишние, будут сняты при ревизии. Итоговое сведение: совпадает
++539 связок, добавить 580, снять 147; без ваших списков остались только
++10-мм пистолет-пулемёт и Плазменная мина — их не трогаем.
++
+ ## Милицейские моды сверены с вашим каталогом (патч 372)
+ 
+ Присланный каталог ближнего боя (38 оружий) разобран: 35 найдены в игре
+diff --git a/docs/reference-data/melee-catalog-owner-372.json b/docs/reference-data/melee-catalog-owner-372.json
+index f730f5e..c0e0a5c 100644
+--- a/docs/reference-data/melee-catalog-owner-372.json
++++ b/docs/reference-data/melee-catalog-owner-372.json
+@@ -1,44 +1,1385 @@
+ {
+-  "источник": "владелец, 2026-09-25 (fallout-2d20.ru), мили + рукопашная",
+-  "note": "Данные владельца дословно; URL очищены от markdown-обёрток чата",
+-  "weapons": [
+-    {"id":"vykidnoj-nozh","name":"Выкидной нож","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/vykidnoj-nozh","catalogId":"weapon_switchblade","type":"Ближний бой","damageType":"Физический","damage":"2","effects":["Проникающий 1"],"qualities":["Скрытное"],"weight":"1","cost":"20","rarity":"0","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_113"]}]},
+-    {"id":"dubinka","name":"Дубинка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dubinka","catalogId":"weapon_baton","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"15","rarity":"1","mods":[{"name":"Электризованная","prefix":"Шокирующая","effects":"+2 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+15","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_132"]},{"name":"Электрошокер","prefix":"Оглушающая","effects":"+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"","weight":"-","cost":"+30","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_133"]}]},
+-    {"id":"mech","name":"Меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/mech","catalogId":"weapon_sword","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"50","rarity":"2","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"Добавляет \"Устойчивый\"","weight":"-","cost":"+25","perks":"Кузнец 2","catalogIds":["mod_103"]},{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_104"]},{"name":"Электризованное зазубренное лезвие","prefix":"Электризованный зазубренный","effects":"+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)","weight":"-","cost":"+75","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_105"]},{"name":"Электрошокер","prefix":"Оглушающий","effects":"+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"","weight":"-","cost":"+100","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_106"]}]},
+-    {"id":"boevoj-nozh","name":"Боевой нож","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/boevoj-nozh","catalogId":"weapon_combat_knife","type":"Ближний бой","damageType":"Физический","damage":"3","effects":["Проникающий 1"],"qualities":[],"weight":"1","cost":"25","rarity":"1","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+12","perks":"Кузнец 1","catalogIds":["mod_107"]},{"name":"Скрытное лезвие","prefix":"Скрытный","effects":"+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках","weight":"-","cost":"+18","perks":"Кузнец 2","catalogIds":["mod_108"]}]},
+-    {"id":"machete","name":"Мачете","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/machete","catalogId":"weapon_machete","type":"Ближний бой","damageType":"Физический","damage":"3","effects":["Проникающий 1"],"qualities":[],"weight":"2","cost":"25","rarity":"1","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+2 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_109"]}]},
+-    {"id":"potroshitel","name":"Потрошитель","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/potroshitel","catalogId":"weapon_ripper","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Порочный"],"qualities":[],"weight":"6","cost":"50","rarity":"2","mods":[{"name":"Изогнутое лезвие","prefix":"Изогнутый","effects":"+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника, выбив оружие из рук","weight":"+1","cost":"+15","perks":"-","catalogIds":["mod_110"]},{"name":"Удлиненное лезвие","prefix":"Удлиненный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"+3","cost":"+25","perks":"Кузнец 3","catalogIds":["mod_111"]}]},
+-    {"id":"shish-kebab","name":"Шиш-кебаб","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shish-kebab","catalogId":"weapon_shishkebab","type":"Ближний бой","damageType":"Энергетический","damage":"5","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"200","rarity":"3","mods":[{"name":"Дополнительные воспламенительные форсунки","prefix":"Жгучий","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"+1","cost":"+100","perks":"Кузнец 3","catalogIds":["mod_112"]}]},
+-    {"id":"bejsbolnaya-bita","name":"Бейсбольная бита","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bejsbolnaya-bita","catalogId":"weapon_baseball_bat","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"3","cost":"25","rarity":"1","mods":[{"name":"Колючая","prefix":"Колючая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+5","perks":"-","catalogIds":["mod_114"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+7","perks":"-","catalogIds":["mod_115"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+7","perks":"-","catalogIds":["mod_116"]},{"name":"Обмотанная цепью","prefix":"Обмотанная цепью","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_117"]},{"name":"Лезвия","prefix":"Клинковая","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_118"]}]},
+-    {"id":"alyuminievaya-bejsbolnaya-bita","name":"Алюминиевая бейсбольная бита","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/alyuminievaya-bejsbolnaya-bita","catalogId":"weapon_baseball_bat_aluminum","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":["Двуручное"],"weight":"2","cost":"32","rarity":"2","mods":[{"name":"Колючая","prefix":"Колючая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+5","perks":"Кузнец 1","catalogIds":["mod_114"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_115"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_116"]},{"name":"Обмотанная цепью","prefix":"Обмотанная цепью","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_117"]},{"name":"Лезвия","prefix":"Клинковая","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_118"]}]},
+-    {"id":"dryn","name":"Дрын","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dryn","catalogId":"weapon_board","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"3","cost":"20","rarity":"0","mods":[{"name":"Шипованный","prefix":"Шипованный","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+6","perks":"-","catalogIds":["mod_119"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_120"]},{"name":"Лезвия","prefix":"Клинковый","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+10","perks":"Кузнец 2","catalogIds":["mod_121"]}]},
+-    {"id":"svintsovaya-truba","name":"Свинцовая труба","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svintsovaya-truba","catalogId":"weapon_lead_pipe","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"3","cost":"15","rarity":"0","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+4","perks":"-","catalogIds":["mod_122"]},{"name":"Утяжеленная","prefix":"Утяжеленная","effects":"+2 БК","weight":"+2","cost":"+11","perks":"Кузнец 2","catalogIds":["mod_123"]}]},
+-    {"id":"razvodnoj-klyuch","name":"Разводной ключ","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/razvodnoj-klyuch","catalogId":"weapon_pipe_wrench","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"30","rarity":"1","mods":[{"name":"Крюк","prefix":"Загнутый","effects":"+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника","weight":"-","cost":"+9","perks":"-","catalogIds":["mod_124"]},{"name":"Утяжеленный","prefix":"Увесистый","effects":"+2 БК","weight":"+7","cost":"+12","perks":"Кузнец 1","catalogIds":["mod_125"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК, добавляет \"Проникающий\"","weight":"+1","cost":"+13","perks":"Кузнец 1","catalogIds":["mod_126"]},{"name":"Сверхтяжелый","prefix":"Сверхтяжелый","effects":"+3 БК","weight":"+2","cost":"+22","perks":"Кузнец 2","catalogIds":["mod_127"]}]},
+-    {"id":"bilyardnyj-kij","name":"Бильярдный кий","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bilyardnyj-kij","catalogId":"weapon_pool_cue","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"1","cost":"10","rarity":"0","mods":[{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+2","perks":"-","catalogIds":["mod_128"]},{"name":"Заостренный","prefix":"Заостренный","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_129"]}]},
+-    {"id":"skalka","name":"Скалка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/skalka","catalogId":"weapon_rolling_pin","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"1","cost":"10","rarity":"0","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_130"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_131"]}]},
+-    {"id":"kuvalda","name":"Кувалда","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kuvalda","catalogId":"weapon_sledgehammer","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":[],"weight":"12","cost":"40","rarity":"2","mods":[{"name":"Прокалывающая","prefix":"Прокалывающая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+5","cost":"+18","perks":"Кузнец 2","catalogIds":["mod_134"]},{"name":"Тяжелая","prefix":"Тяжелая","effects":"+2 БК","weight":"+9","cost":"+30","perks":"Кузнец 2","catalogIds":["mod_135"]}]},
+-    {"id":"supermolot","name":"Супермолот","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/supermolot","catalogId":"weapon_super_sledge","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Разрушающий"],"qualities":["Двуручное"],"weight":"20","cost":"180","rarity":"3","mods":[{"name":"Нагревательная спираль","prefix":"Раскаленная","effects":"+1 БК, Измените тип урона на Энергетический","weight":"-","cost":"+180","perks":"Кузнец 2","catalogIds":["mod_136"]},{"name":"Электрошокер","prefix":"Оглушающая","effects":"+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический","weight":"-","cost":"+360","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_137"]}]},
+-    {"id":"balonnyj-klyuch","name":"Балонный ключ","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/balonnyj-klyuch","catalogId":"weapon_tire_iron","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"3","cost":"25","rarity":"1","mods":[{"name":"Лезвия","prefix":"Клинковый","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_138"]}]},
+-    {"id":"trost","name":"Трость","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/trost","catalogId":"weapon_walking_cane","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"10","rarity":"0","mods":[{"name":"Колючая","prefix":"Колючая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_139"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_140"]}]},
+-    {"id":"bokserskaya-perchatka","name":"Боксерская перчатка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bokserskaya-perchatka","catalogId":"weapon_boxing_glove","type":"Рукопашная","damageType":"Физический","damage":"3","effects":["Оглушающий"],"qualities":[],"weight":"1","cost":"10","rarity":"1","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_141"]},{"name":"Колючая","prefix":"Колючая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+4","perks":"Кузнец 1","catalogIds":["mod_142"]},{"name":"Свинцовая подкладка","prefix":"Свинцовая","effects":"+2 БК","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_143"]}]},
+-    {"id":"perchatka-kogtya-smerti","name":"Перчатка когтя смерти","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-kogtya-smerti","catalogId":"weapon_deathclaw_gauntlet","type":"Рукопашная","damageType":"Физический","damage":"5","effects":["Проникающий 1"],"qualities":[],"weight":"10","cost":"75","rarity":"3","mods":[{"name":"Дополнительный коготь","prefix":"Большая","effects":"+1 БК, при успешной атаке потратьте 2 ОД, чтобы обезоружить противника","weight":"+2","cost":"+22","perks":"-","catalogIds":["mod_144"]}]},
+-    {"id":"kastet","name":"Кастет","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kastet","catalogId":"weapon_knuckles","type":"Рукопашная","damageType":"Физический","damage":"3","effects":[],"qualities":["Скрытное"],"weight":"<1","cost":"10","rarity":"1","mods":[{"name":"Заостренный","prefix":"Заостренный","effects":"добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_145"]},{"name":"Шипованный","prefix":"Шипованный","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_146"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+4","perks":"Кузнец 1","catalogIds":["mod_147"]},{"name":"Лезвия","prefix":"Клинковый","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+5","perks":"Кузнец 1","catalogIds":["mod_148"]}]},
+-    {"id":"silovoj-kastet","name":"Силовой кастет","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/silovoj-kastet","catalogId":"weapon_power_fist","type":"Рукопашная","damageType":"Физический","damage":"4","effects":["Оглушающий"],"qualities":[],"weight":"4","cost":"100","rarity":"2","mods":[{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+45","perks":"Кузнец 2","catalogIds":["mod_149"]},{"name":"Нагревательная спираль","prefix":"Раскаленный","effects":"+2 БК, измените тип урона на \"Энергетический\"","weight":"-","cost":"+100","perks":"Кузнец 3","catalogIds":["mod_150"]}]},
+-    {"id":"klinok-shturmotrona","name":"Клинок штурмотрона","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/klinok-shturmotrona","catalogId":"weapon_assaultron_blade","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":[],"weight":"3","cost":"50","rarity":"3","mods":[{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true}]},
+-    {"id":"avtotopor","name":"Автотопор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/avtotopor","catalogId":"weapon_auto_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Порочный"],"qualities":["Двуручный"],"weight":"20","cost":"100","rarity":"3","mods":[{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Горящее лезвие","prefix":"Горящее","effects":"Измените тип урона на \"Энергетический\", получает \"Стойкий\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Ядовитое лезвие","prefix":"Ядовитое","effects":"Добавляет \"Стойкий\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Турбо","prefix":"Турбо","effects":"Каждое потраченное ОД на дополнительный урон прибавляет +2 БК, вместо +1 БК","weight":"+2","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true}]},
+-    {"id":"benzopila","name":"Бензопила","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/benzopila","catalogId":"weapon_chainsaw","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Порочный"],"qualities":["Двуручное"],"weight":"12","cost":"140","rarity":"3","special":"Не получает бонуса к урону в ближнем бою от характеристик пользователя (СИЛ не добавляется).","mods":[{"name":"Двойная шина","prefix":"Двойная","effects":"+2 БК","weight":"+1","cost":"+30","perks":"Кузнец 2","catalogIds":[],"new":true},{"name":"Изогнутая шина","prefix":"Изогнутая","effects":"Получает \"Проникающий\" 1","weight":"+2","cost":"+45","perks":"Кузнец 3","catalogIds":[],"new":true},{"name":"Удлинённая изогнутая шина","prefix":"Удлинённая изогнутая","effects":"добавляет \"Стойкий\"","weight":"+3","cost":"+60","perks":"Кузнец 3","catalogIds":[],"new":true},{"name":"Огнемет","prefix":"Огненный","effects":"+1 БК, измените тип урона на \"Энергетический\", мод \"Огнемет\" может быть добавлен как дополнение к любому другому моду","weight":"+2","cost":"+90","perks":"Кузнец 3, Фанатик Оружия 1","catalogIds":[],"new":true}]},
+-    {"id":"ballisticheskij-kulak","name":"Баллистический кулак","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/ballisticheskij-kulak","catalogId":"weapon_ballistic_fist","type":"Рукопашная","damageType":"Физический","damage":"6","effects":["Оглушение","Порочный"],"qualities":["Медленная перезарядка"],"weight":"6","cost":"150","rarity":"4","special":"Требует 1 патрон для дробовика на каждую атаку. Из-за 'Медленной перезарядки' нужно перезарядить малым действием перед следующим использованием. Без патрона — обычная атака без оружия."},
+-    {"id":"bolshoj-mech","name":"Большой меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bolshoj-mech","catalogId":"weapon_bumper_sword","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Проникающий 1"],"qualities":["Отдача 7","Двуручный"],"weight":"12","cost":"125","rarity":"2","special":"Отдача 7: требует СИЛ 7+, иначе +1 сложность. Двуручный."},
+-    {"id":"elektroshoker","name":"Электрошокер","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/elektroshoker","catalogId":"weapon_cattle_prod","type":"Ближний бой","damageType":"Энергетический","damage":"7","effects":["Оглушение"],"qualities":[],"weight":"3","cost":"90","rarity":"4"},
+-    {"id":"tanbo-smerti","name":"Танбо смерти","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tanbo-smerti","catalogId":"weapon_death_tambo","type":"Рукопашная","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":[],"weight":"1","cost":"40","rarity":"2","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звона."},
+-    {"id":"perchatka-vytesnitel","name":"Перчатка-вытеснитель","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-vytesnitel","catalogId":"weapon_displacer_glove","type":"Рукопашная","damageType":"Физический","damage":"6","effects":["Проникающий 1","Оглушение"],"qualities":[],"weight":"6","cost":"175","rarity":"4"},
+-    {"id":"gitara-mech","name":"Гитара-меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/gitara-mech","catalogId":"weapon_guitar_sword","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"45","rarity":"3","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."},
+-    {"id":"tsirkulyarnyj-rezak-mistera-pomoshchnika","name":"Циркулярный резак Мистера Помощника","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tsirkulyarnyj-rezak-mistera-pomoshchnika","catalogId":"weapon_mr_handy_buzz_blade","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Порочный"],"qualities":["Двуручное"],"weight":"10","cost":"50","rarity":"2"},
+-    {"id":"universalnyj-topor","name":"Универсальный топор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/universalnyj-topor","catalogId":"weapon_multi_purpose_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":["Двуручное"],"weight":"4","cost":"40","rarity":"2"},
+-    {"id":"protonnyj-topor","name":"Протонный топор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/protonnyj-topor","catalogId":"weapon_proton_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Проникающий 1"],"qualities":["Всплеск"],"weight":"8","cost":"175","rarity":"5","special":"Особо эффективен против роботов и механики."},
+-    {"id":"voennyj-baraban","name":"Военный барабан","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/voennyj-baraban","catalogId":"weapon_war_drum","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Оглушение"],"qualities":["Двуручное"],"weight":"20","cost":"115","rarity":"3","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."},
+-    {"id":"posokh-atoma","name":"Посох Атома","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/posokh-atoma","catalogId":null,"type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Проникающий 1"],"qualities":["Парирование","Двуручный"],"weight":"15","cost":"200","rarity":"4","note":"НЕТ В КАТАЛОГЕ","mods":[{"name":"Шокирующие катушки","prefix":"Стремительный","effects":"+2 БК, Наносит оба вида урона, Физический и Энергетический","weight":"-","cost":"+100","perks":"Кузнец 2, Наука! 2","catalogIds":[],"new":true}]},
+-    {"id":"shakhterskij-perforator","name":"Шахтерский перфоратор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shakhterskij-perforator","catalogId":null,"type":"Ближний бой","damageType":"Физический","damage":"2","effects":["Проникающий 2","Разрушающий"],"qualities":["Двуручный"],"weight":"18","cost":"100","rarity":"4","note":"НЕТ В КАТАЛОГЕ","special":"Встроена ячейка с Ядерной батареей: можно потратить 1-3 заряда ячейки чтобы добавить 1-3 БК к базовому урону при атаке."},
+-    {"id":"svarochnaya-gorelka","name":"Сварочная горелка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svarochnaya-gorelka","catalogId":"weapon_arc_welder?","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 3","Устойчивый"],"qualities":["Ослабляющее","Неточный","Топливо"],"weight":"15","cost":"120","rarity":"4","note":"ВОПРОС: это weapon_arc_welder (сейчас «Электросварка», статы 3/370/4) или отдельное оружие? Статы владельца: 15/120/4","special":"Свойство ТОПЛИВО (Топливо для огнемета): нужно 4 топлива для работы. При выпадении Осложнения при атаке топливо заканчивается и нужна перезарядка (малое действие) перед следующим использованием."}
+-  ]
+-}
++ "источник": "владелец, 2026-09-25 (fallout-2d20.ru), мили + рукопашная",
++ "note": "Данные владельца дословно; URL очищены от markdown-обёрток чата",
++ "weapons": [
++  {
++   "id": "vykidnoj-nozh",
++   "name": "Выкидной нож",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/vykidnoj-nozh",
++   "catalogId": "weapon_switchblade",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "2",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Скрытное"
++   ],
++   "weight": "1",
++   "cost": "20",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Зазубренное лезвие",
++     "prefix": "Зазубренный",
++     "effects": "+1 БК, Добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+10",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_113"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "dubinka",
++   "name": "Дубинка",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dubinka",
++   "catalogId": "weapon_baton",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "2",
++   "cost": "15",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Электризованная",
++     "prefix": "Шокирующая",
++     "effects": "+2 БК, Измените тип урона на \"Энергетический\"",
++     "weight": "-",
++     "cost": "+15",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [
++      "mod_132"
++     ]
++    },
++    {
++     "name": "Электрошокер",
++     "prefix": "Оглушающая",
++     "effects": "+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
++     "weight": "-",
++     "cost": "+30",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [
++      "mod_133"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "mech",
++   "name": "Меч",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/mech",
++   "catalogId": "weapon_sword",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Парирование"
++   ],
++   "weight": "3",
++   "cost": "50",
++   "rarity": "2",
++   "mods": [
++    {
++     "name": "Зазубренное лезвие",
++     "prefix": "Зазубренный",
++     "effects": "Добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+25",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_103"
++     ]
++    },
++    {
++     "name": "Электризованное лезвие",
++     "prefix": "Электризованный",
++     "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
++     "weight": "-",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [
++      "mod_104"
++     ]
++    },
++    {
++     "name": "Электризованное зазубренное лезвие",
++     "prefix": "Электризованный зазубренный",
++     "effects": "+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)",
++     "weight": "-",
++     "cost": "+75",
++     "perks": "Кузнец 3, Наука! 1",
++     "catalogIds": [
++      "mod_105"
++     ]
++    },
++    {
++     "name": "Электрошокер",
++     "prefix": "Оглушающий",
++     "effects": "+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
++     "weight": "-",
++     "cost": "+100",
++     "perks": "Кузнец 3, Наука! 1",
++     "catalogIds": [
++      "mod_106"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "boevoj-nozh",
++   "name": "Боевой нож",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/boevoj-nozh",
++   "catalogId": "weapon_combat_knife",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [],
++   "weight": "1",
++   "cost": "25",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Зазубренное лезвие",
++     "prefix": "Зазубренный",
++     "effects": "+1 БК, Добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+12",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_107"
++     ]
++    },
++    {
++     "name": "Скрытное лезвие",
++     "prefix": "Скрытный",
++     "effects": "+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках",
++     "weight": "-",
++     "cost": "+18",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_108"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "machete",
++   "name": "Мачете",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/machete",
++   "catalogId": "weapon_machete",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [],
++   "weight": "2",
++   "cost": "25",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Зазубренное лезвие",
++     "prefix": "Зазубренный",
++     "effects": "+2 БК, Добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+12",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_109"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "potroshitel",
++   "name": "Потрошитель",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/potroshitel",
++   "catalogId": "weapon_ripper",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Порочный"
++   ],
++   "qualities": [],
++   "weight": "6",
++   "cost": "50",
++   "rarity": "2",
++   "mods": [
++    {
++     "name": "Изогнутое лезвие",
++     "prefix": "Изогнутый",
++     "effects": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника, выбив оружие из рук",
++     "weight": "+1",
++     "cost": "+15",
++     "perks": "-",
++     "catalogIds": [
++      "mod_110"
++     ]
++    },
++    {
++     "name": "Удлиненное лезвие",
++     "prefix": "Удлиненный",
++     "effects": "+1 БК, Добавляет \"Устойчивый\"",
++     "weight": "+3",
++     "cost": "+25",
++     "perks": "Кузнец 3",
++     "catalogIds": [
++      "mod_111"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "shish-kebab",
++   "name": "Шиш-кебаб",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shish-kebab",
++   "catalogId": "weapon_shishkebab",
++   "type": "Ближний бой",
++   "damageType": "Энергетический",
++   "damage": "5",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Парирование"
++   ],
++   "weight": "3",
++   "cost": "200",
++   "rarity": "3",
++   "mods": [
++    {
++     "name": "Дополнительные воспламенительные форсунки",
++     "prefix": "Жгучий",
++     "effects": "+1 БК, Добавляет \"Устойчивый\"",
++     "weight": "+1",
++     "cost": "+100",
++     "perks": "Кузнец 3",
++     "catalogIds": [
++      "mod_112"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "bejsbolnaya-bita",
++   "name": "Бейсбольная бита",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bejsbolnaya-bita",
++   "catalogId": "weapon_baseball_bat",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "3",
++   "cost": "25",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Колючая",
++     "prefix": "Колючая",
++     "effects": "Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+5",
++     "perks": "-",
++     "catalogIds": [
++      "mod_114"
++     ]
++    },
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+1",
++     "cost": "+7",
++     "perks": "-",
++     "catalogIds": [
++      "mod_115"
++     ]
++    },
++    {
++     "name": "Заостренная",
++     "prefix": "Заостренная",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "+1",
++     "cost": "+7",
++     "perks": "-",
++     "catalogIds": [
++      "mod_116"
++     ]
++    },
++    {
++     "name": "Обмотанная цепью",
++     "prefix": "Обмотанная цепью",
++     "effects": "+2 БК",
++     "weight": "+1",
++     "cost": "+10",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_117"
++     ]
++    },
++    {
++     "name": "Лезвия",
++     "prefix": "Клинковая",
++     "effects": "+2 БК, добавляет \"Устойчивый\"",
++     "weight": "+2",
++     "cost": "+12",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_118"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "alyuminievaya-bejsbolnaya-bita",
++   "name": "Алюминиевая бейсбольная бита",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/alyuminievaya-bejsbolnaya-bita",
++   "catalogId": "weapon_baseball_bat_aluminum",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "2",
++   "cost": "32",
++   "rarity": "2",
++   "mods": [
++    {
++     "name": "Колючая",
++     "prefix": "Колючая",
++     "effects": "Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+5",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_114"
++     ]
++    },
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+1",
++     "cost": "+7",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_115"
++     ]
++    },
++    {
++     "name": "Заостренная",
++     "prefix": "Заостренная",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "+1",
++     "cost": "+7",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_116"
++     ]
++    },
++    {
++     "name": "Обмотанная цепью",
++     "prefix": "Обмотанная цепью",
++     "effects": "+2 БК",
++     "weight": "+1",
++     "cost": "+10",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_117"
++     ]
++    },
++    {
++     "name": "Лезвия",
++     "prefix": "Клинковая",
++     "effects": "+2 БК, добавляет \"Устойчивый\"",
++     "weight": "+2",
++     "cost": "+12",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_118"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "dryn",
++   "name": "Дрын",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dryn",
++   "catalogId": "weapon_board",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "3",
++   "cost": "20",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Шипованный",
++     "prefix": "Шипованный",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+1",
++     "cost": "+6",
++     "perks": "-",
++     "catalogIds": [
++      "mod_119"
++     ]
++    },
++    {
++     "name": "Прокалывающий",
++     "prefix": "Прокалывающий",
++     "effects": "+2 БК",
++     "weight": "+1",
++     "cost": "+10",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_120"
++     ]
++    },
++    {
++     "name": "Лезвия",
++     "prefix": "Клинковый",
++     "effects": "+2 БК, добавляет \"Устойчивый\"",
++     "weight": "+2",
++     "cost": "+10",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_121"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "svintsovaya-truba",
++   "name": "Свинцовая труба",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svintsovaya-truba",
++   "catalogId": "weapon_lead_pipe",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "3",
++   "cost": "15",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+1",
++     "cost": "+4",
++     "perks": "-",
++     "catalogIds": [
++      "mod_122"
++     ]
++    },
++    {
++     "name": "Утяжеленная",
++     "prefix": "Утяжеленная",
++     "effects": "+2 БК",
++     "weight": "+2",
++     "cost": "+11",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_123"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "razvodnoj-klyuch",
++   "name": "Разводной ключ",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/razvodnoj-klyuch",
++   "catalogId": "weapon_pipe_wrench",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "2",
++   "cost": "30",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Крюк",
++     "prefix": "Загнутый",
++     "effects": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
++     "weight": "-",
++     "cost": "+9",
++     "perks": "-",
++     "catalogIds": [
++      "mod_124"
++     ]
++    },
++    {
++     "name": "Утяжеленный",
++     "prefix": "Увесистый",
++     "effects": "+2 БК",
++     "weight": "+7",
++     "cost": "+12",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_125"
++     ]
++    },
++    {
++     "name": "Прокалывающий",
++     "prefix": "Прокалывающий",
++     "effects": "+2 БК, добавляет \"Проникающий\"",
++     "weight": "+1",
++     "cost": "+13",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_126"
++     ]
++    },
++    {
++     "name": "Сверхтяжелый",
++     "prefix": "Сверхтяжелый",
++     "effects": "+3 БК",
++     "weight": "+2",
++     "cost": "+22",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_127"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "bilyardnyj-kij",
++   "name": "Бильярдный кий",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bilyardnyj-kij",
++   "catalogId": "weapon_pool_cue",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "1",
++   "cost": "10",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Прокалывающий",
++     "prefix": "Прокалывающий",
++     "effects": "Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+2",
++     "perks": "-",
++     "catalogIds": [
++      "mod_128"
++     ]
++    },
++    {
++     "name": "Заостренный",
++     "prefix": "Заостренный",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_129"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "skalka",
++   "name": "Скалка",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/skalka",
++   "catalogId": "weapon_rolling_pin",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "1",
++   "cost": "10",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_130"
++     ]
++    },
++    {
++     "name": "Заостренная",
++     "prefix": "Заостренная",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_131"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "kuvalda",
++   "name": "Кувалда",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kuvalda",
++   "catalogId": "weapon_sledgehammer",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [],
++   "qualities": [],
++   "weight": "12",
++   "cost": "40",
++   "rarity": "2",
++   "mods": [
++    {
++     "name": "Прокалывающая",
++     "prefix": "Прокалывающая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+5",
++     "cost": "+18",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_134"
++     ]
++    },
++    {
++     "name": "Тяжелая",
++     "prefix": "Тяжелая",
++     "effects": "+2 БК",
++     "weight": "+9",
++     "cost": "+30",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_135"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "supermolot",
++   "name": "Супермолот",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/supermolot",
++   "catalogId": "weapon_super_sledge",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Разрушающий"
++   ],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "20",
++   "cost": "180",
++   "rarity": "3",
++   "mods": [
++    {
++     "name": "Нагревательная спираль",
++     "prefix": "Раскаленная",
++     "effects": "+1 БК, Измените тип урона на Энергетический",
++     "weight": "-",
++     "cost": "+180",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_136"
++     ]
++    },
++    {
++     "name": "Электрошокер",
++     "prefix": "Оглушающая",
++     "effects": "+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический",
++     "weight": "-",
++     "cost": "+360",
++     "perks": "Кузнец 3, Наука! 1",
++     "catalogIds": [
++      "mod_137"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "balonnyj-klyuch",
++   "name": "Балонный ключ",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/balonnyj-klyuch",
++   "catalogId": "weapon_tire_iron",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "3",
++   "cost": "25",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Лезвия",
++     "prefix": "Клинковый",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "+1",
++     "cost": "+12",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_138"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "trost",
++   "name": "Трость",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/trost",
++   "catalogId": "weapon_walking_cane",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [],
++   "weight": "2",
++   "cost": "10",
++   "rarity": "0",
++   "mods": [
++    {
++     "name": "Колючая",
++     "prefix": "Колючая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_139"
++     ]
++    },
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_140"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "bokserskaya-perchatka",
++   "name": "Боксерская перчатка",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bokserskaya-perchatka",
++   "catalogId": "weapon_boxing_glove",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [
++    "Оглушающий"
++   ],
++   "qualities": [],
++   "weight": "1",
++   "cost": "10",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Шипастая",
++     "prefix": "Шипастая",
++     "effects": "Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_141"
++     ]
++    },
++    {
++     "name": "Колючая",
++     "prefix": "Колючая",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+4",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_142"
++     ]
++    },
++    {
++     "name": "Свинцовая подкладка",
++     "prefix": "Свинцовая",
++     "effects": "+2 БК",
++     "weight": "+1",
++     "cost": "+7",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_143"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "perchatka-kogtya-smerti",
++   "name": "Перчатка когтя смерти",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-kogtya-smerti",
++   "catalogId": "weapon_deathclaw_gauntlet",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [],
++   "weight": "10",
++   "cost": "75",
++   "rarity": "3",
++   "mods": [
++    {
++     "name": "Дополнительный коготь",
++     "prefix": "Большая",
++     "effects": "+1 БК, при успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
++     "weight": "+2",
++     "cost": "+22",
++     "perks": "-",
++     "catalogIds": [
++      "mod_144"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "kastet",
++   "name": "Кастет",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kastet",
++   "catalogId": "weapon_knuckles",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "3",
++   "effects": [],
++   "qualities": [
++    "Скрытное"
++   ],
++   "weight": "<1",
++   "cost": "10",
++   "rarity": "1",
++   "mods": [
++    {
++     "name": "Заостренный",
++     "prefix": "Заостренный",
++     "effects": "добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_145"
++     ]
++    },
++    {
++     "name": "Шипованный",
++     "prefix": "Шипованный",
++     "effects": "Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+3",
++     "perks": "-",
++     "catalogIds": [
++      "mod_146"
++     ]
++    },
++    {
++     "name": "Прокалывающий",
++     "prefix": "Прокалывающий",
++     "effects": "+1 БК, Добавляет \"Проникающий\" 1",
++     "weight": "-",
++     "cost": "+4",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_147"
++     ]
++    },
++    {
++     "name": "Лезвия",
++     "prefix": "Клинковый",
++     "effects": "+1 БК, добавляет \"Устойчивый\"",
++     "weight": "-",
++     "cost": "+5",
++     "perks": "Кузнец 1",
++     "catalogIds": [
++      "mod_148"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "silovoj-kastet",
++   "name": "Силовой кастет",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/silovoj-kastet",
++   "catalogId": "weapon_power_fist",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Оглушающий"
++   ],
++   "qualities": [],
++   "weight": "4",
++   "cost": "100",
++   "rarity": "2",
++   "mods": [
++    {
++     "name": "Прокалывающий",
++     "prefix": "Прокалывающий",
++     "effects": "+2 БК, Добавляет \"Проникающий\" 1",
++     "weight": "+1",
++     "cost": "+45",
++     "perks": "Кузнец 2",
++     "catalogIds": [
++      "mod_149"
++     ]
++    },
++    {
++     "name": "Нагревательная спираль",
++     "prefix": "Раскаленный",
++     "effects": "+2 БК, измените тип урона на \"Энергетический\"",
++     "weight": "-",
++     "cost": "+100",
++     "perks": "Кузнец 3",
++     "catalogIds": [
++      "mod_150"
++     ]
++    }
++   ]
++  },
++  {
++   "id": "klinok-shturmotrona",
++   "name": "Клинок штурмотрона",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/klinok-shturmotrona",
++   "catalogId": "weapon_assaultron_blade",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [],
++   "weight": "3",
++   "cost": "50",
++   "rarity": "3",
++   "mods": [
++    {
++     "name": "Электризованное лезвие",
++     "prefix": "Электризованный",
++     "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
++     "weight": "-",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [],
++     "new": true
++    }
++   ]
++  },
++  {
++   "id": "avtotopor",
++   "name": "Автотопор",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/avtotopor",
++   "catalogId": "weapon_auto_axe",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [
++    "Порочный"
++   ],
++   "qualities": [
++    "Двуручный"
++   ],
++   "weight": "20",
++   "cost": "100",
++   "rarity": "3",
++   "mods": [
++    {
++     "name": "Электризованное лезвие",
++     "prefix": "Электризованный",
++     "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
++     "weight": "-",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Горящее лезвие",
++     "prefix": "Горящее",
++     "effects": "Измените тип урона на \"Энергетический\", получает \"Стойкий\"",
++     "weight": "-",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Ядовитое лезвие",
++     "prefix": "Ядовитое",
++     "effects": "Добавляет \"Стойкий\"",
++     "weight": "-",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Турбо",
++     "prefix": "Турбо",
++     "effects": "Каждое потраченное ОД на дополнительный урон прибавляет +2 БК, вместо +1 БК",
++     "weight": "+2",
++     "cost": "+50",
++     "perks": "Кузнец 2, Наука! 1",
++     "catalogIds": [],
++     "new": true
++    }
++   ]
++  },
++  {
++   "id": "benzopila",
++   "name": "Бензопила",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/benzopila",
++   "catalogId": "weapon_chainsaw",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Порочный"
++   ],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "12",
++   "cost": "140",
++   "rarity": "3",
++   "special": "Не получает бонуса к урону в ближнем бою от характеристик пользователя (СИЛ не добавляется).",
++   "mods": [
++    {
++     "name": "Двойная шина",
++     "prefix": "Двойная",
++     "effects": "+2 БК",
++     "weight": "+1",
++     "cost": "+30",
++     "perks": "Кузнец 2",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Изогнутая шина",
++     "prefix": "Изогнутая",
++     "effects": "Получает \"Проникающий\" 1",
++     "weight": "+2",
++     "cost": "+45",
++     "perks": "Кузнец 3",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Удлинённая изогнутая шина",
++     "prefix": "Удлинённая изогнутая",
++     "effects": "добавляет \"Стойкий\"",
++     "weight": "+3",
++     "cost": "+60",
++     "perks": "Кузнец 3",
++     "catalogIds": [],
++     "new": true
++    },
++    {
++     "name": "Огнемет",
++     "prefix": "Огненный",
++     "effects": "+1 БК, измените тип урона на \"Энергетический\", мод \"Огнемет\" может быть добавлен как дополнение к любому другому моду",
++     "weight": "+2",
++     "cost": "+90",
++     "perks": "Кузнец 3, Фанатик Оружия 1",
++     "catalogIds": [],
++     "new": true
++    }
++   ]
++  },
++  {
++   "id": "ballisticheskij-kulak",
++   "name": "Баллистический кулак",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/ballisticheskij-kulak",
++   "catalogId": "weapon_ballistic_fist",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Оглушение",
++    "Порочный"
++   ],
++   "qualities": [
++    "Медленная перезарядка"
++   ],
++   "weight": "6",
++   "cost": "150",
++   "rarity": "4",
++   "special": "Требует 1 патрон для дробовика на каждую атаку. Из-за 'Медленной перезарядки' нужно перезарядить малым действием перед следующим использованием. Без патрона — обычная атака без оружия."
++  },
++  {
++   "id": "bolshoj-mech",
++   "name": "Большой меч",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bolshoj-mech",
++   "catalogId": "weapon_bumper_sword",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Отдача 7",
++    "Двуручный"
++   ],
++   "weight": "12",
++   "cost": "125",
++   "rarity": "2",
++   "special": "Отдача 7: требует СИЛ 7+, иначе +1 сложность. Двуручный."
++  },
++  {
++   "id": "elektroshoker",
++   "name": "Электрошокер",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/elektroshoker",
++   "catalogId": "weapon_cattle_prod",
++   "type": "Ближний бой",
++   "damageType": "Энергетический",
++   "damage": "7",
++   "effects": [
++    "Оглушение"
++   ],
++   "qualities": [],
++   "weight": "3",
++   "cost": "90",
++   "rarity": "4"
++  },
++  {
++   "id": "tanbo-smerti",
++   "name": "Танбо смерти",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tanbo-smerti",
++   "catalogId": "weapon_death_tambo",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [],
++   "weight": "1",
++   "cost": "40",
++   "rarity": "2",
++   "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звона."
++  },
++  {
++   "id": "perchatka-vytesnitel",
++   "name": "Перчатка-вытеснитель",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-vytesnitel",
++   "catalogId": "weapon_displacer_glove",
++   "type": "Рукопашная",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Проникающий 1",
++    "Оглушение"
++   ],
++   "qualities": [],
++   "weight": "6",
++   "cost": "175",
++   "rarity": "4"
++  },
++  {
++   "id": "gitara-mech",
++   "name": "Гитара-меч",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/gitara-mech",
++   "catalogId": "weapon_guitar_sword",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Парирование"
++   ],
++   "weight": "3",
++   "cost": "45",
++   "rarity": "3",
++   "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."
++  },
++  {
++   "id": "tsirkulyarnyj-rezak-mistera-pomoshchnika",
++   "name": "Циркулярный резак Мистера Помощника",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tsirkulyarnyj-rezak-mistera-pomoshchnika",
++   "catalogId": "weapon_mr_handy_buzz_blade",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Порочный"
++   ],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "10",
++   "cost": "50",
++   "rarity": "2"
++  },
++  {
++   "id": "universalnyj-topor",
++   "name": "Универсальный топор",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/universalnyj-topor",
++   "catalogId": "weapon_multi_purpose_axe",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "4",
++   "cost": "40",
++   "rarity": "2"
++  },
++  {
++   "id": "protonnyj-topor",
++   "name": "Протонный топор",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/protonnyj-topor",
++   "catalogId": "weapon_proton_axe",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Всплеск"
++   ],
++   "weight": "8",
++   "cost": "175",
++   "rarity": "5",
++   "special": "Особо эффективен против роботов и механики."
++  },
++  {
++   "id": "voennyj-baraban",
++   "name": "Военный барабан",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/voennyj-baraban",
++   "catalogId": "weapon_war_drum",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "5",
++   "effects": [
++    "Оглушение"
++   ],
++   "qualities": [
++    "Двуручное"
++   ],
++   "weight": "20",
++   "cost": "115",
++   "rarity": "3",
++   "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."
++  },
++  {
++   "id": "posokh-atoma",
++   "name": "Посох Атома",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/posokh-atoma",
++   "catalogId": null,
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "6",
++   "effects": [
++    "Проникающий 1"
++   ],
++   "qualities": [
++    "Парирование",
++    "Двуручный"
++   ],
++   "weight": "15",
++   "cost": "200",
++   "rarity": "4",
++   "note": "НЕТ В КАТАЛОГЕ",
++   "mods": [
++    {
++     "name": "Шокирующие катушки",
++     "prefix": "Стремительный",
++     "effects": "+2 БК, Наносит оба вида урона, Физический и Энергетический",
++     "weight": "-",
++     "cost": "+100",
++     "perks": "Кузнец 2, Наука! 2",
++     "catalogIds": [],
++     "new": true
++    }
++   ]
++  },
++  {
++   "id": "shakhterskij-perforator",
++   "name": "Шахтерский перфоратор",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shakhterskij-perforator",
++   "catalogId": null,
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "2",
++   "effects": [
++    "Проникающий 2",
++    "Разрушающий"
++   ],
++   "qualities": [
++    "Двуручный"
++   ],
++   "weight": "18",
++   "cost": "100",
++   "rarity": "4",
++   "note": "НЕТ В КАТАЛОГЕ",
++   "special": "Встроена ячейка с Ядерной батареей: можно потратить 1-3 заряда ячейки чтобы добавить 1-3 БК к базовому урону при атаке."
++  },
++  {
++   "id": "svarochnaya-gorelka",
++   "name": "Сварочная горелка",
++   "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svarochnaya-gorelka",
++   "catalogId": "weapon_arc_welder",
++   "type": "Ближний бой",
++   "damageType": "Физический",
++   "damage": "4",
++   "effects": [
++    "Проникающий 3",
++    "Устойчивый"
++   ],
++   "qualities": [
++    "Ослабляющее",
++    "Неточный",
++    "Топливо"
++   ],
++   "weight": "15",
++   "cost": "120",
++   "rarity": "4",
++   "special": "Свойство ТОПЛИВО (Топливо для огнемета): нужно 4 топлива для работы. При выпадении Осложнения при атаке топливо заканчивается и нужна перезарядка (малое действие) перед следующим использованием.",
++   "note": "Подтверждено владельцем (373): это и есть Электросварка/Дуговая сварка (arc welder), модов нет"
++  }
++ ]
++}
+\ No newline at end of file
+diff --git a/docs/reference-data/weapon-mods-support-map-370.json b/docs/reference-data/weapon-mods-support-map-370.json
+index 2a463ae..118579d 100644
+--- a/docs/reference-data/weapon-mods-support-map-370.json
++++ b/docs/reference-data/weapon-mods-support-map-370.json
+@@ -2,35 +2,17 @@
+  "meta": {
+   "источник": "gemini-code-1790317366823.json (main), русские имена владельца",
+   "пар": 141,
+-  "совпали_с_текущими": 477,
++  "совпали_с_текущими": 539,
+   "добавить": 580,
+   "снять": 231,
+-  "снять_у_оружий_со_списком": 126,
++  "снять_у_оружий_со_списком": 147,
+   "снять_отложено_без_списка_владельца": 104,
+   "правило": "Снимать текущую поддержку только у оружий из draft (список владельца есть). Оружия без списка владельца — не трогать до уточнения (милицейские 16 + Дуговая сварка, Институтский лазер, 10-мм ПП, плазменная мина).",
+   "оружия_без_списка": [
+    "weapon_10mm_smg",
+-   "weapon_arc_welder",
+-   "weapon_baseball_bat",
+-   "weapon_baseball_bat_aluminum",
+-   "weapon_baton",
+-   "weapon_board",
+-   "weapon_boxing_glove",
+-   "weapon_deathclaw_gauntlet",
+-   "weapon_institute_laser",
+-   "weapon_knuckles",
+-   "weapon_lead_pipe",
+-   "weapon_pipe_wrench",
+-   "weapon_plasma_mine",
+-   "weapon_pool_cue",
+-   "weapon_power_fist",
+-   "weapon_rolling_pin",
+-   "weapon_sledgehammer",
+-   "weapon_super_sledge",
+-   "weapon_tire_iron",
+-   "weapon_walking_cane"
++   "weapon_plasma_mine"
+   ],
+-  "оружий_без_списка": 20,
++  "оружий_без_списка": 2,
+   "новых_модов": 13,
+   "подтверждено_владельцем": "13 новых + 3 уникальных Тесла (EN из референсов); «Магазин на энергоячейках» = mod_171",
+   "этап_В": "мили: 53 пары привязаны 1:1 (расхождений поддержки 0), 9 новых строк, Посох Атома/Перфоратор — оружия нет в каталоге, Сварочная горелка — вопрос (arc_welder?)"
+@@ -2527,6 +2509,176 @@
+    "weapons": [
+     "Силовой кастет"
+    ]
++  },
++  "ил|weapon_institute_laser|Photon Exciter": {
++   "ids": [
++    "mod_045"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Возбудитель фотонов",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Beta Wave Tuner": {
++   "ids": [
++    "mod_043"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Тюнер бета-волн",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Boosted Capacitor": {
++   "ids": [
++    "mod_044"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Усиленный конденсатор",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Photon Agitator": {
++   "ids": [
++    "mod_046"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Фотонная мешалка",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Long Barrel": {
++   "ids": [
++    "mod_204"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Длинный ствол",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Automatic Barrel": {
++   "ids": [
++    "mod_053"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Автоматический ствол",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Improved Barrel": {
++   "ids": [
++    "mod_054"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Улучшенный ствол",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Standard Stock": {
++   "ids": [
++    "mod_058"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Стандартная ложа",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Reflex Sight": {
++   "ids": [
++    "mod_062"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Коллиматорный",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Short Scope": {
++   "ids": [
++    "mod_063"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Короткий оптический",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Long Scope": {
++   "ids": [
++    "mod_064"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Длинный оптический",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Short Night Vision Scope": {
++   "ids": [
++    "mod_065"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Короткий оптический ночного видения",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Long Night Vision Scope": {
++   "ids": [
++    "mod_066"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Длинный оптический ночного видения",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Recon Scope": {
++   "ids": [
++    "mod_067"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Прицел разведчика",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Beam Splitter": {
++   "ids": [
++    "mod_068"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Разделитель луча",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Beam Focuser": {
++   "ids": [
++    "mod_069"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Фокусировщик луча",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
++  },
++  "ил|weapon_institute_laser|Gyro Compensating Lens": {
++   "ids": [
++    "mod_070"
++   ],
++   "via": "Лазер института: референс владельца (EN-мост)",
++   "name": "Линза с гирокомпенсацией",
++   "weapons": [
++    "Институтский лазер (Лазер института)"
++   ]
+   }
+  },
+  "draft": {
+@@ -8188,7 +8340,139 @@
+      "via": "фантом-семейство"
+     }
+    ]
+-  }
++  },
++  "weapon_institute_laser": {
++   "Конденсатор": [
++    {
++     "name": "Возбудитель фотонов",
++     "en": "Photon Exciter",
++     "ids": [
++      "mod_045"
++     ]
++    },
++    {
++     "name": "Тюнер бета-волн",
++     "en": "Beta Wave Tuner",
++     "ids": [
++      "mod_043"
++     ]
++    },
++    {
++     "name": "Усиленный конденсатор",
++     "en": "Boosted Capacitor",
++     "ids": [
++      "mod_044"
++     ]
++    },
++    {
++     "name": "Фотонная мешалка",
++     "en": "Photon Agitator",
++     "ids": [
++      "mod_046"
++     ]
++    }
++   ],
++   "Ствол": [
++    {
++     "name": "Длинный ствол",
++     "en": "Long Barrel",
++     "ids": [
++      "mod_204"
++     ]
++    },
++    {
++     "name": "Автоматический ствол",
++     "en": "Automatic Barrel",
++     "ids": [
++      "mod_053"
++     ]
++    },
++    {
++     "name": "Улучшенный ствол",
++     "en": "Improved Barrel",
++     "ids": [
++      "mod_054"
++     ]
++    }
++   ],
++   "Ложа": [
++    {
++     "name": "Стандартная ложа",
++     "en": "Standard Stock",
++     "ids": [
++      "mod_058"
++     ]
++    }
++   ],
++   "Прицел": [
++    {
++     "name": "Коллиматорный",
++     "en": "Reflex Sight",
++     "ids": [
++      "mod_062"
++     ]
++    },
++    {
++     "name": "Короткий оптический",
++     "en": "Short Scope",
++     "ids": [
++      "mod_063"
++     ]
++    },
++    {
++     "name": "Длинный оптический",
++     "en": "Long Scope",
++     "ids": [
++      "mod_064"
++     ]
++    },
++    {
++     "name": "Короткий оптический ночного видения",
++     "en": "Short Night Vision Scope",
++     "ids": [
++      "mod_065"
++     ]
++    },
++    {
++     "name": "Длинный оптический ночного видения",
++     "en": "Long Night Vision Scope",
++     "ids": [
++      "mod_066"
++     ]
++    },
++    {
++     "name": "Прицел разведчика",
++     "en": "Recon Scope",
++     "ids": [
++      "mod_067"
++     ]
++    }
++   ],
++   "Дуло": [
++    {
++     "name": "Разделитель луча",
++     "en": "Beam Splitter",
++     "ids": [
++      "mod_068"
++     ]
++    },
++    {
++     "name": "Фокусировщик луча",
++     "en": "Beam Focuser",
++     "ids": [
++      "mod_069"
++     ]
++    },
++    {
++     "name": "Линза с гирокомпенсацией",
++     "en": "Gyro Compensating Lens",
++     "ids": [
++      "mod_070"
++     ]
++    }
++   ]
++  },
++  "weapon_arc_welder": {}
+  },
+  "coverage": {
+   "add": [
+@@ -11189,6 +11473,126 @@
+     "m": "mod_157",
+     "mod_name": "Полная ложа"
+    },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_043",
++    "mod_name": "Тюнер бета-волн"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_044",
++    "mod_name": "Усиленный конденсатор"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_045",
++    "mod_name": "Возбудитель фотонов"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_046",
++    "mod_name": "Фотонная мешалка"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_051",
++    "mod_name": "Длинный ствол"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_052",
++    "mod_name": "Расщепитель"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_053",
++    "mod_name": "Автоматический ствол"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_054",
++    "mod_name": "Улучшенный ствол"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_055",
++    "mod_name": "Снайперский ствол"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_057",
++    "mod_name": "Тактическая"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_058",
++    "mod_name": "Стандартная ложа"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_060",
++    "mod_name": "Ложа стрелка"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_061",
++    "mod_name": "Ложа с компенсатором отдачи"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_062",
++    "mod_name": "Коллиматорный"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_063",
++    "mod_name": "Короткий оптический"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_064",
++    "mod_name": "Длинный оптический"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_065",
++    "mod_name": "Короткий оптический ночного видения"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_066",
++    "mod_name": "Длинный оптический ночного видения"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_067",
++    "mod_name": "Прицел разведчика"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_068",
++    "mod_name": "Разделитель луча"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_069",
++    "mod_name": "Фокусировщик луча"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_070",
++    "mod_name": "Линза с гирокомпенсацией"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_204",
++    "mod_name": "Длинный ствол"
++   },
++   {
++    "w": "weapon_arc_welder",
++    "m": "mod_205",
++    "mod_name": "Зажигательный ствол"
++   },
+    {
+     "w": "weapon_assault_rifle",
+     "m": "mod_153",
+@@ -11634,16 +12038,6 @@
+     "m": "mod_197",
+     "mod_name": "Большой штык"
+    },
+-   {
+-    "w": "weapon_ripper",
+-    "m": "mod_110",
+-    "mod_name": "Изогнутое лезвие"
+-   },
+-   {
+-    "w": "weapon_ripper",
+-    "m": "mod_111",
+-    "mod_name": "Удлинённое лезвие"
+-   },
+    {
+     "w": "weapon_sniper_rifle",
+     "m": "mod_036",
+@@ -11684,11 +12078,6 @@
+     "m": "mod_196",
+     "mod_name": "Кольцевая мушка"
+    },
+-   {
+-    "w": "weapon_sword",
+-    "m": "mod_106",
+-    "mod_name": "Шокер"
+-   },
+    {
+     "w": "weapon_syringer",
+     "m": "mod_015",
+@@ -12473,5 +12862,143 @@
+   "Меч из бампера": "Большой меч",
+   "Cattle Prod": "Электрошокер",
+   "Death Tambo": "Танбо смерти"
+- }
++ },
++ "institute_laser_draft": {
++  "weapon_institute_laser": {
++   "Конденсатор": [
++    {
++     "name": "Возбудитель фотонов",
++     "en": "Photon Exciter",
++     "ids": [
++      "mod_045"
++     ]
++    },
++    {
++     "name": "Тюнер бета-волн",
++     "en": "Beta Wave Tuner",
++     "ids": [
++      "mod_043"
++     ]
++    },
++    {
++     "name": "Усиленный конденсатор",
++     "en": "Boosted Capacitor",
++     "ids": [
++      "mod_044"
++     ]
++    },
++    {
++     "name": "Фотонная мешалка",
++     "en": "Photon Agitator",
++     "ids": [
++      "mod_046"
++     ]
++    }
++   ],
++   "Ствол": [
++    {
++     "name": "Длинный ствол",
++     "en": "Long Barrel",
++     "ids": [
++      "mod_204"
++     ]
++    },
++    {
++     "name": "Автоматический ствол",
++     "en": "Automatic Barrel",
++     "ids": [
++      "mod_053"
++     ]
++    },
++    {
++     "name": "Улучшенный ствол",
++     "en": "Improved Barrel",
++     "ids": [
++      "mod_054"
++     ]
++    }
++   ],
++   "Ложа": [
++    {
++     "name": "Стандартная ложа",
++     "en": "Standard Stock",
++     "ids": [
++      "mod_058"
++     ]
++    }
++   ],
++   "Прицел": [
++    {
++     "name": "Коллиматорный",
++     "en": "Reflex Sight",
++     "ids": [
++      "mod_062"
++     ]
++    },
++    {
++     "name": "Короткий оптический",
++     "en": "Short Scope",
++     "ids": [
++      "mod_063"
++     ]
++    },
++    {
++     "name": "Длинный оптический",
++     "en": "Long Scope",
++     "ids": [
++      "mod_064"
++     ]
++    },
++    {
++     "name": "Короткий оптический ночного видения",
++     "en": "Short Night Vision Scope",
++     "ids": [
++      "mod_065"
++     ]
++    },
++    {
++     "name": "Длинный оптический ночного видения",
++     "en": "Long Night Vision Scope",
++     "ids": [
++      "mod_066"
++     ]
++    },
++    {
++     "name": "Прицел разведчика",
++     "en": "Recon Scope",
++     "ids": [
++      "mod_067"
++     ]
++    }
++   ],
++   "Дуло": [
++    {
++     "name": "Разделитель луча",
++     "en": "Beam Splitter",
++     "ids": [
++      "mod_068"
++     ]
++    },
++    {
++     "name": "Фокусировщик луча",
++     "en": "Beam Focuser",
++     "ids": [
++      "mod_069"
++     ]
++    },
++    {
++     "name": "Линза с гирокомпенсацией",
++     "en": "Gyro Compensating Lens",
++     "ids": [
++      "mod_070"
++     ]
++    }
++   ]
++  }
++ },
++ "institute_laser_stats": {
++  "владелец": "урон 3DC, Burst, скорострельность 3, дальность C, Close Quarters+Inaccurate, вес 4, цена 50, редкость 2",
++  "каталог": "совпадает полностью (3/3/4/50/2) — расхождений нет"
++ },
++ "arc_welder_decision": "Владелец (373): Электросварка = arc welder = «Дуговая сварка», модов НЕТ. Текущие 24 привязки в каталоге — снять при ревизии."
+ }
+\ No newline at end of file
+diff --git a/docs/reference-data/weapon-mods-support-map-370.md b/docs/reference-data/weapon-mods-support-map-370.md
+index 3b2fcbd..71b24e2 100644
+--- a/docs/reference-data/weapon-mods-support-map-370.md
++++ b/docs/reference-data/weapon-mods-support-map-370.md
+@@ -1,4 +1,4 @@
+-# Поддерживаемые моды к оружию (патчи 370–372)
++# Поддерживаемые моды к оружию (патчи 370–373)
+ 
+ Материал ревизии модов (план 368). Этап Б: собираем «какие моды поддерживает
+ оружие» из файла владельца `gemini-code-1790317366823.json` (репозиторий на
+@@ -87,17 +87,14 @@ focharactersheet_weapon_mods.json в docs/reference-data):
+ 
+ ## Покрытие (оружие, мод)
+ 
+-- Совпадает с текущими данными: **477** пар — ничего не меняется.
++- Совпадает с текущими данными: **539** пар — ничего не меняется.
+ - **Добавить поддержку: 580** пар (в основном «законные»: у владельца список
+   шире — ваши списки и есть истина).
+-- **Снять поддержку: 126** пар — только у оружий, чей список есть у вас
+-  (21 ствол из карты 369). Пример: у Гатлинг-лазера снимаем 7, у
+-  Боевого дробовика 7 и т.д.
++- **Снять поддержку: 147** пар — у оружий с вашим списком (включая 24 лишние
++  привязки Электросварки — вы подтвердили, что модов у неё нет).
+ 
+-⚠ **Не трогаем (104 пары у 20 оружий):** у этих оружий в вашем файле списка
+-нет («не всё доделано»): вся мили кроме Меча/Боевого ножа/Мачете/Потрошителя/
+-Выкидного ножа/Шиш-кебаба, Дуговая сварка, Институтский лазер, 10-мм ПП,
+-Плазменная мина. Снимать у них поддержку пока нельзя — пришлёте списки.
++⚠ **Без вашего списка остались 2:** 10-мм пистолет-пулемёт (вы не нашли его
++в своих данных) и Плазменная мина — их поддержка остаётся как есть.
+ 
+ ## Этап В: мили и рукопашная (патч 372)
+ 
+@@ -130,12 +127,25 @@ focharactersheet_weapon_mods.json в docs/reference-data):
+   Универсальный топор; Боевой барабан → Военный барабан; Меч из бампера →
+   Большой меч; Cattle Prod → Электрошокер; Death Tambo → Танбо смерти.
+ 
+-Уточнения владельца, записанные в 372: «монтировки» в его данных нет —
+-в каталоге уже «Балонный ключ» (weapon_tire_iron); «Дуговая сварка» есть
+-в его данных, но БЕЗ списков модов — поддержку не трогаем; 10-мм
+-пистолет-пулемёт в его данных не нашёлся — не трогаем. Робо-оружие в
+-файле не присылалось: поддержка робо-модов в программе отдельная
+-(патчи 290–294, 359), покрыта тестами — ревизия её не ломает, работает «ок».
++Уточнения владельца (372–373): «монтировки» в его данных нет — в каталоге
++уже «Балонный ключ» (weapon_tire_iron); 10-мм пистолет-пулемёт в его данных
++не нашёлся — не трогаем. Робо-оружие в файле не присылалось: поддержка
++робо-модов в программе отдельная (патчи 290–294, 359), покрыта тестами —
++ревизия её не ломает, работает «ок».
++
++**Лазер института закрыт референсом (373).** Ваш референс совпал с
++программой 17/17 (конденсаторы: Возбудитель фотонов, Тюнер бета-волн,
++Усиленный конденсатор, Фотонная мешалка; ствол: Длинный, Автоматический,
++Улучшенный; ложа: Стандартная; прицелы: Коллиматорный, Короткий/Длинный
++оптический, оба Ночного видения, Разведчика; дуло: Разделитель луча,
++Фокусировщик, Линза с гирокомпенсацией). Статы тоже совпали
++(3 DC, Burst, скорострельность 3, C, вес 4, цена 50, редкость 2) —
++расхождений нет.
++
++**Электросварка (373).** Подтверждено: это arc welder = «Дуговая сварка»,
++модов у неё НЕТ. Текущие 24 привязки в каталоге — лишние, снять при
++ревизии. «Сварочная горелка» из милицейского каталога — то же оружие
++(вес 15, цена 120, редкость 4, урон 4 — цифры владельца приоритетны).
+ 
+ Итог по 20 «оружиям без списка»: 16 мили-стволов ЗАКРЫТЫ этим этапом
+ (осталось 4: Дуговая сварка, Лазер института, 10-мм ПП, Плазменная мина).
+diff --git a/patchs/372-mily-svereny-53-pary-1k1.patch b/patchs/372-mily-svereny-53-pary-1k1.patch
+new file mode 100644
+index 0000000..bb19dc0
+--- /dev/null
++++ b/patchs/372-mily-svereny-53-pary-1k1.patch
+@@ -0,0 +1,1398 @@
++diff --git a/docs/agents/state.md b/docs/agents/state.md
++index fc298f1..239a411 100644
++--- a/docs/agents/state.md
+++++ b/docs/agents/state.md
++@@ -8,15 +8,15 @@
++ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
++ 
++ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++-· последний сданный патч: **371** · у владельца закоммичено до **365**
++-(экспорты файлов патчей на main: 364+365); ревизия модов идёт: этап А
++-(имена оружия → id) сдан в 369, этап Б (поддерживаемые моды) — материал
++-готов: 370 (141 пара разобрана) + 371 (владелец одобрил 13 новых модов;
++-EN-названия найдены в референсах, включая 3 уникальных Тесла-мода;
++-«Магазин на энергоячейках» = mod_171). Итог материала: 98 прямых id,
++-29 семейств-фантомов на слияние, 13 новых строк. Данные не тронуты.
+++· последний сданный патч: **372** · у владельца закоммичено до **365**
+++(экспорты файлов патчей на main: 364+365); ревизия модов: материал
+++собран — 369 (имена оружия), 370–371 (141 пара дальнего боя, 13 новых
+++модов одобрены), 372 (мили: 38 оружий, 53 пары 1:1, поддержка уже
+++совпадает, 9 новых строк, 14 переименований оружия; остались без списков
+++4 ствола: Дуговая сварка, Лазер института, 10-мм ПП, Плазменная мина).
+++Робо-моды не трогаем (отдельный контур, работает). Данные не тронуты.
++ Дальше: серия патчей ревизии (канон-id, слияние фантомов, названия по
++-владельцу, новые 13 строк, перенос сохранений).
+++владельцу, новые 22 строки, перенос сохранений).
++ 
++ ## Состав приложения (игровыми терминами)
++ 
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index 76acfd4..e9a70aa 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -3,6 +3,18 @@
++ ---
++ ---
++ ---
+++---
+++## Melee mods cross-checked against your catalog (patch 372)
+++
+++The melee catalog you sent (38 weapons) is resolved: 35 exist in the game
+++(renames queued to your names), 53 weapon-mod bindings already match what
+++the app supports (no divergence), 9 mods will be created (auto axe
+++elemental blades, chainsaw bars, etc.). Outside the catalog: Atom's Staff,
+++Mining Pick... and the Welding Torch — a question: is it the current arc
+++welder or a separate weapon? Robot weapons untouched: their mods work and
+++are covered by tests. Only 4 weapons remain without your lists (arc welder,
+++Institute laser, 10mm SMG, plasma mine) — their support stays as is.
+++
++ ## New mods confirmed, English names found (patch 371)
++ 
++ Your answers are recorded: the 11 missing mods will be created; "Tesla
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 79d55a8..a0cb412 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,6 +1,19 @@
++ # История изменений
++ 
++ ---
+++## Милицейские моды сверены с вашим каталогом (патч 372)
+++
+++Присланный каталог ближнего боя (38 оружий) разобран: 35 найдены в игре
+++(переименуем по вашим именам — «Выкидной нож», «Дубинка», «Большой меч» и
+++др.), 53 привязки «оружие — улучшение» совпали с тем, что уже умеет
+++программа (расхождений нет), 9 улучшений заведём (электро/огонь/яд
+++лезвий автотопора, шины бензопилы и пр.). Вне каталога остались Посох
+++Атома, Шахтерский перфоратор и Сварочная горелка — по последней вопрос:
+++это нынешняя «Электросварка» или отдельное оружие? Робо-оружие не трогали:
+++его улучшения в программе работают и покрыты проверками. Списки остались
+++неприсланными только у 4 стволов (Дуговая сварка, Лазер института, 10-мм
+++пистолет-пулемёт, Плазменная мина) — их поддержка останется как есть.
+++
++ ## Подтверждены новые улучшения, английские имена найдены (патч 371)
++ 
++ Ваши ответы записаны: 11 недостающих улучшений заведём; «Динамо катушки
++diff --git a/docs/reference-data/melee-catalog-owner-372.json b/docs/reference-data/melee-catalog-owner-372.json
++new file mode 100644
++index 0000000..f730f5e
++--- /dev/null
+++++ b/docs/reference-data/melee-catalog-owner-372.json
++@@ -0,0 +1,44 @@
+++{
+++  "источник": "владелец, 2026-09-25 (fallout-2d20.ru), мили + рукопашная",
+++  "note": "Данные владельца дословно; URL очищены от markdown-обёрток чата",
+++  "weapons": [
+++    {"id":"vykidnoj-nozh","name":"Выкидной нож","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/vykidnoj-nozh","catalogId":"weapon_switchblade","type":"Ближний бой","damageType":"Физический","damage":"2","effects":["Проникающий 1"],"qualities":["Скрытное"],"weight":"1","cost":"20","rarity":"0","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_113"]}]},
+++    {"id":"dubinka","name":"Дубинка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dubinka","catalogId":"weapon_baton","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"15","rarity":"1","mods":[{"name":"Электризованная","prefix":"Шокирующая","effects":"+2 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+15","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_132"]},{"name":"Электрошокер","prefix":"Оглушающая","effects":"+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"","weight":"-","cost":"+30","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_133"]}]},
+++    {"id":"mech","name":"Меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/mech","catalogId":"weapon_sword","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"50","rarity":"2","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"Добавляет \"Устойчивый\"","weight":"-","cost":"+25","perks":"Кузнец 2","catalogIds":["mod_103"]},{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":["mod_104"]},{"name":"Электризованное зазубренное лезвие","prefix":"Электризованный зазубренный","effects":"+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)","weight":"-","cost":"+75","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_105"]},{"name":"Электрошокер","prefix":"Оглушающий","effects":"+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"","weight":"-","cost":"+100","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_106"]}]},
+++    {"id":"boevoj-nozh","name":"Боевой нож","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/boevoj-nozh","catalogId":"weapon_combat_knife","type":"Ближний бой","damageType":"Физический","damage":"3","effects":["Проникающий 1"],"qualities":[],"weight":"1","cost":"25","rarity":"1","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+12","perks":"Кузнец 1","catalogIds":["mod_107"]},{"name":"Скрытное лезвие","prefix":"Скрытный","effects":"+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках","weight":"-","cost":"+18","perks":"Кузнец 2","catalogIds":["mod_108"]}]},
+++    {"id":"machete","name":"Мачете","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/machete","catalogId":"weapon_machete","type":"Ближний бой","damageType":"Физический","damage":"3","effects":["Проникающий 1"],"qualities":[],"weight":"2","cost":"25","rarity":"1","mods":[{"name":"Зазубренное лезвие","prefix":"Зазубренный","effects":"+2 БК, Добавляет \"Устойчивый\"","weight":"-","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_109"]}]},
+++    {"id":"potroshitel","name":"Потрошитель","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/potroshitel","catalogId":"weapon_ripper","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Порочный"],"qualities":[],"weight":"6","cost":"50","rarity":"2","mods":[{"name":"Изогнутое лезвие","prefix":"Изогнутый","effects":"+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника, выбив оружие из рук","weight":"+1","cost":"+15","perks":"-","catalogIds":["mod_110"]},{"name":"Удлиненное лезвие","prefix":"Удлиненный","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"+3","cost":"+25","perks":"Кузнец 3","catalogIds":["mod_111"]}]},
+++    {"id":"shish-kebab","name":"Шиш-кебаб","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shish-kebab","catalogId":"weapon_shishkebab","type":"Ближний бой","damageType":"Энергетический","damage":"5","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"200","rarity":"3","mods":[{"name":"Дополнительные воспламенительные форсунки","prefix":"Жгучий","effects":"+1 БК, Добавляет \"Устойчивый\"","weight":"+1","cost":"+100","perks":"Кузнец 3","catalogIds":["mod_112"]}]},
+++    {"id":"bejsbolnaya-bita","name":"Бейсбольная бита","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bejsbolnaya-bita","catalogId":"weapon_baseball_bat","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"3","cost":"25","rarity":"1","mods":[{"name":"Колючая","prefix":"Колючая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+5","perks":"-","catalogIds":["mod_114"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+7","perks":"-","catalogIds":["mod_115"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+7","perks":"-","catalogIds":["mod_116"]},{"name":"Обмотанная цепью","prefix":"Обмотанная цепью","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_117"]},{"name":"Лезвия","prefix":"Клинковая","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_118"]}]},
+++    {"id":"alyuminievaya-bejsbolnaya-bita","name":"Алюминиевая бейсбольная бита","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/alyuminievaya-bejsbolnaya-bita","catalogId":"weapon_baseball_bat_aluminum","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":["Двуручное"],"weight":"2","cost":"32","rarity":"2","mods":[{"name":"Колючая","prefix":"Колючая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+5","perks":"Кузнец 1","catalogIds":["mod_114"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_115"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_116"]},{"name":"Обмотанная цепью","prefix":"Обмотанная цепью","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_117"]},{"name":"Лезвия","prefix":"Клинковая","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_118"]}]},
+++    {"id":"dryn","name":"Дрын","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dryn","catalogId":"weapon_board","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"3","cost":"20","rarity":"0","mods":[{"name":"Шипованный","prefix":"Шипованный","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+6","perks":"-","catalogIds":["mod_119"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК","weight":"+1","cost":"+10","perks":"Кузнец 1","catalogIds":["mod_120"]},{"name":"Лезвия","prefix":"Клинковый","effects":"+2 БК, добавляет \"Устойчивый\"","weight":"+2","cost":"+10","perks":"Кузнец 2","catalogIds":["mod_121"]}]},
+++    {"id":"svintsovaya-truba","name":"Свинцовая труба","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svintsovaya-truba","catalogId":"weapon_lead_pipe","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"3","cost":"15","rarity":"0","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+4","perks":"-","catalogIds":["mod_122"]},{"name":"Утяжеленная","prefix":"Утяжеленная","effects":"+2 БК","weight":"+2","cost":"+11","perks":"Кузнец 2","catalogIds":["mod_123"]}]},
+++    {"id":"razvodnoj-klyuch","name":"Разводной ключ","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/razvodnoj-klyuch","catalogId":"weapon_pipe_wrench","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"30","rarity":"1","mods":[{"name":"Крюк","prefix":"Загнутый","effects":"+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника","weight":"-","cost":"+9","perks":"-","catalogIds":["mod_124"]},{"name":"Утяжеленный","prefix":"Увесистый","effects":"+2 БК","weight":"+7","cost":"+12","perks":"Кузнец 1","catalogIds":["mod_125"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК, добавляет \"Проникающий\"","weight":"+1","cost":"+13","perks":"Кузнец 1","catalogIds":["mod_126"]},{"name":"Сверхтяжелый","prefix":"Сверхтяжелый","effects":"+3 БК","weight":"+2","cost":"+22","perks":"Кузнец 2","catalogIds":["mod_127"]}]},
+++    {"id":"bilyardnyj-kij","name":"Бильярдный кий","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bilyardnyj-kij","catalogId":"weapon_pool_cue","type":"Ближний бой","damageType":"Физический","damage":"4","effects":[],"qualities":["Двуручное"],"weight":"1","cost":"10","rarity":"0","mods":[{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+2","perks":"-","catalogIds":["mod_128"]},{"name":"Заостренный","prefix":"Заостренный","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_129"]}]},
+++    {"id":"skalka","name":"Скалка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/skalka","catalogId":"weapon_rolling_pin","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"1","cost":"10","rarity":"0","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_130"]},{"name":"Заостренная","prefix":"Заостренная","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_131"]}]},
+++    {"id":"kuvalda","name":"Кувалда","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kuvalda","catalogId":"weapon_sledgehammer","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":[],"weight":"12","cost":"40","rarity":"2","mods":[{"name":"Прокалывающая","prefix":"Прокалывающая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"+5","cost":"+18","perks":"Кузнец 2","catalogIds":["mod_134"]},{"name":"Тяжелая","prefix":"Тяжелая","effects":"+2 БК","weight":"+9","cost":"+30","perks":"Кузнец 2","catalogIds":["mod_135"]}]},
+++    {"id":"supermolot","name":"Супермолот","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/supermolot","catalogId":"weapon_super_sledge","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Разрушающий"],"qualities":["Двуручное"],"weight":"20","cost":"180","rarity":"3","mods":[{"name":"Нагревательная спираль","prefix":"Раскаленная","effects":"+1 БК, Измените тип урона на Энергетический","weight":"-","cost":"+180","perks":"Кузнец 2","catalogIds":["mod_136"]},{"name":"Электрошокер","prefix":"Оглушающая","effects":"+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический","weight":"-","cost":"+360","perks":"Кузнец 3, Наука! 1","catalogIds":["mod_137"]}]},
+++    {"id":"balonnyj-klyuch","name":"Балонный ключ","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/balonnyj-klyuch","catalogId":"weapon_tire_iron","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"3","cost":"25","rarity":"1","mods":[{"name":"Лезвия","prefix":"Клинковый","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"+1","cost":"+12","perks":"Кузнец 2","catalogIds":["mod_138"]}]},
+++    {"id":"trost","name":"Трость","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/trost","catalogId":"weapon_walking_cane","type":"Ближний бой","damageType":"Физический","damage":"3","effects":[],"qualities":[],"weight":"2","cost":"10","rarity":"0","mods":[{"name":"Колючая","prefix":"Колючая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_139"]},{"name":"Шипастая","prefix":"Шипастая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_140"]}]},
+++    {"id":"bokserskaya-perchatka","name":"Боксерская перчатка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bokserskaya-perchatka","catalogId":"weapon_boxing_glove","type":"Рукопашная","damageType":"Физический","damage":"3","effects":["Оглушающий"],"qualities":[],"weight":"1","cost":"10","rarity":"1","mods":[{"name":"Шипастая","prefix":"Шипастая","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_141"]},{"name":"Колючая","prefix":"Колючая","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+4","perks":"Кузнец 1","catalogIds":["mod_142"]},{"name":"Свинцовая подкладка","prefix":"Свинцовая","effects":"+2 БК","weight":"+1","cost":"+7","perks":"Кузнец 1","catalogIds":["mod_143"]}]},
+++    {"id":"perchatka-kogtya-smerti","name":"Перчатка когтя смерти","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-kogtya-smerti","catalogId":"weapon_deathclaw_gauntlet","type":"Рукопашная","damageType":"Физический","damage":"5","effects":["Проникающий 1"],"qualities":[],"weight":"10","cost":"75","rarity":"3","mods":[{"name":"Дополнительный коготь","prefix":"Большая","effects":"+1 БК, при успешной атаке потратьте 2 ОД, чтобы обезоружить противника","weight":"+2","cost":"+22","perks":"-","catalogIds":["mod_144"]}]},
+++    {"id":"kastet","name":"Кастет","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kastet","catalogId":"weapon_knuckles","type":"Рукопашная","damageType":"Физический","damage":"3","effects":[],"qualities":["Скрытное"],"weight":"<1","cost":"10","rarity":"1","mods":[{"name":"Заостренный","prefix":"Заостренный","effects":"добавляет \"Устойчивый\"","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_145"]},{"name":"Шипованный","prefix":"Шипованный","effects":"Добавляет \"Проникающий\" 1","weight":"-","cost":"+3","perks":"-","catalogIds":["mod_146"]},{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+1 БК, Добавляет \"Проникающий\" 1","weight":"-","cost":"+4","perks":"Кузнец 1","catalogIds":["mod_147"]},{"name":"Лезвия","prefix":"Клинковый","effects":"+1 БК, добавляет \"Устойчивый\"","weight":"-","cost":"+5","perks":"Кузнец 1","catalogIds":["mod_148"]}]},
+++    {"id":"silovoj-kastet","name":"Силовой кастет","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/silovoj-kastet","catalogId":"weapon_power_fist","type":"Рукопашная","damageType":"Физический","damage":"4","effects":["Оглушающий"],"qualities":[],"weight":"4","cost":"100","rarity":"2","mods":[{"name":"Прокалывающий","prefix":"Прокалывающий","effects":"+2 БК, Добавляет \"Проникающий\" 1","weight":"+1","cost":"+45","perks":"Кузнец 2","catalogIds":["mod_149"]},{"name":"Нагревательная спираль","prefix":"Раскаленный","effects":"+2 БК, измените тип урона на \"Энергетический\"","weight":"-","cost":"+100","perks":"Кузнец 3","catalogIds":["mod_150"]}]},
+++    {"id":"klinok-shturmotrona","name":"Клинок штурмотрона","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/klinok-shturmotrona","catalogId":"weapon_assaultron_blade","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":[],"weight":"3","cost":"50","rarity":"3","mods":[{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true}]},
+++    {"id":"avtotopor","name":"Автотопор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/avtotopor","catalogId":"weapon_auto_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Порочный"],"qualities":["Двуручный"],"weight":"20","cost":"100","rarity":"3","mods":[{"name":"Электризованное лезвие","prefix":"Электризованный","effects":"+1 БК, Измените тип урона на \"Энергетический\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Горящее лезвие","prefix":"Горящее","effects":"Измените тип урона на \"Энергетический\", получает \"Стойкий\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Ядовитое лезвие","prefix":"Ядовитое","effects":"Добавляет \"Стойкий\"","weight":"-","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true},{"name":"Турбо","prefix":"Турбо","effects":"Каждое потраченное ОД на дополнительный урон прибавляет +2 БК, вместо +1 БК","weight":"+2","cost":"+50","perks":"Кузнец 2, Наука! 1","catalogIds":[],"new":true}]},
+++    {"id":"benzopila","name":"Бензопила","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/benzopila","catalogId":"weapon_chainsaw","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Порочный"],"qualities":["Двуручное"],"weight":"12","cost":"140","rarity":"3","special":"Не получает бонуса к урону в ближнем бою от характеристик пользователя (СИЛ не добавляется).","mods":[{"name":"Двойная шина","prefix":"Двойная","effects":"+2 БК","weight":"+1","cost":"+30","perks":"Кузнец 2","catalogIds":[],"new":true},{"name":"Изогнутая шина","prefix":"Изогнутая","effects":"Получает \"Проникающий\" 1","weight":"+2","cost":"+45","perks":"Кузнец 3","catalogIds":[],"new":true},{"name":"Удлинённая изогнутая шина","prefix":"Удлинённая изогнутая","effects":"добавляет \"Стойкий\"","weight":"+3","cost":"+60","perks":"Кузнец 3","catalogIds":[],"new":true},{"name":"Огнемет","prefix":"Огненный","effects":"+1 БК, измените тип урона на \"Энергетический\", мод \"Огнемет\" может быть добавлен как дополнение к любому другому моду","weight":"+2","cost":"+90","perks":"Кузнец 3, Фанатик Оружия 1","catalogIds":[],"new":true}]},
+++    {"id":"ballisticheskij-kulak","name":"Баллистический кулак","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/ballisticheskij-kulak","catalogId":"weapon_ballistic_fist","type":"Рукопашная","damageType":"Физический","damage":"6","effects":["Оглушение","Порочный"],"qualities":["Медленная перезарядка"],"weight":"6","cost":"150","rarity":"4","special":"Требует 1 патрон для дробовика на каждую атаку. Из-за 'Медленной перезарядки' нужно перезарядить малым действием перед следующим использованием. Без патрона — обычная атака без оружия."},
+++    {"id":"bolshoj-mech","name":"Большой меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bolshoj-mech","catalogId":"weapon_bumper_sword","type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Проникающий 1"],"qualities":["Отдача 7","Двуручный"],"weight":"12","cost":"125","rarity":"2","special":"Отдача 7: требует СИЛ 7+, иначе +1 сложность. Двуручный."},
+++    {"id":"elektroshoker","name":"Электрошокер","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/elektroshoker","catalogId":"weapon_cattle_prod","type":"Ближний бой","damageType":"Энергетический","damage":"7","effects":["Оглушение"],"qualities":[],"weight":"3","cost":"90","rarity":"4"},
+++    {"id":"tanbo-smerti","name":"Танбо смерти","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tanbo-smerti","catalogId":"weapon_death_tambo","type":"Рукопашная","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":[],"weight":"1","cost":"40","rarity":"2","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звона."},
+++    {"id":"perchatka-vytesnitel","name":"Перчатка-вытеснитель","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-vytesnitel","catalogId":"weapon_displacer_glove","type":"Рукопашная","damageType":"Физический","damage":"6","effects":["Проникающий 1","Оглушение"],"qualities":[],"weight":"6","cost":"175","rarity":"4"},
+++    {"id":"gitara-mech","name":"Гитара-меч","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/gitara-mech","catalogId":"weapon_guitar_sword","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 1"],"qualities":["Парирование"],"weight":"3","cost":"45","rarity":"3","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."},
+++    {"id":"tsirkulyarnyj-rezak-mistera-pomoshchnika","name":"Циркулярный резак Мистера Помощника","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tsirkulyarnyj-rezak-mistera-pomoshchnika","catalogId":"weapon_mr_handy_buzz_blade","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Порочный"],"qualities":["Двуручное"],"weight":"10","cost":"50","rarity":"2"},
+++    {"id":"universalnyj-topor","name":"Универсальный топор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/universalnyj-topor","catalogId":"weapon_multi_purpose_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":[],"qualities":["Двуручное"],"weight":"4","cost":"40","rarity":"2"},
+++    {"id":"protonnyj-topor","name":"Протонный топор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/protonnyj-topor","catalogId":"weapon_proton_axe","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Проникающий 1"],"qualities":["Всплеск"],"weight":"8","cost":"175","rarity":"5","special":"Особо эффективен против роботов и механики."},
+++    {"id":"voennyj-baraban","name":"Военный барабан","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/voennyj-baraban","catalogId":"weapon_war_drum","type":"Ближний бой","damageType":"Физический","damage":"5","effects":["Оглушение"],"qualities":["Двуручное"],"weight":"20","cost":"115","rarity":"3","special":"При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."},
+++    {"id":"posokh-atoma","name":"Посох Атома","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/posokh-atoma","catalogId":null,"type":"Ближний бой","damageType":"Физический","damage":"6","effects":["Проникающий 1"],"qualities":["Парирование","Двуручный"],"weight":"15","cost":"200","rarity":"4","note":"НЕТ В КАТАЛОГЕ","mods":[{"name":"Шокирующие катушки","prefix":"Стремительный","effects":"+2 БК, Наносит оба вида урона, Физический и Энергетический","weight":"-","cost":"+100","perks":"Кузнец 2, Наука! 2","catalogIds":[],"new":true}]},
+++    {"id":"shakhterskij-perforator","name":"Шахтерский перфоратор","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shakhterskij-perforator","catalogId":null,"type":"Ближний бой","damageType":"Физический","damage":"2","effects":["Проникающий 2","Разрушающий"],"qualities":["Двуручный"],"weight":"18","cost":"100","rarity":"4","note":"НЕТ В КАТАЛОГЕ","special":"Встроена ячейка с Ядерной батареей: можно потратить 1-3 заряда ячейки чтобы добавить 1-3 БК к базовому урону при атаке."},
+++    {"id":"svarochnaya-gorelka","name":"Сварочная горелка","url":"https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svarochnaya-gorelka","catalogId":"weapon_arc_welder?","type":"Ближний бой","damageType":"Физический","damage":"4","effects":["Проникающий 3","Устойчивый"],"qualities":["Ослабляющее","Неточный","Топливо"],"weight":"15","cost":"120","rarity":"4","note":"ВОПРОС: это weapon_arc_welder (сейчас «Электросварка», статы 3/370/4) или отдельное оружие? Статы владельца: 15/120/4","special":"Свойство ТОПЛИВО (Топливо для огнемета): нужно 4 топлива для работы. При выпадении Осложнения при атаке топливо заканчивается и нужна перезарядка (малое действие) перед следующим использованием."}
+++  ]
+++}
++diff --git a/docs/reference-data/weapon-mods-support-map-370.json b/docs/reference-data/weapon-mods-support-map-370.json
++index 35363a2..2a463ae 100644
++--- a/docs/reference-data/weapon-mods-support-map-370.json
+++++ b/docs/reference-data/weapon-mods-support-map-370.json
++@@ -32,7 +32,8 @@
++   ],
++   "оружий_без_списка": 20,
++   "новых_модов": 13,
++-  "подтверждено_владельцем": "13 новых + 3 уникальных Тесла (EN из референсов); «Магазин на энергоячейках» = mod_171"
+++  "подтверждено_владельцем": "13 новых + 3 уникальных Тесла (EN из референсов); «Магазин на энергоячейках» = mod_171",
+++  "этап_В": "мили: 53 пары привязаны 1:1 (расхождений поддержки 0), 9 новых строк, Посох Атома/Перфоратор — оружия нет в каталоге, Сварочная горелка — вопрос (arc_welder?)"
++  },
++  "pairs": {
++   "антенна|Глубокая антенна": {
++@@ -1996,6 +1997,536 @@
++    "weapons": [
++     "Кислоплюй"
++    ]
+++  },
+++  "weapon_switchblade|Serrated Blade": {
+++   "ids": [
+++    "mod_113"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Выкидной нож: Зазубренное лезвие",
+++   "weapons": [
+++    "Выкидной нож"
+++   ]
+++  },
+++  "weapon_baton|Electrified": {
+++   "ids": [
+++    "mod_132"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Дубинка: Электризованная",
+++   "weapons": [
+++    "Дубинка"
+++   ]
+++  },
+++  "weapon_baton|Stun Pack": {
+++   "ids": [
+++    "mod_133"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Дубинка: Электрошокер",
+++   "weapons": [
+++    "Дубинка"
+++   ]
+++  },
+++  "weapon_sword|Serrated Blade": {
+++   "ids": [
+++    "mod_103"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Меч: Зазубренное лезвие",
+++   "weapons": [
+++    "Меч"
+++   ]
+++  },
+++  "weapon_sword|Electrified Blade": {
+++   "ids": [
+++    "mod_104"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Меч: Электризованное лезвие",
+++   "weapons": [
+++    "Меч"
+++   ]
+++  },
+++  "weapon_sword|Electrified Serrated Blade": {
+++   "ids": [
+++    "mod_105"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Меч: Электризованное зазубренное лезвие",
+++   "weapons": [
+++    "Меч"
+++   ]
+++  },
+++  "weapon_sword|Stun Pack": {
+++   "ids": [
+++    "mod_106"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Меч: Электрошокер",
+++   "weapons": [
+++    "Меч"
+++   ]
+++  },
+++  "weapon_combat_knife|Serrated Blade": {
+++   "ids": [
+++    "mod_107"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Боевой нож: Зазубренное лезвие",
+++   "weapons": [
+++    "Боевой нож"
+++   ]
+++  },
+++  "weapon_combat_knife|Stealth Blade": {
+++   "ids": [
+++    "mod_108"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Боевой нож: Скрытное лезвие",
+++   "weapons": [
+++    "Боевой нож"
+++   ]
+++  },
+++  "weapon_machete|Serrated Blade": {
+++   "ids": [
+++    "mod_109"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Мачете: Зазубренное лезвие",
+++   "weapons": [
+++    "Мачете"
+++   ]
+++  },
+++  "weapon_ripper|Curved Blade": {
+++   "ids": [
+++    "mod_110"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Потрошитель: Изогнутое лезвие",
+++   "weapons": [
+++    "Потрошитель"
+++   ]
+++  },
+++  "weapon_ripper|Extended Blade": {
+++   "ids": [
+++    "mod_111"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Потрошитель: Удлиненное лезвие",
+++   "weapons": [
+++    "Потрошитель"
+++   ]
+++  },
+++  "weapon_shishkebab|Extra Flame Jets": {
+++   "ids": [
+++    "mod_112"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Шиш-кебаб: Дополнительные воспламенительные форсунки",
+++   "weapons": [
+++    "Шиш-кебаб"
+++   ]
+++  },
+++  "weapon_baseball_bat|Barbed": {
+++   "ids": [
+++    "mod_114"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бейсбольная бита: Колючая",
+++   "weapons": [
+++    "Бейсбольная бита"
+++   ]
+++  },
+++  "weapon_baseball_bat|Spiked": {
+++   "ids": [
+++    "mod_115"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бейсбольная бита: Шипастая",
+++   "weapons": [
+++    "Бейсбольная бита"
+++   ]
+++  },
+++  "weapon_baseball_bat|Sharp": {
+++   "ids": [
+++    "mod_116"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бейсбольная бита: Заостренная",
+++   "weapons": [
+++    "Бейсбольная бита"
+++   ]
+++  },
+++  "weapon_baseball_bat|Chain-Wrapped": {
+++   "ids": [
+++    "mod_117"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бейсбольная бита: Обмотанная цепью",
+++   "weapons": [
+++    "Бейсбольная бита"
+++   ]
+++  },
+++  "weapon_baseball_bat|Bladed": {
+++   "ids": [
+++    "mod_118"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бейсбольная бита: Лезвия",
+++   "weapons": [
+++    "Бейсбольная бита"
+++   ]
+++  },
+++  "weapon_baseball_bat_aluminum|Barbed": {
+++   "ids": [
+++    "mod_114"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Алюминиевая бита: Колючая",
+++   "weapons": [
+++    "Алюминиевая бита"
+++   ]
+++  },
+++  "weapon_baseball_bat_aluminum|Spiked": {
+++   "ids": [
+++    "mod_115"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Алюминиевая бита: Шипастая",
+++   "weapons": [
+++    "Алюминиевая бита"
+++   ]
+++  },
+++  "weapon_baseball_bat_aluminum|Sharp": {
+++   "ids": [
+++    "mod_116"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Алюминиевая бита: Заостренная",
+++   "weapons": [
+++    "Алюминиевая бита"
+++   ]
+++  },
+++  "weapon_baseball_bat_aluminum|Chain-Wrapped": {
+++   "ids": [
+++    "mod_117"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Алюминиевая бита: Обмотанная цепью",
+++   "weapons": [
+++    "Алюминиевая бита"
+++   ]
+++  },
+++  "weapon_baseball_bat_aluminum|Bladed": {
+++   "ids": [
+++    "mod_118"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Алюминиевая бита: Лезвия",
+++   "weapons": [
+++    "Алюминиевая бита"
+++   ]
+++  },
+++  "weapon_board|Spiked": {
+++   "ids": [
+++    "mod_119"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Дрын: Шипованный",
+++   "weapons": [
+++    "Дрын"
+++   ]
+++  },
+++  "weapon_board|Puncturing": {
+++   "ids": [
+++    "mod_120"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Дрын: Прокалывающий",
+++   "weapons": [
+++    "Дрын"
+++   ]
+++  },
+++  "weapon_board|Bladed": {
+++   "ids": [
+++    "mod_121"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Дрын: Лезвия",
+++   "weapons": [
+++    "Дрын"
+++   ]
+++  },
+++  "weapon_lead_pipe|Spiked": {
+++   "ids": [
+++    "mod_122"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Свинцовая труба: Шипастая",
+++   "weapons": [
+++    "Свинцовая труба"
+++   ]
+++  },
+++  "weapon_lead_pipe|Heavy": {
+++   "ids": [
+++    "mod_123"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Свинцовая труба: Утяжеленная",
+++   "weapons": [
+++    "Свинцовая труба"
+++   ]
+++  },
+++  "weapon_pipe_wrench|Hooked": {
+++   "ids": [
+++    "mod_124"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Разводной ключ: Крюк",
+++   "weapons": [
+++    "Разводной ключ"
+++   ]
+++  },
+++  "weapon_pipe_wrench|Heavy": {
+++   "ids": [
+++    "mod_125"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Разводной ключ: Утяжеленный",
+++   "weapons": [
+++    "Разводной ключ"
+++   ]
+++  },
+++  "weapon_pipe_wrench|Puncturing": {
+++   "ids": [
+++    "mod_126"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Разводной ключ: Прокалывающий",
+++   "weapons": [
+++    "Разводной ключ"
+++   ]
+++  },
+++  "weapon_pipe_wrench|Extra Heavy": {
+++   "ids": [
+++    "mod_127"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Разводной ключ: Сверхтяжелый",
+++   "weapons": [
+++    "Разводной ключ"
+++   ]
+++  },
+++  "weapon_pool_cue|Barbed": {
+++   "ids": [
+++    "mod_128"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бильярдный кий: Прокалывающий",
+++   "weapons": [
+++    "Бильярдный кий"
+++   ]
+++  },
+++  "weapon_pool_cue|Sharp": {
+++   "ids": [
+++    "mod_129"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Бильярдный кий: Заостренный",
+++   "weapons": [
+++    "Бильярдный кий"
+++   ]
+++  },
+++  "weapon_rolling_pin|Spiked": {
+++   "ids": [
+++    "mod_130"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Скалка: Шипастая",
+++   "weapons": [
+++    "Скалка"
+++   ]
+++  },
+++  "weapon_rolling_pin|Sharp": {
+++   "ids": [
+++    "mod_131"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Скалка: Заостренная",
+++   "weapons": [
+++    "Скалка"
+++   ]
+++  },
+++  "weapon_sledgehammer|Puncturing": {
+++   "ids": [
+++    "mod_134"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кувалда: Прокалывающая",
+++   "weapons": [
+++    "Кувалда"
+++   ]
+++  },
+++  "weapon_sledgehammer|Heavy": {
+++   "ids": [
+++    "mod_135"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кувалда: Тяжелая",
+++   "weapons": [
+++    "Кувалда"
+++   ]
+++  },
+++  "weapon_super_sledge|Heating Coil": {
+++   "ids": [
+++    "mod_136"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Супермолот: Нагревательная спираль",
+++   "weapons": [
+++    "Супермолот"
+++   ]
+++  },
+++  "weapon_super_sledge|Stun Pack": {
+++   "ids": [
+++    "mod_137"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Супермолот: Электрошокер",
+++   "weapons": [
+++    "Супермолот"
+++   ]
+++  },
+++  "weapon_tire_iron|Bladed": {
+++   "ids": [
+++    "mod_138"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Балонный ключ: Лезвия",
+++   "weapons": [
+++    "Балонный ключ"
+++   ]
+++  },
+++  "weapon_walking_cane|Barbed": {
+++   "ids": [
+++    "mod_139"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Трость: Колючая",
+++   "weapons": [
+++    "Трость"
+++   ]
+++  },
+++  "weapon_walking_cane|Spiked": {
+++   "ids": [
+++    "mod_140"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Трость: Шипастая",
+++   "weapons": [
+++    "Трость"
+++   ]
+++  },
+++  "weapon_boxing_glove|Spiked": {
+++   "ids": [
+++    "mod_141"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Боксерская перчатка: Шипастая",
+++   "weapons": [
+++    "Боксерская перчатка"
+++   ]
+++  },
+++  "weapon_boxing_glove|Puncturing": {
+++   "ids": [
+++    "mod_142"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Боксерская перчатка: Колючая",
+++   "weapons": [
+++    "Боксерская перчатка"
+++   ]
+++  },
+++  "weapon_boxing_glove|Lead Lining": {
+++   "ids": [
+++    "mod_143"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Боксерская перчатка: Свинцовая подкладка",
+++   "weapons": [
+++    "Боксерская перчатка"
+++   ]
+++  },
+++  "weapon_deathclaw_gauntlet|Extra Claw": {
+++   "ids": [
+++    "mod_144"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Перчатка когтя смерти: Дополнительный коготь",
+++   "weapons": [
+++    "Перчатка когтя смерти"
+++   ]
+++  },
+++  "weapon_knuckles|Sharp": {
+++   "ids": [
+++    "mod_145"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кастет: Заостренный",
+++   "weapons": [
+++    "Кастет"
+++   ]
+++  },
+++  "weapon_knuckles|Spiked": {
+++   "ids": [
+++    "mod_146"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кастет: Шипованный",
+++   "weapons": [
+++    "Кастет"
+++   ]
+++  },
+++  "weapon_knuckles|Puncturing": {
+++   "ids": [
+++    "mod_147"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кастет: Прокалывающий",
+++   "weapons": [
+++    "Кастет"
+++   ]
+++  },
+++  "weapon_knuckles|Bladed": {
+++   "ids": [
+++    "mod_148"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Кастет: Лезвия",
+++   "weapons": [
+++    "Кастет"
+++   ]
+++  },
+++  "weapon_power_fist|Puncturing": {
+++   "ids": [
+++    "mod_149"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Силовой кастет: Прокалывающий",
+++   "weapons": [
+++    "Силовой кастет"
+++   ]
+++  },
+++  "weapon_power_fist|Heating Coil": {
+++   "ids": [
+++    "mod_150"
+++   ],
+++   "via": "мили: EN-мост (референс владельца)",
+++   "name": "Силовой кастет: Нагревательная спираль",
+++   "weapons": [
+++    "Силовой кастет"
+++   ]
++   }
++  },
++  "draft": {
++@@ -11296,5 +11827,651 @@
++    "slot": "ресивер",
++    "weapon": "Помповый дробовик"
++   }
+++ },
+++ "melee_draft": {
+++  "weapon_switchblade": [
+++   {
+++    "name": "Зазубренное лезвие",
+++    "prefix": "Зазубренный",
+++    "en": "Serrated Blade",
+++    "ids": [
+++     "mod_113"
+++    ]
+++   }
+++  ],
+++  "weapon_baton": [
+++   {
+++    "name": "Электризованная",
+++    "prefix": "Шокирующая",
+++    "en": "Electrified",
+++    "ids": [
+++     "mod_132"
+++    ]
+++   },
+++   {
+++    "name": "Электрошокер",
+++    "prefix": "Оглушающая",
+++    "en": "Stun Pack",
+++    "ids": [
+++     "mod_133"
+++    ]
+++   }
+++  ],
+++  "weapon_sword": [
+++   {
+++    "name": "Зазубренное лезвие",
+++    "prefix": "Зазубренный",
+++    "en": "Serrated Blade",
+++    "ids": [
+++     "mod_103"
+++    ]
+++   },
+++   {
+++    "name": "Электризованное лезвие",
+++    "prefix": "Электризованный",
+++    "en": "Electrified Blade",
+++    "ids": [
+++     "mod_104"
+++    ]
+++   },
+++   {
+++    "name": "Электризованное зазубренное лезвие",
+++    "prefix": "Электризованный зазубренный",
+++    "en": "Electrified Serrated Blade",
+++    "ids": [
+++     "mod_105"
+++    ]
+++   },
+++   {
+++    "name": "Электрошокер",
+++    "prefix": "Оглушающий",
+++    "en": "Stun Pack",
+++    "ids": [
+++     "mod_106"
+++    ]
+++   }
+++  ],
+++  "weapon_combat_knife": [
+++   {
+++    "name": "Зазубренное лезвие",
+++    "prefix": "Зазубренный",
+++    "en": "Serrated Blade",
+++    "ids": [
+++     "mod_107"
+++    ]
+++   },
+++   {
+++    "name": "Скрытное лезвие",
+++    "prefix": "Скрытный",
+++    "en": "Stealth Blade",
+++    "ids": [
+++     "mod_108"
+++    ]
+++   }
+++  ],
+++  "weapon_machete": [
+++   {
+++    "name": "Зазубренное лезвие",
+++    "prefix": "Зазубренный",
+++    "en": "Serrated Blade",
+++    "ids": [
+++     "mod_109"
+++    ]
+++   }
+++  ],
+++  "weapon_ripper": [
+++   {
+++    "name": "Изогнутое лезвие",
+++    "prefix": "Изогнутый",
+++    "en": "Curved Blade",
+++    "ids": [
+++     "mod_110"
+++    ]
+++   },
+++   {
+++    "name": "Удлиненное лезвие",
+++    "prefix": "Удлиненный",
+++    "en": "Extended Blade",
+++    "ids": [
+++     "mod_111"
+++    ]
+++   }
+++  ],
+++  "weapon_shishkebab": [
+++   {
+++    "name": "Дополнительные воспламенительные форсунки",
+++    "prefix": "Жгучий",
+++    "en": "Extra Flame Jets",
+++    "ids": [
+++     "mod_112"
+++    ]
+++   }
+++  ],
+++  "weapon_baseball_bat": [
+++   {
+++    "name": "Колючая",
+++    "prefix": "Колючая",
+++    "en": "Barbed",
+++    "ids": [
+++     "mod_114"
+++    ]
+++   },
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_115"
+++    ]
+++   },
+++   {
+++    "name": "Заостренная",
+++    "prefix": "Заостренная",
+++    "en": "Sharp",
+++    "ids": [
+++     "mod_116"
+++    ]
+++   },
+++   {
+++    "name": "Обмотанная цепью",
+++    "prefix": "Обмотанная цепью",
+++    "en": "Chain-Wrapped",
+++    "ids": [
+++     "mod_117"
+++    ]
+++   },
+++   {
+++    "name": "Лезвия",
+++    "prefix": "Клинковая",
+++    "en": "Bladed",
+++    "ids": [
+++     "mod_118"
+++    ]
+++   }
+++  ],
+++  "weapon_baseball_bat_aluminum": [
+++   {
+++    "name": "Колючая",
+++    "prefix": "Колючая",
+++    "en": "Barbed",
+++    "ids": [
+++     "mod_114"
+++    ]
+++   },
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_115"
+++    ]
+++   },
+++   {
+++    "name": "Заостренная",
+++    "prefix": "Заостренная",
+++    "en": "Sharp",
+++    "ids": [
+++     "mod_116"
+++    ]
+++   },
+++   {
+++    "name": "Обмотанная цепью",
+++    "prefix": "Обмотанная цепью",
+++    "en": "Chain-Wrapped",
+++    "ids": [
+++     "mod_117"
+++    ]
+++   },
+++   {
+++    "name": "Лезвия",
+++    "prefix": "Клинковая",
+++    "en": "Bladed",
+++    "ids": [
+++     "mod_118"
+++    ]
+++   }
+++  ],
+++  "weapon_board": [
+++   {
+++    "name": "Шипованный",
+++    "prefix": "Шипованный",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_119"
+++    ]
+++   },
+++   {
+++    "name": "Прокалывающий",
+++    "prefix": "Прокалывающий",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_120"
+++    ]
+++   },
+++   {
+++    "name": "Лезвия",
+++    "prefix": "Клинковый",
+++    "en": "Bladed",
+++    "ids": [
+++     "mod_121"
+++    ]
+++   }
+++  ],
+++  "weapon_lead_pipe": [
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_122"
+++    ]
+++   },
+++   {
+++    "name": "Утяжеленная",
+++    "prefix": "Утяжеленная",
+++    "en": "Heavy",
+++    "ids": [
+++     "mod_123"
+++    ]
+++   }
+++  ],
+++  "weapon_pipe_wrench": [
+++   {
+++    "name": "Крюк",
+++    "prefix": "Загнутый",
+++    "en": "Hooked",
+++    "ids": [
+++     "mod_124"
+++    ]
+++   },
+++   {
+++    "name": "Утяжеленный",
+++    "prefix": "Увесистый",
+++    "en": "Heavy",
+++    "ids": [
+++     "mod_125"
+++    ]
+++   },
+++   {
+++    "name": "Прокалывающий",
+++    "prefix": "Прокалывающий",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_126"
+++    ]
+++   },
+++   {
+++    "name": "Сверхтяжелый",
+++    "prefix": "Сверхтяжелый",
+++    "en": "Extra Heavy",
+++    "ids": [
+++     "mod_127"
+++    ]
+++   }
+++  ],
+++  "weapon_pool_cue": [
+++   {
+++    "name": "Прокалывающий",
+++    "prefix": "Прокалывающий",
+++    "en": "Barbed",
+++    "ids": [
+++     "mod_128"
+++    ]
+++   },
+++   {
+++    "name": "Заостренный",
+++    "prefix": "Заостренный",
+++    "en": "Sharp",
+++    "ids": [
+++     "mod_129"
+++    ]
+++   }
+++  ],
+++  "weapon_rolling_pin": [
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_130"
+++    ]
+++   },
+++   {
+++    "name": "Заостренная",
+++    "prefix": "Заостренная",
+++    "en": "Sharp",
+++    "ids": [
+++     "mod_131"
+++    ]
+++   }
+++  ],
+++  "weapon_sledgehammer": [
+++   {
+++    "name": "Прокалывающая",
+++    "prefix": "Прокалывающая",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_134"
+++    ]
+++   },
+++   {
+++    "name": "Тяжелая",
+++    "prefix": "Тяжелая",
+++    "en": "Heavy",
+++    "ids": [
+++     "mod_135"
+++    ]
+++   }
+++  ],
+++  "weapon_super_sledge": [
+++   {
+++    "name": "Нагревательная спираль",
+++    "prefix": "Раскаленная",
+++    "en": "Heating Coil",
+++    "ids": [
+++     "mod_136"
+++    ]
+++   },
+++   {
+++    "name": "Электрошокер",
+++    "prefix": "Оглушающая",
+++    "en": "Stun Pack",
+++    "ids": [
+++     "mod_137"
+++    ]
+++   }
+++  ],
+++  "weapon_tire_iron": [
+++   {
+++    "name": "Лезвия",
+++    "prefix": "Клинковый",
+++    "en": "Bladed",
+++    "ids": [
+++     "mod_138"
+++    ]
+++   }
+++  ],
+++  "weapon_walking_cane": [
+++   {
+++    "name": "Колючая",
+++    "prefix": "Колючая",
+++    "en": "Barbed",
+++    "ids": [
+++     "mod_139"
+++    ]
+++   },
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_140"
+++    ]
+++   }
+++  ],
+++  "weapon_boxing_glove": [
+++   {
+++    "name": "Шипастая",
+++    "prefix": "Шипастая",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_141"
+++    ]
+++   },
+++   {
+++    "name": "Колючая",
+++    "prefix": "Колючая",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_142"
+++    ]
+++   },
+++   {
+++    "name": "Свинцовая подкладка",
+++    "prefix": "Свинцовая",
+++    "en": "Lead Lining",
+++    "ids": [
+++     "mod_143"
+++    ]
+++   }
+++  ],
+++  "weapon_deathclaw_gauntlet": [
+++   {
+++    "name": "Дополнительный коготь",
+++    "prefix": "Большая",
+++    "en": "Extra Claw",
+++    "ids": [
+++     "mod_144"
+++    ]
+++   }
+++  ],
+++  "weapon_knuckles": [
+++   {
+++    "name": "Заостренный",
+++    "prefix": "Заостренный",
+++    "en": "Sharp",
+++    "ids": [
+++     "mod_145"
+++    ]
+++   },
+++   {
+++    "name": "Шипованный",
+++    "prefix": "Шипованный",
+++    "en": "Spiked",
+++    "ids": [
+++     "mod_146"
+++    ]
+++   },
+++   {
+++    "name": "Прокалывающий",
+++    "prefix": "Прокалывающий",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_147"
+++    ]
+++   },
+++   {
+++    "name": "Лезвия",
+++    "prefix": "Клинковый",
+++    "en": "Bladed",
+++    "ids": [
+++     "mod_148"
+++    ]
+++   }
+++  ],
+++  "weapon_power_fist": [
+++   {
+++    "name": "Прокалывающий",
+++    "prefix": "Прокалывающий",
+++    "en": "Puncturing",
+++    "ids": [
+++     "mod_149"
+++    ]
+++   },
+++   {
+++    "name": "Нагревательная спираль",
+++    "prefix": "Раскаленный",
+++    "en": "Heating Coil",
+++    "ids": [
+++     "mod_150"
+++    ]
+++   }
+++  ],
+++  "weapon_assaultron_blade": [
+++   {
+++    "name": "Электризованное лезвие",
+++    "prefix": "Электризованный",
+++    "en": "Electrified Blade",
+++    "ids": []
+++   }
+++  ],
+++  "weapon_auto_axe": [
+++   {
+++    "name": "Электризованное лезвие",
+++    "prefix": "Электризованный",
+++    "en": "Electrified Blade",
+++    "ids": []
+++   },
+++   {
+++    "name": "Горящее лезвие",
+++    "prefix": "Горящее",
+++    "en": "Burning Blade",
+++    "ids": []
+++   },
+++   {
+++    "name": "Ядовитое лезвие",
+++    "prefix": "Ядовитое",
+++    "en": "Poison Blade",
+++    "ids": []
+++   },
+++   {
+++    "name": "Турбо",
+++    "prefix": "Турбо",
+++    "en": "Turbo",
+++    "ids": []
+++   }
+++  ],
+++  "weapon_chainsaw": [
+++   {
+++    "name": "Двойная шина",
+++    "prefix": "Двойная",
+++    "en": "Double Chain",
+++    "ids": []
+++   },
+++   {
+++    "name": "Изогнутая шина",
+++    "prefix": "Изогнутая",
+++    "en": "Curved Chain",
+++    "ids": []
+++   },
+++   {
+++    "name": "Удлинённая изогнутая шина",
+++    "prefix": "Удлинённая изогнутая",
+++    "en": "Extended Curved Chain",
+++    "ids": []
+++   },
+++   {
+++    "name": "Огнемет",
+++    "prefix": "Огненный",
+++    "en": "Flamer",
+++    "ids": []
+++   }
+++  ]
+++ },
+++ "melee_new_mods": [
+++  {
+++   "weapon": "weapon_assaultron_blade",
+++   "weapon_ru": "Клинок ассаултрона",
+++   "name": "Электризованное лезвие",
+++   "prefix": "Электризованный",
+++   "en": "Electrified Blade"
+++  },
+++  {
+++   "weapon": "weapon_auto_axe",
+++   "weapon_ru": "Автотопор",
+++   "name": "Электризованное лезвие",
+++   "prefix": "Электризованный",
+++   "en": "Electrified Blade"
+++  },
+++  {
+++   "weapon": "weapon_auto_axe",
+++   "weapon_ru": "Автотопор",
+++   "name": "Горящее лезвие",
+++   "prefix": "Горящее",
+++   "en": "Burning Blade"
+++  },
+++  {
+++   "weapon": "weapon_auto_axe",
+++   "weapon_ru": "Автотопор",
+++   "name": "Ядовитое лезвие",
+++   "prefix": "Ядовитое",
+++   "en": "Poison Blade"
+++  },
+++  {
+++   "weapon": "weapon_auto_axe",
+++   "weapon_ru": "Автотопор",
+++   "name": "Турбо",
+++   "prefix": "Турбо",
+++   "en": "Turbo"
+++  },
+++  {
+++   "weapon": "weapon_chainsaw",
+++   "weapon_ru": "Бензопила",
+++   "name": "Двойная шина",
+++   "prefix": "Двойная",
+++   "en": "Double Chain"
+++  },
+++  {
+++   "weapon": "weapon_chainsaw",
+++   "weapon_ru": "Бензопила",
+++   "name": "Изогнутая шина",
+++   "prefix": "Изогнутая",
+++   "en": "Curved Chain"
+++  },
+++  {
+++   "weapon": "weapon_chainsaw",
+++   "weapon_ru": "Бензопила",
+++   "name": "Удлинённая изогнутая шина",
+++   "prefix": "Удлинённая изогнутая",
+++   "en": "Extended Curved Chain"
+++  },
+++  {
+++   "weapon": "weapon_chainsaw",
+++   "weapon_ru": "Бензопила",
+++   "name": "Огнемет",
+++   "prefix": "Огненный",
+++   "en": "Flamer"
+++  }
+++ ],
+++ "melee_weapon_aliases": {
+++  "vykidnoj-nozh": "weapon_switchblade",
+++  "dubinka": "weapon_baton",
+++  "mech": "weapon_sword",
+++  "boevoj-nozh": "weapon_combat_knife",
+++  "machete": "weapon_machete",
+++  "potroshitel": "weapon_ripper",
+++  "shish-kebab": "weapon_shishkebab",
+++  "bejsbolnaya-bita": "weapon_baseball_bat",
+++  "alyuminievaya-bejsbolnaya-bita": "weapon_baseball_bat_aluminum",
+++  "dryn": "weapon_board",
+++  "svintsovaya-truba": "weapon_lead_pipe",
+++  "razvodnoj-klyuch": "weapon_pipe_wrench",
+++  "bilyardnyj-kij": "weapon_pool_cue",
+++  "skalka": "weapon_rolling_pin",
+++  "kuvalda": "weapon_sledgehammer",
+++  "supermolot": "weapon_super_sledge",
+++  "balonnyj-klyuch": "weapon_tire_iron",
+++  "trost": "weapon_walking_cane",
+++  "bokserskaya-perchatka": "weapon_boxing_glove",
+++  "perchatka-kogtya-smerti": "weapon_deathclaw_gauntlet",
+++  "kastet": "weapon_knuckles",
+++  "silovoj-kastet": "weapon_power_fist",
+++  "klinok-shturmotrona": "weapon_assaultron_blade",
+++  "avtotopor": "weapon_auto_axe",
+++  "benzopila": "weapon_chainsaw",
+++  "elektroshoker": "weapon_cattle_prod",
+++  "tanbo-smerti": "weapon_death_tambo"
+++ },
+++ "melee_missing_weapons": [
+++  {
+++   "владелец": "Посох Атома",
+++   "id": "posokh-atoma"
+++  }
+++ ],
+++ "melee_renames": {
+++  "Лазер института": "Лазерный пистолет института (+ложа = Лазерная винтовка института)",
+++  "Складной нож": "Выкидной нож",
+++  "Полицейская дубинка": "Дубинка",
+++  "Боксерские перчатки": "Боксерская перчатка",
+++  "Супер-кувалда": "Супермолот",
+++  "Силовой кулак": "Силовой кастет",
+++  "Клинок ассаултрона": "Клинок штурмотрона",
+++  "Перемещающая перчатка": "Перчатка-вытеснитель",
+++  "Жужжащий клинок мистера Хэнди": "Циркулярный резак Мистера Помощника",
+++  "Многоцелевой топор": "Универсальный топор",
+++  "Боевой барабан": "Военный барабан",
+++  "Меч из бампера": "Большой меч",
+++  "Cattle Prod": "Электрошокер",
+++  "Death Tambo": "Танбо смерти"
++  }
++ }
++\ No newline at end of file
++diff --git a/docs/reference-data/weapon-mods-support-map-370.md b/docs/reference-data/weapon-mods-support-map-370.md
++index f70d1bf..3b2fcbd 100644
++--- a/docs/reference-data/weapon-mods-support-map-370.md
+++++ b/docs/reference-data/weapon-mods-support-map-370.md
++@@ -1,4 +1,4 @@
++-# Поддерживаемые моды к оружию (патчи 370–371)
+++# Поддерживаемые моды к оружию (патчи 370–372)
++ 
++ Материал ревизии модов (план 368). Этап Б: собираем «какие моды поддерживает
++ оружие» из файла владельца `gemini-code-1790317366823.json` (репозиторий на
++@@ -99,6 +99,47 @@ focharactersheet_weapon_mods.json в docs/reference-data):
++ Выкидного ножа/Шиш-кебаба, Дуговая сварка, Институтский лазер, 10-мм ПП,
++ Плазменная мина. Снимать у них поддержку пока нельзя — пришлёте списки.
++ 
+++## Этап В: мили и рукопашная (патч 372)
+++
+++Вы прислали каталог мили (38 оружий, fallout-2d20.ru). Результат:
+++
+++- **35 из 38 есть в каталоге** (многие под другими именами — см. переименования).
+++  Нет в каталоге: **Посох Атома** (мод «Шокирующие катушки»), **Шахтерский
+++  перфоратор**, **Сварочная горелка** (вопрос: это `weapon_arc_welder`,
+++  сейчас «Электросварка», статы каталога 3/370/4 против ваших 15/120/4 —
+++  или отдельное оружие?).
+++- **53 пары (оружие, мод) привязаны 1:1.** Поддержка в приложении УЖЕ
+++  совпадает с вашими списками (0 расхождений по 25 оружиям с модами) —
+++  расходуются только НАЗВАНИЯ: справочник даёт «Колючая, Шипастая,
+++  Заостренная, Прокалывающий, Лезвия, Утяжеленная», каталог — «Шипастый,
+++  Шипованный, Острый, Пронзающий, С лезвием, Тяжёлый» (разные переводы
+++  Barbed/Spiked/Sharp/Puncturing/Bladed/Heavy). При ревизии имена берём
+++  из вашего справочника.
+++- **9 новых строк** (модов нет в каталоге): Клинок штурмотрона —
+++  Электризованное лезвие; Автотопор — Электризованное/Горящее/Ядовитое
+++  лезвие, Турбо; Бензопила — Двойная шина, Изогнутая шина, Удлинённая
+++  изогнутая шина, Огнемет. Кузнечные колонки — в
+++  `melee-catalog-owner-372.json`.
+++- **Переименования оружия** (ваше имя — приоритет): Лазер института →
+++  Лазерный пистолет института (+ложа = Лазерная винтовка института);
+++  Складной нож → Выкидной нож; Полицейская дубинка → Дубинка; Боксерские
+++  перчатки → Боксерская перчатка; Супер-кувалда → Супермолот; Силовой
+++  кулак → Силовой кастет; Клинок ассаултрона → Клинок штурмотрона;
+++  Перемещающая перчатка → Перчатка-вытеснитель; Жужжащий клинок мистера
+++  Хэнди → Циркулярный резак Мистера Помощника; Многоцелевой топор →
+++  Универсальный топор; Боевой барабан → Военный барабан; Меч из бампера →
+++  Большой меч; Cattle Prod → Электрошокер; Death Tambo → Танбо смерти.
+++
+++Уточнения владельца, записанные в 372: «монтировки» в его данных нет —
+++в каталоге уже «Балонный ключ» (weapon_tire_iron); «Дуговая сварка» есть
+++в его данных, но БЕЗ списков модов — поддержку не трогаем; 10-мм
+++пистолет-пулемёт в его данных не нашёлся — не трогаем. Робо-оружие в
+++файле не присылалось: поддержка робо-модов в программе отдельная
+++(патчи 290–294, 359), покрыта тестами — ревизия её не ломает, работает «ок».
+++
+++Итог по 20 «оружиям без списка»: 16 мили-стволов ЗАКРЫТЫ этим этапом
+++(осталось 4: Дуговая сварка, Лазер института, 10-мм ПП, Плазменная мина).
+++
++ ## Правило будущих патчей (по слову владельца)
++ 
++ 1. Ревизия id: человекочитаемые канон-id, фантомы слить (одна строка на
++diff --git a/public/version.json b/public/version.json
++index aab9adb..adbd158 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,5 +1,5 @@
++ {
++-  "version": "371",
+++  "version": "372",
++   "release": "1",
++   "notes": {
++     "ru-RU": [
+diff --git a/public/version.json b/public/version.json
+index adbd158..1e301c1 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "372",
++  "version": "373",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
