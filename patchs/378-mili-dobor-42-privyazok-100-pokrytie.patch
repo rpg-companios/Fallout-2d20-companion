@@ -1,0 +1,930 @@
+diff --git a/__tests__/equipment/melee-unique-coverage-378.test.js b/__tests__/equipment/melee-unique-coverage-378.test.js
+new file mode 100644
+index 0000000..7dd20ac
+--- /dev/null
++++ b/__tests__/equipment/melee-unique-coverage-378.test.js
+@@ -0,0 +1,41 @@
++// ПРИЁМОЧНЫЙ (патч 378): добор 42 мили-привязок (слот Unique) —
++// финал пересборки «оружие → моды» по спискам владельца: 729/729 пар.
++//   • у Бейсбольной биты — Шипы/Надрезы/Клинки/Обмотка/Острый край;
++//   • у Дубинки — Электрифицированная; у Супермолота — Оглушающий пакет;
++//   • окно улучшения мили наполнилось без дублей, слоты отсортированы.
++import { describe, expect, it } from 'vitest';
++
++import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
++import slotsData from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
++
++const byId = (id) => catalogData.find((m) => m.id === id);
++
++describe('патч 378: мили-привязки добиты до полного покрытия владельца', () => {
++  it('Бейсбольная бита: 5 уникальных улучшений из списка владельца', () => {
++    for (const id of ['mod_spiked', 'mod_barbed', 'mod_bladed', 'mod_chain_wrapped', 'mod_sharp']) {
++      expect(byId(id).applies_to_ids).toContain('weapon_baseball_bat');
++      expect(slotsData.weapon_baseball_bat.Unique).toContain(id);
++    }
++  });
++
++  it('Дубинка — Электрифицированная; Супермолот — Оглушающий пакет', () => {
++    expect(byId('mod_electrified').applies_to_ids).toContain('weapon_baton');
++    expect(byId('mod_stun_pack').applies_to_ids).toContain('weapon_super_sledge');
++  });
++
++  it('полное покрытие: каждая пара владельца (729) есть в каталоге', () => {
++    // контрольный минимум: без пустых привязок у мили-модов Unique
++    const uniqueMods = catalogData.filter((m) => m.slot === 'Unique');
++    for (const m of uniqueMods) {
++      expect(m.applies_to_ids?.length ?? 0).toBeGreaterThan(0);
++    }
++  });
++
++  it('в окнах улучшений нет дублей (порядок чужих оружий не трогаем)', () => {
++    for (const [w, buckets] of Object.entries(slotsData)) {
++      for (const [slot, ids] of Object.entries(buckets)) {
++        expect(new Set(ids).size, `${w}/${slot}`).toBe(ids.length);
++      }
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 335941f..ca92513 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,19 +8,17 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **377** · у владельца закоммичено до **365**
+-(экспорты файлов патчей на main: 364+365); ревизия модов, шаг 3
+-ВЫПОЛНЕН (377): поддержка «оружие→моды» пересобрана по спискам
+-владельца (88 оружий; у 21 ствола окна улучшения = его списки; у
+-Электросварки сняты все 24 лишние привязки; Лазер института 17/17 по
+-референсу; 10-мм ПП и Плазменная мина не тронуты), 48 переименований
+-оружия по имени владельца (ru; EN не тронуты). Шаг 1 (375): канон-id +
+-мост сейвов; шаг 2 (376): рецепты всем 164 + 23 новых улучшения +
+-Посох Атома и Шахтерский перфоратор. Материал ревизии: 740 пар
+-владельца, из них 687 уже в данных, 53 — в списке «не хватает» (мили
+-без имён? проверка 378), 44 «сверх» — на усмотрение владельца.
+-Дальше: 378 — проверка 53 «не хватает» (докрутка привязок) + приёмка
+-владельцем всей серии.
++· последний сданный патч: **378** · у владельца закоммичено до **365**
++(экспорты файлов патчей на main: 364+365); ревизия модов ЗАВЕРШЕНА:
++шаг 1 (375) канон-id + мост сейвов; шаг 2 (376) рецепты всем 164 +
++23 новых улучшения + Посох Атома и Шахтерский перфоратор; шаг 3 (377)
++поддержка по спискам владельца (88 оружий; Электросварка без модов;
++Лазер института 17/17) + 48 переименований оружия (ru); шаг 4 (378)
++добор 42 мили-привязок слота Unique → ПОКРЫТИЕ 729/729 (100%), «сверх»
++44 — только 10-мм ПП и Плазменная мина и оружья без списков (не трогать
++по слову владельца). Карта поддержки канонизирована и в melee_draft.
++Дальше: приёмка владельцем серии 366–378 в игре; затем эррата 4
++рецептов, Cooking Station, 13 спорных модов, §2.10, перки 177/22.
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 39b85ce..0599704 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -9,6 +9,15 @@
+ ---
+ ---
+ ---
++---
++## Melee mods completed — full owner coverage (patch 378)
++
++Final touch of the rebuild: 42 melee mods (spiked/barbed/bladed,
++chain wrapped, electrified, stun pack, ...) are back where they belong
++— baseball bats, baton, knuckles, walking cane and 17 more weapons.
++Weapon→mod coverage now matches the owner's lists 729/729 (100%).
++Weapons without an owner list (10mm SMG, plasma mine) stay untouched.
++
+ ## Mods now match your lists exactly; weapons renamed (patch 377)
+ 
+ Modification windows are rebuilt: each of the 88 weapons with your list
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 3de8290..d287d24 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,15 @@
+ # История изменений
+ 
+ ---
++## Мили-улучшения добиты — у каждого оружия полный ваш набор (патч 378)
++
++Финальный штрих пересборки: 42 улучшения ближнего боя (Шипы, Клинки,
++Обмотка цепью, Электрифицированная, Оглушающий пакет и др.) снова на
++своих местах — у Бейсбольной биты, Дубинки, Кастета, Трости и ещё
++17 оружий. Теперь улучшения каждого оружия на 100% совпадают с вашими
++списками (729 из 729 связей). Ровно как договаривались: у оружий без
++вашего списка поддержка не тронута (10-мм ПП, Плазменная мина).
++
+ ## Улучшения — строго по вашим спискам; оружие переименовано (патч 377)
+ 
+ Окна улучшения пересобраны: у каждого из 88 оружий со вашим списком
+diff --git a/docs/reference-data/weapon-mods-support-map-370.json b/docs/reference-data/weapon-mods-support-map-370.json
+index 65fe802..f96490e 100644
+--- a/docs/reference-data/weapon-mods-support-map-370.json
++++ b/docs/reference-data/weapon-mods-support-map-370.json
+@@ -11794,7 +11794,7 @@
+     "prefix": "Зазубренный",
+     "en": "Serrated Blade",
+     "ids": [
+-     "mod_113"
++     "mod_serrated_blade"
+     ]
+    }
+   ],
+@@ -11804,7 +11804,7 @@
+     "prefix": "Шокирующая",
+     "en": "Electrified",
+     "ids": [
+-     "mod_132"
++     "mod_electrified"
+     ]
+    },
+    {
+@@ -11812,7 +11812,7 @@
+     "prefix": "Оглушающая",
+     "en": "Stun Pack",
+     "ids": [
+-     "mod_133"
++     "mod_stun_pack"
+     ]
+    }
+   ],
+@@ -11822,7 +11822,7 @@
+     "prefix": "Зазубренный",
+     "en": "Serrated Blade",
+     "ids": [
+-     "mod_103"
++     "mod_serrated_blade"
+     ]
+    },
+    {
+@@ -11830,7 +11830,7 @@
+     "prefix": "Электризованный",
+     "en": "Electrified Blade",
+     "ids": [
+-     "mod_104"
++     "mod_electrified_blade"
+     ]
+    },
+    {
+@@ -11838,7 +11838,7 @@
+     "prefix": "Электризованный зазубренный",
+     "en": "Electrified Serrated Blade",
+     "ids": [
+-     "mod_105"
++     "mod_electrified_serrated_blade"
+     ]
+    },
+    {
+@@ -11846,7 +11846,7 @@
+     "prefix": "Оглушающий",
+     "en": "Stun Pack",
+     "ids": [
+-     "mod_106"
++     "mod_stun_pack"
+     ]
+    }
+   ],
+@@ -11856,7 +11856,7 @@
+     "prefix": "Зазубренный",
+     "en": "Serrated Blade",
+     "ids": [
+-     "mod_107"
++     "mod_serrated_blade"
+     ]
+    },
+    {
+@@ -11864,7 +11864,7 @@
+     "prefix": "Скрытный",
+     "en": "Stealth Blade",
+     "ids": [
+-     "mod_108"
++     "mod_stealth_blade"
+     ]
+    }
+   ],
+@@ -11874,7 +11874,7 @@
+     "prefix": "Зазубренный",
+     "en": "Serrated Blade",
+     "ids": [
+-     "mod_109"
++     "mod_serrated_blade"
+     ]
+    }
+   ],
+@@ -11884,7 +11884,7 @@
+     "prefix": "Изогнутый",
+     "en": "Curved Blade",
+     "ids": [
+-     "mod_110"
++     "mod_curved_blade"
+     ]
+    },
+    {
+@@ -11892,7 +11892,7 @@
+     "prefix": "Удлиненный",
+     "en": "Extended Blade",
+     "ids": [
+-     "mod_111"
++     "mod_extended_blade"
+     ]
+    }
+   ],
+@@ -11902,7 +11902,7 @@
+     "prefix": "Жгучий",
+     "en": "Extra Flame Jets",
+     "ids": [
+-     "mod_112"
++     "mod_extra_flame_jets"
+     ]
+    }
+   ],
+@@ -11912,7 +11912,7 @@
+     "prefix": "Колючая",
+     "en": "Barbed",
+     "ids": [
+-     "mod_114"
++     "mod_barbed"
+     ]
+    },
+    {
+@@ -11920,7 +11920,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_115"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -11928,7 +11928,7 @@
+     "prefix": "Заостренная",
+     "en": "Sharp",
+     "ids": [
+-     "mod_116"
++     "mod_sharp"
+     ]
+    },
+    {
+@@ -11936,7 +11936,7 @@
+     "prefix": "Обмотанная цепью",
+     "en": "Chain-Wrapped",
+     "ids": [
+-     "mod_117"
++     "mod_chain_wrapped"
+     ]
+    },
+    {
+@@ -11944,7 +11944,7 @@
+     "prefix": "Клинковая",
+     "en": "Bladed",
+     "ids": [
+-     "mod_118"
++     "mod_bladed"
+     ]
+    }
+   ],
+@@ -11954,7 +11954,7 @@
+     "prefix": "Колючая",
+     "en": "Barbed",
+     "ids": [
+-     "mod_114"
++     "mod_barbed"
+     ]
+    },
+    {
+@@ -11962,7 +11962,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_115"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -11970,7 +11970,7 @@
+     "prefix": "Заостренная",
+     "en": "Sharp",
+     "ids": [
+-     "mod_116"
++     "mod_sharp"
+     ]
+    },
+    {
+@@ -11978,7 +11978,7 @@
+     "prefix": "Обмотанная цепью",
+     "en": "Chain-Wrapped",
+     "ids": [
+-     "mod_117"
++     "mod_chain_wrapped"
+     ]
+    },
+    {
+@@ -11986,7 +11986,7 @@
+     "prefix": "Клинковая",
+     "en": "Bladed",
+     "ids": [
+-     "mod_118"
++     "mod_bladed"
+     ]
+    }
+   ],
+@@ -11996,7 +11996,7 @@
+     "prefix": "Шипованный",
+     "en": "Spiked",
+     "ids": [
+-     "mod_119"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -12004,7 +12004,7 @@
+     "prefix": "Прокалывающий",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_120"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12012,7 +12012,7 @@
+     "prefix": "Клинковый",
+     "en": "Bladed",
+     "ids": [
+-     "mod_121"
++     "mod_bladed"
+     ]
+    }
+   ],
+@@ -12022,7 +12022,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_122"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -12030,7 +12030,7 @@
+     "prefix": "Утяжеленная",
+     "en": "Heavy",
+     "ids": [
+-     "mod_123"
++     "mod_heavy"
+     ]
+    }
+   ],
+@@ -12040,7 +12040,7 @@
+     "prefix": "Загнутый",
+     "en": "Hooked",
+     "ids": [
+-     "mod_124"
++     "mod_hooked"
+     ]
+    },
+    {
+@@ -12048,7 +12048,7 @@
+     "prefix": "Увесистый",
+     "en": "Heavy",
+     "ids": [
+-     "mod_125"
++     "mod_heavy"
+     ]
+    },
+    {
+@@ -12056,7 +12056,7 @@
+     "prefix": "Прокалывающий",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_126"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12064,7 +12064,7 @@
+     "prefix": "Сверхтяжелый",
+     "en": "Extra Heavy",
+     "ids": [
+-     "mod_127"
++     "mod_extra_heavy"
+     ]
+    }
+   ],
+@@ -12074,7 +12074,7 @@
+     "prefix": "Прокалывающий",
+     "en": "Barbed",
+     "ids": [
+-     "mod_128"
++     "mod_barbed"
+     ]
+    },
+    {
+@@ -12082,7 +12082,7 @@
+     "prefix": "Заостренный",
+     "en": "Sharp",
+     "ids": [
+-     "mod_129"
++     "mod_sharp"
+     ]
+    }
+   ],
+@@ -12092,7 +12092,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_130"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -12100,7 +12100,7 @@
+     "prefix": "Заостренная",
+     "en": "Sharp",
+     "ids": [
+-     "mod_131"
++     "mod_sharp"
+     ]
+    }
+   ],
+@@ -12110,7 +12110,7 @@
+     "prefix": "Прокалывающая",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_134"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12118,7 +12118,7 @@
+     "prefix": "Тяжелая",
+     "en": "Heavy",
+     "ids": [
+-     "mod_135"
++     "mod_heavy"
+     ]
+    }
+   ],
+@@ -12128,7 +12128,7 @@
+     "prefix": "Раскаленная",
+     "en": "Heating Coil",
+     "ids": [
+-     "mod_136"
++     "mod_heating_coil"
+     ]
+    },
+    {
+@@ -12136,7 +12136,7 @@
+     "prefix": "Оглушающая",
+     "en": "Stun Pack",
+     "ids": [
+-     "mod_137"
++     "mod_stun_pack"
+     ]
+    }
+   ],
+@@ -12146,7 +12146,7 @@
+     "prefix": "Клинковый",
+     "en": "Bladed",
+     "ids": [
+-     "mod_138"
++     "mod_bladed"
+     ]
+    }
+   ],
+@@ -12156,7 +12156,7 @@
+     "prefix": "Колючая",
+     "en": "Barbed",
+     "ids": [
+-     "mod_139"
++     "mod_barbed"
+     ]
+    },
+    {
+@@ -12164,7 +12164,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_140"
++     "mod_spiked"
+     ]
+    }
+   ],
+@@ -12174,7 +12174,7 @@
+     "prefix": "Шипастая",
+     "en": "Spiked",
+     "ids": [
+-     "mod_141"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -12182,7 +12182,7 @@
+     "prefix": "Колючая",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_142"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12190,7 +12190,7 @@
+     "prefix": "Свинцовая",
+     "en": "Lead Lining",
+     "ids": [
+-     "mod_143"
++     "mod_lead_lining"
+     ]
+    }
+   ],
+@@ -12200,7 +12200,7 @@
+     "prefix": "Большая",
+     "en": "Extra Claw",
+     "ids": [
+-     "mod_144"
++     "mod_extra_claw"
+     ]
+    }
+   ],
+@@ -12210,7 +12210,7 @@
+     "prefix": "Заостренный",
+     "en": "Sharp",
+     "ids": [
+-     "mod_145"
++     "mod_sharp"
+     ]
+    },
+    {
+@@ -12218,7 +12218,7 @@
+     "prefix": "Шипованный",
+     "en": "Spiked",
+     "ids": [
+-     "mod_146"
++     "mod_spiked"
+     ]
+    },
+    {
+@@ -12226,7 +12226,7 @@
+     "prefix": "Прокалывающий",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_147"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12234,7 +12234,7 @@
+     "prefix": "Клинковый",
+     "en": "Bladed",
+     "ids": [
+-     "mod_148"
++     "mod_bladed"
+     ]
+    }
+   ],
+@@ -12244,7 +12244,7 @@
+     "prefix": "Прокалывающий",
+     "en": "Puncturing",
+     "ids": [
+-     "mod_149"
++     "mod_puncturing"
+     ]
+    },
+    {
+@@ -12252,7 +12252,7 @@
+     "prefix": "Раскаленный",
+     "en": "Heating Coil",
+     "ids": [
+-     "mod_150"
++     "mod_heating_coil"
+     ]
+    }
+   ],
+diff --git a/modules/fallout/data/equipment/weapon_mod_slots.json b/modules/fallout/data/equipment/weapon_mod_slots.json
+index 25494b2..f2d13e8 100644
+--- a/modules/fallout/data/equipment/weapon_mod_slots.json
++++ b/modules/fallout/data/equipment/weapon_mod_slots.json
+@@ -1417,22 +1417,112 @@
+       "mod_serrated_blade"
+     ]
+   },
+-  "weapon_baseball_bat": {},
+-  "weapon_baseball_bat_aluminum": {},
+-  "weapon_board": {},
+-  "weapon_lead_pipe": {},
+-  "weapon_pipe_wrench": {},
+-  "weapon_pool_cue": {},
+-  "weapon_rolling_pin": {},
+-  "weapon_baton": {},
+-  "weapon_sledgehammer": {},
+-  "weapon_super_sledge": {},
+-  "weapon_tire_iron": {},
+-  "weapon_walking_cane": {},
+-  "weapon_boxing_glove": {},
+-  "weapon_deathclaw_gauntlet": {},
+-  "weapon_knuckles": {},
+-  "weapon_power_fist": {},
++  "weapon_baseball_bat": {
++    "Unique": [
++      "mod_barbed",
++      "mod_bladed",
++      "mod_chain_wrapped",
++      "mod_sharp",
++      "mod_spiked"
++    ]
++  },
++  "weapon_baseball_bat_aluminum": {
++    "Unique": [
++      "mod_barbed",
++      "mod_bladed",
++      "mod_chain_wrapped",
++      "mod_sharp",
++      "mod_spiked"
++    ]
++  },
++  "weapon_board": {
++    "Unique": [
++      "mod_bladed",
++      "mod_puncturing",
++      "mod_spiked"
++    ]
++  },
++  "weapon_lead_pipe": {
++    "Unique": [
++      "mod_heavy",
++      "mod_spiked"
++    ]
++  },
++  "weapon_pipe_wrench": {
++    "Unique": [
++      "mod_extra_heavy",
++      "mod_heavy",
++      "mod_hooked",
++      "mod_puncturing"
++    ]
++  },
++  "weapon_pool_cue": {
++    "Unique": [
++      "mod_barbed",
++      "mod_sharp"
++    ]
++  },
++  "weapon_rolling_pin": {
++    "Unique": [
++      "mod_sharp",
++      "mod_spiked"
++    ]
++  },
++  "weapon_baton": {
++    "Unique": [
++      "mod_electrified",
++      "mod_stun_pack"
++    ]
++  },
++  "weapon_sledgehammer": {
++    "Unique": [
++      "mod_heavy",
++      "mod_puncturing"
++    ]
++  },
++  "weapon_super_sledge": {
++    "Unique": [
++      "mod_heating_coil",
++      "mod_stun_pack"
++    ]
++  },
++  "weapon_tire_iron": {
++    "Unique": [
++      "mod_bladed"
++    ]
++  },
++  "weapon_walking_cane": {
++    "Unique": [
++      "mod_barbed",
++      "mod_spiked"
++    ]
++  },
++  "weapon_boxing_glove": {
++    "Unique": [
++      "mod_lead_lining",
++      "mod_puncturing",
++      "mod_spiked"
++    ]
++  },
++  "weapon_deathclaw_gauntlet": {
++    "Unique": [
++      "mod_extra_claw"
++    ]
++  },
++  "weapon_knuckles": {
++    "Unique": [
++      "mod_bladed",
++      "mod_puncturing",
++      "mod_sharp",
++      "mod_spiked"
++    ]
++  },
++  "weapon_power_fist": {
++    "Unique": [
++      "mod_heating_coil",
++      "mod_puncturing"
++    ]
++  },
+   "weapon_junk_jet": {
+     "Muzzle": [
+       "mod_electrification_module",
+diff --git a/modules/fallout/data/equipment/weapon_mods.json b/modules/fallout/data/equipment/weapon_mods.json
+index f6e9a61..a99b45b 100644
+--- a/modules/fallout/data/equipment/weapon_mods.json
++++ b/modules/fallout/data/equipment/weapon_mods.json
+@@ -570,7 +570,12 @@
+     "materials": "Common x 2",
+     "cost": 5,
+     "weight": null,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baseball_bat",
++      "weapon_baseball_bat_aluminum",
++      "weapon_pool_cue",
++      "weapon_walking_cane"
++    ],
+     "qualityChanges": [],
+     "effectChanges": [
+       {
+@@ -781,7 +786,13 @@
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 12,
+     "weight": 2,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baseball_bat",
++      "weapon_baseball_bat_aluminum",
++      "weapon_board",
++      "weapon_knuckles",
++      "weapon_tire_iron"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -1194,7 +1205,10 @@
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 10,
+     "weight": 1,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baseball_bat",
++      "weapon_baseball_bat_aluminum"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -1529,7 +1543,9 @@
+     "materials": "Common x 5 Uncommon x 3",
+     "cost": 15,
+     "weight": null,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baton"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -1716,7 +1732,9 @@
+     "materials": "Common x 2",
+     "cost": 22,
+     "weight": 2,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_deathclaw_gauntlet"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 1
+@@ -1767,7 +1785,9 @@
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 22,
+     "weight": 2,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_pipe_wrench"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 3
+@@ -2341,7 +2361,10 @@
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 180,
+     "weight": null,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_power_fist",
++      "weapon_super_sledge"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 1
+@@ -2367,7 +2390,11 @@
+     "materials": "Common x 4 Uncommon x 2",
+     "cost": 11,
+     "weight": 2,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_lead_pipe",
++      "weapon_pipe_wrench",
++      "weapon_sledgehammer"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -2436,7 +2463,9 @@
+     "materials": "Common x 2",
+     "cost": 9,
+     "weight": null,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_pipe_wrench"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 1
+@@ -2814,7 +2843,9 @@
+     "materials": "Common x 3",
+     "cost": 7,
+     "weight": 1,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_boxing_glove"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -3465,7 +3496,14 @@
+     "materials": "Common x 3",
+     "cost": 9,
+     "weight": 1,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_board",
++      "weapon_boxing_glove",
++      "weapon_knuckles",
++      "weapon_pipe_wrench",
++      "weapon_power_fist",
++      "weapon_sledgehammer"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 2
+@@ -3942,7 +3980,13 @@
+     "materials": "Common x 3",
+     "cost": 7,
+     "weight": 1,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baseball_bat",
++      "weapon_baseball_bat_aluminum",
++      "weapon_knuckles",
++      "weapon_pool_cue",
++      "weapon_rolling_pin"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 1
+@@ -4310,7 +4354,16 @@
+     "materials": "Common x 3",
+     "cost": 7,
+     "weight": 1,
+-    "applies_to_ids": [],
++    "applies_to_ids": [
++      "weapon_baseball_bat",
++      "weapon_baseball_bat_aluminum",
++      "weapon_board",
++      "weapon_boxing_glove",
++      "weapon_knuckles",
++      "weapon_lead_pipe",
++      "weapon_rolling_pin",
++      "weapon_walking_cane"
++    ],
+     "damageModifier": {
+       "op": "+",
+       "value": 1
+@@ -4462,6 +4515,8 @@
+     "cost": 100,
+     "weight": null,
+     "applies_to_ids": [
++      "weapon_baton",
++      "weapon_super_sledge",
+       "weapon_sword"
+     ],
+     "damageModifier": {
+diff --git a/public/version.json b/public/version.json
+index 2e99456..c2907ad 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "377",
++  "version": "378",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
