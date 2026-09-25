@@ -13,6 +13,16 @@
 ---
 ---
 ---
+---
+## The installed mod is now visible on the weapon card (patch 382)
+
+A modded weapon now carries the mod's name — e.g. "Усиленный 10-мм
+пистолет" for an upgraded 10mm pistol; previously stats changed but the
+card showed nothing. Also added an end-to-end check: a test repeats the
+"Apply" press on real game data (equipped armor doesn't interfere) and
+verifies the whole chain — the mod lands in its own weapon, hides from
+the bag, and returns to the bag when replaced.
+
 ## Old saves repair themselves (patch 381)
 
 Because of the previous update's bug, some weapon mods may have been

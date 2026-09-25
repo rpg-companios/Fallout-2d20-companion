@@ -220,7 +220,10 @@ export const enrichWeaponItem = (weaponLike, catalog, opts = {}) => {
     || '';
   const modPrefixes = mods
     .filter((mod) => !(mod.slot === 'Stock' && hasStockRename))
-    .map((mod) => mod.prefix)
+    // 382 (владелец: «на карточке не видно, что мод стоит»): поле prefix в
+    // данных пусто у всех модов — тогда карточка носит ЛОКАЛИЗОВАННОЕ ИМЯ
+    // мода (правило имени владельца: [мод-префиксы][качества][базовое имя]).
+    .map((mod) => mod.prefix || mod.name)
     .filter(Boolean);
   const qualityNameById = opts.qualityNameById || (() => '');
   const qualityNames = (weaponLike.uniqQualities || [])
