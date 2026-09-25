@@ -1,5 +1,9 @@
 [
   {
+    "id": "mod_10mm_receiver",
+    "name": "Ресивер 10-мм"
+  },
+  {
     "id": "mod_25mm_receiver",
     "name": "25-мм гранатометный"
   },
@@ -16,12 +20,20 @@
     "name": ".38"
   },
   {
+    "id": "mod_3_charge_camera",
+    "name": "3-зарядная камера"
+  },
+  {
     "id": "mod_45_receiver",
     "name": ".45"
   },
   {
     "id": "mod_50_receiver",
     "name": ".50"
+  },
+  {
+    "id": "mod_6_charge_camera",
+    "name": "6-зарядная камера"
   },
   {
     "id": "mod_9mm_receiver",
@@ -64,6 +76,10 @@
     "name": "Пистонный ресивер с автоогнём"
   },
   {
+    "id": "mod_balanced_stock",
+    "name": "Сбалансированная"
+  },
+  {
     "id": "mod_barbed",
     "name": "Колючая"
   },
@@ -104,12 +120,24 @@
     "name": "Усиленный конденсатор"
   },
   {
+    "id": "mod_bracketed_short_barrel",
+    "name": "Короткий ствол с кронштейном"
+  },
+  {
     "id": "mod_bull_barrel",
     "name": "Толстостенный"
   },
   {
+    "id": "mod_burning_blade",
+    "name": "Горящее лезвие"
+  },
+  {
     "id": "mod_calibrated",
     "name": "Калиброванный"
+  },
+  {
+    "id": "mod_calibrated_capacitor_pc",
+    "name": "Калиброванный конденсатор"
   },
   {
     "id": "mod_calibrated_powerful",
@@ -168,8 +196,16 @@
     "name": "Потрошитель: Изогнутое лезвие"
   },
   {
+    "id": "mod_curved_chain",
+    "name": "Изогнутая шина"
+  },
+  {
     "id": "mod_deep_dish",
     "name": "Глубокая антенна"
+  },
+  {
+    "id": "mod_double_chain",
+    "name": "Двойная шина"
   },
   {
     "id": "mod_electric_signal_carrier_antennae",
@@ -188,12 +224,24 @@
     "name": "Электризованное"
   },
   {
+    "id": "mod_electrified_blade_aa",
+    "name": "Электризованное лезвие"
+  },
+  {
+    "id": "mod_electrified_blade_ab",
+    "name": "Электризованное лезвие"
+  },
+  {
     "id": "mod_electrified_serrated_blade",
     "name": "Электризованное зазубренное"
   },
   {
     "id": "mod_extended_blade",
     "name": "Потрошитель: Удлиненное лезвие"
+  },
+  {
+    "id": "mod_extended_curved_chain",
+    "name": "Удлинённая изогнутая шина"
   },
   {
     "id": "mod_extra_claw",
@@ -224,8 +272,16 @@
     "name": "Огнемётный ствол"
   },
   {
+    "id": "mod_flamer_chain",
+    "name": "Огнемет"
+  },
+  {
     "id": "mod_flechette_darts",
     "name": "Игольчатые дротики"
+  },
+  {
+    "id": "mod_folding_stock",
+    "name": "Откидной"
   },
   {
     "id": "mod_four_crank_capacitor",
@@ -284,6 +340,10 @@
     "name": "Тяжелый"
   },
   {
+    "id": "mod_high_speed_electrode",
+    "name": "Высокоскоростной электрод"
+  },
+  {
     "id": "mod_hooked",
     "name": "Разводной ключ: Крюк"
   },
@@ -302,6 +362,10 @@
   {
     "id": "mod_improved_barrel",
     "name": "Улучшенный ствол"
+  },
+  {
+    "id": "mod_improved_receiver",
+    "name": "Улучшенный"
   },
   {
     "id": "mod_incendiary_barrel",
@@ -392,6 +456,10 @@
     "name": "Возбудитель фотонов"
   },
   {
+    "id": "mod_poison_blade",
+    "name": "Ядовитое лезвие"
+  },
+  {
     "id": "mod_ported",
     "name": "Портированный"
   },
@@ -408,12 +476,20 @@
     "name": "Защищенная"
   },
   {
+    "id": "mod_pulse_capacitor",
+    "name": "Пульсовый конденсатор"
+  },
+  {
     "id": "mod_puncturing",
     "name": "Прокалывающий"
   },
   {
     "id": "mod_quad_barrel",
     "name": "Четырёхствольный"
+  },
+  {
+    "id": "mod_quantum_gyro_lens",
+    "name": "Квантовая гиростабилизирующая линза"
   },
   {
     "id": "mod_quick_eject_mag",
@@ -474,6 +550,10 @@
   {
     "id": "mod_shielded_barrel",
     "name": "Экранированный"
+  },
+  {
+    "id": "mod_shocking_coils",
+    "name": "Шокирующие катушки"
   },
   {
     "id": "mod_short_night_vision_scope",
@@ -540,6 +620,14 @@
     "name": "Компьютер наведения"
   },
   {
+    "id": "mod_tesla_coil_capacitor",
+    "name": "Конденсатор катушки Теслы"
+  },
+  {
+    "id": "mod_tesla_coil_dynamo",
+    "name": "Динамо катушки Теслы"
+  },
+  {
     "id": "mod_three_crank_capacitor",
     "name": "3-зарядный"
   },
@@ -554,6 +642,10 @@
   {
     "id": "mod_tuned",
     "name": "Настроенный"
+  },
+  {
+    "id": "mod_turbo",
+    "name": "Турбо"
   },
   {
     "id": "mod_vaporization_nozzle",

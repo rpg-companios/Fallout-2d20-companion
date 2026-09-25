@@ -4,7 +4,8 @@
       "mod_long",
       "mod_automatic_barrel",
       "mod_improved_barrel",
-      "mod_sniper_barrel"
+      "mod_sniper_barrel",
+      "mod_bracketed_short_barrel"
     ],
     "Grip": [
       "mod_sharpshooters_grip"
@@ -59,7 +60,8 @@
     "Barrel": [
       "mod_automatic_barrel",
       "mod_splitter",
-      "mod_improved_barrel"
+      "mod_improved_barrel",
+      "mod_quantum_gyro_lens"
     ],
     "Sight": [
       "mod_reflex_sight"
@@ -298,7 +300,8 @@
       "mod_powerful",
       "mod_advanced",
       "mod_38_receiver",
-      "mod_calibrated_powerful"
+      "mod_calibrated_powerful",
+      "mod_improved_receiver"
     ],
     "Barrel": [
       "mod_long",
@@ -711,6 +714,10 @@
       "mod_compensator",
       "mod_muzzle_break",
       "mod_suppressor"
+    ],
+    "Capacitor": [
+      "mod_tesla_coil_capacitor",
+      "mod_tesla_coil_dynamo"
     ]
   },
   "weapon_plasma_caster": {
@@ -740,6 +747,11 @@
       "mod_compensator",
       "mod_muzzle_break",
       "mod_suppressor"
+    ],
+    "Capacitor": [
+      "mod_high_speed_electrode",
+      "mod_calibrated_capacitor_pc",
+      "mod_pulse_capacitor"
     ]
   },
   "weapon_ghoul_rifle": {
@@ -837,7 +849,8 @@
       "mod_hardened",
       "mod_powerful",
       "mod_armor_piercing_receiver",
-      "mod_calibrated_powerful"
+      "mod_calibrated_powerful",
+      "mod_10mm_receiver"
     ],
     "Sight": [
       "mod_reflex_sight",
@@ -1460,7 +1473,8 @@
   },
   "weapon_laser_musket": {
     "Barrel": [
-      "mod_long_barrel"
+      "mod_long_barrel",
+      "mod_bracketed_short_barrel"
     ],
     "Capacitor": [
       "mod_three_crank_capacitor",
@@ -1778,6 +1792,42 @@
     "Container": [
       "mod_large_ampoule",
       "mod_large_vial"
+    ]
+  },
+  "weapon_tear_gas_launcher": {
+    "Camera": [
+      "mod_3_charge_camera",
+      "mod_6_charge_camera"
+    ],
+    "Stock": [
+      "mod_folding_stock",
+      "mod_balanced_stock"
+    ]
+  },
+  "weapon_atom_staff": {
+    "Unique": [
+      "mod_shocking_coils"
+    ]
+  },
+  "weapon_assaultron_blade": {
+    "Unique": [
+      "mod_electrified_blade_ab"
+    ]
+  },
+  "weapon_auto_axe": {
+    "Unique": [
+      "mod_electrified_blade_aa",
+      "mod_burning_blade",
+      "mod_poison_blade",
+      "mod_turbo"
+    ]
+  },
+  "weapon_chainsaw": {
+    "Unique": [
+      "mod_double_chain",
+      "mod_curved_chain",
+      "mod_extended_curved_chain",
+      "mod_flamer_chain"
     ]
   }
 }

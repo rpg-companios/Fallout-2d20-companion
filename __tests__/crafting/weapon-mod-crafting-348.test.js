@@ -1,5 +1,5 @@
 // ПРИЁМОЧНЫЙ (патч 348): крафт модов ОРУЖИЯ — квадрат «Оружие» жив.
-//   • 105 рецепта из колонок каталога weapon_mods.json (аудит печатных
+//   • 164 рецепта из колонок каталога weapon_mods.json (аудит печатных
 //     таблиц, решения владельца 346/347: выпускаем все с колонками, включая
 //     уникальные; конденсаторы — как есть);
 //   • проверка — ИНТ + навык (Ремонт/Наука!), сложность из колонки;
@@ -41,11 +41,11 @@ const seedStack = (itemId, quantity) => {
 const inventoryList = () => Object.values(state().items || {});
 
 describe('Крафт модов оружия (348): квадрат «Оружие», проверка, мод в сумке', () => {
-  it('квадрат «Оружие»: 105 рецепта из колонок каталога; верстак не жжёт', () => {
+  it('квадрат «Оружие»: 164 рецепта из колонок каталога; верстак не жжёт', () => {
     const tiles = buildCraftTiles();
     const weapons = tiles.find((t) => t.category === 'weapons');
-    expect(weapons.recipes).toBe(105);
-    expect(buildCategoryModel('weapons').length).toBe(105);
+    expect(weapons.recipes).toBe(164);
+    expect(buildCategoryModel('weapons').length).toBe(164);
     // правило верстака оружия (как у брони): провал не сжигает материалы
     expect(getCraftingCategoryRules('weapons').failBurnsMaterialsSkills).toEqual([]);
   });

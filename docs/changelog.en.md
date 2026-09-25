@@ -7,6 +7,20 @@
 ---
 ---
 ---
+---
+## Every mod crafts now; 23 new mods and two new weapons (patch 376)
+
+Revision continues. Every weapon mod has a crafting recipe now (36 were
+missing) — costs derived from rarity and difficulty per the book. As you
+approved, 23 new mods were added: Tesla coil dynamo/capacitor, quantum
+gyro compensating lens, plasma caster capacitors, tear gas launcher
+cameras/stocks, Thompson and pump-action receivers, bracketed short
+barrel, auto axe blades, chainsaw bars, assaultron blade electrifier and
+shocking coils. Two brand-new weapons join the catalog — Atom's Staff
+(6 dmg, Piercing, Parry, Two-handed) and the Mining Drill (2 dmg,
+Piercing 2, Breaking, Two-handed) — with your stats. The "Weapons"
+crafting tile now holds 164 recipes.
+
 ## Weapon mods get readable internal ids, duplicates merged (patch 375)
 
 Catalog revision begins. Opaque ids (mod_030 etc.) are replaced with

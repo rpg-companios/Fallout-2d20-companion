@@ -71,16 +71,16 @@ describe('патч 375: канон-id модов оружия', () => {
   });
 
   it('каталог: 141 канон-строка, без mod_NNN; i18n/рецепты/слоты согласованы', () => {
-    expect(catalogData).toHaveLength(141);
+    expect(catalogData).toHaveLength(164);
     const ids = catalogData.map((m) => m.id);
-    expect(new Set(ids).size).toBe(141);
+    expect(new Set(ids).size).toBe(164);
     for (const id of ids) {
       expect(id).toMatch(/^mod_[a-z0-9][a-z0-9_]*$/);
       expect(id).not.toMatch(/^mod_\d{3}$/);
     }
     const idSet = new Set(ids);
-    expect(ruNames).toHaveLength(141);
-    expect(enNames).toHaveLength(141);
+    expect(ruNames).toHaveLength(164);
+    expect(enNames).toHaveLength(164);
     expect(new Set(ruNames.map((x) => x.id))).toEqual(idSet);
     expect(new Set(enNames.map((x) => x.id))).toEqual(idSet);
     for (const r of recipeData) expect(idSet.has(r.id)).toBe(true);

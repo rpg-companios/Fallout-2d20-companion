@@ -1,47 +1,27 @@
 [
   {
-    "id": "mod_rapid",
-    "name": "Rapid"
+    "id": "mod_10mm_receiver",
+    "name": "10mm Receiver"
   },
   {
-    "id": "mod_armor_piercing",
-    "name": "Armor-Piercing"
+    "id": "mod_25mm_receiver",
+    "name": "25mm Receiver"
   },
   {
-    "id": "mod_tuned",
-    "name": "Tuned"
+    "id": "mod_308_receiver",
+    "name": ".308 Receiver"
   },
   {
-    "id": "mod_hardened",
-    "name": "Hardened"
-  },
-  {
-    "id": "mod_powerful",
-    "name": "Powerful"
-  },
-  {
-    "id": "mod_advanced",
-    "name": "Advanced"
-  },
-  {
-    "id": "mod_calibrated",
-    "name": "Calibrated"
-  },
-  {
-    "id": "mod_automatic",
-    "name": "Automatic"
-  },
-  {
-    "id": "mod_hair_trigger",
-    "name": "Hair Trigger"
+    "id": "mod_357_receiver",
+    "name": ".357 Receiver"
   },
   {
     "id": "mod_38_receiver",
     "name": ".38 Receiver"
   },
   {
-    "id": "mod_308_receiver",
-    "name": ".308 Receiver"
+    "id": "mod_3_charge_camera",
+    "name": "3-Shot Camera"
   },
   {
     "id": "mod_45_receiver",
@@ -52,264 +32,120 @@
     "name": ".50 Receiver"
   },
   {
-    "id": "mod_automatic_piston",
-    "name": "Automatic Piston"
+    "id": "mod_6_charge_camera",
+    "name": "6-Shot Camera"
   },
   {
-    "id": "mod_snubnose",
-    "name": "Snubnose"
-  },
-  {
-    "id": "mod_bull_barrel",
-    "name": "Bull Barrel"
-  },
-  {
-    "id": "mod_long",
-    "name": "Long"
-  },
-  {
-    "id": "mod_ported",
-    "name": "Ported"
-  },
-  {
-    "id": "mod_vented",
-    "name": "Vented"
-  },
-  {
-    "id": "mod_sawed_off",
-    "name": "Sawed-Off"
-  },
-  {
-    "id": "mod_shielded_barrel",
-    "name": "Shielded Barrel"
-  },
-  {
-    "id": "mod_finned",
-    "name": "Finned"
-  },
-  {
-    "id": "mod_large_magazine",
-    "name": "Large Magazine"
-  },
-  {
-    "id": "mod_quick_eject_mag",
-    "name": "Quick-Eject Mag"
-  },
-  {
-    "id": "mod_large_quick_eject_mag",
-    "name": "Large Quick-Eject Mag"
-  },
-  {
-    "id": "mod_full_capacitors",
-    "name": "Full Capacitors"
-  },
-  {
-    "id": "mod_capacitor_boosting_coil",
-    "name": "Capacitor Boosting Coil"
-  },
-  {
-    "id": "mod_compensator",
-    "name": "Compensator"
-  },
-  {
-    "id": "mod_muzzle_break",
-    "name": "Muzzle Break"
-  },
-  {
-    "id": "mod_suppressor",
-    "name": "Suppressor"
-  },
-  {
-    "id": "mod_three_crank_capacitor",
-    "name": "Three-Crank Capacitor"
-  },
-  {
-    "id": "mod_four_crank_capacitor",
-    "name": "Four-Crank Capacitor"
-  },
-  {
-    "id": "mod_five_crank_capacitor",
-    "name": "Five-Crank Capacitor"
-  },
-  {
-    "id": "mod_six_crank_capacitor",
-    "name": "Six-Crank Capacitor"
-  },
-  {
-    "id": "mod_splitter",
-    "name": "Splitter"
-  },
-  {
-    "id": "mod_automatic_barrel",
-    "name": "Automatic Barrel"
-  },
-  {
-    "id": "mod_improved_barrel",
-    "name": "Improved Barrel"
-  },
-  {
-    "id": "mod_sniper_barrel",
-    "name": "Sniper Barrel"
-  },
-  {
-    "id": "mod_flamer_barrel",
-    "name": "Flamer Barrel"
-  },
-  {
-    "id": "mod_standard_stock",
-    "name": "Standard Stock"
-  },
-  {
-    "id": "mod_recoil_compensating",
-    "name": "Recoil Compensating"
-  },
-  {
-    "id": "mod_beam_splitter",
-    "name": "Beam Splitter"
-  },
-  {
-    "id": "mod_beam_focuser_institute_laser",
-    "name": "Beam Focuser"
-  },
-  {
-    "id": "mod_gyro_compensating_lens",
-    "name": "Gyro Compensating Lens"
-  },
-  {
-    "id": "mod_deep_dish",
-    "name": "Deep Dish"
-  },
-  {
-    "id": "mod_electric_signal_carrier_antennae",
-    "name": "Electric Signal Carrier Antennae"
-  },
-  {
-    "id": "mod_signal_repeater",
-    "name": "Signal Repeater"
-  },
-  {
-    "id": "mod_napalm_fuel",
-    "name": "Napalm Fuel"
-  },
-  {
-    "id": "mod_large_tank",
-    "name": "Large Tank"
-  },
-  {
-    "id": "mod_huge_tank",
-    "name": "Huge Tank"
-  },
-  {
-    "id": "mod_compression_nozzle",
-    "name": "Compression Nozzle"
-  },
-  {
-    "id": "mod_vaporization_nozzle",
-    "name": "Vaporization Nozzle"
-  },
-  {
-    "id": "mod_charging_barrels",
-    "name": "Charging Barrels"
-  },
-  {
-    "id": "mod_beam_focuser_minigun",
-    "name": "Beam Focuser"
+    "id": "mod_9mm_receiver",
+    "name": "9mm Receiver"
   },
   {
     "id": "mod_accelerated_barrel",
     "name": "Accelerated Barrel"
   },
   {
-    "id": "mod_tri_barrel",
-    "name": "Tri-Barrel"
+    "id": "mod_advanced",
+    "name": "Advanced"
   },
   {
-    "id": "mod_shredder",
-    "name": "Shredder"
+    "id": "mod_aerodynamic_barrel",
+    "name": "Aerodynamic Barrel"
   },
   {
-    "id": "mod_triple_barrel",
-    "name": "Triple Barrel"
+    "id": "mod_armor_piercing",
+    "name": "Armor-Piercing"
   },
   {
-    "id": "mod_quad_barrel",
-    "name": "Quad Barrel"
+    "id": "mod_armor_piercing_automatic",
+    "name": "Armor Piercing Automatic"
   },
   {
-    "id": "mod_scope",
-    "name": "Scope"
+    "id": "mod_armor_piercing_receiver",
+    "name": "Armor Piercing Receiver"
   },
   {
-    "id": "mod_night_vision_scope",
-    "name": "Night Vision Scope"
+    "id": "mod_automatic",
+    "name": "Automatic"
   },
   {
-    "id": "mod_targeting_computer",
-    "name": "Targeting Computer"
+    "id": "mod_automatic_barrel",
+    "name": "Automatic Barrel"
   },
   {
-    "id": "mod_stabilizer",
-    "name": "Stabilizer"
+    "id": "mod_automatic_piston",
+    "name": "Automatic Piston"
   },
   {
-    "id": "mod_electrified_blade",
-    "name": "Electrified Blade"
+    "id": "mod_balanced_stock",
+    "name": "Balanced Stock"
   },
   {
-    "id": "mod_electrified_serrated_blade",
-    "name": "Electrified Serrated Blade"
+    "id": "mod_barbed",
+    "name": "Barbed"
   },
   {
-    "id": "mod_stealth_blade",
-    "name": "Stealth Blade"
+    "id": "mod_barbed_harpoon",
+    "name": "Barbed Harpoon"
   },
   {
-    "id": "mod_curved_blade",
-    "name": "Curved Blade"
+    "id": "mod_bayonet",
+    "name": "Bayonet"
   },
   {
-    "id": "mod_extended_blade",
-    "name": "Extended Blade"
+    "id": "mod_beam_focuser_institute_laser",
+    "name": "Beam Focuser"
   },
   {
-    "id": "mod_extra_flame_jets",
-    "name": "Extra Flame Jets"
+    "id": "mod_beam_focuser_minigun",
+    "name": "Beam Focuser"
   },
   {
-    "id": "mod_chain_wrapped",
-    "name": "Chain-Wrapped"
+    "id": "mod_beam_splitter",
+    "name": "Beam Splitter"
   },
   {
-    "id": "mod_hooked",
-    "name": "Hooked"
+    "id": "mod_beta_wave_tuner",
+    "name": "Beta Wave Tuner"
   },
   {
-    "id": "mod_extra_heavy",
-    "name": "Extra Heavy"
+    "id": "mod_bladed",
+    "name": "Bladed"
   },
   {
-    "id": "mod_electrified",
-    "name": "Electrified"
+    "id": "mod_block_frame",
+    "name": "Block Frame"
   },
   {
-    "id": "mod_lead_lining",
-    "name": "Lead Lining"
+    "id": "mod_boosted_capacitor",
+    "name": "Boosted Capacitor"
   },
   {
-    "id": "mod_extra_claw",
-    "name": "Extra Claw"
+    "id": "mod_bracketed_short_barrel",
+    "name": "Bracketed Short Barrel"
   },
   {
-    "id": "mod_caustic",
-    "name": "Caustic"
+    "id": "mod_bull_barrel",
+    "name": "Bull Barrel"
   },
   {
-    "id": "mod_large_ampoule",
-    "name": "Large Ampoule"
+    "id": "mod_burning_blade",
+    "name": "Burning Blade"
   },
   {
-    "id": "mod_large_vial",
-    "name": "Large Vial"
+    "id": "mod_calibrated",
+    "name": "Calibrated"
+  },
+  {
+    "id": "mod_calibrated_capacitor_pc",
+    "name": "Calibrated Capacitor"
+  },
+  {
+    "id": "mod_calibrated_powerful",
+    "name": "Calibrated Powerful"
+  },
+  {
+    "id": "mod_capacitor_boosting_coil",
+    "name": "Capacitor Boosting Coil"
   },
   {
     "id": "mod_capacitor_mk_iii",
@@ -328,212 +164,168 @@
     "name": "Capacitor Mk VI"
   },
   {
-    "id": "mod_light_barrel",
-    "name": "Light Barrel"
+    "id": "mod_caustic",
+    "name": "Caustic"
   },
   {
-    "id": "mod_multi_shot_canister",
-    "name": "Multi Shot Canister"
+    "id": "mod_chain_wrapped",
+    "name": "Chain-Wrapped"
   },
   {
-    "id": "mod_m79_launcher",
-    "name": "M79 Launcher"
-  },
-  {
-    "id": "mod_crystallizing_barrel",
-    "name": "Crystallizing Barrel"
-  },
-  {
-    "id": "mod_reflex_tactical",
-    "name": "Reflex Tactical"
-  },
-  {
-    "id": "mod_barbed_harpoon",
-    "name": "Barbed Harpoon"
-  },
-  {
-    "id": "mod_flechette_darts",
-    "name": "Flechette Darts"
-  },
-  {
-    "id": "mod_armor_piercing_receiver",
-    "name": "Armor Piercing Receiver"
-  },
-  {
-    "id": "mod_armor_piercing_automatic",
-    "name": "Armor Piercing Automatic"
-  },
-  {
-    "id": "mod_hardened_automatic",
-    "name": "Hardened Automatic"
-  },
-  {
-    "id": "mod_rapid_automatic",
-    "name": "Rapid Automatic"
-  },
-  {
-    "id": "mod_calibrated_powerful",
-    "name": "Calibrated Powerful"
-  },
-  {
-    "id": "mod_powerful_automatic",
-    "name": "Powerful Automatic"
-  },
-  {
-    "id": "mod_hardened_piercing_auto",
-    "name": "Hardened Piercing Auto"
-  },
-  {
-    "id": "mod_9mm_receiver",
-    "name": "9mm Receiver"
-  },
-  {
-    "id": "mod_357_receiver",
-    "name": ".357 Receiver"
-  },
-  {
-    "id": "mod_25mm_receiver",
-    "name": "25mm Receiver"
-  },
-  {
-    "id": "mod_speedy_receiver",
-    "name": "Speedy Receiver"
-  },
-  {
-    "id": "mod_extra_large_magazine",
-    "name": "Extra-Large Magazine"
-  },
-  {
-    "id": "mod_front_sight_ring",
-    "name": "Front Sight Ring"
-  },
-  {
-    "id": "mod_large_bayonet",
-    "name": "Large Bayonet"
-  },
-  {
-    "id": "mod_block_frame",
-    "name": "Block Frame"
-  },
-  {
-    "id": "mod_iron_sight",
-    "name": "Iron Sight"
-  },
-  {
-    "id": "mod_illuminated_sight",
-    "name": "Illuminated Sight"
-  },
-  {
-    "id": "mod_protected_winch",
-    "name": "Protected Winch"
-  },
-  {
-    "id": "mod_reinforced_winch",
-    "name": "Reinforced Winch"
-  },
-  {
-    "id": "mod_aerodynamic_barrel",
-    "name": "Aerodynamic Barrel"
-  },
-  {
-    "id": "mod_incendiary_barrel",
-    "name": "Incendiary Barrel"
-  },
-  {
-    "id": "mod_heavy_barrel",
-    "name": "Heavy Barrel"
-  },
-  {
-    "id": "mod_long_barrel",
-    "name": "Long Barrel"
-  },
-  {
-    "id": "mod_beta_wave_tuner",
-    "name": "Beta Wave Tuner"
-  },
-  {
-    "id": "mod_boosted_capacitor",
-    "name": "Boosted Capacitor"
-  },
-  {
-    "id": "mod_photon_agitator",
-    "name": "Photon Agitator"
-  },
-  {
-    "id": "mod_photon_exciter",
-    "name": "Photon Exciter"
+    "id": "mod_charging_barrels",
+    "name": "Charging Barrels"
   },
   {
     "id": "mod_comfort_grip",
     "name": "Comfort Grip"
   },
   {
-    "id": "mod_sharpshooters_grip",
-    "name": "Sharpshooter's Grip"
+    "id": "mod_compensator",
+    "name": "Compensator"
   },
   {
-    "id": "mod_fusion_mag",
-    "name": "Fusion Mag"
+    "id": "mod_compression_nozzle",
+    "name": "Compression Nozzle"
   },
   {
-    "id": "mod_bayonet",
-    "name": "Bayonet"
+    "id": "mod_crystallizing_barrel",
+    "name": "Crystallizing Barrel"
+  },
+  {
+    "id": "mod_curved_blade",
+    "name": "Curved Blade"
+  },
+  {
+    "id": "mod_curved_chain",
+    "name": "Curved Chain"
+  },
+  {
+    "id": "mod_deep_dish",
+    "name": "Deep Dish"
+  },
+  {
+    "id": "mod_double_chain",
+    "name": "Double Chain"
+  },
+  {
+    "id": "mod_electric_signal_carrier_antennae",
+    "name": "Electric Signal Carrier Antennae"
   },
   {
     "id": "mod_electrification_module",
     "name": "Electrification Module"
   },
   {
-    "id": "mod_ignition_module",
-    "name": "Ignition Module"
+    "id": "mod_electrified",
+    "name": "Electrified"
   },
   {
-    "id": "mod_gunner_sight",
-    "name": "Gunner Sight"
+    "id": "mod_electrified_blade",
+    "name": "Electrified Blade"
   },
   {
-    "id": "mod_long_night_vision_scope",
-    "name": "Long Night Vision Scope"
+    "id": "mod_electrified_blade_aa",
+    "name": "Electrified Blade"
   },
   {
-    "id": "mod_long_scope",
-    "name": "Long Scope"
+    "id": "mod_electrified_blade_ab",
+    "name": "Electrified Blade"
   },
   {
-    "id": "mod_recon_scope",
-    "name": "Recon Scope"
+    "id": "mod_electrified_serrated_blade",
+    "name": "Electrified Serrated Blade"
   },
   {
-    "id": "mod_reflex_sight",
-    "name": "Reflex Sight"
+    "id": "mod_extended_blade",
+    "name": "Extended Blade"
   },
   {
-    "id": "mod_short_night_vision_scope",
-    "name": "Short Night Vision Scope"
+    "id": "mod_extended_curved_chain",
+    "name": "Extended Curved Chain"
   },
   {
-    "id": "mod_short_scope",
-    "name": "Short Scope"
+    "id": "mod_extra_claw",
+    "name": "Extra Claw"
+  },
+  {
+    "id": "mod_extra_flame_jets",
+    "name": "Extra Flame Jets"
+  },
+  {
+    "id": "mod_extra_heavy",
+    "name": "Extra Heavy"
+  },
+  {
+    "id": "mod_extra_large_magazine",
+    "name": "Extra-Large Magazine"
+  },
+  {
+    "id": "mod_finned",
+    "name": "Finned"
+  },
+  {
+    "id": "mod_five_crank_capacitor",
+    "name": "Five-Crank Capacitor"
+  },
+  {
+    "id": "mod_flamer_barrel",
+    "name": "Flamer Barrel"
+  },
+  {
+    "id": "mod_flamer_chain",
+    "name": "Flamer"
+  },
+  {
+    "id": "mod_flechette_darts",
+    "name": "Flechette Darts"
+  },
+  {
+    "id": "mod_folding_stock",
+    "name": "Folding Stock"
+  },
+  {
+    "id": "mod_four_crank_capacitor",
+    "name": "Four-Crank Capacitor"
+  },
+  {
+    "id": "mod_front_sight_ring",
+    "name": "Front Sight Ring"
+  },
+  {
+    "id": "mod_full_capacitors",
+    "name": "Full Capacitors"
   },
   {
     "id": "mod_full_stock",
     "name": "Full Stock"
   },
   {
-    "id": "mod_marksmans_stock",
-    "name": "Marksman's Stock"
+    "id": "mod_fusion_mag",
+    "name": "Fusion Mag"
   },
   {
-    "id": "mod_recoil_compensating_stock",
-    "name": "Recoil Compensating Stock"
+    "id": "mod_gunner_sight",
+    "name": "Gunner Sight"
   },
   {
-    "id": "mod_barbed",
-    "name": "Barbed"
+    "id": "mod_gyro_compensating_lens",
+    "name": "Gyro Compensating Lens"
   },
   {
-    "id": "mod_bladed",
-    "name": "Bladed"
+    "id": "mod_hair_trigger",
+    "name": "Hair Trigger"
+  },
+  {
+    "id": "mod_hardened",
+    "name": "Hardened"
+  },
+  {
+    "id": "mod_hardened_automatic",
+    "name": "Hardened Automatic"
+  },
+  {
+    "id": "mod_hardened_piercing_auto",
+    "name": "Hardened Piercing Auto"
   },
   {
     "id": "mod_heating_coil",
@@ -544,8 +336,204 @@
     "name": "Heavy"
   },
   {
+    "id": "mod_heavy_barrel",
+    "name": "Heavy Barrel"
+  },
+  {
+    "id": "mod_high_speed_electrode",
+    "name": "High Speed Electrode"
+  },
+  {
+    "id": "mod_hooked",
+    "name": "Hooked"
+  },
+  {
+    "id": "mod_huge_tank",
+    "name": "Huge Tank"
+  },
+  {
+    "id": "mod_ignition_module",
+    "name": "Ignition Module"
+  },
+  {
+    "id": "mod_illuminated_sight",
+    "name": "Illuminated Sight"
+  },
+  {
+    "id": "mod_improved_barrel",
+    "name": "Improved Barrel"
+  },
+  {
+    "id": "mod_improved_receiver",
+    "name": "Improved Receiver"
+  },
+  {
+    "id": "mod_incendiary_barrel",
+    "name": "Incendiary Barrel"
+  },
+  {
+    "id": "mod_iron_sight",
+    "name": "Iron Sight"
+  },
+  {
+    "id": "mod_large_ampoule",
+    "name": "Large Ampoule"
+  },
+  {
+    "id": "mod_large_bayonet",
+    "name": "Large Bayonet"
+  },
+  {
+    "id": "mod_large_magazine",
+    "name": "Large Magazine"
+  },
+  {
+    "id": "mod_large_quick_eject_mag",
+    "name": "Large Quick-Eject Mag"
+  },
+  {
+    "id": "mod_large_tank",
+    "name": "Large Tank"
+  },
+  {
+    "id": "mod_large_vial",
+    "name": "Large Vial"
+  },
+  {
+    "id": "mod_lead_lining",
+    "name": "Lead Lining"
+  },
+  {
+    "id": "mod_light_barrel",
+    "name": "Light Barrel"
+  },
+  {
+    "id": "mod_long",
+    "name": "Long"
+  },
+  {
+    "id": "mod_long_barrel",
+    "name": "Long Barrel"
+  },
+  {
+    "id": "mod_long_night_vision_scope",
+    "name": "Long Night Vision Scope"
+  },
+  {
+    "id": "mod_long_scope",
+    "name": "Long Scope"
+  },
+  {
+    "id": "mod_m79_launcher",
+    "name": "M79 Launcher"
+  },
+  {
+    "id": "mod_marksmans_stock",
+    "name": "Marksman's Stock"
+  },
+  {
+    "id": "mod_multi_shot_canister",
+    "name": "Multi Shot Canister"
+  },
+  {
+    "id": "mod_muzzle_break",
+    "name": "Muzzle Break"
+  },
+  {
+    "id": "mod_napalm_fuel",
+    "name": "Napalm Fuel"
+  },
+  {
+    "id": "mod_night_vision_scope",
+    "name": "Night Vision Scope"
+  },
+  {
+    "id": "mod_photon_agitator",
+    "name": "Photon Agitator"
+  },
+  {
+    "id": "mod_photon_exciter",
+    "name": "Photon Exciter"
+  },
+  {
+    "id": "mod_poison_blade",
+    "name": "Poison Blade"
+  },
+  {
+    "id": "mod_ported",
+    "name": "Ported"
+  },
+  {
+    "id": "mod_powerful",
+    "name": "Powerful"
+  },
+  {
+    "id": "mod_powerful_automatic",
+    "name": "Powerful Automatic"
+  },
+  {
+    "id": "mod_protected_winch",
+    "name": "Protected Winch"
+  },
+  {
+    "id": "mod_pulse_capacitor",
+    "name": "Pulse Capacitor"
+  },
+  {
     "id": "mod_puncturing",
     "name": "Puncturing"
+  },
+  {
+    "id": "mod_quad_barrel",
+    "name": "Quad Barrel"
+  },
+  {
+    "id": "mod_quantum_gyro_lens",
+    "name": "Quantum Gyro Compensating Lens"
+  },
+  {
+    "id": "mod_quick_eject_mag",
+    "name": "Quick-Eject Mag"
+  },
+  {
+    "id": "mod_rapid",
+    "name": "Rapid"
+  },
+  {
+    "id": "mod_rapid_automatic",
+    "name": "Rapid Automatic"
+  },
+  {
+    "id": "mod_recoil_compensating",
+    "name": "Recoil Compensating"
+  },
+  {
+    "id": "mod_recoil_compensating_stock",
+    "name": "Recoil Compensating Stock"
+  },
+  {
+    "id": "mod_recon_scope",
+    "name": "Recon Scope"
+  },
+  {
+    "id": "mod_reflex_sight",
+    "name": "Reflex Sight"
+  },
+  {
+    "id": "mod_reflex_tactical",
+    "name": "Reflex Tactical"
+  },
+  {
+    "id": "mod_reinforced_winch",
+    "name": "Reinforced Winch"
+  },
+  {
+    "id": "mod_sawed_off",
+    "name": "Sawed-Off"
+  },
+  {
+    "id": "mod_scope",
+    "name": "Scope"
   },
   {
     "id": "mod_serrated_blade",
@@ -556,11 +544,115 @@
     "name": "Sharp"
   },
   {
+    "id": "mod_sharpshooters_grip",
+    "name": "Sharpshooter's Grip"
+  },
+  {
+    "id": "mod_shielded_barrel",
+    "name": "Shielded Barrel"
+  },
+  {
+    "id": "mod_shocking_coils",
+    "name": "Shocking Coils"
+  },
+  {
+    "id": "mod_short_night_vision_scope",
+    "name": "Short Night Vision Scope"
+  },
+  {
+    "id": "mod_short_scope",
+    "name": "Short Scope"
+  },
+  {
+    "id": "mod_shredder",
+    "name": "Shredder"
+  },
+  {
+    "id": "mod_signal_repeater",
+    "name": "Signal Repeater"
+  },
+  {
+    "id": "mod_six_crank_capacitor",
+    "name": "Six-Crank Capacitor"
+  },
+  {
+    "id": "mod_sniper_barrel",
+    "name": "Sniper Barrel"
+  },
+  {
+    "id": "mod_snubnose",
+    "name": "Snubnose"
+  },
+  {
+    "id": "mod_speedy_receiver",
+    "name": "Speedy Receiver"
+  },
+  {
     "id": "mod_spiked",
     "name": "Spiked"
   },
   {
+    "id": "mod_splitter",
+    "name": "Splitter"
+  },
+  {
+    "id": "mod_stabilizer",
+    "name": "Stabilizer"
+  },
+  {
+    "id": "mod_standard_stock",
+    "name": "Standard Stock"
+  },
+  {
+    "id": "mod_stealth_blade",
+    "name": "Stealth Blade"
+  },
+  {
     "id": "mod_stun_pack",
     "name": "Stun Pack"
+  },
+  {
+    "id": "mod_suppressor",
+    "name": "Suppressor"
+  },
+  {
+    "id": "mod_targeting_computer",
+    "name": "Targeting Computer"
+  },
+  {
+    "id": "mod_tesla_coil_capacitor",
+    "name": "Tesla Coil Capacitor"
+  },
+  {
+    "id": "mod_tesla_coil_dynamo",
+    "name": "Tesla Coil Dynamo"
+  },
+  {
+    "id": "mod_three_crank_capacitor",
+    "name": "Three-Crank Capacitor"
+  },
+  {
+    "id": "mod_tri_barrel",
+    "name": "Tri-Barrel"
+  },
+  {
+    "id": "mod_triple_barrel",
+    "name": "Triple Barrel"
+  },
+  {
+    "id": "mod_tuned",
+    "name": "Tuned"
+  },
+  {
+    "id": "mod_turbo",
+    "name": "Turbo"
+  },
+  {
+    "id": "mod_vaporization_nozzle",
+    "name": "Vaporization Nozzle"
+  },
+  {
+    "id": "mod_vented",
+    "name": "Vented"
   }
 ]
