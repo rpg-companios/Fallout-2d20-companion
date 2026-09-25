@@ -1,0 +1,233 @@
+{
+  "small_guns_mods": {
+    "receiver_mods": [
+      {"item": "Hardened", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Powerful", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Advanced", "complexity": 5, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Calibrated", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Automatic", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Hair Trigger", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": ".38 Receiver", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": ".308 Receiver", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": ".45 Receiver", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": ".50 Receiver", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Automatic Piston", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "barrel_mods": [
+      {"item": "Snubnose", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Bull Barrel", "complexity": 5, "perks": "Gun Nut 3", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Long", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Ported", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Vented", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Sawed-Off", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Finned", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "grip_mods": [
+      {"item": "Comfort Grip", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Sharpshooter's Grip", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "stock_mods": [
+      {"item": "Full Stock", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Marksman's Stock", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Recoil Compensating Stock", "complexity": 5, "perks": "Gun Nut 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "sights": [
+      {"item": "Reflex Sight", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Short Scope", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Long Scope", "complexity": 4, "perks": "Science! 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Short Night Vision Scope", "complexity": 4, "perks": "Science! 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Long Night Vision Scope", "complexity": 5, "perks": "Science! 3", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Recon Scope", "complexity": 5, "perks": "Science! 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "muzzle": [
+      {"item": "Bayonet", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Compensator", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Muzzle Break", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Suppressor", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"}
+    ]
+  },
+  "energy_weapon_mods": {
+    "capacitor_mods": [
+      {"item": "Beta Wave Tuner", "complexity": 2, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Boosted Capacitor", "complexity": 2, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Photon Exciter", "complexity": 3, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Photon Agitator", "complexity": 4, "perks": "Science! 2", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Three-crank capacitor", "complexity": 2, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Four-crank capacitor", "complexity": 3, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Five-crank capacitor", "complexity": 4, "perks": "Science! 2", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Six-crank capacitor", "complexity": 5, "perks": "Science! 3", "skill": "Science", "rarity": "Uncommon"}
+    ],
+    "barrel_mods": [
+      {"item": "Bracketed Short Barrel", "complexity": 3, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Long Barrel", "complexity": 3, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Splitter", "complexity": 3, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Automatic Barrel", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Bracketed Long Barrel", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Improved Barrel", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Sniper Barrel", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Flamer Barrel", "complexity": 5, "perks": "Science! 2", "skill": "Science", "rarity": "Uncommon"}
+    ],
+    "grip_mods": [
+      {"item": "Sharpshooter's Grip", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "stock_mods": [
+      {"item": "Standard Stock", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Full Stock", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Marksman's Stock", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Recoil Compensating Stock", "complexity": 5, "perks": "Gun Nut 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "sights": [
+      {"item": "Reflex Sight", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Short Scope", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Long Scope", "complexity": 4, "perks": "Science! 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Short Night Vision Scope", "complexity": 4, "perks": "Science! 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Long Night Vision Scope", "complexity": 5, "perks": "Science! 3", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Recon Scope", "complexity": 5, "perks": "Science! 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "muzzle": [
+      {"item": "Beam Splitter", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Beam Focuser", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Gyro Compensating Lens", "complexity": 4, "perks": "Science! 1", "skill": "Science", "rarity": "Uncommon"}
+    ]
+  },
+  "big_gun_mods": {
+    "flamer_mod": [
+      {"item": "Napalm Fuel", "complexity": 3, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Long Barrel", "complexity": 3, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Large Tank", "complexity": 3, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Huge Tank", "complexity": 4, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Compression Nozzle", "complexity": 3, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Vaporization Nozzle", "complexity": 4, "perks": null, "skill": "Repair", "rarity": "Common"}
+    ],
+    "gamma_gun_mods": [
+      {"item": "Deep Dish", "complexity": 6, "perks": "Science! 4", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Electric Signal Carrier antennae", "complexity": 5, "perks": "Science! 3", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Signal Repeater", "complexity": 6, "perks": "Science! 4", "skill": "Science", "rarity": "Uncommon"}
+    ],
+    "gatling_laser_mods": [
+      {"item": "Photon Exciter", "complexity": 6, "perks": "Science! 3", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Beta Wave Tuner", "complexity": 4, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Boosted Capacitor", "complexity": 4, "perks": null, "skill": "Science", "rarity": "Common"},
+      {"item": "Photon Agitator", "complexity": 6, "perks": "Science! 3", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Charging Barrels", "complexity": 7, "perks": "Science! 4", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Reflex Sight", "complexity": 7, "perks": "Science! 4", "skill": "Science", "rarity": "Uncommon"},
+      {"item": "Beam Focuser", "complexity": 4, "perks": null, "skill": "Science", "rarity": "Common"}
+    ],
+    "junk_jet_mods": [
+      {"item": "Long Barrel", "complexity": 3, "perks": "Gun Nut 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Recoil Compensating Stock", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Gunner Sight", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Electrification Module", "complexity": 6, "perks": "Gun Nut 2, Science! 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Ignition Module", "complexity": 7, "perks": "Gun Nut 3, Science! 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "minigun_mods": [
+      {"item": "Accelerated Barrel", "complexity": 5, "perks": "Gun Nut 3", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Tri-Barrel", "complexity": 6, "perks": "Gun Nut 4", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Gunner Sight", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Shredder", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "missile_launcher_mod": [
+      {"item": "Triple Barrel", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Quad Barrel", "complexity": 5, "perks": "Gun Nut 3", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Scope", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Night Vision Scope", "complexity": 6, "perks": "Gun Nut 4, Science! 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Targeting Computer", "complexity": 6, "perks": "Gun Nut 2, Science! 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Bayonet", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Stabilizer", "complexity": 4, "perks": "Gun Nut 2", "skill": "Repair", "rarity": "Uncommon"}
+    ]
+  },
+  "melee_weapon_mods": {
+    "sword_mods": [
+      {"item": "Serrated Blade", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Electrified Blade", "complexity": 4, "perks": "Blacksmith 2, Science! 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Electrified Serrated Blade", "complexity": 5, "perks": "Blacksmith 3, Science! 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Stun Pack", "complexity": 5, "perks": "Blacksmith 3, Science! 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "combat_knife_mods": [
+      {"item": "Serrated Blade", "complexity": 3, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "stealth_blade": [
+      {"item": "Stealth Blade", "complexity": 4, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "machete_mod": [
+      {"item": "Serrated Blade", "complexity": 3, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "ripper_mods": [
+      {"item": "Curved Blade", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Extended Blade", "complexity": 5, "perks": "Blacksmith 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "shishkebab_mod": [
+      {"item": "Extra Flame Jets", "complexity": 5, "perks": "Blacksmith 3", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "switchblade_mod": [
+      {"item": "Serrated Blade", "complexity": 3, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "baseball_bat_mods": [
+      {"item": "Barbed", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Spiked", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Sharp", "complexity": 2, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Chain-Wrapped", "complexity": 3, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Bladed", "complexity": 4, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "board_mods": [
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Puncturing", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Bladed", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "lead_pipe_mods": [
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Heavy", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "pipe_wrench_mods": [
+      {"item": "Hooked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Heavy", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Puncturing", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Extra Heavy", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "pool_cue_mods": [
+      {"item": "Barbed", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Sharp", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"}
+    ],
+    "rolling_pin_mods": [
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Sharp", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"}
+    ],
+    "baton_mods": [
+      {"item": "Electrified", "complexity": 4, "perks": "Blacksmith 2, Science! 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Stun Pack", "complexity": 4, "perks": "Blacksmith 2, Science! 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "sledgehammer_mods": [
+      {"item": "Puncturing", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Heavy", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "super_sledge_mods": [
+      {"item": "Heating Coil", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Stun Pack", "complexity": 5, "perks": "Blacksmith 3, Science! 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "tire_iron_mod": [
+      {"item": "Bladed", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "walking_cane_mods": [
+      {"item": "Barbed", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"}
+    ],
+    "boxing_glove_mods": [
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Puncturing", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Lead lining", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "deathclaw_gauntlet_mod": [
+      {"item": "Extra Claw", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"}
+    ],
+    "knuckles_mods": [
+      {"item": "Sharp", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Spiked", "complexity": 1, "perks": null, "skill": "Repair", "rarity": "Common"},
+      {"item": "Puncturing", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Bladed", "complexity": 2, "perks": "Blacksmith 1", "skill": "Repair", "rarity": "Uncommon"}
+    ],
+    "power_fist_mods": [
+      {"item": "Puncturing", "complexity": 3, "perks": "Blacksmith 2", "skill": "Repair", "rarity": "Uncommon"},
+      {"item": "Heating Coil", "complexity": 4, "perks": "Blacksmith 3", "skill": "Repair", "rarity": "Uncommon"}
+    ]
+  }
+}
