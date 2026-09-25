@@ -3,6 +3,18 @@
 ---
 ---
 ---
+---
+## Melee mods cross-checked against your catalog (patch 372)
+
+The melee catalog you sent (38 weapons) is resolved: 35 exist in the game
+(renames queued to your names), 53 weapon-mod bindings already match what
+the app supports (no divergence), 9 mods will be created (auto axe
+elemental blades, chainsaw bars, etc.). Outside the catalog: Atom's Staff,
+Mining Pick... and the Welding Torch — a question: is it the current arc
+welder or a separate weapon? Robot weapons untouched: their mods work and
+are covered by tests. Only 4 weapons remain without your lists (arc welder,
+Institute laser, 10mm SMG, plasma mine) — their support stays as is.
+
 ## New mods confirmed, English names found (patch 371)
 
 Your answers are recorded: the 11 missing mods will be created; "Tesla
