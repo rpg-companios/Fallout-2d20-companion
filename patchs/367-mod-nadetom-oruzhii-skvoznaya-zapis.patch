@@ -1,0 +1,598 @@
+diff --git a/__tests__/equipment/human-weapon-mod-write-367.test.js b/__tests__/equipment/human-weapon-mod-write-367.test.js
+new file mode 100644
+index 0000000..66ccda2
+--- /dev/null
++++ b/__tests__/equipment/human-weapon-mod-write-367.test.js
+@@ -0,0 +1,157 @@
++// ПРИЁМОЧНЫЙ (патч 367, ГОТОВИТСЯ): реплей РЕАЛЬНОГО экспорта владельца
++// («крош», человек 8 ур., старый сейв). Репорт от 2026-09-25:
++//   1) «применил к 10мм ресивер для автоогня — на карточках оружия изменений
++//      нет, а должны были появиться эффекты (Очередь и т.д.)»;
++//   2) в экспорте у 10мм appliedMods = {} — установка не записалась вовсе.
++// Диагноз (этот тест его фиксирует): классификатор плана записи (311) для
++// НАДЕТОГО оружия человека возвращает null — в записях equippedWeapons нет
++// ни storeItemId, ни uniqueId (только instanceId), поэтому экран молча
++// ничего не пишет, а модалка при этом показывает зелёную отметку «Применено».
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++
++vi.mock('../../db', () => {
++  const rows = new Map();
++  return {
++    saveCharacter: vi.fn(async (id, name, level, originName, data) => {
++      rows.set(id, { id, name, level, originName, data, folderId: null, renamePending: false });
++      return id;
++    }),
++    loadCharacterById: vi.fn(async (id) => rows.get(id) ?? null),
++    getCharactersList: vi.fn(async () => Array.from(rows.values())),
++    deleteCharacter: vi.fn(async () => {}),
++    clearCharacterRenameRequest: vi.fn(async () => {}),
++  };
++});
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn(async () => {}),
++}));
++vi.mock('../../db/Database', () => ({
++  getWeaponById: vi.fn(async () => null),
++  getWeaponModById: vi.fn(async () => null),
++  getAmmoById: vi.fn(async () => null),
++  getItemByName: vi.fn(async () => null),
++  getCharactersList: vi.fn(async () => []),
++}));
++
++import saveExport from '../fixtures/krosh-human-export.json';
++import useCharacterStore from '../../src/store/characterStore';
++import { loadCharacter, saveCharacter } from '../../src/saves/characterSaves';
++import { classifyModWritePlan } from '../../src/engine/items/weaponMods';
++import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++
++const state = () => useCharacterStore.getState();
++const CHAR_ID = 'char_1789449430018_8ewxoar1b';
++
++const loadExport = async () => {
++  const { loadCharacterById } = await import('../../db');
++  loadCharacterById.mockImplementation(async (id) => (id === CHAR_ID ? {
++    id: CHAR_ID,
++    name: 'крош',
++    level: 8,
++    originName: 'vaultDweller',
++    data: saveExport.character.data,
++    folderId: null,
++    renamePending: false,
++  } : null));
++  expect(await loadCharacter(CHAR_ID)).toBe(true);
++};
++
++// Точная имитация входов handleApplyModification (WeaponsAndArmorScreen).
++const screenPlanInputs = (cardWeapon) => {
++  const items = state().items;
++  const resolveStoreItemId = (weapon) => {
++    if (weapon?.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
++    if (weapon?.id && items[weapon.id]) return weapon.id;
++    return Object.values(items).find(
++      (item) => item.equipped && (
++        item.uniqueId === weapon?.uniqueId
++        || item.id === weapon?.id
++        || item.weaponId === weapon?.weaponId
++      ),
++    )?.id;
++  };
++  return {
++    sourceSlot: cardWeapon?.sourceSlot,
++    attackRole: cardWeapon?.attackRole,
++    isBuiltin: cardWeapon?.isBuiltin,
++    storeItemId: resolveStoreItemId(cardWeapon) || null,
++    uniqueId: cardWeapon?.uniqueId || null,
++    weaponId: cardWeapon?.weaponId || cardWeapon?.id || null,
++  };
++};
++
++beforeEach(async () => {
++  state().resetCharacterStore();
++  await loadExport();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++describe('ПРИЁМОЧНЫЙ (патч 367): мод на надетом оружии человека — реплей «крош»', () => {
++  it('ДИАГНОЗ: план записи = storeItem (по ключу items), не equippedWeapon', () => {
++    const w = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
++    expect(w).toBeTruthy();
++    expect(w.appliedMods).toEqual({}); // как в экспорте владельца
++    expect(w.uniqueId).toBeUndefined(); // в сейве ключей экземпляра нет
++    // В рантайме надетое оружие лежит и в items — классификатор (311)
++    // уводит запись в ветку «предмет сумки»…
++    expect(state().items['weapon_10mm_pistol']).toBeTruthy();
++    const card = resolveWeaponWithAppliedMods(w, getEquipmentCatalog('ru-RU'));
++    const plan = classifyModWritePlan(screenPlanInputs(card), { slotHasHeldWeapon: false });
++    expect(plan?.kind).toBe('storeItem');
++    expect(plan.itemId).toBe('weapon_10mm_pistol');
++  });
++
++  it('ПОТЕРЯ: ветка storeItem пишет только в items — карточка (equippedWeapons) и сейв мод не видят', () => {
++    const w = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
++    // Точно как в ветке storeItem экрана: флагов нет (мода в сумке нет),
++    // патч — в items, возврат. equippedWeapons не трогается.
++    const patch = { appliedMods: { Receiver: 'mod_008' } };
++    state().updateItem('weapon_10mm_pistol', patch);
++
++    // Копия в items мод получила…
++    expect(state().items['weapon_10mm_pistol'].appliedMods).toEqual({ Receiver: 'mod_008' });
++    // …а надетый экземпляр (его читают карточки и сейв) — НЕТ.
++    expect(state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol').appliedMods).toEqual({});
++  });
++
++  it('ЦЕЛЬ ПОЧИНКИ: сквозная запись (как на экране) → «Очередь» на карточке → мод выживает сейв→загрузку', async () => {
++    const w = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
++    const card = resolveWeaponWithAppliedMods(w, getEquipmentCatalog('ru-RU'));
++    const modifiedWeapon = { ...card, appliedMods: { Receiver: 'mod_008' } };
++    // Точная имитация ветки storeItem экрана после 367: патч в items +
++    // запись-сквозняк в надетый список по ключу предмета.
++    state().updateItem(modifiedWeapon.instanceId || modifiedWeapon.id, { appliedMods: modifiedWeapon.appliedMods });
++    state().setEquippedWeapons((prev) => prev.map((x) => (
++      x && (x.uniqueId === w.uniqueId || x.instanceId === w.instanceId || x.id === w.id) ? modifiedWeapon : x
++    )));
++
++    const after = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
++    expect(after.appliedMods).toEqual({ Receiver: 'mod_008' });
++
++    // Эффект на карточке: «Очередь» (effect_burst) среди эффектов
++    // (мод_008 «Автоматический»; локализацию id делает экран).
++    const enriched = resolveWeaponWithAppliedMods(after, getEquipmentCatalog('ru-RU'));
++    expect(JSON.stringify(enriched.effects ?? '')).toContain('effect_burst');
++
++    // Мод выживает перезагрузку: сохранить (реальный путь) → грузить РОВНО
++    // сохранённую строку (урок: мок, указывающий на исходный экспорт, давал
++    // ложный «путь загрузки теряет моды»).
++    const dbmod = await import('../../db');
++    await saveCharacter(); // настоящий путь сохранения (characterSaves)
++    const call = dbmod.saveCharacter.mock.calls.at(-1);
++    const savedRow = {
++      id: call[0], name: call[1], level: call[2], originName: call[3],
++      data: call[4], folderId: null, renamePending: false,
++    };
++    dbmod.loadCharacterById.mockImplementation(async (id) => (id === CHAR_ID ? savedRow : null));
++    state().resetCharacterStore();
++    expect(await loadCharacter(CHAR_ID)).toBe(true);
++    const reloaded = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
++    expect(reloaded?.appliedMods).toEqual({ Receiver: 'mod_008' });
++  });
++});
+diff --git a/__tests__/equipment/inline-feedback-363.test.js b/__tests__/equipment/inline-feedback-363.test.js
+index 0b759c8..f6f5d9c 100644
+--- a/__tests__/equipment/inline-feedback-363.test.js
++++ b/__tests__/equipment/inline-feedback-363.test.js
+@@ -46,14 +46,16 @@ describe('ПРИЁМОЧНЫЙ (363–364): диалоги крафта/модо
+     expect(crafting).not.toContain('askZeroTarget');
+   });
+ 
+-  it('применение модов видно: зелёная отметка, окно не закрывается молча', () => {
++  it('применение модов (367): окно закрывается как раньше, запись сквозная', () => {
+     const screen = read(SCREEN);
+     const start = screen.indexOf('const handleApplyModification = useCallback');
+     const end = screen.indexOf('const handleUnequipWeapon', start);
+     const body = screen.slice(start, end);
+-    expect(body).not.toContain('handleCloseModificationModal');
+-    expect(body).toContain('setSelectedWeaponForModification(modifiedWeapon)');
+-    expect(modal).toContain('installNote');
+-    expect(modal).toContain('installApplied');
++    // 367 (слово владельца): после «Применить» окно закрывается КАК РАНЬШЕ
++    expect(body).toContain('handleCloseModificationModal();');
++    // 367: мод пишется и в надетый список — карточки и сейв его видят
++    expect(body).toContain('setEquippedWeapons');
++    // зелёная отметка 364 снесена вместе с «окно не закрывать»
++    expect(modal).not.toContain('installNote');
+   });
+ });
+diff --git a/__tests__/fixtures/krosh-human-export.json b/__tests__/fixtures/krosh-human-export.json
+new file mode 100644
+index 0000000..d94fea5
+--- /dev/null
++++ b/__tests__/fixtures/krosh-human-export.json
+@@ -0,0 +1,190 @@
++{
++  "format": "rpg-companion-character",
++  "version": 1,
++  "exportedAt": "2026-09-25T04:45:40.271Z",
++  "character": {
++    "id": "char_1789449430018_8ewxoar1b",
++    "name": "крош",
++    "level": 8,
++    "originName": "vaultDweller",
++    "data": {
++      "characterName": "крош",
++      "level": 8,
++      "attributes": [
++        { "name": "STR", "value": 4 },
++        { "name": "END", "value": 7 },
++        { "name": "PER", "value": 4 },
++        { "name": "AGI", "value": 10 },
++        { "name": "INT", "value": 4 },
++        { "name": "CHA", "value": 4 },
++        { "name": "LCK", "value": 7 }
++      ],
++      "skills": [
++        { "name": "ATHLETICS", "value": 6 },
++        { "name": "BARTER", "value": 6 },
++        { "name": "BIG_GUNS", "value": 4 },
++        { "name": "ENERGY_WEAPONS", "value": 3 },
++        { "name": "EXPLOSIVES", "value": 1 },
++        { "name": "LOCKPICK", "value": 0 },
++        { "name": "MEDICINE", "value": 0 },
++        { "name": "MELEE_WEAPONS", "value": 0 },
++        { "name": "PILOT", "value": 0 },
++        { "name": "REPAIR", "value": 0 },
++        { "name": "SCIENCE", "value": 0 },
++        { "name": "SMALL_GUNS", "value": 2 },
++        { "name": "SNEAK", "value": 2 },
++        { "name": "SPEECH", "value": 2 },
++        { "name": "SURVIVAL", "value": 2 },
++        { "name": "THROWING", "value": 0 },
++        { "name": "UNARMED", "value": 0 }
++      ],
++      "selectedSkills": ["SMALL_GUNS", "SPEECH", "SNEAK"],
++      "extraTaggedSkills": ["SURVIVAL"],
++      "forcedSelectedSkills": ["SURVIVAL"],
++      "origin": { "id": "vaultDweller" },
++      "trait": {
++        "ids": ["ghoul-necrotic-posthuman"],
++        "id": "ghoul-necrotic-posthuman",
++        "name": "Некротический постчеловек",
++        "modifiers": {
++          "immunities": ["radiation"],
++          "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"],
++          "forcedSkills": ["SURVIVAL"],
++          "extraSkills": 1,
++          "selectedTraitIds": ["ghoul-necrotic-posthuman"],
++          "selectedTraitNames": ["Некротический постчеловек"],
++          "selectionMode": "single"
++        }
++      },
++      "equipment": {
++        "id": "vault_resident",
++        "name": "Житель Убежища",
++        "weight": 8.5,
++        "price": 198,
++        "items": [
++          { "id": "clothing_vault_jumpsuit", "itemType": "clothing", "quantity": 1, "equipped": false },
++          { "id": "ammo_10mm", "quantity": 4, "itemType": "ammo", "equipped": false },
++          { "id": "chem_stimpak", "itemType": "chem", "quantity": 2, "equipped": false },
++          { "id": "item_pip_boy", "itemType": "misc", "quantity": 1, "equipped": false },
++          { "id": "unarmed_human", "isBuiltin": true, "equipped": true },
++          {
++            "id": "plastic", "instanceId": "plastic", "weaponId": "plastic", "itemType": "misc",
++            "equipped": false, "locked": false, "requiresMkII": false, "quantity": 3,
++            "stackKey": "plastic", "appliedMods": {}, "durabilityTracked": false
++          },
++          {
++            "id": "asbestos", "instanceId": "asbestos", "weaponId": "asbestos", "itemType": "misc",
++            "equipped": false, "locked": false, "requiresMkII": false, "quantity": 2,
++            "stackKey": "asbestos", "appliedMods": {}, "durabilityTracked": false
++          }
++        ],
++        "purchaseMaxRarity": null
++      },
++      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"],
++      "activeTimedEffects": [],
++      "sceneCounter": 0,
++      "equippedWeapons": [
++        { "id": "unarmed_human", "isBuiltin": true },
++        {
++          "id": "weapon_switchblade", "instanceId": "weapon_switchblade", "weaponId": "weapon_switchblade",
++          "itemType": "weapon", "equipped": true, "locked": false, "requiresMkII": false,
++          "quantity": 1, "stackKey": "weapon_switchblade", "appliedMods": {}, "durabilityTracked": false
++        },
++        {
++          "id": "weapon_10mm_pistol", "instanceId": "weapon_10mm_pistol", "weaponId": "weapon_10mm_pistol",
++          "itemType": "weapon", "equipped": true, "locked": false, "requiresMkII": false,
++          "quantity": 1, "stackKey": "weapon_10mm_pistol", "appliedMods": {}, "durabilityTracked": false
++        }
++      ],
++      "equippedArmor": {
++        "head": {
++          "armor": null,
++          "clothing": {
++            "id": "headwear_casual_hat", "itemType": "clothing", "weaponId": "headwear_casual_hat",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "headwear_casual_hat", "durabilityTracked": false,
++            "uniqueId": "inv-stack-headwear_casual_hat", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449557703-kxyej0"
++          }
++        },
++        "body": {
++          "armor": null,
++          "clothing": {
++            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
++            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
++          }
++        },
++        "leftArm": {
++          "armor": null,
++          "clothing": {
++            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
++            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
++          }
++        },
++        "rightArm": {
++          "armor": null,
++          "clothing": {
++            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
++            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
++          }
++        },
++        "leftLeg": {
++          "armor": null,
++          "clothing": {
++            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
++            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
++          }
++        },
++        "rightLeg": {
++          "armor": null,
++          "clothing": {
++            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
++            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
++            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
++            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
++            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
++          }
++        }
++      },
++      "equippedPowerArmor": {
++        "frame": null,
++        "pieces": { "head": null, "body": null, "leftArm": null, "rightArm": null, "leftLeg": null, "rightLeg": null }
++      },
++      "powerArmorRuntime": { "coreAccumulatorMs": 0 },
++      "caps": 10,
++      "currentHealth": 14,
++      "radiation": 0,
++      "availablePerkAttributePoints": 0,
++      "luckPoints": 7,
++      "attributesSaved": true,
++      "skillsSaved": true,
++      "selectedPerks": [
++        { "id": "scrapper", "rank": 1 },
++        { "id": "scrapper", "rank": 2 }
++      ],
++      "conditions": [],
++      "chemDosesLog": [],
++      "sceneRiskStates": {},
++      "lastDiseaseResistAt": null,
++      "survival": {
++        "food": 4, "water": 3, "sleep": 5, "fatigue": [],
++        "acc": { "food": 1, "water": 1, "sleep": 2 },
++        "timeCarried": 0.01674000000000048, "hpBonus": 0, "bedRestHours": 0
++      },
++      "rewardedSkills": ["SMALL_GUNS", "SPEECH", "SNEAK", "SURVIVAL"],
++      "schemaVersion": 26
++    }
++  }
++}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 476a9ce..19ac145 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,10 +7,10 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-24** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **366** · у владельца закоммичено до **362**;
+-363–365 применены установщиком (коммитить сразу после установки), 366
+-после пересборки встаёт той же командой `./apply-patch.sh 366`.
++Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **367** · у владельца закоммичено до **362**;
++363–365 применены установщиком и ждут коммита, дальше: 366 (пересобран)
++и 367 одной установкой `./apply-patch.sh 367` → коммит.
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+@@ -383,6 +383,20 @@
+   Первая сборка самого файла 366 была испорчена (параллельные правки
+   state.md: утеряна эта запись, добавлен дубль хвоста) — файл пересобран
+   заново; испорченная версия ни у кого не успела примениться.
++- 367 — ПОЧИНКА ЗАПИСИ МОДОВ НА НАДЕТОМ ОРУЖИИ ЧЕЛОВЕКА (репорт владельца:
++  «применил к 10мм ресивер для автоогня — на карточках изменений нет», в
++  его экспорте appliedMods пуст). КОРЕНЬ (патч 311): ветка storeItem
++  классификатора писала мод только в копию инвентаря (updateItem), а
++  карточки и сейв читают список надетого — мод оседал невидимо. Починка:
++  сквозная запись setEquippedWeapons по ключу предмета после updateItem.
++  По слову владельца «Применить» снова ЗАКРЫВАЕТ окно модов как раньше
++  (зелёная отметка 364 снесена: installNote/installApplied удалены) —
++  молчания больше нет, карточка обновляется сквозной записью. Приёмочный
++  реплей __tests__/equipment/human-weapon-mod-write-367.test.js (3) на
++  фикстуре экспорта владельца krosh-human-export.json: диагноз, потеря,
++  починка + выживание сейв→загрузка. Путь ЗАГРУЗКИ потерь не имеет
++  (проверено; подозрение «загрузка стирает моды» — артефакт пробника,
++  мокшего исходный экспорт вместо сохранённой строки).
+ 
+ ## Открытые вопросы (ждут слова владельца)
+ 
+@@ -425,6 +439,11 @@
+   друга, задвоили хвост и испортили файл патча (владельцу он не достался —
+   установщик отложил его, дерево не тронув).
+ 
++- (367) Пробник загрузки обязан грузить РОВНО то, что проверяет: мок,
++  указывающий на исходный экспорт вместо сохранённой строки, дал ложный
++  диагноз «загрузка стирает моды» — потеря была только в записи (311
++  storeItem-ветка). Перед выводом — проверять, ЧТО реально читает мок.
++
+ - (365) Новые агентские документы НЕ заводить без слова владельца:
+   документ-память «как работает приложение» уже есть —
+   `docs/agents/README.md` (патч 313); дополнения — разделами внутрь неё.
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 385c5a5..0565b81 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,16 @@
+ # Changelog
+ 
+ ---
++## Mods on equipped weapons are actually saved now (patch 367)
++
++Report: an automatic receiver was applied to the 10mm pistol, but the
++weapon cards showed no change and the mod vanished after reload. The
++Apply button wrote the mod into a hidden inventory copy, while cards and
++the save file read the equipped-weapons list. The write is now pass-
++through: the card instantly shows Burst and new stats, and the mod
++survives character reload. The mod window closes after Apply again, as
++it used to.
++
+ ## Update installer fix (patch 366)
+ 
+ Update #364 failed to install after #363: the update file was built
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 584c649..7383583 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,15 @@
+ # История изменений
+ 
+ ---
++## Моды на надетом оружии записываются по-настоящему (патч 367)
++
++Репорт: ресивер автоогня применён к 10мм — на карточках оружия изменений
++нет, после перезахода мод пропадает. Причина: «Применить» писало мод в
++скрытую копию предмета, а карточки и сохранение читают список надетого.
++Теперь запись сквозная: карточка сразу показывает «Очередь» и новые
++статы, мод переживает перезагрузку персонажа. Окно модов после
++«Применить» снова закрывается, как раньше.
++
+ ## Починка установки обновлений (патч 366)
+ 
+ Обновление №364 не устанавливалось после №363: файл обновления был
+diff --git a/i18n/en-EN/screens/weaponsAndArmor/screen.json b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+index 27e70e3..4d3d0d7 100644
+--- a/i18n/en-EN/screens/weaponsAndArmor/screen.json
++++ b/i18n/en-EN/screens/weaponsAndArmor/screen.json
+@@ -107,8 +107,7 @@
+     "createAskZeroTitle": "Difficulty cleared by skill",
+     "createAskZeroText": "Roll the dice? Success/Failure rules apply.",
+     "createAskZeroRoll": "Roll dice",
+-    "createAskZeroAuto": "Auto-success",
+-    "installApplied": "Applied"
++    "createAskZeroAuto": "Auto-success"
+   },
+   "displayToggle": {
+     "spoilers": "List (spoilers)",
+diff --git a/i18n/ru-RU/screens/weaponsAndArmor/screen.json b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+index fbe6fa8..428d360 100644
+--- a/i18n/ru-RU/screens/weaponsAndArmor/screen.json
++++ b/i18n/ru-RU/screens/weaponsAndArmor/screen.json
+@@ -107,8 +107,7 @@
+     "createAskZeroTitle": "Сложность снята навыком",
+     "createAskZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
+     "createAskZeroRoll": "Бросить кубики",
+-    "createAskZeroAuto": "Автоуспех",
+-    "installApplied": "Применено"
++    "createAskZeroAuto": "Автоуспех"
+   },
+   "displayToggle": {
+     "spoilers": "Список (спойлеры)",
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 0e9fceb..8ba0290 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -963,10 +963,11 @@ const WeaponsAndArmorScreen = () => {
+   const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+ 
+   const handleApplyModification = useCallback((modifiedWeapon) => {
+-    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно НЕ
+-    // закрывается молча — обновляем карточку, модалка перечитает выбор и
+-    // покажет зелёную отметку применения; закрытие — крестиком.
+-    setSelectedWeaponForModification(modifiedWeapon);
++    // 363→367 (слово владельца): после «Применить» окно закрывается КАК
++    // РАНЬШЕ. Молчаливого закрытия больше нет — запись мода сквозная (367):
++    // мод попадает в надетый список, карточка на экране сразу показывает
++    // «Очередь»/новые статы.
++    handleCloseModificationModal();
+     const itemId = resolveStoreItemId(selectedWeaponForModification);
+     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
+ 
+@@ -1744,4 +1745,22 @@ const WeaponsAndArmorScreen = () => {
+ };
+ 
+ 
++export default WeaponsAndArmorScreen;
++BodyModalText}>
++              {tWeaponsAndArmorScreen('robotBodyUpgrade.comingSoon')}
++            </Text>
++            <TouchableOpacity
++              style={localStyles.robotBodyModalButton}
++              onPress={() => setRobotBodyUpgradeModalVisible(false)}
++            >
++              <Text style={localStyles.robotBodyModalButtonText}>{tWeaponsAndArmorScreen('common.close')}</Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      </Modal>
++    </ImageBackground>
++  );
++};
++
++
+ export default WeaponsAndArmorScreen;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 499d097..9f23df1 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -331,7 +331,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+ 
+   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
+   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
+-  const [installNote, setInstallNote] = useState(null); // 363: видимая отметка установки
+ 
+   const handleCreateMod = (modId, modName) => {
+     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
+@@ -661,13 +660,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
+             )}
+           </ScrollView>
+ 
+-          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
+-          {installNote && (
+-            <Text style={styles.installNote}>
+-              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
+-            </Text>
+-          )}
+-
+           {/* Кнопки действий */}
+           <View style={styles.modalFooter}>
+             <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
+diff --git a/modules/fallout/styles/WeaponModificationModal.styles.js b/modules/fallout/styles/WeaponModificationModal.styles.js
+index 6a0398c..e741d21 100644
+--- a/modules/fallout/styles/WeaponModificationModal.styles.js
++++ b/modules/fallout/styles/WeaponModificationModal.styles.js
+@@ -121,7 +121,6 @@ const styles = StyleSheet.create({
+   reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
+   reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+   // 363: зелёная отметка применения (вопросы/отказы — AlertHost, 364).
+-  installNote: { color: '#16a34a', fontSize: 12, textAlign: 'center', paddingVertical: 6 },
+ });
+ 
+ export default styles;
+diff --git a/public/version.json b/public/version.json
+index cd2ad0b..e9a8731 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "366",
++  "version": "367",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
