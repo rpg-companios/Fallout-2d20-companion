@@ -1,6 +1,16 @@
 # Changelog
 
 ---
+## Mods on equipped weapons are actually saved now (patch 367)
+
+Report: an automatic receiver was applied to the 10mm pistol, but the
+weapon cards showed no change and the mod vanished after reload. The
+Apply button wrote the mod into a hidden inventory copy, while cards and
+the save file read the equipped-weapons list. The write is now pass-
+through: the card instantly shows Burst and new stats, and the mod
+survives character reload. The mod window closes after Apply again, as
+it used to.
+
 ## Update installer fix (patch 366)
 
 Update #364 failed to install after #363: the update file was built

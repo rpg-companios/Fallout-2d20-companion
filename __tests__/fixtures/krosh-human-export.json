@@ -1,0 +1,190 @@
+{
+  "format": "rpg-companion-character",
+  "version": 1,
+  "exportedAt": "2026-09-25T04:45:40.271Z",
+  "character": {
+    "id": "char_1789449430018_8ewxoar1b",
+    "name": "крош",
+    "level": 8,
+    "originName": "vaultDweller",
+    "data": {
+      "characterName": "крош",
+      "level": 8,
+      "attributes": [
+        { "name": "STR", "value": 4 },
+        { "name": "END", "value": 7 },
+        { "name": "PER", "value": 4 },
+        { "name": "AGI", "value": 10 },
+        { "name": "INT", "value": 4 },
+        { "name": "CHA", "value": 4 },
+        { "name": "LCK", "value": 7 }
+      ],
+      "skills": [
+        { "name": "ATHLETICS", "value": 6 },
+        { "name": "BARTER", "value": 6 },
+        { "name": "BIG_GUNS", "value": 4 },
+        { "name": "ENERGY_WEAPONS", "value": 3 },
+        { "name": "EXPLOSIVES", "value": 1 },
+        { "name": "LOCKPICK", "value": 0 },
+        { "name": "MEDICINE", "value": 0 },
+        { "name": "MELEE_WEAPONS", "value": 0 },
+        { "name": "PILOT", "value": 0 },
+        { "name": "REPAIR", "value": 0 },
+        { "name": "SCIENCE", "value": 0 },
+        { "name": "SMALL_GUNS", "value": 2 },
+        { "name": "SNEAK", "value": 2 },
+        { "name": "SPEECH", "value": 2 },
+        { "name": "SURVIVAL", "value": 2 },
+        { "name": "THROWING", "value": 0 },
+        { "name": "UNARMED", "value": 0 }
+      ],
+      "selectedSkills": ["SMALL_GUNS", "SPEECH", "SNEAK"],
+      "extraTaggedSkills": ["SURVIVAL"],
+      "forcedSelectedSkills": ["SURVIVAL"],
+      "origin": { "id": "vaultDweller" },
+      "trait": {
+        "ids": ["ghoul-necrotic-posthuman"],
+        "id": "ghoul-necrotic-posthuman",
+        "name": "Некротический постчеловек",
+        "modifiers": {
+          "immunities": ["radiation"],
+          "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"],
+          "forcedSkills": ["SURVIVAL"],
+          "extraSkills": 1,
+          "selectedTraitIds": ["ghoul-necrotic-posthuman"],
+          "selectedTraitNames": ["Некротический постчеловек"],
+          "selectionMode": "single"
+        }
+      },
+      "equipment": {
+        "id": "vault_resident",
+        "name": "Житель Убежища",
+        "weight": 8.5,
+        "price": 198,
+        "items": [
+          { "id": "clothing_vault_jumpsuit", "itemType": "clothing", "quantity": 1, "equipped": false },
+          { "id": "ammo_10mm", "quantity": 4, "itemType": "ammo", "equipped": false },
+          { "id": "chem_stimpak", "itemType": "chem", "quantity": 2, "equipped": false },
+          { "id": "item_pip_boy", "itemType": "misc", "quantity": 1, "equipped": false },
+          { "id": "unarmed_human", "isBuiltin": true, "equipped": true },
+          {
+            "id": "plastic", "instanceId": "plastic", "weaponId": "plastic", "itemType": "misc",
+            "equipped": false, "locked": false, "requiresMkII": false, "quantity": 3,
+            "stackKey": "plastic", "appliedMods": {}, "durabilityTracked": false
+          },
+          {
+            "id": "asbestos", "instanceId": "asbestos", "weaponId": "asbestos", "itemType": "misc",
+            "equipped": false, "locked": false, "requiresMkII": false, "quantity": 2,
+            "stackKey": "asbestos", "appliedMods": {}, "durabilityTracked": false
+          }
+        ],
+        "purchaseMaxRarity": null
+      },
+      "effects": ["radiation_healing", "slow_aging", "infertility", "discrimination"],
+      "activeTimedEffects": [],
+      "sceneCounter": 0,
+      "equippedWeapons": [
+        { "id": "unarmed_human", "isBuiltin": true },
+        {
+          "id": "weapon_switchblade", "instanceId": "weapon_switchblade", "weaponId": "weapon_switchblade",
+          "itemType": "weapon", "equipped": true, "locked": false, "requiresMkII": false,
+          "quantity": 1, "stackKey": "weapon_switchblade", "appliedMods": {}, "durabilityTracked": false
+        },
+        {
+          "id": "weapon_10mm_pistol", "instanceId": "weapon_10mm_pistol", "weaponId": "weapon_10mm_pistol",
+          "itemType": "weapon", "equipped": true, "locked": false, "requiresMkII": false,
+          "quantity": 1, "stackKey": "weapon_10mm_pistol", "appliedMods": {}, "durabilityTracked": false
+        }
+      ],
+      "equippedArmor": {
+        "head": {
+          "armor": null,
+          "clothing": {
+            "id": "headwear_casual_hat", "itemType": "clothing", "weaponId": "headwear_casual_hat",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "headwear_casual_hat", "durabilityTracked": false,
+            "uniqueId": "inv-stack-headwear_casual_hat", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449557703-kxyej0"
+          }
+        },
+        "body": {
+          "armor": null,
+          "clothing": {
+            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
+            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
+          }
+        },
+        "leftArm": {
+          "armor": null,
+          "clothing": {
+            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
+            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
+          }
+        },
+        "rightArm": {
+          "armor": null,
+          "clothing": {
+            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
+            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
+          }
+        },
+        "leftLeg": {
+          "armor": null,
+          "clothing": {
+            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
+            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
+          }
+        },
+        "rightLeg": {
+          "armor": null,
+          "clothing": {
+            "id": "clothing_vault_jumpsuit", "itemType": "clothing", "weaponId": "clothing_vault_jumpsuit",
+            "quantity": 1, "equipped": false, "locked": false, "appliedMods": {},
+            "stackKey": "clothing_vault_jumpsuit", "durabilityTracked": false,
+            "uniqueId": "inv-stack-clothing_vault_jumpsuit", "isEquipped": false,
+            "equipInstanceId": "armor-instance-1789449488776-n6ko3a"
+          }
+        }
+      },
+      "equippedPowerArmor": {
+        "frame": null,
+        "pieces": { "head": null, "body": null, "leftArm": null, "rightArm": null, "leftLeg": null, "rightLeg": null }
+      },
+      "powerArmorRuntime": { "coreAccumulatorMs": 0 },
+      "caps": 10,
+      "currentHealth": 14,
+      "radiation": 0,
+      "availablePerkAttributePoints": 0,
+      "luckPoints": 7,
+      "attributesSaved": true,
+      "skillsSaved": true,
+      "selectedPerks": [
+        { "id": "scrapper", "rank": 1 },
+        { "id": "scrapper", "rank": 2 }
+      ],
+      "conditions": [],
+      "chemDosesLog": [],
+      "sceneRiskStates": {},
+      "lastDiseaseResistAt": null,
+      "survival": {
+        "food": 4, "water": 3, "sleep": 5, "fatigue": [],
+        "acc": { "food": 1, "water": 1, "sleep": 2 },
+        "timeCarried": 0.01674000000000048, "hpBonus": 0, "bedRestHours": 0
+      },
+      "rewardedSkills": ["SMALL_GUNS", "SPEECH", "SNEAK", "SURVIVAL"],
+      "schemaVersion": 26
+    }
+  }
+}

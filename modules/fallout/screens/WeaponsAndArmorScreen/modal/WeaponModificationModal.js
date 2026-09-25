@@ -331,7 +331,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
-  const [installNote, setInstallNote] = useState(null); // 363: видимая отметка установки
 
   const handleCreateMod = (modId, modName) => {
     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
@@ -660,13 +659,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
               </View>
             )}
           </ScrollView>
-
-          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
-          {installNote && (
-            <Text style={styles.installNote}>
-              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
-            </Text>
-          )}
 
           {/* Кнопки действий */}
           <View style={styles.modalFooter}>

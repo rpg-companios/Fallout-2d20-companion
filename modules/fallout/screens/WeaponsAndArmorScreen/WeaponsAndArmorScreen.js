@@ -963,10 +963,11 @@ const WeaponsAndArmorScreen = () => {
   const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
 
   const handleApplyModification = useCallback((modifiedWeapon) => {
-    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно НЕ
-    // закрывается молча — обновляем карточку, модалка перечитает выбор и
-    // покажет зелёную отметку применения; закрытие — крестиком.
-    setSelectedWeaponForModification(modifiedWeapon);
+    // 363→367 (слово владельца): после «Применить» окно закрывается КАК
+    // РАНЬШЕ. Молчаливого закрытия больше нет — запись мода сквозная (367):
+    // мод попадает в надетый список, карточка на экране сразу показывает
+    // «Очередь»/новые статы.
+    handleCloseModificationModal();
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
@@ -1728,6 +1729,24 @@ const WeaponsAndArmorScreen = () => {
               {tWeaponsAndArmorScreen('robotBodyUpgrade.title')}
             </Text>
             <Text style={localStyles.robotBodyModalText}>
+              {tWeaponsAndArmorScreen('robotBodyUpgrade.comingSoon')}
+            </Text>
+            <TouchableOpacity
+              style={localStyles.robotBodyModalButton}
+              onPress={() => setRobotBodyUpgradeModalVisible(false)}
+            >
+              <Text style={localStyles.robotBodyModalButtonText}>{tWeaponsAndArmorScreen('common.close')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </ImageBackground>
+  );
+};
+
+
+export default WeaponsAndArmorScreen;
+BodyModalText}>
               {tWeaponsAndArmorScreen('robotBodyUpgrade.comingSoon')}
             </Text>
             <TouchableOpacity
