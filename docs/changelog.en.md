@@ -1,6 +1,15 @@
 # Changelog
 
 ---
+## Russian weapon names mapped to the catalog (patch 369)
+
+Revision begins: all 83 names from the owner's weapon list are mapped
+one-to-one to internal ids (54 matched by name, 25 resolved by stats,
+4 — robot duplicates). This also settles the catalog dispute: the two
+"combat rifles" get the owner's names — "Боевой карабин" and
+"Самозарядная винтовка". Names and data are not changed yet — revision
+material only.
+
 ## Weapon mod revision plan (patch 368)
 
 Decision: the "why do some mods have no Create button" questions are
