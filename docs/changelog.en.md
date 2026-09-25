@@ -10,6 +10,14 @@
 ---
 ---
 ---
+---
+## Fixed build of the Weapons & Armor screen (patch 379)
+
+The app failed to bundle: patch 367 accidentally duplicated a chunk of
+code past the end of the screen file. The extra 18 lines are removed.
+A new guard test parses every app JS file on each test run, so a broken
+file now fails tests immediately instead of only at build time.
+
 ## Melee mods completed — full owner coverage (patch 378)
 
 Final touch of the rebuild: 42 melee mods (spiked/barbed/bladed,

@@ -1746,21 +1746,3 @@ const WeaponsAndArmorScreen = () => {
 
 
 export default WeaponsAndArmorScreen;
-BodyModalText}>
-              {tWeaponsAndArmorScreen('robotBodyUpgrade.comingSoon')}
-            </Text>
-            <TouchableOpacity
-              style={localStyles.robotBodyModalButton}
-              onPress={() => setRobotBodyUpgradeModalVisible(false)}
-            >
-              <Text style={localStyles.robotBodyModalButtonText}>{tWeaponsAndArmorScreen('common.close')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </ImageBackground>
-  );
-};
-
-
-export default WeaponsAndArmorScreen;
