@@ -16,6 +16,15 @@
 ---
 ---
 ---
+## Fixed: removing mods from the robot's Head Laser (patch 385)
+
+In older saves the Assaultron Head Laser's mods could not be removed:
+after "No mod" the laser showed the loaded capacitor again. Removal now
+works immediately and survives saving; swapping one capacitor for
+another worked before and still does. Covered by a test on an old save:
+remove → save → load → empty; install → save → load → in place.
+
+---
 ## Minor mod name fix (patch 384)
 
 The Thompson SMG's "10mm" receiver name clarified in Russian (was
