@@ -1,0 +1,1239 @@
+[
+  {
+    "id": "vykidnoj-nozh",
+    "name": "Выкидной нож",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/vykidnoj-nozh",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_switchblade.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "2",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Скрытное"
+    ],
+    "weight": "1",
+    "cost": "20",
+    "rarity": "0",
+    "description": "Распространенное оружие ближнего боя. Его небольшой размер означает, что его легко пронести скрытно в запретные зоны и с ним легко обращаться. Однако он не наносит такого урона, как большие ножи.",
+    "mods": [
+      {
+        "name": "Зазубренное лезвие",
+        "prefix": "Зазубренный",
+        "effects": "+1 БК, Добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+10",
+        "perks": "Кузнец 1"
+      }
+    ]
+  },
+  {
+    "id": "dubinka",
+    "name": "Дубинка",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dubinka",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weappolicebaton.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "2",
+    "cost": "15",
+    "rarity": "1",
+    "description": "Складная телескопическая дубинка из тех, что использовались полицейскими и охраной до Великой войны. Служба безопасности 'Волт-Тек' в каждом убежище имела их запас.",
+    "mods": [
+      {
+        "name": "Электризованная",
+        "prefix": "Шокирующая",
+        "effects": "+2 БК, Измените тип урона на \"Энергетический\"",
+        "weight": "-",
+        "cost": "+15",
+        "perks": "Кузнец 2, Наука! 1"
+      },
+      {
+        "name": "Электрошокер",
+        "prefix": "Оглушающая",
+        "effects": "+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+        "weight": "-",
+        "cost": "+30",
+        "perks": "Кузнец 2, Наука! 1"
+      }
+    ]
+  },
+  {
+    "id": "mech",
+    "name": "Меч",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/mech",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_bumpersword.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Парирование"
+    ],
+    "weight": "3",
+    "cost": "50",
+    "rarity": "2",
+    "description": "Мечи использовались почти столько же, сколько велись войны, оставались символами статуса офицеров вплоть до Великой войны. Многие найденные в пустошах — трофейные китайские офицерские клинки.",
+    "mods": [
+      {
+        "name": "Зазубренное лезвие",
+        "prefix": "Зазубренный",
+        "effects": "Добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+25",
+        "perks": "Кузнец 2"
+      },
+      {
+        "name": "Электризованное лезвие",
+        "prefix": "Электризованный",
+        "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
+        "weight": "-",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      },
+      {
+        "name": "Электризованное зазубренное лезвие",
+        "prefix": "Электризованный зазубренный",
+        "effects": "+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)",
+        "weight": "-",
+        "cost": "+75",
+        "perks": "Кузнец 3, Наука! 1"
+      },
+      {
+        "name": "Электрошокер",
+        "prefix": "Оглушающий",
+        "effects": "+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+        "weight": "-",
+        "cost": "+100",
+        "perks": "Кузнец 3, Наука! 1"
+      }
+    ]
+  },
+  {
+    "id": "boevoj-nozh",
+    "name": "Боевой нож",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/boevoj-nozh",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_combat_knife.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [],
+    "weight": "1",
+    "cost": "25",
+    "rarity": "1",
+    "description": "Как для боя, так и для прикладных задач. Боевой нож пустошей — обычно тип, выданный армии США во время Великой войны, однолезвийный со скошенным обухом.",
+    "mods": [
+      {
+        "name": "Зазубренное лезвие",
+        "prefix": "Зазубренный",
+        "effects": "+1 БК, Добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+12",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Скрытное лезвие",
+        "prefix": "Скрытный",
+        "effects": "+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках",
+        "weight": "-",
+        "cost": "+18",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "machete",
+    "name": "Мачете",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/machete",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_machetegeck.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [],
+    "weight": "2",
+    "cost": "25",
+    "rarity": "1",
+    "description": "Длинный острый нож для прорубания растительности, так же эффективен как оружие. В пустоши встречаются как довоенные образцы, так и кустарные из заточенного металла газонокосилок на простой рукояти.",
+    "mods": [
+      {
+        "name": "Зазубренное лезвие",
+        "prefix": "Зазубренный",
+        "effects": "+2 БК, Добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+12",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "potroshitel",
+    "name": "Потрошитель",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/potroshitel",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_ripper.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Порочный"
+    ],
+    "qualities": [],
+    "weight": "6",
+    "cost": "50",
+    "rarity": "2",
+    "description": "Небольшая ручная бензопила для военных, широко использовалась до Великой войны; уменьшенная коммерческая версия была доступна. Пишет как плоть так и металл.",
+    "mods": [
+      {
+        "name": "Изогнутое лезвие",
+        "prefix": "Изогнутый",
+        "effects": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника, выбив оружие из рук",
+        "weight": "+1",
+        "cost": "+15",
+        "perks": "-"
+      },
+      {
+        "name": "Удлиненное лезвие",
+        "prefix": "Удлиненный",
+        "effects": "+1 БК, Добавляет \"Устойчивый\"",
+        "weight": "+3",
+        "cost": "+25",
+        "perks": "Кузнец 3"
+      }
+    ]
+  },
+  {
+    "id": "shish-kebab",
+    "name": "Шиш-кебаб",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shish-kebab",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_shishkebab.webp",
+    "type": "Ближний бой",
+    "damageType": "Энергетический",
+    "damage": "5",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Парирование"
+    ],
+    "weight": "3",
+    "cost": "200",
+    "rarity": "3",
+    "description": "Кустарный 'пылающий меч' из хлама. Общие элементы: топливный бак/канистра, запальник и пусковой механизм с мотоцикла. Топливо выбрасывается вдоль лезвия и воспламеняется.",
+    "mods": [
+      {
+        "name": "Дополнительные воспламенительные форсунки",
+        "prefix": "Жгучий",
+        "effects": "+1 БК, Добавляет \"Устойчивый\"",
+        "weight": "+1",
+        "cost": "+100",
+        "perks": "Кузнец 3"
+      }
+    ]
+  },
+  {
+    "id": "bejsbolnaya-bita",
+    "name": "Бейсбольная бита",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bejsbolnaya-bita",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_baseball_bat.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "3",
+    "cost": "25",
+    "rarity": "1",
+    "description": "Когда-то для игры в бейсбол — любимого спорта довоенной Америки. Двести лет спустя — грубое но эффективное оружие. Обычно из ясеня.",
+    "mods": [
+      {
+        "name": "Колючая",
+        "prefix": "Колючая",
+        "effects": "Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+5",
+        "perks": "-"
+      },
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+1",
+        "cost": "+7",
+        "perks": "-"
+      },
+      {
+        "name": "Заостренная",
+        "prefix": "Заостренная",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "+1",
+        "cost": "+7",
+        "perks": "-"
+      },
+      {
+        "name": "Обмотанная цепью",
+        "prefix": "Обмотанная цепью",
+        "effects": "+2 БК",
+        "weight": "+1",
+        "cost": "+10",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Лезвия",
+        "prefix": "Клинковая",
+        "effects": "+2 БК, добавляет \"Устойчивый\"",
+        "weight": "+2",
+        "cost": "+12",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "alyuminievaya-bejsbolnaya-bita",
+    "name": "Алюминиевая бейсбольная бита",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/alyuminievaya-bejsbolnaya-bita",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_fh_fencebuster.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "2",
+    "cost": "32",
+    "rarity": "2",
+    "description": "Алюминиевая версия биты — более легкая и твердая. Использовалась в бейсболе до войны.",
+    "mods": [
+      {
+        "name": "Колючая",
+        "prefix": "Колючая",
+        "effects": "Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+5",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+1",
+        "cost": "+7",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Заостренная",
+        "prefix": "Заостренная",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "+1",
+        "cost": "+7",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Обмотанная цепью",
+        "prefix": "Обмотанная цепью",
+        "effects": "+2 БК",
+        "weight": "+1",
+        "cost": "+10",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Лезвия",
+        "prefix": "Клинковая",
+        "effects": "+2 БК, добавляет \"Устойчивый\"",
+        "weight": "+2",
+        "cost": "+12",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "dryn",
+    "name": "Дрын",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dryn",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_board.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "3",
+    "cost": "20",
+    "rarity": "0",
+    "description": "Длинная деревянная доска с ручкой, обмотанной изолентой или ветошью. Тяжелое оружие, обычно предпочитаемое Супермутантами.",
+    "mods": [
+      {
+        "name": "Шипованный",
+        "prefix": "Шипованный",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+1",
+        "cost": "+6",
+        "perks": "-"
+      },
+      {
+        "name": "Прокалывающий",
+        "prefix": "Прокалывающий",
+        "effects": "+2 БК",
+        "weight": "+1",
+        "cost": "+10",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Лезвия",
+        "prefix": "Клинковый",
+        "effects": "+2 БК, добавляет \"Устойчивый\"",
+        "weight": "+2",
+        "cost": "+10",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "svintsovaya-truba",
+    "name": "Свинцовая труба",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svintsovaya-truba",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weapleadpipe.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "3",
+    "cost": "15",
+    "rarity": "0",
+    "description": "Отрезок тяжелой металлической (обычно свинцовой) трубы с рукояткой из изоленты на одном конце и гайками/болтами на другом. Грубо, просто и больно.",
+    "mods": [
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+1",
+        "cost": "+4",
+        "perks": "-"
+      },
+      {
+        "name": "Утяжеленная",
+        "prefix": "Утяжеленная",
+        "effects": "+2 БК",
+        "weight": "+2",
+        "cost": "+11",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "razvodnoj-klyuch",
+    "name": "Разводной ключ",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/razvodnoj-klyuch",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_pipe_wrench.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "2",
+    "cost": "30",
+    "rarity": "1",
+    "description": "Тяжелый металлический разводной ключ, достаточно длинный для ближнего боя. Регулируемые губки часто используются для удержания модов — легко модифицируется.",
+    "mods": [
+      {
+        "name": "Крюк",
+        "prefix": "Загнутый",
+        "effects": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
+        "weight": "-",
+        "cost": "+9",
+        "perks": "-"
+      },
+      {
+        "name": "Утяжеленный",
+        "prefix": "Увесистый",
+        "effects": "+2 БК",
+        "weight": "+7",
+        "cost": "+12",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Прокалывающий",
+        "prefix": "Прокалывающий",
+        "effects": "+2 БК, добавляет \"Проникающий\"",
+        "weight": "+1",
+        "cost": "+13",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Сверхтяжелый",
+        "prefix": "Сверхтяжелый",
+        "effects": "+3 БК",
+        "weight": "+2",
+        "cost": "+22",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "bilyardnyj-kij",
+    "name": "Бильярдный кий",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bilyardnyj-kij",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fallout4_pool_cue.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "1",
+    "cost": "10",
+    "rarity": "0",
+    "description": "Длинный тонкий кусок дерева для бильярда. Полезен в качестве оружия если нет ничего тяжелее.",
+    "mods": [
+      {
+        "name": "Прокалывающий",
+        "prefix": "Прокалывающий",
+        "effects": "Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+2",
+        "perks": "-"
+      },
+      {
+        "name": "Заостренный",
+        "prefix": "Заостренный",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      }
+    ]
+  },
+  {
+    "id": "skalka",
+    "name": "Скалка",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/skalka",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weaprollingpin.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "1",
+    "cost": "10",
+    "rarity": "0",
+    "description": "Инструмент для раскатки теста — прочный деревянный цилиндр с ручками или без. Достаточно тяжелый чтобы сдержать нападающих.",
+    "mods": [
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      },
+      {
+        "name": "Заостренная",
+        "prefix": "Заостренная",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      }
+    ]
+  },
+  {
+    "id": "kuvalda",
+    "name": "Кувалда",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kuvalda",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo3_sledgehammer.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [],
+    "qualities": [],
+    "weight": "12",
+    "cost": "40",
+    "rarity": "2",
+    "description": "Тяжелый металлический молот на длинной деревянной рукояти. До войны для дробления камней/разрушения конструкций. Медлителен, но в руках сильного — грозное оружие.",
+    "mods": [
+      {
+        "name": "Прокалывающая",
+        "prefix": "Прокалывающая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+5",
+        "cost": "+18",
+        "perks": "Кузнец 2"
+      },
+      {
+        "name": "Тяжелая",
+        "prefix": "Тяжелая",
+        "effects": "+2 БК",
+        "weight": "+9",
+        "cost": "+30",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "supermolot",
+    "name": "Супермолот",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/supermolot",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo3_supersledge.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Разрушающий"
+    ],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "20",
+    "cost": "180",
+    "rarity": "3",
+    "description": "Усовершенствованный молот. Довоенные — с кинетическими накопителями, послевоенные — с ракетным двигателем в головке для ускорения замаха.",
+    "mods": [
+      {
+        "name": "Нагревательная спираль",
+        "prefix": "Раскаленная",
+        "effects": "+1 БК, Измените тип урона на Энергетический",
+        "weight": "-",
+        "cost": "+180",
+        "perks": "Кузнец 2"
+      },
+      {
+        "name": "Электрошокер",
+        "prefix": "Оглушающая",
+        "effects": "+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический",
+        "weight": "-",
+        "cost": "+360",
+        "perks": "Кузнец 3, Наука! 1"
+      }
+    ]
+  },
+  {
+    "id": "balonnyj-klyuch",
+    "name": "Балонный ключ",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/balonnyj-klyuch",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_tire_iron.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "3",
+    "cost": "25",
+    "rarity": "1",
+    "description": "Инструмент шоферов для снятия колес и разбортовки шин. За неимением лучшего — примитивное ударное холодное оружие.",
+    "mods": [
+      {
+        "name": "Лезвия",
+        "prefix": "Клинковый",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "+1",
+        "cost": "+12",
+        "perks": "Кузнец 2"
+      }
+    ]
+  },
+  {
+    "id": "trost",
+    "name": "Трость",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/trost",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weapnvdresscane.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [],
+    "weight": "2",
+    "cost": "10",
+    "rarity": "0",
+    "description": "Простая ортопедическая трость для опоры при ходьбе. Достаточно прочна и оптимальной длины чтобы стать оружием.",
+    "mods": [
+      {
+        "name": "Колючая",
+        "prefix": "Колючая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      },
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      }
+    ]
+  },
+  {
+    "id": "bokserskaya-perchatka",
+    "name": "Боксерская перчатка",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bokserskaya-perchatka",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fallout4_boxing_glove.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [
+      "Оглушающий"
+    ],
+    "qualities": [],
+    "weight": "1",
+    "cost": "10",
+    "rarity": "1",
+    "description": "Большая кожаная рукавица для защиты рук при ударах. Изначально для спорта, но с модификациями — сильные удары в драке.",
+    "mods": [
+      {
+        "name": "Шипастая",
+        "prefix": "Шипастая",
+        "effects": "Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      },
+      {
+        "name": "Колючая",
+        "prefix": "Колючая",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+4",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Свинцовая подкладка",
+        "prefix": "Свинцовая",
+        "effects": "+2 БК",
+        "weight": "+1",
+        "cost": "+7",
+        "perks": "Кузнец 1"
+      }
+    ]
+  },
+  {
+    "id": "perchatka-kogtya-smerti",
+    "name": "Перчатка когтя смерти",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-kogtya-smerti",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/Kogot.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [],
+    "weight": "10",
+    "cost": "75",
+    "rarity": "3",
+    "description": "Из отрубленных пальцев и когтей Когтя смерти на манжете запястья — позволяет наносить удары с силой владельца когтей.",
+    "mods": [
+      {
+        "name": "Дополнительный коготь",
+        "prefix": "Большая",
+        "effects": "+1 БК, при успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
+        "weight": "+2",
+        "cost": "+22",
+        "perks": "-"
+      }
+    ]
+  },
+  {
+    "id": "kastet",
+    "name": "Кастет",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kastet",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_knuckles.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "3",
+    "effects": [],
+    "qualities": [
+      "Скрытное"
+    ],
+    "weight": "<1",
+    "cost": "10",
+    "rarity": "1",
+    "description": "Придумано в древности, распространено в пустошах. Четыре металлических кольца с дугой-упором, надеваются на пальцы — передает кинетику через меньшую площадь, резко увеличивает травму.",
+    "mods": [
+      {
+        "name": "Заостренный",
+        "prefix": "Заостренный",
+        "effects": "добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      },
+      {
+        "name": "Шипованный",
+        "prefix": "Шипованный",
+        "effects": "Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+3",
+        "perks": "-"
+      },
+      {
+        "name": "Прокалывающий",
+        "prefix": "Прокалывающий",
+        "effects": "+1 БК, Добавляет \"Проникающий\" 1",
+        "weight": "-",
+        "cost": "+4",
+        "perks": "Кузнец 1"
+      },
+      {
+        "name": "Лезвия",
+        "prefix": "Клинковый",
+        "effects": "+1 БК, добавляет \"Устойчивый\"",
+        "weight": "-",
+        "cost": "+5",
+        "perks": "Кузнец 1"
+      }
+    ]
+  },
+  {
+    "id": "silovoj-kastet",
+    "name": "Силовой кастет",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/silovoj-kastet",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/power_fist_fallout_4.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Оглушающий"
+    ],
+    "qualities": [],
+    "weight": "4",
+    "cost": "100",
+    "rarity": "2",
+    "description": "Усиленная перчатка/наруч с пневматическим тараном на костяшках. Разработана для бригад подрывников, использовалась военными для прорыва укреплений.",
+    "mods": [
+      {
+        "name": "Прокалывающий",
+        "prefix": "Прокалывающий",
+        "effects": "+2 БК, Добавляет \"Проникающий\" 1",
+        "weight": "+1",
+        "cost": "+45",
+        "perks": "Кузнец 2"
+      },
+      {
+        "name": "Нагревательная спираль",
+        "prefix": "Раскаленный",
+        "effects": "+2 БК, измените тип урона на \"Энергетический\"",
+        "weight": "-",
+        "cost": "+100",
+        "perks": "Кузнец 3"
+      }
+    ]
+  },
+  {
+    "id": "klinok-shturmotrona",
+    "name": "Клинок штурмотрона",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/klinok-shturmotrona",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/automatron_assaultron_blade.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [],
+    "weight": "3",
+    "cost": "50",
+    "rarity": "3",
+    "description": "Виброклинок от доминатора-штурмотрона, демонтированный и переделанный в оружие ближнего боя.",
+    "mods": [
+      {
+        "name": "Электризованное лезвие",
+        "prefix": "Электризованный",
+        "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
+        "weight": "-",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      }
+    ]
+  },
+  {
+    "id": "avtotopor",
+    "name": "Автотопор",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/avtotopor",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76wl_autoaxe.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [
+      "Порочный"
+    ],
+    "qualities": [
+      "Двуручный"
+    ],
+    "weight": "20",
+    "cost": "100",
+    "rarity": "3",
+    "description": "Общие черты с Потрошителем, но более внушительный. Стальная пила с деталями автомобильного двигателя. Лезвие заменено на 4 топорных лезвия вокруг оси.",
+    "mods": [
+      {
+        "name": "Электризованное лезвие",
+        "prefix": "Электризованный",
+        "effects": "+1 БК, Измените тип урона на \"Энергетический\"",
+        "weight": "-",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      },
+      {
+        "name": "Горящее лезвие",
+        "prefix": "Горящее",
+        "effects": "Измените тип урона на \"Энергетический\", получает \"Стойкий\"",
+        "weight": "-",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      },
+      {
+        "name": "Ядовитое лезвие",
+        "prefix": "Ядовитое",
+        "effects": "Добавляет \"Стойкий\"",
+        "weight": "-",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      },
+      {
+        "name": "Турбо",
+        "prefix": "Турбо",
+        "effects": "Каждое потраченное ОД на дополнительный урон прибавляет +2 БК, вместо +1 БК",
+        "weight": "+2",
+        "cost": "+50",
+        "perks": "Кузнец 2, Наука! 1"
+      }
+    ]
+  },
+  {
+    "id": "ballisticheskij-kulak",
+    "name": "Баллистический кулак",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/ballisticheskij-kulak",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/ballisticfist.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Оглушение",
+      "Порочный"
+    ],
+    "qualities": [
+      "Медленная перезарядка"
+    ],
+    "weight": "6",
+    "cost": "150",
+    "rarity": "4",
+    "description": "Закрепленный на запястье дробовик с нажимной пластиной на костяшках. При ударе пластина срабатывает и выпускает заряд дроби.",
+    "ammoType": "Патроны для дробовика",
+    "special": "Требует 1 патрон для дробовика на каждую атаку. Из-за 'Медленной перезарядки' нужно перезарядить малым действием перед следующим использованием. Без патрона — обычная атака без оружия."
+  },
+  {
+    "id": "bolshoj-mech",
+    "name": "Большой меч",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bolshoj-mech",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_bumpersword.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Отдача 7",
+      "Двуручный"
+    ],
+    "weight": "12",
+    "cost": "125",
+    "rarity": "2",
+    "description": "Меч из бампера — хромированный автомобильный бампер расплющен и заточен в толстое тяжелое лезвие. Номерной знак все еще прикреплен, выхлопная труба служит рукояткой.",
+    "special": "Отдача 7: требует СИЛ 7+, иначе +1 сложность. Двуручный."
+  },
+  {
+    "id": "elektroshoker",
+    "name": "Электрошокер",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/elektroshoker",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76wl_cattleprod.webp",
+    "type": "Ближний бой",
+    "damageType": "Энергетический",
+    "damage": "7",
+    "effects": [
+      "Оглушение"
+    ],
+    "qualities": [],
+    "weight": "3",
+    "cost": "90",
+    "rarity": "4",
+    "description": "Обычно для управления скотом, переоборудован против людей. Толстая электрифицированная металлическая спираль вокруг ударной части, подключенная к паре батарей на рукояти."
+  },
+  {
+    "id": "benzopila",
+    "name": "Бензопила",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/benzopila",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/chainsaw76.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Порочный"
+    ],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "12",
+    "cost": "140",
+    "rarity": "3",
+    "description": "Механизированный инструмент для распила древесины с зубчатой цепью по краю лезвия. В умелых руках — смертоносное оружие.",
+    "special": "Не получает бонуса к урону в ближнем бою от характеристик пользователя (СИЛ не добавляется).",
+    "mods": [
+      {
+        "name": "Двойная шина",
+        "prefix": "Двойная",
+        "effects": "+2 БК",
+        "weight": "+1",
+        "cost": "+30",
+        "perks": "Кузнец 2"
+      },
+      {
+        "name": "Изогнутая шина",
+        "prefix": "Изогнутая",
+        "effects": "Получает \"Проникающий\" 1",
+        "weight": "+2",
+        "cost": "+45",
+        "perks": "Кузнец 3"
+      },
+      {
+        "name": "Удлинённая изогнутая шина",
+        "prefix": "Удлинённая изогнутая",
+        "effects": "добавляет \"Стойкий\"",
+        "weight": "+3",
+        "cost": "+60",
+        "perks": "Кузнец 3"
+      },
+      {
+        "name": "Огнемет",
+        "prefix": "Огненный",
+        "effects": "+1 БК, измените тип урона на \"Энергетический\", мод \"Огнемет\" может быть добавлен как дополнение к любому другому моду",
+        "weight": "+2",
+        "cost": "+90",
+        "perks": "Кузнец 3, Фанатик Оружия 1"
+      }
+    ]
+  },
+  {
+    "id": "tanbo-smerti",
+    "name": "Танбо смерти",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tanbo-smerti",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/death_tambo.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [],
+    "weight": "1",
+    "cost": "40",
+    "rarity": "2",
+    "description": "Что-то между кастетом и бубном — странная смесь колокольчиков и лезвий, созданная чтобы вонзаться кулаком с музыкальным сопровождением.",
+    "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звона."
+  },
+  {
+    "id": "perchatka-vytesnitel",
+    "name": "Перчатка-вытеснитель",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-vytesnitel",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/displacer_glove.webp",
+    "type": "Рукопашная",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Проникающий 1",
+      "Оглушение"
+    ],
+    "qualities": [],
+    "weight": "6",
+    "cost": "175",
+    "rarity": "4",
+    "description": "Продвинутый прибор для простой задачи. Динамик на костяшках создает звуковой удар, придающий дополнительную силу ударам."
+  },
+  {
+    "id": "gitara-mech",
+    "name": "Гитара-меч",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/gitara-mech",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/guitar_sword_f76.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Парирование"
+    ],
+    "weight": "3",
+    "cost": "45",
+    "rarity": "3",
+    "description": "Меч в форме гитары — или гитара служащая мечом. После убийства скорее всего придется настроить.",
+    "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."
+  },
+  {
+    "id": "tsirkulyarnyj-rezak-mistera-pomoshchnika",
+    "name": "Циркулярный резак Мистера Помощника",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tsirkulyarnyj-rezak-mistera-pomoshchnika",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/mr._handy_buzz_blade.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Порочный"
+    ],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "10",
+    "cost": "50",
+    "rarity": "2",
+    "description": "Пила-рука мистера Помощника, получившая новую жизнь на маленьком моторе и длинной рукояти (метла/триммер)."
+  },
+  {
+    "id": "universalnyj-topor",
+    "name": "Универсальный топор",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/universalnyj-topor",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76_multipurpose_axe.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "4",
+    "cost": "40",
+    "rarity": "2",
+    "description": "Довоенный многофункциональный топор — одинаково хорошо рубит древесину и головы. Убедитесь что вы на правильной стороне удара."
+  },
+  {
+    "id": "protonnyj-topor",
+    "name": "Протонный топор",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/protonnyj-topor",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/protonaxe.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Всплеск"
+    ],
+    "weight": "8",
+    "cost": "175",
+    "rarity": "5",
+    "description": "Футуристический военный топор со светящимся лезвием электрической энергии. На обратной стороне два конденсатора с синим разрядом. Мощный электрический выброс особенно опасен для роботов.",
+    "special": "Особо эффективен против роботов и механики."
+  },
+  {
+    "id": "voennyj-baraban",
+    "name": "Военный барабан",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/voennyj-baraban",
+    "image": "https://www.fallout-2d20.ru/images/2025/04/25/wardrum.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "5",
+    "effects": [
+      "Оглушение"
+    ],
+    "qualities": [
+      "Двуручное"
+    ],
+    "weight": "20",
+    "cost": "115",
+    "rarity": "3",
+    "description": "Металлический барабан на металлическом столбе с прикрепленными банками с гвоздями на ободке. Добавляет перкуссии к сотрясениям.",
+    "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука."
+  },
+  {
+    "id": "posokh-atoma",
+    "name": "Посох Атома",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/posokh-atoma",
+    "image": "https://www.fallout-2d20.ru/images/2025/05/11/fo76wa_shepherds_crook.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "6",
+    "effects": [
+      "Проникающий 1"
+    ],
+    "qualities": [
+      "Парирование",
+      "Двуручный"
+    ],
+    "weight": "15",
+    "cost": "200",
+    "rarity": "4",
+    "description": "Усиленный металлический посох ~1.5м с символом Атома на золотом диске наверху. Кинетические накопители вдоль рукояти увеличивают силу удара. Длина дает маневренность для отражения ударов.",
+    "mods": [
+      {
+        "name": "Шокирующие катушки",
+        "prefix": "Стремительный",
+        "effects": "+2 БК, Наносит оба вида урона, Физический и Энергетический",
+        "weight": "-",
+        "cost": "+100",
+        "perks": "Кузнец 2, Наука! 2"
+      }
+    ]
+  },
+  {
+    "id": "shakhterskij-perforator",
+    "name": "Шахтерский перфоратор",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shakhterskij-perforator",
+    "image": "https://www.fallout-2d20.ru/images/2025/05/13/fo76gd_drill_fist.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "2",
+    "effects": [
+      "Проникающий 2",
+      "Разрушающий"
+    ],
+    "qualities": [
+      "Двуручный"
+    ],
+    "weight": "18",
+    "cost": "100",
+    "rarity": "4",
+    "description": "Горнодобывающая дрель для пробивания твердых пород и закладки динамита. Неуклюжая но эффективная — проходит сквозь броню как нож сквозь масло.",
+    "special": "Встроена ячейка с Ядерной батареей: можно потратить 1-3 заряда ячейки чтобы добавить 1-3 БК к базовому урону при атаке."
+  },
+  {
+    "id": "svarochnaya-gorelka",
+    "name": "Сварочная горелка",
+    "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svarochnaya-gorelka",
+    "image": "https://www.fallout-2d20.ru/images/2025/05/13/blowtorch.webp",
+    "type": "Ближний бой",
+    "damageType": "Физический",
+    "damage": "4",
+    "effects": [
+      "Проникающий 3",
+      "Устойчивый"
+    ],
+    "qualities": [
+      "Ослабляющее",
+      "Неточный",
+      "Топливо"
+    ],
+    "weight": "15",
+    "cost": "120",
+    "rarity": "4",
+    "description": "Использовались для горнодобычи: резка балок, ремонт конструкций, прожигание силовой брони. Мало какие проблемы не решаются несколькими тысячами градусов по Фаренгейту.",
+    "ammoType": "Топливо для огнемета",
+    "special": "Свойство ТОПЛИВО (Топливо для огнемета): нужно 4 топлива для работы. При выпадении Осложнения при атаке топливо заканчивается и нужна перезарядка (малое действие) перед следующим использованием."
+  }
+]
