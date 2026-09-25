@@ -15,6 +15,15 @@
 ---
 ---
 ---
+---
+## Minor mod name fix (patch 384)
+
+The Thompson SMG's "10mm" receiver name clarified in Russian (was
+"Ресивер 10-мм"). The Thompson's mod set is pinned by a test per the
+owner's list: Receiver — Powerful, Hair Trigger, Hardened, Armor
+Piercing, 9mm, 10mm; other slots intact; none of the six uses energy
+cells.
+
 ## The mod window now says what each mod does (patch 383)
 
 The weapon mod window used to show names only. Now every mod carries a
