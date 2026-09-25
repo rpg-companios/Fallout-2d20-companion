@@ -5,6 +5,14 @@
 ---
 ---
 ---
+---
+## Tesla coil dynamo weight set to 6 (patch 374)
+
+The last open figure of the revision material is settled: the Tesla coil
+dynamo mod weighs 6 (references disagreed: 6 vs 12). The revision material
+is complete; next comes the revision patch series itself (human-readable
+ids, duplicate merging, your names, 22 new mods, save migration).
+
 ## Institute laser confirmed by the reference, arc welder has no mods (patch 373)
 
 The Institute Laser reference you sent matches the app on all 17 mods and
