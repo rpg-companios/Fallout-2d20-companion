@@ -11,6 +11,17 @@
 ---
 ---
 ---
+---
+## Fixed: weapon mods now stick to the weapon (patch 380)
+
+When armor was also equipped, applying a weapon mod wrote it to the
+wrong store item (the card lookup confused the weapon with the first
+equipped item) — the modal preview was right while the weapon card
+never changed. The store-item lookup now starts from the exact instance
+key and falls back to weapon-type matching; it moved into the engine
+with acceptance tests: the mod always lands in its own weapon and the
+card shows the new damage immediately.
+
 ## Fixed build of the Weapons & Armor screen (patch 379)
 
 The app failed to bundle: patch 367 accidentally duplicated a chunk of

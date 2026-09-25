@@ -10,6 +10,7 @@ import {
   getEquippedArmor,
   storeItemToWeaponDisplay,
   weaponModPatchToStore,
+  resolveStoreItemIdFromItems,
   selectActiveTimedEffects,
   selectLegacyAttributes,
   selectLegacySkills,
@@ -732,18 +733,10 @@ const findRobotBodyUpgrade = (catalog, robotBodyPlan, inventoryItems = []) => {
 
 // --- Main Component ---
 
-const resolveStoreItemId = (weapon) => {
-  const items = useCharacterStore.getState().items;
-  if (weapon?.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
-  if (weapon?.id && items[weapon.id]) return weapon.id;
-  return Object.values(items).find(
-    (item) => item.equipped && (
-      item.uniqueId === weapon?.uniqueId
-      || item.id === weapon?.id
-      || item.weaponId === weapon?.weaponId
-    ),
-  )?.id;
-};
+// 380: поиск ключа предмета — движок (selectors); локализованная карточка
+// несёт ключ в instanceId, прежний фолбэк ловил первый надетый предмет.
+const resolveStoreItemId = (weapon) =>
+  resolveStoreItemIdFromItems(useCharacterStore.getState().items, weapon);
 
 const WeaponsAndArmorScreen = () => {
   // Шаг 8а (патч 241): атрибуты (legacy-массив) — из стор-словаря.
