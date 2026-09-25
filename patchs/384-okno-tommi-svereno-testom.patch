@@ -1,0 +1,237 @@
+diff --git a/__tests__/equipment/tommy-gun-receivers-384.test.js b/__tests__/equipment/tommy-gun-receivers-384.test.js
+new file mode 100644
+index 0000000..ad51819
+--- /dev/null
++++ b/__tests__/equipment/tommy-gun-receivers-384.test.js
+@@ -0,0 +1,75 @@
++// ПРИЁМОЧНЫЙ (патч 384): окно «ПП Томпсона» (weapon_submachine_gun) —
++// сверка со словом владельца: «Там только РЕСИВЕР: Усиленный, Чувствительный,
++// Укреплённый, Бронебойный, 9-мм, 10-мм. И ни один из них не использует
++// энергоячейки» (это про СОСТАВ ресиверов; остальные слоты остаются).
++// Данные уже соответствуют; тест фиксирует это состояние + исправления
++// самого патча: «Ресивер 10-мм» → «10-мм» (ru/en) и защита «10-мм
++// пистолет-пулемёта» (weapon_10mm_smg) от чужих правок (списков владельца
++// на него нет — не трогать).
++import { describe, expect, it } from 'vitest';
++
++import slotsData from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
++import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
++import ruMods from '../../modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json';
++import enMods from '../../modules/fallout/i18n/en-EN/data/equipment/weapon_mods.json';
++
++const byId = (id) => catalogData.find((m) => m.id === id);
++const ruName = (id) => ruMods.find((m) => m.id === id)?.name;
++const enName = (id) => enMods.find((m) => m.id === id)?.name;
++
++// Боеприпасы-энергоячейки (смена на них ресивером запрещена словом владельца)
++const ENERGY_AMMO = new Set([
++  'ammo_fusion_cell', 'ammo_fusion_core', 'ammo_energy_cell',
++  'ammo_alien_power_cell', 'ammo_cryo_cell',
++]);
++
++const THOMPSON_RECEIVERS = [
++  'mod_10mm_receiver', 'mod_9mm_receiver', 'mod_armor_piercing',
++  'mod_hair_trigger', 'mod_hardened', 'mod_powerful',
++];
++
++describe('патч 384: ПП Томпсона — ресиверы по слову владельца', () => {
++  it('ресиверы ПП Томпсона = ровно 6 названных, других нет', () => {
++    expect([...slotsData.weapon_submachine_gun.Receiver].sort())
++      .toEqual([...THOMPSON_RECEIVERS].sort());
++  });
++
++  it('имена шести ресиверов — терминами i18n из списка владельца', () => {
++    expect(ruName('mod_powerful')).toBe('Усиленный');
++    expect(ruName('mod_hair_trigger')).toBe('Чувствительный');
++    expect(ruName('mod_hardened')).toBe('Укреплённый');
++    expect(ruName('mod_armor_piercing')).toBe('Бронебойный');
++    expect(ruName('mod_9mm_receiver')).toBe('9-мм');
++    expect(ruName('mod_10mm_receiver')).toBe('10-мм');
++    expect(enName('mod_10mm_receiver')).toBe('10mm Receiver'); // en — из референса; голое '10mm' ломает генератор крафта (ингредиент «10mm»)
++  });
++
++  it('ни один из шести ресиверов не переводит оружие на энергоячейки', () => {
++    for (const id of THOMPSON_RECEIVERS) {
++      const ammo = byId(id).ammoOverride;
++      expect(ENERGY_AMMO.has(ammo), `${id} → ${ammo}`).toBe(false);
++    }
++  });
++
++  it('остальные слоты ПП Томпсона на месте (дословность не отменяет их)', () => {
++    const slots = Object.keys(slotsData.weapon_submachine_gun);
++    for (const slot of ['Muzzle', 'Stock', 'Magazine', 'Sight', 'Barrel']) {
++      expect(slots, slot).toContain(slot);
++      expect(slotsData.weapon_submachine_gun[slot].length, slot).toBeGreaterThan(0);
++    }
++  });
++
++  it('«Термоядерный магазин» — только «Бластер пришельцев» и «Криолятор»', () => {
++    expect(byId('mod_fusion_mag').applies_to_ids)
++      .toEqual(['weapon_alien_blaster', 'weapon_cryolator']);
++  });
++
++  it('10-мм пистолет-пулемёт не тронут (списков владельца нет)', () => {
++    // у него свой набор ресиверов, включая не вошедшие в список Томпсона
++    const smg = slotsData.weapon_10mm_smg.Receiver;
++    expect(smg).toContain('mod_rapid');
++    expect(smg).toContain('mod_armor_piercing_receiver');
++    expect(smg).toContain('mod_calibrated_powerful');
++    expect(smg).not.toContain('mod_hair_trigger');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c1a114c..399457e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,50 +8,44 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **383** (владелец: «в модалке у модов нет
+-описания. Никаких» — в i18n-записях модов только id+name, слот
+-effectDescription в модалке пустой. 383: описания ГЕНЕРИРУЮТСЯ из
+-механики мода — describeWeaponModChanges/weaponModRowDescription в
+-domain/weaponDisplay.js (урон/скрострельность/дальность/тип урона/
+-эффекты/качества/вес/цена/расход/боеприпас; словари качеств, эффектов,
+-типов урона и боеприпасов уже были в weaponDisplay; у ВСЕХ 164 модов
+-описание непустое — проверено тестом). Модалка: normalizeModRow несёт
+-effectDescription=weaponModRowDescription(row) + passthrough
+-ammoOverride/ammoPerShotDelta. НАЙДЕН ВИСЯЧИЙ id: mod_fusion_mag →
+-ammo_fusion_cell, боеприпаса с таким id НЕТ (есть ammo_energy_cell /
+-ammo_fusion_core) — показывается как есть, ВЛАДЕЛЬЦУ ВОПРОС: чем
+-заменить. RN-модули в vitest не парсятся (Flow) — проводку модалки
+-проверять по исходнику, хелперы держать в domain · предыдущий блок
+-382 (владелец: «какого чёрта нельзя ставить моды на оружие» — модель и не менялась; сломан был поиск предмета.
+-382 = доказательство на РЕАЛЬНОМ сторе (mod-install-real-store-382.test.js:
+-точная цепочка кнопки, броня первой — мод в СВОЙ предмет, урон 4→6,
+-броня чиста, замена возвращает мод в сумку) + ВИДИМОСТЬ мода на карточке:
+-prefix в данных пуст у всех 164 модов → enrichWeaponItem берёт
+-mod.prefix || mod.name (правило имени владельца; «Усиленный 10-мм
+-пистолет»). Если владельцу префиксы-имена на карточке не нужны — откат
+-одной строки. Старые сейвы: 381 чинит при загрузке) · предыдущий блок
+-381 (владелец: «это живое публичное приложение» — старые сейвы с багом
+-380 чинятся при ЗАГРУЗКЕ, мост
+-repairMisroutedWeaponMods в domain/weaponModCanonical.js, врезан в
+-deserializeState после migrateWeaponModIdsToCanonical: (1) appliedMods
+-снимается с не-оружия/не-мода (броня — инертно, статы не страдали);
+-(2) мод-предметы с осиротевшим флагом (носитель исчез/не оружие/его
+-appliedMods не ссылается) → штатный uninstall → мод снова в сумке.
+-robotSlot:* не тронуты; моды брони (другой каталог) не тронуты; моды на
+-чужом оружии (неотличимы от намеренных) не тронуты. Идемпотентен.
+-Приёмочный __tests__/equipment/save-repair-misrouted-mods-381.test.js.
+-Владельцу: после обновления пересохранить персонажа — ремонт закрепится.
+-Ограничение: целевое оружие баг не знал — моды ставятся заново руками) · у владельца закоммичено до **365**
+-(экспорты файлов патчей на main: 364+365); ревизия модов ЗАВЕРШЕНА:
+-шаг 1 (375) канон-id + мост сейвов; шаг 2 (376) рецепты всем 164 +
+-23 новых улучшения + Посох Атома и Шахтерский перфоратор; шаг 3 (377)
+-поддержка по спискам владельца (88 оружий; Электросварка без модов;
+-Лазер института 17/17) + 48 переименований оружия (ru); шаг 4 (378)
+-добор 42 мили-привязок слота Unique → ПОКРЫТИЕ 729/729 (100%), «сверх»
+-44 — только 10-мм ПП и Плазменная мина и оружья без списков (не трогать
+-по слову владельца). Карта поддержки канонизирована и в melee_draft.
+-Дальше: приёмка владельцем серии 366–378 в игре; затем эррата 4
+-рецептов, Cooking Station, 13 спорных модов, §2.10, перки 177/22.
++· последний сданный патч: **384** (разбор жалобы «какой ядерный магазин
++Томми Гана» — ошибка АГЕНТА в отчёте 383: перепутаны оружие и имя мода.
++i18n-истина: weapon_submachine_gun = «ПП Томпсона», weapon_10mm_smg =
++«10-мм пистолет-пулемёт» (списков владельца НЕТ, не трогать),
++mod_fusion_mag = «Термоядерный магазин», стоит на «Бластере пришельцев»
++и «Криоляторе», НЕ на ПП Томпсона. Окно ПП Томпсона СВЕРЕНО со словом
++владельца и зафиксировано тестом tommy-gun-receivers-384: Ресивер =
++Усиленный/Чувствительный/Укреплённый/Бронебойный/9-мм/10-мм (6),
++остальные слоты на месте, энергоячейки не использует ни один.
++Переименование по слову владельца: «Ресивер 10-мм» → «10-мм» (ru);
++en остался «10mm Receiver» — ГОЛОЕ en-имя «10mm» ломает генератор
++крафта (перехватывает ингредиент рецепта ammo_10mm; доказано,
++генератор читает en-файлы как источник). state.md очищен от дублей
++блоков 380–383. Уроки дописаны: не понимать дословно, имена только
++из i18n, en-имена модов менять только с перегоном генератора) ·
++предыдущий: **383** · у владельца применено до **375**.
++СВЕЖЕЕ (376–384, ждёт пачки): 376 — рецепты всем 164 модам, 23 новых
++улучшения, Посох Атома и Шахтерский перфоратор; 377 — окна улучшений
++по спискам владельца (88 оружий; «Дуговая сварка» без модов; Лазер
++института 17/17) + 48 переименований оружия; 378 — добор 42
++мили-привязок (покрытие 729/729); 379 — фикс сборки
++WeaponsAndArmorScreen (дубль хвоста из 367) + заслон-парсер всех JS;
++380 — моды пишутся в свой предмет (ключ из instanceId, был «первый
++надетый»); 381 — ремонт старых сейвов при загрузке (мод-флаги из брони
++в сумку); 382 — имя мода на карточке (prefix→name) + сквозной тест на
++реальном сторе; 383 — описания модов ГЕНЕРИРУЮТСЯ из механики
++(describeWeaponModChanges, у всех 164 непустые). Уроки 376–384 (для
++агента): имена в отчётах — ТОЛЬКО из i18n (weapon_submachine_gun =
++«ПП Томпсона», weapon_10mm_smg = «10-мм пистолет-пулемёт», mod_fusion_mag
++= «Термоядерный магазин» на «Бластере пришельцев»/«Криоляторе»);
++владельца не понимать дословно — анализировать; state.md — один блок на
++патч, без «предыдущих блоков»; RN в vitest не парсится — хелперы в
++domain, проводку UI проверять по исходнику. ОТКРЫТЫЙ ВОПРОС ВЛАДЕЛЬЦУ:
++mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cell — такого
++боеприпаса нет (есть ammo_energy_cell «Энергоячейка», ammo_fusion_core
++«Ядерный блок») — чем заменить? Дальше: пачка 376–384 владельцу,
++приёмка в игре; эррата 4 рецептов; Cooking Station; 13 спорных модов;
++§2.10; перки 177/22.
+ 
+ ## Состав приложения (игровыми терминами)
+ 
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 01cf7ed..960027a 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,15 @@
+ ---
+ ---
+ ---
++---
++## Minor mod name fix (patch 384)
++
++The Thompson SMG's "10mm" receiver name clarified in Russian (was
++"Ресивер 10-мм"). The Thompson's mod set is pinned by a test per the
++owner's list: Receiver — Powerful, Hair Trigger, Hardened, Armor
++Piercing, 9mm, 10mm; other slots intact; none of the six uses energy
++cells.
++
+ ## The mod window now says what each mod does (patch 383)
+ 
+ The weapon mod window used to show names only. Now every mod carries a
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d505d3a..2ae6a7f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,14 @@
+ # История изменений
+ 
+ ---
++## Мелкая правка имён улучшений (патч 384)
++
++Уточнено имя улучшения «10-мм» у ПП Томпсона (было «Ресивер 10-мм»).
++Состав улучшений ПП Томпсона проверен по вашему списку и закреплён
++автотестом: Ресивер — Усиленный, Чувствительный, Укреплённый,
++Бронебойный, 9-мм, 10-мм; остальные слоты (ствол, дуло, магазин,
++прицел, ложа) на месте; энергоячейки не использует ни один.
++
+ ## В окне улучшений теперь написано, что делает каждое улучшение (патч 383)
+ 
+ Раньше в окне улучшений оружия были только названия. Теперь у каждого
+diff --git a/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json b/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
+index 8fcc123..0272a2c 100644
+--- a/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
++++ b/modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json
+@@ -1,7 +1,7 @@
+ [
+   {
+     "id": "mod_10mm_receiver",
+-    "name": "Ресивер 10-мм"
++    "name": "10-мм"
+   },
+   {
+     "id": "mod_25mm_receiver",
+diff --git a/public/version.json b/public/version.json
+index b01d143..696b7c7 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "383",
++  "version": "384",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
