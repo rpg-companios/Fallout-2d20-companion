@@ -1,0 +1,292 @@
+diff --git a/__tests__/equipment/save-repair-misrouted-mods-381.test.js b/__tests__/equipment/save-repair-misrouted-mods-381.test.js
+new file mode 100644
+index 0000000..6a8bec7
+--- /dev/null
++++ b/__tests__/equipment/save-repair-misrouted-mods-381.test.js
+@@ -0,0 +1,91 @@
++// ПРИЁМОЧНЫЙ (патч 381): ремонт сейвов, пострадавших от бага 380
++// («моды не ставятся в карточку оружия» — до фикса мод писался в первый
++// надетый предмет, обычно броню). Живое публичное приложение: старые сейвы
++// чинятся при ЗАГРУЗКЕ, без подъёма версии схемы:
++//   • посторонний appliedMods снимается с брони (статы брони не страдали —
++//     поле инертно, но мусор убираем);
++//   • мод-предметы с осиротевшими флагами возвращаются в сумку
++//     (equipped:false, installedOn удалён — как штатный uninstall);
++//   • честно установленные моды (оружие ссылается на мод) не тронуты;
++//   • робо-привязки (robotSlot:*) не тронуты;
++//   • моды брони (другой каталог) не тронуты;
++//   • повторный прогон ничего не меняет (идемпотентность).
++import { describe, expect, it } from 'vitest';
++
++import { repairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
++import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
++
++const weaponModIds = new Set(catalogData.map((m) => m.id));
++
++const damagedSave = () => ({
++  items: {
++    // Броня: на неё баг записал appliedMods оружия
++    'armor-1': {
++      id: 'armor-1', itemType: 'armor', equipped: true, name: 'Кожаная броня',
++      appliedMods: { Receiver: 'mod_powerful', Capacitor: 'mod_boosted_capacitor' },
++    },
++    // Оружие, которому моды предназначались: осталось пустым
++    'w-10mm': {
++      id: 'w-10mm', weaponId: 'weapon_10mm_pistol', itemType: 'weapon', equipped: true,
++      appliedMods: {},
++    },
++    // Мод-предметы: флаги осиротели на броне
++    'modinst-1': { id: 'modinst-1', weaponId: 'mod_powerful', itemType: 'weaponMod', equipped: true, installedOn: 'armor-1' },
++    'modinst-2': { id: 'modinst-2', weaponId: 'mod_boosted_capacitor', itemType: 'weaponMod', equipped: true, installedOn: 'armor-1' },
++    // Честно установленный мод: оружие ссылается — НЕ трогаем
++    'modinst-3': { id: 'modinst-3', weaponId: 'mod_hardened', itemType: 'weaponMod', equipped: true, installedOn: 'w-10mm' },
++    // Робо-привязка: носитель синтетический — НЕ трогаем
++    'modinst-4': {
++      id: 'modinst-4', weaponId: 'mod_photon_exciter', itemType: 'weaponMod',
++      equipped: true, installedOn: 'robotSlot:leftArm:robot_weapon_assaultron_head_laser',
++    },
++    // Носитель исчез (предмет продан) → мод возвращается в сумку
++    'modinst-5': { id: 'modinst-5', weaponId: 'mod_long_scope', itemType: 'weaponMod', equipped: true, installedOn: 'sold-item' },
++    // Мод брони на броне: другой каталог — НЕ трогаем
++    'armor-mod-1': { id: 'armor-mod-1', weaponId: 'mod_std_dense', itemType: 'armorMod', equipped: true, installedOn: 'armor-1' },
++  },
++});
++
++describe('патч 381: ремонт старых сейвов после бага 380', () => {
++  it('броня очищена, моды вернулись в сумку, оружие без изменений', () => {
++    const state = repairMisroutedWeaponMods(damagedSave(), weaponModIds);
++    // 1) appliedMods снят с брони
++    expect(state.items['armor-1'].appliedMods).toBeUndefined();
++    // 2) осиротевшие моды видимы в сумке
++    for (const key of ['modinst-1', 'modinst-2', 'modinst-5']) {
++      expect(state.items[key].equipped).toBe(false);
++      expect(state.items[key].installedOn).toBeUndefined();
++    }
++    // 3) оружие не тронуто (ремонт ничего ему не должен писать)
++    expect(state.items['w-10mm'].appliedMods).toEqual({});
++    expect(state.items['w-10mm'].equipped).toBe(true);
++  });
++
++  it('честные установки, робо-привязки и моды брони не тронуты', () => {
++    const save = damagedSave();
++    // оружие ссылается на мод → флаг честный, остаётся
++    save.items['w-10mm'].appliedMods = { Receiver: 'mod_hardened' };
++    const state = repairMisroutedWeaponMods(save, weaponModIds);
++    expect(state.items['modinst-3'].equipped).toBe(true);
++    expect(state.items['modinst-3'].installedOn).toBe('w-10mm');
++    // робо-привязка жива
++    expect(state.items['modinst-4'].equipped).toBe(true);
++    expect(state.items['modinst-4'].installedOn).toContain('robotSlot:');
++    // мод брони остался на броне
++    expect(state.items['armor-mod-1'].equipped).toBe(true);
++    expect(state.items['armor-mod-1'].installedOn).toBe('armor-1');
++  });
++
++  it('идемпотентен: второй прогон ничего не меняет', () => {
++    const once = repairMisroutedWeaponMods(damagedSave(), weaponModIds);
++    const snapshot = JSON.stringify(once);
++    const twice = repairMisroutedWeaponMods(once, weaponModIds);
++    expect(JSON.stringify(twice)).toBe(snapshot);
++  });
++
++  it('устойчив к пустым/кривым входам', () => {
++    expect(repairMisroutedWeaponMods(null, weaponModIds)).toBeNull();
++    expect(repairMisroutedWeaponMods({}, weaponModIds)).toEqual({});
++    expect(repairMisroutedWeaponMods({ items: null }, weaponModIds)).toEqual({ items: null });
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b0dfbc4..1a02ef3 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,16 +8,18 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **380** (жалоба владельца при приёмке: «моды
+-не ставятся в карточку оружия, в предпросмотре модалки — да». Причина:
+-resolveStoreItemId в WeaponsAndArmorScreen искал ключ предмета по
+-uniqueId/id, а локализованная карточка несёт его в instanceId; фолбэк
+-«undefined===undefined» возвращал ПЕРВЫЙ надетый предмет (броню) — мод
+-писался не в оружие. Фикс: чистая resolveStoreItemIdFromItems в
+-src/store/selectors.js (instanceId → uniqueId → id, фолбэк только по
+-определённым полям), экран вызывает её. Приёмочный
+-__tests__/equipment/weapon-card-mod-write-380.test.js: ключ оружия при
+-броне-первой, полный конвейер мод→предмет→карточка (+2 урона)) · у владельца закоммичено до **365**
++· последний сданный патч: **381** (владелец: «это живое публичное
++приложение» — старые сейвы с багом 380 чинятся при ЗАГРУЗКЕ, мост
++repairMisroutedWeaponMods в domain/weaponModCanonical.js, врезан в
++deserializeState после migrateWeaponModIdsToCanonical: (1) appliedMods
++снимается с не-оружия/не-мода (броня — инертно, статы не страдали);
++(2) мод-предметы с осиротевшим флагом (носитель исчез/не оружие/его
++appliedMods не ссылается) → штатный uninstall → мод снова в сумке.
++robotSlot:* не тронуты; моды брони (другой каталог) не тронуты; моды на
++чужом оружии (неотличимы от намеренных) не тронуты. Идемпотентен.
++Приёмочный __tests__/equipment/save-repair-misrouted-mods-381.test.js.
++Владельцу: после обновления пересохранить персонажа — ремонт закрепится.
++Ограничение: целевое оружие баг не знал — моды ставятся заново руками) · у владельца закоммичено до **365**
+ (экспорты файлов патчей на main: 364+365); ревизия модов ЗАВЕРШЕНА:
+ шаг 1 (375) канон-id + мост сейвов; шаг 2 (376) рецепты всем 164 +
+ 23 новых улучшения + Посох Атома и Шахтерский перфоратор; шаг 3 (377)
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 956d1ef..adbed6d 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -12,6 +12,18 @@
+ ---
+ ---
+ ---
++---
++## Old saves repair themselves (patch 381)
++
++Because of the previous update's bug, some weapon mods may have been
++recorded onto armor instead of the weapon. Nothing is lost forever:
++on save load the game now strips the stray technical field from armor
++(it never affected armor stats) and returns the "hidden" mods to the
++bag. After updating, open your character and re-apply the mods to the
++weapon — they will now stick and the card shows the new damage at
++once. Mods that were installed correctly before are untouched; robot
++mods are untouched.
++
+ ## Fixed: weapon mods now stick to the weapon (patch 380)
+ 
+ When armor was also equipped, applying a weapon mod wrote it to the
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 5a55ab6..42ef000 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,17 @@
+ # История изменений
+ 
+ ---
++## Старые сохранения починятся сами (патч 381)
++
++Из-за ошибки из прошлого обновления часть улучшений могла уйти «в
++броню» вместо оружия. Хорошая новость: ничего не потеряно навсегда.
++Теперь при загрузке сохранения игра сама: убирает с брони посторонний
++служебный след (на защиту брони это никак не влияло и раньше) и
++возвращает «спрятанные» улучшения в сумку. После обновления откройте
++персонажа и повесьте улучшения на оружие заново — теперь они встанут
++на место и карточка сразу покажет новый урон. Улучшения, которые и
++раньше стояли правильно, не тронуты; улучшения роботов не тронуты.
++
+ ## Исправлено: улучшения снова закрепляются на оружии (патч 380)
+ 
+ Если на персонаже надета ещё и броня, улучшение оружия после кнопки
+diff --git a/domain/weaponModCanonical.js b/domain/weaponModCanonical.js
+index 67bf160..e9673b0 100644
+--- a/domain/weaponModCanonical.js
++++ b/domain/weaponModCanonical.js
+@@ -265,3 +265,75 @@ export function migrateWeaponModIdsToCanonical(state) {
+   walk(state);
+   return state;
+ }
++
++/**
++ * Ремонт сейвов, пострадавших от бага 380 (жалоба владельца: «моды не
++ * ставятся в карточку оружия»). До фикса экран искал предмет-носитель по
++ * uniqueId/id, а локализованная карточка несёт ключ в instanceId; фолбэк
++ * «первый надетый предмет» отдавал броню — мод писался не в оружие:
++ *   1) на предмете-НЕоружии появлялся посторонний appliedMods (для брони
++ *      поле инертно — статы брони НЕ страдали);
++ *   2) мод-предмет флагался equipped+installedOn на эту броню и пропадал
++ *      из сумки, а оружие оставалось без мода.
++ * Мост (при загрузке, без подъёма версии схемы, идемпотентно):
++ *   1) appliedMods снимается с предметов, которые не оружие и не мод
++ *      (оружие = есть weaponId вне каталога модов; мод = weaponId из
++ *      каталога оружейных модов);
++ *   2) флаг мод-предмета осиротён (носитель исчез, не оружие, или его
++ *      appliedMods не ссылается на мод) → штатное «uninstall»
++ *      (equipped:false, installedOn удалён) — мод снова виден в сумке
++ *      и ставится заново уже исправленным экраном. Робо-привязки
++ *      (installedOn с префиксом «robotSlot:») не трогаем — их носитель
++ *      синтетический. Моды, попавшие до бага на ДРУГОЕ оружие, не
++ *      отличимы от намеренных — не трогаем.
++ *
++ * @param {object} state — загруженное состояние персонажа
++ * @param {Set<string>} weaponModIds — id оружейных модов каталога
++ * @returns {object} то же состояние (items заменяется при ремонте)
++ */
++export function repairMisroutedWeaponMods(state, weaponModIds) {
++  if (!state || typeof state !== 'object') return state;
++  const items = state.items;
++  if (!items || typeof items !== 'object') return state;
++
++  const isKnownMod = (id) => Boolean(id && weaponModIds && weaponModIds.has(id));
++  const isWeaponItem = (item) => Boolean(item.weaponId) && !isKnownMod(item.weaponId);
++  const isModItem = (item) => isKnownMod(item.weaponId);
++
++  let changed = false;
++  const next = {};
++  for (const [key, raw] of Object.entries(items)) {
++    let item = raw;
++    if (item && typeof item === 'object') {
++      // 1) посторонний appliedMods на не-оружии/не-моде (броня, одежда…)
++      if (
++        item.appliedMods && typeof item.appliedMods === 'object'
++        && !isWeaponItem(item) && !isModItem(item)
++        && Object.keys(item.appliedMods).length > 0
++      ) {
++        item = { ...item };
++        delete item.appliedMods;
++        changed = true;
++      }
++      // 2) осиротевший флаг мод-предмета → возврат мода в сумку
++      if (
++        isModItem(item) && item.equipped && item.installedOn
++        && !String(item.installedOn).startsWith('robotSlot:')
++      ) {
++        const host = items[item.installedOn];
++        const hostIsWeapon = Boolean(host && isWeaponItem(host));
++        const hostReferences = hostIsWeapon
++          && host.appliedMods && typeof host.appliedMods === 'object'
++          && Object.values(host.appliedMods).includes(item.weaponId);
++        if (!hostIsWeapon || !hostReferences) {
++          item = { ...item, equipped: false };
++          delete item.installedOn;
++          changed = true;
++        }
++      }
++    }
++    next[key] = item;
++  }
++  if (changed) state.items = next;
++  return state;
++}
+diff --git a/public/version.json b/public/version.json
+index 1703af2..1b05f8d 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "380",
++  "version": "381",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index e75cdfa..d0848cd 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -47,7 +47,7 @@ import {
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
+ import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
+-import { migrateWeaponModIdsToCanonical } from '../../domain/weaponModCanonical';
++import { migrateWeaponModIdsToCanonical, repairMisroutedWeaponMods as migrateRepairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
+ import { resolveBodyPlan } from '../../domain/bodyplan';
+ import { resolveKitItems } from '../../domain/kitResolver';
+ import { inspectSelectedPerkRecords } from '../../domain/perks';
+@@ -166,6 +166,12 @@ const deserializeState = (data) => {
+   // старые «жирные» и новые «худые» сейвы давали одинаковый рендер.
+   // Каталог строим один раз на загрузку, а не на каждый предмет.
+   const catalog = catalogForCurrentLocale();
++  // Ремонт сейвов после бага 380 (патч 381): appliedMods, записанные на
++  // не-оружие, снимаются; мод-предметы с осиротевшими флагами возвращаются
++  // в сумку. Идемпотентно, робо-привязки не тронуты.
++  if (catalog?.weaponMods?.length) {
++    migrateRepairMisroutedWeaponMods(migrated, new Set(catalog.weaponMods.map((m) => m.id)));
++  }
+   const restored = catalog
+     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
+     : migrated;
