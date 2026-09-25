@@ -2,35 +2,17 @@
  "meta": {
   "источник": "gemini-code-1790317366823.json (main), русские имена владельца",
   "пар": 141,
-  "совпали_с_текущими": 477,
+  "совпали_с_текущими": 539,
   "добавить": 580,
   "снять": 231,
-  "снять_у_оружий_со_списком": 126,
+  "снять_у_оружий_со_списком": 147,
   "снять_отложено_без_списка_владельца": 104,
   "правило": "Снимать текущую поддержку только у оружий из draft (список владельца есть). Оружия без списка владельца — не трогать до уточнения (милицейские 16 + Дуговая сварка, Институтский лазер, 10-мм ПП, плазменная мина).",
   "оружия_без_списка": [
    "weapon_10mm_smg",
-   "weapon_arc_welder",
-   "weapon_baseball_bat",
-   "weapon_baseball_bat_aluminum",
-   "weapon_baton",
-   "weapon_board",
-   "weapon_boxing_glove",
-   "weapon_deathclaw_gauntlet",
-   "weapon_institute_laser",
-   "weapon_knuckles",
-   "weapon_lead_pipe",
-   "weapon_pipe_wrench",
-   "weapon_plasma_mine",
-   "weapon_pool_cue",
-   "weapon_power_fist",
-   "weapon_rolling_pin",
-   "weapon_sledgehammer",
-   "weapon_super_sledge",
-   "weapon_tire_iron",
-   "weapon_walking_cane"
+   "weapon_plasma_mine"
   ],
-  "оружий_без_списка": 20,
+  "оружий_без_списка": 2,
   "новых_модов": 13,
   "подтверждено_владельцем": "13 новых + 3 уникальных Тесла (EN из референсов); «Магазин на энергоячейках» = mod_171",
   "этап_В": "мили: 53 пары привязаны 1:1 (расхождений поддержки 0), 9 новых строк, Посох Атома/Перфоратор — оружия нет в каталоге, Сварочная горелка — вопрос (arc_welder?)"
@@ -2526,6 +2508,176 @@
    "name": "Силовой кастет: Нагревательная спираль",
    "weapons": [
     "Силовой кастет"
+   ]
+  },
+  "ил|weapon_institute_laser|Photon Exciter": {
+   "ids": [
+    "mod_045"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Возбудитель фотонов",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Beta Wave Tuner": {
+   "ids": [
+    "mod_043"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Тюнер бета-волн",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Boosted Capacitor": {
+   "ids": [
+    "mod_044"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Усиленный конденсатор",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Photon Agitator": {
+   "ids": [
+    "mod_046"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Фотонная мешалка",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Long Barrel": {
+   "ids": [
+    "mod_204"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Длинный ствол",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Automatic Barrel": {
+   "ids": [
+    "mod_053"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Автоматический ствол",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Improved Barrel": {
+   "ids": [
+    "mod_054"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Улучшенный ствол",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Standard Stock": {
+   "ids": [
+    "mod_058"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Стандартная ложа",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Reflex Sight": {
+   "ids": [
+    "mod_062"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Коллиматорный",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Short Scope": {
+   "ids": [
+    "mod_063"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Короткий оптический",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Long Scope": {
+   "ids": [
+    "mod_064"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Длинный оптический",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Short Night Vision Scope": {
+   "ids": [
+    "mod_065"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Короткий оптический ночного видения",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Long Night Vision Scope": {
+   "ids": [
+    "mod_066"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Длинный оптический ночного видения",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Recon Scope": {
+   "ids": [
+    "mod_067"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Прицел разведчика",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Beam Splitter": {
+   "ids": [
+    "mod_068"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Разделитель луча",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Beam Focuser": {
+   "ids": [
+    "mod_069"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Фокусировщик луча",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
+   ]
+  },
+  "ил|weapon_institute_laser|Gyro Compensating Lens": {
+   "ids": [
+    "mod_070"
+   ],
+   "via": "Лазер института: референс владельца (EN-мост)",
+   "name": "Линза с гирокомпенсацией",
+   "weapons": [
+    "Институтский лазер (Лазер института)"
    ]
   }
  },
@@ -8188,7 +8340,139 @@
      "via": "фантом-семейство"
     }
    ]
-  }
+  },
+  "weapon_institute_laser": {
+   "Конденсатор": [
+    {
+     "name": "Возбудитель фотонов",
+     "en": "Photon Exciter",
+     "ids": [
+      "mod_045"
+     ]
+    },
+    {
+     "name": "Тюнер бета-волн",
+     "en": "Beta Wave Tuner",
+     "ids": [
+      "mod_043"
+     ]
+    },
+    {
+     "name": "Усиленный конденсатор",
+     "en": "Boosted Capacitor",
+     "ids": [
+      "mod_044"
+     ]
+    },
+    {
+     "name": "Фотонная мешалка",
+     "en": "Photon Agitator",
+     "ids": [
+      "mod_046"
+     ]
+    }
+   ],
+   "Ствол": [
+    {
+     "name": "Длинный ствол",
+     "en": "Long Barrel",
+     "ids": [
+      "mod_204"
+     ]
+    },
+    {
+     "name": "Автоматический ствол",
+     "en": "Automatic Barrel",
+     "ids": [
+      "mod_053"
+     ]
+    },
+    {
+     "name": "Улучшенный ствол",
+     "en": "Improved Barrel",
+     "ids": [
+      "mod_054"
+     ]
+    }
+   ],
+   "Ложа": [
+    {
+     "name": "Стандартная ложа",
+     "en": "Standard Stock",
+     "ids": [
+      "mod_058"
+     ]
+    }
+   ],
+   "Прицел": [
+    {
+     "name": "Коллиматорный",
+     "en": "Reflex Sight",
+     "ids": [
+      "mod_062"
+     ]
+    },
+    {
+     "name": "Короткий оптический",
+     "en": "Short Scope",
+     "ids": [
+      "mod_063"
+     ]
+    },
+    {
+     "name": "Длинный оптический",
+     "en": "Long Scope",
+     "ids": [
+      "mod_064"
+     ]
+    },
+    {
+     "name": "Короткий оптический ночного видения",
+     "en": "Short Night Vision Scope",
+     "ids": [
+      "mod_065"
+     ]
+    },
+    {
+     "name": "Длинный оптический ночного видения",
+     "en": "Long Night Vision Scope",
+     "ids": [
+      "mod_066"
+     ]
+    },
+    {
+     "name": "Прицел разведчика",
+     "en": "Recon Scope",
+     "ids": [
+      "mod_067"
+     ]
+    }
+   ],
+   "Дуло": [
+    {
+     "name": "Разделитель луча",
+     "en": "Beam Splitter",
+     "ids": [
+      "mod_068"
+     ]
+    },
+    {
+     "name": "Фокусировщик луча",
+     "en": "Beam Focuser",
+     "ids": [
+      "mod_069"
+     ]
+    },
+    {
+     "name": "Линза с гирокомпенсацией",
+     "en": "Gyro Compensating Lens",
+     "ids": [
+      "mod_070"
+     ]
+    }
+   ]
+  },
+  "weapon_arc_welder": {}
  },
  "coverage": {
   "add": [
@@ -11190,6 +11474,126 @@
     "mod_name": "Полная ложа"
    },
    {
+    "w": "weapon_arc_welder",
+    "m": "mod_043",
+    "mod_name": "Тюнер бета-волн"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_044",
+    "mod_name": "Усиленный конденсатор"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_045",
+    "mod_name": "Возбудитель фотонов"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_046",
+    "mod_name": "Фотонная мешалка"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_051",
+    "mod_name": "Длинный ствол"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_052",
+    "mod_name": "Расщепитель"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_053",
+    "mod_name": "Автоматический ствол"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_054",
+    "mod_name": "Улучшенный ствол"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_055",
+    "mod_name": "Снайперский ствол"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_057",
+    "mod_name": "Тактическая"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_058",
+    "mod_name": "Стандартная ложа"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_060",
+    "mod_name": "Ложа стрелка"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_061",
+    "mod_name": "Ложа с компенсатором отдачи"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_062",
+    "mod_name": "Коллиматорный"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_063",
+    "mod_name": "Короткий оптический"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_064",
+    "mod_name": "Длинный оптический"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_065",
+    "mod_name": "Короткий оптический ночного видения"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_066",
+    "mod_name": "Длинный оптический ночного видения"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_067",
+    "mod_name": "Прицел разведчика"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_068",
+    "mod_name": "Разделитель луча"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_069",
+    "mod_name": "Фокусировщик луча"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_070",
+    "mod_name": "Линза с гирокомпенсацией"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_204",
+    "mod_name": "Длинный ствол"
+   },
+   {
+    "w": "weapon_arc_welder",
+    "m": "mod_205",
+    "mod_name": "Зажигательный ствол"
+   },
+   {
     "w": "weapon_assault_rifle",
     "m": "mod_153",
     "mod_name": "Прицел стрелка"
@@ -11635,16 +12039,6 @@
     "mod_name": "Большой штык"
    },
    {
-    "w": "weapon_ripper",
-    "m": "mod_110",
-    "mod_name": "Изогнутое лезвие"
-   },
-   {
-    "w": "weapon_ripper",
-    "m": "mod_111",
-    "mod_name": "Удлинённое лезвие"
-   },
-   {
     "w": "weapon_sniper_rifle",
     "m": "mod_036",
     "mod_name": "Короткий оптический ночного видения"
@@ -11683,11 +12077,6 @@
     "w": "weapon_submachine_gun",
     "m": "mod_196",
     "mod_name": "Кольцевая мушка"
-   },
-   {
-    "w": "weapon_sword",
-    "m": "mod_106",
-    "mod_name": "Шокер"
    },
    {
     "w": "weapon_syringer",
@@ -12473,5 +12862,143 @@
   "Меч из бампера": "Большой меч",
   "Cattle Prod": "Электрошокер",
   "Death Tambo": "Танбо смерти"
- }
+ },
+ "institute_laser_draft": {
+  "weapon_institute_laser": {
+   "Конденсатор": [
+    {
+     "name": "Возбудитель фотонов",
+     "en": "Photon Exciter",
+     "ids": [
+      "mod_045"
+     ]
+    },
+    {
+     "name": "Тюнер бета-волн",
+     "en": "Beta Wave Tuner",
+     "ids": [
+      "mod_043"
+     ]
+    },
+    {
+     "name": "Усиленный конденсатор",
+     "en": "Boosted Capacitor",
+     "ids": [
+      "mod_044"
+     ]
+    },
+    {
+     "name": "Фотонная мешалка",
+     "en": "Photon Agitator",
+     "ids": [
+      "mod_046"
+     ]
+    }
+   ],
+   "Ствол": [
+    {
+     "name": "Длинный ствол",
+     "en": "Long Barrel",
+     "ids": [
+      "mod_204"
+     ]
+    },
+    {
+     "name": "Автоматический ствол",
+     "en": "Automatic Barrel",
+     "ids": [
+      "mod_053"
+     ]
+    },
+    {
+     "name": "Улучшенный ствол",
+     "en": "Improved Barrel",
+     "ids": [
+      "mod_054"
+     ]
+    }
+   ],
+   "Ложа": [
+    {
+     "name": "Стандартная ложа",
+     "en": "Standard Stock",
+     "ids": [
+      "mod_058"
+     ]
+    }
+   ],
+   "Прицел": [
+    {
+     "name": "Коллиматорный",
+     "en": "Reflex Sight",
+     "ids": [
+      "mod_062"
+     ]
+    },
+    {
+     "name": "Короткий оптический",
+     "en": "Short Scope",
+     "ids": [
+      "mod_063"
+     ]
+    },
+    {
+     "name": "Длинный оптический",
+     "en": "Long Scope",
+     "ids": [
+      "mod_064"
+     ]
+    },
+    {
+     "name": "Короткий оптический ночного видения",
+     "en": "Short Night Vision Scope",
+     "ids": [
+      "mod_065"
+     ]
+    },
+    {
+     "name": "Длинный оптический ночного видения",
+     "en": "Long Night Vision Scope",
+     "ids": [
+      "mod_066"
+     ]
+    },
+    {
+     "name": "Прицел разведчика",
+     "en": "Recon Scope",
+     "ids": [
+      "mod_067"
+     ]
+    }
+   ],
+   "Дуло": [
+    {
+     "name": "Разделитель луча",
+     "en": "Beam Splitter",
+     "ids": [
+      "mod_068"
+     ]
+    },
+    {
+     "name": "Фокусировщик луча",
+     "en": "Beam Focuser",
+     "ids": [
+      "mod_069"
+     ]
+    },
+    {
+     "name": "Линза с гирокомпенсацией",
+     "en": "Gyro Compensating Lens",
+     "ids": [
+      "mod_070"
+     ]
+    }
+   ]
+  }
+ },
+ "institute_laser_stats": {
+  "владелец": "урон 3DC, Burst, скорострельность 3, дальность C, Close Quarters+Inaccurate, вес 4, цена 50, редкость 2",
+  "каталог": "совпадает полностью (3/3/4/50/2) — расхождений нет"
+ },
+ "arc_welder_decision": "Владелец (373): Электросварка = arc welder = «Дуговая сварка», модов НЕТ. Текущие 24 привязки в каталоге — снять при ревизии."
 }

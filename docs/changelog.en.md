@@ -4,6 +4,16 @@
 ---
 ---
 ---
+---
+## Institute laser confirmed by the reference, arc welder has no mods (patch 373)
+
+The Institute Laser reference you sent matches the app on all 17 mods and
+stats — no divergence. Arc welder is recorded as one weapon (= "Дуговая
+сварка", "Сварочная горелка") with no mods — its 24 catalog bindings are
+extra and will be removed in the revision. Final tally: 539 bindings match,
+580 to add, 147 to remove; only the 10mm SMG and plasma mine remain without
+your lists — left untouched.
+
 ## Melee mods cross-checked against your catalog (patch 372)
 
 The melee catalog you sent (38 weapons) is resolved: 35 exist in the game
