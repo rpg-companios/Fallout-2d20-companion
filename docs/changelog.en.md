@@ -8,6 +8,19 @@
 ---
 ---
 ---
+---
+## Mods now match your lists exactly; weapons renamed (patch 377)
+
+Modification windows are rebuilt: each of the 88 weapons with your list
+now carries exactly your mods (21 weapons expanded, extra mods removed
+from gatling laser and others). The arc welder (= "Дуговая сварка") lost
+all 24 extra mods — no mods per your call. The Institute laser carries
+exactly the 17 mods from your reference. The 10mm SMG and plasma mine
+are untouched (no lists). 48 weapons renamed to your names (Russian
+only; English untouched): Switchblade → "Выкидной нож", bumper sword →
+"Большой меч", Institute laser → "Лазерный пистолет института", etc.
+Robot weapon mods keep working — covered by tests.
+
 ## Every mod crafts now; 23 new mods and two new weapons (patch 376)
 
 Revision continues. Every weapon mod has a crafting recipe now (36 were
