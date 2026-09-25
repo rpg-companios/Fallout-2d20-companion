@@ -1,0 +1,3389 @@
+{
+  "meta": {
+    "source": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya",
+    "language": "ru-RU",
+    "scrapedAt": "2026-09-25",
+    "gameSystem": "Fallout 2d20",
+    "category": "Оружие ближнего боя",
+    "totalWeapons": 38,
+    "totalUniqueModEntries": 50,
+    "totalModInstallations": 63,
+    "note": "Данные собраны выгрузкой 38 страниц раздела 'Оружие ближнего боя' на fallout-2d20.ru. Поле effectDescription и qualityDescription добавлены на основе описаний с сайта и официальных правил (Core + дополнения). Урон указан как количество Боевых Кубиков (КК / CD). Стоимость и вес модов — как дельта к базе ('+' означает прибавку, '-' без изменения). Перк 'Кузнец' соответствует Blacksmith, 'Наука!' — Science!, 'Фанатик Оружия' — Gun Nut.",
+    "mappingNote": "projectId — соответствие ID из modules/fallout/data/equipment/weapons.json. null = оружие из дополнений (76/Wasteland Warfare), отсутствующее в текущем JSON проекта. Все ID модов внутренние (mod_melee_XX) — предложены для импорта."
+  },
+  "glossary": {
+    "damageTypes": {
+      "Физический": "physical — физический урон, против Физ. СУ",
+      "Энергетический": "energy — энергетический/лазер/плазма/огонь, против Энерг. СУ",
+      "Радиационный": "radiation — радиация, против Рад. СУ",
+      "Физический+Энергетический": "наносит оба типа одновременно (Посох Атома с модом)"
+    },
+    "effects": {
+      "Проникающий X": "Piercing X — игнорирует X пунктов СУ цели за каждый выпавший Эффект. Рейтинг = значение после названия (обычно 1, у перфоратора 2, у горелки 3).",
+      "Порочный": "Vicious — +1 урон за каждый выпавший Эффект.",
+      "Устойчивый / Стойкий": "Persistent — урон от оружия сохраняется как продолжающийся (Persistent). В картах сайта встречается как 'Устойчивый' и 'Стойкий' — синонимы.",
+      "Оглушающий / Оглушение": "Stun — при Эффекте цель получает состояние Оглушена/стон (Stun). В базе проекта effect_stun.",
+      "Разрушающий": "Breaking — ломает броню/повреждает защиту.",
+      "Ослабляющий / Изнуряющий": "Debilitating — дает истощение/дебафф (качество, но часто указано как эффект в таблицах).",
+      "Всплеск": "Blast — урон по зоне (Взрыв). У Протонного топора — 'Всплеск'.",
+      "Парирование": "Parry — качество, но иногда упоминается как эффект; дает защиту.",
+      "Дуга": "Arc — эффект электрических дуг."
+    },
+    "qualities": {
+      "Скрытное": "Concealed (quality_concealed) — легко скрыть, бонус к проносу в запретные зоны; на Выкидном ноже базовое.",
+      "Парирование": "Parry (quality_parry) — позволяет парировать атаки ближнего боя, дает +1 к защите при наличии.",
+      "Двуручное": "Two-handed (quality_two-handed) — нужно держать обеими руками; атака одной рукой +2 к сложности.",
+      "Изнуряющий / Ослабляющее": "Debilitating (quality_debilitating) — изнуряет цель.",
+      "Неточный / Неточное": "Inaccurate (quality_inaccurate) — +1 к сложности атаки, оппозиция Точному.",
+      "Топливо": "Fuel — требует заправку указанным типом боеприпасов (Топливо для огнемета, Ядерная батарея). Для работы нужно топлива = базовому урону. При осложнения на атаке топливо заканчивается.",
+      "Отдача X": "Recoil X (quality_recoil_x) — если СИЛ < X, сложность атак +1. Игнорируется двумя руками/упором.",
+      "Медленная перезарядка": "Slow Load — требует малое действие на перезарядку перед следующей атакой (Баллистический кулак).",
+      "Всплеск / Взрыв": "Blast (quality_blast) — урон по области.",
+      "Скрытный_мод": "Моды типа 'Скрытное лезвие' дают +2 КК при скрытных атаках.",
+      "Обезоруживающий": "Disarm — можно потратить 2 ОД при успешной атаке чтобы выбить оружие (Изогнутое лезвие Потрошителя, Крюк, Дополнительный коготь).",
+      "Проникающий_качество": "Многие моды добавляют именно эффект 'Проникающий', а не качество."
+    },
+    "perks": {
+      "Кузнец 1-3": "Blacksmith — требование для модификаций холодного оружия",
+      "Наука! 1-2": "Science! — требование для энергетических модов",
+      "Фанатик Оружия 1": "Gun Nut — требование для Огнемета на бензопилу"
+    },
+    "specialRules": {
+      "ТОПЛИВО": "Сварочная горелка: 'ТОПЛИВО (Топливо для огнемета)' — нужно топлива = базовому урону (4). При осложнении топливо кончается.",
+      "Баллистический кулак": "Требует 1 патрон для дробовика на атаку. Медленная перезарядка = малое действие перед следующей атакой. Без патрона — атака без оружия.",
+      "Бензопила": "Не получает бонус к урону от СИЛ персонажа.",
+      "Танбо/Барабан/Гитара": "Увеличивают диапазон Осложнений на 1 при скрытной атаке из-за звука.",
+      "Перфоратор": "Встроена Ядерная батарея; можно потратить 1-3 заряда чтобы добавить 1-3 КК к базовому урону.",
+      "Бензопила Огнемет": "Мод 'Огнемет' можно поставить как дополнение к любому другому моду шины (совместим).",
+      "Автотопор Турбо": "Каждое потраченное ОД на доп. урон дает +2 КК вместо +1 КК.",
+      "Посох Атома": "Шокирующие катушки = наносит оба типа урона (Физический + Энергетический) одновременно."
+    }
+  },
+  "weapons": [
+    {
+      "slug": "vykidnoj-nozh",
+      "name": "Выкидной нож",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/vykidnoj-nozh",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_switchblade.webp",
+      "projectId": "weapon_switchblade",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 2,
+      "damageDiceDisplay": "2 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 пункт СУ цели за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Скрытное",
+          "id": "quality_concealed",
+          "description": "Маленький — легко пронести скрытно, бонус к сокрытию"
+        }
+      ],
+      "weight": 1,
+      "cost": 20,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Распространенное оружие ближнего боя. Его небольшой размер означает, что его легко пронести скрытно в запретные зоны и с ним легко обращаться. Однако он не наносит такого урона, как большие ножи.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_switchblade_serrated",
+          "name": "Зазубренное лезвие",
+          "prefix": "Зазубренный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый (Persistent)"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Увеличивает урон на +1 КК и добавляет эффект Устойчивый (Persistent) — урон сохраняется.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 10,
+          "costDeltaRaw": "+10",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        }
+      ]
+    },
+    {
+      "slug": "dubinka",
+      "name": "Дубинка",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dubinka",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weappolicebaton.webp",
+      "projectId": "weapon_baton",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 2,
+      "cost": 15,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Складная телескопическая дубинка из тех, что использовались полицейскими и охраной до Великой войны. Служба безопасности 'Волт-Тек' в каждом убежище имела их запас.",
+      "special": null,
+      "modsSlot": "Дубинка",
+      "mods": [
+        {
+          "id": "mod_melee_baton_electrified",
+          "name": "Электризованная",
+          "prefix": "Шокирующая",
+          "slot": "Дубинка",
+          "effectsRaw": "+2 БК, Измените тип урона на \"Энергетический\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "Меняет тип урона на Энергетический и +2 КК к урону. Против Энерг. СУ.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 15,
+          "costDeltaRaw": "+15",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        },
+        {
+          "id": "mod_melee_baton_stun",
+          "name": "Электрошокер",
+          "prefix": "Оглушающая",
+          "slot": "Дубинка",
+          "effectsRaw": "+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 3,
+            "addEffects": ["Оглушающий (Stun)"],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+3 КК, Энергетический урон, добавляет эффект Оглушающий (Stun) — шанс оглушить цель.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 30,
+          "costDeltaRaw": "+30",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        }
+      ]
+    },
+    {
+      "slug": "mech",
+      "name": "Меч",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/mech",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_bumpersword.webp",
+      "projectId": "weapon_sword",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 пункт СУ за каждый Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Парирование",
+          "id": "quality_parry",
+          "description": "Позволяет парировать атаки, дает оборонительный бонус"
+        }
+      ],
+      "weight": 3,
+      "cost": 50,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Мечи использовались почти столько же, сколько велись войны, оставались символами статуса офицеров вплоть до Великой войны. Многие найденные в пустошах — трофейные китайские офицерские клинки.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_sword_serrated",
+          "name": "Зазубренное лезвие",
+          "prefix": "Зазубренный",
+          "slot": "Лезвие",
+          "effectsRaw": "Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет эффект Устойчивый (Persistent) без изменения урона.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 25,
+          "costDeltaRaw": "+25",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        },
+        {
+          "id": "mod_melee_sword_electrified",
+          "name": "Электризованное лезвие",
+          "prefix": "Электризованный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+1 КК, меняет урон на Энергетический.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        },
+        {
+          "id": "mod_melee_sword_electrified_serrated",
+          "name": "Электризованное зазубренное лезвие",
+          "prefix": "Электризованный зазубренный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый (Физический)"],
+            "changeDamageType": "Энергетический",
+            "special": "Устойчивый остается физическим"
+          },
+          "whatItDoes": "+1 КК, урон становится Энергетическим, но добавляет Устойчивый который считается Физическим.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 75,
+          "costDeltaRaw": "+75",
+          "perks": "Кузнец 3, Наука! 1",
+          "perksEn": "Blacksmith 3, Science! 1"
+        },
+        {
+          "id": "mod_melee_sword_stun",
+          "name": "Электрошокер",
+          "prefix": "Оглушающий",
+          "slot": "Лезвие",
+          "effectsRaw": "+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Оглушающий"],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+2 КК, Энергетический урон + эффект Оглушающий.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 100,
+          "costDeltaRaw": "+100",
+          "perks": "Кузнец 3, Наука! 1",
+          "perksEn": "Blacksmith 3, Science! 1"
+        }
+      ]
+    },
+    {
+      "slug": "boevoj-nozh",
+      "name": "Боевой нож",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/boevoj-nozh",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_combat_knife.webp",
+      "projectId": "weapon_combat_knife",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 1,
+      "cost": 25,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Как для боя, так и для прикладных задач. Боевой нож пустошей — обычно тип, выданный армии США во время Великой войны, однолезвийный со скошенным обухом.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_combatknife_serrated",
+          "name": "Зазубренное лезвие",
+          "prefix": "Зазубренный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый (Persistent).",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_combatknife_stealth",
+          "name": "Скрытное лезвие",
+          "prefix": "Скрытный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": "+2 КК дополнительно при скрытной атаке"
+          },
+          "whatItDoes": "+1 КК всегда + Устойчивый, а при скрытной атаке еще +2 КК (итого +3 КК в скрыте).",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 18,
+          "costDeltaRaw": "+18",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "machete",
+      "name": "Мачете",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/machete",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_machetegeck.webp",
+      "projectId": "weapon_machete",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 2,
+      "cost": 25,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Длинный острый нож для прорубания растительности, так же эффективен как оружие. В пустоши встречаются как довоенные образцы, так и кустарные из заточенного металла газонокосилок на простой рукояти.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_machete_serrated",
+          "name": "Зазубренное лезвие",
+          "prefix": "Зазубренный",
+          "slot": "Лезвие",
+          "effectsRaw": "+2 БК, Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Устойчивый. Сильнее чем у боевого ножа.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "potroshitel",
+      "name": "Потрошитель",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/potroshitel",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_ripper.webp",
+      "projectId": "weapon_ripper",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Порочный",
+          "id": "effect_vicious",
+          "description": "Атака наносит +1 урон за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 6,
+      "cost": 50,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Небольшая ручная бензопила для военных, широко использовалась до Великой войны; уменьшенная коммерческая версия была доступна. Пишет как плоть так и металл.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_ripper_curved",
+          "name": "Изогнутое лезвие",
+          "prefix": "Изогнутый",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника, выбив оружие из рук",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": "Обезоруживание за 2 ОД"
+          },
+          "whatItDoes": "+1 КК и дает прием 'Обезоруживание': потратить 2 ОД после успеха чтобы выбить оружие.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 15,
+          "costDeltaRaw": "+15",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_ripper_extended",
+          "name": "Удлиненное лезвие",
+          "prefix": "Удлиненный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 3,
+          "weightDeltaRaw": "+3",
+          "costDelta": 25,
+          "costDeltaRaw": "+25",
+          "perks": "Кузнец 3",
+          "perksEn": "Blacksmith 3"
+        }
+      ]
+    },
+    {
+      "slug": "shish-kebab",
+      "name": "Шиш-кебаб",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shish-kebab",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_shishkebab.webp",
+      "projectId": "weapon_shishkebab",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Энергетический",
+      "damageTypeEn": "energy",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Парирование",
+          "id": "quality_parry",
+          "description": "Можно парировать"
+        }
+      ],
+      "weight": 3,
+      "cost": 200,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Кустарный 'пылающий меч' из хлама. Общие элементы: топливный бак/канистра, запальник и пусковой механизм с мотоцикла. Топливо выбрасывается вдоль лезвия и воспламеняется.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_shish_extra_jets",
+          "name": "Дополнительные воспламенительные форсунки",
+          "prefix": "Жгучий",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 100,
+          "costDeltaRaw": "+100",
+          "perks": "Кузнец 3",
+          "perksEn": "Blacksmith 3"
+        }
+      ]
+    },
+    {
+      "slug": "bejsbolnaya-bita",
+      "name": "Бейсбольная бита",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bejsbolnaya-bita",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_baseball_bat.webp",
+      "projectId": "weapon_baseball_bat",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 к сложности"
+        }
+      ],
+      "weight": 3,
+      "cost": 25,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Когда-то для игры в бейсбол — любимого спорта довоенной Америки. Двести лет спустя — грубое но эффективное оружие. Обычно из ясеня.",
+      "special": null,
+      "modsSlot": "Бита",
+      "mods": [
+        {
+          "id": "mod_melee_bat_barbed",
+          "name": "Колючая",
+          "prefix": "Колючая",
+          "slot": "Бита",
+          "effectsRaw": "Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет эффект Проникающий 1 (игнор 1 СУ за Эффект) без бонуса к кубикам.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 5,
+          "costDeltaRaw": "+5",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_bat_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Бита",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 7,
+          "costDeltaRaw": "+7",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_bat_sharp",
+          "name": "Заостренная",
+          "prefix": "Заостренная",
+          "slot": "Бита",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 7,
+          "costDeltaRaw": "+7",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_bat_chain",
+          "name": "Обмотанная цепью",
+          "prefix": "Обмотанная цепью",
+          "slot": "Бита",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Просто +2 КК, без доп. эффектов — самый большой чистый бонус к урону у биты.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 10,
+          "costDeltaRaw": "+10",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_bat_bladed",
+          "name": "Лезвия",
+          "prefix": "Клинковая",
+          "slot": "Бита",
+          "effectsRaw": "+2 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Устойчивый — топовый мод биты.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "alyuminievaya-bejsbolnaya-bita",
+      "name": "Алюминиевая бейсбольная бита",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/alyuminievaya-bejsbolnaya-bita",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_fh_fencebuster.webp",
+      "projectId": "weapon_baseball_bat_aluminum",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 к сложности"
+        }
+      ],
+      "weight": 2,
+      "cost": 32,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Алюминиевая версия биты — более легкая и твердая. Использовалась в бейсболе до войны.",
+      "special": null,
+      "modsSlot": "Бита",
+      "mods": [
+        {
+          "id": "mod_melee_alubat_barbed",
+          "name": "Колючая",
+          "prefix": "Колючая",
+          "slot": "Бита",
+          "effectsRaw": "Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 5,
+          "costDeltaRaw": "+5",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_alubat_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Бита",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 7,
+          "costDeltaRaw": "+7",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_alubat_sharp",
+          "name": "Заостренная",
+          "prefix": "Заостренная",
+          "slot": "Бита",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 7,
+          "costDeltaRaw": "+7",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_alubat_chain",
+          "name": "Обмотанная цепью",
+          "prefix": "Обмотанная цепью",
+          "slot": "Бита",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 10,
+          "costDeltaRaw": "+10",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_alubat_bladed",
+          "name": "Лезвия",
+          "prefix": "Клинковая",
+          "slot": "Бита",
+          "effectsRaw": "+2 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Устойчивый.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "dryn",
+      "name": "Дрын",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/dryn",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_board.webp",
+      "projectId": "weapon_board",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 к сложности. Предпочитается Супермутантами."
+        }
+      ],
+      "weight": 3,
+      "cost": 20,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Длинная деревянная доска с ручкой, обмотанной изолентой или ветошью. Тяжелое оружие, обычно предпочитаемое Супермутантами.",
+      "special": null,
+      "modsSlot": "Дрын",
+      "mods": [
+        {
+          "id": "mod_melee_board_spiked",
+          "name": "Шипованный",
+          "prefix": "Шипованный",
+          "slot": "Дрын",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 6,
+          "costDeltaRaw": "+6",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_board_piercing",
+          "name": "Прокалывающий",
+          "prefix": "Прокалывающий",
+          "slot": "Дрын",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК чистого урона.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 10,
+          "costDeltaRaw": "+10",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_board_bladed",
+          "name": "Лезвия",
+          "prefix": "Клинковый",
+          "slot": "Дрын",
+          "effectsRaw": "+2 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Устойчивый.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 10,
+          "costDeltaRaw": "+10",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "svintsovaya-truba",
+      "name": "Свинцовая труба",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svintsovaya-truba",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weapleadpipe.webp",
+      "projectId": "weapon_lead_pipe",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 3,
+      "cost": 15,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Отрезок тяжелой металлической (обычно свинцовой) трубы с рукояткой из изоленты на одном конце и гайками/болтами на другом. Грубо, просто и больно.",
+      "special": null,
+      "modsSlot": "Труба",
+      "mods": [
+        {
+          "id": "mod_melee_pipe_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Труба",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 4,
+          "costDeltaRaw": "+4",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_pipe_heavy",
+          "name": "Утяжеленная",
+          "prefix": "Утяжеленная",
+          "slot": "Труба",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК чистого урона. Увеличивает вес на +2.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 11,
+          "costDeltaRaw": "+11",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "razvodnoj-klyuch",
+      "name": "Разводной ключ",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/razvodnoj-klyuch",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_pipe_wrench.webp",
+      "projectId": "weapon_pipe_wrench",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 2,
+      "cost": 30,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Тяжелый металлический разводной ключ, достаточно длинный для ближнего боя. Регулируемые губки часто используются для удержания модов — легко модифицируется.",
+      "special": null,
+      "modsSlot": "Ключ",
+      "mods": [
+        {
+          "id": "mod_melee_wrench_hook",
+          "name": "Крюк",
+          "prefix": "Загнутый",
+          "slot": "Ключ",
+          "effectsRaw": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": "Обезоруживание за 2 ОД"
+          },
+          "whatItDoes": "+1 КК + прием Обезоруживание (2 ОД).",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 9,
+          "costDeltaRaw": "+9",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_wrench_heavy",
+          "name": "Утяжеленный",
+          "prefix": "Увесистый",
+          "slot": "Ключ",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК, но вес +7 (тяжелеет сильно).",
+          "weightDelta": 7,
+          "weightDeltaRaw": "+7",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_wrench_piercing",
+          "name": "Прокалывающий",
+          "prefix": "Прокалывающий",
+          "slot": "Ключ",
+          "effectsRaw": "+2 БК, добавляет \"Проникающий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Проникающий"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Проникающий (игнор СУ).",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 13,
+          "costDeltaRaw": "+13",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_wrench_extra_heavy",
+          "name": "Сверхтяжелый",
+          "prefix": "Сверхтяжелый",
+          "slot": "Ключ",
+          "effectsRaw": "+3 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 3,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+3 КК — максимальный бонус урона для ключа. Вес +2.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 22,
+          "costDeltaRaw": "+22",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "bilyardnyj-kij",
+      "name": "Бильярдный кий",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bilyardnyj-kij",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fallout4_pool_cue.webp",
+      "projectId": "weapon_pool_cue",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 к сложности"
+        }
+      ],
+      "weight": 1,
+      "cost": 10,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Длинный тонкий кусок дерева для бильярда. Полезен в качестве оружия если нет ничего тяжелее.",
+      "special": null,
+      "modsSlot": "Кий",
+      "mods": [
+        {
+          "id": "mod_melee_cue_piercing",
+          "name": "Прокалывающий",
+          "prefix": "Прокалывающий",
+          "slot": "Кий",
+          "effectsRaw": "Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 2,
+          "costDeltaRaw": "+2",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_cue_pointed",
+          "name": "Заостренный",
+          "prefix": "Заостренный",
+          "slot": "Кий",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        }
+      ]
+    },
+    {
+      "slug": "skalka",
+      "name": "Скалка",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/skalka",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weaprollingpin.webp",
+      "projectId": "weapon_rolling_pin",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 1,
+      "cost": 10,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Инструмент для раскатки теста — прочный деревянный цилиндр с ручками или без. Достаточно тяжелый чтобы сдержать нападающих.",
+      "special": null,
+      "modsSlot": "Скалка",
+      "mods": [
+        {
+          "id": "mod_melee_pin_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Скалка",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_pin_sharp",
+          "name": "Заостренная",
+          "prefix": "Заостренная",
+          "slot": "Скалка",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        }
+      ]
+    },
+    {
+      "slug": "kuvalda",
+      "name": "Кувалда",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kuvalda",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo3_sledgehammer.webp",
+      "projectId": "weapon_sledgehammer",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 12,
+      "cost": 40,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Тяжелый металлический молот на длинной деревянной рукояти. До войны для дробления камней/разрушения конструкций. Медлителен, но в руках сильного — грозное оружие.",
+      "special": null,
+      "modsSlot": "Кувалда",
+      "mods": [
+        {
+          "id": "mod_melee_sledge_piercing",
+          "name": "Прокалывающая",
+          "prefix": "Прокалывающая",
+          "slot": "Кувалда",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1. Вес +5.",
+          "weightDelta": 5,
+          "weightDeltaRaw": "+5",
+          "costDelta": 18,
+          "costDeltaRaw": "+18",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        },
+        {
+          "id": "mod_melee_sledge_heavy",
+          "name": "Тяжелая",
+          "prefix": "Тяжелая",
+          "slot": "Кувалда",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК чистого урона. Вес +9 — самый тяжелый мод кувалды.",
+          "weightDelta": 9,
+          "weightDeltaRaw": "+9",
+          "costDelta": 30,
+          "costDeltaRaw": "+30",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "supermolot",
+      "name": "Супермолот",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/supermolot",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo3_supersledge.webp",
+      "projectId": "weapon_super_sledge",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Разрушающий",
+          "id": "effect_breaking",
+          "description": "Ломает защиту/броню цели"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 к сложности"
+        }
+      ],
+      "weight": 20,
+      "cost": 180,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Усовершенствованный молот. Довоенные — с кинетическими накопителями, послевоенные — с ракетным двигателем в головке для ускорения замаха.",
+      "special": null,
+      "modsSlot": "Супермолот",
+      "mods": [
+        {
+          "id": "mod_melee_supersledge_heating",
+          "name": "Нагревательная спираль",
+          "prefix": "Раскаленная",
+          "slot": "Супермолот",
+          "effectsRaw": "+1 БК, Измените тип урона на Энергетический",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+1 КК и меняет Физический урон на Энергетический (огонь).",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 180,
+          "costDeltaRaw": "+180",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        },
+        {
+          "id": "mod_melee_supersledge_stun",
+          "name": "Электрошокер",
+          "prefix": "Оглушающая",
+          "slot": "Супермолот",
+          "effectsRaw": "+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Оглушающий"],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Оглушающий + смена на Энергетический.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 360,
+          "costDeltaRaw": "+360",
+          "perks": "Кузнец 3, Наука! 1",
+          "perksEn": "Blacksmith 3, Science! 1"
+        }
+      ]
+    },
+    {
+      "slug": "balonnyj-klyuch",
+      "name": "Балонный ключ",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/balonnyj-klyuch",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_tire_iron.webp",
+      "projectId": "weapon_tire_iron",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 3,
+      "cost": 25,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Инструмент шоферов для снятия колес и разбортовки шин. За неимением лучшего — примитивное ударное холодное оружие.",
+      "special": null,
+      "modsSlot": "Ключ",
+      "mods": [
+        {
+          "id": "mod_melee_tireiron_bladed",
+          "name": "Лезвия",
+          "prefix": "Клинковый",
+          "slot": "Ключ",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 12,
+          "costDeltaRaw": "+12",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        }
+      ]
+    },
+    {
+      "slug": "trost",
+      "name": "Трость",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/trost",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_weapnvdresscane.webp",
+      "projectId": "weapon_walking_cane",
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [],
+      "weight": 2,
+      "cost": 10,
+      "rarity": 0,
+      "ammoType": null,
+      "description": "Простая ортопедическая трость для опоры при ходьбе. Достаточно прочна и оптимальной длины чтобы стать оружием.",
+      "special": null,
+      "modsSlot": "Трость",
+      "mods": [
+        {
+          "id": "mod_melee_cane_barbed",
+          "name": "Колючая",
+          "prefix": "Колючая",
+          "slot": "Трость",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_cane_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Трость",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "То же что и 'Колючая' — +1 КК + Проникающий 1 (вариант названия).",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        }
+      ]
+    },
+    {
+      "slug": "bokserskaya-perchatka",
+      "name": "Боксерская перчатка",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bokserskaya-perchatka",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fallout4_boxing_glove.webp",
+      "projectId": "weapon_boxing_glove",
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [
+        {
+          "name": "Оглушающий",
+          "id": "effect_stun",
+          "description": "Цель может быть Оглушена при Эффекте"
+        }
+      ],
+      "qualities": [],
+      "weight": 1,
+      "cost": 10,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Большая кожаная рукавица для защиты рук при ударах. Изначально для спорта, но с модификациями — сильные удары в драке.",
+      "special": null,
+      "modsSlot": "Перчатка",
+      "mods": [
+        {
+          "id": "mod_melee_boxing_spiked",
+          "name": "Шипастая",
+          "prefix": "Шипастая",
+          "slot": "Перчатка",
+          "effectsRaw": "Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_boxing_barbed",
+          "name": "Колючая",
+          "prefix": "Колючая",
+          "slot": "Перчатка",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 4,
+          "costDeltaRaw": "+4",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_boxing_lead",
+          "name": "Свинцовая подкладка",
+          "prefix": "Свинцовая",
+          "slot": "Перчатка",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК чистого урона, вес +1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 7,
+          "costDeltaRaw": "+7",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        }
+      ]
+    },
+    {
+      "slug": "perchatka-kogtya-smerti",
+      "name": "Перчатка когтя смерти",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-kogtya-smerti",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/Kogot.webp",
+      "projectId": "weapon_deathclaw_gauntlet",
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 10,
+      "cost": 75,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Из отрубленных пальцев и когтей Когтя смерти на манжете запястья — позволяет наносить удары с силой владельца когтей.",
+      "special": null,
+      "modsSlot": "Когти",
+      "mods": [
+        {
+          "id": "mod_melee_deathclaw_extra",
+          "name": "Дополнительный коготь",
+          "prefix": "Большая",
+          "slot": "Когти",
+          "effectsRaw": "+1 БК, при успешной атаке потратьте 2 ОД, чтобы обезоружить противника",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": "Обезоруживание за 2 ОД"
+          },
+          "whatItDoes": "+1 КК + прием Обезоруживание (2 ОД). Вес +2.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 22,
+          "costDeltaRaw": "+22",
+          "perks": "-",
+          "perksEn": "-"
+        }
+      ]
+    },
+    {
+      "slug": "kastet",
+      "name": "Кастет",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/kastet",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fo4_knuckles.webp",
+      "projectId": "weapon_knuckles",
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 3,
+      "damageDiceDisplay": "3 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Скрытное",
+          "id": "quality_concealed",
+          "description": "Четыре соединенных кольца — легко скрыть"
+        }
+      ],
+      "weight": 0.5,
+      "weightRaw": "<1",
+      "cost": 10,
+      "rarity": 1,
+      "ammoType": null,
+      "description": "Придумано в древности, распространено в пустошах. Четыре металлических кольца с дугой-упором, надеваются на пальцы — передает кинетику через меньшую площадь, резко увеличивает травму.",
+      "special": null,
+      "modsSlot": "Кастет",
+      "mods": [
+        {
+          "id": "mod_melee_knuckles_pointed",
+          "name": "Заостренный",
+          "prefix": "Заостренный",
+          "slot": "Кастет",
+          "effectsRaw": "добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Устойчивый.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_knuckles_spiked",
+          "name": "Шипованный",
+          "prefix": "Шипованный",
+          "slot": "Кастет",
+          "effectsRaw": "Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 3,
+          "costDeltaRaw": "+3",
+          "perks": "-",
+          "perksEn": "-"
+        },
+        {
+          "id": "mod_melee_knuckles_piercing",
+          "name": "Прокалывающий",
+          "prefix": "Прокалывающий",
+          "slot": "Кастет",
+          "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Проникающий 1.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 4,
+          "costDeltaRaw": "+4",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        },
+        {
+          "id": "mod_melee_knuckles_bladed",
+          "name": "Лезвия",
+          "prefix": "Клинковый",
+          "slot": "Кастет",
+          "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": ["Устойчивый"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Устойчивый.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 5,
+          "costDeltaRaw": "+5",
+          "perks": "Кузнец 1",
+          "perksEn": "Blacksmith 1"
+        }
+      ]
+    },
+    {
+      "slug": "silovoj-kastet",
+      "name": "Силовой кастет",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/silovoj-kastet",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/power_fist_fallout_4.webp",
+      "projectId": "weapon_power_fist",
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Оглушающий",
+          "id": "effect_stun",
+          "description": "Оглушение при Эффекте"
+        }
+      ],
+      "qualities": [],
+      "weight": 4,
+      "cost": 100,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Усиленная перчатка/наруч с пневматическим тараном на костяшках. Разработана для бригад подрывников, использовалась военными для прорыва укреплений.",
+      "special": null,
+      "modsSlot": "Кастет",
+      "mods": [
+        {
+          "id": "mod_melee_powerfist_piercing",
+          "name": "Прокалывающий",
+          "prefix": "Прокалывающий",
+          "slot": "Кастет",
+          "effectsRaw": "+2 БК, Добавляет \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК + Проникающий 1. Вес +1.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 45,
+          "costDeltaRaw": "+45",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        },
+        {
+          "id": "mod_melee_powerfist_heating",
+          "name": "Нагревательная спираль",
+          "prefix": "Раскаленный",
+          "slot": "Кастет",
+          "effectsRaw": "+2 БК, измените тип урона на \"Энергетический\"",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+2 КК и смена урона на Энергетический.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 100,
+          "costDeltaRaw": "+100",
+          "perks": "Кузнец 3",
+          "perksEn": "Blacksmith 3"
+        }
+      ]
+    },
+    {
+      "slug": "klinok-shturmotrona",
+      "name": "Клинок штурмотрона",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/klinok-shturmotrona",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/automatron_assaultron_blade.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 3,
+      "cost": 50,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Виброклинок от доминатора-штурмотрона, демонтированный и переделанный в оружие ближнего боя.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_assaultron_electrified",
+          "name": "Электризованное лезвие",
+          "prefix": "Электризованный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+1 КК + смена на Энергетический.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        }
+      ]
+    },
+    {
+      "slug": "avtotopor",
+      "name": "Автотопор",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/avtotopor",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76wl_autoaxe.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [
+        {
+          "name": "Порочный",
+          "id": "effect_vicious",
+          "description": "Атака наносит +1 урон за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручный",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 20,
+      "cost": 100,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Общие черты с Потрошителем, но более внушительный. Стальная пила с деталями автомобильного двигателя. Лезвие заменено на 4 топорных лезвия вокруг оси.",
+      "special": null,
+      "modsSlot": "Лезвие",
+      "mods": [
+        {
+          "id": "mod_melee_autoaxe_electrified",
+          "name": "Электризованное лезвие",
+          "prefix": "Электризованный",
+          "slot": "Лезвие",
+          "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "+1 КК + Энергетический.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        },
+        {
+          "id": "mod_melee_autoaxe_burning",
+          "name": "Горящее лезвие",
+          "prefix": "Горящее",
+          "slot": "Лезвие",
+          "effectsRaw": "Измените тип урона на \"Энергетический\", получает \"Стойкий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Стойкий (Persistent)"],
+            "changeDamageType": "Энергетический",
+            "special": null
+          },
+          "whatItDoes": "Меняет урон на Энергетический и добавляет Стойкий.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        },
+        {
+          "id": "mod_melee_autoaxe_poison",
+          "name": "Ядовитое лезвие",
+          "prefix": "Ядовитое",
+          "slot": "Лезвие",
+          "effectsRaw": "Добавляет \"Стойкий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Стойкий"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Стойкий (Persistent) к физическому урону.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        },
+        {
+          "id": "mod_melee_autoaxe_turbo",
+          "name": "Турбо",
+          "prefix": "Турбо",
+          "slot": "Лезвие",
+          "effectsRaw": "Каждое потраченное ОД на дополнительный урон прибавляет +2 БК, вместо +1 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": "Удвоенный бонус ОД -> урон"
+          },
+          "whatItDoes": "Меняет правило траты ОД на урон: 1 ОД = +2 КК вместо обычных +1 КК. Вес +2.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 50,
+          "costDeltaRaw": "+50",
+          "perks": "Кузнец 2, Наука! 1",
+          "perksEn": "Blacksmith 2, Science! 1"
+        }
+      ]
+    },
+    {
+      "slug": "ballisticheskij-kulak",
+      "name": "Баллистический кулак",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/ballisticheskij-kulak",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/ballisticfist.webp",
+      "projectId": null,
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Оглушение",
+          "id": "effect_stun",
+          "description": "Оглушение при Эффекте"
+        },
+        {
+          "name": "Порочный",
+          "id": "effect_vicious",
+          "description": "Атака наносит +1 урон за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Медленная перезарядка",
+          "id": "quality_slow_load",
+          "description": "Нужно перезарядить малым действием перед следующей атакой"
+        }
+      ],
+      "weight": 6,
+      "cost": 150,
+      "rarity": 4,
+      "ammoType": "Патроны для дробовика",
+      "ammoTypeEn": "ammo_shotgun_shell",
+      "ammoUse": "1 патрон за атаку",
+      "description": "Закрепленный на запястье дробовик с нажимной пластиной на костяшках. При ударе пластина срабатывает и выпускает заряд дроби.",
+      "special": "Требует 1 патрон для дробовика на каждую атаку. Из-за 'Медленной перезарядки' нужно перезарядить малым действием перед следующим использованием. Без патрона — обычная атака без оружия.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "bolshoj-mech",
+      "name": "Большой меч",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/bolshoj-mech",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/24/fnv_bumpersword.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Отдача",
+          "rating": 7,
+          "id": "quality_recoil_x",
+          "description": "Если СИЛ < 7, сложность атак +1. Игнорируется двумя руками/упором."
+        },
+        {
+          "name": "Двуручный",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками; одной рукой +2 сложности, но игнорирует Отдачу"
+        }
+      ],
+      "weight": 12,
+      "cost": 125,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Меч из бампера — хромированный автомобильный бампер расплющен и заточен в толстое тяжелое лезвие. Номерной знак все еще прикреплен, выхлопная труба служит рукояткой.",
+      "special": "Отдача 7: требует СИЛ 7+, иначе +1 сложность. Двуручный.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "elektroshoker",
+      "name": "Электрошокер",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/elektroshoker",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76wl_cattleprod.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Энергетический",
+      "damageTypeEn": "energy",
+      "damageDice": 7,
+      "damageDiceDisplay": "7 БК",
+      "effects": [
+        {
+          "name": "Оглушение",
+          "id": "effect_stun",
+          "description": "Оглушение при Эффекте"
+        }
+      ],
+      "qualities": [],
+      "weight": 3,
+      "cost": 90,
+      "rarity": 4,
+      "ammoType": null,
+      "description": "Обычно для управления скотом, переоборудован против людей. Толстая электрифицированная металлическая спираль вокруг ударной части, подключенная к паре батарей на рукояти.",
+      "special": null,
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "benzopila",
+      "name": "Бензопила",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/benzopila",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/chainsaw76.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Порочный",
+          "id": "effect_vicious",
+          "description": "Атака наносит +1 урон за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 12,
+      "cost": 140,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Механизированный инструмент для распила древесины с зубчатой цепью по краю лезвия. В умелых руках — смертоносное оружие.",
+      "special": "Не получает бонуса к урону в ближнем бою от характеристик пользователя (СИЛ не добавляется).",
+      "modsSlot": "Шина",
+      "mods": [
+        {
+          "id": "mod_melee_chainsaw_double",
+          "name": "Двойная шина",
+          "prefix": "Двойная",
+          "slot": "Шина",
+          "effectsRaw": "+2 БК",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "+2 КК.",
+          "weightDelta": 1,
+          "weightDeltaRaw": "+1",
+          "costDelta": 30,
+          "costDeltaRaw": "+30",
+          "perks": "Кузнец 2",
+          "perksEn": "Blacksmith 2"
+        },
+        {
+          "id": "mod_melee_chainsaw_curved",
+          "name": "Изогнутая шина",
+          "prefix": "Изогнутая",
+          "slot": "Шина",
+          "effectsRaw": "Получает \"Проникающий\" 1",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Проникающий 1"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Проникающий 1.",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 45,
+          "costDeltaRaw": "+45",
+          "perks": "Кузнец 3",
+          "perksEn": "Blacksmith 3"
+        },
+        {
+          "id": "mod_melee_chainsaw_long_curved",
+          "name": "Удлинённая изогнутая шина",
+          "prefix": "Удлинённая изогнутая",
+          "slot": "Шина",
+          "effectsRaw": "добавляет \"Стойкий\"",
+          "effectsParsed": {
+            "damageDiceBonus": 0,
+            "addEffects": ["Стойкий (Persistent)"],
+            "changeDamageType": null,
+            "special": null
+          },
+          "whatItDoes": "Добавляет Стойкий (Persistent).",
+          "weightDelta": 3,
+          "weightDeltaRaw": "+3",
+          "costDelta": 60,
+          "costDeltaRaw": "+60",
+          "perks": "Кузнец 3",
+          "perksEn": "Blacksmith 3"
+        },
+        {
+          "id": "mod_melee_chainsaw_flamer",
+          "name": "Огнемет",
+          "prefix": "Огненный",
+          "slot": "Шина",
+          "effectsRaw": "+1 БК, измените тип урона на \"Энергетический\", мод \"Огнемет\" может быть добавлен как дополнение к любому другому моду",
+          "effectsParsed": {
+            "damageDiceBonus": 1,
+            "addEffects": [],
+            "changeDamageType": "Энергетический",
+            "special": "Совместим с любым другим модом шины (доп. слот)"
+          },
+          "whatItDoes": "+1 КК + смена на Энергетический, можно совместить с любым другим модом шины (единственный стакующий мод).",
+          "weightDelta": 2,
+          "weightDeltaRaw": "+2",
+          "costDelta": 90,
+          "costDeltaRaw": "+90",
+          "perks": "Кузнец 3, Фанатик Оружия 1",
+          "perksEn": "Blacksmith 3, Gun Nut 1"
+        }
+      ]
+    },
+    {
+      "slug": "tanbo-smerti",
+      "name": "Танбо смерти",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tanbo-smerti",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/death_tambo.webp",
+      "projectId": null,
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [],
+      "weight": 1,
+      "cost": 40,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Что-то между кастетом и бубном — странная смесь колокольчиков и лезвий, созданная чтобы вонзаться кулаком с музыкальным сопровождением.",
+      "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звона.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "perchatka-vytesnitel",
+      "name": "Перчатка-вытеснитель",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/perchatka-vytesnitel",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/displacer_glove.webp",
+      "projectId": null,
+      "type": "Рукопашная",
+      "typeEn": "Unarmed",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        },
+        {
+          "name": "Оглушение",
+          "id": "effect_stun",
+          "description": "Оглушение при Эффекте"
+        }
+      ],
+      "qualities": [],
+      "weight": 6,
+      "cost": 175,
+      "rarity": 4,
+      "ammoType": null,
+      "description": "Продвинутый прибор для простой задачи. Динамик на костяшках создает звуковой удар, придающий дополнительную силу ударам.",
+      "special": null,
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "gitara-mech",
+      "name": "Гитара-меч",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/gitara-mech",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/guitar_sword_f76.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Парирование",
+          "id": "quality_parry",
+          "description": "Можно парировать"
+        }
+      ],
+      "weight": 3,
+      "cost": 45,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Меч в форме гитары — или гитара служащая мечом. После убийства скорее всего придется настроить.",
+      "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "tsirkulyarnyj-rezak-mistera-pomoshchnika",
+      "name": "Циркулярный резак Мистера Помощника",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/tsirkulyarnyj-rezak-mistera-pomoshchnika",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/mr._handy_buzz_blade.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Порочный",
+          "id": "effect_vicious",
+          "description": "Атака наносит +1 урон за каждый выпавший Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 10,
+      "cost": 50,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Пила-рука мистера Помощника, получившая новую жизнь на маленьком моторе и длинной рукояти (метла/триммер).",
+      "special": null,
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "universalnyj-topor",
+      "name": "Универсальный топор",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/universalnyj-topor",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/f76_multipurpose_axe.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 4,
+      "cost": 40,
+      "rarity": 2,
+      "ammoType": null,
+      "description": "Довоенный многофункциональный топор — одинаково хорошо рубит древесину и головы. Убедитесь что вы на правильной стороне удара.",
+      "special": null,
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "protonnyj-topor",
+      "name": "Протонный топор",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/protonnyj-topor",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/protonaxe.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Всплеск",
+          "id": "quality_blast",
+          "description": "Урон по зоне/всплеск — по нескольким целям рядом"
+        }
+      ],
+      "weight": 8,
+      "cost": 175,
+      "rarity": 5,
+      "ammoType": null,
+      "description": "Футуристический военный топор со светящимся лезвием электрической энергии. На обратной стороне два конденсатора с синим разрядом. Мощный электрический выброс особенно опасен для роботов.",
+      "special": "Особо эффективен против роботов и механики.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "voennyj-baraban",
+      "name": "Военный барабан",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/voennyj-baraban",
+      "image": "https://www.fallout-2d20.ru/images/2025/04/25/wardrum.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 5,
+      "damageDiceDisplay": "5 БК",
+      "effects": [
+        {
+          "name": "Оглушение",
+          "id": "effect_stun",
+          "description": "Оглушение при Эффекте"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручное",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 20,
+      "cost": 115,
+      "rarity": 3,
+      "ammoType": null,
+      "description": "Металлический барабан на металлическом столбе с прикрепленными банками с гвоздями на ободке. Добавляет перкуссии к сотрясениям.",
+      "special": "При скрытной атаке увеличивает диапазон Осложнений на 1 из-за звука.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "posokh-atoma",
+      "name": "Посох Атома",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/posokh-atoma",
+      "image": "https://www.fallout-2d20.ru/images/2025/05/11/fo76wa_shepherds_crook.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 6,
+      "damageDiceDisplay": "6 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 1,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 1 СУ за Эффект"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Парирование",
+          "id": "quality_parry",
+          "description": "Можно парировать"
+        },
+        {
+          "name": "Двуручный",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 15,
+      "cost": 200,
+      "rarity": 4,
+      "ammoType": null,
+      "description": "Усиленный металлический посох ~1.5м с символом Атома на золотом диске наверху. Кинетические накопители вдоль рукояти увеличивают силу удара. Длина дает маневренность для отражения ударов.",
+      "special": null,
+      "modsSlot": "Посох",
+      "mods": [
+        {
+          "id": "mod_melee_staff_shocking",
+          "name": "Шокирующие катушки",
+          "prefix": "Стремительный",
+          "slot": "Посох",
+          "effectsRaw": "+2 БК, Наносит оба вида урона, Физический и Энергетический",
+          "effectsParsed": {
+            "damageDiceBonus": 2,
+            "addEffects": [],
+            "changeDamageType": "Физический + Энергетический (оба)",
+            "special": "Дуальный урон"
+          },
+          "whatItDoes": "+2 КК и наносит оба типа урона одновременно — проходит по меньшей из двух СУ? По правилам наносит оба типа сразу.",
+          "weightDelta": 0,
+          "weightDeltaRaw": "-",
+          "costDelta": 100,
+          "costDeltaRaw": "+100",
+          "perks": "Кузнец 2, Наука! 2",
+          "perksEn": "Blacksmith 2, Science! 2"
+        }
+      ]
+    },
+    {
+      "slug": "shakhterskij-perforator",
+      "name": "Шахтерский перфоратор",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/shakhterskij-perforator",
+      "image": "https://www.fallout-2d20.ru/images/2025/05/13/fo76gd_drill_fist.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 2,
+      "damageDiceDisplay": "2 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 2,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 2 СУ за каждый Эффект"
+        },
+        {
+          "name": "Разрушающий",
+          "id": "effect_breaking",
+          "description": "Ломает броню"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Двуручный",
+          "id": "quality_two-handed",
+          "description": "Нужно держать обеими руками"
+        }
+      ],
+      "weight": 18,
+      "cost": 100,
+      "rarity": 4,
+      "ammoType": null,
+      "description": "Горнодобывающая дрель для пробивания твердых пород и закладки динамита. Неуклюжая но эффективная — проходит сквозь броню как нож сквозь масло.",
+      "special": "Встроена ячейка с Ядерной батареей: можно потратить 1-3 заряда ячейки чтобы добавить 1-3 БК к базовому урону при атаке.",
+      "modsSlot": null,
+      "mods": []
+    },
+    {
+      "slug": "svarochnaya-gorelka",
+      "name": "Сварочная горелка",
+      "url": "https://www.fallout-2d20.ru/oruzhie/oruzhie-blizhnego-boya/svarochnaya-gorelka",
+      "image": "https://www.fallout-2d20.ru/images/2025/05/13/blowtorch.webp",
+      "projectId": null,
+      "type": "Ближний бой",
+      "typeEn": "Melee",
+      "damageType": "Физический",
+      "damageTypeEn": "physical",
+      "damageDice": 4,
+      "damageDiceDisplay": "4 БК",
+      "effects": [
+        {
+          "name": "Проникающий",
+          "rating": 3,
+          "id": "effect_piercing_x",
+          "description": "Игнорирует 3 СУ за каждый Эффект"
+        },
+        {
+          "name": "Устойчивый",
+          "id": "effect_persistent",
+          "description": "Устойчивый урон (Persistent)"
+        }
+      ],
+      "qualities": [
+        {
+          "name": "Ослабляющее",
+          "id": "quality_debilitating",
+          "description": "Изнуряющее — истощает цель"
+        },
+        {
+          "name": "Неточный",
+          "id": "quality_inaccurate",
+          "description": "Неточное — +1 к сложности атаки"
+        },
+        {
+          "name": "Топливо",
+          "id": "quality_fuel",
+          "description": "Требует Топливо для огнемета = базовому урону (4). При Осложнении топливо кончается, нужна перезарядка малым действием."
+        }
+      ],
+      "weight": 15,
+      "cost": 120,
+      "rarity": 4,
+      "ammoType": "Топливо для огнемета",
+      "ammoTypeEn": "ammo_flamer_fuel",
+      "ammoUse": "4 единицы топлива на заправку = базовому урону",
+      "description": "Использовались для горнодобычи: резка балок, ремонт конструкций, прожигание силовой брони. Мало какие проблемы не решаются несколькими тысячами градусов по Фаренгейту.",
+      "special": "Свойство ТОПЛИВО (Топливо для огнемета): нужно 4 топлива для работы. При выпадении Осложнения при атаке топливо заканчивается и нужна перезарядка (малое действие) перед следующим использованием.",
+      "modsSlot": null,
+      "mods": []
+    }
+  ],
+  "modsFlat": [
+    {
+      "id": "mod_melee_switchblade_serrated",
+      "name": "Зазубренное лезвие",
+      "prefix": "Зазубренный",
+      "slot": "Лезвие",
+      "appliesTo": ["Выкидной нож"],
+      "appliesToSlugs": ["vykidnoj-nozh"],
+      "appliesToProjectIds": ["weapon_switchblade"],
+      "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+      "whatItDoes": "Увеличивает урон на +1 КК и добавляет эффект Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 10,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_baton_electrified",
+      "name": "Электризованная",
+      "prefix": "Шокирующая",
+      "slot": "Дубинка",
+      "appliesTo": ["Дубинка"],
+      "appliesToSlugs": ["dubinka"],
+      "appliesToProjectIds": ["weapon_baton"],
+      "effectsRaw": "+2 БК, Измените тип урона на \"Энергетический\"",
+      "whatItDoes": "Меняет тип урона на Энергетический и +2 КК",
+      "weightDelta": 0,
+      "costDelta": 15,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_baton_stun",
+      "name": "Электрошокер",
+      "prefix": "Оглушающая",
+      "slot": "Дубинка",
+      "effectsRaw": "+3 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+      "whatItDoes": "+3 КК, Энергетический, добавляет Оглушающий",
+      "weightDelta": 0,
+      "costDelta": 30,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_sword_serrated",
+      "name": "Зазубренное лезвие",
+      "prefix": "Зазубренный",
+      "slot": "Лезвие",
+      "appliesTo": ["Меч"],
+      "appliesToSlugs": ["mech"],
+      "appliesToProjectIds": ["weapon_sword"],
+      "effectsRaw": "Добавляет \"Устойчивый\"",
+      "whatItDoes": "Добавляет Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 25,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_sword_electrified",
+      "name": "Электризованное лезвие",
+      "prefix": "Электризованный",
+      "slot": "Лезвие",
+      "appliesTo": ["Меч", "Клинок штурмотрона"],
+      "appliesToSlugs": ["mech", "klinok-shturmotrona"],
+      "appliesToProjectIds": ["weapon_sword"],
+      "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+      "whatItDoes": "+1 КК, меняет урон на Энергетический",
+      "weightDelta": 0,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_sword_electrified_serrated",
+      "name": "Электризованное зазубренное лезвие",
+      "prefix": "Электризованный зазубренный",
+      "slot": "Лезвие",
+      "appliesTo": ["Меч"],
+      "appliesToSlugs": ["mech"],
+      "appliesToProjectIds": ["weapon_sword"],
+      "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\", добавляет \"Устойчивый\" (Физический)",
+      "whatItDoes": "+1 КК, урон Энергетический, но добавляет Устойчивый (Физический)",
+      "weightDelta": 0,
+      "costDelta": 75,
+      "perks": "Кузнец 3, Наука! 1"
+    },
+    {
+      "id": "mod_melee_sword_stun",
+      "name": "Электрошокер",
+      "prefix": "Оглушающий",
+      "slot": "Лезвие",
+      "appliesTo": ["Меч"],
+      "appliesToSlugs": ["mech"],
+      "appliesToProjectIds": ["weapon_sword"],
+      "effectsRaw": "+2 БК, измените тип урона на \"Энергетический\", добавляет \"Оглушающий\"",
+      "whatItDoes": "+2 КК, Энергетический + Оглушающий",
+      "weightDelta": 0,
+      "costDelta": 100,
+      "perks": "Кузнец 3, Наука! 1"
+    },
+    {
+      "id": "mod_melee_combatknife_serrated",
+      "name": "Зазубренное лезвие",
+      "prefix": "Зазубренный",
+      "slot": "Лезвие",
+      "appliesTo": ["Боевой нож"],
+      "appliesToSlugs": ["boevoj-nozh"],
+      "appliesToProjectIds": ["weapon_combat_knife"],
+      "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 12,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_combatknife_stealth",
+      "name": "Скрытное лезвие",
+      "prefix": "Скрытный",
+      "slot": "Лезвие",
+      "appliesTo": ["Боевой нож"],
+      "appliesToSlugs": ["boevoj-nozh"],
+      "appliesToProjectIds": ["weapon_combat_knife"],
+      "effectsRaw": "+1 БК, Добавляет \"Устойчивый\", +2 БК при скрытных атаках",
+      "whatItDoes": "+1 КК + Устойчивый, +2 КК дополнительно при скрытной атаке (итого +3 КК в скрыте)",
+      "weightDelta": 0,
+      "costDelta": 18,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_machete_serrated",
+      "name": "Зазубренное лезвие",
+      "prefix": "Зазубренный",
+      "slot": "Лезвие",
+      "appliesTo": ["Мачете"],
+      "appliesToSlugs": ["machete"],
+      "appliesToProjectIds": ["weapon_machete"],
+      "effectsRaw": "+2 БК, Добавляет \"Устойчивый\"",
+      "whatItDoes": "+2 КК + Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 12,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_ripper_curved",
+      "name": "Изогнутое лезвие",
+      "prefix": "Изогнутый",
+      "slot": "Лезвие",
+      "appliesTo": ["Потрошитель"],
+      "appliesToSlugs": ["potroshitel"],
+      "appliesToProjectIds": ["weapon_ripper"],
+      "effectsRaw": "+1 БК, При успешной атаке потратьте 2 ОД, чтобы обезоружить",
+      "whatItDoes": "+1 КК + прием Обезоруживание (2 ОД)",
+      "weightDelta": 1,
+      "costDelta": 15,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_ripper_extended",
+      "name": "Удлиненное лезвие",
+      "prefix": "Удлиненный",
+      "slot": "Лезвие",
+      "appliesTo": ["Потрошитель"],
+      "appliesToSlugs": ["potroshitel"],
+      "appliesToProjectIds": ["weapon_ripper"],
+      "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 3,
+      "costDelta": 25,
+      "perks": "Кузнец 3"
+    },
+    {
+      "id": "mod_melee_shish_extra_jets",
+      "name": "Дополнительные воспламенительные форсунки",
+      "prefix": "Жгучий",
+      "slot": "Лезвие",
+      "appliesTo": ["Шиш-кебаб"],
+      "appliesToSlugs": ["shish-kebab"],
+      "appliesToProjectIds": ["weapon_shishkebab"],
+      "effectsRaw": "+1 БК, Добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 1,
+      "costDelta": 100,
+      "perks": "Кузнец 3"
+    },
+    {
+      "id": "mod_melee_board_spiked",
+      "name": "Шипованный",
+      "prefix": "Шипованный",
+      "slot": "Дрын",
+      "appliesTo": ["Дрын"],
+      "appliesToSlugs": ["dryn"],
+      "appliesToProjectIds": ["weapon_board"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1",
+      "weightDelta": 1,
+      "costDelta": 6,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_board_piercing",
+      "name": "Прокалывающий",
+      "prefix": "Прокалывающий",
+      "slot": "Дрын",
+      "appliesTo": ["Дрын"],
+      "appliesToSlugs": ["dryn"],
+      "appliesToProjectIds": ["weapon_board"],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК",
+      "weightDelta": 1,
+      "costDelta": 10,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_board_bladed",
+      "name": "Лезвия",
+      "prefix": "Клинковый",
+      "slot": "Дрын",
+      "appliesTo": ["Дрын", "Бейсбольная бита", "Алюминиевая бейсбольная бита", "Кастет", "Балонный ключ"],
+      "appliesToSlugs": ["dryn", "bejsbolnaya-bita", "alyuminievaya-bejsbolnaya-bita", "kastet", "balonnyj-klyuch"],
+      "appliesToProjectIds": ["weapon_board", "weapon_baseball_bat", "weapon_baseball_bat_aluminum", "weapon_knuckles", "weapon_tire_iron"],
+      "effectsRaw": "+2 БК, добавляет \"Устойчивый\"",
+      "whatItDoes": "+2 КК + Устойчивый",
+      "weightDelta": 2,
+      "costDelta": 10,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_pipe_spiked",
+      "name": "Шипастая",
+      "prefix": "Шипастая",
+      "slot": "Труба",
+      "appliesTo": ["Свинцовая труба"],
+      "appliesToSlugs": ["svintsovaya-truba"],
+      "appliesToProjectIds": ["weapon_lead_pipe"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1",
+      "weightDelta": 1,
+      "costDelta": 4,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_pipe_heavy",
+      "name": "Утяжеленная",
+      "prefix": "Утяжеленная",
+      "slot": "Труба",
+      "appliesTo": ["Свинцовая труба"],
+      "appliesToSlugs": ["svintsovaya-truba"],
+      "appliesToProjectIds": ["weapon_lead_pipe"],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК",
+      "weightDelta": 2,
+      "costDelta": 11,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_wrench_hook",
+      "name": "Крюк",
+      "prefix": "Загнутый",
+      "slot": "Ключ",
+      "appliesTo": ["Разводной ключ"],
+      "appliesToSlugs": ["razvodnoj-klyuch"],
+      "appliesToProjectIds": ["weapon_pipe_wrench"],
+      "effectsRaw": "+1 БК, Обезоруживание за 2 ОД",
+      "whatItDoes": "+1 КК + Обезоруживание (2 ОД)",
+      "weightDelta": 0,
+      "costDelta": 9,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_wrench_heavy",
+      "name": "Утяжеленный",
+      "prefix": "Увесистый",
+      "slot": "Ключ",
+      "appliesTo": ["Разводной ключ"],
+      "appliesToSlugs": ["razvodnoj-klyuch"],
+      "appliesToProjectIds": ["weapon_pipe_wrench"],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК, вес +7",
+      "weightDelta": 7,
+      "costDelta": 12,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_wrench_piercing",
+      "name": "Прокалывающий",
+      "prefix": "Прокалывающий",
+      "slot": "Ключ",
+      "appliesTo": ["Разводной ключ"],
+      "appliesToSlugs": ["razvodnoj-klyuch"],
+      "appliesToProjectIds": ["weapon_pipe_wrench"],
+      "effectsRaw": "+2 БК, добавляет \"Проникающий\"",
+      "whatItDoes": "+2 КК + Проникающий",
+      "weightDelta": 1,
+      "costDelta": 13,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_wrench_extra_heavy",
+      "name": "Сверхтяжелый",
+      "prefix": "Сверхтяжелый",
+      "slot": "Ключ",
+      "appliesTo": ["Разводной ключ"],
+      "appliesToSlugs": ["razvodnoj-klyuch"],
+      "appliesToProjectIds": ["weapon_pipe_wrench"],
+      "effectsRaw": "+3 БК",
+      "whatItDoes": "+3 КК",
+      "weightDelta": 2,
+      "costDelta": 22,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_cue_piercing",
+      "name": "Прокалывающий",
+      "prefix": "Прокалывающий",
+      "slot": "Кий",
+      "appliesTo": ["Бильярдный кий"],
+      "appliesToSlugs": ["bilyardnyj-kij"],
+      "appliesToProjectIds": ["weapon_pool_cue"],
+      "effectsRaw": "Добавляет \"Проникающий\" 1",
+      "whatItDoes": "Добавляет Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 2,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_cue_pointed",
+      "name": "Заостренный",
+      "prefix": "Заостренный",
+      "slot": "Кий",
+      "appliesTo": ["Бильярдный кий"],
+      "appliesToSlugs": ["bilyardnyj-kij"],
+      "appliesToProjectIds": ["weapon_pool_cue"],
+      "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_pin_spiked",
+      "name": "Шипастая",
+      "prefix": "Шипастая",
+      "slot": "Скалка",
+      "appliesTo": ["Скалка"],
+      "appliesToSlugs": ["skalka"],
+      "appliesToProjectIds": ["weapon_rolling_pin"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_pin_sharp",
+      "name": "Заостренная",
+      "prefix": "Заостренная",
+      "slot": "Скалка",
+      "appliesTo": ["Скалка"],
+      "appliesToSlugs": ["skalka"],
+      "appliesToProjectIds": ["weapon_rolling_pin"],
+      "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_sledge_piercing",
+      "name": "Прокалывающая",
+      "prefix": "Прокалывающая",
+      "slot": "Кувалда",
+      "appliesTo": ["Кувалда"],
+      "appliesToSlugs": ["kuvalda"],
+      "appliesToProjectIds": ["weapon_sledgehammer"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1, вес +5",
+      "weightDelta": 5,
+      "costDelta": 18,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_sledge_heavy",
+      "name": "Тяжелая",
+      "prefix": "Тяжелая",
+      "slot": "Кувалда",
+      "appliesTo": ["Кувалда"],
+      "appliesToSlugs": ["kuvalda"],
+      "appliesToProjectIds": ["weapon_sledgehammer"],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК, вес +9",
+      "weightDelta": 9,
+      "costDelta": 30,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_supersledge_heating",
+      "name": "Нагревательная спираль",
+      "prefix": "Раскаленная",
+      "slot": "Супермолот",
+      "appliesTo": ["Супермолот"],
+      "appliesToSlugs": ["supermolot"],
+      "appliesToProjectIds": ["weapon_super_sledge"],
+      "effectsRaw": "+1 БК, Измените тип урона на Энергетический",
+      "whatItDoes": "+1 КК, смена на Энергетический",
+      "weightDelta": 0,
+      "costDelta": 180,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_supersledge_stun",
+      "name": "Электрошокер",
+      "prefix": "Оглушающая",
+      "slot": "Супермолот",
+      "appliesTo": ["Супермолот"],
+      "appliesToSlugs": ["supermolot"],
+      "appliesToProjectIds": ["weapon_super_sledge"],
+      "effectsRaw": "+2 БК, добавляет \"Оглушающий\", измените тип урона на Энергетический",
+      "whatItDoes": "+2 КК + Оглушающий + Энергетический",
+      "weightDelta": 0,
+      "costDelta": 360,
+      "perks": "Кузнец 3, Наука! 1"
+    },
+    {
+      "id": "mod_melee_boxing_spiked",
+      "name": "Шипастая",
+      "prefix": "Шипастая",
+      "slot": "Перчатка",
+      "appliesTo": ["Боксерская перчатка"],
+      "appliesToSlugs": ["bokserskaya-perchatka"],
+      "appliesToProjectIds": ["weapon_boxing_glove"],
+      "effectsRaw": "Добавляет \"Проникающий\" 1",
+      "whatItDoes": "Добавляет Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_boxing_barbed",
+      "name": "Колючая",
+      "prefix": "Колючая",
+      "slot": "Перчатка",
+      "appliesTo": ["Боксерская перчатка"],
+      "appliesToSlugs": ["bokserskaya-perchatka"],
+      "appliesToProjectIds": ["weapon_boxing_glove"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 4,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_boxing_lead",
+      "name": "Свинцовая подкладка",
+      "prefix": "Свинцовая",
+      "slot": "Перчатка",
+      "appliesTo": ["Боксерская перчатка"],
+      "appliesToSlugs": ["bokserskaya-perchatka"],
+      "appliesToProjectIds": ["weapon_boxing_glove"],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК, вес +1",
+      "weightDelta": 1,
+      "costDelta": 7,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_deathclaw_extra",
+      "name": "Дополнительный коготь",
+      "prefix": "Большая",
+      "slot": "Когти",
+      "appliesTo": ["Перчатка когтя смерти"],
+      "appliesToSlugs": ["perchatka-kogtya-smerti"],
+      "appliesToProjectIds": ["weapon_deathclaw_gauntlet"],
+      "effectsRaw": "+1 БК, Обезоруживание за 2 ОД",
+      "whatItDoes": "+1 КК + Обезоруживание (2 ОД), вес +2",
+      "weightDelta": 2,
+      "costDelta": 22,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_knuckles_pointed",
+      "name": "Заостренный",
+      "prefix": "Заостренный",
+      "slot": "Кастет",
+      "appliesTo": ["Кастет"],
+      "appliesToSlugs": ["kastet"],
+      "appliesToProjectIds": ["weapon_knuckles"],
+      "effectsRaw": "добавляет \"Устойчивый\"",
+      "whatItDoes": "Добавляет Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_knuckles_spiked",
+      "name": "Шипованный",
+      "prefix": "Шипованный",
+      "slot": "Кастет",
+      "appliesTo": ["Кастет"],
+      "appliesToSlugs": ["kastet"],
+      "appliesToProjectIds": ["weapon_knuckles"],
+      "effectsRaw": "Добавляет \"Проникающий\" 1",
+      "whatItDoes": "Добавляет Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 3,
+      "perks": "-"
+    },
+    {
+      "id": "mod_melee_knuckles_piercing",
+      "name": "Прокалывающий",
+      "prefix": "Прокалывающий",
+      "slot": "Кастет",
+      "appliesTo": ["Кастет"],
+      "appliesToSlugs": ["kastet"],
+      "appliesToProjectIds": ["weapon_knuckles"],
+      "effectsRaw": "+1 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+1 КК + Проникающий 1",
+      "weightDelta": 0,
+      "costDelta": 4,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_knuckles_bladed",
+      "name": "Лезвия",
+      "prefix": "Клинковый",
+      "slot": "Кастет",
+      "appliesTo": ["Кастет"],
+      "appliesToSlugs": ["kastet"],
+      "appliesToProjectIds": ["weapon_knuckles"],
+      "effectsRaw": "+1 БК, добавляет \"Устойчивый\"",
+      "whatItDoes": "+1 КК + Устойчивый",
+      "weightDelta": 0,
+      "costDelta": 5,
+      "perks": "Кузнец 1"
+    },
+    {
+      "id": "mod_melee_powerfist_piercing",
+      "name": "Прокалывающий",
+      "prefix": "Прокалывающий",
+      "slot": "Кастет",
+      "appliesTo": ["Силовой кастет"],
+      "appliesToSlugs": ["silovoj-kastet"],
+      "appliesToProjectIds": ["weapon_power_fist"],
+      "effectsRaw": "+2 БК, Добавляет \"Проникающий\" 1",
+      "whatItDoes": "+2 КК + Проникающий 1, вес +1",
+      "weightDelta": 1,
+      "costDelta": 45,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_powerfist_heating",
+      "name": "Нагревательная спираль",
+      "prefix": "Раскаленный",
+      "slot": "Кастет",
+      "appliesTo": ["Силовой кастет"],
+      "appliesToSlugs": ["silovoj-kastet"],
+      "appliesToProjectIds": ["weapon_power_fist"],
+      "effectsRaw": "+2 БК, измените тип урона на \"Энергетический\"",
+      "whatItDoes": "+2 КК, смена на Энергетический",
+      "weightDelta": 0,
+      "costDelta": 100,
+      "perks": "Кузнец 3"
+    },
+    {
+      "id": "mod_melee_assaultron_electrified",
+      "name": "Электризованное лезвие",
+      "prefix": "Электризованный",
+      "slot": "Лезвие",
+      "appliesTo": ["Клинок штурмотрона"],
+      "appliesToSlugs": ["klinok-shturmotrona"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+      "whatItDoes": "+1 КК + Энергетический",
+      "weightDelta": 0,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_autoaxe_electrified",
+      "name": "Электризованное лезвие",
+      "prefix": "Электризованный",
+      "slot": "Лезвие",
+      "appliesTo": ["Автотопор"],
+      "appliesToSlugs": ["avtotopor"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "+1 БК, Измените тип урона на \"Энергетический\"",
+      "whatItDoes": "+1 КК + Энергетический",
+      "weightDelta": 0,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_autoaxe_burning",
+      "name": "Горящее лезвие",
+      "prefix": "Горящее",
+      "slot": "Лезвие",
+      "appliesTo": ["Автотопор"],
+      "appliesToSlugs": ["avtotopor"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "Измените тип урона на \"Энергетический\", получает \"Стойкий\"",
+      "whatItDoes": "Меняет на Энергетический + Стойкий",
+      "weightDelta": 0,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_autoaxe_poison",
+      "name": "Ядовитое лезвие",
+      "prefix": "Ядовитое",
+      "slot": "Лезвие",
+      "appliesTo": ["Автотопор"],
+      "appliesToSlugs": ["avtotopor"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "Добавляет \"Стойкий\"",
+      "whatItDoes": "Добавляет Стойкий",
+      "weightDelta": 0,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_autoaxe_turbo",
+      "name": "Турбо",
+      "prefix": "Турбо",
+      "slot": "Лезвие",
+      "appliesTo": ["Автотопор"],
+      "appliesToSlugs": ["avtotopor"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "Каждое ОД на урон = +2 БК вместо +1 БК",
+      "whatItDoes": "Удваивает бонус ОД->урон (+2 КК за 1 ОД), вес +2",
+      "weightDelta": 2,
+      "costDelta": 50,
+      "perks": "Кузнец 2, Наука! 1"
+    },
+    {
+      "id": "mod_melee_chainsaw_double",
+      "name": "Двойная шина",
+      "prefix": "Двойная",
+      "slot": "Шина",
+      "appliesTo": ["Бензопила"],
+      "appliesToSlugs": ["benzopila"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "+2 БК",
+      "whatItDoes": "+2 КК",
+      "weightDelta": 1,
+      "costDelta": 30,
+      "perks": "Кузнец 2"
+    },
+    {
+      "id": "mod_melee_chainsaw_curved",
+      "name": "Изогнутая шина",
+      "prefix": "Изогнутая",
+      "slot": "Шина",
+      "appliesTo": ["Бензопила"],
+      "appliesToSlugs": ["benzopila"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "Получает \"Проникающий\" 1",
+      "whatItDoes": "Добавляет Проникающий 1",
+      "weightDelta": 2,
+      "costDelta": 45,
+      "perks": "Кузнец 3"
+    },
+    {
+      "id": "mod_melee_chainsaw_long_curved",
+      "name": "Удлинённая изогнутая шина",
+      "prefix": "Удлинённая изогнутая",
+      "slot": "Шина",
+      "appliesTo": ["Бензопила"],
+      "appliesToSlugs": ["benzopila"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "добавляет \"Стойкий\"",
+      "whatItDoes": "Добавляет Стойкий",
+      "weightDelta": 3,
+      "costDelta": 60,
+      "perks": "Кузнец 3"
+    },
+    {
+      "id": "mod_melee_chainsaw_flamer",
+      "name": "Огнемет",
+      "prefix": "Огненный",
+      "slot": "Шина",
+      "appliesTo": ["Бензопила"],
+      "appliesToSlugs": ["benzopila"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "+1 БК, измените тип урона на \"Энергетический\", совместим с любым другим модом",
+      "whatItDoes": "+1 КК + Энергетический, можно сложить с другим модом шины",
+      "weightDelta": 2,
+      "costDelta": 90,
+      "perks": "Кузнец 3, Фанатик Оружия 1"
+    },
+    {
+      "id": "mod_melee_staff_shocking",
+      "name": "Шокирующие катушки",
+      "prefix": "Стремительный",
+      "slot": "Посох",
+      "appliesTo": ["Посох Атома"],
+      "appliesToSlugs": ["posokh-atoma"],
+      "appliesToProjectIds": [],
+      "effectsRaw": "+2 БК, Наносит оба вида урона, Физический и Энергетический",
+      "whatItDoes": "+2 КК, наносит оба типа урона одновременно (Физ+Энерг)",
+      "weightDelta": 0,
+      "costDelta": 100,
+      "perks": "Кузнец 2, Наука! 2"
+    }
+  ],
+  "integration": {
+    "projectWeaponsFile": "modules/fallout/data/equipment/weapons.json",
+    "projectWeaponsI18n": "modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json",
+    "projectModsFile": "modules/fallout/data/equipment/weapon_mods.json",
+    "projectModsI18n": "modules/fallout/i18n/ru-RU/data/equipment/weapon_mods.json",
+    "existingWeaponsInProject": [
+      "weapon_switchblade",
+      "weapon_baton",
+      "weapon_sword",
+      "weapon_combat_knife",
+      "weapon_machete",
+      "weapon_ripper",
+      "weapon_shishkebab",
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum",
+      "weapon_board",
+      "weapon_lead_pipe",
+      "weapon_pipe_wrench",
+      "weapon_pool_cue",
+      "weapon_rolling_pin",
+      "weapon_sledgehammer",
+      "weapon_super_sledge",
+      "weapon_tire_iron",
+      "weapon_walking_cane",
+      "weapon_boxing_glove",
+      "weapon_deathclaw_gauntlet",
+      "weapon_knuckles",
+      "weapon_power_fist"
+    ],
+    "missingInProjectNew": [
+      {
+        "slug": "klinok-shturmotrona",
+        "name": "Клинок штурмотрона",
+        "suggestedId": "weapon_assaultron_blade",
+        "reason": "Автоматрон DLC, робо-оружие переделанное для человека"
+      },
+      {
+        "slug": "avtotopor",
+        "name": "Автотопор",
+        "suggestedId": "weapon_auto_axe",
+        "reason": "Fallout 76"
+      },
+      {
+        "slug": "ballisticheskij-kulak",
+        "name": "Баллистический кулак",
+        "suggestedId": "weapon_ballistic_fist",
+        "reason": "FNV, дробовик+кулак, требует патронов дробовика"
+      },
+      {
+        "slug": "bolshoj-mech",
+        "name": "Большой меч",
+        "suggestedId": "weapon_bumper_sword",
+        "reason": "FNV, меч из бампера, Отдача 7"
+      },
+      {
+        "slug": "elektroshoker",
+        "name": "Электрошокер",
+        "suggestedId": "weapon_cattle_prod",
+        "reason": "Fallout 76, 7КК Энергетический"
+      },
+      {
+        "slug": "benzopila",
+        "name": "Бензопила",
+        "suggestedId": "weapon_chainsaw",
+        "reason": "76, без бонуса СИЛ, шина-моды"
+      },
+      {
+        "slug": "tanbo-smerti",
+        "name": "Танбо смерти",
+        "suggestedId": "weapon_death_tambo",
+        "reason": "76, музыкальный шум +1 осложнение в скрыте"
+      },
+      {
+        "slug": "perchatka-vytesnitel",
+        "name": "Перчатка-вытеснитель",
+        "suggestedId": "weapon_displacer_glove",
+        "reason": "FNV, звуковой удар, 6КК"
+      },
+      {
+        "slug": "gitara-mech",
+        "name": "Гитара-меч",
+        "suggestedId": "weapon_guitar_sword",
+        "reason": "76, гитара, шум +1 осложнение"
+      },
+      {
+        "slug": "tsirkulyarnyj-rezak-mistera-pomoshchnika",
+        "name": "Циркулярный резак Мистера Помощника",
+        "suggestedId": "weapon_buzz_blade",
+        "reason": "Рука-пила Мистера Помощника"
+      },
+      {
+        "slug": "universalnyj-topor",
+        "name": "Универсальный топор",
+        "suggestedId": "weapon_multipurpose_axe",
+        "reason": "76, топор-инструмент"
+      },
+      {
+        "slug": "protonnyj-topor",
+        "name": "Протонный топор",
+        "suggestedId": "weapon_proton_axe",
+        "reason": "FNV OWB, Всплеск, анти-робот"
+      },
+      {
+        "slug": "voennyj-baraban",
+        "name": "Военный барабан",
+        "suggestedId": "weapon_war_drum",
+        "reason": "76, барабан с гвоздями, шум +1 осложнение"
+      },
+      {
+        "slug": "posokh-atoma",
+        "name": "Посох Атома",
+        "suggestedId": "weapon_shepherds_crook",
+        "reason": "Far Harbor / Дети Атома, посох пастыря"
+      },
+      {
+        "slug": "shakhterskij-perforator",
+        "name": "Шахтерский перфоратор",
+        "suggestedId": "weapon_drill",
+        "reason": "76, Проникающий 2 + Разрушающий, тратит Ядерную батарею"
+      },
+      {
+        "slug": "svarochnaya-gorelka",
+        "name": "Сварочная горелка",
+        "suggestedId": "weapon_blowtorch",
+        "reason": "76, Проникающий 3, Топливо для огнемета, Ослабляющее+Неточный"
+      }
+    ],
+    "howToImport": "1) В modules/fallout/data/equipment/weapons.json добавить объекты из секции weapons (переведя поля в формат проекта: damage, damageType, qualities [{qualityId}], effects [{effectId,value}], weight, cost, rarity, weaponType:'Melee'/'Unarmed'). 2) В modules/fallout/i18n/ru-RU/data/equipment/weapons/weapons.json добавить name/flavour. 3) В modules/fallout/data/equipment/weapon_mods.json добавить моды из modsFlat (с полями slot, applies_to_ids, damageModifier, qualityChanges etc). 4) Обновить weapon_mod_slots.json для новых слотов. Пример конверсии см. в tools/melee_weapons_companion_import_example.json (будет создан далее) и в scripts/."
+  }
+}
