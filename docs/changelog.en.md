@@ -2,6 +2,17 @@
 
 ---
 ---
+---
+## New mods confirmed, English names found (patch 371)
+
+Your answers are recorded: the 11 missing mods will be created; "Tesla
+coil dynamo" and "Quantum gyro compensating lens" are unique mods whose
+English names were found in the references — along with a third unique
+one, "Tesla Coil Capacitor". Good news: the Cryolator's "energy cell
+magazine" is the existing Fusion Magazine — just a rename. Stage result:
+13 new mods with reference data; coverage recomputed (580 to add, 126
+to remove).
+
 ## Supported mods collected from your list (patch 370)
 
 Revision continues: all 141 unique slot+mod entries from your list are
