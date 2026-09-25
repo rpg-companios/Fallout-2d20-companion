@@ -24,6 +24,10 @@ import {
 } from '../../../crafting/windowModel';
 import { settleCraftTime } from '../../../crafting/operations';
 import { getActionPoints } from '../../../../../domain/actionPoints';
+// 364 (слово владельца: в приложении ЕДИНЫЙ механизм всплывающих окон —
+// components/alerts/alertService + AlertHost, работает и на вебе, и на
+// нативе; системный Alert на Web — тихая заглушка).
+import { showRawAlert } from '../../../../../components/alerts/alertService';
 // 357: отчёт о крафте — общий компонент окна крафта и модалки установки модов.
 import CraftReportView from '../../../crafting/CraftReportView';
 
@@ -53,7 +57,6 @@ export default function CraftingModal({ visible, onClose }) {
   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
   const [qty, setQty] = useState(1);
   const [report, setReport] = useState(null);
-  const [askZeroTarget, setAskZeroTarget] = useState(null); // 363: inline-вопрос про бросок
   const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
 
@@ -109,10 +112,19 @@ export default function CraftingModal({ visible, onClose }) {
   // отдельным окном (по умолчанию 1); одна — создать сразу.
   const onPressCreate = (row) => {
     // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
-    // 363: системный Alert на Web — тихая заглушка, вопрос задаёт inline-диалог
-    // (как окно количества): «да» — бросаем, «нет» — автоуспех.
+    // 364: вопрос через ЕДИНУЮ точку диалогов (AlertHost работает везде;
+    // системный Alert на Web молчит). Кнопки — формат системного Alert, промис
+    // резолвится индексом; закрытие без выбора (null) = автоуспех.
     if (row.zeroDifficulty) {
-      setAskZeroTarget({ row });
+      showRawAlert({
+        title: ui.askZeroTitle ?? '',
+        message: ui.askZeroText ?? '',
+        kind: 'choice',
+        buttons: [
+          { text: ui.askZeroRoll ?? '' },
+          { text: ui.askZeroAuto ?? '', style: 'cancel' },
+        ],
+      }).then((index) => proceedCreate(row, index === 0 ? 'roll' : 'auto'));
       return;
     }
     proceedCreate(row, 'auto');
@@ -266,29 +278,6 @@ export default function CraftingModal({ visible, onClose }) {
             />
           )}
         </SafeAreaView>
-
-        {/* 363: вопрос про бросок при снятой сложности — inline-диалог
-            (системный Alert на Web молчит, кнопка выглядела мёртвой). */}
-        <Modal visible={!!askZeroTarget} transparent animationType="fade" onRequestClose={() => setAskZeroTarget(null)}>
-          <View style={styles.qtyOverlay}>
-            <View style={styles.qtyDialog}>
-              <Text style={styles.qtyText}>{ui.askZeroTitle ?? ''}</Text>
-              <Text style={styles.qtyText}>{ui.askZeroText ?? ''}</Text>
-              <View style={styles.qtyActions}>
-                <TouchableOpacity
-                  style={styles.qtyCancel}
-                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'auto'); }}>
-                  <Text style={styles.qtyCancelText}>{ui.askZeroAuto ?? ''}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.bigCraft, styles.qtyActionsBigCraft]}
-                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'roll'); }}>
-                  <Text style={styles.bigCraftText}>{ui.askZeroRoll ?? ''}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
 
         {/* Окно количества (318): «сколько штук создать?» с − и +, по умолчанию 1. */}
         <Modal visible={!!qtyTarget} transparent animationType="fade" onRequestClose={() => setQtyTarget(null)}>
