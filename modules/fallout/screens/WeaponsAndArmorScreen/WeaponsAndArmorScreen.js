@@ -22,7 +22,8 @@ import { isRobotCharacter } from '../../../../domain/origins';
 import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
 // Единый путь записи модов (311): классификация места хранения — движок.
-import { classifyModWritePlan } from '../../../../src/engine/items/weaponMods';
+import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
+import { diffModInstallPlan } from '../../../../domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
@@ -952,8 +953,20 @@ const WeaponsAndArmorScreen = () => {
     setSelectedWeaponForModification(null);
   };
 
+  // Селекторы действий стора — ВЫШЕ колбэков, чьи массивы зависимостей их
+  // читают при рендере (362: TDZ «Cannot access before initialization» —
+  // объявления стояли ниже handleApplyModification).
+  const installArmorMod = useCharacterStore((state) => state.installArmorMod);
+  const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
+  const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
+  const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
+  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+
   const handleApplyModification = useCallback((modifiedWeapon) => {
-    handleCloseModificationModal();
+    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно НЕ
+    // закрывается молча — обновляем карточку, модалка перечитает выбор и
+    // покажет зелёную отметку применения; закрытие — крестиком.
+    setSelectedWeaponForModification(modifiedWeapon);
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
@@ -979,6 +992,17 @@ const WeaponsAndArmorScreen = () => {
     debugLog('weapon.mod.apply.screen.plan', { itemId, modPlan });
 
     if (modPlan?.kind === 'robotSlot') {
+      // 359 (жалоба владельца: «мод не ставится, хотя в инвентаре есть»):
+      // закон 343/344 действует и на робо-оружии — мод-предмет прячется из
+      // сумки (флаг «экипирован», привязка к слоту+оружию) и возвращается
+      // при замене/снятии. Носитель — не предмет, ключ синтетический.
+      const robotHostKey = robotWeaponHostKey(modPlan.slotKey, modPlan.weaponId);
+      const robotDiff = diffModInstallPlan(
+        modIdList(selectedWeaponForModification),
+        modIdList(modifiedWeapon),
+      );
+      robotDiff.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: robotHostKey }));
+      robotDiff.install.forEach((id) => installRobotWeaponMod({ modId: id, hostKey: robotHostKey }));
       if (modPlan.role === 'held') {
         const sourceSlot = modPlan.slotKey;
         setEquippedRobotSlots((prev) => {
@@ -1037,6 +1061,12 @@ const WeaponsAndArmorScreen = () => {
     }
 
     if (modPlan?.kind === 'storeItem') {
+      // 351 (закон владельца 343/344): мод-предмет оружия при установке
+      // получает флаг «экипирован» и привязывается к предмету оружия;
+      // снятие/замена возвращает прежние моды в сумку. Дифф — чистый.
+      const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
       const patch = weaponModPatchToStore(modifiedWeapon);
       debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
       updateItem(modPlan.itemId, patch);
@@ -1044,13 +1074,20 @@ const WeaponsAndArmorScreen = () => {
     }
 
     if (modPlan?.kind === 'equippedWeapon') {
+      // 351: флаг «экипирован» — на экземпляр в сумке (если он есть; кулаки —
+      // виртуальный носитель, флага нет). Снятие/замена — прежние моды видны.
+      if (itemId) {
+        const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+        plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: itemId }));
+        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId }));
+      }
       // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
       // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
       setEquippedWeapons((prev) => prev.map((w) => (
         w && w.uniqueId === modPlan.uniqueId ? modifiedWeapon : w
       )));
     }
-  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons]);
+  }, [selectedWeaponForModification, equippedRobotSlots, setEquippedRobotSlots, updateItem, setEquippedWeapons, installRobotWeaponMod, uninstallWeaponModFlag]);
 
   const handleUnequipWeapon = useCallback((weapon) => {
     if (!weapon || weapon.isBuiltin || weapon.isManipulator) return;
@@ -1072,6 +1109,24 @@ const WeaponsAndArmorScreen = () => {
   const handleApplyArmorModification = (modifiedItem) => {
     if (!selectedArmorSlot) return;
     const field = armorModalMode === 'clothing' ? 'clothing' : 'armor';
+    // 343 (слово владельца): при установке мод получает флаг «экипирован» и
+    // привязывается к предмету-носителю (невидим в сумке до снятия); при
+    // замене/снятии прежний мод освобождается и снова виден. Пункты «Без
+    // мода» = снятие (id нет в новом наборе — освобождаем).
+    const prevItem = equippedArmor?.[selectedArmorSlot]?.[field];
+    const idsOf = (item) => [
+      item?.appliedArmorModId || null,
+      item?.appliedUniqueArmorModId || null,
+      item?.appliedClothingModId || null,
+    ].filter(Boolean);
+    const prevIds = idsOf(prevItem);
+    const nextIds = idsOf(modifiedItem);
+    // 344: привязка — к ПРЕДМЕТУ (экземпляр в сумке; у инстанса id === ключу,
+    // id выживает в слот-копию через INSTANCE_FIELDS).
+    const hostKey = prevItem?.instanceId || prevItem?.id
+      || `${selectedArmorSlot}.${field}`;
+    prevIds.filter((id) => !nextIds.includes(id)).forEach((id) => uninstallArmorMod({ modId: id, hostKey }));
+    nextIds.filter((id) => !prevIds.includes(id)).forEach((id) => installArmorMod({ modId: id, hostKey }));
     // Патч 237: альбом не пишется — modifiedItem несёт appliedArmorModId/
     // appliedUniqueArmorModId (схема id+моды); сборщик пересоберёт при загрузке.
     setEquippedArmor((prev) => ({
@@ -1081,6 +1136,17 @@ const WeaponsAndArmorScreen = () => {
         [field]: modifiedItem,
       },
     }));
+    // 344: id модов живут на ЭКЗЕМПЛЯРЕ («предмет с модом — одно целое»):
+    // синхронно пишем в сумку — снятие/надевание брони не теряет моды.
+    if (useCharacterStore.getState().items[hostKey]) {
+      const patch = {};
+      ['appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId'].forEach((key) => {
+        if ((prevItem?.[key] || null) !== (modifiedItem[key] || null)) {
+          patch[key] = modifiedItem[key] || null;
+        }
+      });
+      if (Object.keys(patch).length > 0) updateItem(hostKey, patch);
+    }
     setArmorModalVisible(false);
     setSelectedArmorSlot(null);
   };

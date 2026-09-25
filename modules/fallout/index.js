@@ -93,6 +93,8 @@ import recipesManifest from './data/recipes/index.json';
 import recipesCategoryRules from './data/recipes/categoryRules.json';
 import recipesAmmo from './data/recipes/ammo.json';
 import recipesExplosives from './data/recipes/explosives.json';
+import recipesArmor from './data/recipes/armor.json';
+import recipesWeapons from './data/recipes/weapons.json';
 import recipesChems from './data/recipes/chems.json';
 import recipesFood from './data/recipes/food.json';
 import recipesDrinks from './data/recipes/drinks.json';
@@ -258,6 +260,8 @@ export const SETTING = Object.freeze({
       sections: {
         ammo: recipesAmmo,
         explosives: recipesExplosives,
+        armor: recipesArmor,
+        weapons: recipesWeapons,
         chems: recipesChems,
         food: recipesFood,
         drinks: recipesDrinks,

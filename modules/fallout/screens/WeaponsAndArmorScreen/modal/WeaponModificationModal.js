@@ -4,8 +4,7 @@ import {
   Text,
   Modal,
   TouchableOpacity,
-  ScrollView,
-  Alert
+  ScrollView
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
 import { shiftRange } from '../../../../../domain/range';
@@ -14,6 +13,14 @@ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
 import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
+import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+import useCharacterStore from '../../../../../src/store/characterStore';
+import { buildModCraftHint, buildCraftReport } from '../../../crafting/windowModel';
+import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
+import { getActionPoints } from '../../../../../domain/actionPoints';
+// 357: отчёт о крафте — тот же компонент, что в окне крафта (кубики, исход,
+// сгоревшие материалы, время, вопрос про 2 ОД).
+import CraftReportView from '../../../crafting/CraftReportView';
 
 
 function toNumber(v) {
@@ -313,6 +320,76 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
   const [expandedCategories, setExpandedCategories] = useState({}); // slot -> boolean
   const [modsBySlot, setModsBySlot] = useState({}); // slot -> modRow[]
 
+  // 352 (план §2.10): кнопка «Создать» на позиции мода — при включённой
+  // настройке «Установка модификаций»; скрыта, если мод уже в инвентаре.
+  const modsViaCraft = useAppSettingsStore((s) => s.getSettingValue('modsRequireInventoryItem'));
+  const storeItems = useCharacterStore((s) => s.items);
+  const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+
+  const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
+  const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
+  // 363: inline-вопрос/отказ (системный Alert на Web — тихая заглушка:
+  // «бросить кубики?» и «не хватает перка/материалов» молчали).
+  const [craftNotice, setCraftNotice] = useState(null); // {title, text, actions:[{label, primary, onPress}]}
+  const [installNote, setInstallNote] = useState(null); // видимая отметка установки
+
+  const handleCreateMod = (modId, modName) => {
+    // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
+    // «Да» — бросаем, действуют правила Успехов/Провалов; «нет» — автоуспех.
+    const evaluation = craftingPreview(modId)?.evaluation;
+    if (evaluation?.auto) {
+      setCraftNotice({
+        title: tWeaponsAndArmorScreen('modals.createAskZeroTitle'),
+        text: tWeaponsAndArmorScreen('modals.createAskZeroText'),
+        actions: [
+          { label: tWeaponsAndArmorScreen('modals.createAskZeroAuto'), onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'auto'); } },
+          { label: tWeaponsAndArmorScreen('modals.createAskZeroRoll'), primary: true, onPress: () => { setCraftNotice(null); runCreateMod(modId, modName, 'roll'); } },
+        ],
+      });
+      return;
+    }
+    runCreateMod(modId, modName, 'auto');
+  };
+
+  const runCreateMod = (modId, modName, zeroDifficulty) => {
+    const run = craftRecipe(modId, {}, { deferTime: true, zeroDifficulty });
+    if (run.stage === 'gate' || run.stage === 'store') {
+      // 352: отказ ДО проверки — короткое объяснение (перк/материалы).
+      const reasons = Array.isArray(run.reasons) ? run.reasons : [];
+      const reasonKey = reasons.some((r) => r?.code === 'missing-perk')
+        ? 'modals.createFailMissingPerk'
+        : 'modals.createFailMaterials';
+      setCraftNotice({
+        title: tWeaponsAndArmorScreen('modals.createFailTitle'),
+        text: tWeaponsAndArmorScreen(reasonKey),
+        actions: [{ label: tWeaponsAndArmorScreen('modals.createNoticeDone'), onPress: () => setCraftNotice(null) }],
+      });
+      return;
+    }
+    // 357 (слово владельца: «не понятно, что произошло и из-за чего»):
+    // дальше — тот же отчёт, что в окне крафта: арифметика проверки, кубики
+    // и исход, что получено/сгорело, время; при успехе — вопрос про 2 ОД
+    // (324). Если ОД в пуле меньше двух — время списывается сразу, полное.
+    const rep = buildCraftReport(modId, { attempts: [run], stoppedEarly: 0 });
+    let settled = null;
+    if (rep.pendingTime && (!rep.pendingTime.hasSuccess || getActionPoints() < 2)) {
+      settled = settleCraftTime(modId, run, { spendActionPoints: false });
+    }
+    setSettledTime(settled);
+    setCraftReport({ ...rep, run, title: modName || rep.title });
+  };
+
+  // Решение про 2 ОД (323/324) — как в окне крафта.
+  const settleCraftTimeDecision = (spendActionPoints) => {
+    const settled = settleCraftTime(craftReport.recipeId, craftReport.run, { spendActionPoints });
+    setSettledTime(settled);
+  };
+
+  const finishCraftReport = () => {
+    setCraftReport(null);
+    setSettledTime(null);
+  };
+
   // Обновляем modifiedWeapon при изменении weapon
   React.useEffect(() => {
     let cancelled = false;
@@ -376,6 +453,9 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           }
         }
 
+        // 350–352 (настройка «Установка модификаций»): список НЕ фильтруется —
+        // у каждой позиции кнопка «Создать» (352); моды, УЖЕ установленные на
+        // этом оружии, тоже видны — иначе их не снять.
         if (cancelled) return;
         setModsBySlot(bySlot);
         setSelectedModifications(selected);
@@ -429,6 +509,14 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
     debugLog('weapon.mod.apply.modal', { modificationsArray: modificationsArray.map((m) => ({ id: m.id, slot: m.slot, damageModifier: m.damageModifier, fireRateModifier: m.fireRateModifier })), modifiedWeapon });
     // Разрешаем применить даже с нулём модов — это означает снятие всех модов с оружия
     onApplyModification(modifiedWeapon);
+    // 363 (репорт владельца: «прикрепляю — ui не меняется»): окно не
+    // закрывается молча — свежий weapon приходит с экрана, выбор
+    // перечитывается, а зелёная отметка показывает, что применилось.
+    const names = modificationsArray
+      .map((m) => getModDisplayName(m, weapon?.baseWeaponName ?? weapon?.name) || m.name)
+      .filter(Boolean);
+    setInstallNote(names.join(', ') || null);
+    setCraftReport(null);
   };
 
   const handleClose = () => {
@@ -498,24 +586,52 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
                         : tWeaponsAndArmorScreen('modals.noWeaponMod')}
                     </Text>
                   </TouchableOpacity>
-                  {mods.map((mod, index) => (
-                    <TouchableOpacity
+                  {mods.map((mod, index) => {
+                    // 352: кнопка и требования — у НЕ установленного (на этом
+                    // оружии) мода, без своего предмета в инвентаре.
+                    const hint = buildModCraftHint(mod.id, { items: storeItems, selectedPerks });
+                    const isInstalledHere = selectedModifications[slot]?.id === mod.id;
+                    const showCreate = modsViaCraft && hint && !hint.inInventory && !isInstalledHere;
+                    return (
+                    <View
                       key={index}
                       style={[
                         styles.modificationItem,
                         selectedModifications[slot]?.id === mod.id && styles.selectedModification
                       ]}
-                      onPress={() => handleSelectModification(slot, mod)}
                     >
-                      <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
-                      <Text style={styles.modificationEffects}>
-                        {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
-                      </Text>
-                      <Text style={styles.modificationStats}>
-                        {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                      <TouchableOpacity
+                        style={styles.modItemMain}
+                        onPress={() => handleSelectModification(slot, mod)}
+                      >
+                        <Text style={styles.modificationName}>{getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name}</Text>
+                        <Text style={styles.modificationEffects}>
+                          {`${tWeaponsAndArmorScreen('modals.previewEffects')}: ${mod.effectDescription || tWeaponsAndArmorScreen('common.empty')}`}
+                        </Text>
+                        <Text style={styles.modificationStats}>
+                          {tWeaponsAndArmorScreen('modals.weight')}: {toNumber(mod.weight) >= 0 ? '+' : ''}{toNumber(mod.weight)} | {tWeaponsAndArmorScreen('modals.cost')}: +{toNumber(mod.cost)}
+                        </Text>
+                      </TouchableOpacity>
+                      {showCreate && (
+                        <View>
+                          <Text style={styles.modificationRequirements}>
+                            {`${tWeaponsAndArmorScreen('modals.requirements')}: ${hint.requirements}`}
+                          </Text>
+                          <View style={styles.requirementsRow}>
+                            <Text style={styles.requirementsMaterials}>{hint.materialsLine}</Text>
+                            <TouchableOpacity
+                              style={[styles.createButton, !hint.enabled && styles.createButtonDimmed]}
+                              disabled={!hint.enabled}
+                              onPress={() => handleCreateMod(mod.id, getModDisplayName(mod, weapon?.baseWeaponName ?? weapon?.name) || mod.name)}
+                            >
+                              <Text style={styles.createButtonText}>{tWeaponsAndArmorScreen('modals.create')}</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                    );
+                  })}
                 </CollapsibleSection>
                 );
               })}
@@ -544,6 +660,13 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
             )}
           </ScrollView>
 
+          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
+          {installNote && (
+            <Text style={styles.installNote}>
+              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
+            </Text>
+          )}
+
           {/* Кнопки действий */}
           <View style={styles.modalFooter}>
             <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
@@ -558,6 +681,43 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
           </View>
         </View>
       </View>
+
+      {/* 363: inline-вопрос/отказ — системный Alert на Web молчал. */}
+      <Modal visible={!!craftNotice} transparent animationType="fade" onRequestClose={() => setCraftNotice(null)}>
+        <View style={styles.reportOverlay}>
+          <View style={styles.reportDialog}>
+            <Text style={styles.reportTitle}>{craftNotice?.title ?? ''}</Text>
+            <Text style={styles.reportText}>{craftNotice?.text ?? ''}</Text>
+            <View style={styles.noticeActions}>
+              {(craftNotice?.actions ?? []).map((a, i) => (
+                <TouchableOpacity
+                  key={`a_${i}`}
+                  style={a.primary ? [styles.bigCraft, styles.noticeActionsBigCraft] : styles.qtyCancel}
+                  onPress={a.onPress}>
+                  <Text style={a.primary ? styles.bigCraftText : styles.qtyCancelText}>{a.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 357: отчёт о крафте — тот же, что в окне крафта (352 давал только
+          короткий Alert: «Проверка навыка не пройдена» без кубиков и без
+          судьбы материалов). */}
+      <Modal visible={!!craftReport} transparent animationType="fade" onRequestClose={finishCraftReport}>
+        <View style={styles.reportOverlay}>
+          <View style={styles.reportDialog}>
+            <Text style={styles.reportTitle}>{craftReport?.title ?? ''}</Text>
+            <CraftReportView
+              report={craftReport}
+              settledTime={settledTime}
+              onSettleTime={settleCraftTimeDecision}
+              onDone={finishCraftReport}
+            />
+          </View>
+        </View>
+      </Modal>
     </Modal>
   );
 };

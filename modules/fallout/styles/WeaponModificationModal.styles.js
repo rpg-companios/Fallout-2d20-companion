@@ -48,6 +48,24 @@ const styles = StyleSheet.create({
   },
   expandIcon: { fontSize: 16, color: '#666' },
   sectionContent: { paddingLeft: 10, paddingTop: 5 },
+  // 352/353: строка мода — тап по текстам выбирает мод; кнопка «Создать» —
+  // компактная справа в строке материалов (макет владельца), стиль — аналог
+  // applyButton этой же модалки (#007AFF, borderRadius 5).
+  modItemMain: { flex: 1 },
+  createButton: {
+    // 355 (замечание владельца): зелёная — rgb(34, 197, 94) из стилей
+    // (PerkSelectModal.styles #22c55e); синяя была ошибкой 353.
+    backgroundColor: '#22c55e',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginLeft: 8,
+  },
+  createButtonDimmed: { opacity: 0.4 },
+  createButtonText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+  modificationRequirements: { fontSize: 12, fontWeight: '600', color: '#333', marginTop: 4 },
+  requirementsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  requirementsMaterials: { flex: 1, fontSize: 11, color: '#555' },
   modificationItem: {
     padding: 10,
     borderWidth: 1,
@@ -97,6 +115,16 @@ const styles = StyleSheet.create({
   },
   disabledButton: { backgroundColor: '#ccc' },
   applyButtonText: { color: 'white', fontWeight: 'bold' },
+
+  // 357: диалог отчёта о крафте — как окно количества в окне крафта (318).
+  reportOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
+  reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  // 363: текст inline-вопроса/отказа, кнопки, зелёная отметка применения.
+  reportText: { color: '#000', fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  noticeActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  noticeActionsBigCraft: { flex: 1, marginTop: 0 },
+  installNote: { color: '#16a34a', fontSize: 12, textAlign: 'center', paddingVertical: 6 },
 });
 
 export default styles;

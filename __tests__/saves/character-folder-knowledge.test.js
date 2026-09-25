@@ -105,7 +105,7 @@ describe('characterFolders: наложение при записи (overlayFolde
 
 describe('characterFolders: схема v25 и миграция', () => {
   it('текущая версия схемы — 25', () => {
-    expect(CURRENT_SCHEMA_VERSION).toBe(25);
+    expect(CURRENT_SCHEMA_VERSION).toBe(26);
   });
 
   it('миграция v23→v24 идентична: поле folder проходит без изменений', () => {
@@ -115,7 +115,7 @@ describe('characterFolders: схема v25 и миграция', () => {
       folder: { id: 'folder_a', name: 'Рейдеры' },
     };
     const out = migrateCharacterState(v23);
-    expect(out.schemaVersion).toBe(25);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.folder).toEqual({ id: 'folder_a', name: 'Рейдеры' });
     expect(out.characterName).toBe('Курьер');
   });
@@ -123,14 +123,14 @@ describe('characterFolders: схема v25 и миграция', () => {
   it('старый сейв без folder мигрирует без поля (корневой список)', () => {
     const v23 = { schemaVersion: 23, characterName: 'Курьер' };
     const out = migrateCharacterState(v23);
-    expect(out.schemaVersion).toBe(25);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(Object.hasOwn(out, 'folder')).toBe(false);
   });
 
   it('сейв с folder: null остаётся null (явный корневой список)', () => {
     const v23 = { schemaVersion: 23, characterName: 'Курьер', folder: null };
     const out = migrateCharacterState(v23);
-    expect(out.schemaVersion).toBe(25);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.folder).toBeNull();
   });
 });

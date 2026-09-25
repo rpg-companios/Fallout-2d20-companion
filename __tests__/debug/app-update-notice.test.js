@@ -1,8 +1,9 @@
-// ПРИЁМОЧНЫЙ (патч 321): система обновлений PWA — окно «Что нового».
-// Приложение читает /version.json свежим; версия новее запомненной → окно
-// с чейнджлогом; галочка «больше не показывать» запоминает версию; без
-// галочки окно появится снова. Файл version.json обновляется в том же
-// патче, что и changelogs (версия = номер последнего патча).
+// ПРИЁМОЧНЫЙ (патч 335): окно «Что нового» — один раз на РЕЛИЗ.
+// Слово владельца: «поле с галочкой убрать, показывать один раз в релиз.
+// Релиз может состоять из кучи патчей» — патчи между релизами окно не
+// показывают, notes в version.json описывают РЕЛИЗ, а не последний патч.
+// Правило 321 сохранено: version = номер последнего патча, файл обновляется
+// каждым патчем; release поднимает владелец.
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -23,41 +24,49 @@ const memoryStorage = () => {
   };
 };
 
-describe('Система обновлений (321): version.json, окно «Что нового»', () => {
-  it('version.json: версия — номер патча (растёт), чейнджлог на обоих языках', () => {
-    // Правило 321: версия = номер последнего патча, обновляется В ТОМ ЖЕ
-    // ПАТЧЕ. Точное число не фиксируем — оно растёт каждым патчем.
+describe('Окно «Что нового» (335): один раз на релиз, без галочки', () => {
+  it('version.json: version = патч (растёт), release задан, notes = описание релиза', () => {
     expect(String(versionJson.version)).toMatch(/^\d+$/);
-    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(321);
+    expect(Number(versionJson.version)).toBeGreaterThanOrEqual(335);
+    expect(versionJson.release, 'релиз объявлен в version.json').toBeTruthy();
     expect(versionJson.notes['ru-RU'].length).toBeGreaterThan(0);
     expect(versionJson.notes['en-EN'].length).toBeGreaterThan(0);
   });
 
-  it('галочка «больше не показывать»: показывать только неизвестную версию', () => {
+  it('галочки больше нет: показывать только незнакомый релиз', () => {
     expect(shouldShowUpdateNotice(null, null)).toBe(false);
-    expect(shouldShowUpdateNotice('321', '321')).toBe(false);
-    expect(shouldShowUpdateNotice('321', null)).toBe(true);
-    expect(shouldShowUpdateNotice('321', '319')).toBe(true);
+    expect(shouldShowUpdateNotice('1', '1')).toBe(false); // релиз уже показывали
+    expect(shouldShowUpdateNotice('1', null)).toBe(true);
+    expect(shouldShowUpdateNotice('2', '1')).toBe(true); // новый релиз — показываем
+    // патчи между релизами: release тот же — окно молчит
+    expect(shouldShowUpdateNotice('1', '1')).toBe(false);
   });
 
-  it('память устройства: записали версию — прочитали ту же', () => {
+  it('память устройства: записали релиз — прочитали тот же', () => {
     const storage = memoryStorage();
     expect(readAckedVersion(storage)).toBeNull();
-    writeAckedVersion(storage, '321');
-    expect(readAckedVersion(storage)).toBe('321');
-    expect(readAckedVersion(storage)).not.toBe('319');
+    writeAckedVersion(storage, '1');
+    expect(readAckedVersion(storage)).toBe('1');
+    expect(readAckedVersion(storage)).not.toBe('2');
   });
 
   it('ключ хранилища стабилен (смена ключа = окно всем заново)', () => {
     expect(ACK_STORAGE_KEY).toBe('app_version_ack');
   });
 
-  it('выкачка version.json: успех, 404 и битый JSON не роняют приложение', async () => {
+  it('выкачка version.json: release читается, без поля — фолбэк на патч', async () => {
     const ok = await fetchLatestVersion(vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ version: '335', release: '1', notes: { 'ru-RU': ['а'] } }),
+    }));
+    expect(ok).toEqual({ version: '335', release: '1', notes: { 'ru-RU': ['а'] } });
+
+    // старое развёртывание без release: релиз = версия (поведение 321)
+    const legacy = await fetchLatestVersion(vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ version: '321', notes: { 'ru-RU': ['а'] } }),
     }));
-    expect(ok).toEqual({ version: '321', notes: { 'ru-RU': ['а'] } });
+    expect(legacy).toEqual({ version: '321', release: '321', notes: { 'ru-RU': ['а'] } });
 
     await expect(fetchLatestVersion(vi.fn().mockResolvedValue({ ok: false }))).resolves.toBeNull();
     await expect(fetchLatestVersion(vi.fn().mockRejectedValue(new Error('offline')))).resolves.toBeNull();
@@ -67,11 +76,27 @@ describe('Система обновлений (321): version.json, окно «Ч
     }))).resolves.toBeNull();
   });
 
-  it('чейнджлог: язык приложения, фолбэк на ru, пустые notes', () => {
+  it('описание релиза: язык приложения, фолбэк на ru, пустые notes', () => {
     expect(notesForLocale(versionJson.notes, 'ru-RU')).toEqual(versionJson.notes['ru-RU']);
     expect(notesForLocale(versionJson.notes, 'en-EN')).toEqual(versionJson.notes['en-EN']);
     expect(notesForLocale({ 'ru-RU': ['а'] }, 'en-EN')).toEqual(['а']);
     expect(notesForLocale({}, 'ru-RU')).toEqual([]);
+  });
+
+  it('галочка «больше не показывать» удалена из словарей и модалки', () => {
+    const ru = require('fs').readFileSync(
+      new URL('../../i18n/ru-RU/App.json', import.meta.url),
+      'utf-8',
+    );
+    expect(ru).not.toContain('dontShow');
+    const modal = require('fs').readFileSync(
+      new URL('../../components/UpdateNotice/UpdateNoticeModal.js', import.meta.url),
+      'utf-8',
+    );
+    expect(modal).not.toContain('dontShow');
+    expect(modal).not.toContain('MaterialCommunityIcons');
+    // закрытие окна запоминает релиз (автоматический ack)
+    expect(modal).toContain('writeAckedVersion(storage(), notice.release)');
   });
 
   it('окно смонтировано в приложении (проводка, урок патча 319)', () => {

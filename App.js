@@ -15,8 +15,8 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import FusionCoreChoiceModal from './components/powerArmor/FusionCoreChoiceModal';
 import AlertHost from './components/alerts/AlertHost';
-// Окно «Что нового» (патч 321): /version.json + чейнджлог с галочкой
-// «больше не показывать» (логика — src/utils/appVersion.js).
+// Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
+// /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
 // Часы выживания — компонент модуля сеттинга (этап 5): монтируется рядом
 // с AlertHost; движок лишь рендерит, правила внутри модуля.

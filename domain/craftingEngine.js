@@ -176,6 +176,11 @@ export const runCraft = ({
   inventoryCounts = {},
   failBurnsMaterials = false,
   complicationDurationMultiplier = 1,
+  // 356 (слово владельца, механизм проверок в целом): сложность 0 —
+  // 'auto' (прежнее поведение: автоуспех без броска) или 'roll' (кубики
+  // брошены, действуют правила Успехов/Провалов — включая автоматический
+  // провал на двух осложнениях). Выбор спрашивает UI; движок только исполняет.
+  zeroDifficulty = 'auto',
   rollD20,
   rollCD,
   spend,
@@ -195,7 +200,7 @@ export const runCraft = ({
   const quantity = resolveOutputQuantity(recipe.outputQuantity ?? 1, rollCD);
 
   let check = null;
-  if (!evaluation.auto) {
+  if (!evaluation.auto || zeroDifficulty === 'roll') {
     check = resolveD20Check({
       attributeValue,
       skillValue: Math.max(0, Number(skillRank) || 0),
@@ -205,7 +210,7 @@ export const runCraft = ({
       ...(rollD20 ? { rollD20 } : {}),
     });
   }
-  const passed = evaluation.auto || check.passed;
+  const passed = (evaluation.auto && !check) || check.passed;
   const plan = evaluation.materials.map(({ itemId, need }) => ({ itemId, count: need }));
 
   // Осложнение не отменяет успех (корневая система 2d20): оно помножает
@@ -231,7 +236,8 @@ export const runCraft = ({
     const grantResult = grant({ itemId: recipe.id, quantity });
     return {
       done: true,
-      auto: evaluation.auto,
+      // 356: auto = «броска не было» — отчёт печатает кубики, если бросили.
+      auto: evaluation.auto && !check,
       durationMultiplier,
       spent: plan,
       granted: {

@@ -15,6 +15,8 @@ import ammoFile from '../../modules/fallout/data/recipes/ammo.json';
 import chemsFile from '../../modules/fallout/data/recipes/chems.json';
 import foodFile from '../../modules/fallout/data/recipes/food.json';
 import explosivesFile from '../../modules/fallout/data/recipes/explosives.json';
+import armorRecipesFile from '../../modules/fallout/data/recipes/armor.json';
+import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
 import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
 
 const state = () => useCharacterStore.getState();
@@ -50,8 +52,8 @@ const setSkill = (skillId, total) => {
 describe('реестр — точка, откуда движок крафта видит данные', () => {
   it('все файлы категории собраны индексом без потерь', () => {
     const byFile = {
-      'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'chems.json': chemsFile,
-      'food.json': foodFile, 'drinks.json': drinksFile,
+      'ammo.json': ammoFile, 'explosives.json': explosivesFile, 'armor.json': armorRecipesFile, 'chems.json': chemsFile,
+      'food.json': foodFile, 'drinks.json': drinksFile, 'weapons.json': weaponsFile,
     };
     const declared = craftingIndex.recipes.reduce((sum, entry) => sum + entry.count, 0);
     expect(getCraftingRecipes()).toHaveLength(declared);

@@ -55,6 +55,12 @@ export const findCatalogEntry = (catalog, id, itemType) => {
       return search(catalog.ammoTypes);
     case 'armor':
       return catalog.armorIndex?.byId?.get(id) || null;
+    case 'armorMod':
+      // Моды брони (341): стандартные и уникальные — плоские списки каталога.
+      return search(catalog.armorMods) || search(catalog.uniqArmorMods);
+    case 'weaponMod':
+      // Моды оружия (348): крафт даёт мод-предмет; пул включает и робо-моды (290).
+      return search(catalog.weaponMods) || null;
     case 'clothing':
     case 'outfit': {
       const all = (catalog.clothes?.clothes || []).flatMap((g) => g.items || []);
@@ -122,6 +128,7 @@ const INSTANCE_FIELDS = [
   'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
   'itemType',                                 // тип хранится на инстансе
   'quantity', 'equipped', 'locked',           // состояние инвентаря
+  'installedOn',                              // 343: мод установлен на предмет
   'appliedMods', 'stackKey',                  // моды и подпись стопки
   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',

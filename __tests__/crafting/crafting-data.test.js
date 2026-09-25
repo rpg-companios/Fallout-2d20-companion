@@ -45,6 +45,9 @@ import junkData from '../../modules/fallout/data/junk/junk.json';
 import materialsData from '../../modules/fallout/data/junk/material.json';
 import foragingTable from '../../modules/fallout/data/loot/foraging.json';
 
+import armorModsData from '../../modules/fallout/data/equipment/armor_mods.json';
+import uniqArmorModsData from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
+
 import craftingIndex from '../../modules/fallout/data/recipes/index.json';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
@@ -76,6 +79,10 @@ collectIds(clothesData, 'clothing', catalogIds);
 collectIds(powerArmorData, 'powerArmor', catalogIds);
 collectIds(junkData, 'junk', catalogIds);
 collectIds(materialsData, 'misc', catalogIds);
+collectIds(armorModsData, 'armorMod', catalogIds);
+collectIds(uniqArmorModsData, 'armorMod', catalogIds);
+// 348: моды оружия — предметы-результаты ветки «weapons».
+collectIds(weaponModsData, 'weaponMod', catalogIds);
 
 const perkIds = new Set(perksData.map((p) => p.id));
 
@@ -127,10 +134,12 @@ describe('данные крафта: файлы категории', () => {
     // Порядок и состав манифеста — он же порядок вкладок окна (269).
     expect(craftingIndex.recipes).toEqual([
       { file: 'ammo.json', category: 'ammo', count: 28 },
+      { file: 'armor.json', category: 'armor', count: 44 },
       { file: 'chems.json', category: 'chems', count: 21 },
       { file: 'drinks.json', category: 'drinks', count: 8 },
       { file: 'explosives.json', category: 'explosives', count: 9 },
       { file: 'food.json', category: 'food', count: 27 },
+      { file: 'weapons.json', category: 'weapons', count: 152 },
     ]);
   });
 
@@ -200,7 +209,7 @@ describe('данные крафта: ссылки', () => {
   it('навык — канонический ключ, категория — из манифеста', () => {
     for (const { category, record } of allRecipes()) {
       expect(ALL_SKILL_KEYS, `${record.id}: навык ${record.requires.skill}`).toContain(record.requires.skill);
-      expect(['ammo', 'explosives', 'chems', 'food', 'drinks'], `${record.id}: категория ${category}`).toContain(category);
+      expect(['ammo', 'armor', 'explosives', 'chems', 'food', 'drinks', 'weapons'], `${record.id}: категория ${category}`).toContain(category);
       expect(Number.isInteger(record.requires.complexity)).toBe(true);
       expect(record.requires.complexity).toBeGreaterThanOrEqual(1);
       expect(record.requires.complexity).toBeLessThanOrEqual(7);

@@ -1270,6 +1270,44 @@ const MIGRATIONS = [
   // же индекс, modules/fallout/diseases/migration.js).
   (state) => state,
 
+  // v25 -> v26: патч 333 — из общих модов брони/одежды убраны три
+  // «материала»-дубля модов синтов (mod_std_laminate, mod_std_rubberized,
+  // mod_std_microcarbon; слово владельца: «Ламинированная, Прорезиненная,
+  // Микроуглеродистая, Нановолоконная — это уникальные моды брони синтов»).
+  // Ссылки на них в сейве аккуратно снимаются: appliedArmorModId,
+  // appliedClothingModId и встроенный appliedArmorMod старого формата.
+  // Остальные моды (включая все uniq_synth_*) не трогаются.
+  (state) => {
+    const REMOVED = new Set([
+      'mod_std_laminate',
+      'mod_std_rubberized',
+      'mod_std_microcarbon',
+    ]);
+    const strip = (item) => {
+      if (!item || typeof item !== 'object') return item;
+      const stdHit = REMOVED.has(item.appliedArmorModId)
+        || REMOVED.has(item.appliedClothingModId)
+        || REMOVED.has(item.appliedArmorMod?.id);
+      if (!stdHit) return item;
+      const next = { ...item };
+      delete next.appliedArmorModId;
+      delete next.appliedClothingModId;
+      delete next.appliedArmorMod;
+      return next;
+    };
+    const next = { ...state };
+    if (Array.isArray(next.inventory)) next.inventory = next.inventory.map(strip);
+    if (next.modifiedItems && typeof next.modifiedItems === 'object') {
+      const cleaned = {};
+      for (const [key, item] of Object.entries(next.modifiedItems)) {
+        cleaned[key] = strip(item);
+      }
+      next.modifiedItems = cleaned;
+    }
+    if (next.equippedArmor) next.equippedArmor = strip(next.equippedArmor);
+    return next;
+  },
+
 ];
 /**
  * Мерж комплекта снаряжения при сохранении снапшота.

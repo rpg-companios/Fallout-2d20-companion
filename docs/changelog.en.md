@@ -1,8 +1,458 @@
 # Changelog
 
 ---
+## Craft and mod buttons respond on the web (patch 363)
 
-## Rarity, capacity and item are independent (patch 328)
+From the owner's bug batch, the root of the "silent" buttons: on the
+web build the system popups are silent stubs — and the "Roll the
+dice?" question at zero difficulty and the "missing perk/materials"
+messages relied on them. Both now ask inline in the window
+("Roll dice"/"Auto-success", "Done"), and applying mods no longer
+closes the window silently: the card updates in place and a green
+"Applied: …" note appears. Mod installation itself worked before (the
+italic bag items were installed mods).
+
+## Fixed the equipment screen crash (patch 362)
+
+The "Cannot access before initialization" error when opening the
+Weapons and Armor screen — a regression from patch 359 where store
+action selectors were declared below the code using them. Moved above;
+a test now guards the declaration order.
+
+## Export = save, byte for byte (patch 361)
+
+Per the owner's request "export always equals the save": the source of
+historical drift is gone — on export the save body was re-compressed
+with the screen's catalog, so the file could differ from the save
+(different locale, updated compression rules, double pass). The export
+file now carries exactly the body stored in the save, with no
+reprocessing. Import and old "fat" files work as before.
+
+## Robot weapon mods after loading a save: ghost cleanup and reliable writes (patch 360)
+
+From the owner's save export (an assaultron with a laser gun): old
+saves kept a second copy of robot weapons in the equipped list — a card
+with a stale mod set, which made an already-removed capacitor look
+stuck. The ghost copy is now purged on load. Also, writing mods to
+robot weapons no longer depends on the slot shape inside a save: slots
+are always expanded to the full form, so install/remove/replace works
+after any load.
+
+## Robot weapon mods follow the common law (patch 359)
+
+Owner's report (a beta-wave tuner for the assaultron laser): a mod on a
+robot slot weapon was applied, but the mod item stayed in the inventory
+forever — it looked like "nothing happened". The same law as on human
+weapons applies now: installing hides the mod item from the inventory
+(bound to the slot and the weapon), replacing or removing returns it;
+taking the weapon out of the slot or swapping the limb returns its mods
+too.
+
+## Exact law of automatic check failure (patch 358)
+
+Owner's clarification on the check mechanism: an automatic failure is
+"a complication and no successes at all", not "two 20s rolled". A 20
+and a 20 fail by themselves (they give no successes), but a single 20
+with no successes fails too. On the usual two dice the outcomes are
+unchanged; the rule is now exact. Standing laws: each situation defines
+its own failure consequence (chems and alcohol — addiction, crafting —
+lost materials or time, disease — longer duration), and successes
+beyond the difficulty always refill the AP pool.
+
+## Craft report in the mod installation modal (patch 357)
+
+Owner's feedback: crafting a mod with the "Create" button left it
+unclear what had happened. The same report as in the crafting window is
+now shown: the check arithmetic, rolled dice and outcome, what was
+gained and what happened to the materials (including "burned" on a
+failure), the time; on success — the 2 AP question. A refusal before
+the check (perk, materials) keeps the short message. Also fixed a rare
+crash when a check earned more successes than required.
+
+## Difficulty 0: the game asks about rolling (patch 356)
+
+Owner's word: when difficulty is cleared by skill (difficulty 0), the
+game asks — "Roll the dice?". "Yes" — roll with the Success/Failure
+rules: a 1 is a critical (2 successes), a 20 is a complication (extra
+time), a complication with no successes fails the check. "No" — auto-success without a roll, as
+before. The question appears in the crafting window (one per batch)
+and on the "Create" button in the weapon mod modal.
+
+## The "Create" button is green (patch 355)
+
+Per the owner's feedback: the button color is green rgb(34, 197, 94),
+already used in the app styles (the perk selection modal). The blue from
+the previous fix was a mistake.
+
+---
+## "Create" button: compact and darker, requirements per the mockup (patches 353–354)
+
+Fixes from the owner's interface testing feedback.
+
+- The "Create" button now matches this modal's "Apply" button style and
+  no longer stretches across the row: compact, on the right.
+- Requirements are shown as a block: a "Requirements: perk · complexity"
+  line, with materials as "have/need" (e.g. "Common material 2/4") in
+  small font to the left of the button.
+
+---
+## A "Create" button in the weapon modification modal (patch 352)
+
+The first slice of the owner's plan (§2.10) — for interface testing.
+With the "Modification installation" setting on, every mod position that
+is not in the inventory shows a "Create" button and a requirements line.
+
+- The button is green when there are enough materials; dimmed otherwise.
+- Requirements in one line: perk(s) with ranks, materials by rarity,
+  complexity.
+- Pressing creates the mod (it lands in the inventory and the button
+  disappears); missing perk or materials is explained.
+- The mod list is no longer filtered by the setting — buttons instead.
+
+---
+## Weapon mods: installation from the bag, same binding law (patch 351)
+
+Law 343/344 now covers weapons too: a crafted or found weapon mod, once
+installed, gets the "equipped" flag and binds to the weapon item.
+
+- "Sold the weapon with the mod — both are gone"; removing or replacing
+  makes the old mod visible in the bag again.
+- With the "Modification installation" setting on, the weapon modification
+  modal shows only mods from the inventory (mods already installed on this
+  weapon stay visible — otherwise they could not be removed).
+- Built-in weapons (fists) without a bag item are a virtual host: the mod
+  is not flagged.
+- Robot built-in weapons (limbs) are untouched — they have their own
+  limb-swap mechanics.
+
+---
+## Setting renamed: "Modification installation" (patch 350)
+
+Owner's word: the "mods via crafting" mode is the existing setting,
+named and described as: "Modification installation. A modification can
+be installed only if the modification itself is in the inventory."
+
+- The setting's title and description updated (ru and en); behavior
+  unchanged: off — free installation, on — the mod must be in the
+  inventory.
+- The open point of plan §2.10 is closed; work order confirmed: next —
+  weapon mod installation from the bag.
+
+---
+## Plan recorded: "Create" in install modals and crafting sections (patch 349)
+
+The owner's idea recorded in the owner's own words (reference, §2.10);
+timing — "perhaps toward the end of crafting". No code changed.
+
+- Install modals get a per-position "Create" button and requirements
+  (perks, materials, complexity) when the "mods via crafting" mode is on;
+  hidden when the mod is already in the inventory.
+- Crafting categories get sections by armor family and weapon slot
+  ("Leather Armor", "Receiver").
+- Open question: is "mods via crafting" a new setting or the existing
+  "Require mod in bag"?
+
+---
+## Weapon mod crafting: 152 recipes, the "Weapons" square is alive (patch 348)
+
+Per the owner's decisions (346/347): recipes are built from the weapon
+mod catalog columns — the audit of the book's printed tables. All mods
+with crafting columns are released, uniques included; capacitors as-is.
+
+- The crafting window's "Weapons" square: 152 recipes (289 in total).
+- The check skill is Repair or Science! (from the column); perk gates are
+  the same as for other recipes: "Gun Nut", "Science!", "Blacksmith".
+- A crafted mod lands in the bag as a regular item.
+- Failure burns materials by the gear rule (like armor mods).
+- A data typo fixed: "Serrated Blade" — the "Blacksmith 1" perk (was
+  "Blacksmtih").
+- Mods without crafting columns (53) stay recipe-less — the book has
+  none for them.
+
+---
+## Capacitors confirmed, no doubt marks left in weapon mods (patch 347)
+
+Owner's word: leave the capacitors as they are — materials and
+complexities are confirmed. Rarity was also checked against the same
+book tables.
+
+- "Large Magazine" and "Quick-Eject Mag": rarity Uncommon (the data said
+  Common — a mismatch with the table, now fixed).
+- The audit's doubt mark "?" was removed from all remaining fields: none
+  of the 205 weapon mods carry it any more.
+- Capacitors: complexities 5 and 2, materials unchanged.
+
+---
+## Weapon mod crafting columns revised against the book (patch 346)
+
+The owner provided the printed tables (pp. 222–223); the data was checked
+row by row and four mismatches were fixed.
+
+- "Large Magazine": complexity 4 (was 3), "Gun Nut 1" (was 2).
+- "Quick-Eject Mag": complexity 5 (was 3), materials follow the
+  complexity-5 curve — Common ×6, Uncommon ×4, Rare ×2.
+- "Full Capacitors" and "Capacitor Boosting Coil": the book's perk
+  requirements are pairs, "Gun Nut" + "Science!" (3+2 and 4+3).
+- The audit's doubt mark "?" was removed from confirmed rows; the
+  materials of the two capacitor mods await the owner's word (the book
+  has no complexity column for capacitors).
+
+---
+## Clarification: creation-kit clothing does have its own item (patch 345)
+
+The owner's question exposed an error in the previous report: creation
+kits put ALL items (clothing included) into the inventory as items with
+ids — the character equips them manually. There is no separate
+"creation cosmetic without an item".
+
+- The mod-to-item binding works the same for all clothing and armor.
+- A slot without an instance key is only possible in old saves and
+  file-imported characters — there the mod simply stays a visible item
+  in the bag (it is not lost).
+- Documentation-only changes; app behavior unchanged.
+
+---
+## Selling and spending buttons now take installed mods along (patch 344)
+
+Owner's word: selling and spending items are buttons on items in the
+inventory; weapon mods will behave the same way — bound to the item,
+inventory visibility.
+
+- The "Sell"/"Spend"/"Discard" buttons now go through the store: when the
+  quantity reaches zero, installed mods leave together with the item (the
+  rule lives in a single copy — in the store).
+- A mod is bound to the ITEM (the bag instance): taking armor off and on
+  again no longer loses mods — they are "one whole" with the item.
+- Installing a mod on an item without a bag instance (kit clothing) is
+  virtual: the mod is not flagged and stays visible.
+- Recorded as law: weapon mods (once they become items — the "Weapons"
+  crafting square) behave the same — bound to the item, bag visibility.
+
+---
+
+## An installed armor mod now becomes equipped (patch 343)
+
+Owner's word: selling the host item takes the mod with it; an equipped mod
+is invisible in the inventory; removing or replacing it makes the mod
+visible again. The owner's analogy — a robot arm with a built-in weapon.
+
+- On installation the mod item gets an "equipped" flag and is bound to the
+  armor piece it was installed on (`installedOn`).
+- When the host item is consumed away, its installed mods go with it.
+- Removing or replacing the mod in the install window returns the old mod
+  to the bag.
+- Free installation (the "require mod in bag" setting is off and no mod
+  item exists) is just a record on the armor — nothing to return.
+
+---
+
+## Universal mod, Material vs Modification, bag gate (patch 342)
+
+Owner's words after the first snag of testing.
+
+- A mod is universal unless stated otherwise: "Boiled Leather" fits any
+  part of its armor family, "Shadowed Metal" — any metal armor piece.
+  The data already worked this way — recorded as law.
+- Armor material ≠ armor modification: armor takes 1 material + 1
+  modification. Install-window sections renamed in owner's words:
+  "Armor material" and "Modifications" (were "Unique/Standard").
+- New Crafting-section setting — "Require the mod in the bag to install"
+  (default OFF: free installation, as before). On — only created/found
+  mods can be installed; empty groups show "None in the bag (craft them
+  in the Crafting window)".
+
+## ## ARMOR MOD CRAFTING — the "Armor" tile works (patch 341)
+
+Owner's word: "I'm waiting to test crafting armor mods." Patch 341 starts
+the series: mod crafting is ready for testing.
+
+- The "Armor" tile in the crafting window: 44 recipes — every mod-item
+  from your table (weave, vault-suit linings, raider/leather/metal/combat/
+  synth materials, generic body/arms/legs mods). Not emitted: the four
+  recipe-only mods (340) and the ambiguous "Lightweight (2)" row.
+- Materials follow material capacity (book): capacity 2 = Common ×3,
+  capacity 7 = Common ×8 + Uncommon ×6 + Rare ×4, etc.
+- Check: INT + Repair, difficulty = capacity − rank (rules 323); perks
+  (Armorer/Science!) gate like other recipes; one hour; failure burns
+  materials per the "gear" setting.
+- The crafted mod is an inventory item with its catalog name ("Вываренная
+  кожа", "Ballistic weave"…). The mod-install window still lists catalog
+  mods freely — QUESTION to the owner: should installing REQUIRE the
+  crafted mod in the bag (today it doesn't)?
+- Not in this patch: power armor and weapons (empty tiles), rare-recipe
+  learning (future series), applying the four recipe-only mods (340).
+
+## ## Debt closed: "Pockets" and three more are craft-recipes (patch 340)
+
+The owner checked the book: Pockets, Deep pockets, Lead-lined and
+Ultra-light are mod-RECIPES, not mod-items ("different concepts, like a
+byte and a kilobyte"). You can craft them, but you cannot apply them to
+armor yet: the book's mod-items section has no such entries — errata
+needed.
+
+- The crafting table (327) stays true; the reference doc records the
+  distinction: a mod-recipe ≠ a mod-item (linked by id, exist separately).
+- The armor-mod data is now considered COMPLETE. The fate of the four
+  recipes (skip them or emit with an "cannot be applied" note) is decided
+  when the mod-crafting series starts.
+
+## ## Three mod clarifications; origin of the four "owed" (patch 339)
+
+Owner's words recorded into effect descriptions (shown in the armor
+upgrade window's "Effects" line; DR columns empty for all three — 337):
+
+- Parrying: +2 Phys. DR, only when an attack using the Melee Weapons
+  skill targets you.
+- Soft lining (legs): +2 Phys. DR, only when the character falls.
+- Lightweight (arms): while worn, weapons using Melee Weapons or Unarmed
+  gain Piercing 1 (stacks with existing).
+
+Answer to "where did it come from": the four mods (Pockets, Deep pockets,
+Lead-lined, Ultra-light) are from the owner's own crafting-table dictation
+(patch 327, "Armor modifications" section, quote kept in the reference).
+"Lightweight" from that record is resolved — it's the arms mod. The other
+four await the owner's decision: real (then categories + effects) or a
+dictation error.
+
+## ## Armor mod clarifications: synths, five mods owed (patch 338)
+
+Owner's words on patch 337's questions.
+
+- "All body" in the install table means "fits any body area", while these
+  mods install ONLY on synth armor. The patch 333 removal of the three
+  "materials" was correct — not restoring; uniq_synth_* records represent
+  them on synths.
+- The five generic craft mods (Lightweight, Pockets, Deep pockets,
+  Lead-lined, Ultra-light) are OWED: the owner will check which armor
+  categories they belong to and send effects. Until then they stay out of
+  the windows.
+- Bottom line: armor-mod data is complete except the five owed mods.
+
+## ## Armor mod install table — cross-checked, 2 double-counts fixed (patch 337)
+
+The owner dictated the book's "Armor improvement modifications" table
+(effects/weight/cost/perks). Cross-check: all 12 standard mods already
+carried book-accurate effects, weights, costs and perks; two double-counts
+found and fixed — "Parrying" granted +2 Energy DR on top of its "+2 vs
+melee attacks" effect, "Soft lining" (legs) — +2 Physical DR on top of the
+"+2 vs falling" effect. The book leaves both DR columns empty — now so
+does the data. Characters with these mods recompute automatically on the
+next load.
+
+The table is recorded in the reference doc (§2.7). Two questions to the
+owner (protocol 331): 1) "Laminated/Rubberized/Microcarbon" appear in the
+install table as all-body upgrades, though patch 333 removed them as
+"synth-only" — restore them? 2) five craft-only mods (pockets, lead-lined,
+ultra-light, lightweight, deep pockets) have no install-table row — no
+combat effects at all, or a different page?
+
+## ## "What's new" — once per release, no checkbox (patch 335)
+
+Owner's word: the checkbox is excessive; show the window once per
+RELEASE — a release consists of many patches, not "every little step".
+
+- version.json now carries release (the release number) and notes = the
+  RELEASE description; version (the patch number, rule 321) updates as
+  before.
+- The window shows once per release: closing it remembers the release;
+  until the next release it stays quiet. The checkbox is gone (dictionaries
+  too).
+- Patches between releases don't raise the window. You declare a release —
+  on your word ("make a release") I bump the number and write the batch's
+  description.
+- Release #1 describes the whole batch since patch 315: the new crafting,
+  book rules, the AP pool, explosives, armor mods — references and the
+  duplicates cleanup.
+
+## ## Spoiler materials as a flat list (patch 334)
+
+Owner's word: material headers are excessive ("Materials", "Common
+materials", "Uncommon materials") — type and quantity are enough.
+
+- A recipe's spoiler now shows materials as one flat line each: name on
+  the left, the "have N · need M" counter on the right.
+- The "Materials" section label and rarity group headers are gone;
+  complexity, skill and cooking time remain the spoiler's first line.
+
+## ## Synth-material duplicates removed from generic mods (patch 333)
+
+Owner's word: "Laminated, Rubberized, Microcarbon, Nanofiber are unique
+SYNTH armor mods." They must not exist in the generic mod list.
+
+- Removed mod_std_laminate, mod_std_rubberized, mod_std_microcarbon from
+  generic mods (15 → 12); the unique synth mods (uniq_synth_*, including
+  Nanofiber) are untouched.
+- Save migration v25 → v26: if a character had one of the removed
+  duplicates installed on armor/clothing, it is gently uninstalled
+  (inventory, modified-items album, equipped piece); other mods are
+  untouched. No one loses bonuses: stats came from the catalog record
+  that no longer exists.
+- Owner's answers recorded (§2.5): costume-mod effects table is coming;
+  a recipe item is consumed on use; the rare-recipe learning system is
+  built for ALL crafting from the start.
+
+## ## Armor-mod answers — recorded, plan refined (patch 332)
+
+The owner answered the four questions of 327. The app itself is
+unchanged — records and code checks only.
+
+- Crafting capacity and item complexity are different things (the owner
+  was right, my comparison was wrong): the mods' complexity field is used
+  nowhere, the data stays untouched; capacity will come from the book
+  table as its own field.
+- The 15 missing mods are CLOTHING mods: the weave fits most costumes,
+  the vault suit takes the weave + linings; effects table awaited.
+- Laminated/Rubberized/Microcarbon/Nanofiber are unique SYNTH armor mods;
+  the generic duplicates are redundant.
+- Rarity: common recipes known to everyone; uncommon unlock via perks;
+  rare ones via recipe ITEMS (a new "Recipes" inventory category, MK II
+  driver principle: applying the item lifts the lock, item id = recipe
+  id). A separate patch series — spec recorded in the reference doc.
+
+## ## Question protocol — ask first, fix later never (patch 331)
+
+Owner's word after the 329→330 pair: "if there is any misunderstanding
+or ambiguity — push it onto me so I describe the details, instead of
+patching the misunderstanding twice."
+
+- The rule is recorded in state.md Lessons as law: any ambiguity becomes
+  a question to the owner BEFORE work; questions in reports get an
+  explicit "QUESTIONS — awaiting answers by number" heading.
+- The four armor-mod questions (327) are restyled: the reference doc's
+  section header now shouts that these are questions and mod crafting
+  will not start without answers (the owner honestly missed them as
+  "statements").
+
+## ## Category tiles — like character cards (patch 330)
+
+Owner's correction to 329: "do character cards look like that?" — no.
+In 329 the tiles were styled after home-screen FOLDERS (dark panel, gold
+border) — the wrong reference.
+
+- Category tiles now follow the CHARACTER cards (characterCell): light
+  panel, grey border, radius 8; dark label, grey counter, icon in the
+  border's tone.
+- The window background (setting image) and the rest of 329 are untouched.
+
+## ## Crafting window — setting background, home-style tiles, perk-style cards (patch 329)
+
+Owner's design word: the categories window gets the setting windows'
+background, category areas styled like the home screen, spoilers as neat
+cards like the perks modal; availability by color and in parentheses.
+
+- The categories window now sits on the setting windows' background image
+  (assets/bg.png, dimmed like the Gear/Character screens).
+- Category tiles match the home-screen areas: dark panel, gold border,
+  rounded corners; warm-gold label, grey counter.
+- Recipe spoilers are cards modeled on the perks modal: border, radius,
+  padding, separator before the body — no more solid sheets.
+- An available recipe is a light card; perk/rank-locked is grey (grey name
+  too). Material availability sits next to the name in parentheses:
+  "(can craft)" / "(missing materials)" / "(needs a perk)".
+- Complexity, skill and cooking time moved inside the spoiler (first line);
+  the full missing-perk text is there as well.
+
+## ## Rarity, capacity and item are independent (patch 328)
 
 Owner's clarification to the armor-mods table (327), recorded in
 `docs/reference-data/armor-mods-crafting.md` (section 1.1). The app is

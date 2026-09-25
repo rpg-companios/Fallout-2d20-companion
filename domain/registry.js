@@ -65,6 +65,8 @@ const moduleCraftingCategoryRules = SETTING.data.recipes.categoryRules;
 const CRAFTING_FILES = {
   'ammo.json': SETTING.data.recipes.sections.ammo,
   'explosives.json': SETTING.data.recipes.sections.explosives,
+  'armor.json': SETTING.data.recipes.sections.armor,
+  'weapons.json': SETTING.data.recipes.sections.weapons,
   'chems.json': SETTING.data.recipes.sections.chems,
   'food.json': SETTING.data.recipes.sections.food,
   'drinks.json': SETTING.data.recipes.sections.drinks,

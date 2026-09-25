@@ -1,5 +1,3 @@
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { findCatalogEntry } from '../../../domain/resolveItem';
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -533,18 +531,9 @@ export default function HomeScreen({ navigation }) {
         return;
       }
 
-      // Экспорт худым телом (слайм): имя/цена/вес/статы восстанавливаются
-      // из каталога на импорте — файл не тащит дубли каталога.
-      let exportCatalog = null;
-      try { exportCatalog = getEquipmentCatalog(moduleLocale); } catch (e) { exportCatalog = null; }
-      const payload = createCharacterExportPayload(row, {
-        getEntry: exportCatalog
-          ? (id, itemType) => {
-              try { return findCatalogEntry(exportCatalog, id, itemType); }
-              catch (e) { return null; }
-            }
-          : undefined,
-      });
+      // 361: экспорт = тело сейва байт в байт (слайм — только в saveCharacter,
+      // повторная обработка тела на экспорте давала расхождения «экспорт ≠ сейв»).
+      const payload = createCharacterExportPayload(row);
       const result = await downloadCharacterPayload(payload, row.name);
       
       if (!result.success && !result.aborted) {

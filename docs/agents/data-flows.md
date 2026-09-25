@@ -150,3 +150,63 @@ components/UpdateNotice/UpdateNoticeModal.js  (окно «Что нового»,
 Застрявшие клиенты: /sw.js меняется намеренно (compat-worker revision) —
 воркер переустанавливается и самоуничтожается, кэши чистятся.
 ```
+
+## 9. Моды брони: крафт → установка → снятие (патчи 341–343)
+
+```
+КРАФТ (окно «Крафт», квадрат «Броня»):
+  recipes/armor.json (генератор build-crafting-data.mjs)
+        │  domain/resolveItem.js case 'armorMod' (каталог armorMods/uniqArmorMods)
+        ▼
+  мод-ПРЕДМЕТ в сумке (items[instanceKey], weaponId = id мода)
+
+УСТАНОВКА (WeaponsAndArmorScreen → ArmorModificationModal):
+  выбор в окне → setEquippedArmor(slot, modifiedItem)  — запись id модов
+  на предмет брони (appliedUniqueArmorModId / appliedArmorModId /
+  appliedClothingModId; форма правды — см. §1 справочника armor-mods)
+        │  ПАРАЛЛЕЛЬНО (343, слово владельца):
+        ▼
+  installArmorMod({modId, hostKey}) — экземпляр мода в сумке:
+    equipped: true (невидим в сумке: selectItemsByEquipped(false),
+    вес не задваивается — вес брони уже включает weightModifier)
+    installedOn: hostKey (ключ экземпляра носителя, иначе «слот.слой»)
+    экземпляра в сумке нет (гейт ВЫКЛ) → null, просто запись на броне
+
+СНЯТИЕ/ЗАМЕНА (окно установки):
+  uninstallArmorMod({modId, hostKey}) — equipped: false, installedOn
+  стирается → мод снова виден в сумке
+
+РОБО-ОРУЖИЕ (359, тот же закон 343/344): оружие в слоте робота — НЕ предмет
+  сумки (комплект кладёт его в конечность), поэтому мод привязывается к
+  синтетическому носителю robotWeaponHostKey(слот, id оружия) =
+  «robotSlot:слот:id». Экран (ветка robotSlot плана classifyModWritePlan):
+  дифф модов → installRobotWeaponMod (как installArmorMod, но без требования
+  items[hostKey]) / uninstallArmorMod. Оружие уходит из слота
+  (replaceLimb/unequipHeldWeapon) — слайс возвращает его моды в сумку.
+
+УДАЛЕНИЕ НОСИТЕЛЯ — одна копия правила В СТОРЕ (344):
+  adjustItemQuantity(itemId, delta) — кнопки «Продать»/«Потратить»/
+  «Выбросить» инвентаря (UI-хелпер делегирует) и крафт-расход
+  (spendItemStacks, боеприпас spendAmmoForWeapon): при удалении предмета
+  collectModsBoundTo уводит его моды («продали предмет с модом —
+  ушли оба»); releaseModsBoundTo — действие для будущих точек.
+  ПРИВЯЗКА — К ПРЕДМЕТУ (344): id модов пишутся и на слот-копию, и на
+  ЭКЗЕМПЛЯР в сумке (updateItem в handleApplyArmorModification) —
+  снятие/надевание брони моды не теряет. Слот без ключа экземпляра
+  (только старые сохранения/перенос файлом; предметы комплектов создания
+  ВСЕГДА имеют экземпляры) — мод не флагается, остаётся видимым (345).
+
+ПАСПОРТ: installedOn — в SAVE_STATE_FIELDS (saveSlimming) и
+INSTANCE_FIELDS (resolveItem); действия — в CRUD_OP_KEYS
+(characterActions.ts, fuse action-passports).
+
+МОДЫ ОРУЖИЯ (351): тот же закон. Экран модификации оружия исполняет
+план classifyModWritePlan; ветки storeItem/equippedWeapon дополнительно
+проводят дифф (diffModInstallPlan в domain/modsEquip) через те же
+store actions (modIdList — форма правды, appliedMods приоритетен).
+Кулаки/isBuiltin без экземпляра в сумке — виртуальный носитель, флага
+нет. Робо-ветки (held/installed/ownAttack) флага НЕ получают.
+Гейт «Установка модификаций» в WeaponModificationModal: фильтр
+modsBySlot по ownedModIds (bag weaponIds) + моды, уже установленные
+на этом оружии (иначе не снять).
+```

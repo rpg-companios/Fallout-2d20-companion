@@ -8,9 +8,12 @@
 // здесь только кнопки, списки и иконки квадратов.
 
 import React, { useMemo, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, ScrollView, ImageBackground } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from '../../../styles/CraftingModal.styles';
+// 329 (слово владельца): фон окна категорий — фоновое изображение окон
+// сеттинга (как на экранах Снаряжения/Персонажа, opacity 0.3).
+const BG_IMAGE = require('../../../../../assets/bg.png');
 import {
   buildCraftTiles,
   buildCategoryModel,
@@ -18,10 +21,11 @@ import {
   buildCraftReport,
   craftDict,
   craftFormat,
-  formatCraftMinutes,
 } from '../../../crafting/windowModel';
 import { settleCraftTime } from '../../../crafting/operations';
 import { getActionPoints } from '../../../../../domain/actionPoints';
+// 357: отчёт о крафте — общий компонент окна крафта и модалки установки модов.
+import CraftReportView from '../../../crafting/CraftReportView';
 
 // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
 const CATEGORY_ICONS = {
@@ -33,12 +37,6 @@ const CATEGORY_ICONS = {
   armor: 'shield-outline',
   powerArmor: 'shield-half-full',
   ammo: 'ammo',
-};
-
-const RARITY_LABEL_KEYS = {
-  common: 'rarityCommon',
-  uncommon: 'rarityUncommon',
-  rare: 'rarityRare',
 };
 
 // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
@@ -55,6 +53,7 @@ export default function CraftingModal({ visible, onClose }) {
   const [qtyTarget, setQtyTarget] = useState(null); // { row, max }
   const [qty, setQty] = useState(1);
   const [report, setReport] = useState(null);
+  const [askZeroTarget, setAskZeroTarget] = useState(null); // 363: inline-вопрос про бросок
   const [settledTime, setSettledTime] = useState(null); // {minutes, spendActionPoints} (323)
   const [refresh, setRefresh] = useState(0); // пересборка модели после крафта
 
@@ -90,9 +89,11 @@ export default function CraftingModal({ visible, onClose }) {
     setOpenId(null);
   };
 
-  const create = (row, count) => {
+  // 356: выбор «сложность снята навыком» для текущего создания (спросили —
+  // применили ко всей пачке; ответ движка честный: бросок или автоуспех).
+  const create = (row, count, zeroDifficulty = 'auto') => {
     // 323: время откладывается — окно спросит про 2 ОД после успеха.
-    const run = craftBatch(row.recipeId, count, { deferTime: true });
+    const run = craftBatch(row.recipeId, count, { deferTime: true, zeroDifficulty });
     const rep = buildCraftReport(row.recipeId, run);
     let settled = null;
     // 324: вопрос про 2 ОД — только если в пуле хватает (иначе полное время).
@@ -107,11 +108,21 @@ export default function CraftingModal({ visible, onClose }) {
   // Решение владельца (318): можно сделать больше одной — спросить количество
   // отдельным окном (по умолчанию 1); одна — создать сразу.
   const onPressCreate = (row) => {
+    // 356 (механизм проверок): сложность 0 — спросить про бросок кубиков.
+    // 363: системный Alert на Web — тихая заглушка, вопрос задаёт inline-диалог
+    // (как окно количества): «да» — бросаем, «нет» — автоуспех.
+    if (row.zeroDifficulty) {
+      setAskZeroTarget({ row });
+      return;
+    }
+    proceedCreate(row, 'auto');
+  };
+  const proceedCreate = (row, zeroDifficulty) => {
     if (row.maxCraft > 1) {
       setQty(1);
-      setQtyTarget({ row, max: row.maxCraft });
+      setQtyTarget({ row, max: row.maxCraft, zeroDifficulty });
     } else {
-      create(row, 1);
+      create(row, 1, zeroDifficulty);
     }
   };
   const finishReport = () => {
@@ -151,6 +162,7 @@ export default function CraftingModal({ visible, onClose }) {
           </View>
 
           {!report && view === 'categories' && (
+            <ImageBackground source={BG_IMAGE} style={styles.bg} imageStyle={styles.bgImage}>
             <ScrollView style={styles.body} contentContainerStyle={styles.tilesContent}>
               {/* Патч 322: строки по 3 квадрата, прокрутка (владелец: окно на ПК
                   не прокручивалось). Выравнивание остатка строки: одинокая — по
@@ -180,6 +192,7 @@ export default function CraftingModal({ visible, onClose }) {
                 <Text style={styles.closeBtnText}>{ui.close ?? ''}</Text>
               </TouchableOpacity>
             </ScrollView>
+            </ImageBackground>
           )}
 
           {!report && view === 'category' && (
@@ -190,42 +203,40 @@ export default function CraftingModal({ visible, onClose }) {
               ListEmptyComponent={<Text style={styles.empty}>{ui.emptyCategory ?? '—'}</Text>}
               renderItem={({ item }) => {
                 const expanded = item.recipeId === openId;
+                // 329 (слово владельца): доступные — светлые, недоступные по
+                // перку/рангу — серые; доступность материалов — в скобках
+                // рядом с названием; сложность/навык/время — внутри спойлера.
+                const perkLocked = item.status === 'missing-perk';
+                const note = item.canCraft
+                  ? (ui.ready ?? '')
+                  : perkLocked ? (ui.perkShort ?? '') : (ui.shortMaterials ?? '');
                 return (
-                  <View style={[styles.row, !item.canCraft && styles.rowDisabled]}>
+                  <View style={[styles.row, perkLocked && styles.rowDisabled]}>
                     <TouchableOpacity
                       style={styles.spoilerHead}
                       onPress={() => setOpenId(expanded ? null : item.recipeId)}>
                       <View style={styles.rowTop}>
-                        <Text style={[styles.rowName, item.canCraft && styles.rowNameReady]}>
+                        <Text style={[styles.rowName, perkLocked && styles.rowNameLocked]} numberOfLines={2}>
                           {item.outputName}
+                        </Text>
+                        {/* 326: никаких сводок по видам — счётчики штук на строках материалов */}
+                        <Text style={[
+                          styles.rowNote,
+                          item.canCraft ? styles.rowNoteOk : perkLocked ? styles.rowNoteLocked : styles.rowNoteBad,
+                        ]}>
+                          ({note})
                         </Text>
                         <Text style={styles.spoilerArrow}>{expanded ? '▾' : '▸'}</Text>
                       </View>
-                      <Text style={styles.rowMeta}>{item.metaLine}</Text>
-                      <Text style={item.canCraft ? styles.rowReady : styles.rowReason}>
-                        {/* 326 (слово владельца): никаких сводок по видам —
-                            счётчики штук живут на строках материалов. */}
-                        {item.canCraft ? (ui.ready ?? '') : (item.reason || '')}
-                      </Text>
                     </TouchableOpacity>
 
                     {expanded && (
                       <View style={styles.spoilerBody}>
-                        <Text style={styles.detailLabel}>{ui.materialsTitle}</Text>
-                        {item.materialGroups.map((group) => (
-                          <View key={group.type}>
-                            <Text style={styles.rarityLine}>
-                              {ui[RARITY_LABEL_KEYS[group.type]] ?? group.type}
-                            </Text>
-                            {item.materials.filter((m) => m.rarity === group.type).map((m) => (
-                              <View key={m.itemId} style={styles.materialLine}>
-                                <Text style={styles.materialName}>{m.name}</Text>
-                                <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
-                              </View>
-                            ))}
-                          </View>
-                        ))}
-                        {item.materials.filter((m) => !m.rarity).map((m) => (
+                        <Text style={styles.rowMeta}>{item.metaLine}</Text>
+                        {perkLocked && <Text style={styles.rowReason}>{item.reason}</Text>}
+                        {/* 334 (слово владельца): заголовки по материалам излишни —
+                            плоский список: тип материала и количество. */}
+                        {item.materials.map((m) => (
                           <View key={m.itemId} style={styles.materialLine}>
                             <Text style={styles.materialName}>{m.name}</Text>
                             <Text style={m.enough ? styles.materialOk : styles.materialBad}>{m.haveLine}</Text>
@@ -247,46 +258,37 @@ export default function CraftingModal({ visible, onClose }) {
           )}
 
           {report && (
-            <View style={styles.list}>
-              <View style={styles.resultBox}>
-                {report.lines.map((line, i) => (
-                  <Text key={`r_${i}`} style={styles.resultLine}>{line}</Text>
-                ))}
-                {/* 323: время — после решения про ОД (успех можно сократить вдвое). */}
-                {settledTime && (
-                  <Text style={styles.resultLine}>
-                    {`${craftFormat(ui.timeSpent ?? '', { time: formatCraftMinutes(settledTime.minutes) })}`
-                      + (settledTime.spendActionPoints ? `. ${ui.apHalvedNote ?? ''}` : '')}
-                  </Text>
-                )}
-              </View>
-
-              {report.pendingTime && settledTime === null && (
-                <View style={styles.apBox}>
-                  <Text style={styles.apQuestion}>
-                    {craftFormat(ui.apQuestion ?? '', { pool: getActionPoints() })}
-                  </Text>
-                  <View style={styles.qtyActions}>
-                    <TouchableOpacity
-                      style={[styles.bigCraft, styles.qtyActionsBigCraft]}
-                      onPress={() => settleTimeDecision(true)}>
-                      <Text style={styles.bigCraftText}>{ui.apYes ?? ''}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.qtyCancel}
-                      onPress={() => settleTimeDecision(false)}>
-                      <Text style={styles.qtyCancelText}>{ui.apNo ?? ''}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
-              <TouchableOpacity style={styles.doneBtn} onPress={finishReport}>
-                <Text style={styles.doneBtnText}>{ui.done ?? ''}</Text>
-              </TouchableOpacity>
-            </View>
+            <CraftReportView
+              report={report}
+              settledTime={settledTime}
+              onSettleTime={settleTimeDecision}
+              onDone={finishReport}
+            />
           )}
         </SafeAreaView>
+
+        {/* 363: вопрос про бросок при снятой сложности — inline-диалог
+            (системный Alert на Web молчит, кнопка выглядела мёртвой). */}
+        <Modal visible={!!askZeroTarget} transparent animationType="fade" onRequestClose={() => setAskZeroTarget(null)}>
+          <View style={styles.qtyOverlay}>
+            <View style={styles.qtyDialog}>
+              <Text style={styles.qtyText}>{ui.askZeroTitle ?? ''}</Text>
+              <Text style={styles.qtyText}>{ui.askZeroText ?? ''}</Text>
+              <View style={styles.qtyActions}>
+                <TouchableOpacity
+                  style={styles.qtyCancel}
+                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'auto'); }}>
+                  <Text style={styles.qtyCancelText}>{ui.askZeroAuto ?? ''}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.bigCraft, styles.qtyActionsBigCraft]}
+                  onPress={() => { const t = askZeroTarget; setAskZeroTarget(null); if (t) proceedCreate(t.row, 'roll'); }}>
+                  <Text style={styles.bigCraftText}>{ui.askZeroRoll ?? ''}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Окно количества (318): «сколько штук создать?» с − и +, по умолчанию 1. */}
         <Modal visible={!!qtyTarget} transparent animationType="fade" onRequestClose={() => setQtyTarget(null)}>
@@ -318,7 +320,7 @@ export default function CraftingModal({ visible, onClose }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.bigCraft, styles.qtyActionsBigCraft]}
-                  onPress={() => qtyTarget && create(qtyTarget.row, qty)}>
+                  onPress={() => qtyTarget && create(qtyTarget.row, qty, qtyTarget.zeroDifficulty)}>
                   <Text style={styles.bigCraftText}>{ui.create ?? ''}</Text>
                 </TouchableOpacity>
               </View>

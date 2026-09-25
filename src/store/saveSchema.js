@@ -76,7 +76,10 @@
 //       сопротивляться) и ранг на эффекте болезни (поле rank). Ранг старым
 //       сейвам проставляет сетевая миграция modules/fallout/diseases/
 //       migration.js (по каталогу); движковая миграция версии идентична.
-export const CURRENT_SCHEMA_VERSION = 25;
+// v26 — патч 333: сняты ссылки на три убранных дубля-«материала» синтов
+//       (mod_std_laminate/rubberized/microcarbon): appliedArmorModId /
+//       appliedClothingModId / встроенный appliedArmorMod с такими id.
+export const CURRENT_SCHEMA_VERSION = 26;
 
 // Версия, которая ставится при отсутствии schemaVersion в сохранении
 // (старые сохранения без поля — считаем v0, текущим форматом).

@@ -39,6 +39,7 @@ import {
 } from '../../modules/fallout/survival/survival';
 import { migrateDiseaseRanks } from '../../modules/fallout/diseases/migration';
 import { migrateCharacterState } from '../../src/store/migrations';
+import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
 
 const buzzBrain = {
   id: 'disease_buzz_brain',
@@ -270,7 +271,7 @@ describe('болезни: миграция v24 → v25 (ранги из ката
       ],
     };
     const out = migrateCharacterState(v23);
-    expect(out.schemaVersion).toBe(25);
+    expect(out.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(out.activeTimedEffects[0].rank).toBe(4);
   });
 });

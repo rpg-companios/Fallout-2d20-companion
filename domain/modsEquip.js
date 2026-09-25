@@ -43,6 +43,14 @@ export const getAvailableArmorMods = (item, catalog) => {
     return { standardMods, uniqueMods };
 };
 
+/**
+ * Патч 342 (настройка «Требовать мод в сумке»): оставить только моды,
+ * созданные/найденные персонажем. ownedIds — Set id модов-предметов в сумке
+ * (weaponId экземпляров). Чистая функция — настройку читает UI.
+ */
+export const filterModsByInventory = (mods, ownedIds) =>
+  !ownedIds ? mods : (mods || []).filter((mod) => ownedIds.has(mod.id));
+
 /** Return whether a unique mod belongs to the item's explicit armor category. */
 export const isUniqueModAllowedForArmor = (mod, item, catalog) => {
     if (!mod) return false;
@@ -132,4 +140,18 @@ export const applyArmorMods = (armorItem, catalog, opts = {}) => {
     });
 
     return { item: modified, effects: { bonusEffects, rules: bonusEffects } };
+};
+
+/**
+ * 351 (продолжение 343/344): дифф списков модов при применении окна
+ * модификации. «Сняли — мод снова видим; заменили — старый видим».
+ * Чистая функция: установка/снятие флага экземпляров делает стор.
+ */
+export const diffModInstallPlan = (prevIds, nextIds) => {
+  const prev = Array.isArray(prevIds) ? prevIds : [];
+  const next = Array.isArray(nextIds) ? nextIds : [];
+  return {
+    install: next.filter((id) => !prev.includes(id)),
+    uninstall: prev.filter((id) => !next.includes(id)),
+  };
 };

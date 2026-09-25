@@ -164,19 +164,10 @@ const InventoryScreen = () => {
   }, [inventoryItems]);
 
   const adjustStoreItemQuantity = useCallback((itemId, delta) => {
-    const { items } = useCharacterStore.getState();
-    const item = items[itemId];
-    if (!item) return;
-
-    const newQty = (item.quantity || 1) + delta;
-    if (newQty <= 0) {
-      const updated = { ...items };
-      delete updated[itemId];
-      useCharacterStore.setState({ items: updated });
-      return;
-    }
-    updateItem(itemId, { quantity: newQty });
-  }, [updateItem]);
+    // 344: количество меняет СТОР (adjustItemQuantity) — удаление при нуле
+    // уводит установленные моды вместе с предметом (правило в одной копии).
+    useCharacterStore.getState().adjustItemQuantity(itemId, delta);
+  }, []);
 
   const equipWeaponInStore = useCallback((displayWeapon, sourceStackKey) => {
     const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);

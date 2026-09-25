@@ -36,7 +36,6 @@ export const CRAFT_CATEGORIES = [
 // Редкость материала → сводка «обычные/необычные/редкие» (патч 318).
 // Материалы сеттинга знают свой materialType; ингредиенты-вне-материалов
 // (мясо и пр.) редкости не имеют и в сводку не попадают.
-const RARITY_TYPES = ['common', 'uncommon', 'rare'];
 
 let materialTypeById = null;
 const materialRarityOf = (itemId) => {
@@ -69,6 +68,10 @@ const hintByPrefix = (id) => {
   if (s.startsWith('food_')) return 'food';
   if (s.startsWith('drink_')) return 'drinks';
   if (s.startsWith('armor_')) return 'armor';
+  // Моды брони (341): крафт даёт мод-предмет; имена берутся из каталога модов.
+  if (s.startsWith('uniq_') || s.startsWith('mod_std_')) return 'armorMod';
+  // Моды оружия (348): id вида mod_0NN — имя из пула weaponMods каталога.
+  if (s.startsWith('mod_')) return 'weaponMod';
   return null;
 };
 
@@ -77,6 +80,53 @@ const itemName = (catalog, id, typeHint) => {
   const entry = (hint ? findCatalogEntry(catalog, id, hint) : null)
     ?? findCatalogEntry(catalog, id, 'misc');
   return entry?.name ?? id;
+};
+
+/**
+ * 352 (план §2.10, первая очередь — модалка оружия): состояние кнопки
+ * «Создать» на позиции мода. Чистая функция: рецепт из данных, наличие в
+ * сумке и «хватает ли материалов» считаются из инвентаря (только свободные
+ * предметы — установленные/надетые материалами не являются). Кнопка зелёная
+ * (enabled) когда материалов хватает — правило владельца; перк проверяется
+ * при нажатии (движок), но его требование видно в строке.
+ * null — рецепта у мода нет (безколоночный): кнопки не будет.
+ */
+export const buildModCraftHint = (modId, { items = {}, selectedPerks = [] } = {}) => {
+  const recipe = getCraftingRecipeById(modId);
+  if (!recipe) return null;
+  const have = new Map();
+  for (const item of Object.values(items || {})) {
+    if (!item || item.installedOn || item.equipped) continue;
+    const id = item.weaponId || item.id;
+    if (!id) continue;
+    have.set(id, (have.get(id) || 0) + (Number(item.quantity) || 1));
+  }
+  const d = dict().ui;
+  // строка «Требования: …» — перки и сложность (352, макет владельца 353)
+  const requirementParts = [];
+  for (const perk of recipe.requires.perks || []) {
+    requirementParts.push(`${perkName(perk.perkId)} ${perk.rank}`);
+  }
+  requirementParts.push(fmt(d.complexity, { n: recipe.requires.complexity }));
+  // строка материалов — «есть/нужно» мелким шрифтом слева от кнопки
+  const shortLabel = {
+    item_common_materials: d.matCommon,
+    item_uncommon_materials: d.matUncommon,
+    item_rare_materials: d.matRare,
+  };
+  let enabled = true;
+  const materialParts = [];
+  for (const material of recipe.materials) {
+    const owned = have.get(material.itemId) || 0;
+    materialParts.push(`${shortLabel[material.itemId] || material.itemId} ${owned}/${material.count}`);
+    if (owned < material.count) enabled = false;
+  }
+  return {
+    inInventory: (have.get(modId) || 0) > 0,
+    enabled,
+    requirements: requirementParts.join(' · '),
+    materialsLine: materialParts.join(', '),
+  };
 };
 
 export const formatCraftMinutes = (minutes) => {
@@ -90,11 +140,10 @@ export const formatCraftMinutes = (minutes) => {
  * Строки одной категории-квадрата: что получится, чем, сколько это времени,
  * статус и (если нельзя) причина. Максимальный пакет — floor по самому
  * дефицитному материалу; для «можно» строк он ≥ 1.
- * Редкость (патч 318): каждый материал знает свой тип; materialGroups —
- * группировка заголовков спойлера по обычным/необычным/редким (не требуемые
- * типы не попадают). Счётчиков видов в сводке больше нет (326, слово
- * владельца: «не раздуваем интерфейс» — достаточно счётчиков штук на строках
- * материалов).
+ * Редкость (патч 318): каждый материал знает свой тип. Заголовков по
+ * редкостям в спойлере больше нет (326 — без счётчиков видов; 334 — без
+ * заголовков вовсе): спойлер показывает плоский список «тип материала»
+ * + счётчик «есть N шт. · нужно M шт.».
  */
 const buildRowsForCategory = (category) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());
@@ -134,15 +183,14 @@ const buildRowsForCategory = (category) => {
         + ' · ' + getSkillDisplayName(recipe.requires.skill)
         + ' · ' + fmt(d.craftTime, { t: formatCraftMinutes(minutes) }),
       status,
+      // 356: сложность снята навыком — окно спросит про бросок кубиков.
+      zeroDifficulty: evaluation.auto,
       canCraft: evaluation.ready,
       maxCraft: Number.isFinite(maxCraft) ? Math.max(0, maxCraft) : 0,
       reason: missingPerk
         ? fmt(d.needPerk, { perk: perkName(missingPerk.perkId), rank: missingPerk.need })
         : status === 'missing-material' ? d.shortMaterials : null,
       materials,
-      materialGroups: RARITY_TYPES
-        .filter((type) => materials.some((m) => m.rarity === type))
-        .map((type) => ({ type })),
       labels: {
         materialsTitle: d.materialsTitle,
         craft: d.craft,
@@ -264,7 +312,7 @@ export const buildCraftReport = (recipeId, run) => {
   const apGained = run.attempts.reduce((sum, a) => sum + (a.apEarned?.gained ?? 0), 0);
   const apPool = run.attempts.reduce((acc, a) => (a.apEarned?.pool != null ? a.apEarned.pool : acc), null);
   if (apGained > 0 && apPool != null) {
-    lines.push(fmt(d.ui.apEarnedLine, { n: apGained, pool: apPool }));
+    lines.push(fmt(d.apEarnedLine, { n: apGained, pool: apPool }));
   }
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.

@@ -410,6 +410,16 @@ export const loadCharacter = async (id) => {
     // Migrate old [null, null] format to dynamic array
     const rawWeapons = data.equippedWeapons || [];
     let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((w) => w !== null) : [];
+    // 360 (репорт владельца: «Смешанный конденсатор не снимается»): в старых
+    // сейвах робо-оружие оседало копией-призраком в equippedWeapons (карточка
+    // с устаревшими appliedMods). Правда о модах робо-оружия — только слоты
+    // (robot.slots), призрак при загрузке вычищается: иначе он всплывает
+    // устаревшим набором модов, который «не снимается».
+    const ghostCount = migratedWeapons.filter((w) => w?.sourceSlot).length;
+    if (ghostCount > 0) {
+      migratedWeapons = migratedWeapons.filter((w) => !w?.sourceSlot);
+      debugLog('character.load.robotGhostPurged', { count: ghostCount });
+    }
     // Ensure the archetype's built-in unarmed weapon is present on load
     // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
     const loadedOrigin = resolveOrigin(data.origin);

@@ -1,0 +1,160 @@
+{
+  "format": "rpg-companion-character",
+  "version": 1,
+  "exportedAt": "2026-09-24T08:26:54.858Z",
+  "character": {
+    "id": "char_1790055767985_l9qvxxsas",
+    "name": "вввв",
+    "level": 1,
+    "originName": "assaultron",
+    "data": {
+      "characterName": "вввв",
+      "level": 1,
+      "attributes": [
+        { "name": "STR", "value": 4 },
+        { "name": "PER", "value": 4 },
+        { "name": "END", "value": 10 },
+        { "name": "CHA", "value": 4 },
+        { "name": "INT", "value": 4 },
+        { "name": "AGI", "value": 4 },
+        { "name": "LCK", "value": 10 }
+      ],
+      "skills": [
+        { "name": "ATHLETICS", "value": 3 },
+        { "name": "BARTER", "value": 3 },
+        { "name": "BIG_GUNS", "value": 3 },
+        { "name": "ENERGY_WEAPONS", "value": 3 },
+        { "name": "EXPLOSIVES", "value": 3 },
+        { "name": "LOCKPICK", "value": 3 },
+        { "name": "MEDICINE", "value": 1 },
+        { "name": "MELEE_WEAPONS", "value": 0 },
+        { "name": "PILOT", "value": 0 },
+        { "name": "REPAIR", "value": 0 },
+        { "name": "SCIENCE", "value": 0 },
+        { "name": "SMALL_GUNS", "value": 0 },
+        { "name": "SNEAK", "value": 0 },
+        { "name": "SPEECH", "value": 0 },
+        { "name": "SURVIVAL", "value": 0 },
+        { "name": "THROWING", "value": 0 },
+        { "name": "UNARMED", "value": 0 }
+      ],
+      "selectedSkills": ["ATHLETICS", "BARTER", "BIG_GUNS"],
+      "extraTaggedSkills": [],
+      "forcedSelectedSkills": [],
+      "origin": { "id": "assaultron" },
+      "trait": {
+        "ids": ["assaultron-designed-for-frontline"],
+        "id": "assaultron-designed-for-frontline",
+        "name": "Designed for the Frontline",
+        "modifiers": {
+          "immunities": ["disease", "radiation", "poison"],
+          "carryWeightFixed": 150,
+          "carryWeightStrengthMultiplier": 0,
+          "meleeBonusDelta": 1,
+          "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"]
+        }
+      },
+      "equipment": {
+        "id": "assaultron_us_military",
+        "name": "US Military Model",
+        "weight": 4,
+        "price": 138,
+        "items": [
+          { "id": "ammo_energy_cell", "instanceId": "ammo_energy_cell", "weaponId": "ammo_energy_cell", "itemType": "ammo", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 12, "stackKey": "ammo_energy_cell", "appliedMods": {}, "durabilityTracked": false },
+          { "id": "clothing_casual_clothes", "instanceId": "clothing_casual_clothes", "weaponId": "clothing_casual_clothes", "itemType": "clothing", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "clothing_casual_clothes", "appliedMods": {}, "durabilityTracked": false },
+          { "id": "chem_buffout", "instanceId": "chem_buffout", "weaponId": "chem_buffout", "itemType": "chem", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "chem_buffout", "appliedMods": {}, "durabilityTracked": false },
+          { "id": "ammo_flamer_fuel", "instanceId": "ammo_flamer_fuel", "weaponId": "ammo_flamer_fuel", "itemType": "ammo", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 4, "stackKey": "ammo_flamer_fuel", "appliedMods": {}, "durabilityTracked": false },
+          { "id": "item_common_materials", "instanceId": "item_common_materials", "weaponId": "item_common_materials", "itemType": "misc", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 3, "stackKey": "item_common_materials", "appliedMods": {}, "durabilityTracked": false },
+          { "id": "mod_043", "instanceId": "mod_043", "weaponId": "mod_043", "itemType": "weaponMod", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "mod_043", "appliedMods": {}, "durabilityTracked": false }
+        ],
+        "purchaseMaxRarity": null
+      },
+      "effects": ["no_consumables_food_rest", "repair_to_heal", "built_in_laser", "self_destruct"],
+      "activeTimedEffects": [],
+      "sceneCounter": 0,
+      "equippedWeapons": [
+        {
+          "id": "weapon_laser_gun",
+          "itemType": "weapon",
+          "appliedMods": { "capacitor": "mod_046", "barrel": "mod_055" },
+          "weaponId": "weapon_laser_gun",
+          "sourceSlot": "leftArm",
+          "isBuiltin": true
+        }
+      ],
+      "equippedRobotSlots": {
+        "leftArm": {
+          "content": "robot_arm_assaultron",
+          "armorLayers": { "frame": null, "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": ["mod_055"] }]
+        },
+        "head": {
+          "content": "robot_head_assaultron_laser",
+          "armorLayers": { "frame": null, "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": []
+        },
+        "rightArm": {
+          "content": "robot_arm_assaultron",
+          "armorLayers": { "frame": null, "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": []
+        },
+        "leftLeg": {
+          "content": "robot_legs_assaultron",
+          "armorLayers": { "frame": null, "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": []
+        },
+        "body": {
+          "content": "robot_body_assaultron",
+          "armorLayers": { "frame": "robot_frame_actuated_body", "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": []
+        },
+        "rightLeg": {
+          "content": "robot_legs_assaultron",
+          "armorLayers": { "frame": null, "plating": null, "armor": null },
+          "heldWeaponId": null,
+          "heldWeaponMods": [],
+          "installedWeapons": []
+        }
+      },
+      "equippedRobotModules": [
+        { "id": "robot_module_recon_sensors", "itemType": "module", "weight": 0, "cost": 0, "rarity": 0, "name": "Recon Sensors", "type": "fixed", "itemId": "robot_module_recon_sensors" }
+      ],
+      "mk2Installed": false,
+      "equippedArmor": {
+        "head": { "armor": null, "clothing": null },
+        "body": { "armor": null, "clothing": null },
+        "leftArm": { "armor": null, "clothing": null },
+        "rightArm": { "armor": null, "clothing": null },
+        "leftLeg": { "armor": null, "clothing": null },
+        "rightLeg": { "armor": null, "clothing": null }
+      },
+      "equippedPowerArmor": { "frame": null, "pieces": { "head": null, "body": null, "leftArm": null, "rightArm": null, "leftLeg": null, "rightLeg": null } },
+      "powerArmorRuntime": { "coreAccumulatorMs": 0 },
+      "caps": 45,
+      "currentHealth": 20,
+      "radiation": 0,
+      "availablePerkAttributePoints": 0,
+      "luckPoints": 10,
+      "attributesSaved": true,
+      "skillsSaved": true,
+      "selectedPerks": [],
+      "conditions": [],
+      "chemDosesLog": [],
+      "sceneRiskStates": {},
+      "lastDiseaseResistAt": null,
+      "survival": null,
+      "rewardedSkills": ["ATHLETICS", "BARTER", "BIG_GUNS"],
+      "schemaVersion": 26
+    }
+  }
+}

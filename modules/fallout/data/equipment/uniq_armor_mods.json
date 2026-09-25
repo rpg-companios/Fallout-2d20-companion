@@ -827,5 +827,365 @@
       }
     },
     "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_weave_ballistic",
+    "modCategory": "costumeUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 20
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_weave_ballistic_mk2",
+    "modCategory": "costumeUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 1",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 30
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_weave_ballistic_mk3",
+    "modCategory": "costumeUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 40
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 4
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_weave_ballistic_mk4",
+    "modCategory": "costumeUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 50
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 5
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 5
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_weave_ballistic_mk5",
+    "modCategory": "costumeUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 4",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 60
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 6
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 6
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_vaultsuit_insulated",
+    "modCategory": "vaultSuitUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 2,
+    "requiredPerk": "",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 10
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 0
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 0
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_vaultsuit_processed",
+    "modCategory": "vaultSuitUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 3,
+    "requiredPerk": "Бронник 2",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 20
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 1
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 1
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_vaultsuit_sturdy",
+    "modCategory": "vaultSuitUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 4,
+    "requiredPerk": "Бронник 3",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 30
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 1
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_vaultsuit_protective",
+    "modCategory": "vaultSuitUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 5,
+    "requiredPerk": "Бронник 4, Наука! 2",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 40
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 2
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 2
+      }
+    },
+    "specialEffects": []
+  },
+  {
+    "modType": "armorUnique",
+    "id": "uniq_vaultsuit_shielded",
+    "modCategory": "vaultSuitUniqueMods",
+    "protectedAreas": [
+      "Body",
+      "Hand",
+      "Leg"
+    ],
+    "complexity": 6,
+    "requiredPerk": "Бронник 4, Наука! 4",
+    "requiredSkill": "REPAIR",
+    "costModifier": {
+      "op": "+",
+      "value": 50
+    },
+    "weightModifier": {
+      "op": "+",
+      "value": 1
+    },
+    "statModifiers": {
+      "physicalDamageRating": {
+        "op": "+",
+        "value": 0
+      },
+      "energyDamageRating": {
+        "op": "+",
+        "value": 3
+      },
+      "radiationDamageRating": {
+        "op": "+",
+        "value": 3
+      }
+    },
+    "specialEffects": []
   }
 ]

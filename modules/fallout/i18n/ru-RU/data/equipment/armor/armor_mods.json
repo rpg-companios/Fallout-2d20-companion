@@ -1,17 +1,5 @@
 [
   {
-    "id": "mod_std_laminate",
-    "name": "Ламинированная"
-  },
-  {
-    "id": "mod_std_rubberized",
-    "name": "Прорезиненная"
-  },
-  {
-    "id": "mod_std_microcarbon",
-    "name": "Микроуглеродистая"
-  },
-  {
     "id": "mod_std_soft_padding",
     "name": "Мягкая",
     "specialEffects": [
@@ -77,7 +65,7 @@
     "specialEffects": [
       {
         "id": "effect_melee_damage_resistance_2",
-        "description": "+2 к сопротивлению урону от атак ближнего боя."
+        "description": "+2 Физ. СУ, только если против персонажа идёт атака с использованием навыка «Ближний бой»."
       }
     ]
   },
@@ -107,7 +95,7 @@
     "specialEffects": [
       {
         "id": "effect_melee_piercing_1",
-        "description": "Атаки ближнего боя и рукопашные атаки получают эффект 'Проникающий' 1."
+        "description": "Пока броня с этим модом надета, оружие с навыком «Ближний бой» или «Рукопашная» получает эффект «Проникающий» 1 (складывается с имеющимся)."
       }
     ]
   },
@@ -117,7 +105,7 @@
     "specialEffects": [
       {
         "id": "effect_fall_damage_resistance",
-        "description": "+2 к сопротивлению физическому урону от падения."
+        "description": "+2 Физ. СУ, только когда персонаж падает."
       }
     ]
   },

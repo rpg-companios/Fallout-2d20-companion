@@ -2,7 +2,9 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { applyArmorMods, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
+import { applyArmorMods, filterModsByInventory, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
+import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+import useCharacterStore from '../../../../../src/store/characterStore';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import styles from '../../../styles/ArmorModificationModal.styles';
 
@@ -75,6 +77,18 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
     setExpandedCategories({ standard: false, unique: false });
   }, [visible, localizedTargetItem, stdKey, uniqKey]);
 
+  // 342 (настройка «Требовать мод в сумке», слово владельца): включена —
+  // ставить можно только созданные/найденные моды (есть в сумке); выключена
+  // (по умолчанию) — установка свободна, любой доступный броне мод.
+  const requireModInBag = useAppSettingsStore((s) => s.getSettingValue('modsRequireInventoryItem'));
+  const bagItems = useCharacterStore((s) => s.items);
+  const ownedModIds = useMemo(() => {
+    if (!requireModInBag) return null;
+    return new Set(Object.values(bagItems || {})
+      .map((item) => item?.weaponId)
+      .filter(Boolean));
+  }, [requireModInBag, bagItems]);
+
   const { standardMods, uniqueMods } = useMemo(() => {
     // Одежда не модифицируется модами брони.
     if (isClothingMode || !localizedTargetItem) return { standardMods: [], uniqueMods: [] };
@@ -82,8 +96,12 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
     // ПРАВИЛО (от владельца): уникальные моды — строго по типу брони.
     // См. domain/modsEquip.js — если категория брони неизвестна, уникальных
     // модов нет вообще (а не «все моды всем»).
-    return getAvailableArmorMods(localizedTargetItem, catalog);
-  }, [localizedTargetItem, catalog, isClothingMode]);
+    const available = getAvailableArmorMods(localizedTargetItem, catalog);
+    return {
+      standardMods: filterModsByInventory(available.standardMods, ownedModIds),
+      uniqueMods: filterModsByInventory(available.uniqueMods, ownedModIds),
+    };
+  }, [localizedTargetItem, catalog, isClothingMode, ownedModIds]);
 
   const previewItem = useMemo(() => {
     if (!localizedTargetItem) return null;
@@ -155,6 +173,9 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
                     <Text style={styles.modificationName}>{selectedStd ? tWeaponsAndArmorScreen('modals.removeStandard') : tWeaponsAndArmorScreen('modals.noStandard')}</Text>
                   </TouchableOpacity>
                 )}
+                {requireModInBag && standardMods.length === 0 && (
+                  <Text style={styles.modsNotInInventory}>{tWeaponsAndArmorScreen('modals.modsNotInInventory')}</Text>
+                )}
                 {standardMods.map((m) => (
                   <ModRow key={m.id} mod={m} selected={selectedStd === m.id} onPress={() => setSelectedStd(m.id)} />
                 ))}
@@ -172,6 +193,9 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
                   >
                     <Text style={styles.modificationName}>{selectedUniq ? tWeaponsAndArmorScreen('modals.removeUnique') : tWeaponsAndArmorScreen('modals.noUnique')}</Text>
                   </TouchableOpacity>
+                  {requireModInBag && uniqueMods.length === 0 && (
+                    <Text style={styles.modsNotInInventory}>{tWeaponsAndArmorScreen('modals.modsNotInInventory')}</Text>
+                  )}
                   {uniqueMods.map((m) => (
                     <ModRow key={m.id} mod={m} selected={selectedUniq === m.id} onPress={() => setSelectedUniq(m.id)} />
                   ))}
