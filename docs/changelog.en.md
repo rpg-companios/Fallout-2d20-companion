@@ -14,6 +14,17 @@
 ---
 ---
 ---
+---
+## The mod window now says what each mod does (patch 383)
+
+The weapon mod window used to show names only. Now every mod carries a
+description generated from its mechanics: "Урон +2 · Вес +1 · Цена +25"
+(Damage +2 · Weight +1 · Cost +25), "Скорострельность +1 · Тип урона:
+Энергетический" (Fire rate +1 · Damage type: Energy), "Эффект:
+Проникающий 1" (Effect: Piercing 1), "Боеприпас: Патрон .308" (Ammo:
+.308 Round), etc. Shown both in the mod list and in the preview.
+Covered by a test: all 164 mods produce a description.
+
 ## The installed mod is now visible on the weapon card (patch 382)
 
 A modded weapon now carries the mod's name — e.g. "Усиленный 10-мм
