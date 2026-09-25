@@ -1,0 +1,252 @@
+diff --git a/__tests__/equipment/weapon-card-mod-write-380.test.js b/__tests__/equipment/weapon-card-mod-write-380.test.js
+new file mode 100644
+index 0000000..022e2fc
+--- /dev/null
++++ b/__tests__/equipment/weapon-card-mod-write-380.test.js
+@@ -0,0 +1,92 @@
++// ПРИЁМОЧНЫЙ (патч 380): моды на надетом оружии человека — запись в СВОЙ
++// предмет стора. Жалоба владельца: «моды не ставятся в карточку оружия,
++// в предпросмотре модалки — да». Причина: локализованная карточка несёт
++// ключ предмета в instanceId, а поиск вёлcя по uniqueId/id; фолбэк
++// («undefined === undefined» у любого предмета без uniqueId) возвращал
++// ПЕРВЫЙ надетый предмет (броню) — мод писался не в оружие.
++//   • карточка (порядок стора: броня первой, оружие вторым) → ключ оружия,
++//     не брони;
++//   • полный конвейер: применили мод в модалке → patch к предмету →
++//     карточка показывает +2 урона («Улучшенный» ПП-ресивер).
++import { describe, expect, it } from 'vitest';
++
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import {
++  resolveStoreItemIdFromItems,
++  storeItemToWeaponDisplay,
++  weaponModPatchToStore,
++} from '../../src/store/selectors';
++import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
++
++const catalog = getEquipmentCatalog('ru-RU');
++
++const armorItem = {
++  id: 'inst-armor-1',
++  instanceId: 'inst-armor-1',
++  itemType: 'armor',
++  equipped: true,
++  name: 'Кожаная броня',
++};
++
++const weaponItem = {
++  id: 'inst-10mm-1',
++  instanceId: 'inst-10mm-1',
++  weaponId: 'weapon_10mm_pistol',
++  itemType: 'weapon',
++  equipped: true,
++  appliedMods: {},
++};
++
++// Порядок вставки как в живом сторе: броня надета раньше оружия.
++const items = {
++  [armorItem.id]: armorItem,
++  [weaponItem.id]: weaponItem,
++};
++
++describe('патч 380: ключ предмета по карточке оружия', () => {
++  it('карточка надетого оружия → ключ ОРУЖИЯ, даже если броня в сторе раньше', () => {
++    const display = resolveWeaponWithAppliedMods(storeItemToWeaponDisplay(weaponItem), catalog);
++    expect(display.instanceId).toBe('inst-10mm-1');
++    expect(resolveStoreItemIdFromItems(items, display)).toBe('inst-10mm-1');
++  });
++
++  it('прежний фолбэк ловил первый надетый предмет (регрессия задокументирована)', () => {
++    // Старая логика (до 380) на той же паре предметов:
++    const legacyFind = Object.values(items).find(
++      (item) => item.equipped && (
++        item.uniqueId === undefined // weapon.uniqueId === undefined
++        || item.id === undefined
++      ),
++    )?.id;
++    expect(legacyFind).toBe('inst-armor-1'); // вот куда писался мод до фикса
++  });
++
++  it('полный конвейер: мод из модалки попадает в предмет и в карточку', () => {
++    // 1) В модалке применили «Улучшенный ресивер» (+2 урона, слот Receiver):
++    const display = resolveWeaponWithAppliedMods(storeItemToWeaponDisplay(weaponItem), catalog);
++    const modifiedWeapon = resolveWeaponWithAppliedMods(
++      { ...display, appliedMods: { Receiver: 'mod_powerful' } },
++      catalog,
++    );
++    expect(modifiedWeapon.damage).toBe(6); // 4 базы + 2 мода (предпросмотр модалки)
++
++    // 2) Экран пишет патч в СВОЙ предмет (ключ из карточки):
++    const itemId = resolveStoreItemIdFromItems(items, modifiedWeapon);
++    expect(itemId).toBe('inst-10mm-1');
++    const patch = weaponModPatchToStore(modifiedWeapon);
++    const nextItems = { ...items, [itemId]: { ...items[itemId], ...patch } };
++
++    // 3) Карточка на экране перечитала стор — урон с модом:
++    const cardAfter = resolveWeaponWithAppliedMods(
++      storeItemToWeaponDisplay(nextItems[itemId]),
++      catalog,
++    );
++    expect(cardAfter.damage).toBe(6);
++    expect(cardAfter.appliedMods).toEqual({ Receiver: 'mod_powerful' });
++  });
++
++  it('виртуальное оружие без предмета в сторе → undefined (план equippedWeapon)', () => {
++    expect(resolveStoreItemIdFromItems(items, { id: 'weapon_fists', damage: 0 })).toBeUndefined();
++    expect(resolveStoreItemIdFromItems(items, null)).toBeUndefined();
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3edd94d..b0dfbc4 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,11 +8,16 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **379** (срочный фикс сборки: в 367 при правке
+-WeaponsAndArmorScreen продублировался хвост файла — vitest этот файл не
+-импортировал и провала не видел; Metro у владельца упал. Хвост удалён,
+-заведён заслон __tests__/screens/js-syntax-379.test.js — babel-парс
+-всех 211 JS-файлов кода при каждом прогоне) · у владельца закоммичено до **365**
++· последний сданный патч: **380** (жалоба владельца при приёмке: «моды
++не ставятся в карточку оружия, в предпросмотре модалки — да». Причина:
++resolveStoreItemId в WeaponsAndArmorScreen искал ключ предмета по
++uniqueId/id, а локализованная карточка несёт его в instanceId; фолбэк
++«undefined===undefined» возвращал ПЕРВЫЙ надетый предмет (броню) — мод
++писался не в оружие. Фикс: чистая resolveStoreItemIdFromItems в
++src/store/selectors.js (instanceId → uniqueId → id, фолбэк только по
++определённым полям), экран вызывает её. Приёмочный
++__tests__/equipment/weapon-card-mod-write-380.test.js: ключ оружия при
++броне-первой, полный конвейер мод→предмет→карточка (+2 урона)) · у владельца закоммичено до **365**
+ (экспорты файлов патчей на main: 364+365); ревизия модов ЗАВЕРШЕНА:
+ шаг 1 (375) канон-id + мост сейвов; шаг 2 (376) рецепты всем 164 +
+ 23 новых улучшения + Посох Атома и Шахтерский перфоратор; шаг 3 (377)
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 6caa78b..956d1ef 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -11,6 +11,17 @@
+ ---
+ ---
+ ---
++---
++## Fixed: weapon mods now stick to the weapon (patch 380)
++
++When armor was also equipped, applying a weapon mod wrote it to the
++wrong store item (the card lookup confused the weapon with the first
++equipped item) — the modal preview was right while the weapon card
++never changed. The store-item lookup now starts from the exact instance
++key and falls back to weapon-type matching; it moved into the engine
++with acceptance tests: the mod always lands in its own weapon and the
++card shows the new damage immediately.
++
+ ## Fixed build of the Weapons & Armor screen (patch 379)
+ 
+ The app failed to bundle: patch 367 accidentally duplicated a chunk of
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 336187d..5a55ab6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,16 @@
+ # История изменений
+ 
+ ---
++## Исправлено: улучшения снова закрепляются на оружии (патч 380)
++
++Если на персонаже надета ещё и броня, улучшение оружия после кнопки
++«Применить» записывалось не в тот предмет (поиск карточки путал его с
++первым надетым предметом) — окно предпросмотра всё показывало, а
++карточка оружия не менялась. Поиск ключа предмета переписан (сначала
++точный ключ экземпляра, затем совпадение по типу оружия) и вынесен в
++движок с автотестами: улучшение гарантированно попадает в своё оружие,
++карточка сразу показывает новый урон.
++
+ ## Исправлена сборка экрана «Оружие и броня» (патч 379)
+ 
+ Приложение не собиралось: в патче 367 при доработке экрана случайно
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 448ad12..c6030bf 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -10,6 +10,7 @@ import {
+   getEquippedArmor,
+   storeItemToWeaponDisplay,
+   weaponModPatchToStore,
++  resolveStoreItemIdFromItems,
+   selectActiveTimedEffects,
+   selectLegacyAttributes,
+   selectLegacySkills,
+@@ -732,18 +733,10 @@ const findRobotBodyUpgrade = (catalog, robotBodyPlan, inventoryItems = []) => {
+ 
+ // --- Main Component ---
+ 
+-const resolveStoreItemId = (weapon) => {
+-  const items = useCharacterStore.getState().items;
+-  if (weapon?.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
+-  if (weapon?.id && items[weapon.id]) return weapon.id;
+-  return Object.values(items).find(
+-    (item) => item.equipped && (
+-      item.uniqueId === weapon?.uniqueId
+-      || item.id === weapon?.id
+-      || item.weaponId === weapon?.weaponId
+-    ),
+-  )?.id;
+-};
++// 380: поиск ключа предмета — движок (selectors); локализованная карточка
++// несёт ключ в instanceId, прежний фолбэк ловил первый надетый предмет.
++const resolveStoreItemId = (weapon) =>
++  resolveStoreItemIdFromItems(useCharacterStore.getState().items, weapon);
+ 
+ const WeaponsAndArmorScreen = () => {
+   // Шаг 8а (патч 241): атрибуты (legacy-массив) — из стор-словаря.
+diff --git a/public/version.json b/public/version.json
+index 0ebb612..1703af2 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "379",
++  "version": "380",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/selectors.js b/src/store/selectors.js
+index bb36d2a..14d96b0 100644
+--- a/src/store/selectors.js
++++ b/src/store/selectors.js
+@@ -98,6 +98,34 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
+   };
+ };
+ 
++/**
++ * Найти ключ предмета-оружия в сторе по отображаемой (локализованной) карточке.
++ * Патч 380: раньше ключ искали по uniqueId/id, а локализованная карточка несёт
++ * ключ в instanceId; фолбэк «первый надетый предмет» (сравнение
++ * undefined === undefined) отдавал чужой предмет (броню) — мод писался не в
++ * оружие и карточка молча не менялась. Теперь: instanceId → uniqueId → id,
++ * фолбэк — по совпадению только ОПРЕДЕЛЁННЫХ полей (weaponId и т.д.).
++ * Чистая функция (items аргументом) — движок; экран только вызывает.
++ *
++ * @param {object} items  — словарь предметов стора (state.items)
++ * @param {object} weapon — карточка оружия (storeItemToWeaponDisplay/локализованная)
++ * @returns {string|undefined} ключ предмета в сторе
++ */
++export const resolveStoreItemIdFromItems = (items, weapon) => {
++  if (!weapon || !items) return undefined;
++  if (weapon.instanceId && items[weapon.instanceId]) return weapon.instanceId;
++  if (weapon.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
++  if (weapon.id && items[weapon.id]) return weapon.id;
++  return Object.values(items).find(
++    (item) => item.equipped && (
++      (weapon.uniqueId != null && item.uniqueId === weapon.uniqueId)
++      || (weapon.instanceId != null && item.instanceId === weapon.instanceId)
++      || (weapon.weaponId != null && item.weaponId === weapon.weaponId)
++      || (weapon.id != null && item.id === weapon.id)
++    ),
++  )?.id;
++};
++
+ /**
+  * Convert a normalized store weapon item to legacy display shape
+  */
