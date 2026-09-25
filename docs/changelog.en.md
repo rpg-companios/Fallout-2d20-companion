@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+---
+## Supported mods collected from your list (patch 370)
+
+Revision continues: all 141 unique slot+mod entries from your list are
+resolved — 100 match existing rows, 29 are phantom duplicates (to be merged
+during the revision), 11 mods are missing from the catalog entirely, 2 are
+recorded as candidates. Coverage computed: 582 (weapon, mod) pairs to add,
+127 to remove; 20 weapons (all melee except six names, arc welder etc.) have
+no list yet — untouched until you send theirs. Data unchanged — revision
+material (`weapon-mods-support-map-370`).
+
 ## Russian weapon names mapped to the catalog (patch 369)
 
 Revision begins: all 83 names from the owner's weapon list are mapped
