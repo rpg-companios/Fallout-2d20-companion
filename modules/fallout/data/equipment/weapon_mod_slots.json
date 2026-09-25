@@ -1417,22 +1417,112 @@
       "mod_serrated_blade"
     ]
   },
-  "weapon_baseball_bat": {},
-  "weapon_baseball_bat_aluminum": {},
-  "weapon_board": {},
-  "weapon_lead_pipe": {},
-  "weapon_pipe_wrench": {},
-  "weapon_pool_cue": {},
-  "weapon_rolling_pin": {},
-  "weapon_baton": {},
-  "weapon_sledgehammer": {},
-  "weapon_super_sledge": {},
-  "weapon_tire_iron": {},
-  "weapon_walking_cane": {},
-  "weapon_boxing_glove": {},
-  "weapon_deathclaw_gauntlet": {},
-  "weapon_knuckles": {},
-  "weapon_power_fist": {},
+  "weapon_baseball_bat": {
+    "Unique": [
+      "mod_barbed",
+      "mod_bladed",
+      "mod_chain_wrapped",
+      "mod_sharp",
+      "mod_spiked"
+    ]
+  },
+  "weapon_baseball_bat_aluminum": {
+    "Unique": [
+      "mod_barbed",
+      "mod_bladed",
+      "mod_chain_wrapped",
+      "mod_sharp",
+      "mod_spiked"
+    ]
+  },
+  "weapon_board": {
+    "Unique": [
+      "mod_bladed",
+      "mod_puncturing",
+      "mod_spiked"
+    ]
+  },
+  "weapon_lead_pipe": {
+    "Unique": [
+      "mod_heavy",
+      "mod_spiked"
+    ]
+  },
+  "weapon_pipe_wrench": {
+    "Unique": [
+      "mod_extra_heavy",
+      "mod_heavy",
+      "mod_hooked",
+      "mod_puncturing"
+    ]
+  },
+  "weapon_pool_cue": {
+    "Unique": [
+      "mod_barbed",
+      "mod_sharp"
+    ]
+  },
+  "weapon_rolling_pin": {
+    "Unique": [
+      "mod_sharp",
+      "mod_spiked"
+    ]
+  },
+  "weapon_baton": {
+    "Unique": [
+      "mod_electrified",
+      "mod_stun_pack"
+    ]
+  },
+  "weapon_sledgehammer": {
+    "Unique": [
+      "mod_heavy",
+      "mod_puncturing"
+    ]
+  },
+  "weapon_super_sledge": {
+    "Unique": [
+      "mod_heating_coil",
+      "mod_stun_pack"
+    ]
+  },
+  "weapon_tire_iron": {
+    "Unique": [
+      "mod_bladed"
+    ]
+  },
+  "weapon_walking_cane": {
+    "Unique": [
+      "mod_barbed",
+      "mod_spiked"
+    ]
+  },
+  "weapon_boxing_glove": {
+    "Unique": [
+      "mod_lead_lining",
+      "mod_puncturing",
+      "mod_spiked"
+    ]
+  },
+  "weapon_deathclaw_gauntlet": {
+    "Unique": [
+      "mod_extra_claw"
+    ]
+  },
+  "weapon_knuckles": {
+    "Unique": [
+      "mod_bladed",
+      "mod_puncturing",
+      "mod_sharp",
+      "mod_spiked"
+    ]
+  },
+  "weapon_power_fist": {
+    "Unique": [
+      "mod_heating_coil",
+      "mod_puncturing"
+    ]
+  },
   "weapon_junk_jet": {
     "Muzzle": [
       "mod_electrification_module",

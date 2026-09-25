@@ -9,6 +9,15 @@
 ---
 ---
 ---
+---
+## Melee mods completed — full owner coverage (patch 378)
+
+Final touch of the rebuild: 42 melee mods (spiked/barbed/bladed,
+chain wrapped, electrified, stun pack, ...) are back where they belong
+— baseball bats, baton, knuckles, walking cane and 17 more weapons.
+Weapon→mod coverage now matches the owner's lists 729/729 (100%).
+Weapons without an owner list (10mm SMG, plasma mine) stay untouched.
+
 ## Mods now match your lists exactly; weapons renamed (patch 377)
 
 Modification windows are rebuilt: each of the 88 weapons with your list

@@ -570,7 +570,12 @@
     "materials": "Common x 2",
     "cost": 5,
     "weight": null,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum",
+      "weapon_pool_cue",
+      "weapon_walking_cane"
+    ],
     "qualityChanges": [],
     "effectChanges": [
       {
@@ -781,7 +786,13 @@
     "materials": "Common x 5 Uncommon x 3",
     "cost": 12,
     "weight": 2,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum",
+      "weapon_board",
+      "weapon_knuckles",
+      "weapon_tire_iron"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -1194,7 +1205,10 @@
     "materials": "Common x 4 Uncommon x 2",
     "cost": 10,
     "weight": 1,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -1529,7 +1543,9 @@
     "materials": "Common x 5 Uncommon x 3",
     "cost": 15,
     "weight": null,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baton"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -1716,7 +1732,9 @@
     "materials": "Common x 2",
     "cost": 22,
     "weight": 2,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_deathclaw_gauntlet"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -1767,7 +1785,9 @@
     "materials": "Common x 4 Uncommon x 2",
     "cost": 22,
     "weight": 2,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 3
@@ -2341,7 +2361,10 @@
     "materials": "Common x 4 Uncommon x 2",
     "cost": 180,
     "weight": null,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_power_fist",
+      "weapon_super_sledge"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -2367,7 +2390,11 @@
     "materials": "Common x 4 Uncommon x 2",
     "cost": 11,
     "weight": 2,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_lead_pipe",
+      "weapon_pipe_wrench",
+      "weapon_sledgehammer"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -2436,7 +2463,9 @@
     "materials": "Common x 2",
     "cost": 9,
     "weight": null,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_pipe_wrench"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -2814,7 +2843,9 @@
     "materials": "Common x 3",
     "cost": 7,
     "weight": 1,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_boxing_glove"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -3465,7 +3496,14 @@
     "materials": "Common x 3",
     "cost": 9,
     "weight": 1,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_board",
+      "weapon_boxing_glove",
+      "weapon_knuckles",
+      "weapon_pipe_wrench",
+      "weapon_power_fist",
+      "weapon_sledgehammer"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 2
@@ -3942,7 +3980,13 @@
     "materials": "Common x 3",
     "cost": 7,
     "weight": 1,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum",
+      "weapon_knuckles",
+      "weapon_pool_cue",
+      "weapon_rolling_pin"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -4310,7 +4354,16 @@
     "materials": "Common x 3",
     "cost": 7,
     "weight": 1,
-    "applies_to_ids": [],
+    "applies_to_ids": [
+      "weapon_baseball_bat",
+      "weapon_baseball_bat_aluminum",
+      "weapon_board",
+      "weapon_boxing_glove",
+      "weapon_knuckles",
+      "weapon_lead_pipe",
+      "weapon_rolling_pin",
+      "weapon_walking_cane"
+    ],
     "damageModifier": {
       "op": "+",
       "value": 1
@@ -4462,6 +4515,8 @@
     "cost": 100,
     "weight": null,
     "applies_to_ids": [
+      "weapon_baton",
+      "weapon_super_sledge",
       "weapon_sword"
     ],
     "damageModifier": {
