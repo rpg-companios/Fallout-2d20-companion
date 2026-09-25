@@ -21,11 +21,11 @@ const seed = (id, quantity = 1) => {
 
 // mod_001: сложность 3, Gun Nut 1, REPAIR, обычный ×4 + необычный ×2.
 const singleReport = ({ skill, rolls, zeroDifficulty }) => {
-  const run = craftRecipe('mod_001', { rollD20: () => rolls.shift() ?? 1 }, {
+  const run = craftRecipe('mod_rapid', { rollD20: () => rolls.shift() ?? 1 }, {
     deferTime: true,
     ...(zeroDifficulty ? { zeroDifficulty } : {}),
   });
-  return { run, report: buildCraftReport('mod_001', { attempts: [run], stoppedEarly: 0 }) };
+  return { run, report: buildCraftReport('mod_rapid', { attempts: [run], stoppedEarly: 0 }) };
 };
 
 beforeEach(() => {
@@ -77,7 +77,7 @@ describe('ПРИЁМОЧНЫЙ (патч 357): отчёт о крафте в м�
     expect(report.pendingTime?.hasSuccess).toBe(true);
 
     // как в модалке: «да» на 2 ОД — время успеха вдвое (60 → 30 минут)
-    const settled = settleCraftTime('mod_001', run, { spendActionPoints: true });
+    const settled = settleCraftTime('mod_rapid', run, { spendActionPoints: true });
     expect(settled.minutes).toBe(30);
   });
 
@@ -86,7 +86,7 @@ describe('ПРИЁМОЧНЫЙ (патч 357): отчёт о крафте в м�
     seed('item_uncommon_materials', 2);
     const { run, report } = singleReport({ skill: 2, rolls: [20, 20] });
     expect(report.pendingTime.hasSuccess).toBe(false);
-    const settled = settleCraftTime('mod_001', run, { spendActionPoints: false });
+    const settled = settleCraftTime('mod_rapid', run, { spendActionPoints: false });
     expect(settled.minutes).toBe(120); // базовый час + 2 × 30 за осложнения
   });
 

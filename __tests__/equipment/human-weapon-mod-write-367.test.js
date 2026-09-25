@@ -110,11 +110,11 @@ describe('ПРИЁМОЧНЫЙ (патч 367): мод на надетом ору
     const w = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
     // Точно как в ветке storeItem экрана: флагов нет (мода в сумке нет),
     // патч — в items, возврат. equippedWeapons не трогается.
-    const patch = { appliedMods: { Receiver: 'mod_008' } };
+    const patch = { appliedMods: { Receiver: 'mod_automatic' } };
     state().updateItem('weapon_10mm_pistol', patch);
 
     // Копия в items мод получила…
-    expect(state().items['weapon_10mm_pistol'].appliedMods).toEqual({ Receiver: 'mod_008' });
+    expect(state().items['weapon_10mm_pistol'].appliedMods).toEqual({ Receiver: 'mod_automatic' });
     // …а надетый экземпляр (его читают карточки и сейв) — НЕТ.
     expect(state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol').appliedMods).toEqual({});
   });
@@ -122,7 +122,7 @@ describe('ПРИЁМОЧНЫЙ (патч 367): мод на надетом ору
   it('ЦЕЛЬ ПОЧИНКИ: сквозная запись (как на экране) → «Очередь» на карточке → мод выживает сейв→загрузку', async () => {
     const w = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
     const card = resolveWeaponWithAppliedMods(w, getEquipmentCatalog('ru-RU'));
-    const modifiedWeapon = { ...card, appliedMods: { Receiver: 'mod_008' } };
+    const modifiedWeapon = { ...card, appliedMods: { Receiver: 'mod_automatic' } };
     // Точная имитация ветки storeItem экрана после 367: патч в items +
     // запись-сквозняк в надетый список по ключу предмета.
     state().updateItem(modifiedWeapon.instanceId || modifiedWeapon.id, { appliedMods: modifiedWeapon.appliedMods });
@@ -131,7 +131,7 @@ describe('ПРИЁМОЧНЫЙ (патч 367): мод на надетом ору
     )));
 
     const after = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
-    expect(after.appliedMods).toEqual({ Receiver: 'mod_008' });
+    expect(after.appliedMods).toEqual({ Receiver: 'mod_automatic' });
 
     // Эффект на карточке: «Очередь» (effect_burst) среди эффектов
     // (мод_008 «Автоматический»; локализацию id делает экран).
@@ -152,6 +152,6 @@ describe('ПРИЁМОЧНЫЙ (патч 367): мод на надетом ору
     state().resetCharacterStore();
     expect(await loadCharacter(CHAR_ID)).toBe(true);
     const reloaded = state().equippedWeapons.find((x) => x?.weaponId === 'weapon_10mm_pistol');
-    expect(reloaded?.appliedMods).toEqual({ Receiver: 'mod_008' });
+    expect(reloaded?.appliedMods).toEqual({ Receiver: 'mod_automatic' });
   });
 });

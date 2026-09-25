@@ -25,21 +25,21 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
   it('материалов хватает → enabled (зелёная); не хватает → dimmed', () => {
     useCharacterStore.setState({ items: {}, selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     // «Скорострельный»: Обычные ×4 + Необычные ×2
-    const ok = buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks });
+    const ok = buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: state().selectedPerks });
     expect(ok.enabled).toBe(false); // пустая сумка
 
     seed('item_common_materials', 4);
     seed('item_uncommon_materials', 2);
-    const green = buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks });
+    const green = buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: state().selectedPerks });
     expect(green.enabled).toBe(true);
 
     seed('item_common_materials', 1); // обычных 5, но необычных 2 — всё ещё хватает
-    expect(buildModCraftHint('mod_001', { items: state().items, selectedPerks: state().selectedPerks }).enabled).toBe(true);
+    expect(buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: state().selectedPerks }).enabled).toBe(true);
   });
 
   it('требования блоком: «Требования» (перк · сложность) + материалы «есть/нужно»', () => {
     useCharacterStore.setState({ items: {} });
-    const hint = buildModCraftHint('mod_001', { items: {}, selectedPerks: [] });
+    const hint = buildModCraftHint('mod_rapid', { items: {}, selectedPerks: [] });
     // строка требований: перк и сложность
     expect(hint.requirements).toBe('Gun Nut 1 · Complexity 3');
     // строка материалов: «есть/нужно» мелким слева от кнопки (макет 353)
@@ -48,15 +48,15 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
     useCharacterStore.setState((prev) => ({
       items: { ...prev.items, k1: { weaponId: 'item_common_materials', quantity: 2 } },
     }));
-    const partial = buildModCraftHint('mod_001', { items: useCharacterStore.getState().items, selectedPerks: [] });
+    const partial = buildModCraftHint('mod_rapid', { items: useCharacterStore.getState().items, selectedPerks: [] });
     expect(partial.materialsLine).toBe('Common material 2/4, Uncommon material 0/2');
     expect(partial.enabled).toBe(false);
   });
 
   it('мод уже в инвентаре → hint.inInventory (кнопка и требования скрыты)', () => {
     useCharacterStore.setState({ items: {} });
-    seed('mod_001', 1);
-    const hint = buildModCraftHint('mod_001', { items: state().items, selectedPerks: [] });
+    seed('mod_rapid', 1);
+    const hint = buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: [] });
     expect(hint.inInventory).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
     useCharacterStore.setState((prev) => ({
       items: { ...prev.items, k1: { weaponId: 'item_common_materials', quantity: 4, installedOn: 'weapon_x' } },
     }));
-    const hint = buildModCraftHint('mod_001', { items: state().items, selectedPerks: [] });
+    const hint = buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: [] });
     expect(hint.enabled).toBe(false); // надетые/установленные материалыми не являются
   });
 
@@ -76,7 +76,7 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
 
   it('крафт по кнопке: успех кладёт мод в сумку; отказ на перке — stage gate', () => {
     useCharacterStore.setState({ items: {}, selectedPerks: [] });
-    const blocked = craftRecipe('mod_001', {}, { deferTime: true });
+    const blocked = craftRecipe('mod_rapid', {}, { deferTime: true });
     expect(blocked.done).toBe(false);
     expect(blocked.stage).toBe('gate');
     expect(blocked.reasons.some((r) => r.code === 'missing-perk')).toBe(true);
@@ -87,11 +87,11 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» �
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
     }));
-    const run = craftRecipe('mod_001', { rollD20: () => 3 }, { deferTime: true });
+    const run = craftRecipe('mod_rapid', { rollD20: () => 3 }, { deferTime: true });
     expect(run.done).toBe(true);
-    const settled = settleCraftTime('mod_001', run, { spendActionPoints: false });
+    const settled = settleCraftTime('mod_rapid', run, { spendActionPoints: false });
     expect(settled.minutes).toBeGreaterThan(0);
-    const inBag = Object.values(state().items).some((i) => i.weaponId === 'mod_001');
+    const inBag = Object.values(state().items).some((i) => i.weaponId === 'mod_rapid');
     expect(inBag).toBe(true);
   });
 

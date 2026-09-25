@@ -59,13 +59,13 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
   let modKey;
 
   beforeEach(() => {
-    modKey = state().addNewItem({ weaponId: 'mod_043', itemType: 'weaponMod' });
+    modKey = state().addNewItem({ weaponId: 'mod_beta_wave_tuner', itemType: 'weaponMod' });
   });
 
   it('установка: тюнер исчезает из сумки, привязан к слоту+оружию', () => {
     const slots = kitSlots();
     const card = weaponOnCard(slots);
-    const modified = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
+    const modified = { ...card, appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' } };
 
     applyOnScreen({ slots, card, modified });
 
@@ -74,25 +74,25 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
     expect(item.installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
     // в сумке (свободные предметы) мода больше нет
     const free = Object.values(state().items).filter((i) => !i.equipped && !i.installedOn);
-    expect(free.some((i) => i.weaponId === 'mod_043')).toBe(false);
+    expect(free.some((i) => i.weaponId === 'mod_beta_wave_tuner')).toBe(false);
   });
 
   it('замена конденсатора обратно: прежний мод вернулся в сумку', () => {
     const slots = kitSlots();
     const card = weaponOnCard(slots);
-    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
+    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' } };
     const { slots: slots2, hostKey } = applyOnScreen({ slots, card, modified: withTuner });
 
     // игрок ставит «Смешанный» (mod_046) вместо тюнера
     const card2 = collectAttacks(slots2).find((a) => a.weaponId === 'weapon_laser_gun');
-    const back = { ...card2, appliedMods: { Capacitor: 'mod_046', Barrel: 'mod_055' } };
+    const back = { ...card2, appliedMods: { Capacitor: 'mod_photon_agitator', Barrel: 'mod_sniper_barrel' } };
     applyOnScreen({ slots: slots2, card: card2, modified: back });
 
     const item = state().items[modKey];
     expect(item.equipped).toBe(false);
     expect(item.installedOn).toBeUndefined();
     const free = Object.values(state().items).filter((i) => !i.equipped && !i.installedOn);
-    expect(free.some((i) => i.weaponId === 'mod_043')).toBe(true);
+    expect(free.some((i) => i.weaponId === 'mod_beta_wave_tuner')).toBe(true);
     expect(hostKey).toBe('robotSlot:leftArm:weapon_laser_gun');
   });
 
@@ -100,10 +100,10 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
     // закон исполняет слайс: releaseRobotSlotMods при replaceLimb/unequipHeldWeapon
     const slots = kitSlots();
     const card = weaponOnCard(slots);
-    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
+    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' } };
     const { hostKey } = applyOnScreen({ slots, card, modified: withTuner });
 
-    state().uninstallArmorMod({ modId: 'mod_043', hostKey });
+    state().uninstallArmorMod({ modId: 'mod_beta_wave_tuner', hostKey });
     const item = state().items[modKey];
     expect(item.equipped).toBe(false);
     expect(item.installedOn).toBeUndefined();
@@ -112,11 +112,11 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
   it('слайс: оружие убрали из ладони — его моды вернулись в сумку', () => {
     // реальное действие unequipHeldWeapon исполняет закон 343/344 само
     const slots = kitSlots();
-    const palm = { ...slots.rightArm, heldWeapon: { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] } };
+    const palm = { ...slots.rightArm, heldWeapon: { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_beta_wave_tuner' }, modIds: ['mod_beta_wave_tuner'] } };
     useCharacterStore.setState({ robot: { bodyPlan: 'assaultron', slots: { ...slots, rightArm: palm }, modules: [], mk2Installed: false } });
 
     const hostKey = robotWeaponHostKey('rightArm', 'weapon_laser_gun');
-    expect(state().installRobotWeaponMod({ modId: 'mod_043', hostKey })).toBeTruthy();
+    expect(state().installRobotWeaponMod({ modId: 'mod_beta_wave_tuner', hostKey })).toBeTruthy();
     expect(state().items[modKey].equipped).toBe(true);
 
     state().unequipHeldWeapon('rightArm');
@@ -127,7 +127,7 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
   it('круг через сейв: привязка переживает сохранение, дубль не заводится', () => {
     const slots = kitSlots();
     const card = weaponOnCard(slots);
-    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' } };
+    const withTuner = { ...card, appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' } };
     applyOnScreen({ slots, card, modified: withTuner });
 
     // повторное «применить» того же набора — дифф пуст, второй мод не прячется

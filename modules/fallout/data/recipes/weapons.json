@@ -1,206 +1,6 @@
 [
   {
-    "id": "mod_001",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_002",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_003",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_004",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_005",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_006",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_007",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_008",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_009",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_010",
+    "id": "mod_308_receiver",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -228,7 +28,7 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_011",
+    "id": "mod_38_receiver",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -256,7 +56,7 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_012",
+    "id": "mod_45_receiver",
     "requires": {
       "skill": "REPAIR",
       "complexity": 4,
@@ -280,7 +80,7 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_013",
+    "id": "mod_50_receiver",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -308,45 +108,7 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_014",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_015",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_016",
+    "id": "mod_accelerated_barrel",
     "requires": {
       "skill": "REPAIR",
       "complexity": 5,
@@ -374,7 +136,59 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_017",
+    "id": "mod_advanced",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_armor_piercing",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_automatic",
     "requires": {
       "skill": "REPAIR",
       "complexity": 3,
@@ -398,324 +212,208 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_018",
+    "id": "mod_automatic_barrel",
     "requires": {
-      "skill": "REPAIR",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 4
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_019",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 4
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_020",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_021",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_022",
-    "requires": {
-      "skill": "REPAIR",
+      "skill": "SCIENCE",
       "complexity": 4,
       "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_023",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_024",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_025",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_026",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_027",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_028",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_029",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_030",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_031",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 3
-        },
         {
           "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_automatic_piston",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
           "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_barbed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_bayonet",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_beam_focuser_institute_laser",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_beam_focuser_minigun",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_beam_splitter",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_beta_wave_tuner",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_bladed",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_boosted_capacitor",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_bull_barrel",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 3
         }
       ]
     },
@@ -736,7 +434,21 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_032",
+    "id": "mod_calibrated",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_capacitor_boosting_coil",
     "requires": {
       "skill": "REPAIR",
       "complexity": 2,
@@ -760,159 +472,13 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_033",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_034",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_035",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_036",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_037",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_038",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_039",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_040",
+    "id": "mod_chain_wrapped",
     "requires": {
       "skill": "REPAIR",
       "complexity": 3,
       "perks": [
         {
-          "perkId": "gunNut",
+          "perkId": "blacksmith",
           "rank": 1
         }
       ]
@@ -930,949 +496,7 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_041",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_042",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_043",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_044",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_045",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_046",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_047",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_048",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_049",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_050",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_051",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_052",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_053",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_054",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_055",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_056",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_057",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_058",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_059",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_060",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_061",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_062",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_063",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_064",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_065",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_066",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_067",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_068",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_069",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_070",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_071",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 4
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_072",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_073",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 4
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_074",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_075",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_076",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_077",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_078",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_079",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_080",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_081",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_082",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_083",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 6,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 7
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_084",
+    "id": "mod_charging_barrels",
     "requires": {
       "skill": "SCIENCE",
       "complexity": 7,
@@ -1900,53 +524,21 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_085",
+    "id": "mod_comfort_grip",
     "requires": {
-      "skill": "SCIENCE",
-      "complexity": 7,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 4
-        }
-      ]
+      "skill": "REPAIR",
+      "complexity": 2
     },
     "materials": [
       {
         "itemId": "item_common_materials",
-        "count": 8
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 4
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_086",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
         "count": 3
       }
     ],
     "outputQuantity": 1
   },
   {
-    "id": "mod_087",
+    "id": "mod_compensator",
     "requires": {
       "skill": "REPAIR",
       "complexity": 3,
@@ -1970,7 +562,25 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_088",
+    "id": "mod_compression_nozzle",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_curved_blade",
     "requires": {
       "skill": "REPAIR",
       "complexity": 2
@@ -1984,21 +594,63 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_089",
+    "id": "mod_deep_dish",
     "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
+      "skill": "SCIENCE",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 4
+        }
+      ]
     },
     "materials": [
       {
         "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
         "count": 3
       }
     ],
     "outputQuantity": 1
   },
   {
-    "id": "mod_090",
+    "id": "mod_electric_signal_carrier_antennae",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_electrification_module",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -2030,7 +682,491 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_091",
+    "id": "mod_electrified",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        },
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_electrified_blade",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        },
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_electrified_serrated_blade",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 3
+        },
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_extended_blade",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_extra_claw",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_extra_flame_jets",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_extra_heavy",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_finned",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_five_crank_capacitor",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_flamer_barrel",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_four_crank_capacitor",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_full_capacitors",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 3
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_full_stock",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_gunner_sight",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_gyro_compensating_lens",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_hair_trigger",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_hardened",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_heating_coil",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_heavy",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_hooked",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 1
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_huge_tank",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_ignition_module",
     "requires": {
       "skill": "REPAIR",
       "complexity": 7,
@@ -2062,13 +1198,193 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_092",
+    "id": "mod_improved_barrel",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_incendiary_barrel",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_large_magazine",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_large_quick_eject_mag",
     "requires": {
       "skill": "REPAIR",
       "complexity": 5,
       "perks": [
         {
           "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_large_tank",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_lead_lining",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_long",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_long_barrel",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_long_night_vision_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "science",
           "rank": 3
         }
       ]
@@ -2090,7 +1406,177 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_093",
+    "id": "mod_long_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_marksmans_stock",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_muzzle_break",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_napalm_fuel",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_night_vision_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 4
+        },
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_photon_agitator",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_photon_exciter",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_ported",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -2118,69 +1604,51 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_094",
+    "id": "mod_powerful",
     "requires": {
       "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_095",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
+      "complexity": 3,
       "perks": [
         {
           "perkId": "gunNut",
-          "rank": 2
+          "rank": 1
         }
       ]
     },
     "materials": [
       {
         "itemId": "item_common_materials",
-        "count": 5
+        "count": 4
       },
       {
         "itemId": "item_uncommon_materials",
-        "count": 3
+        "count": 2
       }
     ],
     "outputQuantity": 1
   },
   {
-    "id": "mod_096",
+    "id": "mod_puncturing",
     "requires": {
       "skill": "REPAIR",
-      "complexity": 4,
+      "complexity": 2,
       "perks": [
         {
-          "perkId": "gunNut",
-          "rank": 2
+          "perkId": "blacksmith",
+          "rank": 1
         }
       ]
     },
     "materials": [
       {
         "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
         "count": 3
       }
     ],
     "outputQuantity": 1
   },
   {
-    "id": "mod_097",
+    "id": "mod_quad_barrel",
     "requires": {
       "skill": "REPAIR",
       "complexity": 5,
@@ -2208,7 +1676,171 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_098",
+    "id": "mod_quick_eject_mag",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_rapid",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_recoil_compensating",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_recoil_compensating_stock",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_recon_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_reflex_sight",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_sawed_off",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_scope",
     "requires": {
       "skill": "REPAIR",
       "complexity": 4,
@@ -2232,7 +1864,449 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_099",
+    "id": "mod_serrated_blade",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_sharp",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_sharpshooters_grip",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_shielded_barrel",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_short_night_vision_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_short_scope",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_shredder",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_signal_repeater",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 4
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_six_crank_capacitor",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 3
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_sniper_barrel",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_snubnose",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_spiked",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_splitter",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 3
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_stabilizer",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_standard_stock",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_stealth_blade",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_stun_pack",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 5,
+      "perks": [
+        {
+          "perkId": "blacksmith",
+          "rank": 3
+        },
+        {
+          "perkId": "science",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 6
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_suppressor",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_targeting_computer",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 6,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        },
+        {
+          "perkId": "science",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 7
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_rare_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_three_crank_capacitor",
+    "requires": {
+      "skill": "SCIENCE",
+      "complexity": 2
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_tri_barrel",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
@@ -2240,10 +2314,6 @@
         {
           "perkId": "gunNut",
           "rank": 4
-        },
-        {
-          "perkId": "science",
-          "rank": 1
         }
       ]
     },
@@ -2264,18 +2334,80 @@
     "outputQuantity": 1
   },
   {
-    "id": "mod_100",
+    "id": "mod_triple_barrel",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 2
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_tuned",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 3,
+      "perks": [
+        {
+          "perkId": "gunNut",
+          "rank": 1
+        }
+      ]
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 4
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 2
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_vaporization_nozzle",
+    "requires": {
+      "skill": "REPAIR",
+      "complexity": 4
+    },
+    "materials": [
+      {
+        "itemId": "item_common_materials",
+        "count": 5
+      },
+      {
+        "itemId": "item_uncommon_materials",
+        "count": 3
+      }
+    ],
+    "outputQuantity": 1
+  },
+  {
+    "id": "mod_vented",
     "requires": {
       "skill": "REPAIR",
       "complexity": 6,
       "perks": [
         {
           "perkId": "gunNut",
-          "rank": 2
-        },
-        {
-          "perkId": "science",
-          "rank": 2
+          "rank": 4
         }
       ]
     },
@@ -2290,1086 +2422,6 @@
       },
       {
         "itemId": "item_rare_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_101",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_102",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_103",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_104",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_105",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_106",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_107",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_108",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_109",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_110",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_111",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_112",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_113",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_114",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_115",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_116",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_117",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_118",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_119",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_120",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_121",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_122",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_123",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_124",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_125",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_126",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_127",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_128",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_129",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_130",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_131",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_132",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_133",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_134",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_135",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_136",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_137",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 5,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        },
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 6
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_rare_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_138",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_139",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_140",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_141",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_142",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_143",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_144",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_145",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_146",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 1
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_147",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_148",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 2,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_149",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 3,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 4
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 2
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_150",
-    "requires": {
-      "skill": "REPAIR",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "blacksmith",
-          "rank": 3
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_204",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "science",
-          "rank": 1
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
-        "count": 3
-      }
-    ],
-    "outputQuantity": 1
-  },
-  {
-    "id": "mod_205",
-    "requires": {
-      "skill": "SCIENCE",
-      "complexity": 4,
-      "perks": [
-        {
-          "perkId": "gunNut",
-          "rank": 2
-        }
-      ]
-    },
-    "materials": [
-      {
-        "itemId": "item_common_materials",
-        "count": 5
-      },
-      {
-        "itemId": "item_uncommon_materials",
         "count": 3
       }
     ],

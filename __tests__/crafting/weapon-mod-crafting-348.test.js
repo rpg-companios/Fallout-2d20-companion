@@ -1,5 +1,5 @@
 // ПРИЁМОЧНЫЙ (патч 348): крафт модов ОРУЖИЯ — квадрат «Оружие» жив.
-//   • 152 рецепта из колонок каталога weapon_mods.json (аудит печатных
+//   • 105 рецепта из колонок каталога weapon_mods.json (аудит печатных
 //     таблиц, решения владельца 346/347: выпускаем все с колонками, включая
 //     уникальные; конденсаторы — как есть);
 //   • проверка — ИНТ + навык (Ремонт/Наука!), сложность из колонки;
@@ -41,17 +41,17 @@ const seedStack = (itemId, quantity) => {
 const inventoryList = () => Object.values(state().items || {});
 
 describe('Крафт модов оружия (348): квадрат «Оружие», проверка, мод в сумке', () => {
-  it('квадрат «Оружие»: 152 рецепта из колонок каталога; верстак не жжёт', () => {
+  it('квадрат «Оружие»: 105 рецепта из колонок каталога; верстак не жжёт', () => {
     const tiles = buildCraftTiles();
     const weapons = tiles.find((t) => t.category === 'weapons');
-    expect(weapons.recipes).toBe(152);
-    expect(buildCategoryModel('weapons').length).toBe(152);
+    expect(weapons.recipes).toBe(105);
+    expect(buildCategoryModel('weapons').length).toBe(105);
     // правило верстака оружия (как у брони): провал не сжигает материалы
     expect(getCraftingCategoryRules('weapons').failBurnsMaterialsSkills).toEqual([]);
   });
 
   it('«Скорострельный» (сложность 3, Фанатик оружия 1): успешен, мод-предмет в сумке', () => {
-    const recipe = getCraftingRecipeById('mod_001');
+    const recipe = getCraftingRecipeById('mod_rapid');
     expect(recipe.requires).toEqual({
       skill: 'REPAIR',
       complexity: 3,
@@ -63,7 +63,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
     ]);
 
     // перковый гейт: без Фанатика оружия рецепт заблокирован
-    const blocked = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_001');
+    const blocked = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_rapid');
     expect(blocked.status).toBe('missing-perk');
 
     seedStack('item_common_materials', 4);
@@ -73,20 +73,20 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
     }));
 
-    const result = craftRecipe('mod_001', { rollD20: () => 3 }, { deferTime: true });
+    const result = craftRecipe('mod_rapid', { rollD20: () => 3 }, { deferTime: true });
     expect(result.done).toBe(true);
-    expect(result.granted.itemId).toBe('mod_001');
+    expect(result.granted.itemId).toBe('mod_rapid');
 
     // мод в сумке: тип weaponMod, каталожное имя, обычный предмет инвентаря
     const catalog = getEquipmentCatalog('en-EN');
-    const inBag = inventoryList().find((i) => i.weaponId === 'mod_001' && !i.installedOn);
+    const inBag = inventoryList().find((i) => i.weaponId === 'mod_rapid' && !i.installedOn);
     expect(inBag).toBeTruthy();
     expect(inBag.itemType).toBe('weaponMod');
-    expect(findCatalogEntry(catalog, 'mod_001', 'weaponMod')?.name).toBe('Rapid');
+    expect(findCatalogEntry(catalog, 'mod_rapid', 'weaponMod')?.name).toBe('Rapid');
   });
 
   it('конденсаторы: пара перков книги (Фанатик 3 + Наука! 2), навык из колонки', () => {
-    const recipe = getCraftingRecipeById('mod_031');
+    const recipe = getCraftingRecipeById('mod_full_capacitors');
     expect(recipe.requires.skill).toBe('REPAIR'); // конденсаторы оставлены как есть (347)
     expect(recipe.requires.complexity).toBe(5);
     expect(recipe.requires.perks).toEqual([
@@ -107,15 +107,15 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
     }));
 
-    const result = craftRecipe('mod_031', { rollD20: () => 2 }, { deferTime: true });
+    const result = craftRecipe('mod_full_capacitors', { rollD20: () => 2 }, { deferTime: true });
     expect(result.done).toBe(true);
-    expect(result.granted.itemId).toBe('mod_031');
-    const inBag = inventoryList().find((i) => i.weaponId === 'mod_031' && !i.installedOn);
+    expect(result.granted.itemId).toBe('mod_full_capacitors');
+    const inBag = inventoryList().find((i) => i.weaponId === 'mod_full_capacitors' && !i.installedOn);
     expect(inBag?.itemType).toBe('weaponMod');
   });
 
   it('наукоёмкий мод (прицел): навык Наука! из колонки работает так же', () => {
-    const recipe = getCraftingRecipeById('mod_045');
+    const recipe = getCraftingRecipeById('mod_photon_exciter');
     expect(recipe.requires).toEqual({
       skill: 'SCIENCE',
       complexity: 3,
@@ -129,9 +129,9 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
       skills: { ...prev.skills, SCIENCE: { ...(prev.skills?.SCIENCE ?? {}), base: 6, total: 6 } },
     }));
 
-    const result = craftRecipe('mod_045', { rollD20: () => 4 }, { deferTime: true });
+    const result = craftRecipe('mod_photon_exciter', { rollD20: () => 4 }, { deferTime: true });
     expect(result.done).toBe(true);
-    const inBag = inventoryList().find((i) => i.weaponId === 'mod_045' && !i.installedOn);
+    const inBag = inventoryList().find((i) => i.weaponId === 'mod_photon_exciter' && !i.installedOn);
     expect(inBag?.itemType).toBe('weaponMod');
   });
 
@@ -140,15 +140,15 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
     seedStack('item_uncommon_materials', 2);
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     // ранг 0 против сложности 3 + провал на броске → крафт не удался
-    const failed = craftRecipe('mod_001', { rollD20: () => 20 });
+    const failed = craftRecipe('mod_rapid', { rollD20: () => 20 });
     expect(failed.stage).toBe('check');
     expect(failed.burned.length).toBeGreaterThan(0);
   });
 
-  it('моды без колонок крафта в рецептов не попадали (53 шт., их нет в книге)', () => {
+  it('моды без колонок крафта в рецептов не попадали (36 шт., их нет в книге)', () => {
     const weaponMods = getEquipmentCatalog('en-EN').weaponMods || [];
     const withColumns = weaponMods.filter((m) => m.complexity != null).length;
-    expect(withColumns).toBeGreaterThanOrEqual(152);
+    expect(withColumns).toBeGreaterThanOrEqual(105);
     const crafted = new Set(buildCategoryModel('weapons').map((r) => r.recipeId));
     for (const mod of weaponMods) {
       if (mod.complexity == null) expect(crafted.has(mod.id)).toBe(false);

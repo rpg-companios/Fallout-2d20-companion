@@ -47,6 +47,7 @@ import {
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
 import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
+import { migrateWeaponModIdsToCanonical } from '../../domain/weaponModCanonical';
 import { resolveBodyPlan } from '../../domain/bodyplan';
 import { resolveKitItems } from '../../domain/kitResolver';
 import { inspectSelectedPerkRecords } from '../../domain/perks';
@@ -155,7 +156,11 @@ const deserializeState = (data) => {
   // Прогоняем сохранение через миграции: если формат старый (v0), приводим к
   // текущей версии. Миграции покрывают будущие изменения формата — вместо
   // «плодящихся fallback» в loadCharacter.
-  const migrated = migrateCharacterState(data);
+  let migrated = migrateCharacterState(data);
+  // Канонизация id модов оружия (патч 375): mod_NNN → канон-id, слияние
+  // фантомных дублей. Без подъёма версии схемы — как migrateSkillsToCanonical;
+  // идемпотентно, канон-id проходят насквозь.
+  migrated = migrateWeaponModIdsToCanonical(migrated);
   // «Худые» сейвы (schemaVersion 19+) хранят только состояние экземпляра;
   // восстанавливаем каталожные данные (имя/цену/вес/статы/моды) здесь, чтобы
   // старые «жирные» и новые «худые» сейвы давали одинаковый рендер.

@@ -65,7 +65,7 @@
           { "id": "chem_buffout", "instanceId": "chem_buffout", "weaponId": "chem_buffout", "itemType": "chem", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "chem_buffout", "appliedMods": {}, "durabilityTracked": false },
           { "id": "ammo_flamer_fuel", "instanceId": "ammo_flamer_fuel", "weaponId": "ammo_flamer_fuel", "itemType": "ammo", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 4, "stackKey": "ammo_flamer_fuel", "appliedMods": {}, "durabilityTracked": false },
           { "id": "item_common_materials", "instanceId": "item_common_materials", "weaponId": "item_common_materials", "itemType": "misc", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 3, "stackKey": "item_common_materials", "appliedMods": {}, "durabilityTracked": false },
-          { "id": "mod_043", "instanceId": "mod_043", "weaponId": "mod_043", "itemType": "weaponMod", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "mod_043", "appliedMods": {}, "durabilityTracked": false }
+          { "id": "mod_beta_wave_tuner", "instanceId": "mod_beta_wave_tuner", "weaponId": "mod_beta_wave_tuner", "itemType": "weaponMod", "equipped": false, "locked": false, "requiresMkII": false, "quantity": 1, "stackKey": "mod_beta_wave_tuner", "appliedMods": {}, "durabilityTracked": false }
         ],
         "purchaseMaxRarity": null
       },
@@ -76,7 +76,7 @@
         {
           "id": "weapon_laser_gun",
           "itemType": "weapon",
-          "appliedMods": { "capacitor": "mod_046", "barrel": "mod_055" },
+          "appliedMods": { "capacitor": "mod_photon_agitator", "barrel": "mod_sniper_barrel" },
           "weaponId": "weapon_laser_gun",
           "sourceSlot": "leftArm",
           "isBuiltin": true
@@ -88,7 +88,7 @@
           "armorLayers": { "frame": null, "plating": null, "armor": null },
           "heldWeaponId": null,
           "heldWeaponMods": [],
-          "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": ["mod_055"] }]
+          "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": ["mod_sniper_barrel"] }]
         },
         "head": {
           "content": "robot_head_assaultron_laser",

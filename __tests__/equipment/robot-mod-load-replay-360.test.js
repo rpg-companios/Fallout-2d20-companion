@@ -94,29 +94,29 @@ describe('ПРИЁМОЧНЫЙ (патч 360): реплей экспорта в�
 
   it('карточка из слотов: только «Снайперский ствол», без «Смешанного»', () => {
     const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
-    expect(card.appliedMods).toEqual({ Barrel: 'mod_055' }); // конденсатора НЕТ
+    expect(card.appliedMods).toEqual({ Barrel: 'mod_sniper_barrel' }); // конденсатора НЕТ
   });
 
   it('замена на скрафченный тюнер (mod_043) — запись срабатывает', () => {
     // тюнер из сумки (в экспорте он есть) прячется по закону 343/344
-    const tunerKey = Object.keys(state().items).find((k) => state().items[k].weaponId === 'mod_043');
+    const tunerKey = Object.keys(state().items).find((k) => state().items[k].weaponId === 'mod_beta_wave_tuner');
     expect(tunerKey).toBeTruthy();
 
-    applyOnScreen({ appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' }, modIds: ['mod_043', 'mod_055'] });
+    applyOnScreen({ appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' }, modIds: ['mod_beta_wave_tuner', 'mod_sniper_barrel'] });
 
     expect(state().items[tunerKey].equipped).toBe(true);
     expect(state().items[tunerKey].installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
 
     const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
-    expect(card.appliedMods).toEqual({ Capacitor: 'mod_043', Barrel: 'mod_055' });
+    expect(card.appliedMods).toEqual({ Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' });
   });
 
   it('снятие ствола — тоже; круг через сейв держит результат', () => {
-    applyOnScreen({ appliedMods: { Capacitor: 'mod_043', Barrel: 'mod_055' }, modIds: ['mod_043', 'mod_055'] });
-    applyOnScreen({ appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] });
+    applyOnScreen({ appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' }, modIds: ['mod_beta_wave_tuner', 'mod_sniper_barrel'] });
+    applyOnScreen({ appliedMods: { Capacitor: 'mod_beta_wave_tuner' }, modIds: ['mod_beta_wave_tuner'] });
 
     const saved = Object.fromEntries(Object.entries(state().robot.slots).map(([k, v]) => [k, serializeSlot(v)]));
     const restored = saved.leftArm.installedWeapons.find((w) => w.id === 'weapon_laser_gun');
-    expect(restored.modIds).toEqual(['mod_043']);
+    expect(restored.modIds).toEqual(['mod_beta_wave_tuner']);
   });
 });

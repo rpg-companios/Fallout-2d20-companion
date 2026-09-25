@@ -139,7 +139,7 @@ describe('данные крафта: файлы категории', () => {
       { file: 'drinks.json', category: 'drinks', count: 8 },
       { file: 'explosives.json', category: 'explosives', count: 9 },
       { file: 'food.json', category: 'food', count: 27 },
-      { file: 'weapons.json', category: 'weapons', count: 152 },
+      { file: 'weapons.json', category: 'weapons', count: 105 },
     ]);
   });
 

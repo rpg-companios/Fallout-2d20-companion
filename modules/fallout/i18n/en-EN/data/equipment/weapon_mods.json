@@ -1,1232 +1,566 @@
 [
   {
-    "id": "mod_001",
-    "name": "Rapid",
-    "prefix": "Rapid",
-    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate"
+    "id": "mod_rapid",
+    "name": "Rapid"
   },
   {
-    "id": "mod_002",
-    "name": "Armor-Piercing",
-    "prefix": "Armor-Piercing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_armor_piercing",
+    "name": "Armor-Piercing"
   },
   {
-    "id": "mod_003",
-    "name": "Tuned",
-    "prefix": "Tuned",
-    "effectDescription": "plus 1 {/CD} Damage, plus 1 Fire Rate"
+    "id": "mod_tuned",
+    "name": "Tuned"
   },
   {
-    "id": "mod_004",
-    "name": "Hardened",
-    "prefix": "Hardened",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_hardened",
+    "name": "Hardened"
   },
   {
-    "id": "mod_005",
-    "name": "Powerful",
-    "prefix": "Powerful",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_powerful",
+    "name": "Powerful"
   },
   {
-    "id": "mod_006",
-    "name": "Advanced",
-    "prefix": "Advanced",
-    "effectDescription": "plus 3 {/CD} Damage, plus 1 Fire Rate"
+    "id": "mod_advanced",
+    "name": "Advanced"
   },
   {
-    "id": "mod_007",
-    "name": "Calibrated",
-    "prefix": "Calibrated",
-    "effectDescription": "gain Vicious"
+    "id": "mod_calibrated",
+    "name": "Calibrated"
   },
   {
-    "id": "mod_008",
-    "name": "Automatic",
-    "prefix": "Auto",
-    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate, gain Burst, gain Inaccurate"
+    "id": "mod_automatic",
+    "name": "Automatic"
   },
   {
-    "id": "mod_009",
-    "name": "Hair Trigger",
-    "prefix": "Hair Trigger",
-    "effectDescription": "plus 1 Fire Rate"
+    "id": "mod_hair_trigger",
+    "name": "Hair Trigger"
   },
   {
-    "id": "mod_010",
-    "name": ".38 Receiver",
-    "prefix": ".38",
-    "effectDescription": "Set 4 {/CD} Damage, Ammo .38"
+    "id": "mod_38_receiver",
+    "name": ".38 Receiver"
   },
   {
-    "id": "mod_011",
-    "name": ".308 Receiver",
-    "prefix": ".308",
-    "effectDescription": "Set 7 {/CD} Damage, Ammo .308"
+    "id": "mod_308_receiver",
+    "name": ".308 Receiver"
   },
   {
-    "id": "mod_012",
-    "name": ".45 Receiver",
-    "prefix": ".45",
-    "effectDescription": "Set 4 {/CD} Damage, Ammo .45"
+    "id": "mod_45_receiver",
+    "name": ".45 Receiver"
   },
   {
-    "id": "mod_013",
-    "name": ".50 Receiver",
-    "prefix": ".50",
-    "effectDescription": "Set 8 {/CD} Damage, Ammo .50"
+    "id": "mod_50_receiver",
+    "name": ".50 Receiver"
   },
   {
-    "id": "mod_014",
-    "name": "Automatic Piston",
-    "prefix": "Automatic",
-    "effectDescription": "plus 2 Fire Rate, minus 1 Range"
+    "id": "mod_automatic_piston",
+    "name": "Automatic Piston"
   },
   {
-    "id": "mod_015",
-    "name": "Snubnose",
-    "prefix": "Snub-Noses",
-    "effectDescription": "gain Inaccurate"
+    "id": "mod_snubnose",
+    "name": "Snubnose"
   },
   {
-    "id": "mod_016",
-    "name": "Bull Barrel",
-    "prefix": "Bull Barrel",
-    "effectDescription": "gain Reliable"
+    "id": "mod_bull_barrel",
+    "name": "Bull Barrel"
   },
   {
-    "id": "mod_017",
-    "name": "Long",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range"
+    "id": "mod_long",
+    "name": "Long"
   },
   {
-    "id": "mod_018",
-    "name": "Ported",
-    "prefix": "Ported",
-    "effectDescription": "plus 1 Range, plus 1 Fire Rate"
+    "id": "mod_ported",
+    "name": "Ported"
   },
   {
-    "id": "mod_019",
-    "name": "Vented",
-    "prefix": "Vented",
-    "effectDescription": "plus 1 Range, plus 1 Fire Rate, gain Reliable"
+    "id": "mod_vented",
+    "name": "Vented"
   },
   {
-    "id": "mod_020",
-    "name": "Sawed-Off",
-    "prefix": "Sawed-Off",
-    "effectDescription": "gain Close Quarters, lose Two-Handed"
+    "id": "mod_sawed_off",
+    "name": "Sawed-Off"
   },
   {
-    "id": "mod_021",
-    "name": "Shielded Barrel",
-    "prefix": "Shielded",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_shielded_barrel",
+    "name": "Shielded Barrel"
   },
   {
-    "id": "mod_022",
-    "name": "Finned",
-    "prefix": "Finned",
-    "effectDescription": "plus 1 {/CD} Damage, plus 1 Range"
+    "id": "mod_finned",
+    "name": "Finned"
   },
   {
-    "id": "mod_023",
-    "name": "Large Magazine",
-    "prefix": "High Capacity",
-    "effectDescription": "plus 1 Fire Rate, gain Unreliable"
+    "id": "mod_large_magazine",
+    "name": "Large Magazine"
   },
   {
-    "id": "mod_024",
-    "name": "Quick-Eject Mag",
-    "prefix": "Quick",
-    "effectDescription": "gain Reliable"
+    "id": "mod_quick_eject_mag",
+    "name": "Quick-Eject Mag"
   },
   {
-    "id": "mod_025",
-    "name": "Large Quick-Eject Mag",
-    "prefix": "Quick High Capacity",
-    "effectDescription": "plus 1 Fire Rate"
+    "id": "mod_large_quick_eject_mag",
+    "name": "Large Quick-Eject Mag"
   },
   {
-    "id": "mod_026",
-    "name": "Comfort Grip",
-    "prefix": "Comfort",
-    "effectDescription": "lose Inaccurate"
+    "id": "mod_full_capacitors",
+    "name": "Full Capacitors"
   },
   {
-    "id": "mod_027",
-    "name": "Sharpshooter's Grip",
-    "prefix": "Sharpshooter's",
-    "effectDescription": "gain Piercing 1, lose Inaccurate"
+    "id": "mod_capacitor_boosting_coil",
+    "name": "Capacitor Boosting Coil"
   },
   {
-    "id": "mod_028",
-    "name": "Full Stock",
-    "prefix": "Full Stock",
-    "effectDescription": "gain Two-Handed, lose Inaccurate"
+    "id": "mod_compensator",
+    "name": "Compensator"
   },
   {
-    "id": "mod_029",
-    "name": "Marksman's Stock",
-    "prefix": "Markman's",
-    "effectDescription": "gain Two-Handed, gain Accurate, lose Inaccurate"
+    "id": "mod_muzzle_break",
+    "name": "Muzzle Break"
   },
   {
-    "id": "mod_030",
-    "name": "Recoil Compensating Stock",
-    "prefix": "Recoil Compensated",
-    "effectDescription": "gain Two-Handed, plus 1 Fire Rate, lose Inaccurate"
+    "id": "mod_suppressor",
+    "name": "Suppressor"
   },
   {
-    "id": "mod_031",
-    "name": "Full Capacitors",
-    "prefix": "",
-    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
+    "id": "mod_three_crank_capacitor",
+    "name": "Three-Crank Capacitor"
   },
   {
-    "id": "mod_032",
-    "name": "Capacitor Boosting Coil",
-    "prefix": "",
-    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate"
+    "id": "mod_four_crank_capacitor",
+    "name": "Four-Crank Capacitor"
   },
   {
-    "id": "mod_033",
-    "name": "Reflex Sight",
-    "prefix": "Tactical",
-    "effectDescription": "gain Re-roll Hit Location"
+    "id": "mod_five_crank_capacitor",
+    "name": "Five-Crank Capacitor"
   },
   {
-    "id": "mod_034",
-    "name": "Short Scope",
-    "prefix": "Scoped",
-    "effectDescription": "gain Accurate"
+    "id": "mod_six_crank_capacitor",
+    "name": "Six-Crank Capacitor"
   },
   {
-    "id": "mod_035",
-    "name": "Long Scope",
-    "prefix": "Long Scoped",
-    "effectDescription": "gain Accurate, plus 1 Range"
+    "id": "mod_splitter",
+    "name": "Splitter"
   },
   {
-    "id": "mod_036",
-    "name": "Short Night Vision Scope",
-    "prefix": "Night Vision",
-    "effectDescription": "gain Accurate, gain Night Vision"
+    "id": "mod_automatic_barrel",
+    "name": "Automatic Barrel"
   },
   {
-    "id": "mod_037",
-    "name": "Long Night Vision Scope",
-    "prefix": "Long Night Vision",
-    "effectDescription": "gain Accurate, gain Night Vision, plus 1 Range"
+    "id": "mod_improved_barrel",
+    "name": "Improved Barrel"
   },
   {
-    "id": "mod_038",
-    "name": "Recon Scope",
-    "prefix": "Recon",
-    "effectDescription": "gain Accurate, gain Recon"
+    "id": "mod_sniper_barrel",
+    "name": "Sniper Barrel"
   },
   {
-    "id": "mod_039",
-    "name": "Bayonet",
-    "prefix": "Beyoneted",
-    "effectDescription": "gain Bayonet"
+    "id": "mod_flamer_barrel",
+    "name": "Flamer Barrel"
   },
   {
-    "id": "mod_040",
-    "name": "Compensator",
-    "prefix": "Componsated",
-    "effectDescription": "lose Inaccurate"
+    "id": "mod_standard_stock",
+    "name": "Standard Stock"
   },
   {
-    "id": "mod_041",
-    "name": "Muzzle Break",
-    "prefix": "Muzzled",
-    "effectDescription": "lose Inaccurate, plus 1 Fire Rate"
+    "id": "mod_recoil_compensating",
+    "name": "Recoil Compensating"
   },
   {
-    "id": "mod_042",
-    "name": "Suppressor",
-    "prefix": "Supressed",
-    "effectDescription": "gain Supressed"
+    "id": "mod_beam_splitter",
+    "name": "Beam Splitter"
   },
   {
-    "id": "mod_043",
-    "name": "Beta Wave Tuner",
-    "prefix": "Incendiary",
-    "effectDescription": "gain Persistent"
+    "id": "mod_beam_focuser_institute_laser",
+    "name": "Beam Focuser"
   },
   {
-    "id": "mod_044",
-    "name": "Boosted Capacitor",
-    "prefix": "Boosted",
-    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate"
+    "id": "mod_gyro_compensating_lens",
+    "name": "Gyro Compensating Lens"
   },
   {
-    "id": "mod_045",
-    "name": "Photon Exciter",
-    "prefix": "Excited",
-    "effectDescription": "gain Vicious"
+    "id": "mod_deep_dish",
+    "name": "Deep Dish"
   },
   {
-    "id": "mod_046",
-    "name": "Photon Agitator",
-    "prefix": "Agitated",
-    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
+    "id": "mod_electric_signal_carrier_antennae",
+    "name": "Electric Signal Carrier Antennae"
   },
   {
-    "id": "mod_047",
-    "name": "Three-Crank Capacitor",
-    "prefix": "Three-Crank",
-    "effectDescription": "plus 1 {/CD} Damage, gain Crank 1"
+    "id": "mod_signal_repeater",
+    "name": "Signal Repeater"
   },
   {
-    "id": "mod_048",
-    "name": "Four-Crank Capacitor",
-    "prefix": "Four-Crank",
-    "effectDescription": "plus 2 {/CD} Damage, gain Crank 2"
+    "id": "mod_napalm_fuel",
+    "name": "Napalm Fuel"
   },
   {
-    "id": "mod_049",
-    "name": "Five-Crank Capacitor",
-    "prefix": "Five-Crank",
-    "effectDescription": "plus 3 {/CD} Damage, gain Crank 3 "
+    "id": "mod_large_tank",
+    "name": "Large Tank"
   },
   {
-    "id": "mod_050",
-    "name": "Six-Crank Capacitor",
-    "prefix": "Six-Crank",
-    "effectDescription": "plus 4 {/CD} Damage, gain Crank 4"
+    "id": "mod_huge_tank",
+    "name": "Huge Tank"
   },
   {
-    "id": "mod_051",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range, lose Close Quarters"
+    "id": "mod_compression_nozzle",
+    "name": "Compression Nozzle"
   },
   {
-    "id": "mod_052",
-    "name": "Splitter",
-    "prefix": "Splitter",
-    "effectDescription": "minus 1 {/CD} Damage, gain Spread, gain Inaccurate"
+    "id": "mod_vaporization_nozzle",
+    "name": "Vaporization Nozzle"
   },
   {
-    "id": "mod_053",
-    "name": "Automatic Barrel",
-    "prefix": "Automatic",
-    "effectDescription": "minus 1 {/CD} Damage, plus 1 Range, plus 1 Fire Rate, lose Close Quarters"
+    "id": "mod_charging_barrels",
+    "name": "Charging Barrels"
   },
   {
-    "id": "mod_054",
-    "name": "Improved Barrel",
-    "prefix": "Improved",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_beam_focuser_minigun",
+    "name": "Beam Focuser"
   },
   {
-    "id": "mod_055",
-    "name": "Sniper Barrel",
-    "prefix": "Sniper",
-    "effectDescription": "plus 2 {/CD} Damage, plus 1 Range, minus 1 Fire Rate, lose Close Quarters"
+    "id": "mod_accelerated_barrel",
+    "name": "Accelerated Barrel"
   },
   {
-    "id": "mod_056",
-    "name": "Flamer Barrel",
-    "prefix": "Thrower",
-    "effectDescription": "minus 2 {/CD} Damage, plus 1 Range, plus 2 Fire Rate, gain Burst, gain Spread, gain Inaccurate"
+    "id": "mod_tri_barrel",
+    "name": "Tri-Barrel"
   },
   {
-    "id": "mod_057",
-    "name": "Sharpshooter's Grip",
-    "prefix": "Sharpshooter's",
-    "effectDescription": "gain Piercing 1, lose Inaccurate"
+    "id": "mod_shredder",
+    "name": "Shredder"
   },
   {
-    "id": "mod_058",
-    "name": "Standard Stock",
-    "prefix": "",
-    "effectDescription": "gain Two-Handed, lose Inaccurate, lose Close Quarters"
+    "id": "mod_triple_barrel",
+    "name": "Triple Barrel"
   },
   {
-    "id": "mod_059",
-    "name": "Full Stock",
-    "prefix": "",
-    "effectDescription": "gain Piercing 1, lose Close Quarters"
+    "id": "mod_quad_barrel",
+    "name": "Quad Barrel"
   },
   {
-    "id": "mod_060",
-    "name": "Marksman's Stock",
-    "prefix": "Marksman's",
-    "effectDescription": "gain Two-Handed, gain Accurate, lose Inaccurate, gain Close Quarters"
+    "id": "mod_scope",
+    "name": "Scope"
   },
   {
-    "id": "mod_061",
-    "name": "Recoil Compensating",
-    "prefix": "Recoil Compensated",
-    "effectDescription": "plus 1 Range, gain Two-Handed, lose Inaccurate, gain Close Quarters"
+    "id": "mod_night_vision_scope",
+    "name": "Night Vision Scope"
   },
   {
-    "id": "mod_062",
-    "name": "Reflex Sight",
-    "prefix": "Tactical",
-    "effectDescription": "gain Re-roll Hit Location"
+    "id": "mod_targeting_computer",
+    "name": "Targeting Computer"
   },
   {
-    "id": "mod_063",
-    "name": "Short Scope",
-    "prefix": "Scoped",
-    "effectDescription": "gain Accurate"
+    "id": "mod_stabilizer",
+    "name": "Stabilizer"
   },
   {
-    "id": "mod_064",
-    "name": "Long Scope",
-    "prefix": "Scoped",
-    "effectDescription": "gain Accurate, plus 1 Range"
+    "id": "mod_electrified_blade",
+    "name": "Electrified Blade"
   },
   {
-    "id": "mod_065",
-    "name": "Short Night Vision Scope",
-    "prefix": "Night Vision",
-    "effectDescription": "gain Accurate, gain Night Vision"
+    "id": "mod_electrified_serrated_blade",
+    "name": "Electrified Serrated Blade"
   },
   {
-    "id": "mod_066",
-    "name": "Long Night Vision Scope",
-    "prefix": "Night Vision",
-    "effectDescription": "gain Accurate, gain Night Vision, plus 1 Range"
+    "id": "mod_stealth_blade",
+    "name": "Stealth Blade"
   },
   {
-    "id": "mod_067",
-    "name": "Recon Scope",
-    "prefix": "Recon",
-    "effectDescription": "gain Accurate, gain Recon"
+    "id": "mod_curved_blade",
+    "name": "Curved Blade"
   },
   {
-    "id": "mod_068",
-    "name": "Beam Splitter",
-    "prefix": "Scattered",
-    "effectDescription": "minus 1 {/CD} Damage, plus 1 Fire Rate, minus 1 Range, gain Spread, gain Inaccurate"
+    "id": "mod_extended_blade",
+    "name": "Extended Blade"
   },
   {
-    "id": "mod_069",
-    "name": "Beam Focuser",
-    "prefix": "Focused",
-    "effectDescription": "plus 1 Range"
+    "id": "mod_extra_flame_jets",
+    "name": "Extra Flame Jets"
   },
   {
-    "id": "mod_070",
-    "name": "Gyro Compensating Lens",
-    "prefix": "Targetting",
-    "effectDescription": "plus 1 Fire Rate, lose Inaccurate"
+    "id": "mod_chain_wrapped",
+    "name": "Chain-Wrapped"
   },
   {
-    "id": "mod_071",
-    "name": "Deep Dish",
-    "prefix": "Long",
-    "effectDescription": "plus 1 {/CD} Damage, plus 1 Range"
+    "id": "mod_hooked",
+    "name": "Hooked"
   },
   {
-    "id": "mod_072",
-    "name": "Electric Signal Carrier Antennae",
-    "prefix": "Electrifed",
-    "effectDescription": "Set 7 {/CD} Damage, Damage Type Energy, gain Radioactive"
+    "id": "mod_extra_heavy",
+    "name": "Extra Heavy"
   },
   {
-    "id": "mod_073",
-    "name": "Signal Repeater",
-    "prefix": "Automatic",
-    "effectDescription": "plus 2 Fire Rate, gain Burst, lose Blast"
+    "id": "mod_electrified",
+    "name": "Electrified"
   },
   {
-    "id": "mod_074",
-    "name": "Napalm Fuel",
-    "prefix": "Napalmer",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_lead_lining",
+    "name": "Lead Lining"
   },
   {
-    "id": "mod_075",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "lose Inaccurate"
+    "id": "mod_extra_claw",
+    "name": "Extra Claw"
   },
   {
-    "id": "mod_076",
-    "name": "Large Tank",
-    "prefix": "High Capacity",
-    "effectDescription": "plus 1 Fire Rate"
+    "id": "mod_caustic",
+    "name": "Caustic"
   },
   {
-    "id": "mod_077",
-    "name": "Huge Tank",
-    "prefix": "Max Capacity",
-    "effectDescription": "plus 2 Fire Rate"
+    "id": "mod_large_ampoule",
+    "name": "Large Ampoule"
   },
   {
-    "id": "mod_078",
-    "name": "Compression Nozzle",
-    "prefix": "Compressed",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_large_vial",
+    "name": "Large Vial"
   },
   {
-    "id": "mod_079",
-    "name": "Vaporization Nozzle",
-    "prefix": "Vaporizing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
+    "id": "mod_capacitor_mk_iii",
+    "name": "Capacitor Mk III"
   },
   {
-    "id": "mod_080",
-    "name": "Photon Exciter",
-    "prefix": "Excited",
-    "effectDescription": "gain Vicious"
+    "id": "mod_capacitor_mk_iv",
+    "name": "Capacitor Mk IV"
   },
   {
-    "id": "mod_081",
-    "name": "Beta Wave Tuner",
-    "prefix": "Incendiary",
-    "effectDescription": "gain Persistent"
+    "id": "mod_capacitor_mk_v",
+    "name": "Capacitor Mk V"
   },
   {
-    "id": "mod_082",
-    "name": "Boosted Capacitor",
-    "prefix": "Boosted",
-    "effectDescription": "plus 1 {/CD} Damage"
+    "id": "mod_capacitor_mk_vi",
+    "name": "Capacitor Mk VI"
   },
   {
-    "id": "mod_083",
-    "name": "Photon Agitator",
-    "prefix": "Agitated",
-    "effectDescription": "plus 1 {/CD} Damage, gain Vicious"
+    "id": "mod_light_barrel",
+    "name": "Light Barrel"
   },
   {
-    "id": "mod_084",
-    "name": "Charging Barrels",
-    "prefix": "Charging",
-    "effectDescription": "plus 4 {/CD} Damage, plus 1 Range, minus 3 Fire Rate"
+    "id": "mod_multi_shot_canister",
+    "name": "Multi Shot Canister"
   },
   {
-    "id": "mod_085",
-    "name": "Reflex Sight",
-    "prefix": "Tactical",
-    "effectDescription": "lose Inaccurate"
+    "id": "mod_m79_launcher",
+    "name": "M79 Launcher"
   },
   {
-    "id": "mod_086",
-    "name": "Beam Focuser",
-    "prefix": "Focused",
-    "effectDescription": "plus 1 Range, gain Piercing 1"
+    "id": "mod_crystallizing_barrel",
+    "name": "Crystallizing Barrel"
   },
   {
-    "id": "mod_087",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range"
+    "id": "mod_reflex_tactical",
+    "name": "Reflex Tactical"
   },
   {
-    "id": "mod_088",
-    "name": "Recoil Compensating Stock",
-    "prefix": "Recoil Compensated",
-    "effectDescription": "plus 1 Fire Rate"
+    "id": "mod_barbed_harpoon",
+    "name": "Barbed Harpoon"
   },
   {
-    "id": "mod_089",
-    "name": "Gunner Sight",
-    "prefix": "Tactical",
-    "effectDescription": "gain Re-roll Hit Location"
+    "id": "mod_flechette_darts",
+    "name": "Flechette Darts"
   },
   {
-    "id": "mod_090",
-    "name": "Electrification Module",
-    "prefix": "Electrifed",
-    "effectDescription": "gain Vicious, Damage Type Energy"
+    "id": "mod_armor_piercing_receiver",
+    "name": "Armor Piercing Receiver"
   },
   {
-    "id": "mod_091",
-    "name": "Ignition Module",
-    "prefix": "Flaming",
-    "effectDescription": "gain Persistent"
+    "id": "mod_armor_piercing_automatic",
+    "name": "Armor Piercing Automatic"
   },
   {
-    "id": "mod_092",
-    "name": "Accelerated Barrel",
-    "prefix": "High-Speed",
-    "effectDescription": "plus 1 {/CD} Damage, plus 1 Fire Rate, minus 1 Range"
+    "id": "mod_hardened_automatic",
+    "name": "Hardened Automatic"
   },
   {
-    "id": "mod_093",
-    "name": "Tri-Barrel",
-    "prefix": "High-Powered",
-    "effectDescription": "plus 2 {/CD} Damage, minus 2 Fire Rate"
+    "id": "mod_rapid_automatic",
+    "name": "Rapid Automatic"
   },
   {
-    "id": "mod_094",
-    "name": "Gunner Sight",
-    "prefix": "Tactical",
-    "effectDescription": "lose Inaccurate"
+    "id": "mod_calibrated_powerful",
+    "name": "Calibrated Powerful"
   },
   {
-    "id": "mod_095",
-    "name": "Shredder",
-    "prefix": "Bayonetted Shredding",
-    "effectDescription": "gain Shredder"
+    "id": "mod_powerful_automatic",
+    "name": "Powerful Automatic"
   },
   {
-    "id": "mod_096",
-    "name": "Triple Barrel",
-    "prefix": "Triple Barrel",
-    "effectDescription": "plus 1 Fire Rate"
+    "id": "mod_hardened_piercing_auto",
+    "name": "Hardened Piercing Auto"
   },
   {
-    "id": "mod_097",
-    "name": "Quad Barrel",
-    "prefix": "Quad Barrel",
-    "effectDescription": "plus 2 Fire Rate"
+    "id": "mod_9mm_receiver",
+    "name": "9mm Receiver"
   },
   {
-    "id": "mod_098",
-    "name": "Scope",
-    "prefix": "Scoped",
-    "effectDescription": "gain Accurate"
+    "id": "mod_357_receiver",
+    "name": ".357 Receiver"
   },
   {
-    "id": "mod_099",
-    "name": "Night Vision Scope",
-    "prefix": "Night-Vision",
-    "effectDescription": "gain Accurate, gain Night Vision"
+    "id": "mod_25mm_receiver",
+    "name": "25mm Receiver"
   },
   {
-    "id": "mod_100",
-    "name": "Targeting Computer",
-    "prefix": "Targetting",
-    "effectDescription": "gain Targetting Computer"
+    "id": "mod_speedy_receiver",
+    "name": "Speedy Receiver"
   },
   {
-    "id": "mod_101",
-    "name": "Bayonet",
-    "prefix": "Bayonetted Shredding",
-    "effectDescription": "gain Bayonet"
+    "id": "mod_extra_large_magazine",
+    "name": "Extra-Large Magazine"
   },
   {
-    "id": "mod_102",
-    "name": "Stabilizer",
-    "prefix": "Muzzles",
-    "effectDescription": "gain Piercing 1"
+    "id": "mod_front_sight_ring",
+    "name": "Front Sight Ring"
   },
   {
-    "id": "mod_103",
-    "name": "Serrated Blade",
-    "prefix": "Serrated",
-    "effectDescription": "gain Persistent"
+    "id": "mod_large_bayonet",
+    "name": "Large Bayonet"
   },
   {
-    "id": "mod_104",
-    "name": "Electrified Blade",
-    "prefix": "Electrifed",
-    "effectDescription": "plus 1 {/CD} Damage, damage type Energy"
+    "id": "mod_block_frame",
+    "name": "Block Frame"
   },
   {
-    "id": "mod_105",
-    "name": "Electrified Serrated Blade",
-    "prefix": "Serrated Electrifed",
-    "effectDescription": "plus 1 {/CD} Damage, damage type Energy, gain Persistent"
+    "id": "mod_iron_sight",
+    "name": "Iron Sight"
   },
   {
-    "id": "mod_106",
-    "name": "Stun Pack",
-    "prefix": "Stunning",
-    "effectDescription": "plus 2 {/CD} Damage, damage type Energy, gain Stun"
+    "id": "mod_illuminated_sight",
+    "name": "Illuminated Sight"
   },
   {
-    "id": "mod_107",
-    "name": "Serrated Blade",
-    "prefix": "Serrated",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_protected_winch",
+    "name": "Protected Winch"
   },
   {
-    "id": "mod_108",
-    "name": "Stealth Blade",
-    "prefix": "Stealth",
-    "effectDescription": "plus 1 {/CD} Damage, gain Sneak Attack, gain Persistent"
+    "id": "mod_reinforced_winch",
+    "name": "Reinforced Winch"
   },
   {
-    "id": "mod_109",
-    "name": "Serrated Blade",
-    "prefix": "Serrated",
-    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
+    "id": "mod_aerodynamic_barrel",
+    "name": "Aerodynamic Barrel"
   },
   {
-    "id": "mod_110",
-    "name": "Curved Blade",
-    "prefix": "Curved",
-    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
+    "id": "mod_incendiary_barrel",
+    "name": "Incendiary Barrel"
   },
   {
-    "id": "mod_111",
-    "name": "Extended Blade",
-    "prefix": "Extended",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_heavy_barrel",
+    "name": "Heavy Barrel"
   },
   {
-    "id": "mod_112",
-    "name": "Extra Flame Jets",
-    "prefix": "Searing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_long_barrel",
+    "name": "Long Barrel"
   },
   {
-    "id": "mod_113",
-    "name": "Serrated Blade",
-    "prefix": "Serrated",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_beta_wave_tuner",
+    "name": "Beta Wave Tuner"
   },
   {
-    "id": "mod_114",
-    "name": "Barbed",
-    "prefix": "Barbed",
-    "effectDescription": "gain Piercing 1"
+    "id": "mod_boosted_capacitor",
+    "name": "Boosted Capacitor"
   },
   {
-    "id": "mod_115",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_photon_agitator",
+    "name": "Photon Agitator"
   },
   {
-    "id": "mod_116",
-    "name": "Sharp",
-    "prefix": "Sharp",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_photon_exciter",
+    "name": "Photon Exciter"
   },
   {
-    "id": "mod_117",
-    "name": "Chain-Wrapped",
-    "prefix": "Chain-Wrapped",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_comfort_grip",
+    "name": "Comfort Grip"
   },
   {
-    "id": "mod_118",
-    "name": "Bladed",
-    "prefix": "Bladed",
-    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
+    "id": "mod_sharpshooters_grip",
+    "name": "Sharpshooter's Grip"
   },
   {
-    "id": "mod_119",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_fusion_mag",
+    "name": "Fusion Mag"
   },
   {
-    "id": "mod_120",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_bayonet",
+    "name": "Bayonet"
   },
   {
-    "id": "mod_121",
-    "name": "Bladed",
-    "prefix": "Bladed",
-    "effectDescription": "plus 2 {/CD} Damage, gain Persistent"
+    "id": "mod_electrification_module",
+    "name": "Electrification Module"
   },
   {
-    "id": "mod_122",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_ignition_module",
+    "name": "Ignition Module"
   },
   {
-    "id": "mod_123",
-    "name": "Heavy",
-    "prefix": "Heavy",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_gunner_sight",
+    "name": "Gunner Sight"
   },
   {
-    "id": "mod_124",
-    "name": "Hooked",
-    "prefix": "Hooked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
+    "id": "mod_long_night_vision_scope",
+    "name": "Long Night Vision Scope"
   },
   {
-    "id": "mod_125",
-    "name": "Heavy",
-    "prefix": "Heavy",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_long_scope",
+    "name": "Long Scope"
   },
   {
-    "id": "mod_126",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 2 {/CD} Damage, gain Piercing 1"
+    "id": "mod_recon_scope",
+    "name": "Recon Scope"
   },
   {
-    "id": "mod_127",
-    "name": "Extra Heavy",
-    "prefix": "Extra Heavy",
-    "effectDescription": "plus 3 {/CD} Damage"
+    "id": "mod_reflex_sight",
+    "name": "Reflex Sight"
   },
   {
-    "id": "mod_128",
-    "name": "Barbed",
-    "prefix": "Barbed",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_short_night_vision_scope",
+    "name": "Short Night Vision Scope"
   },
   {
-    "id": "mod_129",
-    "name": "Sharp",
-    "prefix": "Sharp",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_short_scope",
+    "name": "Short Scope"
   },
   {
-    "id": "mod_130",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_full_stock",
+    "name": "Full Stock"
   },
   {
-    "id": "mod_131",
-    "name": "Sharp",
-    "prefix": "Sharp",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_marksmans_stock",
+    "name": "Marksman's Stock"
   },
   {
-    "id": "mod_132",
-    "name": "Electrified",
-    "prefix": "Electrified",
-    "effectDescription": "plus 2 {/CD} Damage, damage type Energy"
+    "id": "mod_recoil_compensating_stock",
+    "name": "Recoil Compensating Stock"
   },
   {
-    "id": "mod_133",
-    "name": "Stun Pack",
-    "prefix": "Stun Pack",
-    "effectDescription": "plus 3 {/CD} Damage, damage type Energy, gain Stun"
+    "id": "mod_barbed",
+    "name": "Barbed"
   },
   {
-    "id": "mod_134",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_bladed",
+    "name": "Bladed"
   },
   {
-    "id": "mod_135",
-    "name": "Heavy",
-    "prefix": "Heavy",
-    "effectDescription": "plus 2 {/CD} Damage"
+    "id": "mod_heating_coil",
+    "name": "Heating Coil"
   },
   {
-    "id": "mod_136",
-    "name": "Heating Coil",
-    "prefix": "Heating Coil",
-    "effectDescription": "plus 1 {/CD} Damage, damage type Energy"
+    "id": "mod_heavy",
+    "name": "Heavy"
   },
   {
-    "id": "mod_137",
-    "name": "Stun Pack",
-    "prefix": "Stun Pack",
-    "effectDescription": "plus 2 {/CD} Damage, damage type Energy, gain Stun"
+    "id": "mod_puncturing",
+    "name": "Puncturing"
   },
   {
-    "id": "mod_138",
-    "name": "Bladed",
-    "prefix": "Bladed",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
+    "id": "mod_serrated_blade",
+    "name": "Serrated Blade"
   },
   {
-    "id": "mod_139",
-    "name": "Barbed",
-    "prefix": "Barbed",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_sharp",
+    "name": "Sharp"
   },
   {
-    "id": "mod_140",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
+    "id": "mod_spiked",
+    "name": "Spiked"
   },
   {
-    "id": "mod_141",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "gain Piercing 1"
-  },
-  {
-    "id": "mod_142",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
-  },
-  {
-    "id": "mod_143",
-    "name": "Lead Lining",
-    "prefix": "Lined",
-    "effectDescription": "plus 2 {/CD} Damage"
-  },
-  {
-    "id": "mod_144",
-    "name": "Extra Claw",
-    "prefix": "Large",
-    "effectDescription": "plus 1 {/CD} Damage, gain Disarm"
-  },
-  {
-    "id": "mod_145",
-    "name": "Sharp",
-    "prefix": "Sharp",
-    "effectDescription": "gain Persistent"
-  },
-  {
-    "id": "mod_146",
-    "name": "Spiked",
-    "prefix": "Spiked",
-    "effectDescription": "gain Piercing 1"
-  },
-  {
-    "id": "mod_147",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 1 {/CD} Damage, gain Piercing 1"
-  },
-  {
-    "id": "mod_148",
-    "name": "Bladed",
-    "prefix": "Bladed",
-    "effectDescription": "plus 1 {/CD} Damage, gain Persistent"
-  },
-  {
-    "id": "mod_149",
-    "name": "Puncturing",
-    "prefix": "Puncturing",
-    "effectDescription": "plus 2 {/CD} Damage, Gain Piercing 1"
-  },
-  {
-    "id": "mod_150",
-    "name": "Heating Coil",
-    "prefix": "Heated",
-    "effectDescription": "plus 2 {/CD} Damage, Damage Type Energy"
-  },
-  {
-    "id": "mod_151",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range"
-  },
-  {
-    "id": "mod_152",
-    "name": "Recoil Compensating Stock",
-    "prefix": "Recoil Compensated",
-    "effectDescription": "plus 1 Fire Rate"
-  },
-  {
-    "id": "mod_153",
-    "name": "Gunner Sight",
-    "prefix": "Tactical",
-    "effectDescription": "gain Re-roll Hit Location"
-  },
-  {
-    "id": "mod_154",
-    "name": "Electrification Module",
-    "prefix": "Electrified",
-    "effectDescription": "gain Vicious, Damage Type Energy"
-  },
-  {
-    "id": "mod_155",
-    "name": "Ignition Module",
-    "prefix": "Flaming",
-    "effectDescription": "gain Persistent"
-  },
-  {
-    "id": "mod_156",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range"
-  },
-  {
-    "id": "mod_157",
-    "name": "Full Stock",
-    "prefix": "",
-    "effectDescription": "Gain Two-Handed, Lose Inaccurate"
-  },
-  {
-    "id": "mod_158",
-    "name": "Caustic",
-    "prefix": "Caustic",
-    "effectDescription": "plus 1 {/CD} Damage"
-  },
-  {
-    "id": "mod_159",
-    "name": "Large Ampoule",
-    "prefix": "High Capacity",
-    "effectDescription": "plus 1 Fire Rate"
-  },
-  {
-    "id": "mod_160",
-    "name": "Large Vial",
-    "prefix": "Maximum Capacity",
-    "effectDescription": "plus 3 Fire Rate"
-  },
-  {
-    "id": "mod_161",
-    "name": "Fusion Mag",
-    "prefix": "Converted",
-    "effectDescription": "Set 3 {/CD} Damage, minus 1 Fire Rate, Ammo changes to Fusion Cell"
-  },
-  {
-    "id": "mod_162",
-    "name": "Capacitor Mk III",
-    "prefix": "Mk III",
-    "effectDescription": "plus 1 {/CD} Damage, gain Crank 3"
-  },
-  {
-    "id": "mod_163",
-    "name": "Capacitor Mk IV",
-    "prefix": "Mk IV",
-    "effectDescription": "plus 2 {/CD} Damage, gain Crank 4"
-  },
-  {
-    "id": "mod_164",
-    "name": "Capacitor Mk V",
-    "prefix": "Mk V",
-    "effectDescription": "plus 3 {/CD} Damage, gain Crank 5"
-  },
-  {
-    "id": "mod_165",
-    "name": "Capacitor Mk VI",
-    "prefix": "Mk VI",
-    "effectDescription": "plus 4 {/CD} Damage, gain Crank 6"
-  },
-  {
-    "id": "mod_166",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "plus 1 Range"
-  },
-  {
-    "id": "mod_167",
-    "name": "Light Barrel",
-    "prefix": "Fluted",
-    "effectDescription": "plus 2 {/CD} Damage, Lose Blast"
-  },
-  {
-    "id": "mod_168",
-    "name": "Multi Shot Canister",
-    "prefix": "Repeating",
-    "effectDescription": "plus 1 Fire Rate, Gain Inaccurate"
-  },
-  {
-    "id": "mod_169",
-    "name": "M79 Launcher",
-    "prefix": "Converted",
-    "effectDescription": "plus 1 Range, ammo 40mm Grenades"
-  },
-  {
-    "id": "mod_170",
-    "name": "Crystallizing Barrel",
-    "prefix": "Crystallized",
-    "effectDescription": "plus 2 {/CD} Damage, plus 1 Range, minus 1 Fire Rate, Lose Stun, Lose Unreliable"
-  },
-  {
-    "id": "mod_171",
-    "name": "Fusion Mag",
-    "prefix": "Converted",
-    "effectDescription": "Set 2 {/CD} Damage, minus 1 Fire Rate, Ammo fusion cell"
-  },
-  {
-    "id": "mod_172",
-    "name": "Recoil Compensating Stock",
-    "prefix": "Recoil Compensating",
-    "effectDescription": "plus 1 Fire Rate"
-  },
-  {
-    "id": "mod_173",
-    "name": "Reflex Tactical",
-    "prefix": "",
-    "effectDescription": "Gain Re-roll Hit Location"
-  },
-  {
-    "id": "mod_174",
-    "name": "Barbed Harpoon",
-    "prefix": "Barbed",
-    "effectDescription": "Gain Vicious, Gain Persistent"
-  },
-  {
-    "id": "mod_175",
-    "name": "Flechette Darts",
-    "prefix": "Tiny",
-    "effectDescription": "Gain Spread, minus 1 Range"
-  },
-  {
-    "id": "mod_176",
-    "name": "Recoil Compensating Stock",
-    "prefix": "Recoil Compensating",
-    "effectDescription": "plus 1 Fire Rate"
-  },
-  {
-    "id": "mod_177",
-    "name": "Gunner Sight",
-    "prefix": "Tactical",
-    "effectDescription": "Gain Re-roll Hit Location"
-  },
-  {
-    "id": "mod_178",
-    "name": "Short Scope",
-    "prefix": "Scoped",
-    "effectDescription": "Gain Accurate"
-  },
-  {
-    "id": "mod_179",
-    "name": "Armor Piercing Receiver",
-    "prefix": "Armor Piercing",
-    "effectDescription": "Gain Piercing 1"
-  },
-  {
-    "id": "mod_180",
-    "name": "Armor Piercing Automatic",
-    "prefix": "AP Auto",
-    "effectDescription": "minus 1 {/CD} Damage, plus 2 Fire Rate, gain Piercing 1, gain Inaccurate"
-  },
-  {
-    "id": "mod_181",
-    "name": "Hardened Automatic",
-    "prefix": "Hardened Auto",
-    "effectDescription": "plus 2 Fire Rate, gain Inaccurate"
-  },
-  {
-    "id": "mod_182",
-    "name": "Rapid Automatic",
-    "prefix": "Rapid",
-    "effectDescription": "minus 1 {/CD} Damage, plus 3 Fire Rate, Gain Inaccurate"
-  },
-  {
-    "id": "mod_183",
-    "name": "Calibrated Powerful",
-    "prefix": "Calibrated Powerful",
-    "effectDescription": "plus 2 {/CD} Damage, Gain Vicious"
-  },
-  {
-    "id": "mod_184",
-    "name": "Powerful Automatic",
-    "prefix": "Powerful Auto",
-    "effectDescription": "plus 1 {/CD} Damage, plus 2 Fire Rate, Gain Inaccurate"
-  },
-  {
-    "id": "mod_185",
-    "name": "Hardened Piercing Auto",
-    "prefix": "Hardened AP Auto",
-    "effectDescription": "plus 2 Fire Rate, Gain Piercing 1, Gain Inaccurate"
-  },
-  {
-    "id": "mod_186",
-    "name": "9mm Receiver",
-    "prefix": "9mm",
-    "effectDescription": "Set 3 {/CD} Damage, Ammo 9mm, plus 1 Fire Rate"
-  },
-  {
-    "id": "mod_187",
-    "name": ".357 Receiver",
-    "prefix": ".357",
-    "effectDescription": "Set 5 {/CD} Damage, ammo .357, gain Vicious"
-  },
-  {
-    "id": "mod_188",
-    "name": "Heavy Barrel",
-    "prefix": "",
-    "effectDescription": "Plus 1 {/CD} Damage, gain Vicious"
-  },
-  {
-    "id": "mod_189",
-    "name": "Heavy Barrel",
-    "prefix": "",
-    "effectDescription": "Plus 1 {/CD} Damage, gain Vicious"
-  },
-  {
-    "id": "mod_190",
-    "name": "Long Barrel",
-    "prefix": "",
-    "effectDescription": "Plus 1 Range"
-  },
-  {
-    "id": "mod_191",
-    "name": "25mm Receiver",
-    "prefix": "",
-    "effectDescription": "Set 4 {/CD} Damage, Ammo 25mm Grenade, plus 2 Fire Rate"
-  },
-  {
-    "id": "mod_192",
-    "name": "Speedy Receiver",
-    "prefix": "",
-    "effectDescription": "plus 2 Fire Rate"
-  },
-  {
-    "id": "mod_193",
-    "name": "Long Barrel",
-    "prefix": "Long",
-    "effectDescription": "Plus 1 Range"
-  },
-  {
-    "id": "mod_194",
-    "name": "Comfort Grip",
-    "prefix": "Comfort Grip",
-    "effectDescription": "Lose Recoil 6"
-  },
-  {
-    "id": "mod_195",
-    "name": "Extra-Large Magazine",
-    "prefix": "",
-    "effectDescription": "Plus 1 Fire Rate, Gain Unreliable"
-  },
-  {
-    "id": "mod_196",
-    "name": "Front Sight Ring",
-    "prefix": "Sighted",
-    "effectDescription": "Lose Inaccurate"
-  },
-  {
-    "id": "mod_197",
-    "name": "Large Bayonet",
-    "prefix": "Bayoneted",
-    "effectDescription": "gain Bayonet"
-  },
-  {
-    "id": "mod_198",
-    "name": "mod_198",
-    "prefix": "mod_198",
-    "effectDescription": "plus 1 {/CD} Damage, minus 1 Fire Rate, lose Recoil 6"
-  },
-  {
-    "id": "mod_199",
-    "name": "mod_199",
-    "prefix": "mod_199",
-    "effectDescription": "plus 1 Range"
-  },
-  {
-    "id": "mod_200",
-    "name": "mod_200",
-    "prefix": "mod_200",
-    "effectDescription": "plus 1 Range, gain Accurate"
-  },
-  {
-    "id": "mod_201",
-    "name": "mod_201",
-    "prefix": "mod_201",
-    "effectDescription": "gain Reliable"
-  },
-  {
-    "id": "mod_202",
-    "name": "mod_202",
-    "prefix": "mod_202",
-    "effectDescription": "plus 1 {/CD} Damage"
-  },
-  {
-    "id": "mod_203",
-    "name": "mod_203",
-    "prefix": "mod_203",
-    "effectDescription": "plus 1 Range"
-  },
-  {
-    "id": "mod_204",
-    "name": "Long Barrel",
-    "prefix": "Long-barreled",
-    "effectDescription": "+1 Range, removes Close Quarters"
-  },
-  {
-    "id": "mod_205",
-    "name": "Incendiary Barrel",
-    "prefix": "Incendiary",
-    "effectDescription": "minus 2 {/CD} Damage, plus 2 Fire Rate, adds Burst and Spread, minus 1 range"
+    "id": "mod_stun_pack",
+    "name": "Stun Pack"
   }
 ]

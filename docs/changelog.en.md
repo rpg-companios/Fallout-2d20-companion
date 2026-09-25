@@ -6,6 +6,17 @@
 ---
 ---
 ---
+---
+## Weapon mods get readable internal ids, duplicates merged (patch 375)
+
+Catalog revision begins. Opaque ids (mod_030 etc.) are replaced with
+readable canonical ones, and 95 duplicate rows are merged into 31 real
+upgrades: the catalog shrinks from 205 to 141 entries, each with its book
+recipe when one exists. In-game names are yours (70 taken from your
+lists). Old saves migrate automatically: installed mods move to the new
+ids without loss; the save schema version is unchanged. Nothing should
+visibly change except names.
+
 ## Tesla coil dynamo weight set to 6 (patch 374)
 
 The last open figure of the revision material is settled: the Tesla coil

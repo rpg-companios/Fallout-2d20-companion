@@ -1,1799 +1,1783 @@
 {
   "weapon_alien_blaster": {
     "Barrel": [
-      "mod_017",
-      "mod_053",
-      "mod_054",
-      "mod_055"
+      "mod_long",
+      "mod_automatic_barrel",
+      "mod_improved_barrel",
+      "mod_sniper_barrel"
     ],
     "Grip": [
-      "mod_027"
+      "mod_sharpshooters_grip"
     ],
     "Stock": [
-      "mod_058",
-      "mod_059"
+      "mod_standard_stock",
+      "mod_full_stock"
     ],
     "Sight": [
-      "mod_062",
-      "mod_034"
+      "mod_reflex_sight",
+      "mod_short_scope"
     ]
   },
   "weapon_chinese_assault_rifle": {
     "Receiver": [
-      "mod_007",
-      "mod_005",
-      "mod_004",
-      "mod_006"
+      "mod_calibrated",
+      "mod_powerful",
+      "mod_hardened",
+      "mod_advanced"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_019"
+      "mod_long",
+      "mod_ported",
+      "mod_vented"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_039",
-      "mod_042"
+      "mod_compensator",
+      "mod_bayonet",
+      "mod_suppressor"
     ]
   },
   "weapon_mesmetron": {
     "Capacitor": [
-      "mod_043"
+      "mod_beta_wave_tuner"
     ],
     "Grip": [
-      "mod_027"
+      "mod_sharpshooters_grip"
     ],
     "Sight": [
-      "mod_062"
+      "mod_reflex_sight"
     ]
   },
   "weapon_tesla_rifle": {
     "Barrel": [
-      "mod_053",
-      "mod_052",
-      "mod_054"
+      "mod_automatic_barrel",
+      "mod_splitter",
+      "mod_improved_barrel"
     ],
     "Sight": [
-      "mod_062"
+      "mod_reflex_sight"
     ]
   },
   "weapon_357_magnum_revolver": {
     "Receiver": [
-      "mod_009",
-      "mod_187"
+      "mod_hair_trigger",
+      "mod_357_receiver"
     ],
     "Barrel": [
-      "mod_017"
+      "mod_long"
     ],
     "Magazine": [
-      "mod_023"
+      "mod_large_magazine"
     ]
   },
   "weapon_12_7mm_pistol": {
     "Receiver": [
-      "mod_007",
-      "mod_004",
-      "mod_009",
-      "mod_005",
-      "mod_006",
-      "mod_002",
-      "mod_010"
+      "mod_calibrated",
+      "mod_hardened",
+      "mod_hair_trigger",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_armor_piercing",
+      "mod_38_receiver"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Grip": [
-      "mod_026",
-      "mod_027"
+      "mod_comfort_grip",
+      "mod_sharpshooters_grip"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024"
+      "mod_large_magazine",
+      "mod_quick_eject_mag"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_12_7mm_smg": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_002"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_armor_piercing"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Magazine": [
-      "mod_023"
+      "mod_large_magazine"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_25mm_grenade_apw": {
     "Receiver": [
-      "mod_009"
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017"
+      "mod_long"
     ],
     "Magazine": [
-      "mod_023"
+      "mod_large_magazine"
     ]
   },
   "weapon_9mm_pistol": {
     "Receiver": [
-      "mod_008",
-      "mod_007",
-      "mod_004",
-      "mod_009",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_184",
-      "mod_185",
-      "mod_186",
-      "mod_005"
+      "mod_automatic",
+      "mod_calibrated",
+      "mod_hardened",
+      "mod_hair_trigger",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto",
+      "mod_9mm_receiver",
+      "mod_powerful"
     ],
     "Grip": [
-      "mod_026"
+      "mod_comfort_grip"
     ],
     "Magazine": [
-      "mod_023"
+      "mod_large_magazine"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034"
+      "mod_reflex_sight",
+      "mod_short_scope"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_anti_materiel_rifle": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Magazine": [
-      "mod_023"
+      "mod_large_magazine"
     ],
     "Sight": [
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_battle_rifle": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017"
+      "mod_long"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034"
+      "mod_reflex_sight",
+      "mod_short_scope"
     ],
     "Muzzle": [
-      "mod_039"
+      "mod_bayonet"
     ]
   },
   "weapon_black_powder_blunderbuss": {},
   "weapon_black_powder_pistol": {},
   "weapon_black_powder_rifle": {
     "Muzzle": [
-      "mod_039"
+      "mod_bayonet"
     ]
   },
   "weapon_gauss_pistol": {
     "Barrel": [
-      "mod_021"
+      "mod_shielded_barrel"
     ],
     "Capacitor": [
-      "mod_031",
-      "mod_032"
+      "mod_full_capacitors",
+      "mod_capacitor_boosting_coil"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ]
   },
   "weapon_gauss_shotgun": {
     "Barrel": [
-      "mod_021"
+      "mod_shielded_barrel"
     ],
     "Capacitor": [
-      "mod_031",
-      "mod_032"
+      "mod_full_capacitors",
+      "mod_capacitor_boosting_coil"
     ]
   },
   "weapon_lever_action_rifle": {
     "Receiver": [
-      "mod_007",
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_010",
-      "mod_183",
-      "mod_187"
+      "mod_calibrated",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_38_receiver",
+      "mod_calibrated_powerful",
+      "mod_357_receiver"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029"
+      "mod_full_stock",
+      "mod_marksmans_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_light_machine_gun": {
     "Receiver": [
-      "mod_007",
-      "mod_004",
-      "mod_005",
-      "mod_011",
-      "mod_010",
-      "mod_183"
+      "mod_calibrated",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_308_receiver",
+      "mod_38_receiver",
+      "mod_calibrated_powerful"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_019"
+      "mod_long",
+      "mod_ported",
+      "mod_vented"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_041"
+      "mod_compensator",
+      "mod_muzzle_break"
     ]
   },
   "weapon_pump_action_shotgun": {
     "Receiver": [
-      "mod_007",
-      "mod_009",
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_010",
-      "mod_183"
+      "mod_calibrated",
+      "mod_hair_trigger",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_38_receiver",
+      "mod_calibrated_powerful"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_radium_rifle": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185",
-      "mod_007",
-      "mod_008"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto",
+      "mod_calibrated",
+      "mod_automatic"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_sniper_rifle": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009",
-      "mod_183",
-      "mod_007"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger",
+      "mod_calibrated_powerful",
+      "mod_calibrated"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_bow": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_alien_atomizer": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_alien_disintegrator": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_arc_welder": {
     "Capacitor": [
-      "mod_043",
-      "mod_044",
-      "mod_045",
-      "mod_046"
+      "mod_beta_wave_tuner",
+      "mod_boosted_capacitor",
+      "mod_photon_exciter",
+      "mod_photon_agitator"
     ],
     "Barrel": [
-      "mod_051",
-      "mod_052",
-      "mod_053",
-      "mod_054",
-      "mod_055",
-      "mod_204",
-      "mod_205"
+      "mod_long_barrel",
+      "mod_splitter",
+      "mod_automatic_barrel",
+      "mod_improved_barrel",
+      "mod_sniper_barrel",
+      "mod_incendiary_barrel"
     ],
     "Grip": [
-      "mod_057"
+      "mod_sharpshooters_grip"
     ],
     "Stock": [
-      "mod_058",
-      "mod_060",
-      "mod_061"
+      "mod_standard_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating"
     ],
     "Sight": [
-      "mod_062",
-      "mod_063",
-      "mod_064",
-      "mod_065",
-      "mod_066",
-      "mod_067"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_068",
-      "mod_069",
-      "mod_070"
+      "mod_beam_splitter",
+      "mod_beam_focuser_institute_laser",
+      "mod_gyro_compensating_lens"
     ]
   },
   "weapon_microwave_emitter": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_50_cal_machine_gun": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_auto_grenade_launcher": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_drone_cannon": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_gatling_gun": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_gatling_plasma": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_gauss_minigun": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_plasma_caster": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_hair_trigger"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ]
   },
   "weapon_ghoul_rifle": {
     "Receiver": [
-      "mod_007",
-      "mod_005",
-      "mod_008",
-      "mod_004",
-      "mod_006",
-      "mod_187"
+      "mod_calibrated",
+      "mod_powerful",
+      "mod_automatic",
+      "mod_hardened",
+      "mod_advanced",
+      "mod_357_receiver"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029"
+      "mod_full_stock",
+      "mod_marksmans_stock"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ]
   },
   "weapon_magnum_monicon": {
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced"
     ],
     "Barrel": [
-      "mod_015",
-      "mod_016"
+      "mod_snubnose",
+      "mod_bull_barrel"
     ],
     "Grip": [
-      "mod_026"
+      "mod_comfort_grip"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_038"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_recon_scope"
     ]
   },
   "weapon_eugene": {
     "Barrel": [
-      "mod_096"
+      "mod_triple_barrel"
     ],
     "Sight": [
-      "mod_033"
+      "mod_reflex_sight"
     ]
   },
   "weapon_crossbow": {
     "Frame": [
-      "mod_198"
+      "mod_block_frame"
     ],
     "Sight": [
-      "mod_199",
-      "mod_200"
+      "mod_iron_sight",
+      "mod_illuminated_sight"
     ]
   },
   "weapon_boarding_pistol": {
     "Winch": [
-      "mod_201",
-      "mod_202"
+      "mod_protected_winch",
+      "mod_reinforced_winch"
     ],
     "Barrel": [
-      "mod_017",
-      "mod_203"
+      "mod_long",
+      "mod_aerodynamic_barrel"
     ]
   },
   "weapon_submachine_gun": {
     "Barrel": [
-      "mod_015"
+      "mod_snubnose"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ],
     "Receiver": [
-      "mod_001",
-      "mod_002",
-      "mod_004",
-      "mod_005",
-      "mod_179",
-      "mod_183"
+      "mod_rapid",
+      "mod_armor_piercing",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful"
     ],
     "Sight": [
-      "mod_033",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_10mm_smg": {
     "Barrel": [
-      "mod_015"
+      "mod_snubnose"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_041",
-      "mod_042"
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor"
     ],
     "Receiver": [
-      "mod_001",
-      "mod_002",
-      "mod_004",
-      "mod_005",
-      "mod_179",
-      "mod_183"
+      "mod_rapid",
+      "mod_armor_piercing",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful"
     ],
     "Sight": [
-      "mod_033",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_hunting_rifle": {
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_019"
+      "mod_long",
+      "mod_ported",
+      "mod_vented"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_003",
-      "mod_004",
-      "mod_005",
-      "mod_007",
-      "mod_010",
-      "mod_013",
-      "mod_179",
-      "mod_183"
+      "mod_tuned",
+      "mod_hardened",
+      "mod_powerful",
+      "mod_calibrated",
+      "mod_38_receiver",
+      "mod_50_receiver",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029"
+      "mod_full_stock",
+      "mod_marksmans_stock"
     ]
   },
   "weapon_44_pistol": {
     "Barrel": [
-      "mod_015",
-      "mod_016"
+      "mod_snubnose",
+      "mod_bull_barrel"
     ],
     "Grip": [
-      "mod_026",
-      "mod_194"
+      "mod_comfort_grip"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_179",
-      "mod_183"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ]
   },
   "weapon_10mm_pistol": {
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Grip": [
-      "mod_026",
-      "mod_027",
-      "mod_194"
+      "mod_comfort_grip",
+      "mod_sharpshooters_grip"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_042"
+      "mod_compensator",
+      "mod_suppressor"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_007",
-      "mod_008",
-      "mod_009",
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_calibrated",
+      "mod_automatic",
+      "mod_hair_trigger",
+      "mod_armor_piercing_receiver",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto"
     ],
     "Sight": [
-      "mod_033",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ]
   },
   "weapon_assault_rifle": {
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_019"
+      "mod_long",
+      "mod_ported",
+      "mod_vented"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_040",
-      "mod_042"
+      "mod_compensator",
+      "mod_suppressor"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_007",
-      "mod_008",
-      "mod_009",
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_calibrated",
+      "mod_automatic",
+      "mod_hair_trigger",
+      "mod_armor_piercing_receiver",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_combat_rifle": {
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_019"
+      "mod_long",
+      "mod_ported",
+      "mod_vented"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_007",
-      "mod_008",
-      "mod_009",
-      "mod_010",
-      "mod_011",
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_calibrated",
+      "mod_automatic",
+      "mod_hair_trigger",
+      "mod_38_receiver",
+      "mod_308_receiver",
+      "mod_armor_piercing_receiver",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_combat_shotgun": {
     "Barrel": [
-      "mod_017",
-      "mod_018"
+      "mod_long",
+      "mod_ported"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_007",
-      "mod_008",
-      "mod_009",
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_calibrated",
+      "mod_automatic",
+      "mod_hair_trigger",
+      "mod_armor_piercing_receiver",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_double_barrel_shotgun": {
     "Barrel": [
-      "mod_017",
-      "mod_020"
+      "mod_long",
+      "mod_sawed_off"
     ],
     "Muzzle": [
-      "mod_041"
+      "mod_muzzle_break"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_006",
-      "mod_009"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_advanced",
+      "mod_hair_trigger"
     ],
     "Sight": [
-      "mod_033",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028"
+      "mod_full_stock"
     ]
   },
   "weapon_pipe_bolt_action": {
     "Barrel": [
-      "mod_015",
-      "mod_017",
-      "mod_018",
-      "mod_022"
+      "mod_snubnose",
+      "mod_long",
+      "mod_ported",
+      "mod_finned"
     ],
     "Grip": [
-      "mod_027"
+      "mod_sharpshooters_grip"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_007",
-      "mod_010",
-      "mod_013",
-      "mod_179",
-      "mod_183"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_calibrated",
+      "mod_38_receiver",
+      "mod_50_receiver",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_pipe_gun": {
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_022"
+      "mod_long",
+      "mod_ported",
+      "mod_finned"
     ],
     "Grip": [
-      "mod_027"
+      "mod_sharpshooters_grip"
     ],
     "Magazine": [
-      "mod_023",
-      "mod_024",
-      "mod_025",
-      "mod_195"
+      "mod_large_magazine",
+      "mod_quick_eject_mag",
+      "mod_large_quick_eject_mag",
+      "mod_extra_large_magazine"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_007",
-      "mod_008",
-      "mod_009",
-      "mod_012",
-      "mod_179",
-      "mod_180",
-      "mod_181",
-      "mod_182",
-      "mod_183",
-      "mod_184",
-      "mod_185"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_calibrated",
+      "mod_automatic",
+      "mod_hair_trigger",
+      "mod_45_receiver",
+      "mod_armor_piercing_receiver",
+      "mod_armor_piercing_automatic",
+      "mod_hardened_automatic",
+      "mod_rapid_automatic",
+      "mod_calibrated_powerful",
+      "mod_powerful_automatic",
+      "mod_hardened_piercing_auto"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_pipe_revolver": {
     "Barrel": [
-      "mod_017",
-      "mod_018",
-      "mod_022"
+      "mod_long",
+      "mod_ported",
+      "mod_finned"
     ],
     "Grip": [
-      "mod_027"
+      "mod_sharpshooters_grip"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_040",
-      "mod_041",
-      "mod_042",
-      "mod_197"
+      "mod_bayonet",
+      "mod_compensator",
+      "mod_muzzle_break",
+      "mod_suppressor",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_004",
-      "mod_005",
-      "mod_007",
-      "mod_010",
-      "mod_011",
-      "mod_179",
-      "mod_183",
-      "mod_187"
+      "mod_hardened",
+      "mod_powerful",
+      "mod_calibrated",
+      "mod_38_receiver",
+      "mod_308_receiver",
+      "mod_armor_piercing_receiver",
+      "mod_calibrated_powerful",
+      "mod_357_receiver"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_028",
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_full_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_railway_rifle": {
     "Barrel": [
-      "mod_017"
+      "mod_long"
     ],
     "Muzzle": [
-      "mod_039",
-      "mod_197"
+      "mod_bayonet",
+      "mod_large_bayonet"
     ],
     "Receiver": [
-      "mod_014"
+      "mod_automatic_piston"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_030",
-      "mod_152"
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_syringer": {
     "Barrel": [
-      "mod_015",
-      "mod_017"
+      "mod_snubnose",
+      "mod_long"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_029",
-      "mod_030",
-      "mod_152"
+      "mod_marksmans_stock",
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_gauss_rifle": {
     "Barrel": [
-      "mod_021"
+      "mod_shielded_barrel"
     ],
     "Capacitor": [
-      "mod_031",
-      "mod_032"
+      "mod_full_capacitors",
+      "mod_capacitor_boosting_coil"
     ],
     "Muzzle": [
-      "mod_042"
+      "mod_suppressor"
     ],
     "Sight": [
-      "mod_033",
-      "mod_034",
-      "mod_035",
-      "mod_036",
-      "mod_037",
-      "mod_038",
-      "mod_153",
-      "mod_196"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope",
+      "mod_gunner_sight",
+      "mod_front_sight_ring"
     ],
     "Stock": [
-      "mod_030",
-      "mod_152"
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_institute_laser": {
     "Barrel": [
-      "mod_053",
-      "mod_054",
-      "mod_204"
+      "mod_automatic_barrel",
+      "mod_improved_barrel",
+      "mod_long_barrel"
     ],
     "Capacitor": [
-      "mod_043",
-      "mod_044",
-      "mod_045",
-      "mod_046"
+      "mod_beta_wave_tuner",
+      "mod_boosted_capacitor",
+      "mod_photon_exciter",
+      "mod_photon_agitator"
     ],
     "Muzzle": [
-      "mod_068",
-      "mod_069",
-      "mod_070"
+      "mod_beam_splitter",
+      "mod_beam_focuser_institute_laser",
+      "mod_gyro_compensating_lens"
     ],
     "Sight": [
-      "mod_062",
-      "mod_063",
-      "mod_064",
-      "mod_065",
-      "mod_066",
-      "mod_067"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Stock": [
-      "mod_058"
+      "mod_standard_stock"
     ]
   },
   "weapon_laser_gun": {
     "Barrel": [
-      "mod_053",
-      "mod_054",
-      "mod_055",
-      "mod_204"
+      "mod_automatic_barrel",
+      "mod_improved_barrel",
+      "mod_sniper_barrel",
+      "mod_long_barrel"
     ],
     "Capacitor": [
-      "mod_043",
-      "mod_044",
-      "mod_045",
-      "mod_046"
+      "mod_beta_wave_tuner",
+      "mod_boosted_capacitor",
+      "mod_photon_exciter",
+      "mod_photon_agitator"
     ],
     "Grip": [
-      "mod_057"
+      "mod_sharpshooters_grip"
     ],
     "Muzzle": [
-      "mod_068",
-      "mod_069",
-      "mod_070"
+      "mod_beam_splitter",
+      "mod_beam_focuser_institute_laser",
+      "mod_gyro_compensating_lens"
     ],
     "Sight": [
-      "mod_062",
-      "mod_063",
-      "mod_064",
-      "mod_065",
-      "mod_066",
-      "mod_067"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Stock": [
-      "mod_058",
-      "mod_060",
-      "mod_061"
+      "mod_standard_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating"
     ]
   },
   "weapon_plasma_gun": {
     "Barrel": [
-      "mod_052",
-      "mod_053",
-      "mod_054",
-      "mod_055",
-      "mod_056",
-      "mod_204"
+      "mod_splitter",
+      "mod_automatic_barrel",
+      "mod_improved_barrel",
+      "mod_sniper_barrel",
+      "mod_flamer_barrel",
+      "mod_long_barrel"
     ],
     "Capacitor": [
-      "mod_043",
-      "mod_044",
-      "mod_045",
-      "mod_046"
+      "mod_beta_wave_tuner",
+      "mod_boosted_capacitor",
+      "mod_photon_exciter",
+      "mod_photon_agitator"
     ],
     "Sight": [
-      "mod_062",
-      "mod_063",
-      "mod_064",
-      "mod_065",
-      "mod_066",
-      "mod_067"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Stock": [
-      "mod_058",
-      "mod_060",
-      "mod_061"
+      "mod_standard_stock",
+      "mod_marksmans_stock",
+      "mod_recoil_compensating"
     ]
   },
   "weapon_laser_musket": {
     "Barrel": [
-      "mod_051"
+      "mod_long_barrel"
     ],
     "Capacitor": [
-      "mod_047",
-      "mod_048",
-      "mod_049",
-      "mod_050"
+      "mod_three_crank_capacitor",
+      "mod_four_crank_capacitor",
+      "mod_five_crank_capacitor",
+      "mod_six_crank_capacitor"
     ],
     "Muzzle": [
-      "mod_068",
-      "mod_069",
-      "mod_070"
+      "mod_beam_splitter",
+      "mod_beam_focuser_institute_laser",
+      "mod_gyro_compensating_lens"
     ],
     "Sight": [
-      "mod_062",
-      "mod_063",
-      "mod_064",
-      "mod_065",
-      "mod_066",
-      "mod_067"
+      "mod_reflex_sight",
+      "mod_short_scope",
+      "mod_long_scope",
+      "mod_short_night_vision_scope",
+      "mod_long_night_vision_scope",
+      "mod_recon_scope"
     ],
     "Stock": [
-      "mod_059"
+      "mod_full_stock"
     ]
   },
   "weapon_gamma_gun": {
     "Muzzle": [
-      "mod_072",
-      "mod_073"
+      "mod_electric_signal_carrier_antennae",
+      "mod_signal_repeater"
     ],
     "Dish": [
-      "mod_071"
+      "mod_deep_dish"
     ]
   },
   "weapon_flamer": {
     "Barrel": [
-      "mod_075"
+      "mod_long_barrel"
     ],
     "Fuel": [
-      "mod_074"
+      "mod_napalm_fuel"
     ],
     "Nozzle": [
-      "mod_078",
-      "mod_079"
+      "mod_compression_nozzle",
+      "mod_vaporization_nozzle"
     ],
     "Tank": [
-      "mod_076",
-      "mod_077"
+      "mod_large_tank",
+      "mod_huge_tank"
     ]
   },
   "weapon_minigun": {
     "Barrel": [
-      "mod_084",
-      "mod_092",
-      "mod_093"
+      "mod_charging_barrels",
+      "mod_accelerated_barrel",
+      "mod_tri_barrel"
     ],
     "Capacitor": [
-      "mod_080",
-      "mod_081",
-      "mod_082",
-      "mod_083"
+      "mod_photon_exciter",
+      "mod_beta_wave_tuner",
+      "mod_boosted_capacitor",
+      "mod_photon_agitator"
     ],
     "Muzzle": [
-      "mod_095"
+      "mod_shredder"
     ],
     "Nozzle": [
-      "mod_086"
+      "mod_beam_focuser_minigun"
     ],
     "Sight": [
-      "mod_085",
-      "mod_094"
+      "mod_reflex_sight",
+      "mod_gunner_sight"
     ]
   },
   "weapon_gatling_laser": {
     "Barrel": [
-      "mod_087"
+      "mod_long_barrel"
     ],
     "Muzzle": [
-      "mod_090",
-      "mod_091",
-      "mod_154",
-      "mod_155"
+      "mod_electrification_module",
+      "mod_ignition_module"
     ],
     "Sight": [
-      "mod_089"
+      "mod_gunner_sight"
     ],
     "Stock": [
-      "mod_088"
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_missile_launcher": {
     "Barrel": [
-      "mod_096",
-      "mod_097"
+      "mod_triple_barrel",
+      "mod_quad_barrel"
     ],
     "Muzzle": [
-      "mod_101",
-      "mod_102"
+      "mod_bayonet",
+      "mod_stabilizer"
     ],
     "Sight": [
-      "mod_098",
-      "mod_099",
-      "mod_100"
+      "mod_scope",
+      "mod_night_vision_scope",
+      "mod_targeting_computer"
     ]
   },
   "weapon_sword": {
     "Unique": [
-      "mod_103",
-      "mod_104",
-      "mod_105",
-      "mod_106"
+      "mod_serrated_blade",
+      "mod_electrified_blade",
+      "mod_electrified_serrated_blade",
+      "mod_stun_pack"
     ]
   },
   "weapon_combat_knife": {
     "Unique": [
-      "mod_107",
-      "mod_108"
+      "mod_serrated_blade",
+      "mod_stealth_blade"
     ]
   },
   "weapon_machete": {
     "Unique": [
-      "mod_109"
+      "mod_serrated_blade"
     ]
   },
   "weapon_ripper": {
     "Unique": [
-      "mod_110",
-      "mod_111"
+      "mod_curved_blade",
+      "mod_extended_blade"
     ]
   },
   "weapon_shishkebab": {
     "Unique": [
-      "mod_112"
+      "mod_extra_flame_jets"
     ]
   },
   "weapon_switchblade": {
     "Unique": [
-      "mod_113"
+      "mod_serrated_blade"
     ]
   },
   "weapon_baseball_bat": {
     "Unique": [
-      "mod_114",
-      "mod_115",
-      "mod_116",
-      "mod_117",
-      "mod_118"
+      "mod_barbed",
+      "mod_spiked",
+      "mod_sharp",
+      "mod_chain_wrapped",
+      "mod_bladed"
     ]
   },
   "weapon_baseball_bat_aluminum": {
     "Unique": [
-      "mod_114",
-      "mod_115",
-      "mod_116",
-      "mod_117",
-      "mod_118"
+      "mod_barbed",
+      "mod_spiked",
+      "mod_sharp",
+      "mod_chain_wrapped",
+      "mod_bladed"
     ]
   },
   "weapon_board": {
     "Unique": [
-      "mod_119",
-      "mod_120",
-      "mod_121"
+      "mod_spiked",
+      "mod_puncturing",
+      "mod_bladed"
     ]
   },
   "weapon_lead_pipe": {
     "Unique": [
-      "mod_122",
-      "mod_123"
+      "mod_spiked",
+      "mod_heavy"
     ]
   },
   "weapon_pipe_wrench": {
     "Unique": [
-      "mod_124",
-      "mod_125",
-      "mod_126",
-      "mod_127"
+      "mod_hooked",
+      "mod_heavy",
+      "mod_puncturing",
+      "mod_extra_heavy"
     ]
   },
   "weapon_pool_cue": {
     "Unique": [
-      "mod_128",
-      "mod_129"
+      "mod_barbed",
+      "mod_sharp"
     ]
   },
   "weapon_rolling_pin": {
     "Unique": [
-      "mod_130",
-      "mod_131"
+      "mod_spiked",
+      "mod_sharp"
     ]
   },
   "weapon_baton": {
     "Unique": [
-      "mod_132",
-      "mod_133"
+      "mod_electrified",
+      "mod_stun_pack"
     ]
   },
   "weapon_sledgehammer": {
     "Unique": [
-      "mod_134",
-      "mod_135"
+      "mod_puncturing",
+      "mod_heavy"
     ]
   },
   "weapon_super_sledge": {
     "Unique": [
-      "mod_136",
-      "mod_137"
+      "mod_heating_coil",
+      "mod_stun_pack"
     ]
   },
   "weapon_tire_iron": {
     "Unique": [
-      "mod_138"
+      "mod_bladed"
     ]
   },
   "weapon_walking_cane": {
     "Unique": [
-      "mod_139",
-      "mod_140"
+      "mod_barbed",
+      "mod_spiked"
     ]
   },
   "weapon_boxing_glove": {
     "Unique": [
-      "mod_141",
-      "mod_142",
-      "mod_143"
+      "mod_spiked",
+      "mod_puncturing",
+      "mod_lead_lining"
     ]
   },
   "weapon_deathclaw_gauntlet": {
     "Unique": [
-      "mod_144"
+      "mod_extra_claw"
     ]
   },
   "weapon_knuckles": {
     "Unique": [
-      "mod_145",
-      "mod_146",
-      "mod_147",
-      "mod_148"
+      "mod_sharp",
+      "mod_spiked",
+      "mod_puncturing",
+      "mod_bladed"
     ]
   },
   "weapon_power_fist": {
     "Unique": [
-      "mod_149",
-      "mod_150"
+      "mod_puncturing",
+      "mod_heating_coil"
     ]
   },
   "weapon_junk_jet": {
     "Barrel": [
-      "mod_151"
+      "mod_long_barrel"
     ]
   },
   "weapon_assaultron_head_laser": {
     "Concentrate": [
-      "mod_158"
+      "mod_caustic"
     ],
     "Container": [
-      "mod_159",
-      "mod_160"
+      "mod_large_ampoule",
+      "mod_large_vial"
     ]
   },
   "weapon_broadsider": {
     "Barrel": [
-      "mod_166",
-      "mod_167"
+      "mod_long_barrel",
+      "mod_light_barrel"
     ],
     "Canister": [
-      "mod_168"
+      "mod_multi_shot_canister"
     ],
     "Launcher": [
-      "mod_169"
+      "mod_m79_launcher"
     ]
   },
   "weapon_cryolator": {
     "Barrel": [
-      "mod_170"
+      "mod_crystallizing_barrel"
     ],
     "Magazine": [
-      "mod_171"
+      "mod_fusion_mag"
     ],
     "Sight": [
-      "mod_173"
+      "mod_reflex_tactical"
     ],
     "Stock": [
-      "mod_172"
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_harpoon_gun": {
     "Magazine": [
-      "mod_174",
-      "mod_175"
+      "mod_barbed_harpoon",
+      "mod_flechette_darts"
     ],
     "Sight": [
-      "mod_177",
-      "mod_178"
+      "mod_gunner_sight",
+      "mod_short_scope"
     ],
     "Stock": [
-      "mod_176"
+      "mod_recoil_compensating_stock"
     ]
   },
   "weapon_plasma_mine": {
     "Barrel": [
-      "mod_188"
+      "mod_heavy_barrel"
     ]
   },
   "weapon_m79_grenade_launcher": {
     "Barrel": [
-      "mod_189",
-      "mod_190"
+      "mod_heavy_barrel",
+      "mod_long_barrel"
     ],
     "Receiver": [
-      "mod_191"
+      "mod_25mm_receiver"
     ]
   },
   "weapon_acid_soaker": {
     "Concentrate": [
-      "mod_158"
+      "mod_caustic"
     ],
     "Container": [
-      "mod_159",
-      "mod_160"
+      "mod_large_ampoule",
+      "mod_large_vial"
     ]
   }
 }

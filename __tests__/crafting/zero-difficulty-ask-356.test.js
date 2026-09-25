@@ -19,7 +19,7 @@ const seed = (weaponId, quantity = 1) => {
   }));
 };
 
-const RECIPE = () => getCraftingRecipeById('mod_001'); // сложность 3, Фанатик оружия 1
+const RECIPE = () => getCraftingRecipeById('mod_rapid'); // сложность 3, Фанатик оружия 1
 
 const engineRun = (zeroDifficulty, rollD20) => runCraft({
   recipe: RECIPE(),
@@ -109,7 +109,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
     }));
-    const rolled = craftRecipe('mod_001', { rollD20: () => 1 }, { deferTime: true, zeroDifficulty: 'roll' });
+    const rolled = craftRecipe('mod_rapid', { rollD20: () => 1 }, { deferTime: true, zeroDifficulty: 'roll' });
     expect(rolled.done).toBe(true);
     expect(rolled.auto).toBe(false);
     expect(rolled.check).toBeTruthy();
@@ -117,7 +117,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
     // первый крафт потратил материалы — пересеиваем на второй
     seed('item_common_materials', 4);
     seed('item_uncommon_materials', 2);
-    const auto = craftRecipe('mod_001', {}, { deferTime: true });
+    const auto = craftRecipe('mod_rapid', {}, { deferTime: true });
     expect(auto.done).toBe(true);
     expect(auto.auto).toBe(true);
     expect(auto.check).toBeNull();
@@ -128,7 +128,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
     }));
-    const row = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_001');
+    const row = buildCategoryModel('weapons').find((r) => r.recipeId === 'mod_rapid');
     expect(row.zeroDifficulty).toBe(true);
 
     const crafting = readFileSync('modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
