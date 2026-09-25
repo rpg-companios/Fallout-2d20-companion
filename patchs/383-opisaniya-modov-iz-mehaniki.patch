@@ -1,0 +1,313 @@
+diff --git a/__tests__/equipment/mod-descriptions-383.test.js b/__tests__/equipment/mod-descriptions-383.test.js
+new file mode 100644
+index 0000000..273b830
+--- /dev/null
++++ b/__tests__/equipment/mod-descriptions-383.test.js
+@@ -0,0 +1,66 @@
++// ПРИЁМОЧНЫЙ (патч 383): в модалке улучшений видно, ЧТО ДЕЛАЕТ мод
++// (жалоба владельца: «нет описания. Никаких»). Описания в i18n-записях нет
++// (только id+name) — описание ГЕНЕРИРУЕТСЯ из механики мода:
++//   • «Урон +2», «Скорострельность +1», «Тип урона: Энергетический»,
++//     «Эффект: Устойчивый», «Вес +6», «Боеприпас: Патрон .308»;
++//   • у ВСЕХ 164 модов каталога описание непустое (механика есть у всех);
++//   • модалка: строка мода получает сгенерированное описание
++//     (effectDescription), рукописное — сохраняется как раньше.
++import { describe, expect, it } from 'vitest';
++
++import { describeWeaponModChanges, weaponModRowDescription } from '../../domain/weaponDisplay';
++import { readFileSync } from 'node:fs';
++import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
++
++const byId = (id) => catalogData.find((m) => m.id === id);
++const ru = (mod) => describeWeaponModChanges(mod, 'ru-RU');
++const en = (mod) => describeWeaponModChanges(mod, 'en-EN');
++
++describe('патч 383: описание мода генерируется из механики', () => {
++  it('ресивер «Усиленный»: Урон +2 (плюс вес/цена)', () => {
++    expect(ru(byId('mod_powerful'))).toBe('Урон +2 · Вес +1 · Цена +25');
++    expect(en(byId('mod_powerful'))).toBe('Damage +2 · Weight +1 · Cost +25');
++  });
++
++  it('Динамо катушки Теслы: скорострельность, тип урона, вес, цена', () => {
++    expect(ru(byId('mod_tesla_coil_dynamo')))
++      .toBe('Скорострельность +1 · Тип урона: Энергетический · Вес +6 · Цена +136');
++  });
++
++  it('Горящее лезвие: тип урона и эффект; Изогнутая цепь — эффект с рангом', () => {
++    expect(ru(byId('mod_burning_blade')))
++      .toBe('Тип урона: Энергетический · Эффект: Устойчивый · Цена +50');
++    expect(ru(byId('mod_curved_chain'))).toBe('Эффект: Проникающий 1 · Вес +2 · Цена +45');
++  });
++
++  it('калибровочный ресивер: урон «= 7» и смена боеприпаса локализованным именем', () => {
++    expect(ru(byId('mod_308_receiver'))).toBe('Урон: 7 · Вес +4 · Цена +40 · Боеприпас: Патрон .308');
++  });
++
++  it('у ВСЕХ 164 модов каталога описание непустое (ru и en)', () => {
++    for (const mod of catalogData) {
++      expect(ru(mod), mod.id).not.toBe('');
++      expect(en(mod), mod.id).not.toBe('');
++    }
++  });
++
++  it('рукописное описание важнее сгенерированного', () => {
++    expect(weaponModRowDescription({ effectDescription: 'Ручное', damageModifier: { op: '+', value: 2 } })).toBe('Ручное');
++    expect(weaponModRowDescription({ damageModifier: { op: '+', value: 2 } })).toBe('Damage +2'); // локаль тестов — en
++  });
++
++  it('проводка: модалка использует weaponModRowDescription (описание в строке мода)', () => {
++    const src = readFileSync('modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js', 'utf8');
++    expect(src).toContain("weaponModRowDescription(row)");
++  });
++
++  it('висячий id боеприпаса виден как есть (доложено владельцу)', () => {
++    expect(ru(byId('mod_fusion_mag'))).toContain('Боеприпас: ammo_fusion_cell');
++  });
++
++  it('пустые/кривые входы безопасны', () => {
++    expect(describeWeaponModChanges(null)).toBe('');
++    expect(describeWeaponModChanges({})).toBe('');
++    expect(describeWeaponModChanges({ damageModifier: { op: '+', value: '1,5' } }, 'ru-RU')).toBe('Урон +1.5');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1a41766..c1a114c 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,8 +8,21 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **382** (владелец: «какого чёрта нельзя ставить
+-моды на оружие» — модель и не менялась; сломан был поиск предмета.
++· последний сданный патч: **383** (владелец: «в модалке у модов нет
++описания. Никаких» — в i18n-записях модов только id+name, слот
++effectDescription в модалке пустой. 383: описания ГЕНЕРИРУЮТСЯ из
++механики мода — describeWeaponModChanges/weaponModRowDescription в
++domain/weaponDisplay.js (урон/скрострельность/дальность/тип урона/
++эффекты/качества/вес/цена/расход/боеприпас; словари качеств, эффектов,
++типов урона и боеприпасов уже были в weaponDisplay; у ВСЕХ 164 модов
++описание непустое — проверено тестом). Модалка: normalizeModRow несёт
++effectDescription=weaponModRowDescription(row) + passthrough
++ammoOverride/ammoPerShotDelta. НАЙДЕН ВИСЯЧИЙ id: mod_fusion_mag →
++ammo_fusion_cell, боеприпаса с таким id НЕТ (есть ammo_energy_cell /
++ammo_fusion_core) — показывается как есть, ВЛАДЕЛЬЦУ ВОПРОС: чем
++заменить. RN-модули в vitest не парсятся (Flow) — проводку модалки
++проверять по исходнику, хелперы держать в domain · предыдущий блок
++382 (владелец: «какого чёрта нельзя ставить моды на оружие» — модель и не менялась; сломан был поиск предмета.
+ 382 = доказательство на РЕАЛЬНОМ сторе (mod-install-real-store-382.test.js:
+ точная цепочка кнопки, броня первой — мод в СВОЙ предмет, урон 4→6,
+ броня чиста, замена возвращает мод в сумку) + ВИДИМОСТЬ мода на карточке:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index bcc38c0..01cf7ed 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -14,6 +14,17 @@
+ ---
+ ---
+ ---
++---
++## The mod window now says what each mod does (patch 383)
++
++The weapon mod window used to show names only. Now every mod carries a
++description generated from its mechanics: "Урон +2 · Вес +1 · Цена +25"
++(Damage +2 · Weight +1 · Cost +25), "Скорострельность +1 · Тип урона:
++Энергетический" (Fire rate +1 · Damage type: Energy), "Эффект:
++Проникающий 1" (Effect: Piercing 1), "Боеприпас: Патрон .308" (Ammo:
++.308 Round), etc. Shown both in the mod list and in the preview.
++Covered by a test: all 164 mods produce a description.
++
+ ## The installed mod is now visible on the weapon card (patch 382)
+ 
+ A modded weapon now carries the mod's name — e.g. "Усиленный 10-мм
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index f8fe6bd..d505d3a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,15 @@
+ # История изменений
+ 
+ ---
++## В окне улучшений теперь написано, что делает каждое улучшение (патч 383)
++
++Раньше в окне улучшений оружия были только названия. Теперь у каждого
++улучшения — описание из его механики: «Урон +2 · Вес +1 · Цена +25»,
++«Скорострельность +1 · Тип урона: Энергетический», «Эффект:
++Проникающий 1», «Боеприпас: Патрон .308» и т.д. Описание показывается
++и в списке улучшений, и в предпросмотре. Проверено автотестом: у всех
++164 улучшений описание есть.
++
+ ## Установленный мод видно на карточке оружия (патч 382)
+ 
+ Улучшенное оружие теперь носит имя улучшения: например, «Усиленный
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index d3470a5..98f7f08 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -186,3 +186,129 @@ export const getWeaponDisplayPriority = (weapon) => {
+ 
+ export const sortWeaponsForDisplay = (weapons = []) =>
+   [...weapons].sort((a, b) => getWeaponDisplayPriority(a) - getWeaponDisplayPriority(b));
++
++// ---------------------------------------------------------------------------
++// Патч 383: описание улучшения ДЛЯ ЧЕЛОВЕКА — генерируется из механики мода
++// (damageModifier, fireRateModifier, rangeModifier, effectChanges,
++// qualityChanges, damageTypeOverride, ammoOverride, ammoPerShotDelta, вес,
++// цена). В i18n-записях модов описаний нет (только id+name) — «как понять,
++// что делает мод?» решается генерацией из данных, а не рукописными строками.
++// Словари качеств/эффектов/типов урона — те же, что для карточек (выше).
++// ---------------------------------------------------------------------------
++
++import ruAmmoTypes from '../modules/fallout/i18n/ru-RU/data/equipment/ammo/ammo_types.json';
++import enAmmoTypes from '../modules/fallout/i18n/en-EN/data/equipment/ammo/ammo_types.json';
++
++const AMMO_DICTS = {
++  'ru-RU': Object.fromEntries(ruAmmoTypes.map((a) => [a.id, a.name])),
++  'en-EN': Object.fromEntries(enAmmoTypes.map((a) => [a.id, a.name])),
++};
++
++const MOD_STAT_LABELS = {
++  'ru-RU': {
++    damage: 'Урон', fireRate: 'Скорострельность', range: 'Дальность',
++    damageType: 'Тип урона', effect: 'Эффект', quality: 'Качество',
++    weight: 'Вес', cost: 'Цена', ammoPerShot: 'Расход боеприпасов',
++    ammo: 'Боеприпас', loses: 'Теряет',
++  },
++  'en-EN': {
++    damage: 'Damage', fireRate: 'Fire rate', range: 'Range',
++    damageType: 'Damage type', effect: 'Effect', quality: 'Quality',
++    weight: 'Weight', cost: 'Cost', ammoPerShot: 'Ammo per shot',
++    ammo: 'Ammo', loses: 'Loses',
++  },
++};
++
++const rangeStepsLabel = (locale, n) => {
++  const abs = Math.abs(n);
++  if (locale === 'ru-RU') {
++    const word = abs % 10 === 1 && abs % 100 !== 11 ? 'шаг'
++      : [2, 3, 4].includes(abs % 10) && ![12, 13, 14].includes(abs % 100) ? 'шага' : 'шагов';
++    return `${word}`;
++  }
++  return abs === 1 ? 'step' : 'steps';
++};
++
++const fmtModValue = (n) => {
++  const rounded = Math.round(n * 100) / 100;
++  return rounded > 0 ? `+${rounded}` : `${rounded}`;
++};
++
++/**
++ * Человеческое описание изменений мода: «Урон +2 · Вес +6». Чистая функция
++ * (кроме словарей-констант): каталог не нужен, локаль — аргументом.
++ *
++ * @param {object} mod — запись мода (каталог/БД/нормализованная строка модалки)
++ * @param {string} [locale] — по умолчанию текущая локаль сеттинга
++ * @returns {string} '' — если у мода нет ни одного механического поля
++ */
++export function describeWeaponModChanges(mod, locale = getCurrentModuleLocale()) {
++  if (!mod || typeof mod !== 'object') return '';
++  const L = MOD_STAT_LABELS[locale] || MOD_STAT_LABELS['en-EN'];
++  const num = (v) => {
++    const n = Number(String(v ?? 0).replace(',', '.'));
++    return Number.isFinite(n) ? n : 0;
++  };
++  const parts = [];
++
++  const numMod = (label, modifier) => {
++    if (!modifier) return;
++    const value = num(modifier.value);
++    parts.push(modifier.op === 'set' ? `${label}: ${value}` : `${label} ${fmtModValue(value)}`);
++  };
++  numMod(L.damage, mod.damageModifier);
++  numMod(L.fireRate, mod.fireRateModifier);
++  if (mod.rangeModifier) {
++    const steps = num(mod.rangeModifier.value);
++    if (steps) {
++      const sign = mod.rangeModifier.op === '-' ? -steps : steps;
++      parts.push(`${L.range} ${fmtModValue(sign)} ${rangeStepsLabel(locale, sign)}`);
++    }
++  }
++
++  const typeLabels = DAMAGE_TYPE_LABELS[locale] || {};
++  const typeLabel = (t) => typeLabels[t] || t;
++  if (mod.damageTypeOverride) {
++    const values = Array.isArray(mod.damageTypeOverride.value)
++      ? mod.damageTypeOverride.value
++      : [mod.damageTypeOverride.value];
++    const names = values.map(typeLabel).filter(Boolean).join(', ');
++    parts.push(mod.damageTypeOverride.op === 'add' ? `${L.damageType}: + ${names}` : `${L.damageType}: ${names}`);
++  } else if (mod.damageType) {
++    parts.push(`${L.damageType}: ${typeLabel(mod.damageType)}`);
++  }
++
++  const effectMap = Object.fromEntries((EFFECT_DICTS[locale] || []).map((e) => [e.id, e.name]));
++  (mod.effectChanges || []).forEach((change) => {
++    if (!change?.id) return;
++    const name = effectMap[change.id] || change.id;
++    const level = change.value != null ? ` ${change.value}` : '';
++    if (change.op === 'lose') parts.push(`${L.loses}: ${name}`);
++    else parts.push(`${L.effect}: ${name}${level}`);
++  });
++  const qualityMap = Object.fromEntries((QUALITY_DICTS[locale] || []).map((q) => [q.id, q.name]));
++  (mod.qualityChanges || []).forEach((change) => {
++    const id = change?.id ?? change?.qualityId;
++    if (!id) return;
++    const name = qualityMap[id] || id;
++    const level = change.value != null ? ` ${change.value}` : '';
++    if (change.op === 'lose') parts.push(`${L.loses} ${L.quality.toLowerCase()}: ${name}`);
++    else parts.push(`${L.quality}: ${name}${level}`);
++  });
++
++  if (mod.weight != null && num(mod.weight)) parts.push(`${L.weight} ${fmtModValue(num(mod.weight))}`);
++  if (mod.cost != null && num(mod.cost)) parts.push(`${L.cost} ${fmtModValue(num(mod.cost))}`);
++  if (mod.ammoPerShotDelta != null && num(mod.ammoPerShotDelta)) {
++    parts.push(`${L.ammoPerShot} ${fmtModValue(num(mod.ammoPerShotDelta))}`);
++  }
++  if (mod.ammoOverride) {
++    const name = AMMO_DICTS[locale]?.[mod.ammoOverride] || mod.ammoOverride;
++    parts.push(`${L.ammo}: ${name}`);
++  }
++
++  return parts.join(' · ');
++}
++
++/** Строка описания мода для модалки: рукописное — важнее, иначе генерация. */
++export const weaponModRowDescription = (row) =>
++  row?.effectDescription || row?.effects || describeWeaponModChanges(row);
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+index 9f23df1..4c45ac7 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/modal/WeaponModificationModal.js
+@@ -10,7 +10,7 @@ import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModByI
+ import { shiftRange } from '../../../../../domain/range';
+ import { applyQualityGain } from '../../../../../domain/weaponQualityConflicts';
+ import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
+-import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
++import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../../../domain/weaponDisplay';
+ import styles from '../../../styles/WeaponModificationModal.styles';
+ import { debugLog } from '../../../../../src/debug/falloutDebug';
+ import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
+@@ -44,7 +44,11 @@ function normalizeModRow(row) {
+     weight: row.weight ?? 0,
+     cost: row.cost ?? 0,
+     // Localized description for UI (i18n effectDescription, locale-driven).
+-    effectDescription: row.effectDescription || row.effects || '',
++    // 383: описания в i18n-записях модов нет — генерируем из механики мода
++    // («что делает мод?» отвечают данные: урон/скорострельность/эффекты/…).
++    ammoOverride: row.ammoOverride,
++    ammoPerShotDelta: row.ammoPerShotDelta,
++    effectDescription: weaponModRowDescription(row),
+     damageModifier: row.damageModifier,
+     fireRateModifier: row.fireRateModifier,
+     rangeModifier: row.rangeModifier,
+diff --git a/public/version.json b/public/version.json
+index 8e8839f..b01d143 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "382",
++  "version": "383",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
