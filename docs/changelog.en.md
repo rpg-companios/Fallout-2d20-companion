@@ -1,6 +1,17 @@
 # Changelog
 
 ---
+## Weapon mod revision plan (patch 368)
+
+Decision: the "why do some mods have no Create button" questions are
+closed by a catalog revision — the data contains phantom rows (the same
+improvement recorded several times, not all copies have a recipe):
+31 improvements are duplicated across 95 rows, 53 rows lack recipes.
+Recorded the plan (human-readable ids, merging phantoms, craft columns
+from the book tables, lossless save migration) and the full duplicate
+list. Work starts after it is confirmed that mods install and work
+(patch 367).
+
 ## Mods on equipped weapons are actually saved now (patch 367)
 
 Report: an automatic receiver was applied to the 10mm pistol, but the
