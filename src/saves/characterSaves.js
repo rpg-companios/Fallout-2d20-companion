@@ -47,7 +47,7 @@ import {
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
 import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
-import { migrateWeaponModIdsToCanonical } from '../../domain/weaponModCanonical';
+import { migrateWeaponModIdsToCanonical, repairMisroutedWeaponMods as migrateRepairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
 import { resolveBodyPlan } from '../../domain/bodyplan';
 import { resolveKitItems } from '../../domain/kitResolver';
 import { inspectSelectedPerkRecords } from '../../domain/perks';
@@ -166,6 +166,12 @@ const deserializeState = (data) => {
   // старые «жирные» и новые «худые» сейвы давали одинаковый рендер.
   // Каталог строим один раз на загрузку, а не на каждый предмет.
   const catalog = catalogForCurrentLocale();
+  // Ремонт сейвов после бага 380 (патч 381): appliedMods, записанные на
+  // не-оружие, снимаются; мод-предметы с осиротевшими флагами возвращаются
+  // в сумку. Идемпотентно, робо-привязки не тронуты.
+  if (catalog?.weaponMods?.length) {
+    migrateRepairMisroutedWeaponMods(migrated, new Set(catalog.weaponMods.map((m) => m.id)));
+  }
   const restored = catalog
     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
     : migrated;

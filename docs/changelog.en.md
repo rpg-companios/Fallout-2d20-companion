@@ -12,6 +12,18 @@
 ---
 ---
 ---
+---
+## Old saves repair themselves (patch 381)
+
+Because of the previous update's bug, some weapon mods may have been
+recorded onto armor instead of the weapon. Nothing is lost forever:
+on save load the game now strips the stray technical field from armor
+(it never affected armor stats) and returns the "hidden" mods to the
+bag. After updating, open your character and re-apply the mods to the
+weapon — they will now stick and the card shows the new damage at
+once. Mods that were installed correctly before are untouched; robot
+mods are untouched.
+
 ## Fixed: weapon mods now stick to the weapon (patch 380)
 
 When armor was also equipped, applying a weapon mod wrote it to the

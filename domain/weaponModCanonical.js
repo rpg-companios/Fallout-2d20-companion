@@ -265,3 +265,75 @@ export function migrateWeaponModIdsToCanonical(state) {
   walk(state);
   return state;
 }
+
+/**
+ * Ремонт сейвов, пострадавших от бага 380 (жалоба владельца: «моды не
+ * ставятся в карточку оружия»). До фикса экран искал предмет-носитель по
+ * uniqueId/id, а локализованная карточка несёт ключ в instanceId; фолбэк
+ * «первый надетый предмет» отдавал броню — мод писался не в оружие:
+ *   1) на предмете-НЕоружии появлялся посторонний appliedMods (для брони
+ *      поле инертно — статы брони НЕ страдали);
+ *   2) мод-предмет флагался equipped+installedOn на эту броню и пропадал
+ *      из сумки, а оружие оставалось без мода.
+ * Мост (при загрузке, без подъёма версии схемы, идемпотентно):
+ *   1) appliedMods снимается с предметов, которые не оружие и не мод
+ *      (оружие = есть weaponId вне каталога модов; мод = weaponId из
+ *      каталога оружейных модов);
+ *   2) флаг мод-предмета осиротён (носитель исчез, не оружие, или его
+ *      appliedMods не ссылается на мод) → штатное «uninstall»
+ *      (equipped:false, installedOn удалён) — мод снова виден в сумке
+ *      и ставится заново уже исправленным экраном. Робо-привязки
+ *      (installedOn с префиксом «robotSlot:») не трогаем — их носитель
+ *      синтетический. Моды, попавшие до бага на ДРУГОЕ оружие, не
+ *      отличимы от намеренных — не трогаем.
+ *
+ * @param {object} state — загруженное состояние персонажа
+ * @param {Set<string>} weaponModIds — id оружейных модов каталога
+ * @returns {object} то же состояние (items заменяется при ремонте)
+ */
+export function repairMisroutedWeaponMods(state, weaponModIds) {
+  if (!state || typeof state !== 'object') return state;
+  const items = state.items;
+  if (!items || typeof items !== 'object') return state;
+
+  const isKnownMod = (id) => Boolean(id && weaponModIds && weaponModIds.has(id));
+  const isWeaponItem = (item) => Boolean(item.weaponId) && !isKnownMod(item.weaponId);
+  const isModItem = (item) => isKnownMod(item.weaponId);
+
+  let changed = false;
+  const next = {};
+  for (const [key, raw] of Object.entries(items)) {
+    let item = raw;
+    if (item && typeof item === 'object') {
+      // 1) посторонний appliedMods на не-оружии/не-моде (броня, одежда…)
+      if (
+        item.appliedMods && typeof item.appliedMods === 'object'
+        && !isWeaponItem(item) && !isModItem(item)
+        && Object.keys(item.appliedMods).length > 0
+      ) {
+        item = { ...item };
+        delete item.appliedMods;
+        changed = true;
+      }
+      // 2) осиротевший флаг мод-предмета → возврат мода в сумку
+      if (
+        isModItem(item) && item.equipped && item.installedOn
+        && !String(item.installedOn).startsWith('robotSlot:')
+      ) {
+        const host = items[item.installedOn];
+        const hostIsWeapon = Boolean(host && isWeaponItem(host));
+        const hostReferences = hostIsWeapon
+          && host.appliedMods && typeof host.appliedMods === 'object'
+          && Object.values(host.appliedMods).includes(item.weaponId);
+        if (!hostIsWeapon || !hostReferences) {
+          item = { ...item, equipped: false };
+          delete item.installedOn;
+          changed = true;
+        }
+      }
+    }
+    next[key] = item;
+  }
+  if (changed) state.items = next;
+  return state;
+}
