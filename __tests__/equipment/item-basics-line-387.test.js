@@ -19,12 +19,18 @@ const junk = () => catalog.junk.find((j) => j.cost > 0);
 const drink = () => catalog.drinks.find((d) => d.positiveEffectLabel);
 
 describe('патч 387: базовые характеристики предмета одной строкой', () => {
-  it('оружие: Урон · Скорострельность · Дальность · Вес · Цена', () => {
+  it('оружие: Урон · Скорострельность · Дальность · Боеприпас · Эффекты · Качества · Вес · Цена', () => {
     expect(describeItemBasics(weapon('weapon_44_pistol'), 'ru-RU'))
-      .toBe('Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99');
+      .toBe('Урон 6 · Скорострельность 1 · Дальность: Близкая · Боеприпас: Патрон .44 Магнум · Эффекты: Порочный · Качества: Вплотную · Вес 4 · Цена 99');
+    // ammoId списком: «Энергоячейка / Ядерный блок»
+    expect(describeItemBasics(weapon('weapon_gatling_laser'), 'ru-RU'))
+      .toBe('Урон 3 · Скорострельность 6 · Дальность: Средняя · Боеприпас: Энергоячейка / Ядерный блок · Эффекты: Очередь, Проникающий · Качества: Двуручное, Гатлинг, Неточное · Вес 19 · Цена 804');
     const en10 = catalogEn.weapons.find((w) => w.id === 'weapon_10mm_pistol');
     expect(describeItemBasics(en10, 'en-EN'))
-      .toBe('Damage 4 · Fire rate 2 · Range: Close · Weight 4 · Cost 50');
+      .toBe('Damage 4 · Fire rate 2 · Range: Close · Ammo: 10mm Round · Qualities: Close Quarters, Reliable · Weight 4 · Cost 50');
+    // без патронов/качеств — этих кусков просто нет
+    const gauntlet = describeItemBasics(weapon('weapon_deathclaw_gauntlet'), 'ru-RU');
+    expect(gauntlet).toBe('Урон 5 · Эффекты: Проникающий · Вес 10 · Цена 75');
   });
 
   it('броня: СУ по трём типам (ноль СУ показываем), вес, цена', () => {

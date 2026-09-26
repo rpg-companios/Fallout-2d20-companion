@@ -16,6 +16,14 @@
 ---
 ---
 ---
+## Weapon lines in the picker now include ammo, effects, qualities (patch 388)
+
+The item stats line for weapons now lists the ammo type after range
+(two calibers → "Энергоячейка / Ядерный блок"), then effects and
+qualities — the same localized names as on the weapon card. Weapons
+without ammo or qualities simply omit those parts.
+
+---
 ## Item stats shown inline in the picker (patch 387)
 
 In the add-item modal (loot, starting purchase) each item now shows its

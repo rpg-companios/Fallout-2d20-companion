@@ -11,17 +11,20 @@
 // логика живёт здесь, а модалка только вызывает.
 
 import { getCurrentModuleLocale } from '../i18n/locale';
+import { resolveAmmoName, weaponEffectsLabel, weaponQualitiesLabel } from './weaponDisplay';
 
 const LABELS = {
   'ru-RU': {
     damage: 'Урон', fireRate: 'Скорострельность', range: 'Дальность',
     physical: 'Физ', energy: 'Энерг', radiation: 'Рад',
     weight: 'Вес', cost: 'Цена',
+    ammo: 'Боеприпас', effects: 'Эффекты', qualities: 'Качества',
   },
   'en-EN': {
     damage: 'Damage', fireRate: 'Fire rate', range: 'Range',
     physical: 'Phys', energy: 'Energy', radiation: 'Rad',
     weight: 'Weight', cost: 'Cost',
+    ammo: 'Ammo', effects: 'Effects', qualities: 'Qualities',
   },
 };
 
@@ -62,6 +65,22 @@ export function describeItemBasics(item, locale = getCurrentModuleLocale()) {
   if (item.rangeName || item.range_name) {
     parts.push(`${L.range}: ${item.rangeName || item.range_name}`);
   }
+
+  // 387 (слово владельца): у оружия ещё тип патронов, эффекты и качества.
+  // ammoId бывает списком через запятую («ammo_energy_cell,ammo_fusion_core»);
+  // ammo_anything («что угодно») в строку не пишем.
+  if (item.ammoId) {
+    const names = String(item.ammoId)
+      .split(',')
+      .map((id) => id.trim())
+      .filter((id) => id && id !== 'ammo_anything')
+      .map((id) => resolveAmmoName(id, locale));
+    if (names.length) parts.push(`${L.ammo}: ${names.join(' / ')}`);
+  }
+  const effectsLine = weaponEffectsLabel(item.effects, locale);
+  if (effectsLine) parts.push(`${L.effects}: ${effectsLine}`);
+  const qualitiesLine = weaponQualitiesLabel(item.qualities, locale);
+  if (qualitiesLine) parts.push(`${L.qualities}: ${qualitiesLine}`);
 
   // Броня/обшивка/силовая броня: СУ по трём типам (ноль у СУ показываем —
   // «нет защиты от радиации» это характеристика, а не пустота). У оружия в
