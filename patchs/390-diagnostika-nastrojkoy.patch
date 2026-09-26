@@ -1,0 +1,232 @@
+diff --git a/__tests__/screens/pwa-diagnostics-setting-390.test.js b/__tests__/screens/pwa-diagnostics-setting-390.test.js
+new file mode 100644
+index 0000000..983a81d
+--- /dev/null
++++ b/__tests__/screens/pwa-diagnostics-setting-390.test.js
+@@ -0,0 +1,52 @@
++// ПРИЁМОЧНЫЙ (патч 390): «диагностику можешь сделать отдельной настройкой?
++// Чтобы не все видели про версию и пр., а только кто её включил» (владелец).
++// Блок диагностики из 389 скрыт настройкой pwaInstallDiagnostics
++// (движок, раздел «Внешний вид», по умолчанию ВЫКЛ); включившие видят
++// в окне установки проверку из 389.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import {
++  ENGINE_SETTINGS,
++  getSettingsForSurface,
++  SETTING_CONTROL_SURFACES,
++} from '../../domain/settingsCatalog';
++import ru from '../../i18n/ru-RU/screens/home/screen.json';
++import en from '../../i18n/en-EN/screens/home/screen.json';
++
++const src = () => readFileSync('components/screens/HomeScreen/HomeScreen.js', 'utf8');
++
++describe('патч 390: диагностика установки — отдельная настройка', () => {
++  it('настройка pwaInstallDiagnostics: движок, «Внешний вид», по умолчанию ВЫКЛ', () => {
++    const setting = ENGINE_SETTINGS.find((item) => item.id === 'pwaInstallDiagnostics');
++    expect(setting).toBeTruthy();
++    expect(setting.type).toBe('boolean');
++    expect(setting.defaultValue).toBe(false);
++    expect(setting.controlSurface).toBe(SETTING_CONTROL_SURFACES.SETTINGS);
++    expect(setting.sectionKey).toBe('appearance');
++    expect(setting.labelKey).toBe('settings.pwaDiagnosticsTitle');
++    expect(setting.descriptionKey).toBe('settings.pwaDiagnosticsDescription');
++    expect(getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS))
++      .toContainEqual(expect.objectContaining({ id: 'pwaInstallDiagnostics' }));
++  });
++
++  it('селектор стора заведён', () => {
++    const storeSrc = readFileSync('src/store/appSettingsStore.js', 'utf8');
++    expect(storeSrc).toContain("export const selectPwaInstallDiagnosticsEnabled");
++  });
++
++  it('блок диагностики гейтится настройкой, окна инструкции на месте', () => {
++    const code = src();
++    expect(code).toContain('selectPwaInstallDiagnosticsEnabled');
++    expect(code).toContain("!diagnosticsEnabled || !results");
++    expect(code).toContain('[diagnosticsEnabled]);');
++    expect((code.match(/PwaInstallDiagnostics installPrompt=/g) || []).length).toBe(3);
++  });
++
++  it('строки настройки есть в ru и en', () => {
++    expect(ru.settings.pwaDiagnosticsTitle).toContain('Диагностика');
++    expect(ru.settings.pwaDiagnosticsDescription).toContain('Включайте');
++    expect(en.settings.pwaDiagnosticsTitle).toBe('Install diagnostics');
++    expect(en.settings.pwaDiagnosticsDescription).toContain('troubleshooting');
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index ceec30b..2fba3f3 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -53,6 +53,7 @@ import useSettingPackStore, {
+ import useAppSettingsStore, {
+   selectCharacterDeleteActionPlacement,
+   selectCharacterFoldersEnabled,
++  selectPwaInstallDiagnosticsEnabled,
+ } from '../../../src/store/appSettingsStore';
+ 
+ const getOriginImage = (originName) => {
+@@ -214,10 +215,14 @@ const INSTALL_DIAG_LINES = [
+ ];
+ 
+ const PwaInstallDiagnostics = ({ installPrompt }) => {
++  // 390: блок показывается только с включённой настройкой
++  // «Диагностика установки» (по умолчанию выключена).
++  const diagnosticsEnabled = useAppSettingsStore(selectPwaInstallDiagnosticsEnabled);
+   const [results, setResults] = useState(null);
+   const versionRef = useRef('');
+ 
+   useEffect(() => {
++    if (!diagnosticsEnabled) return undefined;
+     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+     let cancelled = false;
+     const run = async () => {
+@@ -258,9 +263,9 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
+     };
+     run();
+     return () => { cancelled = true; };
+-  }, []);
++  }, [diagnosticsEnabled]);
+ 
+-  if (Platform.OS !== 'web' || !results) return null;
++  if (Platform.OS !== 'web' || !diagnosticsEnabled || !results) return null;
+   return (
+     <View style={styles.diagBlock}>
+       <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 9dd07da..ac68b45 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,15 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **389** (владелец: «всё ещё не могу установить
++· последний сданный патч: **390** (владелец: «диагностику можешь сделать
++отдельной настройкой? чтобы не все видели про версию и пр., а только кто
++её включил»). Блок диагностики 389 скрыт движковой настройкой
++pwaInstallDiagnostics (каталог settingsCatalog, раздел «Внешний вид»,
++по умолчанию ВЫКЛ; селектор selectPwaInstallDiagnosticsEnabled;
++строки settings.pwaDiagnosticsTitle/Description ru+en). Включил —
++в окнах установки снова видна проверка 389; выключена — окна как в 388.
++Компонент сам не ходит в сеть, пока настройка выключена · предыдущий:
++**389** (владелец: «всё ещё не могу установить
+ PWA — сообщение про ярлык, но само PWA не ставится». Проверка хостов
+ вживую: replit = 388 (манифест правильный), na4u = старый экспорт
+ (манифест без 192-иконки, version.json нет) — na4u владелец считает
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 44a5106..df4fe5a 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,15 @@
+ ---
+ ---
+ ---
++---
++## Install diagnostics behind a switch (patch 390)
++
++The technical check inside the install dialog is no longer shown to
++everyone: Settings (the "Appearance" section) now has an "Install
++diagnostics" toggle. It is off by default and the dialogs look as
++before; when enabled, the install dialog shows the check: whether the
++app is already installed, manifest, icons, service worker, build version.
++
+ ---
+ ## The install window now diagnoses itself (patch 389)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 246207e..f621f17 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## Диагностика установки — по переключателю (патч 390)
++
++Техническая проверка из окна установки больше не видна всем: в
++Настройках (раздел «Внешний вид») появился выключатель «Диагностика
++установки». По умолчанию он выключен и окна выглядят как раньше;
++включивший — видит в окне установки проверку: установлено ли
++приложение, манифест, иконки, сервис-воркер, версию сборки.
++
+ ---
+ ## Окно установки теперь само ищет причину (патч 389)
+ 
+diff --git a/domain/settingsCatalog.js b/domain/settingsCatalog.js
+index 42ec9cd..2e96017 100644
+--- a/domain/settingsCatalog.js
++++ b/domain/settingsCatalog.js
+@@ -57,6 +57,17 @@ export const ENGINE_SETTINGS = [
+     descriptionKey: 'settings.bootScreenDescription',
+     defaultValue: false,
+   },
++  {
++    // 390: техническая диагностика установки PWA — по умолчанию скрыта,
++    // включается в настройках тем, кто разбирает установку (владелец).
++    id: 'pwaInstallDiagnostics',
++    type: 'boolean',
++    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
++    sectionKey: 'appearance',
++    labelKey: 'settings.pwaDiagnosticsTitle',
++    descriptionKey: 'settings.pwaDiagnosticsDescription',
++    defaultValue: false,
++  },
+   {
+     id: 'language',
+     type: 'select',
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 881a1ea..513a76d 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -127,7 +127,9 @@
+       "cards": "Cards",
+       "spoilers": "Spoilers",
+       "tabs": "Tabs"
+-    }
++    },
++    "pwaDiagnosticsTitle": "Install diagnostics",
++    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation."
+   },
+   "folders": {
+     "create": "Create folder",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 4b3d1c3..4ea692c 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -127,7 +127,9 @@
+       "cards": "Карточки",
+       "spoilers": "Спойлеры",
+       "tabs": "Табы"
+-    }
++    },
++    "pwaDiagnosticsTitle": "Диагностика установки",
++    "pwaDiagnosticsDescription": "Показывать в окне «Установить приложение» техническую проверку: установлено ли приложение, работает ли сервис-воркер, доступны ли манифест и иконки, версия сборки. Включайте при проблемах с установкой."
+   },
+   "folders": {
+     "create": "Создать каталог",
+diff --git a/public/version.json b/public/version.json
+index 7a721b3..456f540 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "389",
++  "version": "390",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 26e4dda..51c5518 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -229,6 +229,7 @@ export default useAppSettingsStore;
+ export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
+ export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
+ export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScreenEnabled');
++export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
+ export const selectSettingsHydrated = (state) => state.settingsHydrated;
+ export const selectLanguage = (state) => state.getSettingValue('language');
+ export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
