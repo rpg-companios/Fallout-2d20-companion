@@ -51,8 +51,10 @@ const DAMAGE_TYPE_LABELS = {
  * @param {any} qualities
  * @returns {string}
  */
-export function resolveWeaponQualities(qualities) {
-  const locale = getCurrentModuleLocale();
+// 387: локале-явная форма для переиспользования (строка базовых
+// характеристик предмета — domain/itemBasics.js); resolveWeaponQualities
+// ниже — обёртка над ней с текущей локалью (поведение прежнее).
+export function weaponQualitiesLabel(qualities, locale = getCurrentModuleLocale()) {
   const dict = QUALITY_DICTS[locale];
   if (!dict) {
     throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря качеств`);
@@ -89,8 +91,7 @@ export function resolveWeaponQualities(qualities) {
  символа эффекта). В отличие от качеств, эффекты — отдельная сущность.
  Принимает массив {effectId, value?} (или JSON-строку из БД).
  */
-export function resolveWeaponEffects(effects) {
-  const locale = getCurrentModuleLocale();
+export function weaponEffectsLabel(effects, locale = getCurrentModuleLocale()) {
   const dict = EFFECT_DICTS[locale];
   if (!dict) {
     throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря эффектов урона`);
@@ -117,6 +118,20 @@ export function resolveWeaponEffects(effects) {
     })
     .filter(Boolean)
     .join(', ');
+}
+
+export function resolveWeaponEffects(effects) {
+  return weaponEffectsLabel(effects, getCurrentModuleLocale());
+}
+
+export function resolveWeaponQualities(qualities) {
+  return weaponQualitiesLabel(qualities, getCurrentModuleLocale());
+}
+
+/** Локализованное имя боеприпаса; неизвестный id — как есть. */
+export function resolveAmmoName(ammoId, locale = getCurrentModuleLocale()) {
+  if (!ammoId) return '';
+  return AMMO_DICTS[locale]?.[ammoId] || ammoId;
 }
 
 /**
