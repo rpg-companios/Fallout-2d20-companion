@@ -1,0 +1,327 @@
+diff --git a/__tests__/screens/pwa-install-diagnostics-389.test.js b/__tests__/screens/pwa-install-diagnostics-389.test.js
+new file mode 100644
+index 0000000..82b0ac4
+--- /dev/null
++++ b/__tests__/screens/pwa-install-diagnostics-389.test.js
+@@ -0,0 +1,45 @@
++// ПРИЁМОЧНЫЙ (патч 389): «всё ещё не могу установить PWA — сообщение про
++// ярлык, но само PWA не ставится» (владелец; сборка 388 на replit).
++// Манифест/воркер в порядке → самая частая причина «диалога нет» — Chrome
++// считает приложение уже установленным (жив старый ярлык). Патч:
++//   • manifest.json: related_applications [{platform web_app, id '/'}] —
++//     открывает navigator.getInstalledRelatedApps();
++//   • окна инструкции (iOS/Android/десктоп) показывают ЖИВУЮ диагностику:
++//     установлено? воркер? манифест? иконки? нативный диалог доступен?
++//     версия приложения;
++//   • ключи pwa.diag* в обоих словарях (правило: без фолбэков).
++import { describe, expect, it } from 'vitest';
++
++import manifest from '../../public/manifest.json';
++import ru from '../../i18n/ru-RU/screens/home/screen.json';
++import en from '../../i18n/en-EN/screens/home/screen.json';
++import { readFileSync } from 'node:fs';
++
++const src = () => readFileSync('components/screens/HomeScreen/HomeScreen.js', 'utf8');
++
++describe('патч 389: диагностика установки PWA', () => {
++  it('манифест объявляет related_applications (web_app, id "/")', () => {
++    expect(manifest.prefer_related_applications).toBe(false);
++    expect(manifest.related_applications).toContainEqual({ platform: 'web_app', id: '/' });
++  });
++
++  it('в окнах инструкции трижды рендерится диагностика, читается installed-state', () => {
++    const code = src();
++    expect((code.match(/PwaInstallDiagnostics installPrompt=/g) || []).length).toBe(3);
++    expect(code).toContain('getInstalledRelatedApps');
++    expect(code).toContain('diagIconsNo');
++  });
++
++  it('ключи диагностики есть в ru и en (без фолбэков)', () => {
++    for (const dict of [ru, en]) {
++      expect(dict.pwa.diagnosticsTitle).toBeTruthy();
++      expect(dict.pwa.diagSwNo).toBeTruthy();
++      expect(dict.pwa.diagManifestNo).toBeTruthy();
++      expect(dict.pwa.diagIconsNo).toBeTruthy();
++      expect(dict.pwa.diagPromptAvailable).toBeTruthy();
++      expect(dict.pwa.diagVersion).toBeTruthy();
++    }
++    expect(ru.pwa.diagInstalledYes).toContain('УЖЕ установлен');
++    expect(en.pwa.diagInstalledYes).toContain('ALREADY installed');
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 04468f8..ceec30b 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -200,6 +200,87 @@ const CharacterCell = ({
+ 
+ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
+ 
++
++// 389: живая диагностика установки PWA — показывается в окнах инструкции
++// (iOS/Android/десктоп). Только web. Главный вопрос «почему не ставится»:
++// Chrome молча не показывает диалог, если считает приложение установленным;
++// манифест/иконки/воркер проверяются живьём; «уже установлено» — через
++// getInstalledRelatedApps (related_applications добавлены в manifest.json).
++const INSTALL_DIAG_LINES = [
++  ['installed', 'pwa.diagInstalledYes', 'pwa.diagInstalledNo'],
++  ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
++  ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
++  ['icons', 'pwa.diagIconsYes', 'pwa.diagIconsNo'],
++];
++
++const PwaInstallDiagnostics = ({ installPrompt }) => {
++  const [results, setResults] = useState(null);
++  const versionRef = useRef('');
++
++  useEffect(() => {
++    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
++    let cancelled = false;
++    const run = async () => {
++      const found = {};
++      try {
++        const related = await navigator.getInstalledRelatedApps?.() || [];
++        found.installed = related.length > 0;
++      } catch (_) { found.installed = false; }
++      try {
++        const reg = await navigator.serviceWorker?.getRegistration?.();
++        found.sw = Boolean(reg?.active || reg?.waiting || reg?.installing);
++      } catch (_) { found.sw = false; }
++      found.manifest = false;
++      found.icons = false;
++      try {
++        const res = await fetch('/manifest.json', { cache: 'no-store' });
++        if (res.ok) {
++          found.manifest = true;
++          const manifest = await res.json();
++          const icons = (manifest.icons || []).filter((icon) => icon?.src).slice(0, 2);
++          const loaded = await Promise.all(icons.map((icon) => new Promise((resolve) => {
++            const img = new Image();
++            img.onload = () => resolve(true);
++            img.onerror = () => resolve(false);
++            img.src = icon.src;
++          })));
++          found.icons = loaded.length > 0 && loaded.every(Boolean);
++        }
++      } catch (_) { /* манифест недоступен */ }
++      try {
++        const res = await fetch('/version.json', { cache: 'no-store' });
++        if (res.ok) {
++          const data = await res.json();
++          versionRef.current = String(data?.version ?? '');
++        }
++      } catch (_) { /* версия недоступна */ }
++      if (!cancelled) setResults(found);
++    };
++    run();
++    return () => { cancelled = true; };
++  }, []);
++
++  if (Platform.OS !== 'web' || !results) return null;
++  return (
++    <View style={styles.diagBlock}>
++      <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
++      {INSTALL_DIAG_LINES.map(([key, yesKey, noKey]) => (
++        <Text key={key} style={[styles.diagText, !results[key] && styles.diagTextBad]}>
++          {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}
++        </Text>
++      ))}
++      {installPrompt ? (
++        <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptAvailable')}</Text>
++      ) : null}
++      {versionRef.current ? (
++        <Text style={styles.diagText}>
++          {tHomeScreen('pwa.diagVersion')}: {versionRef.current}
++        </Text>
++      ) : null}
++    </View>
++  );
++};
++
+ export default function HomeScreen({ navigation }) {
+   const locale = useLocale();
+   const moduleLocale = useModuleLocale();
+@@ -956,6 +1037,7 @@ export default function HomeScreen({ navigation }) {
+           <View style={styles.infoModal}>
+             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+             <Text style={styles.infoText}>{tHomeScreen('pwa.iosInstructions')}</Text>
++        <PwaInstallDiagnostics installPrompt={installPrompt} />
+             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIosInstallVisible(false)}>
+               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
+             </TouchableOpacity>
+@@ -968,6 +1050,7 @@ export default function HomeScreen({ navigation }) {
+           <View style={styles.infoModal}>
+             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+             <Text style={styles.infoText}>{tHomeScreen('pwa.androidInstructions')}</Text>
++        <PwaInstallDiagnostics installPrompt={installPrompt} />
+             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAndroidInstallVisible(false)}>
+               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
+             </TouchableOpacity>
+@@ -980,6 +1063,7 @@ export default function HomeScreen({ navigation }) {
+           <View style={styles.infoModal}>
+             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
+             <Text style={styles.infoText}>{tHomeScreen('pwa.desktopInstructions')}</Text>
++        <PwaInstallDiagnostics installPrompt={installPrompt} />
+             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setDesktopInstallVisible(false)}>
+               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
+             </TouchableOpacity>
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index bb57458..9dd07da 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,22 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **388** (дополнение строки характеристик —
++· последний сданный патч: **389** (владелец: «всё ещё не могу установить
++PWA — сообщение про ярлык, но само PWA не ставится». Проверка хостов
++вживую: replit = 388 (манифест правильный), na4u = старый экспорт
++(манифест без 192-иконки, version.json нет) — na4u владелец считает
++отстающим по определению (ручная сборка). Диагноз: раз манифест/воркер
++в порядке, а диалога нет — Chrome молча не предлагает установку, считая
++приложение уже установленным (жив старый ярлык). 389: manifest.json +
++related_applications [{platform web_app, id '/'}] → работает
++getInstalledRelatedApps; окна инструкции (iOS/Android/десктоп) получили
++ЖИВУЮ диагностику PwaInstallDiagnostics (установлено? воркер? манифест?
++иконки? нативный диалог? версия) — «✕ Браузер считает приложение УЖЕ
++установленным — удалите старый ярлык…». Ключи pwa.diag* ru+en.
++УРОК АГЕНТУ (повтор 367!): вставки в JSX питоном по срезам ДУБЛИРУЮТ
++куски — править построчно/по уникальным ключам и сразу гнать заслон 379
++(он поймал). fetch_page не качает картинки (HTTP 500 на PNG — это
++инструмент, не сервер) · предыдущий: **388** (дополнение строки характеристик —
+ слово владельца: «оружию ещё тип патронов, эффекты и качества».
+ weaponDisplay: локале-явные хелперы weaponEffectsLabel/
+ weaponQualitiesLabel/resolveAmmoName (resolveWeapon* — делегируют,
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 9007235..44a5106 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,16 @@
+ ---
+ ---
+ ---
++---
++## The install window now diagnoses itself (patch 389)
++
++When the app can't be installed, the install dialog now shows live
++diagnostics: whether the browser already considers the app installed
++(the most common cause — an old shortcut; remove it, reload, install
++again), whether the manifest/icons/service worker are reachable, whether
++the native prompt is available, and the app version. The manifest now
++carries an entry that lets the browser report "already installed".
++
+ ---
+ ## Weapon lines in the picker now include ammo, effects, qualities (patch 388)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 92acfc1..246207e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Окно установки теперь само ищет причину (патч 389)
++
++Если приложение не устанавливается, в окне установки появилась
++диагностика: браузер считает приложение уже установленным (самая
++частая причина — жив старый ярлык: удалите иконку, обновите страницу,
++установите заново), манифест/иконки/сервис-воркер доступны, приходит
++ли нативный диалог, номер версии. Манифест дополнен записью, которая
++позволяет браузеру честно сообщать «уже установлено».
++
+ ---
+ ## В строке предмета у оружия — патроны, эффекты и качества (патч 388)
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index bca5fb3..881a1ea 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -88,7 +88,18 @@
+     "install": "Install App",
+     "iosInstructions": "To install the app on iPhone/iPad:\n\n1. Tap the Share button at the bottom of Safari.\n2. Select «Add to Home Screen».\n3. Tap «Add».",
+     "androidInstructions": "To install the app on Android:\n\nIn Chrome — tap the menu (⋮) in the top right corner and select «Install app» or «Add to Home screen».\n\nIn Samsung Internet — tap the menu (☰) → «Add page» → «On Home screen».",
+-    "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app»."
++    "desktopInstructions": "To install the app:\n\nIn Edge / Chrome — look for the install icon (⊕ or a computer icon) at the right side of the address bar and click it.\n\nIn Firefox — open the menu (···) → «Install site as app».",
++    "diagnosticsTitle": "Install diagnostics",
++    "diagInstalledYes": "The browser considers the app ALREADY installed — that's why no prompt appears. Remove the old shortcut (long-press the icon → Remove, or Settings → Apps → Positronium), then reload the page and install again.",
++    "diagInstalledNo": "Not installed before (as expected).",
++    "diagPromptAvailable": "The native install prompt is available — reopen this dialog and confirm the installation.",
++    "diagSwYes": "Service worker is active.",
++    "diagSwNo": "Service worker is not active — reload the page; if that doesn't help, the build is incomplete.",
++    "diagManifestYes": "App manifest is available.",
++    "diagManifestNo": "Manifest failed to load — the build is incomplete, re-upload the app to the host.",
++    "diagIconsYes": "App icons load fine.",
++    "diagIconsNo": "Icons DO NOT load — a PWA cannot be installed without them: re-upload the build (pwa-icon*.png files).",
++    "diagVersion": "App version"
+   },
+   "settings": {
+     "title": "Settings",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index e9cc02d..4b3d1c3 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -88,7 +88,18 @@
+     "install": "Установить приложение",
+     "iosInstructions": "Чтобы установить приложение на iPhone/iPad:\n\n1. Нажмите кнопку «Поделиться» (Share) в нижней панели Safari.\n2. Выберите «На экран «Домой»» (Add to Home Screen).\n3. Нажмите «Добавить».",
+     "androidInstructions": "Чтобы установить приложение на Android:\n\nВ Chrome — нажмите меню (⋮) в правом верхнем углу и выберите «Установить приложение» или «Добавить на главный экран».\n\nВ Samsung Internet — нажмите меню (☰) → «Добавить страницу» → «На главный экран».",
+-    "desktopInstructions": "Чтобы установить приложение:\n\nВ Edge / Chrome — найдите значок установки (⊕ или значок компьютера) в правой части адресной строки и нажмите его.\n\nВ Firefox — откройте меню (···) → «Установить сайт как приложение»."
++    "desktopInstructions": "Чтобы установить приложение:\n\nВ Edge / Chrome — найдите значок установки (⊕ или значок компьютера) в правой части адресной строки и нажмите его.\n\nВ Firefox — откройте меню (···) → «Установить сайт как приложение».",
++    "diagnosticsTitle": "Диагностика установки",
++    "diagInstalledYes": "Браузер считает приложение УЖЕ установленным — поэтому диалог не приходит. Удалите старый ярлык (удержание иконки → «Удалить», либо Настройки → Приложения → Positronium), затем обновите страницу и установите заново.",
++    "diagInstalledNo": "Раньше приложение не установлено (это нормально).",
++    "diagPromptAvailable": "Нативный диалог установки доступен — откройте это окно ещё раз и подтвердите установку.",
++    "diagSwYes": "Сервис-воркер активен.",
++    "diagSwNo": "Сервис-воркер не активен — обновите страницу; если не помогает, приложение пересобрано неполно.",
++    "diagManifestYes": "Манифест приложения доступен.",
++    "diagManifestNo": "Манифест не загружается — сборка неполная, перезалейте приложение на хост.",
++    "diagIconsYes": "Иконки приложения загружаются.",
++    "diagIconsNo": "Иконки НЕ загружаются — без них PWA не установить: перезалейте сборку (файлы pwa-icon*.png).",
++    "diagVersion": "Версия приложения"
+   },
+   "settings": {
+     "title": "Настройки",
+diff --git a/public/manifest.json b/public/manifest.json
+index 6aec5c5..949ada2 100644
+--- a/public/manifest.json
++++ b/public/manifest.json
+@@ -29,5 +29,11 @@
+       "type": "image/png",
+       "purpose": "maskable"
+     }
++  ],
++  "related_applications": [
++    {
++      "platform": "web_app",
++      "id": "/"
++    }
+   ]
+ }
+diff --git a/public/version.json b/public/version.json
+index 63ca7f4..7a721b3 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "388",
++  "version": "389",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 5a21550..135b141 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -268,6 +268,11 @@ const styles = StyleSheet.create({
+   },
+   infoTitle: { color: '#f0e68c', fontSize: 18, fontWeight: '700', marginBottom: 10 },
+   infoText: { color: '#e5e7eb', fontSize: 14, lineHeight: 20 },
++  // 389: диагностика установки PWA
++  diagBlock: { width: '100%', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#ddd' },
++  diagTitle: { fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 4 },
++  diagText: { fontSize: 12, color: '#555', marginBottom: 3 },
++  diagTextBad: { color: '#c0392b', fontWeight: '700' },
+   linkText: {
+     color: '#93c5fd',
+     fontSize: 14,
