@@ -200,6 +200,87 @@ const CharacterCell = ({
 
 const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 
+
+// 389: живая диагностика установки PWA — показывается в окнах инструкции
+// (iOS/Android/десктоп). Только web. Главный вопрос «почему не ставится»:
+// Chrome молча не показывает диалог, если считает приложение установленным;
+// манифест/иконки/воркер проверяются живьём; «уже установлено» — через
+// getInstalledRelatedApps (related_applications добавлены в manifest.json).
+const INSTALL_DIAG_LINES = [
+  ['installed', 'pwa.diagInstalledYes', 'pwa.diagInstalledNo'],
+  ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
+  ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
+  ['icons', 'pwa.diagIconsYes', 'pwa.diagIconsNo'],
+];
+
+const PwaInstallDiagnostics = ({ installPrompt }) => {
+  const [results, setResults] = useState(null);
+  const versionRef = useRef('');
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+    let cancelled = false;
+    const run = async () => {
+      const found = {};
+      try {
+        const related = await navigator.getInstalledRelatedApps?.() || [];
+        found.installed = related.length > 0;
+      } catch (_) { found.installed = false; }
+      try {
+        const reg = await navigator.serviceWorker?.getRegistration?.();
+        found.sw = Boolean(reg?.active || reg?.waiting || reg?.installing);
+      } catch (_) { found.sw = false; }
+      found.manifest = false;
+      found.icons = false;
+      try {
+        const res = await fetch('/manifest.json', { cache: 'no-store' });
+        if (res.ok) {
+          found.manifest = true;
+          const manifest = await res.json();
+          const icons = (manifest.icons || []).filter((icon) => icon?.src).slice(0, 2);
+          const loaded = await Promise.all(icons.map((icon) => new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(true);
+            img.onerror = () => resolve(false);
+            img.src = icon.src;
+          })));
+          found.icons = loaded.length > 0 && loaded.every(Boolean);
+        }
+      } catch (_) { /* манифест недоступен */ }
+      try {
+        const res = await fetch('/version.json', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          versionRef.current = String(data?.version ?? '');
+        }
+      } catch (_) { /* версия недоступна */ }
+      if (!cancelled) setResults(found);
+    };
+    run();
+    return () => { cancelled = true; };
+  }, []);
+
+  if (Platform.OS !== 'web' || !results) return null;
+  return (
+    <View style={styles.diagBlock}>
+      <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
+      {INSTALL_DIAG_LINES.map(([key, yesKey, noKey]) => (
+        <Text key={key} style={[styles.diagText, !results[key] && styles.diagTextBad]}>
+          {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}
+        </Text>
+      ))}
+      {installPrompt ? (
+        <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptAvailable')}</Text>
+      ) : null}
+      {versionRef.current ? (
+        <Text style={styles.diagText}>
+          {tHomeScreen('pwa.diagVersion')}: {versionRef.current}
+        </Text>
+      ) : null}
+    </View>
+  );
+};
+
 export default function HomeScreen({ navigation }) {
   const locale = useLocale();
   const moduleLocale = useModuleLocale();
@@ -956,6 +1037,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.infoModal}>
             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
             <Text style={styles.infoText}>{tHomeScreen('pwa.iosInstructions')}</Text>
+        <PwaInstallDiagnostics installPrompt={installPrompt} />
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIosInstallVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
@@ -968,6 +1050,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.infoModal}>
             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
             <Text style={styles.infoText}>{tHomeScreen('pwa.androidInstructions')}</Text>
+        <PwaInstallDiagnostics installPrompt={installPrompt} />
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAndroidInstallVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
@@ -980,6 +1063,7 @@ export default function HomeScreen({ navigation }) {
           <View style={styles.infoModal}>
             <Text style={styles.infoTitle}>{tHomeScreen('pwa.install')}</Text>
             <Text style={styles.infoText}>{tHomeScreen('pwa.desktopInstructions')}</Text>
+        <PwaInstallDiagnostics installPrompt={installPrompt} />
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setDesktopInstallVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
