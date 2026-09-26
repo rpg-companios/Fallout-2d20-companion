@@ -1,0 +1,319 @@
+diff --git a/__tests__/equipment/__probe-fields.test.js b/__tests__/equipment/__probe-fields.test.js
+new file mode 100644
+index 0000000..895f7db
+--- /dev/null
++++ b/__tests__/equipment/__probe-fields.test.js
+@@ -0,0 +1,20 @@
++import { it } from 'vitest';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++const log = (...a) => process.stdout.write('FIELDS ' + a.map((x) => JSON.stringify(x)).join(' ') + '\n');
++it('fields', () => {
++  const c = getEquipmentCatalog('ru-RU');
++  const pick = (arr, keys) => (arr || []).slice(0, 2).map((x) => Object.fromEntries(Object.entries(x).filter(([k]) => keys.includes(k))));
++  log('weapon:', pick(c.weapons, ['id','damage','fireRate','range','rangeName','range_name','weight','cost','damageType']));
++  const armorPiece = (c.armor?.armor || []).flatMap((g) => g.items || []).slice(0, 2);
++  log('armor:', JSON.stringify(armorPiece).slice(0, 600));
++  log('ammo:', pick(c.ammoTypes, ['id','name','weight','cost']));
++  log('chems:', JSON.stringify((c.chems || []).slice(0, 2)).slice(0, 500));
++  log('junk:', pick(c.junk, ['id','name','weight','cost']));
++  log('plating:', pick(c.robotPlating, ['id','name','physicalDR','energyDR','radiationDR','weight','cost']));
++  log('frame:', pick(c.robotFrames, ['id','name','weight','cost']));
++  log('robotModule:', pick(c.robotModules, ['id','name','weight','cost']));
++  log('food:', JSON.stringify((c.food || []).slice(0, 2)).slice(0, 400));
++  log('drinks:', JSON.stringify((c.drinks || []).slice(0, 2)).slice(0, 400));
++  log('generalGoods:', pick(c.generalGoods, ['id','name','weight','cost']));
++  log('materials:', pick(c.materials, ['id','name','weight','cost']));
++});
+diff --git a/__tests__/equipment/item-basics-line-387.test.js b/__tests__/equipment/item-basics-line-387.test.js
+new file mode 100644
+index 0000000..68c06e6
+--- /dev/null
++++ b/__tests__/equipment/item-basics-line-387.test.js
+@@ -0,0 +1,62 @@
++// ПРИЁМОЧНЫЙ (патч 387): в модалке выбора предметов (лут/торговля,
++// AddItemModal) у предмета — его базовые характеристики ОДНОЙ СТРОКОЙ
++// (слово владельца: «подстрокой … в строчку»). Строка собирается из данных
++// каталога (domain/itemBasics.js): оружие — урон/скорострельность/дальность;
++// броня — СУ физ/энерг/рад; препараты/еда/напитки — готовый эффект;
++// всё — вес/цена. Пустых значений в строке нет.
++import { describe, expect, it } from 'vitest';
++
++import { describeItemBasics } from '../../domain/itemBasics';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
++import { readFileSync } from 'node:fs';
++
++const catalog = getEquipmentCatalog('ru-RU');
++const catalogEn = getEquipmentCatalog('en-EN');
++const weapon = (id) => catalog.weapons.find((w) => w.id === id);
++const armorPiece = () => (catalog.armor?.armor || []).flatMap((g) => g.items || [])[0];
++const chem = (id) => catalog.chems.find((c) => c.id === id);
++const junk = () => catalog.junk.find((j) => j.cost > 0);
++const drink = () => catalog.drinks.find((d) => d.positiveEffectLabel);
++
++describe('патч 387: базовые характеристики предмета одной строкой', () => {
++  it('оружие: Урон · Скорострельность · Дальность · Вес · Цена', () => {
++    expect(describeItemBasics(weapon('weapon_44_pistol'), 'ru-RU'))
++      .toBe('Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99');
++    const en10 = catalogEn.weapons.find((w) => w.id === 'weapon_10mm_pistol');
++    expect(describeItemBasics(en10, 'en-EN'))
++      .toBe('Damage 4 · Fire rate 2 · Range: Close · Weight 4 · Cost 50');
++  });
++
++  it('броня: СУ по трём типам (ноль СУ показываем), вес, цена', () => {
++    const line = describeItemBasics(armorPiece(), 'ru-RU');
++    expect(line).toContain('Физ 1');
++    expect(line).toContain('Энерг 1');
++    expect(line).toContain('Рад 0'); // ноль СУ — характеристика, не пустота
++    expect(line).toContain('Вес');
++    expect(line).toContain('Цена');
++  });
++
++  it('препарат/напиток: эффект каталога, вес, цена; хлам: вес и цена', () => {
++    const chemLine = describeItemBasics(chem('chem_addictol'), 'ru-RU');
++    expect(chemLine).toContain('Снимает зависимость');
++    expect(chemLine).toContain('Вес 0.5');
++    expect(chemLine).toContain('Цена 125');
++    expect(describeItemBasics(drink(), 'ru-RU')).toContain('+1 AP');
++    const junkLine = describeItemBasics(junk(), 'ru-RU');
++    expect(junkLine).toContain('Вес');
++    expect(junkLine).toContain('Цена');
++  });
++
++  it('пустые/кривые входы и нули не шумят', () => {
++    expect(describeItemBasics(null)).toBe('');
++    expect(describeItemBasics({})).toBe('');
++    expect(describeItemBasics({ weight: 0, cost: 0 })).toBe('');
++    expect(describeItemBasics('Просто папка')).toBe('');
++  });
++
++  it('проводка: AddItemModal рисует подстроку (itemBasics)', () => {
++    const src = readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++    expect(src).toContain('describeItemBasics(item, moduleLocale)');
++    expect(src).toContain('styles.itemBasics');
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index cb01494..2070f24 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -5,6 +5,7 @@ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+ import { tInventory } from '../logic/inventoryI18n';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
++import { describeItemBasics } from '../../../../domain/itemBasics';
+ 
+ const CATEGORY_ICONS = {
+   weapon: '🔫',
+@@ -297,12 +298,15 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const renderItem = ({ item }) => {
+     const isItem = typeof item === 'object' && item?.name;
+     const itemTypeLabel = isItem ? getTypeLabelAndIcon(item.itemType) : '';
++    const basicsLine = isItem ? describeItemBasics(item, moduleLocale) : '';
+ 
+     return (
+       <TouchableOpacity style={styles.itemContainer} onPress={() => handleSelect(item)}>
+         <Text style={styles.itemName}>{isItem ? item.name : item}</Text>
+         {!isItem && <Text style={styles.itemType}>{CATEGORY_ICONS[Object.keys(CATEGORY_ICONS).find((key) => tInventory(`modals.addItemModal.categories.${key}`) === item)] || '📁'}</Text>}
+         {isItem && Boolean(itemTypeLabel) && <Text style={styles.itemType}>{itemTypeLabel}</Text>}
++        {/* 387 (слово владельца): базовые характеристики предмета подстрокой */}
++        {isItem && Boolean(basicsLine) && <Text style={styles.itemBasics}>{basicsLine}</Text>}
+       </TouchableOpacity>
+     );
+   };
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 234e6ea..c4245e8 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,21 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **386** (владелец: «я про лазерный пистолет,
++· последний сданный патч: **387** (слово владельца: «в модалке выбора
++предметов Лута или торговли у предмета — базовые характеристики
++подстрокой в строчку». Модалка = общий AddItemModal (лут + стартовая
++закупка + покупка). Новый чистый domain/itemBasics.js:
++describeItemBasics(item, locale) — строка из данных каталога: оружие —
++«Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99»;
++броня/обшивка/СБ — СУ Физ/Энерг/Рад (ноль СУ показывается; у оружия
++нулевые *DamageRating из данных НЕ показываем — isArmorLike по
++protectedAreas/itemType); препараты/еда/напитки — готовая локализованная
++метка эффекта (effectLabel/description/positiveEffectLabel/
++negativeEffectLabel, первая непустая); всё — Вес/Цена (нули и пустые не
++пишутся). Модалка: подстрока styles.itemBasics (12px, серый, width 100%,
++flexWrap на контейнере). Тест item-basics-line-387: точные строки ru/en,
++проводка по исходнику (RN в vitest не парсится) ·
++предыдущий: **386** (владелец: «я про лазерный пистолет,
+ встроенный в руку, а ты про головной лазер — там 2 лазера, ты выбрал
+ один». Итог: путь УСТАНОВЛЕННОГО оружия (weapon_laser_gun в руке,
+ role installed) проверен на реальном сторе в ТРЁХ формах старого сейва
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 6353398..125501a 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,16 @@
+ ---
+ ---
+ ---
++---
++## Item stats shown inline in the picker (patch 387)
++
++In the add-item modal (loot, starting purchase) each item now shows its
++base characteristics as a sub-line under the name: weapons — "Урон 6 ·
++Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99" (Damage ·
++Fire rate · Range · Weight · Cost), armor — physical/energy/radiation
++ratings, chems and food — their effect, everything — weight and cost.
++Empty values are omitted.
++
+ ---
+ ## Arm-installed Laser Pistol verified on old saves (patch 386)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e19036d..82b2f3a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## В окне выбора предметов — характеристики прямо в строке (патч 387)
++
++В модалке добавления предметов (лут, покупка снаряжения) под названием
++каждого предмета теперь одной строкой его базовые характеристики:
++у оружия — «Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 ·
++Цена 99», у брони — защита по трём типам (Физ/Энерг/Рад), у препаратов
++и еды — эффект, у всего — вес и цена. Пустых значений в строке нет.
++
+ ---
+ ## Проверен лазерный пистолет, встроенный в руку робота (патч 386)
+ 
+diff --git a/domain/itemBasics.js b/domain/itemBasics.js
+new file mode 100644
+index 0000000..aa79c03
+--- /dev/null
++++ b/domain/itemBasics.js
+@@ -0,0 +1,94 @@
++// domain/itemBasics.js
++//
++// Патч 387: базовые характеристики предмета ОДНОЙ СТРОКОЙ — подстрока в
++// модалке выбора предметов (лут, стартовая закупка/торговля; AddItemModal).
++// Только данные каталога: у оружия урон/скорострельность/дальность, у брони —
++// СУ по трём типам, у препаратов/еды/напитков — готовый локализованный эффект,
++// у всего — вес и цена. Пустые значения не пишутся: строка честно короткая.
++//
++// Модуль чистый (словари-константы, локаль аргументом) — по образцу
++// domain/weaponDisplay.js. RN-модули в vitest не парсятся (урок 383), поэтому
++// логика живёт здесь, а модалка только вызывает.
++
++import { getCurrentModuleLocale } from '../i18n/locale';
++
++const LABELS = {
++  'ru-RU': {
++    damage: 'Урон', fireRate: 'Скорострельность', range: 'Дальность',
++    physical: 'Физ', energy: 'Энерг', radiation: 'Рад',
++    weight: 'Вес', cost: 'Цена',
++  },
++  'en-EN': {
++    damage: 'Damage', fireRate: 'Fire rate', range: 'Range',
++    physical: 'Phys', energy: 'Energy', radiation: 'Rad',
++    weight: 'Weight', cost: 'Cost',
++  },
++};
++
++const toNum = (v) => {
++  const n = Number(String(v ?? '').replace(',', '.'));
++  return Number.isFinite(n) ? n : null;
++};
++
++/** Число без хвостовых нулей: 4 → «4», 0.5 → «0.5», 0.04000 → «0.04». */
++const fmt = (n) => String(Math.round(n * 10000) / 10000);
++
++const push = (parts, label, value) => {
++  if (value === null || value === undefined || value === '') return;
++  const n = toNum(value);
++  if (n !== null) {
++    if (n === 0) return; // нули не шумят в строке
++    parts.push(`${label} ${fmt(n)}`);
++    return;
++  }
++  parts.push(`${label}: ${value}`);
++};
++
++/**
++ * Строка базовых характеристик предмета каталога.
++ *
++ * @param {object} item — запись каталога (weapons/armor/ammo/chems/food/…)
++ * @param {string} [locale] — по умолчанию текущая локаль сеттинга
++ * @returns {string} «Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99»
++ *                   или '' — если у предмета нечего показать.
++ */
++export function describeItemBasics(item, locale = getCurrentModuleLocale()) {
++  if (!item || typeof item !== 'object') return '';
++  const L = LABELS[locale] || LABELS['en-EN'];
++  const parts = [];
++
++  if (item.damage != null) push(parts, L.damage, item.damage);
++  if (item.fireRate != null) push(parts, L.fireRate, item.fireRate);
++  if (item.rangeName || item.range_name) {
++    parts.push(`${L.range}: ${item.rangeName || item.range_name}`);
++  }
++
++  // Броня/обшивка/силовая броня: СУ по трём типам (ноль у СУ показываем —
++  // «нет защиты от радиации» это характеристика, а не пустота). У оружия в
++  // данных тоже лежат *DamageRating (нули) — там их не показываем.
++  const isArmorLike = Array.isArray(item.protectedAreas)
++    || item.itemType === 'plating' || item.itemType === 'robotArmor'
++    || item.itemType === 'powerArmor';
++  if (isArmorLike) {
++    const rating = (key, label) => {
++      const v = toNum(item[key]);
++      if (v !== null) parts.push(`${label} ${fmt(v)}`);
++    };
++    rating('physicalDamageRating', L.physical);
++    rating('energyDamageRating', L.energy);
++    rating('radiationDamageRating', L.radiation);
++  }
++
++  // Эффект — готовые локализованные метки каталога.
++  for (const key of ['effectLabel', 'description', 'positiveEffectLabel', 'negativeEffectLabel']) {
++    if (typeof item[key] === 'string' && item[key].trim()) {
++      parts.push(item[key].trim());
++      break;
++    }
++  }
++
++  push(parts, L.weight, item.weight);
++  push(parts, L.cost, item.cost);
++
++  return parts.join(' · ');
++}
+diff --git a/public/version.json b/public/version.json
+index 2988ce8..fa4deb8 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "386",
++  "version": "387",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/AddItemModal.styles.js b/styles/AddItemModal.styles.js
+index df5d1ff..a3d2df8 100644
+--- a/styles/AddItemModal.styles.js
++++ b/styles/AddItemModal.styles.js
+@@ -32,11 +32,14 @@ const styles = StyleSheet.create({
+     borderBottomWidth: 1,
+     borderBottomColor: '#efefef',
+     flexDirection: 'row',
++    flexWrap: 'wrap',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+   },
+   itemName: { fontSize: 16, flex: 1, paddingRight: 8 },
+   itemType: { fontSize: 14, color: '#444' },
++  // 387: базовые характеристики предмета — подстрока под именем
++  itemBasics: { fontSize: 12, color: '#777', width: '100%' },
+   emptyText: { textAlign: 'center', marginVertical: 20, color: '#777' },
+   closeButton: { backgroundColor: '#DC3545', padding: 10, borderRadius: 5, marginTop: 12, alignItems: 'center' },
+   closeButtonText: { color: 'white', fontWeight: 'bold' },
