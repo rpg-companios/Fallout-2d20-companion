@@ -54,8 +54,8 @@ describe('патч 383: описание мода генерируется из 
     expect(src).toContain("weaponModRowDescription(row)");
   });
 
-  it('висячий id боеприпаса виден как есть (доложено владельцу)', () => {
-    expect(ru(byId('mod_fusion_mag'))).toContain('Боеприпас: ammo_fusion_cell');
+  it('«Термоядерный магазин»: боеприпас локализован (Энергоячейка, слово владельца 386)', () => {
+    expect(ru(byId('mod_fusion_mag'))).toContain('Боеприпас: Энергоячейка');
   });
 
   it('пустые/кривые входы безопасны', () => {

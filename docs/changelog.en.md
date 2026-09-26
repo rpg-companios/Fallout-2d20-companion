@@ -16,6 +16,17 @@
 ---
 ---
 ---
+## Arm-installed Laser Pistol verified on old saves (patch 386)
+
+The Assaultron's second laser — the arm-installed Laser Pistol (as
+opposed to the Head Laser) — is verified across all old save shapes:
+mods load from the save, install, remove and survive saving (pinned by
+a test). If this weapon still misbehaves for you, rebuild and run the
+app with the latest patches. Also per your word: the Fusion Mag mod
+now points to the existing "Энергоячейка" ammo (the old id did not
+exist).
+
+---
 ## Fixed: removing mods from the robot's Head Laser (patch 385)
 
 In older saves the Assaultron Head Laser's mods could not be removed:
