@@ -16,6 +16,15 @@
 ---
 ---
 ---
+## Install diagnostics behind a switch (patch 390)
+
+The technical check inside the install dialog is no longer shown to
+everyone: Settings (the "Appearance" section) now has an "Install
+diagnostics" toggle. It is off by default and the dialogs look as
+before; when enabled, the install dialog shows the check: whether the
+app is already installed, manifest, icons, service worker, build version.
+
+---
 ## The install window now diagnoses itself (patch 389)
 
 When the app can't be installed, the install dialog now shows live

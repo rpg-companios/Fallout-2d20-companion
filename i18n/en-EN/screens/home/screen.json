@@ -127,7 +127,9 @@
       "cards": "Cards",
       "spoilers": "Spoilers",
       "tabs": "Tabs"
-    }
+    },
+    "pwaDiagnosticsTitle": "Install diagnostics",
+    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation."
   },
   "folders": {
     "create": "Create folder",

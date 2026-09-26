@@ -229,6 +229,7 @@ export default useAppSettingsStore;
 export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('characterFoldersEnabled');
 export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
 export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScreenEnabled');
+export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
 export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');
 export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');

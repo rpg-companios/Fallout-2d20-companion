@@ -53,6 +53,7 @@ import useSettingPackStore, {
 import useAppSettingsStore, {
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
+  selectPwaInstallDiagnosticsEnabled,
 } from '../../../src/store/appSettingsStore';
 
 const getOriginImage = (originName) => {
@@ -214,10 +215,14 @@ const INSTALL_DIAG_LINES = [
 ];
 
 const PwaInstallDiagnostics = ({ installPrompt }) => {
+  // 390: блок показывается только с включённой настройкой
+  // «Диагностика установки» (по умолчанию выключена).
+  const diagnosticsEnabled = useAppSettingsStore(selectPwaInstallDiagnosticsEnabled);
   const [results, setResults] = useState(null);
   const versionRef = useRef('');
 
   useEffect(() => {
+    if (!diagnosticsEnabled) return undefined;
     if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
     let cancelled = false;
     const run = async () => {
@@ -258,9 +263,9 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
     };
     run();
     return () => { cancelled = true; };
-  }, []);
+  }, [diagnosticsEnabled]);
 
-  if (Platform.OS !== 'web' || !results) return null;
+  if (Platform.OS !== 'web' || !diagnosticsEnabled || !results) return null;
   return (
     <View style={styles.diagBlock}>
       <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
