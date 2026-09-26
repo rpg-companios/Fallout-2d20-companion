@@ -3948,5 +3948,66 @@
     "weaponType": "Explosive",
     "effects": [],
     "withoutMods": true
+  },
+  {
+    "id": "weapon_atom_staff",
+    "itemType": "weapon",
+    "damage": 6,
+    "fireRate": 0,
+    "weight": "15",
+    "cost": 200,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Atom's Staff",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "weaponType": "Melee",
+    "qualities": [
+      {
+        "qualityId": "quality_parry"
+      },
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_piercing_x"
+      }
+    ]
+  },
+  {
+    "id": "weapon_mining_drill",
+    "itemType": "weapon",
+    "damage": 2,
+    "fireRate": 0,
+    "weight": "18",
+    "cost": 100,
+    "rarity": 4,
+    "ammoId": "",
+    "range": "",
+    "imageName": "Mining Drill",
+    "mainAttr": "STR",
+    "mainSkill": "MELEE_WEAPONS",
+    "hasStockVariant": false,
+    "damageType": "physical",
+    "weaponType": "Melee",
+    "qualities": [
+      {
+        "qualityId": "quality_two-handed"
+      }
+    ],
+    "effects": [
+      {
+        "effectId": "effect_piercing_x",
+        "value": 2
+      },
+      {
+        "effectId": "effect_breaking"
+      }
+    ]
   }
 ]

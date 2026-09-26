@@ -46,14 +46,16 @@ describe('ПРИЁМОЧНЫЙ (363–364): диалоги крафта/модо
     expect(crafting).not.toContain('askZeroTarget');
   });
 
-  it('применение модов видно: зелёная отметка, окно не закрывается молча', () => {
+  it('применение модов (367): окно закрывается как раньше, запись сквозная', () => {
     const screen = read(SCREEN);
     const start = screen.indexOf('const handleApplyModification = useCallback');
     const end = screen.indexOf('const handleUnequipWeapon', start);
     const body = screen.slice(start, end);
-    expect(body).not.toContain('handleCloseModificationModal');
-    expect(body).toContain('setSelectedWeaponForModification(modifiedWeapon)');
-    expect(modal).toContain('installNote');
-    expect(modal).toContain('installApplied');
+    // 367 (слово владельца): после «Применить» окно закрывается КАК РАНЬШЕ
+    expect(body).toContain('handleCloseModificationModal();');
+    // 367: мод пишется и в надетый список — карточки и сейв его видят
+    expect(body).toContain('setEquippedWeapons');
+    // зелёная отметка 364 снесена вместе с «окно не закрывать»
+    expect(modal).not.toContain('installNote');
   });
 });

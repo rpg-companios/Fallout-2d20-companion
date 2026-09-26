@@ -1,6 +1,216 @@
 # Changelog
 
 ---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+---
+## Arm-installed Laser Pistol verified on old saves (patch 386)
+
+The Assaultron's second laser — the arm-installed Laser Pistol (as
+opposed to the Head Laser) — is verified across all old save shapes:
+mods load from the save, install, remove and survive saving (pinned by
+a test). If this weapon still misbehaves for you, rebuild and run the
+app with the latest patches. Also per your word: the Fusion Mag mod
+now points to the existing "Энергоячейка" ammo (the old id did not
+exist).
+
+---
+## Fixed: removing mods from the robot's Head Laser (patch 385)
+
+In older saves the Assaultron Head Laser's mods could not be removed:
+after "No mod" the laser showed the loaded capacitor again. Removal now
+works immediately and survives saving; swapping one capacitor for
+another worked before and still does. Covered by a test on an old save:
+remove → save → load → empty; install → save → load → in place.
+
+---
+## Minor mod name fix (patch 384)
+
+The Thompson SMG's "10mm" receiver name clarified in Russian (was
+"Ресивер 10-мм"). The Thompson's mod set is pinned by a test per the
+owner's list: Receiver — Powerful, Hair Trigger, Hardened, Armor
+Piercing, 9mm, 10mm; other slots intact; none of the six uses energy
+cells.
+
+## The mod window now says what each mod does (patch 383)
+
+The weapon mod window used to show names only. Now every mod carries a
+description generated from its mechanics: "Урон +2 · Вес +1 · Цена +25"
+(Damage +2 · Weight +1 · Cost +25), "Скорострельность +1 · Тип урона:
+Энергетический" (Fire rate +1 · Damage type: Energy), "Эффект:
+Проникающий 1" (Effect: Piercing 1), "Боеприпас: Патрон .308" (Ammo:
+.308 Round), etc. Shown both in the mod list and in the preview.
+Covered by a test: all 164 mods produce a description.
+
+## The installed mod is now visible on the weapon card (patch 382)
+
+A modded weapon now carries the mod's name — e.g. "Усиленный 10-мм
+пистолет" for an upgraded 10mm pistol; previously stats changed but the
+card showed nothing. Also added an end-to-end check: a test repeats the
+"Apply" press on real game data (equipped armor doesn't interfere) and
+verifies the whole chain — the mod lands in its own weapon, hides from
+the bag, and returns to the bag when replaced.
+
+## Old saves repair themselves (patch 381)
+
+Because of the previous update's bug, some weapon mods may have been
+recorded onto armor instead of the weapon. Nothing is lost forever:
+on save load the game now strips the stray technical field from armor
+(it never affected armor stats) and returns the "hidden" mods to the
+bag. After updating, open your character and re-apply the mods to the
+weapon — they will now stick and the card shows the new damage at
+once. Mods that were installed correctly before are untouched; robot
+mods are untouched.
+
+## Fixed: weapon mods now stick to the weapon (patch 380)
+
+When armor was also equipped, applying a weapon mod wrote it to the
+wrong store item (the card lookup confused the weapon with the first
+equipped item) — the modal preview was right while the weapon card
+never changed. The store-item lookup now starts from the exact instance
+key and falls back to weapon-type matching; it moved into the engine
+with acceptance tests: the mod always lands in its own weapon and the
+card shows the new damage immediately.
+
+## Fixed build of the Weapons & Armor screen (patch 379)
+
+The app failed to bundle: patch 367 accidentally duplicated a chunk of
+code past the end of the screen file. The extra 18 lines are removed.
+A new guard test parses every app JS file on each test run, so a broken
+file now fails tests immediately instead of only at build time.
+
+## Melee mods completed — full owner coverage (patch 378)
+
+Final touch of the rebuild: 42 melee mods (spiked/barbed/bladed,
+chain wrapped, electrified, stun pack, ...) are back where they belong
+— baseball bats, baton, knuckles, walking cane and 17 more weapons.
+Weapon→mod coverage now matches the owner's lists 729/729 (100%).
+Weapons without an owner list (10mm SMG, plasma mine) stay untouched.
+
+## Mods now match your lists exactly; weapons renamed (patch 377)
+
+Modification windows are rebuilt: each of the 88 weapons with your list
+now carries exactly your mods (21 weapons expanded, extra mods removed
+from gatling laser and others). The arc welder (= "Дуговая сварка") lost
+all 24 extra mods — no mods per your call. The Institute laser carries
+exactly the 17 mods from your reference. The 10mm SMG and plasma mine
+are untouched (no lists). 48 weapons renamed to your names (Russian
+only; English untouched): Switchblade → "Выкидной нож", bumper sword →
+"Большой меч", Institute laser → "Лазерный пистолет института", etc.
+Robot weapon mods keep working — covered by tests.
+
+## Every mod crafts now; 23 new mods and two new weapons (patch 376)
+
+Revision continues. Every weapon mod has a crafting recipe now (36 were
+missing) — costs derived from rarity and difficulty per the book. As you
+approved, 23 new mods were added: Tesla coil dynamo/capacitor, quantum
+gyro compensating lens, plasma caster capacitors, tear gas launcher
+cameras/stocks, Thompson and pump-action receivers, bracketed short
+barrel, auto axe blades, chainsaw bars, assaultron blade electrifier and
+shocking coils. Two brand-new weapons join the catalog — Atom's Staff
+(6 dmg, Piercing, Parry, Two-handed) and the Mining Drill (2 dmg,
+Piercing 2, Breaking, Two-handed) — with your stats. The "Weapons"
+crafting tile now holds 164 recipes.
+
+## Weapon mods get readable internal ids, duplicates merged (patch 375)
+
+Catalog revision begins. Opaque ids (mod_030 etc.) are replaced with
+readable canonical ones, and 95 duplicate rows are merged into 31 real
+upgrades: the catalog shrinks from 205 to 141 entries, each with its book
+recipe when one exists. In-game names are yours (70 taken from your
+lists). Old saves migrate automatically: installed mods move to the new
+ids without loss; the save schema version is unchanged. Nothing should
+visibly change except names.
+
+## Tesla coil dynamo weight set to 6 (patch 374)
+
+The last open figure of the revision material is settled: the Tesla coil
+dynamo mod weighs 6 (references disagreed: 6 vs 12). The revision material
+is complete; next comes the revision patch series itself (human-readable
+ids, duplicate merging, your names, 22 new mods, save migration).
+
+## Institute laser confirmed by the reference, arc welder has no mods (patch 373)
+
+The Institute Laser reference you sent matches the app on all 17 mods and
+stats — no divergence. Arc welder is recorded as one weapon (= "Дуговая
+сварка", "Сварочная горелка") with no mods — its 24 catalog bindings are
+extra and will be removed in the revision. Final tally: 539 bindings match,
+580 to add, 147 to remove; only the 10mm SMG and plasma mine remain without
+your lists — left untouched.
+
+## Melee mods cross-checked against your catalog (patch 372)
+
+The melee catalog you sent (38 weapons) is resolved: 35 exist in the game
+(renames queued to your names), 53 weapon-mod bindings already match what
+the app supports (no divergence), 9 mods will be created (auto axe
+elemental blades, chainsaw bars, etc.). Outside the catalog: Atom's Staff,
+Mining Pick... and the Welding Torch — a question: is it the current arc
+welder or a separate weapon? Robot weapons untouched: their mods work and
+are covered by tests. Only 4 weapons remain without your lists (arc welder,
+Institute laser, 10mm SMG, plasma mine) — their support stays as is.
+
+## New mods confirmed, English names found (patch 371)
+
+Your answers are recorded: the 11 missing mods will be created; "Tesla
+coil dynamo" and "Quantum gyro compensating lens" are unique mods whose
+English names were found in the references — along with a third unique
+one, "Tesla Coil Capacitor". Good news: the Cryolator's "energy cell
+magazine" is the existing Fusion Magazine — just a rename. Stage result:
+13 new mods with reference data; coverage recomputed (580 to add, 126
+to remove).
+
+## Supported mods collected from your list (patch 370)
+
+Revision continues: all 141 unique slot+mod entries from your list are
+resolved — 100 match existing rows, 29 are phantom duplicates (to be merged
+during the revision), 11 mods are missing from the catalog entirely, 2 are
+recorded as candidates. Coverage computed: 582 (weapon, mod) pairs to add,
+127 to remove; 20 weapons (all melee except six names, arc welder etc.) have
+no list yet — untouched until you send theirs. Data unchanged — revision
+material (`weapon-mods-support-map-370`).
+
+## Russian weapon names mapped to the catalog (patch 369)
+
+Revision begins: all 83 names from the owner's weapon list are mapped
+one-to-one to internal ids (54 matched by name, 25 resolved by stats,
+4 — robot duplicates). This also settles the catalog dispute: the two
+"combat rifles" get the owner's names — "Боевой карабин" and
+"Самозарядная винтовка". Names and data are not changed yet — revision
+material only.
+
+## Weapon mod revision plan (patch 368)
+
+Decision: the "why do some mods have no Create button" questions are
+closed by a catalog revision — the data contains phantom rows (the same
+improvement recorded several times, not all copies have a recipe):
+31 improvements are duplicated across 95 rows, 53 rows lack recipes.
+Recorded the plan (human-readable ids, merging phantoms, craft columns
+from the book tables, lossless save migration) and the full duplicate
+list. Work starts after it is confirmed that mods install and work
+(patch 367).
+
+## Mods on equipped weapons are actually saved now (patch 367)
+
+Report: an automatic receiver was applied to the 10mm pistol, but the
+weapon cards showed no change and the mod vanished after reload. The
+Apply button wrote the mod into a hidden inventory copy, while cards and
+the save file read the equipped-weapons list. The write is now pass-
+through: the card instantly shows Burst and new stats, and the mod
+survives character reload. The mod window closes after Apply again, as
+it used to.
+
 ## Update installer fix (patch 366)
 
 Update #364 failed to install after #363: the update file was built

@@ -862,7 +862,14 @@ export function attacksFromSlot(slot, options = {}) {
   const { own } = splitLimbWeapons(limb, { catalog });
   const ownEntry = own[0] ?? null;
   if (ownEntry) {
-    push(ownEntry, 'builtin', ownMods.length > 0 ? ownMods : toModIds(ownEntry));
+    // 385 (репорт владельца: «снять загруженные моды не получается»):
+    // единственный источник модов собственной атаки — limb.ownWeaponMods.
+    // Копия в записи builtinWeapons — артефакт deserializeSlot (360, разворот
+    // худого сейва): при пустом ownWeaponMods фолбэк на неё возвращал
+    // загруженные моды, и снятие не работало до перезагрузки. Копию читаем
+    // больше никогда — списываем перед materializeWeapon.
+    const { modIds: _staleModIds, appliedMods: _staleAppliedMods, ...ownEntryClean } = ownEntry;
+    push(ownEntryClean, 'builtin', ownMods);
   } else if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
     push(limb.attackId, 'builtin', ownMods);
   } else if (limb.builtinWeaponId) {

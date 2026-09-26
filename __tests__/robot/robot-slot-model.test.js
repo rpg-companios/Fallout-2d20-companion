@@ -87,21 +87,21 @@ describe('нормализация состояния слота', () => {
   it('моды оружия в ладони читаются из appliedMods', () => {
     const old = {
       limb: { id: 'robot_arm_protectron' },
-      heldWeapon: { id: 'weapon_10mm_smg', appliedMods: { Receiver: 'mod_001' } },
+      heldWeapon: { id: 'weapon_10mm_smg', appliedMods: { Receiver: 'mod_rapid' } },
     };
-    expect(normalizeSlot(old).heldWeaponMods).toEqual(['mod_001']);
+    expect(normalizeSlot(old).heldWeaponMods).toEqual(['mod_rapid']);
   });
 
   it('новый вид: оружие = база + id модов', () => {
     const next = {
       content: 'robot_arm_protectron',
       heldWeaponId: 'weapon_combat_shotgun',
-      heldWeaponMods: ['mod_001'],
+      heldWeaponMods: ['mod_rapid'],
       installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }, 'weapon_submachine_gun'],
     };
     const state = normalizeSlot(next);
     expect(state.heldWeaponId).toBe('weapon_combat_shotgun');
-    expect(state.heldWeaponMods).toEqual(['mod_001']);
+    expect(state.heldWeaponMods).toEqual(['mod_rapid']);
     expect(state.installedWeapons).toEqual([
       { id: 'weapon_laser_gun', modIds: [] },
       { id: 'weapon_submachine_gun', modIds: [] },
@@ -531,7 +531,7 @@ describe('моды оружия, установленного в конечно�
   // Репорт владельца: лазер-ган из комплекта «assaultron_us_military»
   // (installTo: 'arm' — часть руки, не ладонь) не принимал моды: применяющий
   // код писал только в ладонь/инвентарь, а карточка не читала моды из записи.
-  const MOD_044 = 'mod_044'; // Конденсатор лазер-гана: +1 урон (база 4)
+  const MOD_044 = 'mod_boosted_capacitor'; // Конденсатор лазер-гана: +1 урон (база 4)
   const LASER_GUN = 'weapon_laser_gun';
 
   const armWithLaserGun = () => {

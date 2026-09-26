@@ -7,7 +7,7 @@ import { SETTING } from '../../modules/fallout/index.js';
 const MK_VI = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi';
 const LASER = 'robot_weapon_assaultron_head_laser';
 // 4-оборотный конденсатор лазерного мушкета: gain quality_crank_x = 4
-const MUSKET_CRANK_MOD = 'mod_050';
+const MUSKET_CRANK_MOD = 'mod_six_crank_capacitor';
 
 const musketCatalog = {
   weapons: SETTING.data.equipment.weapons,
@@ -77,7 +77,7 @@ describe('формулы расхода зарядов в модуле (296/298)
   });
 
   it('моды без ammoPerAttack запросов не дают', () => {
-    const plan = buildMechAmmoSpend({ mods: [{ id: 'mod_047', damageModifier: { op: '+', value: 1 } }] });
+    const plan = buildMechAmmoSpend({ mods: [{ id: 'mod_three_crank_capacitor', damageModifier: { op: '+', value: 1 } }] });
     expect(plan.asks).toEqual([]);
     expect(plan.fixed).toBe(1);
   });

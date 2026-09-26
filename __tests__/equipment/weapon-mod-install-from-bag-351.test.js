@@ -32,7 +32,7 @@ describe('ПРИЁМОЧНЫЙ (патч 351): мод оружия привяз�
 
   beforeEach(() => {
     weaponId = state().addNewItem({ weaponId: 'weapon_10mm_pistol', itemType: 'weapon' });
-    modId = state().addNewItem({ weaponId: 'mod_001', itemType: 'weaponMod' });
+    modId = state().addNewItem({ weaponId: 'mod_rapid', itemType: 'weaponMod' });
   });
 
   it('установка: мод оружия — equipped+installedOn, невидим в сумке; снятие возвращает', () => {
@@ -40,10 +40,10 @@ describe('ПРИЁМОЧНЫЙ (патч 351): мод оружия привяз�
     expect(key).toBeTruthy();
     expect(state().items[key].equipped).toBe(true);
     expect(state().items[key].installedOn).toBe(weaponId);
-    expect(bagIds(state())).not.toContain('mod_001');
+    expect(bagIds(state())).not.toContain('mod_rapid');
 
     state().uninstallArmorMod({ modId, hostKey: weaponId });
-    expect(bagIds(state())).toContain('mod_001');
+    expect(bagIds(state())).toContain('mod_rapid');
     expect(state().items[key].installedOn).toBeUndefined();
   });
 
@@ -55,25 +55,25 @@ describe('ПРИЁМОЧНЫЙ (патч 351): мод оружия привяз�
   });
 
   it('форма правды modIdList: appliedMods приоритетнее modIds', () => {
-    expect(modIdList({ appliedMods: { Receiver: 'mod_001' }, modIds: ['mod_002'] }))
-      .toEqual(['mod_001']);
-    expect(modIdList({ modIds: ['mod_002'] })).toEqual(['mod_002']);
+    expect(modIdList({ appliedMods: { Receiver: 'mod_rapid' }, modIds: ['mod_armor_piercing'] }))
+      .toEqual(['mod_rapid']);
+    expect(modIdList({ modIds: ['mod_armor_piercing'] })).toEqual(['mod_armor_piercing']);
     expect(modIdList({})).toEqual([]);
   });
 
   it('дифф проводки: замена слота = снятие старого + установка нового', () => {
-    const plan = diffModInstallPlan(['mod_001'], ['mod_002']);
-    expect(plan).toEqual({ install: ['mod_002'], uninstall: ['mod_001'] });
+    const plan = diffModInstallPlan(['mod_rapid'], ['mod_armor_piercing']);
+    expect(plan).toEqual({ install: ['mod_armor_piercing'], uninstall: ['mod_rapid'] });
     expect(diffModInstallPlan([], [])).toEqual({ install: [], uninstall: [] });
   });
 
   it('гейт: filterModsByInventory скрывает моды не из сумки (моды оружия — те же id)', () => {
     const mods = [
-      { id: 'mod_001', slot: 'Receiver' },
-      { id: 'mod_004', slot: 'Barrel' },
+      { id: 'mod_rapid', slot: 'Receiver' },
+      { id: 'mod_hardened', slot: 'Barrel' },
     ];
-    const owned = new Set(['mod_001']);
-    expect(filterModsByInventory(mods, owned)).toEqual([{ id: 'mod_001', slot: 'Receiver' }]);
+    const owned = new Set(['mod_rapid']);
+    expect(filterModsByInventory(mods, owned)).toEqual([{ id: 'mod_rapid', slot: 'Receiver' }]);
     // настройка выключена — список без изменений
     expect(filterModsByInventory(mods, null)).toEqual(mods);
   });

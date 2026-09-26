@@ -10,7 +10,7 @@ import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModByI
 import { shiftRange } from '../../../../../domain/range';
 import { applyQualityGain } from '../../../../../domain/weaponQualityConflicts';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
-import { resolveWeaponQualities, resolveWeaponEffects } from '../../../../../domain/weaponDisplay';
+import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../../../domain/weaponDisplay';
 import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../../../src/debug/falloutDebug';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
@@ -44,7 +44,11 @@ function normalizeModRow(row) {
     weight: row.weight ?? 0,
     cost: row.cost ?? 0,
     // Localized description for UI (i18n effectDescription, locale-driven).
-    effectDescription: row.effectDescription || row.effects || '',
+    // 383: описания в i18n-записях модов нет — генерируем из механики мода
+    // («что делает мод?» отвечают данные: урон/скорострельность/эффекты/…).
+    ammoOverride: row.ammoOverride,
+    ammoPerShotDelta: row.ammoPerShotDelta,
+    effectDescription: weaponModRowDescription(row),
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
     rangeModifier: row.rangeModifier,
@@ -331,7 +335,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
 
   const [craftReport, setCraftReport] = useState(null); // 357: отчёт о крафте
   const [settledTime, setSettledTime] = useState(null); // итог после решения про 2 ОД
-  const [installNote, setInstallNote] = useState(null); // 363: видимая отметка установки
 
   const handleCreateMod = (modId, modName) => {
     // 356 (механизм проверок): сложность снята навыком — спросить про бросок.
@@ -660,13 +663,6 @@ const WeaponModificationModal = ({ visible, onClose, weapon, onApplyModification
               </View>
             )}
           </ScrollView>
-
-          {/* 363: зелёная отметка применения — вместо молчаливого закрытия. */}
-          {installNote && (
-            <Text style={styles.installNote}>
-              {`${tWeaponsAndArmorScreen('modals.installApplied')}: ${installNote}`}
-            </Text>
-          )}
 
           {/* Кнопки действий */}
           <View style={styles.modalFooter}>

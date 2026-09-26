@@ -110,7 +110,7 @@ describe('окно улучшения: людские моды подходят 
 
   it('слоты Лазерного резака — слоты Лазерного пистолета (конденсаторы)', () => {
     const slots = catalogGetModsForWeaponSlot('robot_weapon_laser_cutter', 'Capacitor').map((m) => m.id);
-    expect(slots).toEqual(expect.arrayContaining(['mod_043', 'mod_044', 'mod_045', 'mod_046']));
+    expect(slots).toEqual(expect.arrayContaining(['mod_beta_wave_tuner', 'mod_boosted_capacitor', 'mod_photon_exciter', 'mod_photon_agitator']));
   });
 });
 
@@ -127,32 +127,32 @@ describe('оружие «с модом из коробки»: Автоматич
     expect(card.damage).toBe(3);
     expect(card.fireRate).toBe(4);
     expect(card.qualities.map((q) => q.qualityId ?? q)).toContain('quality_inaccurate');
-    expect(card.appliedMods).toEqual({ Receiver: 'mod_008' });
+    expect(card.appliedMods).toEqual({ Receiver: 'mod_automatic' });
   });
 
   it('карточка показывает заводской мод как установленный', () => {
     const cards = collectAttacks({ arm1: slot() });
     const card = cards.find((c) => c.id === 'robot_weapon_auto_10mm');
-    expect(card.modIds).toContain('mod_008');
+    expect(card.modIds).toContain('mod_automatic');
     expect(card.isBuiltin).toBeUndefined(); // в ладони — не встроенное
   });
 
   it('мод игрока в том же слоте снимает заводской: Усиленный (+2 урона) вместо авто', () => {
-    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_005');
+    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_powerful');
     const cards = attacksFromSlot(slot([mod_005]), { slotId: 'arm1' });
     const card = cards.find((c) => c.id === 'robot_weapon_auto_10mm');
     expect(card.damage).toBe(6); // 4 базы + 2 Усиленного, авто-мода нет
     expect(card.fireRate).toBe(2); // базовая скорострельность Пистолета 10мм
-    expect(card.appliedMods).toEqual({ Receiver: 'mod_005' });
-    expect(card.modIds).not.toContain('mod_008');
+    expect(card.appliedMods).toEqual({ Receiver: 'mod_powerful' });
+    expect(card.modIds).not.toContain('mod_automatic');
   });
 
   it('снятие модов возвращает заводской авто-ресивер — это часть сути оружия', () => {
-    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_005');
+    const mod_005 = catalog.weaponMods.find((m) => m.id === 'mod_powerful');
     const cleared = slot([mod_005]);
     cleared.heldWeapon = { id: 'robot_weapon_auto_10mm', appliedMods: {} };
     const card = attacksFromSlot(cleared, { slotId: 'arm1' }).find((c) => c.id === 'robot_weapon_auto_10mm');
-    expect(card.appliedMods).toEqual({ Receiver: 'mod_008' });
+    expect(card.appliedMods).toEqual({ Receiver: 'mod_automatic' });
     expect(card.damage).toBe(3);
   });
 

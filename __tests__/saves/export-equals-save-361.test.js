@@ -62,7 +62,7 @@ describe('ПРИЁМОЧНЫЙ (патч 361): экспорт = сейв', () =>
           limb: {
             id: 'robot_arm_assaultron', itemCategory: 'limb', limbType: 'arm', canHoldWeapons: true, weaponSlots: 1,
             builtinWeapons: [
-              { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_043' }, modIds: ['mod_043'] },
+              { id: 'weapon_laser_gun', weaponId: 'weapon_laser_gun', itemType: 'weapon', appliedMods: { Capacitor: 'mod_beta_wave_tuner' }, modIds: ['mod_beta_wave_tuner'] },
             ],
           },
           armorLayers: { frame: null, plating: null, armor: null }, heldWeapon: null,

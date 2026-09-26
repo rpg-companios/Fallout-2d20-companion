@@ -99,6 +99,34 @@ export const weaponModPatchToStore = (modifiedWeapon) => {
 };
 
 /**
+ * Найти ключ предмета-оружия в сторе по отображаемой (локализованной) карточке.
+ * Патч 380: раньше ключ искали по uniqueId/id, а локализованная карточка несёт
+ * ключ в instanceId; фолбэк «первый надетый предмет» (сравнение
+ * undefined === undefined) отдавал чужой предмет (броню) — мод писался не в
+ * оружие и карточка молча не менялась. Теперь: instanceId → uniqueId → id,
+ * фолбэк — по совпадению только ОПРЕДЕЛЁННЫХ полей (weaponId и т.д.).
+ * Чистая функция (items аргументом) — движок; экран только вызывает.
+ *
+ * @param {object} items  — словарь предметов стора (state.items)
+ * @param {object} weapon — карточка оружия (storeItemToWeaponDisplay/локализованная)
+ * @returns {string|undefined} ключ предмета в сторе
+ */
+export const resolveStoreItemIdFromItems = (items, weapon) => {
+  if (!weapon || !items) return undefined;
+  if (weapon.instanceId && items[weapon.instanceId]) return weapon.instanceId;
+  if (weapon.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
+  if (weapon.id && items[weapon.id]) return weapon.id;
+  return Object.values(items).find(
+    (item) => item.equipped && (
+      (weapon.uniqueId != null && item.uniqueId === weapon.uniqueId)
+      || (weapon.instanceId != null && item.instanceId === weapon.instanceId)
+      || (weapon.weaponId != null && item.weaponId === weapon.weaponId)
+      || (weapon.id != null && item.id === weapon.id)
+    ),
+  )?.id;
+};
+
+/**
  * Convert a normalized store weapon item to legacy display shape
  */
 export const storeItemToWeaponDisplay = (item) => {

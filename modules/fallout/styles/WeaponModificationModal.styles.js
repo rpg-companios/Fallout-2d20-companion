@@ -121,7 +121,6 @@ const styles = StyleSheet.create({
   reportDialog: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: '#5a5a5a', padding: 16, width: '100%' },
   reportTitle: { color: '#000', fontSize: 15, fontWeight: '700', textAlign: 'center' },
   // 363: зелёная отметка применения (вопросы/отказы — AlertHost, 364).
-  installNote: { color: '#16a34a', fontSize: 12, textAlign: 'center', paddingVertical: 6 },
 });
 
 export default styles;
