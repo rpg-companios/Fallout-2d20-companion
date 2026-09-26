@@ -16,6 +16,16 @@
 ---
 ---
 ---
+## Item stats shown inline in the picker (patch 387)
+
+In the add-item modal (loot, starting purchase) each item now shows its
+base characteristics as a sub-line under the name: weapons — "Урон 6 ·
+Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99" (Damage ·
+Fire rate · Range · Weight · Cost), armor — physical/energy/radiation
+ratings, chems and food — their effect, everything — weight and cost.
+Empty values are omitted.
+
+---
 ## Arm-installed Laser Pistol verified on old saves (patch 386)
 
 The Assaultron's second laser — the arm-installed Laser Pistol (as

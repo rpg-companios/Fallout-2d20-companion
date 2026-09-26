@@ -1,0 +1,20 @@
+import { it } from 'vitest';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+const log = (...a) => process.stdout.write('FIELDS ' + a.map((x) => JSON.stringify(x)).join(' ') + '\n');
+it('fields', () => {
+  const c = getEquipmentCatalog('ru-RU');
+  const pick = (arr, keys) => (arr || []).slice(0, 2).map((x) => Object.fromEntries(Object.entries(x).filter(([k]) => keys.includes(k))));
+  log('weapon:', pick(c.weapons, ['id','damage','fireRate','range','rangeName','range_name','weight','cost','damageType']));
+  const armorPiece = (c.armor?.armor || []).flatMap((g) => g.items || []).slice(0, 2);
+  log('armor:', JSON.stringify(armorPiece).slice(0, 600));
+  log('ammo:', pick(c.ammoTypes, ['id','name','weight','cost']));
+  log('chems:', JSON.stringify((c.chems || []).slice(0, 2)).slice(0, 500));
+  log('junk:', pick(c.junk, ['id','name','weight','cost']));
+  log('plating:', pick(c.robotPlating, ['id','name','physicalDR','energyDR','radiationDR','weight','cost']));
+  log('frame:', pick(c.robotFrames, ['id','name','weight','cost']));
+  log('robotModule:', pick(c.robotModules, ['id','name','weight','cost']));
+  log('food:', JSON.stringify((c.food || []).slice(0, 2)).slice(0, 400));
+  log('drinks:', JSON.stringify((c.drinks || []).slice(0, 2)).slice(0, 400));
+  log('generalGoods:', pick(c.generalGoods, ['id','name','weight','cost']));
+  log('materials:', pick(c.materials, ['id','name','weight','cost']));
+});

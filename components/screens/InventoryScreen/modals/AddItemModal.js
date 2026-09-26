@@ -5,6 +5,7 @@ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory } from '../logic/inventoryI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/AddItemModal.styles';
+import { describeItemBasics } from '../../../../domain/itemBasics';
 
 const CATEGORY_ICONS = {
   weapon: '🔫',
@@ -297,12 +298,15 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;
     const itemTypeLabel = isItem ? getTypeLabelAndIcon(item.itemType) : '';
+    const basicsLine = isItem ? describeItemBasics(item, moduleLocale) : '';
 
     return (
       <TouchableOpacity style={styles.itemContainer} onPress={() => handleSelect(item)}>
         <Text style={styles.itemName}>{isItem ? item.name : item}</Text>
         {!isItem && <Text style={styles.itemType}>{CATEGORY_ICONS[Object.keys(CATEGORY_ICONS).find((key) => tInventory(`modals.addItemModal.categories.${key}`) === item)] || '📁'}</Text>}
         {isItem && Boolean(itemTypeLabel) && <Text style={styles.itemType}>{itemTypeLabel}</Text>}
+        {/* 387 (слово владельца): базовые характеристики предмета подстрокой */}
+        {isItem && Boolean(basicsLine) && <Text style={styles.itemBasics}>{basicsLine}</Text>}
       </TouchableOpacity>
     );
   };
