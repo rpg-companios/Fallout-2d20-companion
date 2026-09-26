@@ -1,0 +1,195 @@
+diff --git a/__tests__/equipment/item-basics-line-387.test.js b/__tests__/equipment/item-basics-line-387.test.js
+index 68c06e6..bfcde34 100644
+--- a/__tests__/equipment/item-basics-line-387.test.js
++++ b/__tests__/equipment/item-basics-line-387.test.js
+@@ -19,12 +19,18 @@ const junk = () => catalog.junk.find((j) => j.cost > 0);
+ const drink = () => catalog.drinks.find((d) => d.positiveEffectLabel);
+ 
+ describe('патч 387: базовые характеристики предмета одной строкой', () => {
+-  it('оружие: Урон · Скорострельность · Дальность · Вес · Цена', () => {
++  it('оружие: Урон · Скорострельность · Дальность · Боеприпас · Эффекты · Качества · Вес · Цена', () => {
+     expect(describeItemBasics(weapon('weapon_44_pistol'), 'ru-RU'))
+-      .toBe('Урон 6 · Скорострельность 1 · Дальность: Близкая · Вес 4 · Цена 99');
++      .toBe('Урон 6 · Скорострельность 1 · Дальность: Близкая · Боеприпас: Патрон .44 Магнум · Эффекты: Порочный · Качества: Вплотную · Вес 4 · Цена 99');
++    // ammoId списком: «Энергоячейка / Ядерный блок»
++    expect(describeItemBasics(weapon('weapon_gatling_laser'), 'ru-RU'))
++      .toBe('Урон 3 · Скорострельность 6 · Дальность: Средняя · Боеприпас: Энергоячейка / Ядерный блок · Эффекты: Очередь, Проникающий · Качества: Двуручное, Гатлинг, Неточное · Вес 19 · Цена 804');
+     const en10 = catalogEn.weapons.find((w) => w.id === 'weapon_10mm_pistol');
+     expect(describeItemBasics(en10, 'en-EN'))
+-      .toBe('Damage 4 · Fire rate 2 · Range: Close · Weight 4 · Cost 50');
++      .toBe('Damage 4 · Fire rate 2 · Range: Close · Ammo: 10mm Round · Qualities: Close Quarters, Reliable · Weight 4 · Cost 50');
++    // без патронов/качеств — этих кусков просто нет
++    const gauntlet = describeItemBasics(weapon('weapon_deathclaw_gauntlet'), 'ru-RU');
++    expect(gauntlet).toBe('Урон 5 · Эффекты: Проникающий · Вес 10 · Цена 75');
+   });
+ 
+   it('броня: СУ по трём типам (ноль СУ показываем), вес, цена', () => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c4245e8..bb57458 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,18 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **387** (слово владельца: «в модалке выбора
++· последний сданный патч: **388** (дополнение строки характеристик —
++слово владельца: «оружию ещё тип патронов, эффекты и качества».
++weaponDisplay: локале-явные хелперы weaponEffectsLabel/
++weaponQualitiesLabel/resolveAmmoName (resolveWeapon* — делегируют,
++поведение прежнее); itemBasics: для оружия «Боеприпас: …» (ammoId бывает
++списком через запятую → «Энергоячейка / Ядерный блок»; ammo_anything не
++пишем), «Эффекты: …», «Качества: …» — после Дальности, до Вес/Цены.
++Пример: «Урон 6 · Скорострельность 1 · Дальность: Близкая · Боеприпас:
++Патрон .44 Магнум · Эффекты: Порочный · Качества: Вплотную · Вес 4 ·
++Цена 99». Тест item-basics-line-387 дополнен (gatling laser, перчатка
++когтя смерти — куски отсутствуют честно) ·
++предыдущий: **387** (слово владельца: «в модалке выбора
+ предметов Лута или торговли у предмета — базовые характеристики
+ подстрокой в строчку». Модалка = общий AddItemModal (лут + стартовая
+ закупка + покупка). Новый чистый domain/itemBasics.js:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 125501a..9007235 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,14 @@
+ ---
+ ---
+ ---
++---
++## Weapon lines in the picker now include ammo, effects, qualities (patch 388)
++
++The item stats line for weapons now lists the ammo type after range
++(two calibers → "Энергоячейка / Ядерный блок"), then effects and
++qualities — the same localized names as on the weapon card. Weapons
++without ammo or qualities simply omit those parts.
++
+ ---
+ ## Item stats shown inline in the picker (patch 387)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 82b2f3a..92acfc1 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## В строке предмета у оружия — патроны, эффекты и качества (патч 388)
++
++Строка характеристик в окне выбора предметов для оружия пополнена:
++после дальности пишутся тип патронов (если их два — оба: «Энергоячейка /
++Ядерный блок»), затем эффекты и качества — теми же именами, что на
++карточке оружия. У оружия без патронов или качеств этих кусков в строке
++просто нет.
++
+ ---
+ ## В окне выбора предметов — характеристики прямо в строке (патч 387)
+ 
+diff --git a/domain/itemBasics.js b/domain/itemBasics.js
+index aa79c03..bc9fc57 100644
+--- a/domain/itemBasics.js
++++ b/domain/itemBasics.js
+@@ -11,17 +11,20 @@
+ // логика живёт здесь, а модалка только вызывает.
+ 
+ import { getCurrentModuleLocale } from '../i18n/locale';
++import { resolveAmmoName, weaponEffectsLabel, weaponQualitiesLabel } from './weaponDisplay';
+ 
+ const LABELS = {
+   'ru-RU': {
+     damage: 'Урон', fireRate: 'Скорострельность', range: 'Дальность',
+     physical: 'Физ', energy: 'Энерг', radiation: 'Рад',
+     weight: 'Вес', cost: 'Цена',
++    ammo: 'Боеприпас', effects: 'Эффекты', qualities: 'Качества',
+   },
+   'en-EN': {
+     damage: 'Damage', fireRate: 'Fire rate', range: 'Range',
+     physical: 'Phys', energy: 'Energy', radiation: 'Rad',
+     weight: 'Weight', cost: 'Cost',
++    ammo: 'Ammo', effects: 'Effects', qualities: 'Qualities',
+   },
+ };
+ 
+@@ -63,6 +66,22 @@ export function describeItemBasics(item, locale = getCurrentModuleLocale()) {
+     parts.push(`${L.range}: ${item.rangeName || item.range_name}`);
+   }
+ 
++  // 387 (слово владельца): у оружия ещё тип патронов, эффекты и качества.
++  // ammoId бывает списком через запятую («ammo_energy_cell,ammo_fusion_core»);
++  // ammo_anything («что угодно») в строку не пишем.
++  if (item.ammoId) {
++    const names = String(item.ammoId)
++      .split(',')
++      .map((id) => id.trim())
++      .filter((id) => id && id !== 'ammo_anything')
++      .map((id) => resolveAmmoName(id, locale));
++    if (names.length) parts.push(`${L.ammo}: ${names.join(' / ')}`);
++  }
++  const effectsLine = weaponEffectsLabel(item.effects, locale);
++  if (effectsLine) parts.push(`${L.effects}: ${effectsLine}`);
++  const qualitiesLine = weaponQualitiesLabel(item.qualities, locale);
++  if (qualitiesLine) parts.push(`${L.qualities}: ${qualitiesLine}`);
++
+   // Броня/обшивка/силовая броня: СУ по трём типам (ноль у СУ показываем —
+   // «нет защиты от радиации» это характеристика, а не пустота). У оружия в
+   // данных тоже лежат *DamageRating (нули) — там их не показываем.
+diff --git a/domain/weaponDisplay.js b/domain/weaponDisplay.js
+index 98f7f08..f9d4789 100644
+--- a/domain/weaponDisplay.js
++++ b/domain/weaponDisplay.js
+@@ -51,8 +51,10 @@ const DAMAGE_TYPE_LABELS = {
+  * @param {any} qualities
+  * @returns {string}
+  */
+-export function resolveWeaponQualities(qualities) {
+-  const locale = getCurrentModuleLocale();
++// 387: локале-явная форма для переиспользования (строка базовых
++// характеристик предмета — domain/itemBasics.js); resolveWeaponQualities
++// ниже — обёртка над ней с текущей локалью (поведение прежнее).
++export function weaponQualitiesLabel(qualities, locale = getCurrentModuleLocale()) {
+   const dict = QUALITY_DICTS[locale];
+   if (!dict) {
+     throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря качеств`);
+@@ -89,8 +91,7 @@ export function resolveWeaponQualities(qualities) {
+  символа эффекта). В отличие от качеств, эффекты — отдельная сущность.
+  Принимает массив {effectId, value?} (или JSON-строку из БД).
+  */
+-export function resolveWeaponEffects(effects) {
+-  const locale = getCurrentModuleLocale();
++export function weaponEffectsLabel(effects, locale = getCurrentModuleLocale()) {
+   const dict = EFFECT_DICTS[locale];
+   if (!dict) {
+     throw new Error(`[weaponDisplay] Для языка сеттинга "${locale}" нет словаря эффектов урона`);
+@@ -119,6 +120,20 @@ export function resolveWeaponEffects(effects) {
+     .join(', ');
+ }
+ 
++export function resolveWeaponEffects(effects) {
++  return weaponEffectsLabel(effects, getCurrentModuleLocale());
++}
++
++export function resolveWeaponQualities(qualities) {
++  return weaponQualitiesLabel(qualities, getCurrentModuleLocale());
++}
++
++/** Локализованное имя боеприпаса; неизвестный id — как есть. */
++export function resolveAmmoName(ammoId, locale = getCurrentModuleLocale()) {
++  if (!ammoId) return '';
++  return AMMO_DICTS[locale]?.[ammoId] || ammoId;
++}
++
+ /**
+  * Resolves a weapon's damageType to a localized string.
+  *
+diff --git a/public/version.json b/public/version.json
+index fa4deb8..63ca7f4 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "387",
++  "version": "388",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
