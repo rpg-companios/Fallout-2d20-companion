@@ -207,8 +207,10 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 // Chrome молча не показывает диалог, если считает приложение установленным;
 // манифест/иконки/воркер проверяются живьём; «уже установлено» — через
 // getInstalledRelatedApps (related_applications добавлены в manifest.json).
+// 392: «установлено / не установлено» — не провал, а пояснение, поэтому
+// оно вне списка проверок с красным стилем (краснеет только настоящий
+// провал: воркер / манифест / иконки).
 const INSTALL_DIAG_LINES = [
-  ['installed', 'pwa.diagInstalledYes', 'pwa.diagInstalledNo'],
   ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
   ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
   ['icons', 'pwa.diagIconsYes', 'pwa.diagIconsNo'],
@@ -243,11 +245,19 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
           found.manifest = true;
           const manifest = await res.json();
           const icons = (manifest.icons || []).filter((icon) => icon?.src).slice(0, 2);
+          // 392: именно window.Image — в этом файле «Image» из react-native,
+          // его конструктор строит компонент, а не картинку, и проверка
+          // рапортовала «иконки не загружаются» всегда. try/catch, чтобы
+          // никакой бросок не подвесил обещание.
           const loaded = await Promise.all(icons.map((icon) => new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-            img.src = icon.src;
+            try {
+              const img = new window.Image();
+              img.onload = () => resolve(true);
+              img.onerror = () => resolve(false);
+              img.src = icon.src;
+            } catch (_) {
+              resolve(false);
+            }
           })));
           found.icons = loaded.length > 0 && loaded.every(Boolean);
         }
@@ -269,6 +279,11 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
   return (
     <View style={styles.diagBlock}>
       <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
+      {results.installed ? (
+        <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagInstalledYes')}</Text>
+      ) : (
+        <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagInstalledNo')}</Text>
+      )}
       {INSTALL_DIAG_LINES.map(([key, yesKey, noKey]) => (
         <Text key={key} style={[styles.diagText, !results[key] && styles.diagTextBad]}>
           {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}

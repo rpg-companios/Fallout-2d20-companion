@@ -16,6 +16,38 @@
 ---
 ---
 ---
+## The installer explains the cutoff in plain words (patch 393)
+
+When an install goes through the cutoff, patches up to the key one do
+not appear in the "applied" list — their content arrives from the
+branch history as a whole. It used to look like a patch was skipped;
+now the installer explicitly says those patches are already in the
+tree and are not applied one by one.
+
+---
+## The diagnostics itself fixed (patch 392)
+
+Both red lines in the install check were bugs of the diagnostics, not
+the app: "Not installed before" is normal and is now shown as a green
+line, and the icon check always reported failure because of an internal
+mistake (the wrong image constructor was used). After the update the
+check will honestly show the icon status for the first time: if they
+are green — the install problem is elsewhere, and the "already
+installed" line will hint at it.
+
+---
+## Patch installs: cutoff at a key patch (patch 391)
+
+The installer no longer re-verifies the whole chain from scratch: a
+baseline.json file names the key patch (currently 391). On a clean
+tree (everything committed) the installer brings the files to the key
+patch's state straight from the branch history and only checks the
+patches after it — hundreds of checks become a few. With uncommitted
+changes or incomplete history it automatically falls back to the old
+full pass, nothing breaks. The cutoff can be moved to a later patch at
+any time — just name the number.
+
+---
 ## Install diagnostics behind a switch (patch 390)
 
 The technical check inside the install dialog is no longer shown to
