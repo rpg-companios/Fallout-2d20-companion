@@ -1,0 +1,192 @@
+diff --git a/__tests__/equipment/weapon-mod-item-canonical-398.test.js b/__tests__/equipment/weapon-mod-item-canonical-398.test.js
+new file mode 100644
+index 0000000..e4de5a8
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-item-canonical-398.test.js
+@@ -0,0 +1,70 @@
++// ПРИЁМОЧНЫЙ (патч 398): «загрузил старый сейв, в инвентаре оказался мод
++// mod_043, но сейчас имена все другие. И никакого парсера не было в
++// миграторе сейвов» (владелец). Мост 375 переводил appliedMods/modIds,
++// но не каталог-id самого мод-предмета (поле weaponId) — старые моды
++// из сумки оставались mod_NNN вне каталога, с голым id вместо имени.
++// 398: weaponId проходит через ту же карту; оружие/робо-моды насквозь;
++// идемпотентно; без подъёма версии схемы. Точка применения —
++// deserializeState (src/saves/characterSaves.js), он уже зовёт мост.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import {
++  WEAPON_MOD_ID_MAP,
++  migrateWeaponModIdsToCanonical,
++} from '../../domain/weaponModCanonical';
++import catalog from '../../modules/fallout/data/equipment/weapon_mods.json';
++
++describe('патч 398: мод-предметы инвентаря канонизируются при загрузке', () => {
++  it('репорт владельца: предмет с weaponId mod_043 получает канон-id из каталога', () => {
++    const state = {
++      items: {
++        inst1: { weaponId: 'mod_043', qty: 1, name: 'whatever' },
++        inst2: { weaponId: 'weapon_10mm_pistol', qty: 1 },
++        inst3: { weaponId: 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v' },
++      },
++    };
++    const out = migrateWeaponModIdsToCanonical(state);
++    expect(out.items.inst1.weaponId).toBe('mod_beta_wave_tuner');
++    expect(out.items.inst2.weaponId).toBe('weapon_10mm_pistol');
++    expect(out.items.inst3.weaponId).toBe('robot_weapon_mod_assaultron_head_laser_capacitor_mk_v');
++    // канон-id реально существует в каталоге модов (имя оживёт)
++    expect(catalog.some((m) => m.id === 'mod_beta_wave_tuner')).toBe(true);
++  });
++
++  it('слияние фантомов: разные старые носители дают один канон', () => {
++    const out = migrateWeaponModIdsToCanonical({
++      items: {
++        a: { weaponId: 'mod_051' },
++        b: { weaponId: 'mod_075' },
++      },
++    });
++    expect(out.items.a.weaponId).toBe('mod_long_barrel');
++    expect(out.items.b.weaponId).toBe('mod_long_barrel');
++  });
++
++  it('карта покрывает mod_043 и вообще все mod_NNN вида mod_0NN из репорта', () => {
++    expect(WEAPON_MOD_ID_MAP['mod_043']).toBe('mod_beta_wave_tuner');
++    expect(Object.keys(WEAPON_MOD_ID_MAP).length).toBeGreaterThanOrEqual(205);
++  });
++
++  it('идемпотентно; контейнеры 375 не сломаны', () => {
++    const state = {
++      items: { w: { weaponId: 'mod_043', appliedMods: { Receiver: 'mod_004' }, modIds: ['mod_030'] } },
++    };
++    const once = migrateWeaponModIdsToCanonical(state);
++    expect(once.items.w).toEqual({
++      weaponId: 'mod_beta_wave_tuner',
++      appliedMods: { Receiver: 'mod_hardened' },
++      modIds: ['mod_recoil_compensating_stock'],
++    });
++    const twice = migrateWeaponModIdsToCanonical(once);
++    expect(twice.items.w).toEqual(once.items.w);
++  });
++
++  it('проводка: точка чтения сейва зовёт мост (без подъёма версии схемы)', () => {
++    const src = readFileSync('src/saves/characterSaves.js', 'utf8');
++    expect(src).toContain('migrateWeaponModIdsToCanonical(migrated)');
++    expect(src).not.toMatch(/schemaVersion.*\+\s*1/);
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4f52063..48b9938 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,21 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **397** (владелец: «приложение не находит
++· последний сданный патч: **398** (СИЛЬНЫЙ баг от владельца: «загрузил
++старый сейв — в инвентаре мод mod_043, а имена теперь все другие;
++никакого парсера в миграторе сейвов не было»). Мост 375
++(migrateWeaponModIdsToCanonical, зовётся в deserializeState) переводил
++только appliedMods/modIds, но НЕ каталог-id самого мод-предмета — у
++предмета-носителя это поле weaponId; старые моды из сумки оставались
++mod_NNN вне каталога = голый id вместо имени. 398: weaponId проходит
++через ту же карту (оружие weapon_* и робо-моды насквозь; фантомы
++mod_051/mod_075 → mod_long_barrel — два носителя получат одно имя,
++ожидаемо); идемпотентно; без подъёма версии схемы. Карта 205 записей,
++mod_043 → mod_beta_wave_tuner; канон есть в каталоге. Заслон:
++weapon-mod-item-canonical-398 (репорт-кейс, фантомы, идемпотентность,
++проводка deserializeState). ВНИМАНИЕ агенту: любые НОВЫЕ поля сейва,
++несущие каталог-id модов, обязаны идти через remapModId в этом мосту ·
++предыдущий: **397** (владелец: «приложение не находит
+ иконку ammo для карточек крафта. Может bullet или shotgun shell?»).
+ В CATEGORY_ICONS (modules/fallout/screens/InventoryScreen/modals/
+ CraftingModal.js) стоял ammo: 'ammo' — глифа «ammo» в подключённом
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1822eca..4451dae 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,18 @@
+ ---
+ ---
+ ---
++---
++## Old saves: bag mods get their names back (patch 398)
++
++A serious bug fixed: saves made before the mod catalog revision kept
++bag mods under legacy numbers (mod_043 and alike), because the load
++bridge translated only mods already installed on weapons — mods in the
++bag stayed legacy and showed a bare «mod_043» instead of a name. They
++are now translated on load too: name, price and stats come back. The
++fix happens right when a save is opened, no player action needed, and
++re-loading is safe. A mod that was one of the removed duplicates gets
++the name of the canon it was merged into.
++
+ ---
+ ## Ammo icon in the crafting window (patch 397)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 44616e1..fc07a6c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,18 @@
+ # История изменений
+ 
++---
++## Старые сейвы: моды из сумки снова со своими именами (патч 398)
++
++Найден сильный баг: сейвы, сделанные до ревизии каталога модов, несли
++в инвентаре моды со старыми номерами (mod_043 и подобные), а мост при
++загрузке переводил только моды, УЖЕ поставленные на оружие, — моды в
++сумке оставались со старыми номерами и показывались голым «mod_043»
++вместо имени. Теперь при загрузке переводятся и они: имя, цена и
++характеристики оживают. Починка происходит прямо при открытии сейва,
++без каких-либо действий со стороны игрока; повторная загрузка ничего
++не портит. Если мод в сумке был из удалённых дублей — он получит имя
++того канона, в который дубль слился.
++
+ ---
+ ## Иконка боеприпасов в окне крафта (патч 397)
+ 
+diff --git a/domain/weaponModCanonical.js b/domain/weaponModCanonical.js
+index e9673b0..fb2a85b 100644
+--- a/domain/weaponModCanonical.js
++++ b/domain/weaponModCanonical.js
+@@ -242,6 +242,16 @@ const remapModsContainer = (value) => {
+  * Рекурсивный обход: предметы инвентаря, надетое оружие, слоты роботов —
+  * контейнеры модов встречаются в любой ветке состояния. Идемпотентно:
+  * канон-id отсутствуют в карте и не меняются.
++ *
++ * 398 (репорт владельца: «загрузил старый сейв — в инвентаре мод mod_043,
++ * а имена теперь все другие»): мост 375 переводил только контейнеры
++ * appliedMods/modIds, но НЕ каталог-id самого предмета-носителя — у
++ * мод-предмета в инвентаре это поле weaponId. Старый сейв нёс
++ * weaponId: 'mod_043', в каталоге такого больше нет — предмет показывался
++ * голым id. Теперь weaponId тоже проходит через карту (id оружия
++ * «weapon_*» и робо-моды «robot_weapon_mod_*» в карте отсутствуют и
++ * проходят насквозь; слияние фантомов mod_051/mod_075 → mod_long_barrel
++ * даёт одинаковое имя у двух старых носителей — это ожидаемо).
+  */
+ export function migrateWeaponModIdsToCanonical(state) {
+   if (!state || typeof state !== 'object') return state;
+@@ -257,6 +267,10 @@ export function migrateWeaponModIdsToCanonical(state) {
+     if (!node || typeof node !== 'object') return;
+     if ('appliedMods' in node) node.appliedMods = remapModsContainer(node.appliedMods);
+     if ('modIds' in node) node.modIds = remapModsContainer(node.modIds);
++    // 398: каталог-id предмета-носителя мода (см. комментарий функции).
++    if ('weaponId' in node && typeof node.weaponId === 'string') {
++      node.weaponId = remapModId(node.weaponId);
++    }
+     for (const v of Object.values(node)) {
+       if (v && typeof v === 'object') walk(v);
+     }
+diff --git a/public/version.json b/public/version.json
+index e153a59..a05670e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "397",
++  "version": "398",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
