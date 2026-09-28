@@ -1,0 +1,150 @@
+diff --git a/__tests__/screens/release-2-notes-401.test.js b/__tests__/screens/release-2-notes-401.test.js
+new file mode 100644
+index 0000000..bf3182a
+--- /dev/null
++++ b/__tests__/screens/release-2-notes-401.test.js
+@@ -0,0 +1,33 @@
++// ПРИЁМОЧНЫЙ (патч 401): релиз 2 объявлен владельцем. Заметки релиза —
++// на языке игрока (без номеров патчей и служебных слов), парные ru/en,
++// не дублируют релиз 1 (крафтовое окно/час на крафт/пул ОД/взрывчатка),
++// окно «Что нового» покажет их один раз (release 2 > 1).
++import { describe, expect, it } from 'vitest';
++import notes from '../../public/version.json';
++
++describe('патч 401: релиз 2 — заметки «Что нового»', () => {
++  it('релиз поднят до 2, версия = 400; заметки парные', () => {
++    expect(notes.release).toBe(2);
++    expect(notes.version).toBe('400');
++    expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
++    expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
++  });
++
++  it('язык игрока: без номеров патчей и служебных слов', () => {
++    for (const list of [notes.notes['ru-RU'], notes.notes['en-EN']]) {
++      for (const line of list) {
++        expect(line).not.toMatch(/патч|patch \d/i);
++        expect(line).not.toMatch(/агент|baseline|мост|bridge/i);
++      }
++    }
++  });
++
++  it('не дублирует релиз 1 (крафтовое окно/час/пул ОД как там)', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    expect(ru).not.toContain('квадраты категорий');
++    expect(ru).not.toContain('час на изготовление');
++    // но новые темы присутствуют
++    expect(ru).toContain('Бета-волновой тюнер');
++    expect(ru).toContain('Посох Атома');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index d9a2ca6..7ec9718 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,16 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **400** (владелец: «мы делаем универсальное
++· последний сданный патч: **401** (РЕЛИЗ 2 объявлен владельцем:
++«теперь делаем описание релиза. что мы сделали систему крафта и т.п»).
++version.json: release 2, version 400; заметки = патчи 336–400
++(крафт модов оружия+брони, честные правила сложности 0, канон-имена
++улучшений, модель «моды-вещи», автосверка при загрузке, робо-моды,
++Посох Атома + Шахтёрский перфоратор, характеристики в строке выбора,
++подсказки улучшений, PWA-установка). Заметки СВЕРЕНЫ с журналом —
++не дублируют релиз 1 (окно крафта, час на крафт, пул ОД, взрывчатка).
++Релизы объявляет только владелец — следующий только по его слову ·
++предыдущий: **400** (владелец: «мы делаем универсальное
+ приложение… поведение модов же универсально» — запрет на исключения
+ «броня/робо-моды живут по своим законам»). ЗАКОН МОДОВ ТЕПЕРЬ ОДИН:
+ сверка «записи ↔ слоты» при загрузке ведёт все семьи — оружие
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index eb4aad5..fd11bfb 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,15 @@
+ ---
+ ---
+ ---
++---
++## Release 2 (declared by the owner)
++
++The «What's new» notes now cover patches 336–400: mod crafting (weapons
++and armor), real mod names instead of numbers, mods as tangible things
++with auto-reconciliation on load, robot mods under the same rules,
++item stats in the picker row, and the fixed PWA installation. Details
++in the «What's new» window after the update.
++
+ ---
+ ## One law for all mods (patch 400)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d0eba7b..81e3fbd 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## Релиз 2 (объявлен владельцем)
++
++Заметки «Что нового» переписаны на патчи 336–400: крафт улучшений
++(оружие и броня), настоящие имена улучшений вместо номеров, моды как
++осязаемые вещи с автосверкой при загрузке, робо-моды по общим правилам,
++характеристики предметов в строке выбора, починенная установка PWA.
++Подробности — в окне «Что нового» после обновления.
++
+ ---
+ ## Один закон для всех модов (патч 400)
+ 
+diff --git a/public/version.json b/public/version.json
+index 8a10717..f127d3a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,24 +1,30 @@
+ {
+   "version": "400",
+-  "release": "1",
++  "release": 2,
+   "notes": {
+     "ru-RU": [
+-      "Крафт: новое окно — квадраты категорий как карточки персонажей на фоне сеттинга, спойлеры-карточки, материалы плоским списком «тип — есть/нужно»",
+-      "Правила книги: час на изготовление (еда и напитки — 20 минут), проверка ИНТ + навык, осложнение добавляет время",
+-      "Общий пул очков действий (6): успешные проверки пополняют, 2 ОД сокращают время вдвое",
+-      "Взрывчатка — отдельная категория рецептов; потеря материалов при провале — настройка",
+-      "Моды брони: книжная таблица и правила записаны; крафт модов — следующий шаг (ждём таблицу эффектов)",
+-      "Из общих модов убраны три ошибочных «материала» синтов; старые сохранения чистятся автоматически",
+-      "Окно «Что нового» теперь показывается один раз на релиз"
++      "Крафт улучшений: рецепты появились у всех модов оружия и у модов брони; кнопка «Создать» — прямо из окна установки модов, отчёт о крафте — там же.",
++      "Честные правила книги: при сложности 0 игра спрашивает, бросать ли кубики; провал — «нет успеха + осложнение»; сверх-успех всегда даёт очки действий.",
++      "Улучшения оружия получили настоящие имена вместо номеров (mod_043 → «Бета-волновой тюнер»); дубли слиты; у каждого оружия — полный набор улучшений, включая ближний бой.",
++      "Моды — вещи, а не абстракции: мод из сумки вставляется в оружие и снимается обратно в общую пачку; продаёшь оружие — моды уходят вместе с ним; правила едины для оружия, брони и одежды.",
++      "При загрузке персонажа моды сверяются со слотами сами: ничего не теряется и никогда не удваивается, старые сохранения чинятся при первом же открытии.",
++      "Улучшения роботов по тем же правилам: лазеры Штурмотрона, энергоячейка вместо термоядерного магазина, снятие улучшений с Головного лазера.",
++      "Новое снаряжение: Посох Атома и Шахтёрский перфоратор.",
++      "В окне выбора предметов — характеристики прямо в строке: урон, скорострельность, дальность, боеприпасы, эффекты, качества, вес и цена.",
++      "В окне улучшений написано, что делает каждое улучшение; установленный мод виден на карточке оружия.",
++      "Установка приложения (PWA) починена: браузеру возвращён его родной диалог установки; если браузер ставить не умеет — приложение подскажет путь и покажет диагностику установки (включается в настройках)."
+     ],
+     "en-EN": [
+-      "Crafting: a new window — character-card style tiles over the setting background, perk-style spoiler cards, flat \"type — have/need\" material lines",
+-      "Book rules: one hour per craft (food and drinks — 20 minutes), INT + skill check, complications add time",
+-      "Group action-point pool (6): successful checks refill it, 2 AP halve the time",
+-      "Explosives is its own recipe category; material loss on failure is a setting",
+-      "Armor mods: the book table and rules are recorded; mod crafting is next (awaiting the effects table)",
+-      "Three misplaced synth \"material\" mods removed from generic mods; old saves are cleaned automatically",
+-      "The \"What's new\" window now shows once per release"
++      "Mod crafting: recipes added for every weapon mod and armor mod; a «Craft» button right in the mod-install window, with the crafting report in the same place.",
++      "Honest book rules: at difficulty 0 the game asks whether to roll; failure means «no success + complication»; great success always grants action points.",
++      "Weapon mods got real names instead of numbers (mod_043 → «Beta Wave Tuner»); duplicates merged; every weapon now has its full mod list, including melee.",
++      "Mods are things, not abstractions: a mod from the bag is installed into a weapon and removed back into the shared stack; sell a weapon — its mods go with it; the same rules for weapons, armor and clothing.",
++      "On every character load, mods are reconciled with slots: nothing is lost and nothing ever doubles; old saves repair themselves on first open.",
++      "Robot mods follow the same rules: the Assaultron lasers, an energy cell instead of the fusion magazine, removing mods from the Head Laser.",
++      "New gear: the Atom's Staff and the Miner's Jackhammer.",
++      "The item picker shows stats right in the row: damage, fire rate, range, ammo, effects, qualities, weight and cost.",
++      "The mod window explains what each mod does; an installed mod is visible on the weapon card.",
++      "App installation (PWA) is fixed: the browser got its native install prompt back; if a browser cannot install, the app suggests the way and shows install diagnostics (a toggle in settings)."
+     ]
+   }
+ }
