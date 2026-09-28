@@ -1,0 +1,193 @@
+diff --git a/__tests__/screens/pwa-diagnostics-icons-392.test.js b/__tests__/screens/pwa-diagnostics-icons-392.test.js
+new file mode 100644
+index 0000000..4b2d07a
+--- /dev/null
++++ b/__tests__/screens/pwa-diagnostics-icons-392.test.js
+@@ -0,0 +1,44 @@
++// ПРИЁМОЧНЫЙ (патч 392): репорт владельца из диагностики 390/391 — красные
++// «Раньше приложение не установлено» и «Иконки не загружаются».
++// Обе строки оказались дефектами самой диагностики:
++//   • «не установлено» — норма, а рисовалось красным ✕ (стиль вешался на
++//     любой false); теперь это зелёная ✓-строка, «уже установлено» —
++//     янтарное ℹ-пояснение;
++//   • проверка иконок делала new Image() в файле, где Image импортирован
++//     из react-native: строился компонент RN, а не картинка, и проверка
++//     ВСЕГДА рапортовала провал. Теперь конструктор берётся честно —
++//     window.Image, обещанию не дать зависнуть (try/catch в executor).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import ru from '../../i18n/ru-RU/screens/home/screen.json';
++import en from '../../i18n/en-EN/screens/home/screen.json';
++
++const code = () => readFileSync('components/screens/HomeScreen/HomeScreen.js', 'utf8');
++
++describe('патч 392: починка диагностики PWA (иконки и «не установлено»)', () => {
++  it('проверка иконок использует window.Image, new Image() в файле нет', () => {
++    const src = code();
++    expect(src).toContain('new window.Image()');
++    expect(src.includes('new Image()')).toBe(false);
++    expect(src).toContain('resolve(false);');
++  });
++
++  it('«не установлено» не краснеет: installed вне списка ошибочных проверок', () => {
++    const src = code();
++    const list = /const INSTALL_DIAG_LINES = \[[\s\S]*?\];/.exec(src)[0];
++    expect(list).not.toContain('installed');
++    expect(list).toContain("'sw'");
++    expect(list).toContain("'manifest'");
++    expect(list).toContain("'icons'");
++    expect(src).toContain("styles.diagTextInfo");
++    expect(src).toContain("tHomeScreen('pwa.diagInstalledNo')");
++  });
++
++  it('строки пояснений на месте в обоих словарях', () => {
++    expect(ru.pwa.diagInstalledNo).toContain('нормально');
++    expect(ru.pwa.diagInstalledYes).toContain('УЖЕ установлен');
++    expect(en.pwa.diagInstalledNo).toBeTruthy();
++    expect(en.pwa.diagInstalledYes).toContain('ALREADY installed');
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 2fba3f3..de1d5f5 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -207,8 +207,10 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
+ // Chrome молча не показывает диалог, если считает приложение установленным;
+ // манифест/иконки/воркер проверяются живьём; «уже установлено» — через
+ // getInstalledRelatedApps (related_applications добавлены в manifest.json).
++// 392: «установлено / не установлено» — не провал, а пояснение, поэтому
++// оно вне списка проверок с красным стилем (краснеет только настоящий
++// провал: воркер / манифест / иконки).
+ const INSTALL_DIAG_LINES = [
+-  ['installed', 'pwa.diagInstalledYes', 'pwa.diagInstalledNo'],
+   ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
+   ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
+   ['icons', 'pwa.diagIconsYes', 'pwa.diagIconsNo'],
+@@ -243,11 +245,19 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
+           found.manifest = true;
+           const manifest = await res.json();
+           const icons = (manifest.icons || []).filter((icon) => icon?.src).slice(0, 2);
++          // 392: именно window.Image — в этом файле «Image» из react-native,
++          // его конструктор строит компонент, а не картинку, и проверка
++          // рапортовала «иконки не загружаются» всегда. try/catch, чтобы
++          // никакой бросок не подвесил обещание.
+           const loaded = await Promise.all(icons.map((icon) => new Promise((resolve) => {
+-            const img = new Image();
+-            img.onload = () => resolve(true);
+-            img.onerror = () => resolve(false);
+-            img.src = icon.src;
++            try {
++              const img = new window.Image();
++              img.onload = () => resolve(true);
++              img.onerror = () => resolve(false);
++              img.src = icon.src;
++            } catch (_) {
++              resolve(false);
++            }
+           })));
+           found.icons = loaded.length > 0 && loaded.every(Boolean);
+         }
+@@ -269,6 +279,11 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
+   return (
+     <View style={styles.diagBlock}>
+       <Text style={styles.diagTitle}>{tHomeScreen('pwa.diagnosticsTitle')}</Text>
++      {results.installed ? (
++        <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagInstalledYes')}</Text>
++      ) : (
++        <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagInstalledNo')}</Text>
++      )}
+       {INSTALL_DIAG_LINES.map(([key, yesKey, noKey]) => (
+         <Text key={key} style={[styles.diagText, !results[key] && styles.diagTextBad]}>
+           {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 93536c7..31df151 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,19 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **391** (владелец: «скрипт установки проверяет
++· последний сданный патч: **392** (репорт владельца из диагностики 390:
++красные «Раньше приложение не установлено» и «Иконки не загружаются»).
++ОБЕ строки — дефекты самой диагностики, не хоста: (1) «не установлено» —
++норма, а красный стиль вешался на любой false — теперь installed вынесен
++из списка проверок (краснеют только sw/manifest/icons), «не установлено»
++= зелёная ✓, «уже установлено» = янтарная ℹ (новый стиль diagTextInfo);
++(2) проверка иконок делала new Image() в файле, где Image импортирован
++из react-native (HomeScreen:8) — строился RN-компонент, не картинка,
++проверка ВСЕГДА рапортовала провал. Теперь конструктор = window.Image
+++ try/catch в executor (не зависнуть). УРОК: DOM-проверки в RN-файлах —
++только через window.*. Владельцу после деплоя: если иконки зелёные —
++причина «не ставится» ещё не названа, смотреть «уже установлено»/диалог ·
++предыдущий: **391** (владелец: «скрипт установки проверяет
+ очень большое кол-во патчей… может сделать какую-нибудь отсечку? по
+ ключевым патчам? допустим, 391 — ключевой, от него вести проверку, потом
+ 400 или 405»). Отсечка: patchs/baseline.json {"baseline": "391"};
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 9260472..849b034 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,17 @@
+ ---
+ ---
+ ---
++---
++## The diagnostics itself fixed (patch 392)
++
++Both red lines in the install check were bugs of the diagnostics, not
++the app: "Not installed before" is normal and is now shown as a green
++line, and the icon check always reported failure because of an internal
++mistake (the wrong image constructor was used). After the update the
++check will honestly show the icon status for the first time: if they
++are green — the install problem is elsewhere, and the "already
++installed" line will hint at it.
++
+ ---
+ ## Patch installs: cutoff at a key patch (patch 391)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 5d37f3c..57aff0e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Починка самой диагностики (патч 392)
++
++Обе красные строки из проверки установки были ошибками диагностики, а
++не приложения: «Раньше приложение не установлено» — это норма и теперь
++показывается зелёной строкой, а проверка иконок всегда говорила «не
++загружаются» из-за внутренней ошибки (использовался не тот конструктор
++картинки). После обновления диагностика впервые честно покажет состояние
++иконок: если они зелёные — причина «не устанавливается» в другом, и
++подскажет строка «уже установлено».
++
+ ---
+ ## Установка патчей: отсечка по ключевому патчу (патч 391)
+ 
+diff --git a/public/version.json b/public/version.json
+index 693236f..3cf89c4 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "391",
++  "version": "392",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 135b141..3589609 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
+   diagTitle: { fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 4 },
+   diagText: { fontSize: 12, color: '#555', marginBottom: 3 },
+   diagTextBad: { color: '#c0392b', fontWeight: '700' },
++  diagTextInfo: { fontSize: 12, color: '#b45309', marginBottom: 3 },
+   linkText: {
+     color: '#93c5fd',
+     fontSize: 14,
