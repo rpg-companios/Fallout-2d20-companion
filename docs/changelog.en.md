@@ -16,6 +16,15 @@
 ---
 ---
 ---
+## Ammo icon in the crafting window (patch 397)
+
+The «Ammo» category tile rendered blank: no glyph named «ammo» exists
+in the bundled icon font. The category now has a proper bullet icon
+(«bullet»), as suggested. All category icon names are now checked
+against the font's glyph map automatically — no more blank tiles from
+non-existent names.
+
+---
 ## Nothing on our side blocks installation anymore (patch 396)
 
 Since the earliest versions the app intercepted the install event and

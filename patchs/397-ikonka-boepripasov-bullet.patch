@@ -51,28 +51,124 @@ index 0000000..57b7d39
 +  });
 +});
 diff --git a/docs/agents/state.md b/docs/agents/state.md
-index 81daaf2..84c35e5 100644
+index 81daaf2..4f52063 100644
 --- a/docs/agents/state.md
 +++ b/docs/agents/state.md
-@@ -25,10 +25,14 @@ beforeinstallprompt — с первых коммитов проекта мы Г
- диалог браузера, оставляя установку только через нашу кнопку (prompt());
- в сегодняшнем Яндексе отложенный prompt() UI не поднимает → диалога
- не было ВООБЩЕ. Теперь браузер волен показать родной путь; событие
+@@ -8,40 +8,41 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **395** (репорты владельца: «серым про
+-нативный диалог, а вот красным — установка работает и без диалога»;
+-«однажды согласился с диалогом — вместо pwa была ссылка, открывавшаяся
+-в браузере»; «mi-браузер не ставит pwa никак, а яндекс создаёт ярлык»;
+-«раньше pwa было и работало — до разнесения на движок+сеттинг»).
+-ПРОВЕРЕНО: манифест эпохи до разнесения (срез 280) = standalone +
+-512-иконка + тот же домен — сайт устанавливаем ТОГДА и СЕЙЧАС (все
+-живые галочки зелёные); разнесение PWA не ломало. Диагноз финален:
+-виноват браузер владельца — Mi Browser НЕ ставит PWA вообще, Яндекс
+-делает ярлык-ссылку; старое рабочее PWA ставилось из Chrome-семейства.
+-ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
+-ПРОВЕРКА ГИПОТЕЗЫ владельца («проблема в правках после жалобы про
+-кнопку») → патч **396**: в index.html снят event.preventDefault() на
+-beforeinstallprompt — с первых коммитов проекта мы ГЛУШИЛИ родной
+-диалог браузера, оставляя установку только через нашу кнопку (prompt());
+-в сегодняшнем Яндексе отложенный prompt() UI не поднимает → диалога
+-не было ВООБЩЕ. Теперь браузер волен показать родной путь; событие
 -лишь запоминается (диагностика/кнопка). По истории (клон GitHub):
 -перехват стоял ДО разнесения — тогдашний диалог Яндекса шёл через нашу
 -кнопку; сегодня это не подтверждается — Яндекс изменил поведение со
 -своей стороны. Заслон: pwa-no-prompt-suppression-396 (нет
-+лишь запоминается (диагностика/кнопка). ИСПРАВЛЕНО после указания владельца («жило в другом репозитории»):
-+настоящая старая история — handylinux/popytkano5_new (с 2025-09) — там
-+public/ и перехвата НЕ БЫЛО ВООБЩЕ, родные диалоги работали, и PWA
-+владельца ставилось. Перехват+preventDefault вписан 2026-05-10
-+(0e5d534 «Refactor project structure…», живёт в campanion и Katrin) —
-+с той поры родные диалоги глушены. МЕРИТЬ ИСТОРИЮ ТОЛЬКО ТЕКУЩИМ
-+РЕПОЗИТОРИЕМ НЕЛЬЗЯ — проект старше; 396 = возврат к поведению эпохи
-+popytkano5. Заслон: pwa-no-prompt-suppression-396 (нет
- 'event.preventDefault();' в index.html) · (перед этим) ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
- ПОКАЗАЛ нативный диалог установки — Mi и Яндекс не показали ничего;
- Chrome он раньше не пользовал — «старое работавшее PWA», вероятно,
+-'event.preventDefault();' в index.html) · (перед этим) ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
+-ПОКАЗАЛ нативный диалог установки — Mi и Яндекс не показали ничего;
+-Chrome он раньше не пользовал — «старое работавшее PWA», вероятно,
+-было ярлыком Яндекса/Mi, открывавшимся без адресной строки. УСТАНОВКА
+-РЕШЕНА: через Chrome; хранилище на-браузер — напомнить экспорт/синк
+-из старого браузера перед первой установкой.
+-395: строка обходного пути зелёная ✓ (янтарный владелец читал как
+-красный), текст называет Chrome (меню ⋮ → «Установить приложение»,
+-Samsung Internet тоже) + правда о Mi/Яндексе; распознан Mi Browser
+-(MiuiBrowser|XiaoMi до Chrome-ядра); diagStaleShortcut переписан с
+-chrome://apps на правду о браузерах (владелец ярлык давно удалял —
+-не предполагать обратного!). ВАЖНО при переходе на Chrome: хранилище
+-на-браузер — экспорт/синк из старого браузера перед установкой ·
++· последний сданный патч: **397** (владелец: «приложение не находит
++иконку ammo для карточек крафта. Может bullet или shotgun shell?»).
++В CATEGORY_ICONS (modules/fallout/screens/InventoryScreen/modals/
++CraftingModal.js) стоял ammo: 'ammo' — глифа «ammo» в подключённом
++MaterialCommunityIcons НЕТ (нет и shotgun/shell); квадрат боеприпасов
++рисовался пустым. Теперь ammo: 'bullet' (глиф U+F0CF3; есть и
++'ammunition'). Заслон crafting-tile-icons-397: КАЖДОЕ имя CATEGORY_ICONS
++сверяется по глифмапе node_modules/@expo/vector-icons/build/vendor/
++react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json —
++новые иконки категорий сверять с ней, не с памятью ·
++предыдущий: **396** (владелец: «когда-то был диалог на яндексе, pwa
++было… проблема где-то в правках»). В index.html снят
++event.preventDefault() на beforeinstallprompt — с 2026-05-10
++(0e5d534 «Refactor project structure…», живёт в campanion и Katrin)
++мы ГЛУШИЛИ родной диалог браузера, оставляя установку только через
++нашу кнопку; в сегодняшнем Яндексе отложенный prompt() UI не поднимает
++→ диалога не было ВООБЩЕ. Теперь браузер волен показать родной путь;
++событие лишь запоминается (кнопка/диагностика).
++ИСТОРИЯ ИСПРАВЛЕНА по указанию владельца: старый дом — handylinux/
++popytkano5_new (с 2025-09), там public/ и перехвата НЕ БЫЛО ВООБЩЕ,
++родные диалоги работали и PWA владельца ставилось; мерить историю
++только текущим репозиторием НЕЛЬЗЯ — проект старше. Владелец
++подтвердил: Chrome на его телефоне ПОКАЗАЛ нативный диалог (Mi и
++Яндекс — нет); Chrome он ранее не ставил. Заслон:
++pwa-no-prompt-suppression-396. УСТАНОВКА РЕШЕНА через Chrome;
++хранилище на-браузер — напомнить экспорт/синк из старого браузера ·
++предыдущий: **395** (репорты владельца: «серым про нативный диалог,
++а вот красным — установка работает и без диалога»; «однажды согласился
++с диалогом — вместо pwa была ссылка, открывавшаяся в браузере»;
++«mi-браузер не ставит pwa никак, а яндекс создаёт ярлык»; «раньше pwa
++было и работало — до разнесения»). Манифест среза 280 = standalone +
++512-иконка + тот же домен — сайт устанавливаем ТОГДА и СЕЙЧАС. 395:
++строка обходного пути зелёная ✓ (янтарный читался как красный), текст
++называет Chrome; Mi Browser распознан (MiuiBrowser|XiaoMi до
++Chrome-ядра); diagStaleShortcut — правда о браузерах ·
+ предыдущий: **394** (владелец: «в тесте на установку pwa
+ всё серое, всё с галочкой. А самого pwa нигде не установилось»).
+ Развязка: ВСЕ проверки зелёные = сайт валиден (392 починил иконки),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c9f7783..1822eca 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,15 @@
+ ---
+ ---
+ ---
++---
++## Ammo icon in the crafting window (patch 397)
++
++The «Ammo» category tile rendered blank: no glyph named «ammo» exists
++in the bundled icon font. The category now has a proper bullet icon
++(«bullet»), as suggested. All category icon names are now checked
++against the font's glyph map automatically — no more blank tiles from
++non-existent names.
++
+ ---
+ ## Nothing on our side blocks installation anymore (patch 396)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 850396b..44616e1 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## Иконка боеприпасов в окне крафта (патч 397)
++
++Квадрат категории «Боеприпасы» рисовался пустым: иконки с именем
++«ammo» в подключённом шрифте нет. Теперь у категории честная иконка
++пули («bullet»), как и предлагалось. Все имена иконок категорий
++проверяются по глифмапе шрифта автоматически — пустых квадратов из-за
++несуществующих имён больше не будет.
++
+ ---
+ ## Установке больше ничего не мешает на нашей стороне (патч 396)
+ 
 diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
 index c05c3aa..1a338a2 100644
 --- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
@@ -96,3 +192,118 @@ index c05c3aa..1a338a2 100644
  };
  
  // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
+diff --git a/patchs/397-ikonka-boepripasov-bullet.patch b/patchs/397-ikonka-boepripasov-bullet.patch
+new file mode 100644
+index 0000000..cd88ebb
+--- /dev/null
++++ b/patchs/397-ikonka-boepripasov-bullet.patch
+@@ -0,0 +1,98 @@
++diff --git a/__tests__/crafting/crafting-tile-icons-397.test.js b/__tests__/crafting/crafting-tile-icons-397.test.js
++new file mode 100644
++index 0000000..57b7d39
++--- /dev/null
+++++ b/__tests__/crafting/crafting-tile-icons-397.test.js
++@@ -0,0 +1,46 @@
+++// ПРИЁМОЧНЫЙ (патч 397): «приложение не находит иконку ammo для карточек
+++// крафта. Может можно что-то типа bullet или shotgun shell?» (владелец).
+++// В CATEGORY_ICONS стояло ammo: 'ammo' — глифа «ammo» в подключённом
+++// MaterialCommunityIcons НЕТ (и «shotgun»/«shell» тоже нет), квадрат
+++// боеприпасов рисовался пустым. Теперь ammo: 'bullet' (глиф есть).
+++// Заслон: КАЖДОЕ имя иконки категорий обязано существовать в глифмапе
+++// шрифта @expo/vector-icons — имена проверяются по факту, не по памяти.
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++
+++const GLYPHMAP_PATH =
+++  'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json';
+++
+++// Имена читаем из исходника (RN-файл в vitest не импортируется).
+++const categoryIcons = () => {
+++  const src = readFileSync('modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
+++  const block = /const CATEGORY_ICONS = \{([\s\S]*?)\};/.exec(src)[1];
+++  const icons = {};
+++  for (const [, key, name] of block.matchAll(/(\w+):\s*'([\w-]+)'/g)) {
+++    icons[key] = name;
+++  }
+++  return icons;
+++};
+++
+++describe('патч 397: иконки квадратов крафта существуют в шрифте', () => {
+++  it('все имена CATEGORY_ICONS есть в глифмапе MaterialCommunityIcons', () => {
+++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
+++    const icons = categoryIcons();
+++    expect(Object.keys(icons).length).toBeGreaterThanOrEqual(8);
+++    for (const [category, name] of Object.entries(icons)) {
+++      expect(glyphmap, `иконка «${name}» категории «${category}» отсутствует в шрифте`).toHaveProperty(name);
+++    }
+++  });
+++
+++  it('боеприпасы — bullet (глиф есть; «ammo» в шрифте нет)', () => {
+++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
+++    expect(glyphmap).toHaveProperty('bullet');
+++    expect(glyphmap).not.toHaveProperty('ammo');
+++    expect(categoryIcons().ammo).toBe('bullet');
+++  });
+++
+++  it('фолбэк пустой категории тоже существует в шрифте', () => {
+++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
+++    expect(glyphmap).toHaveProperty('circle-outline');
+++  });
+++});
++diff --git a/docs/agents/state.md b/docs/agents/state.md
++index 81daaf2..84c35e5 100644
++--- a/docs/agents/state.md
+++++ b/docs/agents/state.md
++@@ -25,10 +25,14 @@ beforeinstallprompt — с первых коммитов проекта мы Г
++ диалог браузера, оставляя установку только через нашу кнопку (prompt());
++ в сегодняшнем Яндексе отложенный prompt() UI не поднимает → диалога
++ не было ВООБЩЕ. Теперь браузер волен показать родной путь; событие
++-лишь запоминается (диагностика/кнопка). По истории (клон GitHub):
++-перехват стоял ДО разнесения — тогдашний диалог Яндекса шёл через нашу
++-кнопку; сегодня это не подтверждается — Яндекс изменил поведение со
++-своей стороны. Заслон: pwa-no-prompt-suppression-396 (нет
+++лишь запоминается (диагностика/кнопка). ИСПРАВЛЕНО после указания владельца («жило в другом репозитории»):
+++настоящая старая история — handylinux/popytkano5_new (с 2025-09) — там
+++public/ и перехвата НЕ БЫЛО ВООБЩЕ, родные диалоги работали, и PWA
+++владельца ставилось. Перехват+preventDefault вписан 2026-05-10
+++(0e5d534 «Refactor project structure…», живёт в campanion и Katrin) —
+++с той поры родные диалоги глушены. МЕРИТЬ ИСТОРИЮ ТОЛЬКО ТЕКУЩИМ
+++РЕПОЗИТОРИЕМ НЕЛЬЗЯ — проект старше; 396 = возврат к поведению эпохи
+++popytkano5. Заслон: pwa-no-prompt-suppression-396 (нет
++ 'event.preventDefault();' в index.html) · (перед этим) ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
++ ПОКАЗАЛ нативный диалог установки — Mi и Яндекс не показали ничего;
++ Chrome он раньше не пользовал — «старое работавшее PWA», вероятно,
++diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++index c05c3aa..1a338a2 100644
++--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++@@ -32,6 +32,9 @@ import { showRawAlert } from '../../../../../components/alerts/alertService';
++ import CraftReportView from '../../../crafting/CraftReportView';
++ 
++ // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
+++// 397: для боеприпасов было имя «ammo» — такого глифа в подключённом
+++// шрифте НЕТ (квадрат рисовался пустым); «bullet» существует — предложение
+++// владельца. Заслон 397 проверяет все имена по глифмапе шрифта.
++ const CATEGORY_ICONS = {
++   food: 'food',
++   drinks: 'cup',
++@@ -40,7 +43,7 @@ const CATEGORY_ICONS = {
++   weapons: 'sword',
++   armor: 'shield-outline',
++   powerArmor: 'shield-half-full',
++-  ammo: 'ammo',
+++  ammo: 'bullet',
++ };
++ 
++ // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
+diff --git a/public/version.json b/public/version.json
+index b8a1c88..e153a59 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "396",
++  "version": "397",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
