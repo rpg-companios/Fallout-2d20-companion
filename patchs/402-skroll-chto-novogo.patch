@@ -1,0 +1,306 @@
+diff --git a/__tests__/screens/release-2-notes-401.test.js b/__tests__/screens/release-2-notes-401.test.js
+index bf3182a..7991f0e 100644
+--- a/__tests__/screens/release-2-notes-401.test.js
++++ b/__tests__/screens/release-2-notes-401.test.js
+@@ -6,9 +6,11 @@ import { describe, expect, it } from 'vitest';
+ import notes from '../../public/version.json';
+ 
+ describe('патч 401: релиз 2 — заметки «Что нового»', () => {
+-  it('релиз поднят до 2, версия = 400; заметки парные', () => {
++  it('релиз поднят до 2; версия = номер последнего патча (движется каждым); заметки парные', () => {
+     expect(notes.release).toBe(2);
+-    expect(notes.version).toBe('400');
++    // version.json.version — номер ПОСЛЕДНЕГО ПАТЧА: каждый патч его двигает,
++    // зажимать константой нельзя (402-й урок: заслон упал на version '402').
++    expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
+     expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
+     expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
+   });
+diff --git a/__tests__/screens/update-notice-scroll-402.test.js b/__tests__/screens/update-notice-scroll-402.test.js
+new file mode 100644
+index 0000000..349f8c3
+--- /dev/null
++++ b/__tests__/screens/update-notice-scroll-402.test.js
+@@ -0,0 +1,29 @@
++// ПРИЁМОЧНЫЙ (патч 402): «ты снова забыл про скролл длинных окон. Как
++// читать в приложении релиз обновление, если оно за пределами экрана
++// и не двигается?» (владелец; заметки релиза 2 — 10 пунктов, окно без
++// прокрутки). 402: список заметок в ScrollView, окно maxHeight '85%',
++// заголовок и кнопка «Понятно» на месте (образец — окно настроек, 211).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const code = () => readFileSync('components/UpdateNotice/UpdateNoticeModal.js', 'utf8');
++
++describe('патч 402: окно «Что нового» прокручивается', () => {
++  it('список заметок обёрнут в ScrollView с прокруткой', () => {
++    const src = code();
++    expect(src).toContain('ScrollView');
++    expect(src).toContain('<ScrollView style={styles.scroll} nestedScrollEnabled>');
++    // строки заметок внутри прокрутки: между <ScrollView и </ScrollView>
++    const inner = src.slice(src.indexOf('<ScrollView'), src.indexOf('</ScrollView>'));
++    expect(inner).toContain('lines.map');
++  });
++
++  it('окно ограничено высотой экрана, заголовок и кнопка вне прокрутки', () => {
++    const src = code();
++    expect(src).toContain("maxHeight: '85%'");
++    const beforeScroll = src.slice(0, src.indexOf('<ScrollView'));
++    const afterScroll = src.slice(src.indexOf('</ScrollView>'));
++    expect(beforeScroll).toContain('updateNotice.title');
++    expect(afterScroll).toContain('updateNotice.close');
++  });
++});
+diff --git a/components/UpdateNotice/UpdateNoticeModal.js b/components/UpdateNotice/UpdateNoticeModal.js
+index b784666..de32b21 100644
+--- a/components/UpdateNotice/UpdateNoticeModal.js
++++ b/components/UpdateNotice/UpdateNoticeModal.js
+@@ -7,7 +7,7 @@
+ // здесь только отрисовка.
+ 
+ import React, { useEffect, useState } from 'react';
+-import { Modal, View, Text, TouchableOpacity } from 'react-native';
++import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+ import { tApp } from '../../i18n/appI18n';
+ import { useLocale } from '../../i18n/locale';
+ import {
+@@ -52,9 +52,14 @@ export default function UpdateNoticeModal() {
+       <View style={styles.overlay}>
+         <View style={styles.dialog}>
+           <Text style={styles.title}>{tApp('updateNotice.title')}</Text>
+-          {lines.map((line, index) => (
+-            <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
+-          ))}
++          {/* 402: заметки релиза длинные — список прокручивается, заголовок
++              и кнопка остаются на месте (образец — окно настроек, 211).
++              Владелец дважды ловил «окно за экраном и не двигается». */}
++          <ScrollView style={styles.scroll} nestedScrollEnabled>
++            {lines.map((line, index) => (
++              <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
++            ))}
++          </ScrollView>
+           <TouchableOpacity style={styles.closeBtn} onPress={close}>
+             <Text style={styles.closeText}>{tApp('updateNotice.close')}</Text>
+           </TouchableOpacity>
+@@ -66,7 +71,9 @@ export default function UpdateNoticeModal() {
+ 
+ const styles = {
+   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+-  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420 },
++  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420, maxHeight: '85%' },
++  // 402: прокрутка длинных заметок — сжимается до границ окна.
++  scroll: { flexShrink: 1 },
+   title: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginBottom: 10 },
+   line: { color: '#e8e6d9', fontSize: 13, lineHeight: 19, marginBottom: 6 },
+   closeBtn: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 14 },
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 7ec9718..1dfda48 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,14 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **401** (РЕЛИЗ 2 объявлен владельцем:
++· последний сданный патч: **402** (владелец: «ты снова забыл про скролл
++длинных окон. Как читать релиз, если оно за пределами экрана и не
++двигается?»). Окно «Что нового» (UpdateNoticeModal): список заметок
++обёрнут в ScrollView (flexShrink:1, nestedScrollEnabled), окно
++maxHeight '85%', заголовок и кнопка вне прокрутки — образец = окно
++настроек (211). ЗАКОН ВЛАДЕЛЬЦА, ВТОРОЙ СЛУЧАЙ: ЛЮБОЕ длинное окно —
++заголовок и кнопка зафиксированы, контент в ScrollView; при заведении
++нового окна проверять на 10+ строках · предыдущий: **401** (РЕЛИЗ 2 объявлен владельцем:
+ «теперь делаем описание релиза. что мы сделали систему крафта и т.п»).
+ version.json: release 2, version 400; заметки = патчи 336–400
+ (крафт модов оружия+брони, честные правила сложности 0, канон-имена
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fd11bfb..7aa8fd7 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,12 @@
+ ---
+ ---
+ ---
++---
++## The «What's new» window scrolls (patch 402)
++
++Long release notes no longer fall off the screen: the list scrolls,
++the title and the button stay put.
++
+ ---
+ ## Release 2 (declared by the owner)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 81e3fbd..b3c4ab0 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,11 @@
+ # История изменений
+ 
++---
++## Окно «Что нового» прокручивается (патч 402)
++
++Длинные заметки релиза больше не уходят за край экрана: список
++прокручивается, заголовок и кнопка остаются на месте.
++
+ ---
+ ## Релиз 2 (объявлен владельцем)
+ 
+diff --git a/patchs/402-skroll-chto-novogo.patch b/patchs/402-skroll-chto-novogo.patch
+new file mode 100644
+index 0000000..0c20753
+--- /dev/null
++++ b/patchs/402-skroll-chto-novogo.patch
+@@ -0,0 +1,141 @@
++diff --git a/__tests__/screens/update-notice-scroll-402.test.js b/__tests__/screens/update-notice-scroll-402.test.js
++new file mode 100644
++index 0000000..349f8c3
++--- /dev/null
+++++ b/__tests__/screens/update-notice-scroll-402.test.js
++@@ -0,0 +1,29 @@
+++// ПРИЁМОЧНЫЙ (патч 402): «ты снова забыл про скролл длинных окон. Как
+++// читать в приложении релиз обновление, если оно за пределами экрана
+++// и не двигается?» (владелец; заметки релиза 2 — 10 пунктов, окно без
+++// прокрутки). 402: список заметок в ScrollView, окно maxHeight '85%',
+++// заголовок и кнопка «Понятно» на месте (образец — окно настроек, 211).
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++
+++const code = () => readFileSync('components/UpdateNotice/UpdateNoticeModal.js', 'utf8');
+++
+++describe('патч 402: окно «Что нового» прокручивается', () => {
+++  it('список заметок обёрнут в ScrollView с прокруткой', () => {
+++    const src = code();
+++    expect(src).toContain('ScrollView');
+++    expect(src).toContain('<ScrollView style={styles.scroll} nestedScrollEnabled>');
+++    // строки заметок внутри прокрутки: между <ScrollView и </ScrollView>
+++    const inner = src.slice(src.indexOf('<ScrollView'), src.indexOf('</ScrollView>'));
+++    expect(inner).toContain('lines.map');
+++  });
+++
+++  it('окно ограничено высотой экрана, заголовок и кнопка вне прокрутки', () => {
+++    const src = code();
+++    expect(src).toContain("maxHeight: '85%'");
+++    const beforeScroll = src.slice(0, src.indexOf('<ScrollView'));
+++    const afterScroll = src.slice(src.indexOf('</ScrollView>'));
+++    expect(beforeScroll).toContain('updateNotice.title');
+++    expect(afterScroll).toContain('updateNotice.close');
+++  });
+++});
++diff --git a/components/UpdateNotice/UpdateNoticeModal.js b/components/UpdateNotice/UpdateNoticeModal.js
++index b784666..de32b21 100644
++--- a/components/UpdateNotice/UpdateNoticeModal.js
+++++ b/components/UpdateNotice/UpdateNoticeModal.js
++@@ -7,7 +7,7 @@
++ // здесь только отрисовка.
++ 
++ import React, { useEffect, useState } from 'react';
++-import { Modal, View, Text, TouchableOpacity } from 'react-native';
+++import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
++ import { tApp } from '../../i18n/appI18n';
++ import { useLocale } from '../../i18n/locale';
++ import {
++@@ -52,9 +52,14 @@ export default function UpdateNoticeModal() {
++       <View style={styles.overlay}>
++         <View style={styles.dialog}>
++           <Text style={styles.title}>{tApp('updateNotice.title')}</Text>
++-          {lines.map((line, index) => (
++-            <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
++-          ))}
+++          {/* 402: заметки релиза длинные — список прокручивается, заголовок
+++              и кнопка остаются на месте (образец — окно настроек, 211).
+++              Владелец дважды ловил «окно за экраном и не двигается». */}
+++          <ScrollView style={styles.scroll} nestedScrollEnabled>
+++            {lines.map((line, index) => (
+++              <Text key={`n_${index}`} style={styles.line}>• {line}</Text>
+++            ))}
+++          </ScrollView>
++           <TouchableOpacity style={styles.closeBtn} onPress={close}>
++             <Text style={styles.closeText}>{tApp('updateNotice.close')}</Text>
++           </TouchableOpacity>
++@@ -66,7 +71,9 @@ export default function UpdateNoticeModal() {
++ 
++ const styles = {
++   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 24 },
++-  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420 },
+++  dialog: { backgroundColor: '#1f241f', borderRadius: 14, borderWidth: 1, borderColor: '#3f4a3a', padding: 18, width: '100%', maxWidth: 420, maxHeight: '85%' },
+++  // 402: прокрутка длинных заметок — сжимается до границ окна.
+++  scroll: { flexShrink: 1 },
++   title: { color: '#f0e68c', fontSize: 17, fontWeight: '700', marginBottom: 10 },
++   line: { color: '#e8e6d9', fontSize: 13, lineHeight: 19, marginBottom: 6 },
++   closeBtn: { backgroundColor: '#3f4a3a', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 14 },
++diff --git a/docs/agents/state.md b/docs/agents/state.md
++index 7ec9718..1dfda48 100644
++--- a/docs/agents/state.md
+++++ b/docs/agents/state.md
++@@ -8,7 +8,14 @@
++ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
++ 
++ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++-· последний сданный патч: **401** (РЕЛИЗ 2 объявлен владельцем:
+++· последний сданный патч: **402** (владелец: «ты снова забыл про скролл
+++длинных окон. Как читать релиз, если оно за пределами экрана и не
+++двигается?»). Окно «Что нового» (UpdateNoticeModal): список заметок
+++обёрнут в ScrollView (flexShrink:1, nestedScrollEnabled), окно
+++maxHeight '85%', заголовок и кнопка вне прокрутки — образец = окно
+++настроек (211). ЗАКОН ВЛАДЕЛЬЦА, ВТОРОЙ СЛУЧАЙ: ЛЮБОЕ длинное окно —
+++заголовок и кнопка зафиксированы, контент в ScrollView; при заведении
+++нового окна проверять на 10+ строках · предыдущий: **401** (РЕЛИЗ 2 объявлен владельцем:
++ «теперь делаем описание релиза. что мы сделали систему крафта и т.п»).
++ version.json: release 2, version 400; заметки = патчи 336–400
++ (крафт модов оружия+брони, честные правила сложности 0, канон-имена
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index fd11bfb..7aa8fd7 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -15,6 +15,12 @@
++ ---
++ ---
++ ---
+++---
+++## The «What's new» window scrolls (patch 402)
+++
+++Long release notes no longer fall off the screen: the list scrolls,
+++the title and the button stay put.
+++
++ ---
++ ## Release 2 (declared by the owner)
++ 
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index 81e3fbd..b3c4ab0 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,5 +1,11 @@
++ # История изменений
++ 
+++---
+++## Окно «Что нового» прокручивается (патч 402)
+++
+++Длинные заметки релиза больше не уходят за край экрана: список
+++прокручивается, заголовок и кнопка остаются на месте.
+++
++ ---
++ ## Релиз 2 (объявлен владельцем)
++ 
++diff --git a/public/version.json b/public/version.json
++index f127d3a..e8b4143 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,5 +1,5 @@
++ {
++-  "version": "400",
+++  "version": "402",
++   "release": 2,
++   "notes": {
++     "ru-RU": [
+diff --git a/public/version.json b/public/version.json
+index f127d3a..e8b4143 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "400",
++  "version": "402",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
