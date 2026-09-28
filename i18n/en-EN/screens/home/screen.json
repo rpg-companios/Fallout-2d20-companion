@@ -99,7 +99,18 @@
     "diagManifestNo": "Manifest failed to load — the build is incomplete, re-upload the app to the host.",
     "diagIconsYes": "App icons load fine.",
     "diagIconsNo": "Icons DO NOT load — a PWA cannot be installed without them: re-upload the build (pwa-icon*.png files).",
-    "diagVersion": "App version"
+    "diagVersion": "App version",
+    "diagBrowser": "Browser",
+    "browserChrome": "Chrome",
+    "browserSamsung": "Samsung Internet",
+    "browserYandex": "Yandex Browser",
+    "browserFirefox": "Firefox",
+    "browserOpera": "Opera",
+    "browserEdge": "Edge",
+    "browserSafari": "Safari",
+    "browserOther": "other",
+    "diagPromptAbsent": "The native prompt hasn't arrived yet — that happens: browsers show it with a delay, and after a dismissed install they may pause for a while. Close the site and open it again, then try once more.",
+    "diagPromptWorkaround": "Installation also works without the prompt — via the browser menu: «Install app» / «Add to Home screen». You still get a real app: a home-screen icon and a full-screen window."
   },
   "settings": {
     "title": "Settings",

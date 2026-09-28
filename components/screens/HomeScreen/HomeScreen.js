@@ -210,6 +210,33 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 // 392: «установлено / не установлено» — не провал, а пояснение, поэтому
 // оно вне списка проверок с красным стилем (краснеет только настоящий
 // провал: воркер / манифест / иконки).
+// 394: владельцу без нативного диалога нужно имя браузера и обходной путь —
+// диалог шлют не все браузеры, а Chrome держит паузу после отмен.
+const BROWSER_LABEL_KEYS = {
+  chrome: 'pwa.browserChrome',
+  samsung: 'pwa.browserSamsung',
+  yandex: 'pwa.browserYandex',
+  firefox: 'pwa.browserFirefox',
+  opera: 'pwa.browserOpera',
+  edge: 'pwa.browserEdge',
+  safari: 'pwa.browserSafari',
+  other: 'pwa.browserOther',
+};
+
+const detectBrowserId = () => {
+  const ua = navigator.userAgent || '';
+  // Порядок важен: Edge/Opera/Samsung/Yandex сами построены на Chrome
+  // и содержат «Chrome/» в userAgent.
+  if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/YaBrowser/i.test(ua)) return 'yandex';
+  if (/Edg\//i.test(ua)) return 'edge';
+  if (/OPR\/|Opera/i.test(ua)) return 'opera';
+  if (/Firefox\//i.test(ua)) return 'firefox';
+  if (/Chrome\//i.test(ua)) return 'chrome';
+  if (/Safari\//i.test(ua)) return 'safari';
+  return 'other';
+};
+
 const INSTALL_DIAG_LINES = [
   ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
   ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
@@ -289,9 +316,17 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
           {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}
         </Text>
       ))}
+      <Text style={styles.diagText}>
+        {tHomeScreen('pwa.diagBrowser')}: {tHomeScreen(BROWSER_LABEL_KEYS[detectBrowserId()])}
+      </Text>
       {installPrompt ? (
         <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptAvailable')}</Text>
-      ) : null}
+      ) : (
+        <>
+          <Text style={styles.diagText}>• {tHomeScreen('pwa.diagPromptAbsent')}</Text>
+          <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
+        </>
+      )}
       {versionRef.current ? (
         <Text style={styles.diagText}>
           {tHomeScreen('pwa.diagVersion')}: {versionRef.current}
