@@ -1,9 +1,9 @@
 diff --git a/__tests__/installer/install-baseline-391.test.js b/__tests__/installer/install-baseline-391.test.js
 new file mode 100644
-index 0000000..7283353
+index 0000000..d24671d
 --- /dev/null
 +++ b/__tests__/installer/install-baseline-391.test.js
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,47 @@
 +// ПРИЁМОЧНЫЙ (патч 391): «скрипт установки проверяет очень большое кол-во
 +// патчей… может сделать какую-нибудь отсечку? По ключевым патчам?» (владелец).
 +// patchs/baseline.json называет ключевой патч; apply-patch.sh на чистом
@@ -40,15 +40,19 @@ index 0000000..7283353
 +    expect(code).toContain('Идёт полный проход по цепочке');
 +  });
 +
-+  it('полный проход остался на месте', () => {
++  it('полный проход остался на месте, служебные функции целы', () => {
 +    const code = script();
 +    expect(code).toContain('patch_state');
 +    expect(code).toContain('check_reverse');
 +    expect(code).toContain('ОСТАНОВКА: цель');
++    // Сплайс отсечки не должен глотать соседние функции (урок 391):
++    for (const fn of ['is_changelog()', 'patch_files_strong()', 'is_confirmed()', 'added_lines()', 'json_check()']) {
++      expect(code).toContain(fn);
++    }
 +  });
 +});
 diff --git a/apply-patch.sh b/apply-patch.sh
-index 9ddb292..e5fc41b 100755
+index 9ddb292..aa057c9 100755
 --- a/apply-patch.sh
 +++ b/apply-patch.sh
 @@ -51,6 +51,13 @@ usage() {
@@ -65,23 +69,16 @@ index 9ddb292..e5fc41b 100755
  Примеры:
    ./apply-patch.sh 308
    ./apply-patch.sh --status
-@@ -211,142 +218,134 @@ patch_state() {
+@@ -211,19 +218,123 @@ patch_state() {
    printf 'conflict'
  }
  
 -# --- снимок состояния: каждый патч ветки проверяется по текущему дереву -------
--
--declare -A STATE
--for name in "${ALL_PATCHES[@]}"; do
--  STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
--done
 +# --- поиск целевого патча ----------------------------------------------------
  
--# Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
--TOP_APPLIED=""
+-declare -A STATE
 +TARGET=""
  for name in "${ALL_PATCHES[@]}"; do
--  [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
 +  if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
 +    if [[ -n "$TARGET" ]]; then
 +      echo "Ошибка: в Arena-ветке несколько патчей №$PATCH_ID:"
@@ -91,25 +88,13 @@ index 9ddb292..e5fc41b 100755
 +    fi
 +    TARGET="$name"
 +  fi
- done
- 
--TOP_APPLIED_NUMBER=""
--[[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
++done
++
 +if [[ "$MODE" != "status" && -z "$TARGET" ]]; then
 +  echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
 +  exit 1
 +fi
- 
--# Подтверждён ли отложенный патч. Два вида доказательства, любое:
--#   1) более поздний патч на тех же файлах (кроме чейнджлогов — их
--#      трогают все, это не доказательство) стоит или был применён;
--#   2) след строк: хотя бы одна добавленная патчем строка (в файле
--#      вне чейнджлогов) до сих пор лежит в дереве дословно.
--# Есть доказательство — дерево закономерно ушло мимо отложенного
--# (его строки изменило или унаследовало то, что встало позже).
--# Нет — файлы отложенного никем не подтверждены: возможно повреждение.
--is_changelog() {
--  [[ "$1" == "docs/changelog.ru.md" || "$1" == "docs/changelog.en.md" ]]
++
 +# --- отсечка (391): ключевой патч --------------------------------------------
 +# patchs/baseline.json {"baseline": "NNN"} называет ключевой патч. Цепочка ДО
 +# него не проверяется по одному патчу: чистое дерево целиком приводится к
@@ -126,16 +111,8 @@ index 9ddb292..e5fc41b 100755
 +    return 1
 +  fi
 +  sed -nE 's/.*"baseline"[[:space:]]*:[[:space:]]*"?([0-9]+[[:alnum:]]*)"?.*/\1/p' <<<"$raw" | head -1
- }
- 
--patch_files_strong() {
--  # файлы патча, кроме чейнджлогов
--  local f
--  while IFS= read -r f; do
--    [[ -z "$f" ]] && continue
--    is_changelog "$f" && continue
--    printf '%s\n' "$f"
--  done < <(patch_files "$1")
++}
++
 +# Приводит рабочее дерево к состоянию ключевого патча: распаковывает его
 +# содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
 +# которых в этом состоянии уже нет.
@@ -150,29 +127,8 @@ index 9ddb292..e5fc41b 100755
 +      [[ -n "$f" ]] && git -C "$ROOT_DIR" rm -q -f -- "$f"
 +    done <<<"$stale"
 +  fi
- }
- 
--is_confirmed() {
--  # $1 = имя отложенного патча; $2... = имена стоящих/применённых
--  local dname="$1"
--  shift
--  local dnum dfile ok v f
--  dnum="$(patch_number "$dname")"
--  dfile="$(extract_patch "$dname")"
--  ok=0
--
--  # 0) патч самого установщика: установщик приходит бутстрапом (копия себя
--  # из ветки до цепочки), минуя промежуточные патчи 295→297→299 — их
--  # содержимое в дереве перекрыто самой программой установки. Такой патч
--  # подтверждён, если его единственный содержательный файл — apply-patch.sh.
--  local only_installer=1
--  while IFS= read -r f; do
--    [[ -z "$f" ]] && continue
--    if [[ "$f" != "apply-patch.sh" ]]; then only_installer=0; break; fi
--  done < <(patch_files_strong "$dfile")
--  if [[ $only_installer -eq 1 ]]; then
--    return 0
--  fi
++}
++
 +BASELINE_NUM="$(read_baseline_number || true)"
 +BASELINE_NAME=""
 +BASELINE_COMMIT=""
@@ -183,26 +139,7 @@ index 9ddb292..e5fc41b 100755
 +  done
 +  [[ -n "$BASELINE_NAME" ]] || BASELINE_NUM=""
 +fi
- 
--  # 1) общий файл с более поздним стоящим/применённым
--  while IFS= read -r f; do
--    [[ -z "$f" ]] && continue
--    for v in "$@"; do
--      [[ -z "$v" ]] && continue
--      number_lt "$dnum" "$(patch_number "$v")" || continue
--      if patch_files_strong "$(extract_patch "$v")" | grep -Fxq -- "$f"; then
--        return 0
--      fi
--    done
--  done < <(patch_files_strong "$dfile")
--
--  # 2) след добавленных строк в дереве (файлы вне чейнджлогов)
--  local file line checked
--  while IFS=$'\t' read -r file line; do
--    [[ -z "$file" || -z "$line" ]] && continue
--    [[ -f "$ROOT_DIR/$file" ]] || continue
--    if grep -Fqx -- "$line" "$ROOT_DIR/$file" 2>/dev/null; then
--      return 0
++
 +if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_le "$PATCH_ID" "$BASELINE_NUM"; then
 +  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' || true)"
 +  if [[ -n "$local_dirty" ]]; then
@@ -221,62 +158,14 @@ index 9ddb292..e5fc41b 100755
 +      echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
 +      echo "Идёт полный проход по цепочке."
 +      echo
-     fi
--  done < <(added_lines "$dfile")
--  return 1
--}
++    fi
 +  fi
 +fi
- 
--# Добавленные строки патча: «файл<TAB>строка», файлы вне чейнджлогов,
--# строка не короче 10 символов, не больше 15 на файл.
--added_lines() {
--  awk '
--    function flush() { n = 0 }
--    BEGIN { cur = ""; n = 0 }
--    /^diff --git / { flush(); cur = "" }
--    /^\+\+\+ b\// {
--      p = substr($0, 7)
--      if (p != "docs/changelog.ru.md" && p != "docs/changelog.en.md") cur = p
--      else cur = ""
--      flush()
--      next
--    }
--    cur != "" && /^\+/ && !/^\+\+\+/ {
--      if (n < 15) {
--        l = substr($0, 2)
--        if (length(l) >= 10) {
--          printf "%s\t%s\n", cur, l
--          n++
--        }
--      }
--    }
--  ' "$1"
--}
++
 +# --- снимок состояния: проверяются только патчи рабочей области ----------------
 +# Полный статус — все патчи цепочки; установка — либо патчи после отсечки,
 +# либо патчи до цели (как раньше, но без проверки хвоста выше цели).
- 
--# --- целостность файлов данных ------------------------------------------------
--# Склейки «два JSON подряд» ломают приложение на загрузке — ловим сразу
--# после применения и на повторных запусках. Лечение — tools/fix-double-json.js.
--json_check() {
--  command -v node >/dev/null 2>&1 || return 0
--  local out
--  if out="$(cd "$ROOT_DIR" && node -e '
--    const fs=require("fs"),path=require("path");const bad=[];
--    function walk(d){ if(!fs.existsSync(d))return; for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);if(s.isDirectory())walk(p);else if(p.endsWith(".json")){try{JSON.parse(fs.readFileSync(p,"utf8"))}catch(e){bad.push(p+" — "+e.message.slice(0,60))}}}}
--    walk("modules"); walk("i18n");
--    if(bad.length){console.log(bad.join("\n"));process.exit(1)}
--  ' 2>/dev/null)"; then
--    return 0
--  fi
--  echo "ВНИМАНИЕ: в файлах данных есть поломки формата (склейки и т.п.):"
--  printf '%s\n' "$out" | sed 's/^/  /'
--  echo
--  echo "Лечение: node tools/fix-double-json.js  (резервные копии .bak)"
--  return 1
--}
++
 +declare -A STATE
 +STATE_SCOPE=()
 +if [[ "$MODE" == "status" ]]; then
@@ -295,18 +184,20 @@ index 9ddb292..e5fc41b 100755
 +  done
 +fi
 +for name in "${STATE_SCOPE[@]}"; do
-+  STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
-+done
-+
-+# Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
-+TOP_APPLIED=""
-+for name in "${STATE_SCOPE[@]}"; do
-+  [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
-+done
-+TOP_APPLIED_NUMBER=""
-+[[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
+   STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
+ done
  
- # --- режим статуса -----------------------------------------------------------
+ # Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
+ TOP_APPLIED=""
+-for name in "${ALL_PATCHES[@]}"; do
++for name in "${STATE_SCOPE[@]}"; do
+   [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
+ done
+-
+ TOP_APPLIED_NUMBER=""
+ [[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
+ 
+@@ -346,7 +457,10 @@ json_check() {
  
  if [[ "$MODE" == "status" ]]; then
    echo "Состояние патчей (проверка по содержимому дерева, заново):"
@@ -318,7 +209,7 @@ index 9ddb292..e5fc41b 100755
    STANDING=()
    will_apply=()
    confirmed=0
-@@ -394,26 +393,6 @@ if [[ "$MODE" == "status" ]]; then
+@@ -394,26 +508,6 @@ if [[ "$MODE" == "status" ]]; then
    exit 0
  fi
  
@@ -345,7 +236,7 @@ index 9ddb292..e5fc41b 100755
  # --- дерево уже новее запрошенного -------------------------------------------
  
  if [[ -n "$TOP_APPLIED_NUMBER" ]] \
-@@ -431,8 +410,7 @@ fi
+@@ -431,8 +525,7 @@ fi
  QUEUE=()
  UPFRONT_STANDING=()
  
@@ -355,7 +246,7 @@ index 9ddb292..e5fc41b 100755
    if [[ "${STATE[$name]}" == "applied" ]]; then
      UPFRONT_STANDING+=("$name")
    else
-@@ -458,7 +436,7 @@ echo
+@@ -458,7 +551,7 @@ echo
  
  # --- незакоммиченные изменения: предупреждение -------------------------------
  
@@ -437,6 +328,471 @@ index f621f17..5d37f3c 100644
  ---
  ## Диагностика установки — по переключателю (патч 390)
  
+diff --git a/patchs/391-ottsechka-ustanovki.patch b/patchs/391-ottsechka-ustanovki.patch
+new file mode 100644
+index 0000000..98c5ab5
+--- /dev/null
++++ b/patchs/391-ottsechka-ustanovki.patch
+@@ -0,0 +1,459 @@
++diff --git a/__tests__/installer/install-baseline-391.test.js b/__tests__/installer/install-baseline-391.test.js
++new file mode 100644
++index 0000000..7283353
++--- /dev/null
+++++ b/__tests__/installer/install-baseline-391.test.js
++@@ -0,0 +1,43 @@
+++// ПРИЁМОЧНЫЙ (патч 391): «скрипт установки проверяет очень большое кол-во
+++// патчей… может сделать какую-нибудь отсечку? По ключевым патчам?» (владелец).
+++// patchs/baseline.json называет ключевой патч; apply-patch.sh на чистом
+++// дереве приводится к состоянию ключевого патча из истории ветки и
+++// проверяет/применяет только патчи ПОСЛЕ него. Отсечку переносит агент
+++// новым патчем (меняет номер в baseline.json). Грязное дерево или
+++// неполная история — полный проход по цепочке, как раньше.
+++import { describe, expect, it } from 'vitest';
+++import { readFileSync } from 'node:fs';
+++import { execSync } from 'node:child_process';
+++
+++const script = () => readFileSync('apply-patch.sh', 'utf8');
+++
+++describe('патч 391: отсечка установки по ключевому патчу', () => {
+++  it('установщик синтаксически цел (bash -n)', () => {
+++    execSync('bash -n apply-patch.sh');
+++  });
+++
+++  it('baseline.json: номер-формат, текущая отсечка — 391', () => {
+++    // Существование патча-ключа проверяет сам установщик (нет патча —
+++    // вежливый полный проход). Здесь закреплён формат и ТЕКУЩАЯ отсечка:
+++    // перенос ключа (400, 405, …) меняет эту строку тем же патчем.
+++    const config = JSON.parse(readFileSync('patchs/baseline.json', 'utf8'));
+++    expect(String(config.baseline)).toMatch(/^\d+[a-z]?$/);
+++    expect(String(config.baseline)).toBe('391');
+++  });
+++
+++  it('в установщике есть быстрый путь отсечки', () => {
+++    const code = script();
+++    expect(code).toContain('read_baseline_number');
+++    expect(code).toContain('sync_to_baseline');
+++    expect(code).toContain("':(exclude)patchs'");
+++    expect(code).toContain('--diff-filter=A');
+++    expect(code).toContain('Идёт полный проход по цепочке');
+++  });
+++
+++  it('полный проход остался на месте', () => {
+++    const code = script();
+++    expect(code).toContain('patch_state');
+++    expect(code).toContain('check_reverse');
+++    expect(code).toContain('ОСТАНОВКА: цель');
+++  });
+++});
++diff --git a/apply-patch.sh b/apply-patch.sh
++index 9ddb292..e5fc41b 100755
++--- a/apply-patch.sh
+++++ b/apply-patch.sh
++@@ -51,6 +51,13 @@ usage() {
++ узнаёт такие остатки (содержимое совпадает байт в байт) и даёт патчу
++ воссоздать их.
++ 
+++Отсечка (ключевой патч): patchs/baseline.json называет ключевой патч.
+++Цепочка до него не проверяется по одному — чистое дерево целиком
+++приводится к состоянию ключевого патча из истории ветки, проверяются
+++и применяются только патчи ПОСЛЕ него. Если в дереве есть
+++незакоммиченные изменения, отсечка не действует: полный проход, как
+++раньше. Номер ключевого патча переносит агент новым патчем.
+++
++ Примеры:
++   ./apply-patch.sh 308
++   ./apply-patch.sh --status
++@@ -211,142 +218,134 @@ patch_state() {
++   printf 'conflict'
++ }
++ 
++-# --- снимок состояния: каждый патч ветки проверяется по текущему дереву -------
++-
++-declare -A STATE
++-for name in "${ALL_PATCHES[@]}"; do
++-  STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
++-done
+++# --- поиск целевого патча ----------------------------------------------------
++ 
++-# Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
++-TOP_APPLIED=""
+++TARGET=""
++ for name in "${ALL_PATCHES[@]}"; do
++-  [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
+++  if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
+++    if [[ -n "$TARGET" ]]; then
+++      echo "Ошибка: в Arena-ветке несколько патчей №$PATCH_ID:"
+++      echo "  $TARGET"
+++      echo "  $name"
+++      exit 1
+++    fi
+++    TARGET="$name"
+++  fi
++ done
++ 
++-TOP_APPLIED_NUMBER=""
++-[[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
+++if [[ "$MODE" != "status" && -z "$TARGET" ]]; then
+++  echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
+++  exit 1
+++fi
++ 
++-# Подтверждён ли отложенный патч. Два вида доказательства, любое:
++-#   1) более поздний патч на тех же файлах (кроме чейнджлогов — их
++-#      трогают все, это не доказательство) стоит или был применён;
++-#   2) след строк: хотя бы одна добавленная патчем строка (в файле
++-#      вне чейнджлогов) до сих пор лежит в дереве дословно.
++-# Есть доказательство — дерево закономерно ушло мимо отложенного
++-# (его строки изменило или унаследовало то, что встало позже).
++-# Нет — файлы отложенного никем не подтверждены: возможно повреждение.
++-is_changelog() {
++-  [[ "$1" == "docs/changelog.ru.md" || "$1" == "docs/changelog.en.md" ]]
+++# --- отсечка (391): ключевой патч --------------------------------------------
+++# patchs/baseline.json {"baseline": "NNN"} называет ключевой патч. Цепочка ДО
+++# него не проверяется по одному патчу: чистое дерево целиком приводится к
+++# состоянию ключевого патча из истории ветки (коммит, где появился его файл
+++# патча) — это то же дерево, которое даёт полная цепочка; установщик сверяет
+++# его при каждом выпуске отсечки. Проверяются и применяются только патчи
+++# ПОСЛЕ ключевого. Переносит отсечку агент: новым патчем меняет номер
+++# в baseline.json (например на 400 или 405). Грязное дерево, отсутствие
+++# ключевого патча или его истории — полный проход по цепочке, как раньше.
+++
+++read_baseline_number() {
+++  local raw
+++  if ! raw="$(git -C "$ROOT_DIR" show "${FETCHED_COMMIT}:patchs/baseline.json" 2>/dev/null)"; then
+++    return 1
+++  fi
+++  sed -nE 's/.*"baseline"[[:space:]]*:[[:space:]]*"?([0-9]+[[:alnum:]]*)"?.*/\1/p' <<<"$raw" | head -1
++ }
++ 
++-patch_files_strong() {
++-  # файлы патча, кроме чейнджлогов
++-  local f
++-  while IFS= read -r f; do
++-    [[ -z "$f" ]] && continue
++-    is_changelog "$f" && continue
++-    printf '%s\n' "$f"
++-  done < <(patch_files "$1")
+++# Приводит рабочее дерево к состоянию ключевого патча: распаковывает его
+++# содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
+++# которых в этом состоянии уже нет.
+++sync_to_baseline() {
+++  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+++  local baseline_files tracked_files stale
+++  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
+++  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
+++  stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+++  if [[ -n "$stale" ]]; then
+++    while IFS= read -r f; do
+++      [[ -n "$f" ]] && git -C "$ROOT_DIR" rm -q -f -- "$f"
+++    done <<<"$stale"
+++  fi
++ }
++ 
++-is_confirmed() {
++-  # $1 = имя отложенного патча; $2... = имена стоящих/применённых
++-  local dname="$1"
++-  shift
++-  local dnum dfile ok v f
++-  dnum="$(patch_number "$dname")"
++-  dfile="$(extract_patch "$dname")"
++-  ok=0
++-
++-  # 0) патч самого установщика: установщик приходит бутстрапом (копия себя
++-  # из ветки до цепочки), минуя промежуточные патчи 295→297→299 — их
++-  # содержимое в дереве перекрыто самой программой установки. Такой патч
++-  # подтверждён, если его единственный содержательный файл — apply-patch.sh.
++-  local only_installer=1
++-  while IFS= read -r f; do
++-    [[ -z "$f" ]] && continue
++-    if [[ "$f" != "apply-patch.sh" ]]; then only_installer=0; break; fi
++-  done < <(patch_files_strong "$dfile")
++-  if [[ $only_installer -eq 1 ]]; then
++-    return 0
++-  fi
+++BASELINE_NUM="$(read_baseline_number || true)"
+++BASELINE_NAME=""
+++BASELINE_COMMIT=""
+++FAST_MODE=0
+++if [[ -n "${BASELINE_NUM:-}" ]]; then
+++  for name in "${ALL_PATCHES[@]}"; do
+++    [[ "$(patch_number "$name")" == "$BASELINE_NUM" ]] && BASELINE_NAME="$name"
+++  done
+++  [[ -n "$BASELINE_NAME" ]] || BASELINE_NUM=""
+++fi
++ 
++-  # 1) общий файл с более поздним стоящим/применённым
++-  while IFS= read -r f; do
++-    [[ -z "$f" ]] && continue
++-    for v in "$@"; do
++-      [[ -z "$v" ]] && continue
++-      number_lt "$dnum" "$(patch_number "$v")" || continue
++-      if patch_files_strong "$(extract_patch "$v")" | grep -Fxq -- "$f"; then
++-        return 0
++-      fi
++-    done
++-  done < <(patch_files_strong "$dfile")
++-
++-  # 2) след добавленных строк в дереве (файлы вне чейнджлогов)
++-  local file line checked
++-  while IFS=$'\t' read -r file line; do
++-    [[ -z "$file" || -z "$line" ]] && continue
++-    [[ -f "$ROOT_DIR/$file" ]] || continue
++-    if grep -Fqx -- "$line" "$ROOT_DIR/$file" 2>/dev/null; then
++-      return 0
+++if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_le "$PATCH_ID" "$BASELINE_NUM"; then
+++  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' || true)"
+++  if [[ -n "$local_dirty" ]]; then
+++    echo "Отсечка №$BASELINE_NUM не применяется: в дереве незакоммиченные изменения."
+++    echo "Идёт полный проход по цепочке."
+++    echo
+++  else
+++    BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
+++    if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
+++      FAST_MODE=1
+++      echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
+++      echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
+++      echo
+++      sync_to_baseline
+++    else
+++      echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
+++      echo "Идёт полный проход по цепочке."
+++      echo
++     fi
++-  done < <(added_lines "$dfile")
++-  return 1
++-}
+++  fi
+++fi
++ 
++-# Добавленные строки патча: «файл<TAB>строка», файлы вне чейнджлогов,
++-# строка не короче 10 символов, не больше 15 на файл.
++-added_lines() {
++-  awk '
++-    function flush() { n = 0 }
++-    BEGIN { cur = ""; n = 0 }
++-    /^diff --git / { flush(); cur = "" }
++-    /^\+\+\+ b\// {
++-      p = substr($0, 7)
++-      if (p != "docs/changelog.ru.md" && p != "docs/changelog.en.md") cur = p
++-      else cur = ""
++-      flush()
++-      next
++-    }
++-    cur != "" && /^\+/ && !/^\+\+\+/ {
++-      if (n < 15) {
++-        l = substr($0, 2)
++-        if (length(l) >= 10) {
++-          printf "%s\t%s\n", cur, l
++-          n++
++-        }
++-      }
++-    }
++-  ' "$1"
++-}
+++# --- снимок состояния: проверяются только патчи рабочей области ----------------
+++# Полный статус — все патчи цепочки; установка — либо патчи после отсечки,
+++# либо патчи до цели (как раньше, но без проверки хвоста выше цели).
++ 
++-# --- целостность файлов данных ------------------------------------------------
++-# Склейки «два JSON подряд» ломают приложение на загрузке — ловим сразу
++-# после применения и на повторных запусках. Лечение — tools/fix-double-json.js.
++-json_check() {
++-  command -v node >/dev/null 2>&1 || return 0
++-  local out
++-  if out="$(cd "$ROOT_DIR" && node -e '
++-    const fs=require("fs"),path=require("path");const bad=[];
++-    function walk(d){ if(!fs.existsSync(d))return; for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);if(s.isDirectory())walk(p);else if(p.endsWith(".json")){try{JSON.parse(fs.readFileSync(p,"utf8"))}catch(e){bad.push(p+" — "+e.message.slice(0,60))}}}}
++-    walk("modules"); walk("i18n");
++-    if(bad.length){console.log(bad.join("\n"));process.exit(1)}
++-  ' 2>/dev/null)"; then
++-    return 0
++-  fi
++-  echo "ВНИМАНИЕ: в файлах данных есть поломки формата (склейки и т.п.):"
++-  printf '%s\n' "$out" | sed 's/^/  /'
++-  echo
++-  echo "Лечение: node tools/fix-double-json.js  (резервные копии .bak)"
++-  return 1
++-}
+++declare -A STATE
+++STATE_SCOPE=()
+++if [[ "$MODE" == "status" ]]; then
+++  STATE_SCOPE=("${ALL_PATCHES[@]}")
+++elif [[ "$FAST_MODE" -eq 1 ]]; then
+++  for name in "${ALL_PATCHES[@]}"; do
+++    number_le "$BASELINE_NUM" "$(patch_number "$name")" || continue
+++    [[ "$name" == "$BASELINE_NAME" ]] && continue
+++    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+++    STATE_SCOPE+=("$name")
+++  done
+++else
+++  for name in "${ALL_PATCHES[@]}"; do
+++    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+++    STATE_SCOPE+=("$name")
+++  done
+++fi
+++for name in "${STATE_SCOPE[@]}"; do
+++  STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
+++done
+++
+++# Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
+++TOP_APPLIED=""
+++for name in "${STATE_SCOPE[@]}"; do
+++  [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
+++done
+++TOP_APPLIED_NUMBER=""
+++[[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
++ 
++ # --- режим статуса -----------------------------------------------------------
++ 
++ if [[ "$MODE" == "status" ]]; then
++   echo "Состояние патчей (проверка по содержимому дерева, заново):"
++-  echo
+++  if [[ -n "${BASELINE_NUM:-}" ]]; then
+++    echo "Отсечка: ключевой патч №$BASELINE_NUM — установка проверяет только патчи после него."
+++    echo
+++  fi
++   STANDING=()
++   will_apply=()
++   confirmed=0
++@@ -394,26 +393,6 @@ if [[ "$MODE" == "status" ]]; then
++   exit 0
++ fi
++ 
++-# --- поиск целевого патча ----------------------------------------------------
++-
++-TARGET=""
++-for name in "${ALL_PATCHES[@]}"; do
++-  if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
++-    if [[ -n "$TARGET" ]]; then
++-      echo "Ошибка: в Arena-ветке несколько патчей №$PATCH_ID:"
++-      echo "  $TARGET"
++-      echo "  $name"
++-      exit 1
++-    fi
++-    TARGET="$name"
++-  fi
++-done
++-
++-if [[ -z "$TARGET" ]]; then
++-  echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
++-  exit 1
++-fi
++-
++ # --- дерево уже новее запрошенного -------------------------------------------
++ 
++ if [[ -n "$TOP_APPLIED_NUMBER" ]] \
++@@ -431,8 +410,7 @@ fi
++ QUEUE=()
++ UPFRONT_STANDING=()
++ 
++-for name in "${ALL_PATCHES[@]}"; do
++-  number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+++for name in "${STATE_SCOPE[@]}"; do
++   if [[ "${STATE[$name]}" == "applied" ]]; then
++     UPFRONT_STANDING+=("$name")
++   else
++@@ -458,7 +436,7 @@ echo
++ 
++ # --- незакоммиченные изменения: предупреждение -------------------------------
++ 
++-if [[ -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
+++if [[ "$FAST_MODE" -ne 1 && -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
++   echo "ВНИМАНИЕ: в дереве есть незакоммиченные изменения."
++   echo "Смешивать их с применением патчей рискованно. Лучше закоммитить"
++   echo "или сделать stash. Продолжаю, но при неудаче откат сделанного"
++diff --git a/docs/agents/state.md b/docs/agents/state.md
++index ac68b45..93536c7 100644
++--- a/docs/agents/state.md
+++++ b/docs/agents/state.md
++@@ -8,7 +8,22 @@
++ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
++ 
++ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++-· последний сданный патч: **390** (владелец: «диагностику можешь сделать
+++· последний сданный патч: **391** (владелец: «скрипт установки проверяет
+++очень большое кол-во патчей… может сделать какую-нибудь отсечку? по
+++ключевым патчам? допустим, 391 — ключевой, от него вести проверку, потом
+++400 или 405»). Отсечка: patchs/baseline.json {"baseline": "391"};
+++apply-patch.sh на ЧИСТОМ дереве при цели выше ключевого синхронизирует
+++дерево с состоянием ключевого патча (git archive коммита, где появился
+++его patch-файл, --diff-filter=A; prune отслеживаемых файлов, которых
+++нет в базовом состоянии), STATE-проверки только для патчей ПОСЛЕ
+++ключевого; грязное дерево/нет истории/цель ≤ ключа — полный проход.
+++Статус-режим по-прежнему проверяет всё. Перенос отсечки = новый патч,
+++меняющий baseline.json И строку 'toBe(391)' в
+++__tests__/installer/install-baseline-391.test.js. Нюанс: патч-файл N не
+++содержит сам себя — тест закрепляет значение, а не существование файла.
+++GOLD apply-check впредь запускать С ГРЯЗНЫМ маркером (untracked файл,
+++удалить перед diff-сравнением), иначе быстрый путь съест полную
+++проверку цепочки · предыдущий: **390** (владелец: «диагностику можешь сделать
++ отдельной настройкой? чтобы не все видели про версию и пр., а только кто
++ её включил»). Блок диагностики 389 скрыт движковой настройкой
++ pwaInstallDiagnostics (каталог settingsCatalog, раздел «Внешний вид»,
++diff --git a/docs/changelog.en.md b/docs/changelog.en.md
++index df4fe5a..9260472 100644
++--- a/docs/changelog.en.md
+++++ b/docs/changelog.en.md
++@@ -15,6 +15,18 @@
++ ---
++ ---
++ ---
+++---
+++## Patch installs: cutoff at a key patch (patch 391)
+++
+++The installer no longer re-verifies the whole chain from scratch: a
+++baseline.json file names the key patch (currently 391). On a clean
+++tree (everything committed) the installer brings the files to the key
+++patch's state straight from the branch history and only checks the
+++patches after it — hundreds of checks become a few. With uncommitted
+++changes or incomplete history it automatically falls back to the old
+++full pass, nothing breaks. The cutoff can be moved to a later patch at
+++any time — just name the number.
+++
++ ---
++ ## Install diagnostics behind a switch (patch 390)
++ 
++diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
++index f621f17..5d37f3c 100644
++--- a/docs/changelog.ru.md
+++++ b/docs/changelog.ru.md
++@@ -1,5 +1,17 @@
++ # История изменений
++ 
+++---
+++## Установка патчей: отсечка по ключевому патчу (патч 391)
+++
+++Установщик больше не проверяет всю цепочку с самого начала: файл
+++baseline.json называет ключевой патч (сейчас — 391). На чистом дереве
+++(всё закоммичено) установка приводит файлы к состоянию ключевого
+++патча прямо из истории ветки и проверяет только патчи после него —
+++вместо сотни проверок осталось несколько. При незакоммиченных
+++изменениях или неполной истории автоматически идёт прежний полный
+++проход, ничего не ломается. Перенести отсечку на более поздний патч
+++можно в любой момент — для этого скажи номер.
+++
++ ---
++ ## Диагностика установки — по переключателю (патч 390)
++ 
++diff --git a/patchs/baseline.json b/patchs/baseline.json
++new file mode 100644
++index 0000000..9fbff39
++--- /dev/null
+++++ b/patchs/baseline.json
++@@ -0,0 +1,3 @@
+++{
+++  "baseline": "391"
+++}
++diff --git a/public/version.json b/public/version.json
++index 456f540..693236f 100644
++--- a/public/version.json
+++++ b/public/version.json
++@@ -1,5 +1,5 @@
++ {
++-  "version": "390",
+++  "version": "391",
++   "release": "1",
++   "notes": {
++     "ru-RU": [
 diff --git a/patchs/baseline.json b/patchs/baseline.json
 new file mode 100644
 index 0000000..9fbff39
