@@ -16,6 +16,15 @@
 ---
 ---
 ---
+## The installer explains the cutoff in plain words (patch 393)
+
+When an install goes through the cutoff, patches up to the key one do
+not appear in the "applied" list — their content arrives from the
+branch history as a whole. It used to look like a patch was skipped;
+now the installer explicitly says those patches are already in the
+tree and are not applied one by one.
+
+---
 ## The diagnostics itself fixed (patch 392)
 
 Both red lines in the install check were bugs of the diagnostics, not
