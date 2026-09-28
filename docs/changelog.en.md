@@ -16,6 +16,16 @@
 ---
 ---
 ---
+## Diagnostics names the browser and the no-prompt path (patch 394)
+
+If every check is green but the native install prompt never arrives,
+that is browser behavior, not a fault: not every browser sends the
+prompt, and even Chrome shows it with a delay. The check now displays
+the browser name; when there is no prompt it explains: install via the
+browser menu («Install app» / «Add to Home screen») — you still get a
+real app with an icon and no address bar.
+
+---
 ## The installer explains the cutoff in plain words (patch 393)
 
 When an install goes through the cutoff, patches up to the key one do
