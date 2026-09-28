@@ -16,6 +16,17 @@
 ---
 ---
 ---
+## The diagnostics itself fixed (patch 392)
+
+Both red lines in the install check were bugs of the diagnostics, not
+the app: "Not installed before" is normal and is now shown as a green
+line, and the icon check always reported failure because of an internal
+mistake (the wrong image constructor was used). After the update the
+check will honestly show the icon status for the first time: if they
+are green — the install problem is elsewhere, and the "already
+installed" line will hint at it.
+
+---
 ## Patch installs: cutoff at a key patch (patch 391)
 
 The installer no longer re-verifies the whole chain from scratch: a

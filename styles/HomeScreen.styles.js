@@ -273,6 +273,7 @@ const styles = StyleSheet.create({
   diagTitle: { fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 4 },
   diagText: { fontSize: 12, color: '#555', marginBottom: 3 },
   diagTextBad: { color: '#c0392b', fontWeight: '700' },
+  diagTextInfo: { fontSize: 12, color: '#b45309', marginBottom: 3 },
   linkText: {
     color: '#93c5fd',
     fontSize: 14,
