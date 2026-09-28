@@ -214,6 +214,7 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
 // диалог шлют не все браузеры, а Chrome держит паузу после отмен.
 const BROWSER_LABEL_KEYS = {
   chrome: 'pwa.browserChrome',
+  mi: 'pwa.browserMi',
   samsung: 'pwa.browserSamsung',
   yandex: 'pwa.browserYandex',
   firefox: 'pwa.browserFirefox',
@@ -228,6 +229,7 @@ const detectBrowserId = () => {
   // Порядок важен: Edge/Opera/Samsung/Yandex сами построены на Chrome
   // и содержат «Chrome/» в userAgent.
   if (/SamsungBrowser/i.test(ua)) return 'samsung';
+  if (/MiuiBrowser|XiaoMi/i.test(ua)) return 'mi';
   if (/YaBrowser/i.test(ua)) return 'yandex';
   if (/Edg\//i.test(ua)) return 'edge';
   if (/OPR\/|Opera/i.test(ua)) return 'opera';
@@ -324,7 +326,13 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
       ) : (
         <>
           <Text style={styles.diagText}>• {tHomeScreen('pwa.diagPromptAbsent')}</Text>
-          <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
+          {/*
+            395: обходной путь — хорошая новость, а не тревога: янтарный
+            цвет (diagTextInfo) владелец прочёл как красный/ошибку. Зелёная
+            галочка в одном ряду с остальными «✓ это работает».
+          */}
+          <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
+          <Text style={styles.diagText}>• {tHomeScreen('pwa.diagStaleShortcut')}</Text>
         </>
       )}
       {versionRef.current ? (

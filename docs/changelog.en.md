@@ -16,6 +16,17 @@
 ---
 ---
 ---
+## The install check tells the truth about browsers (patch 395)
+
+The install diagnostics no longer misleads with color and names things
+directly: a real app (an icon in the app list, a window without the
+address bar) is installed by Chrome — menu ⋮ → «Install app» (Samsung
+Internet can too). Mi Browser cannot install a real PWA at all; Yandex
+Browser creates a shortcut that opens in the browser — not an app. The
+site passes every install check — it is only about browser
+capabilities.
+
+---
 ## Diagnostics names the browser and the no-prompt path (patch 394)
 
 If every check is green but the native install prompt never arrives,

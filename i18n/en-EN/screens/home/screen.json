@@ -110,7 +110,9 @@
     "browserSafari": "Safari",
     "browserOther": "other",
     "diagPromptAbsent": "The native prompt hasn't arrived yet — that happens: browsers show it with a delay, and after a dismissed install they may pause for a while. Close the site and open it again, then try once more.",
-    "diagPromptWorkaround": "Installation also works without the prompt — via the browser menu: «Install app» / «Add to Home screen». You still get a real app: a home-screen icon and a full-screen window."
+    "diagPromptWorkaround": "A real app (an icon in the app list, a window without the address bar) is installed by Chrome: menu ⋮ → «Install app». Samsung Internet can do this too.",
+    "diagStaleShortcut": "Many Android browsers cannot install a real PWA: Mi Browser — not at all; Yandex Browser creates a shortcut that opens in the browser (not an app). For a real PWA, open the site in Chrome and choose «Install app».",
+    "browserMi": "Mi Browser"
   },
   "settings": {
     "title": "Settings",
