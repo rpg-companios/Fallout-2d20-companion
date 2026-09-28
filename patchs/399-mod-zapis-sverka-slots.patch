@@ -1,0 +1,549 @@
+diff --git a/__tests__/equipment/weapon-mod-sync-399.test.js b/__tests__/equipment/weapon-mod-sync-399.test.js
+new file mode 100644
+index 0000000..e9df76c
+--- /dev/null
++++ b/__tests__/equipment/weapon-mod-sync-399.test.js
+@@ -0,0 +1,166 @@
++// ПРИЁМОЧНЫЙ (патч 399): модель владельца «мод — осязаемая запись, а не
++// два разных предмета» (контракт «бутылок»):
++//   • на оружии ствол, в инвентаре 3 ствола — сверка по недостатку: ровно
++//     недостающее связывается/создаётся; повторная загрузка НИКОГДА не
++//     добавляет (анти-двоение — главное требование владельца);
++//   • 3 оружия × (стволы/ложи/конденсаторы), одинаковые моды — каждый слот
++//     получает свою связанную запись; безличность (никаких номеров в UI);
++//   • продал оружие, не сняв моды — моды ушли вместе (344, единая точка);
++//   • снял — вернулся в пачку без памяти, стек общий с купленными;
++//   • кит = «пульт с батарейками»: моды из коробки — обычные записи;
++//   • старый сейв (записей нет вовсе) — оживает при первой загрузке;
++//   • броня (mod_std_*) и робо-моды (robot_weapon_mod_*) не тронуты.
++import { describe, expect, it, beforeEach, afterEach } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import { syncWeaponModInstances, robotWeaponHostKeyOf } from '../../domain/weaponModInstances';
++import { robotWeaponHostKey } from '../../src/engine/items/weaponMods';
++import { generateStackKey } from '../../domain/itemIdentity';
++import { WEAPON_MOD_ID_MAP } from '../../domain/weaponModCanonical';
++import catalog from '../../modules/fallout/data/equipment/weapon_mods.json';
++
++const weaponModIds = new Set(catalog.map((m) => m.id));
++const BARREL = 'mod_long_barrel';
++const STOCK = 'mod_full_stock';
++const CAP = 'mod_full_capacitors';
++
++const clone = (value) => JSON.parse(JSON.stringify(value));
++
++// Пример владельца: 3 оружия и одинаковые моды на них.
++const ownerScenario = (bagMods = 2) => ({
++  items: {
++    w1: { id: 'w1', weaponId: 'weapon_10mm_pistol', itemType: 'weapon', appliedMods: { Receiver: BARREL, Capacitor: CAP } },
++    w2: { id: 'w2', weaponId: 'weapon_hunting_rifle', itemType: 'weapon', appliedMods: { Receiver: BARREL, Stock: STOCK } },
++    w3: { id: 'w3', weaponId: 'weapon_combat_rifle', itemType: 'weapon', appliedMods: { Receiver: BARREL, Stock: STOCK, Capacitor: CAP } },
++    ...Object.fromEntries(Array.from({ length: bagMods }, (_, i) => (
++      [`bag${i}`, { id: `bag${i}`, weaponId: BARREL, itemType: 'weaponMod', quantity: 1, equipped: false }
++      ]))),
++  },
++});
++
++const boundEntries = (state) => Object.entries(state.items).filter(([, i]) => i.installedOn);
++
++describe('патч 399: мод — осязаемая запись; сверка по недостатку', () => {
++  it('пример владельца: 7 ролей → 7 связанных записей, свободные из пачки уходят', () => {
++    const state = ownerScenario(2);
++    syncWeaponModInstances(state, weaponModIds);
++    const bound = boundEntries(state);
++    expect(bound.length).toBe(7);
++    expect(bound.filter(([, i]) => i.weaponId === BARREL).length).toBe(3);
++    expect(bound.filter(([, i]) => i.weaponId === STOCK).length).toBe(2);
++    expect(bound.filter(([, i]) => i.weaponId === CAP).length).toBe(2);
++    // пачка: обе свободные штуки ушли на роли
++    expect(state.items.bag0.installedOn).toBeTruthy();
++    expect(state.items.bag1.installedOn).toBeTruthy();
++    // у связанной записи известен слот («мод знает, куда вставлен»)
++    expect(bound.find(([, i]) => i.installedOn === 'w1' && i.weaponId === BARREL)[1].installedSlot).toBe('Receiver');
++  });
++
++  it('АНТИ-ДВОЕНИЕ: пять загрузок подряд — байт в байт', () => {
++    let state = ownerScenario(0);
++    for (let run = 0; run < 5; run += 1) {
++      const before = clone(state.items);
++      syncWeaponModInstances(state, weaponModIds);
++      if (run > 0) expect(state.items).toEqual(before);
++    }
++    expect(boundEntries(state).length).toBe(7);
++  });
++
++  it('старый сейв (записей нет, сумка пуста): создаются ровно 7 записей, второй прогон — ничего', () => {
++    const state = ownerScenario(0);
++    syncWeaponModInstances(state, weaponModIds);
++    expect(boundEntries(state).length).toBe(7);
++    const snapshot = clone(state.items);
++    syncWeaponModInstances(state, weaponModIds);
++    expect(state.items).toEqual(snapshot);
++    // созданная запись сливается в общую пачку при снятии (тот же stackKey)
++    const created = boundEntries(state).find(([key]) => key.startsWith('inst-'));
++    expect(created[1].stackKey).toBe(generateStackKey(BARREL));
++  });
++
++  it('лишняя связанная запись (задвоение из старого сейва) возвращается в пачку', () => {
++    const state = ownerScenario(0);
++    // На пару w1|BARREL претендуют двое: законная связка и дубль.
++    state.items.primary = { id: 'primary', weaponId: BARREL, itemType: 'weaponMod', equipped: true, installedOn: 'w1', installedSlot: 'Receiver' };
++    state.items.dupe = { id: 'dupe', weaponId: BARREL, itemType: 'weaponMod', equipped: true, installedOn: 'w1' };
++    syncWeaponModInstances(state, weaponModIds);
++    expect(state.items.dupe.installedOn).toBeUndefined();
++    expect(state.items.dupe.equipped).toBe(false);
++    // законная связка осталась, слот на ней не потерян
++    expect(state.items.primary.installedOn).toBe('w1');
++    expect(state.items.primary.installedSlot).toBe('Receiver');
++    expect(boundEntries(state).filter(([, i]) => i.weaponId === BARREL && i.installedOn === 'w1').length).toBe(1);
++  });
++
++  it('осиротевшая запись (оружие продано) — в пачку без памяти о прошлом', () => {
++    const state = { items: {
++      ghost: { id: 'ghost', weaponId: BARREL, itemType: 'weaponMod', equipped: true, installedOn: 'sold-w9', installedSlot: 'Receiver' },
++    } };
++    syncWeaponModInstances(state, weaponModIds);
++    expect(state.items.ghost.equipped).toBe(false);
++    expect(state.items.ghost.installedOn).toBeUndefined();
++    expect(state.items.ghost.installedSlot).toBeUndefined();
++  });
++
++  it('кит = пульт с батарейками: заводские моды становятся обычными записями', () => {
++    const state = { items: {
++      kitGun: { id: 'kitGun', weaponId: 'weapon_10mm_pistol', itemType: 'weapon', equipped: true, appliedMods: { Receiver: 'mod_hardened' } },
++    } };
++    syncWeaponModInstances(state, weaponModIds);
++    const [key, entry] = boundEntries(state)[0];
++    expect(entry.weaponId).toBe('mod_hardened');
++    expect(entry.installedOn).toBe('kitGun');
++    expect(entry.itemType).toBe('weaponMod');
++    expect(key).toBeTruthy();
++  });
++
++  it('робо-слоты: ключ robotSlot:..., формат совпадает с движком; анти-двоение', () => {
++    expect(robotWeaponHostKeyOf('leftArm', 'weapon_flamer')).toBe(robotWeaponHostKey('leftArm', 'weapon_flamer'));
++    const state = { items: {}, robot: { slots: {
++      leftArm: { heldWeapon: { weaponId: 'weapon_flamer', modIds: [BARREL] } },
++    } } };
++    syncWeaponModInstances(state, weaponModIds);
++    const [, entry] = boundEntries(state)[0];
++    expect(entry.installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_flamer'));
++    const snapshot = clone(state.items);
++    syncWeaponModInstances(state, weaponModIds);
++    expect(state.items).toEqual(snapshot);
++  });
++
++  it('броня и робо-моды не тронуты', () => {
++    const state = { items: {
++      armorMod: { id: 'armorMod', weaponId: 'mod_std_boiled_leather', itemType: 'armorMod', equipped: true, installedOn: 'armor1' },
++      roboMod: { id: 'roboMod', weaponId: 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v', itemType: 'weaponMod', equipped: true, installedOn: 'robotSlot:leftArm:weapon_x' },
++    } };
++    const snapshot = clone(state.items);
++    syncWeaponModInstances(state, weaponModIds);
++    expect(state.items).toEqual(snapshot);
++  });
++
++  it('продал оружие, не сняв моды, — моды ушли вместе (единая точка 344, стор)', async () => {
++    const storeModule = await import('../../src/store/characterStore');
++    const useCharacterStore = storeModule.default;
++    const state = () => useCharacterStore.getState();
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...(prev.items || {}),
++        w1: { id: 'w1', weaponId: 'weapon_10mm_pistol', itemType: 'weapon', quantity: 1, appliedMods: {} },
++        m1: { id: 'm1', weaponId: 'mod_hardened', itemType: 'weaponMod', quantity: 1, equipped: false },
++      },
++    }));
++    const key = state().installArmorMod({ modId: 'mod_hardened', hostKey: 'w1', slot: 'Receiver' });
++    expect(key).toBe('m1');
++    expect(state().items.m1.installedSlot).toBe('Receiver');
++    state().adjustItemQuantity('w1', -1);
++    expect(state().items.w1).toBeUndefined();
++    expect(state().items.m1).toBeUndefined();
++  });
++
++  it('карта 375 покрывает репорт-мод; проводка: deserializeState зовёт сверку до ремонта 381', () => {
++    expect(WEAPON_MOD_ID_MAP['mod_043']).toBe('mod_beta_wave_tuner');
++    const src = readFileSync('src/saves/characterSaves.js', 'utf8');
++    expect(src).toContain('syncWeaponModInstances(migrated, weaponModIds)');
++    expect(src.indexOf('syncWeaponModInstances(migrated'))
++      .toBeLessThan(src.indexOf('migrateRepairMisroutedWeaponMods(migrated'));
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 48b9938..00ba48b 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,24 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **398** (СИЛЬНЫЙ баг от владельца: «загрузил
++· последний сданный патч: **399** (модель владельца, обдумана с ним
++ДО кода: «мод — осязаемая запись, установленность — статус; правила
++бутылок»). КОНТРАКТ: свободные одинаковые моды — одна пачка ×N,
++безличны; установка = штука из пачки получает пару «хост+слот»
++(installedOn/installedSlot), а слот оружия хранит каталожный id
++(«оружие получает id от мода»); снятие — в пачку без памяти; продал
++оружие — моды ушли вместе (344, единая точка adjustItemQuantity —
++уже стояла); кит = «пульт с батарейками» (заводские моды — обычные
++записи, без особых пометок); при загрузке СВЕРКА ПО НЕДОСТАТКУ
++(syncWeaponModInstances, domain/weaponModInstances.js — роли = слоты
++оружия в items + робо-слоты robotSlot:...): добавляется ровно
++недостающее → повторная загрузка НИКОГДА не двоит (главное требование
++владельца); трекаются ТОЛЬКО оружейные моды каталога, броня (mod_std_)
++и робо-моды (robot_weapon_mod_*) не тронуты. Экран передаёт слот в
++installArmorMod. ВАРИАНТ «ключ записи в слоте» ОТКЛОНЁН владельцем
++(личные номера не нужны — штуки взаимозаменяемы). Заслоны: 399-тесты
++(пример «3 оружия», ×5 идемпотентность, старый сейв, кит, дубль,
++сирота, продажа со стором) · предыдущий: **398** (СИЛЬНЫЙ баг от владельца: «загрузил
+ старый сейв — в инвентаре мод mod_043, а имена теперь все другие;
+ никакого парсера в миграторе сейвов не было»). Мост 375
+ (migrateWeaponModIdsToCanonical, зовётся в deserializeState) переводил
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4451dae..2d6a4ae 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,19 @@
+ ---
+ ---
+ ---
++---
++## Mods unified as «stack ↔ slots» (patch 399)
++
++Following the owner's model («a mod is a tangible entry; being
++installed is just its status» — like bottles: empty ones form one
++stack, filled ones change state): on every character load, mod entries
++are reconciled with weapon slots by deficiency — missing ones are
++bound or created, surplus ones return to the stack. Reloading never
++duplicates anything. Factory mods of kit weapons are ordinary mods:
++they can be removed and live their own life. Selling a weapon still
++takes its mods with it. An installed mod «knows» the weapon and slot
++it sits in; screens show only names, no service keys.
++
+ ---
+ ## Old saves: bag mods get their names back (patch 398)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index fc07a6c..82c1c68 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Моды — единая система «пачка ↔ слоты» (патч 399)
++
++По модели владельца («мод — осязаемая запись, установленность —
++статус», как бутылки: пустые — одной пачкой, налил воду — состояние
++сменилось): при каждой загрузке персонажа записи модов сверяются со
++слотами оружия по недостатку — недостающие связываются или создаются,
++лишние возвращаются в пачку. Повторная загрузка никогда ничего не
++добавляет и не удваивает. Заводские моды оружия из комплекта — самые
++обычные моды: снимаются и живут своей жизнью. Продажа оружия по-прежнему
++уносит его моды с собой. Установленный мод «знает», в какой слот какого
++оружия вставлен; на экранах — только названия, никаких служебных
++номеров.
++
+ ---
+ ## Старые сейвы: моды из сумки снова со своими именами (патч 398)
+ 
+diff --git a/domain/weaponModInstances.js b/domain/weaponModInstances.js
+new file mode 100644
+index 0000000..e46097a
+--- /dev/null
++++ b/domain/weaponModInstances.js
+@@ -0,0 +1,185 @@
++// domain/weaponModInstances.js
++//
++// 399: сверка «записи модов ↔ слоты оружия» при загрузке сейва
++// (модель владельца: мод — осязаемая запись; установленный мод — та же
++// запись со статусом «вставлен в оружие X, слот Y»).
++//
++// Контракт (слово владельца, «бутылки»):
++//   • свободные одинаковые моды — одна пачка в сумке, безличны («та, что
++//     под руку попалась»);
++//   • установка = штука из пачки получает пару «хост + мод» (хост — ключ
++//     предмета оружия или синтетический robotSlot:...; мод — каталожный id
++//     в appliedMods/modIds самого оружия: «оружие получает id от мода»);
++//   • снятие = пара стирается, штука возвращается в пачку без памяти;
++//   • продали/удалили оружие — моды уходят вместе (344, уже в сторе);
++//   • при загрузке сверка ПО НЕДОСТАТКУ: добавляется ровно недостающее,
++//     лишние связанные записи возвращаются в пачку → повторная загрузка
++//     никогда ничего не добавляет (анти-двоение, требование владельца);
++//   • моды из комплекта = обычные моды («пульт с батарейками со старта
++//     внутри — тот же пульт, в который батарейки вставили позже»).
++//
++// Транслируются только моды оружия из каталога (weaponModIds): броня
++// (mod_std_*) и робо-моды (robot_weapon_mod_*) живут по своим законам
++// 343/359 и здесь не трогаются.
++
++import { generateStackKey } from './itemIdentity';
++
++// Синтетический ключ-носитель оружия в слоте робота. Формат владельца —
++// robotWeaponHostKey в src/engine/items/weaponMods.ts; заслон 399
++// фиксирует совпадение формата (domain не импортирует engine).
++export const robotWeaponHostKeyOf = (slotKey, weaponId) =>
++  `robotSlot:${slotKey}:${weaponId ?? 'unknown'}`;
++
++// Все каталожные id модов на оружии-карточке: список modIds + карта appliedMods.
++const modIdsOf = (weapon) => {
++  const ids = [];
++  if (Array.isArray(weapon?.modIds)) {
++    ids.push(...weapon.modIds.filter((id) => typeof id === 'string'));
++  }
++  if (weapon?.appliedMods && typeof weapon.appliedMods === 'object') {
++    ids.push(...Object.values(weapon.appliedMods).filter((id) => typeof id === 'string'));
++  }
++  return ids;
++};
++
++/**
++ * Приводит записи модов оружия к слотам оружия по недостатку.
++ * Идемпотентно: второй прогон на согласованных данных — no-op.
++ *
++ * @param {object} state — состояние персонажа (мутируется items при ремонте)
++ * @param {Set<string>} weaponModIds — id оружейных модов каталога
++ * @returns {object} то же состояние
++ */
++export function syncWeaponModInstances(state, weaponModIds) {
++  if (!state || typeof state !== 'object') return state;
++  const isTrackedMod = (id) => typeof id === 'string' && weaponModIds instanceof Set && weaponModIds.has(id);
++  const items = state.items && typeof state.items === 'object' ? state.items : {};
++
++  // 1) Роли «хост|мод»: слоты оружия в инвентаре + робо-слоты.
++  const roles = new Map();
++  const addRole = (hostKey, modId, slot) => {
++    if (!isTrackedMod(modId)) return;
++    const pair = `${hostKey}|${modId}`;
++    if (!roles.has(pair)) roles.set(pair, { hostKey, modId, slot: slot || null });
++  };
++  for (const [key, item] of Object.entries(items)) {
++    if (!item || typeof item !== 'object') continue;
++    const hostId = String(item.weaponId || '');
++    if (!hostId.startsWith('weapon_') || isTrackedMod(hostId)) continue;
++    const applied = item.appliedMods;
++    if (applied && typeof applied === 'object') {
++      for (const [slot, modId] of Object.entries(applied)) addRole(key, modId, slot);
++    }
++  }
++  const slots = state.robot?.slots || state.robots?.slots || {};
++  for (const [slotKey, slotData] of Object.entries(slots)) {
++    const weapons = [
++      ...(Array.isArray(slotData?.limb?.builtinWeapons) ? slotData.limb.builtinWeapons : []),
++      ...(slotData?.heldWeapon ? [slotData.heldWeapon] : []),
++    ];
++    for (const weapon of weapons) {
++      if (!weapon || typeof weapon !== 'object') continue;
++      for (const modId of modIdsOf(weapon)) {
++        addRole(robotWeaponHostKeyOf(slotKey, weapon.weaponId || weapon.id || null), modId, null);
++      }
++    }
++  }
++
++  // 2) Текущие записи: связанные (installedOn) и свободные (пачка).
++  const boundByPair = new Map();
++  const boundKeys = new Set();
++  const freeByMod = new Map();
++  for (const [key, item] of Object.entries(items)) {
++    if (!item || typeof item !== 'object' || !isTrackedMod(item.weaponId)) continue;
++    if (item.installedOn) {
++      boundKeys.add(key);
++      const pair = `${item.installedOn}|${item.weaponId}`;
++      if (!boundByPair.has(pair)) boundByPair.set(pair, []);
++      boundByPair.get(pair).push(key);
++    } else if (!item.equipped) {
++      if (!freeByMod.has(item.weaponId)) freeByMod.set(item.weaponId, []);
++      freeByMod.get(item.weaponId).push(key);
++    }
++  }
++
++  const next = { ...items };
++  let changed = false;
++  const unbind = (key) => {
++    next[key] = { ...next[key], equipped: false };
++    delete next[key].installedOn;
++    delete next[key].installedSlot;
++    changed = true;
++  };
++
++  // 3) Каждой роли — ровно одна связанная запись (по недостатку).
++  let counter = 1;
++  for (const role of roles.values()) {
++    const pair = `${role.hostKey}|${role.modId}`;
++    let bound = boundByPair.get(pair) || [];
++    if (bound.length > 1) {
++      // Задвоение из старых сейвов/повторных прогонов: первая остаётся, прочие — в пачку.
++      for (const key of bound.slice(1)) {
++        unbind(key);
++        boundKeys.delete(key);
++      }
++      bound = [bound[0]];
++      boundByPair.set(pair, bound);
++    }
++    if (bound.length === 1) {
++      // Пара есть: восстановить слот на записи, если известен и не записан.
++      const [key] = bound;
++      if (role.slot && !next[key].installedSlot) {
++        next[key] = { ...next[key], installedSlot: role.slot };
++        changed = true;
++      }
++      continue;
++    }
++    // Недостаток: взять свободную штуку из пачки…
++    const free = (freeByMod.get(role.modId) || [])
++      .filter((key) => next[key] && !next[key].installedOn && !next[key].equipped);
++    if (free.length > 0) {
++      const key = free[0];
++      freeByMod.set(role.modId, free.slice(1));
++      next[key] = {
++        ...next[key],
++        equipped: true,
++        installedOn: role.hostKey,
++        ...(role.slot ? { installedSlot: role.slot } : {}),
++      };
++      changed = true;
++      continue;
++    }
++    // …или создать запись (кит, старый сейв): «пульт с батарейками» —
++    // самый обычный мод. stackKey без модов = стек обычной штуки в пачке.
++    let key = `inst-${role.modId}-sync${counter}`;
++    while (next[key]) {
++      counter += 1;
++      key = `inst-${role.modId}-sync${counter}`;
++    }
++    counter += 1;
++    next[key] = {
++      id: key,
++      instanceId: key,
++      weaponId: role.modId,
++      itemType: 'weaponMod',
++      quantity: 1,
++      equipped: true,
++      installedOn: role.hostKey,
++      ...(role.slot ? { installedSlot: role.slot } : {}),
++      stackKey: generateStackKey(role.modId),
++    };
++    changed = true;
++  }
++
++  // 4) Осиротевшие связанные записи (хост пропал или мод со слота снят) —
++  // обратно в пачку, без памяти о прошлом («сольёл воду — пустая бутылка»).
++  for (const key of boundKeys) {
++    const item = next[key];
++    if (!item || !item.installedOn) continue;
++    const pair = `${item.installedOn}|${item.weaponId}`;
++    if (!roles.has(pair)) unbind(key);
++  }
++
++  if (changed) state.items = next;
++  return state;
++}
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index c6030bf..2230c46 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -1058,10 +1058,13 @@ const WeaponsAndArmorScreen = () => {
+       // 351 (закон владельца 343/344): мод-предмет оружия при установке
+       // получает флаг «экипирован» и привязывается к предмету оружия;
+       // снятие/замена возвращает прежние моды в сумку. Дифф — чистый.
++      // 399: записи остаётся и слот («мод знает, куда он вставлен»).
+       const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+-      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+-      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+       const patch = weaponModPatchToStore(modifiedWeapon);
++      const slotOfMod = (id) => Object.entries(patch.appliedMods || {})
++        .find(([, modId]) => modId === id)?.[0];
++      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
++      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId, slot: slotOfMod(id) }));
+       debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
+       updateItem(modPlan.itemId, patch);
+       return;
+@@ -1072,8 +1075,10 @@ const WeaponsAndArmorScreen = () => {
+       // виртуальный носитель, флага нет). Снятие/замена — прежние моды видны.
+       if (itemId) {
+         const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
++        const applied = modifiedWeapon?.appliedMods || {};
++        const slotOfMod = (id) => Object.entries(applied).find(([, modId]) => modId === id)?.[0];
+         plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: itemId }));
+-        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId }));
++        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId, slot: slotOfMod(id) }));
+       }
+       // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
+       // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
+diff --git a/public/version.json b/public/version.json
+index a05670e..a82f58f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "398",
++  "version": "399",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index d0848cd..05ac37e 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -48,6 +48,8 @@ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
+ import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
+ import { migrateWeaponModIdsToCanonical, repairMisroutedWeaponMods as migrateRepairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
++// 399: сверка «записи модов ↔ слоты оружия» по недостатку (анти-двоение).
++import { syncWeaponModInstances } from '../../domain/weaponModInstances';
+ import { resolveBodyPlan } from '../../domain/bodyplan';
+ import { resolveKitItems } from '../../domain/kitResolver';
+ import { inspectSelectedPerkRecords } from '../../domain/perks';
+@@ -170,7 +172,12 @@ const deserializeState = (data) => {
+   // не-оружие, снимаются; мод-предметы с осиротевшими флагами возвращаются
+   // в сумку. Идемпотентно, робо-привязки не тронуты.
+   if (catalog?.weaponMods?.length) {
+-    migrateRepairMisroutedWeaponMods(migrated, new Set(catalog.weaponMods.map((m) => m.id)));
++    const weaponModIds = new Set(catalog.weaponMods.map((m) => m.id));
++    // 399: сначала сверка «записи ↔ слоты» (создать недостающие/вернуть
++    // лишние в пачку), затем ремонт 381 (мусор не-оружия). Оба — по
++    // недостатку и идемпотентно: повторная загрузка ничего не меняет.
++    syncWeaponModInstances(migrated, weaponModIds);
++    migrateRepairMisroutedWeaponMods(migrated, weaponModIds);
+   }
+   const restored = catalog
+     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index b10c6b8..81eaf9d 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -777,7 +777,10 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+        * выключена) — ничего не делаем: мод «виртуальный», установка свободна.
+        * @returns {string|null} ключ экземпляра мода или null.
+        */
+-      installArmorMod: ({ modId, hostKey }) => {
++      // 399: необязательный slot — на записи остаётся «в какой слот встал»
++      // (закон владельца «мод знает, куда он вставлен»); броня слот не
++      // передаёт — поведение 343/344 без изменений.
++      installArmorMod: ({ modId, hostKey, slot }) => {
+         if (!modId) return null;
+         // 344: привязка — к ПРЕДМЕТУ-носителю. Экземпляра нет (одежда кита,
+         // стартовая запись без ключа в сумке) — мод НЕ флагается: остаётся
+@@ -789,7 +792,12 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         ));
+         if (!entry) return null;
+         const [key, item] = entry;
+-        items[key] = { ...item, equipped: true, installedOn: hostKey || null };
++        items[key] = {
++          ...item,
++          equipped: true,
++          installedOn: hostKey || null,
++          ...(slot ? { installedSlot: slot } : {}),
++        };
+         set({ items });
+         debugLog('armorMod.installed', { modId, instanceKey: key, hostKey });
+         return key;
+@@ -832,6 +840,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         const [key, item] = entry;
+         items[key] = { ...item, equipped: false };
+         delete items[key].installedOn;
++        delete items[key].installedSlot;
+         set({ items });
+         debugLog('armorMod.uninstalled', { modId, instanceKey: key });
+       },
