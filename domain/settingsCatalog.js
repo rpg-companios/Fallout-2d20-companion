@@ -58,6 +58,17 @@ export const ENGINE_SETTINGS = [
     defaultValue: false,
   },
   {
+    // 390: техническая диагностика установки PWA — по умолчанию скрыта,
+    // включается в настройках тем, кто разбирает установку (владелец).
+    id: 'pwaInstallDiagnostics',
+    type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+    sectionKey: 'appearance',
+    labelKey: 'settings.pwaDiagnosticsTitle',
+    descriptionKey: 'settings.pwaDiagnosticsDescription',
+    defaultValue: false,
+  },
+  {
     id: 'language',
     type: 'select',
     controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,

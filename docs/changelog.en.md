@@ -16,6 +16,25 @@
 ---
 ---
 ---
+## Install diagnostics behind a switch (patch 390)
+
+The technical check inside the install dialog is no longer shown to
+everyone: Settings (the "Appearance" section) now has an "Install
+diagnostics" toggle. It is off by default and the dialogs look as
+before; when enabled, the install dialog shows the check: whether the
+app is already installed, manifest, icons, service worker, build version.
+
+---
+## The install window now diagnoses itself (patch 389)
+
+When the app can't be installed, the install dialog now shows live
+diagnostics: whether the browser already considers the app installed
+(the most common cause — an old shortcut; remove it, reload, install
+again), whether the manifest/icons/service worker are reachable, whether
+the native prompt is available, and the app version. The manifest now
+carries an entry that lets the browser report "already installed".
+
+---
 ## Weapon lines in the picker now include ammo, effects, qualities (patch 388)
 
 The item stats line for weapons now lists the ammo type after range
