@@ -16,6 +16,16 @@
 ---
 ---
 ---
+## Nothing on our side blocks installation anymore (patch 396)
+
+Since the earliest versions the app intercepted the install event and
+forbade the browser from showing its native dialog — installation went
+only through the in-app button. In some browsers (today's Yandex) that
+path never raises a window, so there was no dialog at all. The
+interception is relaxed: the browser is free to show its native
+install path again; the button and diagnostics keep working.
+
+---
 ## The install check tells the truth about browsers (patch 395)
 
 The install diagnostics no longer misleads with color and names things
