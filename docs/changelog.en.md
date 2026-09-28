@@ -16,6 +16,15 @@
 ---
 ---
 ---
+## Release 2 (declared by the owner)
+
+The «What's new» notes now cover patches 336–400: mod crafting (weapons
+and armor), real mod names instead of numbers, mods as tangible things
+with auto-reconciliation on load, robot mods under the same rules,
+item stats in the picker row, and the fixed PWA installation. Details
+in the «What's new» window after the update.
+
+---
 ## One law for all mods (patch 400)
 
 Mod rules are no longer split into «weapon» and «the rest»: armor and
