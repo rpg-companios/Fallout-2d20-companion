@@ -1,0 +1,225 @@
+diff --git a/__tests__/screens/pwa-diagnostics-browser-394.test.js b/__tests__/screens/pwa-diagnostics-browser-394.test.js
+index 7523966..1ee5a9b 100644
+--- a/__tests__/screens/pwa-diagnostics-browser-394.test.js
++++ b/__tests__/screens/pwa-diagnostics-browser-394.test.js
+@@ -38,10 +38,14 @@ describe('патч 394: диагностика называет браузер 
+     expect(ru.pwa.diagBrowser).toBe('Браузер');
+     expect(ru.pwa.browserYandex).toBe('Яндекс Браузер');
+     expect(ru.pwa.diagPromptAbsent).toContain('пока не приходил');
+-    expect(ru.pwa.diagPromptWorkaround).toContain('меню браузера');
++    // 395 переписал строку обходного пути: имя браузера, который ставит
++    // настоящее приложение (Яндекс/Mi — не умеют, репорт владельца).
++    expect(ru.pwa.diagPromptWorkaround).toContain('Chrome');
+     expect(en.pwa.diagBrowser).toBe('Browser');
+     expect(en.pwa.diagPromptAbsent).toContain("hasn't arrived");
+-    expect(en.pwa.diagPromptWorkaround).toContain('browser menu');
++    // 395 переписал строку обходного пути: имя браузера, который ставит
++    // настоящее приложение (репорт владельца: Mi — никак, Яндекс — ярлык).
++    expect(en.pwa.diagPromptWorkaround).toContain('Chrome');
+     for (const key of ['browserChrome','browserSamsung','browserYandex','browserFirefox','browserOpera','browserEdge','browserSafari','browserOther']) {
+       expect(ru.pwa[key]).toBeTruthy();
+       expect(en.pwa[key]).toBeTruthy();
+diff --git a/__tests__/screens/pwa-workaround-green-395.test.js b/__tests__/screens/pwa-workaround-green-395.test.js
+new file mode 100644
+index 0000000..1352a0e
+--- /dev/null
++++ b/__tests__/screens/pwa-workaround-green-395.test.js
+@@ -0,0 +1,49 @@
++// ПРИЁМОЧНЫЙ (патч 395): «серым про нативный диалог, а вот красным
++// "установка работает и без диалога"» (владелец). Строка обходного пути
++// была в янтарном стиле diagTextInfo (#b45309) — на экране читается как
++// красная ошибка, хотя по смыслу это хорошая новость и инструкция.
++// 395: строка переведена в зелёный ряд «✓ это работает» (diagText);
++// янтарный остался только у честного предупреждения «уже установлено».
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import ru from '../../i18n/ru-RU/screens/home/screen.json';
++import en from '../../i18n/en-EN/screens/home/screen.json';
++
++const code = () => readFileSync('components/screens/HomeScreen/HomeScreen.js', 'utf8');
++
++describe('патч 395: обходной путь установки — зелёная строка, не «красная»', () => {
++  it('строка обходного пути — зелёная ✓ (diagText), не diagTextInfo', () => {
++    const src = code();
++    expect(src).toContain("✓ {tHomeScreen('pwa.diagPromptWorkaround')}");
++    expect(src).not.toContain("ℹ {tHomeScreen('pwa.diagPromptWorkaround')}");
++    expect(src).not.toContain("<Text style={styles.diagTextInfo}>✓ {tHomeScreen('pwa.diagPromptWorkaround')}");
++  });
++
++  it('диагностика честно называет возможности браузеров (репорт владельца: Mi — никак, Яндекс — ярлык)', () => {
++    const src = code();
++    expect(src).toContain("tHomeScreen('pwa.diagStaleShortcut')");
++    expect(ru.pwa.diagStaleShortcut).toContain('Mi Browser');
++    expect(ru.pwa.diagStaleShortcut).toContain('Яндекс');
++    expect(en.pwa.diagStaleShortcut).toContain('Mi Browser');
++    expect(ru.pwa.diagPromptWorkaround).toContain('Chrome');
++    expect(en.pwa.diagPromptWorkaround).toContain('Chrome');
++  });
++
++  it('Mi Browser распознаётся по userAgent до Chrome-ядра', () => {
++    const src = code();
++    expect(src.indexOf('MiuiBrowser')).toBeGreaterThan(-1);
++    expect(src.indexOf("return 'mi'")).toBeGreaterThan(src.indexOf('MiuiBrowser'));
++    expect(src.indexOf("return 'chrome'")).toBeGreaterThan(src.indexOf("return 'mi'"));
++    expect(ru.pwa.browserMi).toBe('Mi Browser');
++  });
++
++  it('янтарный остался только у предупреждения «уже установлено»', () => {
++    const src = code();
++    expect(src).toContain("styles.diagTextInfo");
++    // Два вхождения: комментарий 395 (почему цвет сменили) и единственный
++    // рендер — предупреждение «уже установлено». Стиль определён в другом файле.
++    expect((src.match(/diagTextInfo/g) || []).length).toBe(2);
++    expect(src).toContain("<Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagInstalledYes')}</Text>");
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index e8d761e..7196670 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -214,6 +214,7 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
+ // диалог шлют не все браузеры, а Chrome держит паузу после отмен.
+ const BROWSER_LABEL_KEYS = {
+   chrome: 'pwa.browserChrome',
++  mi: 'pwa.browserMi',
+   samsung: 'pwa.browserSamsung',
+   yandex: 'pwa.browserYandex',
+   firefox: 'pwa.browserFirefox',
+@@ -228,6 +229,7 @@ const detectBrowserId = () => {
+   // Порядок важен: Edge/Opera/Samsung/Yandex сами построены на Chrome
+   // и содержат «Chrome/» в userAgent.
+   if (/SamsungBrowser/i.test(ua)) return 'samsung';
++  if (/MiuiBrowser|XiaoMi/i.test(ua)) return 'mi';
+   if (/YaBrowser/i.test(ua)) return 'yandex';
+   if (/Edg\//i.test(ua)) return 'edge';
+   if (/OPR\/|Opera/i.test(ua)) return 'opera';
+@@ -324,7 +326,13 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
+       ) : (
+         <>
+           <Text style={styles.diagText}>• {tHomeScreen('pwa.diagPromptAbsent')}</Text>
+-          <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
++          {/*
++            395: обходной путь — хорошая новость, а не тревога: янтарный
++            цвет (diagTextInfo) владелец прочёл как красный/ошибку. Зелёная
++            галочка в одном ряду с остальными «✓ это работает».
++          */}
++          <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
++          <Text style={styles.diagText}>• {tHomeScreen('pwa.diagStaleShortcut')}</Text>
+         </>
+       )}
+       {versionRef.current ? (
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index e2084cf..199a114 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,24 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **394** (владелец: «в тесте на установку pwa
++· последний сданный патч: **395** (репорты владельца: «серым про
++нативный диалог, а вот красным — установка работает и без диалога»;
++«однажды согласился с диалогом — вместо pwa была ссылка, открывавшаяся
++в браузере»; «mi-браузер не ставит pwa никак, а яндекс создаёт ярлык»;
++«раньше pwa было и работало — до разнесения на движок+сеттинг»).
++ПРОВЕРЕНО: манифест эпохи до разнесения (срез 280) = standalone +
++512-иконка + тот же домен — сайт устанавливаем ТОГДА и СЕЙЧАС (все
++живые галочки зелёные); разнесение PWA не ломало. Диагноз финален:
++виноват браузер владельца — Mi Browser НЕ ставит PWA вообще, Яндекс
++делает ярлык-ссылку; старое рабочее PWA ставилось из Chrome-семейства.
++395: строка обходного пути зелёная ✓ (янтарный владелец читал как
++красный), текст называет Chrome (меню ⋮ → «Установить приложение»,
++Samsung Internet тоже) + правда о Mi/Яндексе; распознан Mi Browser
++(MiuiBrowser|XiaoMi до Chrome-ядра); diagStaleShortcut переписан с
++chrome://apps на правду о браузерах (владелец ярлык давно удалял —
++не предполагать обратного!). ВАЖНО при переходе на Chrome: хранилище
++на-браузер — экспорт/синк из старого браузера перед установкой ·
++предыдущий: **394** (владелец: «в тесте на установку pwa
+ всё серое, всё с галочкой. А самого pwa нигде не установилось»).
+ Развязка: ВСЕ проверки зелёные = сайт валиден (392 починил иконки),
+ приложения нет, нативного диалога нет. Проводка HomeScreen перечитана
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b1950f9..325e169 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,17 @@
+ ---
+ ---
+ ---
++---
++## The install check tells the truth about browsers (patch 395)
++
++The install diagnostics no longer misleads with color and names things
++directly: a real app (an icon in the app list, a window without the
++address bar) is installed by Chrome — menu ⋮ → «Install app» (Samsung
++Internet can too). Mi Browser cannot install a real PWA at all; Yandex
++Browser creates a shortcut that opens in the browser — not an app. The
++site passes every install check — it is only about browser
++capabilities.
++
+ ---
+ ## Diagnostics names the browser and the no-prompt path (patch 394)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8a6b77d..8fd0573 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Честно о браузерах в диагностике установки (патч 395)
++
++Проверка установки больше не вводит в заблуждение цветом и называет
++вещи прямо: настоящее приложение (иконка в списке приложений, окно без
++адресной строки) ставит Chrome — меню ⋮ → «Установить приложение»
++(так же умеет Samsung Internet). Mi Browser настоящее PWA не ставит
++вовсе, Яндекс Браузер создаёт ярлык, открывающийся в браузере, — это
++не приложение. Сайт проходит все проверки установки — дело только в
++возможностях браузера.
++
+ ---
+ ## Диагностика называет браузер и путь без диалога (патч 394)
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 21e3e04..a053bcc 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -110,7 +110,9 @@
+     "browserSafari": "Safari",
+     "browserOther": "other",
+     "diagPromptAbsent": "The native prompt hasn't arrived yet — that happens: browsers show it with a delay, and after a dismissed install they may pause for a while. Close the site and open it again, then try once more.",
+-    "diagPromptWorkaround": "Installation also works without the prompt — via the browser menu: «Install app» / «Add to Home screen». You still get a real app: a home-screen icon and a full-screen window."
++    "diagPromptWorkaround": "A real app (an icon in the app list, a window without the address bar) is installed by Chrome: menu ⋮ → «Install app». Samsung Internet can do this too.",
++    "diagStaleShortcut": "Many Android browsers cannot install a real PWA: Mi Browser — not at all; Yandex Browser creates a shortcut that opens in the browser (not an app). For a real PWA, open the site in Chrome and choose «Install app».",
++    "browserMi": "Mi Browser"
+   },
+   "settings": {
+     "title": "Settings",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index a48335e..fff4ea0 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -110,7 +110,9 @@
+     "browserSafari": "Safari",
+     "browserOther": "другой",
+     "diagPromptAbsent": "Нативный диалог пока не приходил — так бывает: браузер показывает его не сразу, а после отменённой установки может держать паузу. Закройте сайт и откройте заново, попробуйте ещё раз.",
+-    "diagPromptWorkaround": "Установка работает и без диалога — через меню браузера: «Установить приложение» или «Добавить на главный экран». Получится настоящее приложение: иконка на столе, полный экран без адресной строки."
++    "diagPromptWorkaround": "Настоящее приложение (иконка в списке приложений, окно без адресной строки) ставит Chrome: меню ⋮ → «Установить приложение». Так же умеет Samsung Internet.",
++    "diagStaleShortcut": "Многие браузеры Android настоящее PWA не ставят: Mi Browser — никак, Яндекс Браузер создаёт ярлык, открывающийся в браузере (это не приложение). Для настоящего PWA откройте сайт в Chrome и выберите «Установить приложение».",
++    "browserMi": "Mi Browser"
+   },
+   "settings": {
+     "title": "Настройки",
+diff --git a/public/version.json b/public/version.json
+index 8df212e..6a15baa 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "394",
++  "version": "395",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
