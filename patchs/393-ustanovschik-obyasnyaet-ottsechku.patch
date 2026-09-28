@@ -1,0 +1,152 @@
+diff --git a/__tests__/installer/install-cutoff-messages-393.test.js b/__tests__/installer/install-cutoff-messages-393.test.js
+new file mode 100644
+index 0000000..0c777fb
+--- /dev/null
++++ b/__tests__/installer/install-cutoff-messages-393.test.js
+@@ -0,0 +1,35 @@
++// ПРИЁМОЧНЫЙ (патч 393): «мой установщик перескочил патч 391, а поставил
++// сразу 392» (владелец). Это штатная работа отсечки (391): содержимое
++// патчей до ключевого включительно приходит в дерево из истории, поэтому
++// 391 не попадает в список «Применено» — но установщик об этом не сказал
++// явно, и это законно выглядело как пропуск. Патч добавляет явные
++// сообщения: при включении отсечки и в финальном вердикте.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { execSync } from 'node:child_process';
++
++const script = () => readFileSync('apply-patch.sh', 'utf8');
++
++describe('патч 393: установщик объясняет отсечку словами', () => {
++  it('синтаксически цел (bash -n)', () => {
++    execSync('bash -n apply-patch.sh');
++  });
++
++  it('при включении отсечки сказано, что содержимое до ключа уже в дереве', () => {
++    const code = script();
++    expect(code).toContain('Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве');
++    expect(code).toContain('по одному они не применяются и в «Применено» не попадут');
++  });
++
++  it('в финальном вердикте есть напоминание об отсечке', () => {
++    const code = script();
++    expect(code).toContain('патчи до неё включительно уже в дереве');
++    expect(code).toContain('приведены отсечкой, по одному не проверялись и не применялись');
++    // напоминание только в быстром режиме
++    expect(code).toContain('if [[ "$FAST_MODE" -eq 1 ]]; then\n    echo\n    echo "Отсечка №$BASELINE_NUM');
++  });
++
++  it('usage объясняет, почему патчи до ключа не появляются в «Применено»', () => {
++    expect(script()).toContain('по одному они не применяются\nи в списке «Применено» не появятся');
++  });
++});
+diff --git a/apply-patch.sh b/apply-patch.sh
+index aa057c9..e021e49 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -54,9 +54,11 @@ usage() {
+ Отсечка (ключевой патч): patchs/baseline.json называет ключевой патч.
+ Цепочка до него не проверяется по одному — чистое дерево целиком
+ приводится к состоянию ключевого патча из истории ветки, проверяются
+-и применяются только патчи ПОСЛЕ него. Если в дереве есть
+-незакоммиченные изменения, отсечка не действует: полный проход, как
+-раньше. Номер ключевого патча переносит агент новым патчем.
++и применяются только патчи ПОСЛЕ него. Содержимое патчей до ключевого
++включительно приходит в дерево из истории — по одному они не применяются
++и в списке «Применено» не появятся. Если в дереве есть незакоммиченные
++изменения, отсечка не действует: полный проход, как раньше. Номер
++ключевого патча переносит агент новым патчем.
+ 
+ Примеры:
+   ./apply-patch.sh 308
+@@ -295,6 +297,8 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_le "$PATCH_ID
+       FAST_MODE=1
+       echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
+       echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
++      echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
++      echo "по одному они не применяются и в «Применено» не попадут."
+       echo
+       sync_to_baseline
+     else
+@@ -721,6 +725,11 @@ if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
+     echo "Отложено (дерево ушло мимо, подтверждено): ${#DEFERRED[@]}"
+     printf '  %s\n' "${DEFERRED[@]}"
+   fi
++  if [[ "$FAST_MODE" -eq 1 ]]; then
++    echo
++    echo "Отсечка №$BASELINE_NUM: патчи до неё включительно уже в дереве —"
++    echo "приведены отсечкой, по одному не проверялись и не применялись."
++  fi
+   echo
+   json_check || exit 1
+   echo "Источник: $REMOTE/$ARENA_BRANCH"
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 31df151..04408e2 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,16 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **392** (репорт владельца из диагностики 390:
++· последний сданный патч: **393** (репорт владельца: «установщик
++перескочил патч 391, а поставил сразу 392»). Это ШТАТНАЯ работа отсечки
++(содержимое до ключа приходит из истории, 391 не попадает в «Применено»),
++но вывод не объяснял это явно. 393: установщик говорит прямо — при
++включении отсечки («Содержимое №N и всех патчей до него УЖЕ в дереве —
++по одному не применяются и в „Применено“ не попадут») и в финальном
++вердикте (напоминание под FAST_MODE). Дерево владельца сейчас = 392,
++содержимое 391 в нём есть (проверить: --status покажет 391 «стоит»).
++СОМНЕНИЕ В ПОТЕРЕ ПАТЧА У ВЛАДЕЛЬЦА → сначала --status и сверка
++version.json, потом выводы · предыдущий: **392** (репорт владельца из диагностики 390:
+ красные «Раньше приложение не установлено» и «Иконки не загружаются»).
+ ОБЕ строки — дефекты самой диагностики, не хоста: (1) «не установлено» —
+ норма, а красный стиль вешался на любой false — теперь installed вынесен
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 849b034..173af7f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,15 @@
+ ---
+ ---
+ ---
++---
++## The installer explains the cutoff in plain words (patch 393)
++
++When an install goes through the cutoff, patches up to the key one do
++not appear in the "applied" list — their content arrives from the
++branch history as a whole. It used to look like a patch was skipped;
++now the installer explicitly says those patches are already in the
++tree and are not applied one by one.
++
+ ---
+ ## The diagnostics itself fixed (patch 392)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 57aff0e..2e88743 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,13 @@
+ # История изменений
+ 
++---
++## Установщик объясняет отсечку словами (патч 393)
++
++Если установка шла через отсечку, патчи до ключевого не появляются в
++списке «Применено» — их содержимое приходит в дерево из истории целиком.
++Раньше это выглядело как «патч перескочили»; теперь установщик прямо
++говорит, что патчи до ключевого уже в дереве и отдельно не применяются.
++
+ ---
+ ## Починка самой диагностики (патч 392)
+ 
+diff --git a/public/version.json b/public/version.json
+index 3cf89c4..08d42d3 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "392",
++  "version": "393",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
