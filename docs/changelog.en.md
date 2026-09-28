@@ -16,6 +16,17 @@
 ---
 ---
 ---
+## One law for all mods (patch 400)
+
+Mod rules are no longer split into «weapon» and «the rest»: armor and
+clothing follow the same rules as weapons — a mod is tangible, can be
+installed and removed, and on every character load entries are
+reconciled with slots by deficiency (missing ones are bound/created,
+surplus ones return to the stack, reloading never duplicates). Factory
+loadouts, mods leaving with a sold host, and «no service keys on
+screen» are just as universal.
+
+---
 ## Mods unified as «stack ↔ slots» (patch 399)
 
 Following the owner's model («a mod is a tangible entry; being

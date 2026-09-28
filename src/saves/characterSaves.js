@@ -173,10 +173,15 @@ const deserializeState = (data) => {
   // в сумку. Идемпотентно, робо-привязки не тронуты.
   if (catalog?.weaponMods?.length) {
     const weaponModIds = new Set(catalog.weaponMods.map((m) => m.id));
-    // 399: сначала сверка «записи ↔ слоты» (создать недостающие/вернуть
-    // лишние в пачку), затем ремонт 381 (мусор не-оружия). Оба — по
-    // недостатку и идемпотентно: повторная загрузка ничего не меняет.
-    syncWeaponModInstances(migrated, weaponModIds);
+    // 400: универсальный закон — сверка ведёт ВСЕ семьи модов: оружейные,
+    // броняные и уникальные броняные (оружейные уже включают робо-моды).
+    const allModIds = new Set(weaponModIds);
+    (catalog.armorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
+    (catalog.uniqArmorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
+    // Сначала сверка «записи ↔ слоты» (создать недостающие/вернуть лишние
+    // в пачку), затем ремонт 381 (мусор оружейных модов на не-оружии).
+    // Оба — по недостатку и идемпотентно: повторная загрузка ничего не меняет.
+    syncWeaponModInstances(migrated, allModIds);
     migrateRepairMisroutedWeaponMods(migrated, weaponModIds);
   }
   const restored = catalog

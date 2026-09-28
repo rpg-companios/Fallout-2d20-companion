@@ -18,11 +18,23 @@
 //   • моды из комплекта = обычные моды («пульт с батарейками со старта
 //     внутри — тот же пульт, в который батарейки вставили позже»).
 //
-// Транслируются только моды оружия из каталога (weaponModIds): броня
-// (mod_std_*) и робо-моды (robot_weapon_mod_*) живут по своим законам
-// 343/359 и здесь не трогаются.
+// 400 (владелец: «поведение модов универсально»): закон ОДИН для всех
+// семей модов. Роли «хост|мод» дают: оружие (appliedMods), слоты роботов
+// (heldWeapon/builtinWeapons: modIds+appliedMods), броня/одежда (три
+// именных поля appliedArmorModId / appliedUniqueArmorModId /
+// appliedClothingModId). Моды «своей атаки» лапы (limb.ownWeaponMods)
+// не перечисляются здесь: их записи ведёт экран (359), а освобождение
+// при замене конечности делает releaseRobotSlotMods — связки robotSlot:
+// сверкой не трогаются, чтобы не судить о синтетическом хосте ошибочно.
 
 import { generateStackKey } from './itemIdentity';
+
+// 400: три именных слота брони/одежды (по одному моду каждого вида).
+const ARMOR_MOD_FIELDS = [
+  ['appliedArmorModId', 'armor'],
+  ['appliedUniqueArmorModId', 'uniqueArmor'],
+  ['appliedClothingModId', 'clothing'],
+];
 
 // Синтетический ключ-носитель оружия в слоте робота. Формат владельца —
 // robotWeaponHostKey в src/engine/items/weaponMods.ts; заслон 399
@@ -64,6 +76,10 @@ export function syncWeaponModInstances(state, weaponModIds) {
   };
   for (const [key, item] of Object.entries(items)) {
     if (!item || typeof item !== 'object') continue;
+    // 400: броня/одежда — три именных слота на предмете.
+    for (const [field, label] of ARMOR_MOD_FIELDS) {
+      if (typeof item[field] === 'string' && item[field]) addRole(key, item[field], label);
+    }
     const hostId = String(item.weaponId || '');
     if (!hostId.startsWith('weapon_') || isTrackedMod(hostId)) continue;
     const applied = item.appliedMods;
@@ -173,9 +189,12 @@ export function syncWeaponModInstances(state, weaponModIds) {
 
   // 4) Осиротевшие связанные записи (хост пропал или мод со слота снят) —
   // обратно в пачку, без памяти о прошлом («сольёл воду — пустая бутылка»).
+  // Связки robotSlot: не судятся здесь: их хост синтетический, освобождение
+  // при замене конечности делает releaseRobotSlotMods (закон 359).
   for (const key of boundKeys) {
     const item = next[key];
     if (!item || !item.installedOn) continue;
+    if (String(item.installedOn).startsWith('robotSlot:')) continue;
     const pair = `${item.installedOn}|${item.weaponId}`;
     if (!roles.has(pair)) unbind(key);
   }

@@ -127,11 +127,13 @@ describe('патч 399: мод — осязаемая запись; сверка
     expect(state.items).toEqual(snapshot);
   });
 
-  it('броня и робо-моды не тронуты', () => {
+  it('броня и робо-моды подчиняются переданному набору (400: универсальный закон — в pwa-mod-sync-400)', () => {
     const state = { items: {
       armorMod: { id: 'armorMod', weaponId: 'mod_std_boiled_leather', itemType: 'armorMod', equipped: true, installedOn: 'armor1' },
       roboMod: { id: 'roboMod', weaponId: 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v', itemType: 'weaponMod', equipped: true, installedOn: 'robotSlot:leftArm:weapon_x' },
     } };
+    // 399-прогон с чисто оружейным набором: броняный мод вне набора —
+    // запись не тронута; robotSlot-хост не судится сверкой (его ведёт 359).
     const snapshot = clone(state.items);
     syncWeaponModInstances(state, weaponModIds);
     expect(state.items).toEqual(snapshot);
@@ -159,7 +161,8 @@ describe('патч 399: мод — осязаемая запись; сверка
   it('карта 375 покрывает репорт-мод; проводка: deserializeState зовёт сверку до ремонта 381', () => {
     expect(WEAPON_MOD_ID_MAP['mod_043']).toBe('mod_beta_wave_tuner');
     const src = readFileSync('src/saves/characterSaves.js', 'utf8');
-    expect(src).toContain('syncWeaponModInstances(migrated, weaponModIds)');
+    // 400: сверке даётся общий набор (оружейные + броняные + уникальные).
+    expect(src).toContain('syncWeaponModInstances(migrated, allModIds)');
     expect(src.indexOf('syncWeaponModInstances(migrated'))
       .toBeLessThan(src.indexOf('migrateRepairMisroutedWeaponMods(migrated'));
   });
