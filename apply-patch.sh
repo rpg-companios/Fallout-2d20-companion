@@ -51,6 +51,13 @@ usage() {
 узнаёт такие остатки (содержимое совпадает байт в байт) и даёт патчу
 воссоздать их.
 
+Отсечка (ключевой патч): patchs/baseline.json называет ключевой патч.
+Цепочка до него не проверяется по одному — чистое дерево целиком
+приводится к состоянию ключевого патча из истории ветки, проверяются
+и применяются только патчи ПОСЛЕ него. Если в дереве есть
+незакоммиченные изменения, отсечка не действует: полный проход, как
+раньше. Номер ключевого патча переносит агент новым патчем.
+
 Примеры:
   ./apply-patch.sh 308
   ./apply-patch.sh --status
@@ -211,19 +218,123 @@ patch_state() {
   printf 'conflict'
 }
 
-# --- снимок состояния: каждый патч ветки проверяется по текущему дереву -------
+# --- поиск целевого патча ----------------------------------------------------
+
+TARGET=""
+for name in "${ALL_PATCHES[@]}"; do
+  if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
+    if [[ -n "$TARGET" ]]; then
+      echo "Ошибка: в Arena-ветке несколько патчей №$PATCH_ID:"
+      echo "  $TARGET"
+      echo "  $name"
+      exit 1
+    fi
+    TARGET="$name"
+  fi
+done
+
+if [[ "$MODE" != "status" && -z "$TARGET" ]]; then
+  echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
+  exit 1
+fi
+
+# --- отсечка (391): ключевой патч --------------------------------------------
+# patchs/baseline.json {"baseline": "NNN"} называет ключевой патч. Цепочка ДО
+# него не проверяется по одному патчу: чистое дерево целиком приводится к
+# состоянию ключевого патча из истории ветки (коммит, где появился его файл
+# патча) — это то же дерево, которое даёт полная цепочка; установщик сверяет
+# его при каждом выпуске отсечки. Проверяются и применяются только патчи
+# ПОСЛЕ ключевого. Переносит отсечку агент: новым патчем меняет номер
+# в baseline.json (например на 400 или 405). Грязное дерево, отсутствие
+# ключевого патча или его истории — полный проход по цепочке, как раньше.
+
+read_baseline_number() {
+  local raw
+  if ! raw="$(git -C "$ROOT_DIR" show "${FETCHED_COMMIT}:patchs/baseline.json" 2>/dev/null)"; then
+    return 1
+  fi
+  sed -nE 's/.*"baseline"[[:space:]]*:[[:space:]]*"?([0-9]+[[:alnum:]]*)"?.*/\1/p' <<<"$raw" | head -1
+}
+
+# Приводит рабочее дерево к состоянию ключевого патча: распаковывает его
+# содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
+# которых в этом состоянии уже нет.
+sync_to_baseline() {
+  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+  local baseline_files tracked_files stale
+  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
+  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
+  stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+  if [[ -n "$stale" ]]; then
+    while IFS= read -r f; do
+      [[ -n "$f" ]] && git -C "$ROOT_DIR" rm -q -f -- "$f"
+    done <<<"$stale"
+  fi
+}
+
+BASELINE_NUM="$(read_baseline_number || true)"
+BASELINE_NAME=""
+BASELINE_COMMIT=""
+FAST_MODE=0
+if [[ -n "${BASELINE_NUM:-}" ]]; then
+  for name in "${ALL_PATCHES[@]}"; do
+    [[ "$(patch_number "$name")" == "$BASELINE_NUM" ]] && BASELINE_NAME="$name"
+  done
+  [[ -n "$BASELINE_NAME" ]] || BASELINE_NUM=""
+fi
+
+if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_le "$PATCH_ID" "$BASELINE_NUM"; then
+  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' || true)"
+  if [[ -n "$local_dirty" ]]; then
+    echo "Отсечка №$BASELINE_NUM не применяется: в дереве незакоммиченные изменения."
+    echo "Идёт полный проход по цепочке."
+    echo
+  else
+    BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
+    if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
+      FAST_MODE=1
+      echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
+      echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
+      echo
+      sync_to_baseline
+    else
+      echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
+      echo "Идёт полный проход по цепочке."
+      echo
+    fi
+  fi
+fi
+
+# --- снимок состояния: проверяются только патчи рабочей области ----------------
+# Полный статус — все патчи цепочки; установка — либо патчи после отсечки,
+# либо патчи до цели (как раньше, но без проверки хвоста выше цели).
 
 declare -A STATE
-for name in "${ALL_PATCHES[@]}"; do
+STATE_SCOPE=()
+if [[ "$MODE" == "status" ]]; then
+  STATE_SCOPE=("${ALL_PATCHES[@]}")
+elif [[ "$FAST_MODE" -eq 1 ]]; then
+  for name in "${ALL_PATCHES[@]}"; do
+    number_le "$BASELINE_NUM" "$(patch_number "$name")" || continue
+    [[ "$name" == "$BASELINE_NAME" ]] && continue
+    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+    STATE_SCOPE+=("$name")
+  done
+else
+  for name in "${ALL_PATCHES[@]}"; do
+    number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+    STATE_SCOPE+=("$name")
+  done
+fi
+for name in "${STATE_SCOPE[@]}"; do
   STATE["$name"]="$(patch_state "$(extract_patch "$name")")"
 done
 
 # Старший стоящий патч (для ответа «дерево уже новее запрошенного»).
 TOP_APPLIED=""
-for name in "${ALL_PATCHES[@]}"; do
+for name in "${STATE_SCOPE[@]}"; do
   [[ "${STATE[$name]}" == "applied" ]] && TOP_APPLIED="$name"
 done
-
 TOP_APPLIED_NUMBER=""
 [[ -n "$TOP_APPLIED" ]] && TOP_APPLIED_NUMBER="$(patch_number "$TOP_APPLIED")"
 
@@ -346,7 +457,10 @@ json_check() {
 
 if [[ "$MODE" == "status" ]]; then
   echo "Состояние патчей (проверка по содержимому дерева, заново):"
-  echo
+  if [[ -n "${BASELINE_NUM:-}" ]]; then
+    echo "Отсечка: ключевой патч №$BASELINE_NUM — установка проверяет только патчи после него."
+    echo
+  fi
   STANDING=()
   will_apply=()
   confirmed=0
@@ -394,26 +508,6 @@ if [[ "$MODE" == "status" ]]; then
   exit 0
 fi
 
-# --- поиск целевого патча ----------------------------------------------------
-
-TARGET=""
-for name in "${ALL_PATCHES[@]}"; do
-  if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
-    if [[ -n "$TARGET" ]]; then
-      echo "Ошибка: в Arena-ветке несколько патчей №$PATCH_ID:"
-      echo "  $TARGET"
-      echo "  $name"
-      exit 1
-    fi
-    TARGET="$name"
-  fi
-done
-
-if [[ -z "$TARGET" ]]; then
-  echo "Ошибка: патч №$PATCH_ID не найден в Arena-ветке."
-  exit 1
-fi
-
 # --- дерево уже новее запрошенного -------------------------------------------
 
 if [[ -n "$TOP_APPLIED_NUMBER" ]] \
@@ -431,8 +525,7 @@ fi
 QUEUE=()
 UPFRONT_STANDING=()
 
-for name in "${ALL_PATCHES[@]}"; do
-  number_le "$(patch_number "$name")" "$PATCH_ID" || continue
+for name in "${STATE_SCOPE[@]}"; do
   if [[ "${STATE[$name]}" == "applied" ]]; then
     UPFRONT_STANDING+=("$name")
   else
@@ -458,7 +551,7 @@ echo
 
 # --- незакоммиченные изменения: предупреждение -------------------------------
 
-if [[ -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
+if [[ "$FAST_MODE" -ne 1 && -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
   echo "ВНИМАНИЕ: в дереве есть незакоммиченные изменения."
   echo "Смешивать их с применением патчей рискованно. Лучше закоммитить"
   echo "или сделать stash. Продолжаю, но при неудаче откат сделанного"
