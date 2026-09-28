@@ -48,6 +48,8 @@ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
 import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
 import { migrateWeaponModIdsToCanonical, repairMisroutedWeaponMods as migrateRepairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
+// 399: сверка «записи модов ↔ слоты оружия» по недостатку (анти-двоение).
+import { syncWeaponModInstances } from '../../domain/weaponModInstances';
 import { resolveBodyPlan } from '../../domain/bodyplan';
 import { resolveKitItems } from '../../domain/kitResolver';
 import { inspectSelectedPerkRecords } from '../../domain/perks';
@@ -170,7 +172,17 @@ const deserializeState = (data) => {
   // не-оружие, снимаются; мод-предметы с осиротевшими флагами возвращаются
   // в сумку. Идемпотентно, робо-привязки не тронуты.
   if (catalog?.weaponMods?.length) {
-    migrateRepairMisroutedWeaponMods(migrated, new Set(catalog.weaponMods.map((m) => m.id)));
+    const weaponModIds = new Set(catalog.weaponMods.map((m) => m.id));
+    // 400: универсальный закон — сверка ведёт ВСЕ семьи модов: оружейные,
+    // броняные и уникальные броняные (оружейные уже включают робо-моды).
+    const allModIds = new Set(weaponModIds);
+    (catalog.armorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
+    (catalog.uniqArmorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
+    // Сначала сверка «записи ↔ слоты» (создать недостающие/вернуть лишние
+    // в пачку), затем ремонт 381 (мусор оружейных модов на не-оружии).
+    // Оба — по недостатку и идемпотентно: повторная загрузка ничего не меняет.
+    syncWeaponModInstances(migrated, allModIds);
+    migrateRepairMisroutedWeaponMods(migrated, weaponModIds);
   }
   const restored = catalog
     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })

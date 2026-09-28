@@ -777,7 +777,10 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        * выключена) — ничего не делаем: мод «виртуальный», установка свободна.
        * @returns {string|null} ключ экземпляра мода или null.
        */
-      installArmorMod: ({ modId, hostKey }) => {
+      // 399: необязательный slot — на записи остаётся «в какой слот встал»
+      // (закон владельца «мод знает, куда он вставлен»); броня слот не
+      // передаёт — поведение 343/344 без изменений.
+      installArmorMod: ({ modId, hostKey, slot }) => {
         if (!modId) return null;
         // 344: привязка — к ПРЕДМЕТУ-носителю. Экземпляра нет (одежда кита,
         // стартовая запись без ключа в сумке) — мод НЕ флагается: остаётся
@@ -789,7 +792,12 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         ));
         if (!entry) return null;
         const [key, item] = entry;
-        items[key] = { ...item, equipped: true, installedOn: hostKey || null };
+        items[key] = {
+          ...item,
+          equipped: true,
+          installedOn: hostKey || null,
+          ...(slot ? { installedSlot: slot } : {}),
+        };
         set({ items });
         debugLog('armorMod.installed', { modId, instanceKey: key, hostKey });
         return key;
@@ -832,6 +840,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         const [key, item] = entry;
         items[key] = { ...item, equipped: false };
         delete items[key].installedOn;
+        delete items[key].installedSlot;
         set({ items });
         debugLog('armorMod.uninstalled', { modId, instanceKey: key });
       },

@@ -16,6 +16,51 @@
 ---
 ---
 ---
+## One law for all mods (patch 400)
+
+Mod rules are no longer split into «weapon» and «the rest»: armor and
+clothing follow the same rules as weapons — a mod is tangible, can be
+installed and removed, and on every character load entries are
+reconciled with slots by deficiency (missing ones are bound/created,
+surplus ones return to the stack, reloading never duplicates). Factory
+loadouts, mods leaving with a sold host, and «no service keys on
+screen» are just as universal.
+
+---
+## Mods unified as «stack ↔ slots» (patch 399)
+
+Following the owner's model («a mod is a tangible entry; being
+installed is just its status» — like bottles: empty ones form one
+stack, filled ones change state): on every character load, mod entries
+are reconciled with weapon slots by deficiency — missing ones are
+bound or created, surplus ones return to the stack. Reloading never
+duplicates anything. Factory mods of kit weapons are ordinary mods:
+they can be removed and live their own life. Selling a weapon still
+takes its mods with it. An installed mod «knows» the weapon and slot
+it sits in; screens show only names, no service keys.
+
+---
+## Old saves: bag mods get their names back (patch 398)
+
+A serious bug fixed: saves made before the mod catalog revision kept
+bag mods under legacy numbers (mod_043 and alike), because the load
+bridge translated only mods already installed on weapons — mods in the
+bag stayed legacy and showed a bare «mod_043» instead of a name. They
+are now translated on load too: name, price and stats come back. The
+fix happens right when a save is opened, no player action needed, and
+re-loading is safe. A mod that was one of the removed duplicates gets
+the name of the canon it was merged into.
+
+---
+## Ammo icon in the crafting window (patch 397)
+
+The «Ammo» category tile rendered blank: no glyph named «ammo» exists
+in the bundled icon font. The category now has a proper bullet icon
+(«bullet»), as suggested. All category icon names are now checked
+against the font's glyph map automatically — no more blank tiles from
+non-existent names.
+
+---
 ## Nothing on our side blocks installation anymore (patch 396)
 
 Since the earliest versions the app intercepted the install event and

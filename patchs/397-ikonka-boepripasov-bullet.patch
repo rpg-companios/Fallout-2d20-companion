@@ -1,0 +1,98 @@
+diff --git a/__tests__/crafting/crafting-tile-icons-397.test.js b/__tests__/crafting/crafting-tile-icons-397.test.js
+new file mode 100644
+index 0000000..57b7d39
+--- /dev/null
++++ b/__tests__/crafting/crafting-tile-icons-397.test.js
+@@ -0,0 +1,46 @@
++// ПРИЁМОЧНЫЙ (патч 397): «приложение не находит иконку ammo для карточек
++// крафта. Может можно что-то типа bullet или shotgun shell?» (владелец).
++// В CATEGORY_ICONS стояло ammo: 'ammo' — глифа «ammo» в подключённом
++// MaterialCommunityIcons НЕТ (и «shotgun»/«shell» тоже нет), квадрат
++// боеприпасов рисовался пустым. Теперь ammo: 'bullet' (глиф есть).
++// Заслон: КАЖДОЕ имя иконки категорий обязано существовать в глифмапе
++// шрифта @expo/vector-icons — имена проверяются по факту, не по памяти.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const GLYPHMAP_PATH =
++  'node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/MaterialCommunityIcons.json';
++
++// Имена читаем из исходника (RN-файл в vitest не импортируется).
++const categoryIcons = () => {
++  const src = readFileSync('modules/fallout/screens/InventoryScreen/modals/CraftingModal.js', 'utf8');
++  const block = /const CATEGORY_ICONS = \{([\s\S]*?)\};/.exec(src)[1];
++  const icons = {};
++  for (const [, key, name] of block.matchAll(/(\w+):\s*'([\w-]+)'/g)) {
++    icons[key] = name;
++  }
++  return icons;
++};
++
++describe('патч 397: иконки квадратов крафта существуют в шрифте', () => {
++  it('все имена CATEGORY_ICONS есть в глифмапе MaterialCommunityIcons', () => {
++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
++    const icons = categoryIcons();
++    expect(Object.keys(icons).length).toBeGreaterThanOrEqual(8);
++    for (const [category, name] of Object.entries(icons)) {
++      expect(glyphmap, `иконка «${name}» категории «${category}» отсутствует в шрифте`).toHaveProperty(name);
++    }
++  });
++
++  it('боеприпасы — bullet (глиф есть; «ammo» в шрифте нет)', () => {
++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
++    expect(glyphmap).toHaveProperty('bullet');
++    expect(glyphmap).not.toHaveProperty('ammo');
++    expect(categoryIcons().ammo).toBe('bullet');
++  });
++
++  it('фолбэк пустой категории тоже существует в шрифте', () => {
++    const glyphmap = JSON.parse(readFileSync(GLYPHMAP_PATH, 'utf8'));
++    expect(glyphmap).toHaveProperty('circle-outline');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 81daaf2..84c35e5 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -25,10 +25,14 @@ beforeinstallprompt — с первых коммитов проекта мы Г
+ диалог браузера, оставляя установку только через нашу кнопку (prompt());
+ в сегодняшнем Яндексе отложенный prompt() UI не поднимает → диалога
+ не было ВООБЩЕ. Теперь браузер волен показать родной путь; событие
+-лишь запоминается (диагностика/кнопка). По истории (клон GitHub):
+-перехват стоял ДО разнесения — тогдашний диалог Яндекса шёл через нашу
+-кнопку; сегодня это не подтверждается — Яндекс изменил поведение со
+-своей стороны. Заслон: pwa-no-prompt-suppression-396 (нет
++лишь запоминается (диагностика/кнопка). ИСПРАВЛЕНО после указания владельца («жило в другом репозитории»):
++настоящая старая история — handylinux/popytkano5_new (с 2025-09) — там
++public/ и перехвата НЕ БЫЛО ВООБЩЕ, родные диалоги работали, и PWA
++владельца ставилось. Перехват+preventDefault вписан 2026-05-10
++(0e5d534 «Refactor project structure…», живёт в campanion и Katrin) —
++с той поры родные диалоги глушены. МЕРИТЬ ИСТОРИЮ ТОЛЬКО ТЕКУЩИМ
++РЕПОЗИТОРИЕМ НЕЛЬЗЯ — проект старше; 396 = возврат к поведению эпохи
++popytkano5. Заслон: pwa-no-prompt-suppression-396 (нет
+ 'event.preventDefault();' в index.html) · (перед этим) ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
+ ПОКАЗАЛ нативный диалог установки — Mi и Яндекс не показали ничего;
+ Chrome он раньше не пользовал — «старое работавшее PWA», вероятно,
+diff --git a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+index c05c3aa..1a338a2 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/CraftingModal.js
+@@ -32,6 +32,9 @@ import { showRawAlert } from '../../../../../components/alerts/alertService';
+ import CraftReportView from '../../../crafting/CraftReportView';
+ 
+ // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
++// 397: для боеприпасов было имя «ammo» — такого глифа в подключённом
++// шрифте НЕТ (квадрат рисовался пустым); «bullet» существует — предложение
++// владельца. Заслон 397 проверяет все имена по глифмапе шрифта.
+ const CATEGORY_ICONS = {
+   food: 'food',
+   drinks: 'cup',
+@@ -40,7 +43,7 @@ const CATEGORY_ICONS = {
+   weapons: 'sword',
+   armor: 'shield-outline',
+   powerArmor: 'shield-half-full',
+-  ammo: 'ammo',
++  ammo: 'bullet',
+ };
+ 
+ // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
