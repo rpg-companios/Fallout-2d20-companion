@@ -38,10 +38,14 @@ describe('патч 394: диагностика называет браузер �
     expect(ru.pwa.diagBrowser).toBe('Браузер');
     expect(ru.pwa.browserYandex).toBe('Яндекс Браузер');
     expect(ru.pwa.diagPromptAbsent).toContain('пока не приходил');
-    expect(ru.pwa.diagPromptWorkaround).toContain('меню браузера');
+    // 395 переписал строку обходного пути: имя браузера, который ставит
+    // настоящее приложение (Яндекс/Mi — не умеют, репорт владельца).
+    expect(ru.pwa.diagPromptWorkaround).toContain('Chrome');
     expect(en.pwa.diagBrowser).toBe('Browser');
     expect(en.pwa.diagPromptAbsent).toContain("hasn't arrived");
-    expect(en.pwa.diagPromptWorkaround).toContain('browser menu');
+    // 395 переписал строку обходного пути: имя браузера, который ставит
+    // настоящее приложение (репорт владельца: Mi — никак, Яндекс — ярлык).
+    expect(en.pwa.diagPromptWorkaround).toContain('Chrome');
     for (const key of ['browserChrome','browserSamsung','browserYandex','browserFirefox','browserOpera','browserEdge','browserSafari','browserOther']) {
       expect(ru.pwa[key]).toBeTruthy();
       expect(en.pwa[key]).toBeTruthy();
