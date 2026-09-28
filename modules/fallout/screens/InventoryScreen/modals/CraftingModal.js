@@ -32,6 +32,9 @@ import { showRawAlert } from '../../../../../components/alerts/alertService';
 import CraftReportView from '../../../crafting/CraftReportView';
 
 // Иконки квадратов (MaterialCommunityIcons); порядок задаёт модель (318).
+// 397: для боеприпасов было имя «ammo» — такого глифа в подключённом
+// шрифте НЕТ (квадрат рисовался пустым); «bullet» существует — предложение
+// владельца. Заслон 397 проверяет все имена по глифмапе шрифта.
 const CATEGORY_ICONS = {
   food: 'food',
   drinks: 'cup',
@@ -40,7 +43,7 @@ const CATEGORY_ICONS = {
   weapons: 'sword',
   armor: 'shield-outline',
   powerArmor: 'shield-half-full',
-  ammo: 'ammo',
+  ammo: 'bullet',
 };
 
 // Строки по perRow квадратов (патч 322): 8 категорий = 3+3+2.
