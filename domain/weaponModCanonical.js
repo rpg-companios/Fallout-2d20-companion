@@ -242,6 +242,16 @@ const remapModsContainer = (value) => {
  * Рекурсивный обход: предметы инвентаря, надетое оружие, слоты роботов —
  * контейнеры модов встречаются в любой ветке состояния. Идемпотентно:
  * канон-id отсутствуют в карте и не меняются.
+ *
+ * 398 (репорт владельца: «загрузил старый сейв — в инвентаре мод mod_043,
+ * а имена теперь все другие»): мост 375 переводил только контейнеры
+ * appliedMods/modIds, но НЕ каталог-id самого предмета-носителя — у
+ * мод-предмета в инвентаре это поле weaponId. Старый сейв нёс
+ * weaponId: 'mod_043', в каталоге такого больше нет — предмет показывался
+ * голым id. Теперь weaponId тоже проходит через карту (id оружия
+ * «weapon_*» и робо-моды «robot_weapon_mod_*» в карте отсутствуют и
+ * проходят насквозь; слияние фантомов mod_051/mod_075 → mod_long_barrel
+ * даёт одинаковое имя у двух старых носителей — это ожидаемо).
  */
 export function migrateWeaponModIdsToCanonical(state) {
   if (!state || typeof state !== 'object') return state;
@@ -257,6 +267,10 @@ export function migrateWeaponModIdsToCanonical(state) {
     if (!node || typeof node !== 'object') return;
     if ('appliedMods' in node) node.appliedMods = remapModsContainer(node.appliedMods);
     if ('modIds' in node) node.modIds = remapModsContainer(node.modIds);
+    // 398: каталог-id предмета-носителя мода (см. комментарий функции).
+    if ('weaponId' in node && typeof node.weaponId === 'string') {
+      node.weaponId = remapModId(node.weaponId);
+    }
     for (const v of Object.values(node)) {
       if (v && typeof v === 'object') walk(v);
     }

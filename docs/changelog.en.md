@@ -16,6 +16,18 @@
 ---
 ---
 ---
+## Old saves: bag mods get their names back (patch 398)
+
+A serious bug fixed: saves made before the mod catalog revision kept
+bag mods under legacy numbers (mod_043 and alike), because the load
+bridge translated only mods already installed on weapons — mods in the
+bag stayed legacy and showed a bare «mod_043» instead of a name. They
+are now translated on load too: name, price and stats come back. The
+fix happens right when a save is opened, no player action needed, and
+re-loading is safe. A mod that was one of the removed duplicates gets
+the name of the canon it was merged into.
+
+---
 ## Ammo icon in the crafting window (patch 397)
 
 The «Ammo» category tile rendered blank: no glyph named «ammo» exists
