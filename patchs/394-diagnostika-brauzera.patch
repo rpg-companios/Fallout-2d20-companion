@@ -1,0 +1,241 @@
+diff --git a/__tests__/screens/pwa-diagnostics-browser-394.test.js b/__tests__/screens/pwa-diagnostics-browser-394.test.js
+new file mode 100644
+index 0000000..7523966
+--- /dev/null
++++ b/__tests__/screens/pwa-diagnostics-browser-394.test.js
+@@ -0,0 +1,50 @@
++// ПРИЁМОЧНЫЙ (патч 394): «в тесте на установку pwa всё серое, всё с
++// галочкой. А самого pwa нигде не установилось» (владелец; после 392/393).
++// Всё зелёное = сайт валиден (воркер/манифест/иконки), приложения нет,
++// нативного диалога нет. Диагностика раньше молчала, ПОЧЕМУ диалога нет:
++// событие установки шлют не все браузеры, а Chrome держит паузу после
++// отмен. 394: строка «Браузер: …» (Edge/Opera/Samsung/Yandex распознаются
++// ДО Chrome — они содержат «Chrome/» в userAgent), строки «диалога пока
++// нет — это нормально» и обходной путь через меню браузера.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import ru from '../../i18n/ru-RU/screens/home/screen.json';
++import en from '../../i18n/en-EN/screens/home/screen.json';
++
++const code = () => readFileSync('components/screens/HomeScreen/HomeScreen.js', 'utf8');
++
++describe('патч 394: диагностика называет браузер и путь без диалога', () => {
++  it('браузер определяется по userAgent, производные Chrome — раньше ядра', () => {
++    const src = code();
++    // В исходнике слэши экранированы («Edg\/»), порядок проверяем по индексам.
++    expect(src.indexOf('SamsungBrowser')).toBeGreaterThan(-1);
++    expect(src.indexOf('YaBrowser')).toBeGreaterThan(src.indexOf('SamsungBrowser'));
++    expect(src.indexOf('Edg\\/')).toBeGreaterThan(src.indexOf('YaBrowser'));
++    expect(src.indexOf("return 'chrome'")).toBeGreaterThan(src.indexOf('Edg\\/'));
++    expect(src).toContain("return 'chrome'");
++    expect(src).toContain('BROWSER_LABEL_KEYS[detectBrowserId()]');
++  });
++
++  it('когда диалога нет — явные строки «пока не приходил» и обходной путь', () => {
++    const src = code();
++    expect(src).toContain("tHomeScreen('pwa.diagPromptAbsent')");
++    expect(src).toContain("tHomeScreen('pwa.diagPromptWorkaround')");
++    // строка «диалог доступен» осталась
++    expect(src).toContain("tHomeScreen('pwa.diagPromptAvailable')");
++  });
++
++  it('строки есть в обоих словарях', () => {
++    expect(ru.pwa.diagBrowser).toBe('Браузер');
++    expect(ru.pwa.browserYandex).toBe('Яндекс Браузер');
++    expect(ru.pwa.diagPromptAbsent).toContain('пока не приходил');
++    expect(ru.pwa.diagPromptWorkaround).toContain('меню браузера');
++    expect(en.pwa.diagBrowser).toBe('Browser');
++    expect(en.pwa.diagPromptAbsent).toContain("hasn't arrived");
++    expect(en.pwa.diagPromptWorkaround).toContain('browser menu');
++    for (const key of ['browserChrome','browserSamsung','browserYandex','browserFirefox','browserOpera','browserEdge','browserSafari','browserOther']) {
++      expect(ru.pwa[key]).toBeTruthy();
++      expect(en.pwa[key]).toBeTruthy();
++    }
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index de1d5f5..e8d761e 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -210,6 +210,33 @@ const EmptyCell = ({ id }) => <View key={id} style={styles.emptyCell} />;
+ // 392: «установлено / не установлено» — не провал, а пояснение, поэтому
+ // оно вне списка проверок с красным стилем (краснеет только настоящий
+ // провал: воркер / манифест / иконки).
++// 394: владельцу без нативного диалога нужно имя браузера и обходной путь —
++// диалог шлют не все браузеры, а Chrome держит паузу после отмен.
++const BROWSER_LABEL_KEYS = {
++  chrome: 'pwa.browserChrome',
++  samsung: 'pwa.browserSamsung',
++  yandex: 'pwa.browserYandex',
++  firefox: 'pwa.browserFirefox',
++  opera: 'pwa.browserOpera',
++  edge: 'pwa.browserEdge',
++  safari: 'pwa.browserSafari',
++  other: 'pwa.browserOther',
++};
++
++const detectBrowserId = () => {
++  const ua = navigator.userAgent || '';
++  // Порядок важен: Edge/Opera/Samsung/Yandex сами построены на Chrome
++  // и содержат «Chrome/» в userAgent.
++  if (/SamsungBrowser/i.test(ua)) return 'samsung';
++  if (/YaBrowser/i.test(ua)) return 'yandex';
++  if (/Edg\//i.test(ua)) return 'edge';
++  if (/OPR\/|Opera/i.test(ua)) return 'opera';
++  if (/Firefox\//i.test(ua)) return 'firefox';
++  if (/Chrome\//i.test(ua)) return 'chrome';
++  if (/Safari\//i.test(ua)) return 'safari';
++  return 'other';
++};
++
+ const INSTALL_DIAG_LINES = [
+   ['sw', 'pwa.diagSwYes', 'pwa.diagSwNo'],
+   ['manifest', 'pwa.diagManifestYes', 'pwa.diagManifestNo'],
+@@ -289,9 +316,17 @@ const PwaInstallDiagnostics = ({ installPrompt }) => {
+           {results[key] ? '✓' : '✕'} {tHomeScreen(results[key] ? yesKey : noKey)}
+         </Text>
+       ))}
++      <Text style={styles.diagText}>
++        {tHomeScreen('pwa.diagBrowser')}: {tHomeScreen(BROWSER_LABEL_KEYS[detectBrowserId()])}
++      </Text>
+       {installPrompt ? (
+         <Text style={styles.diagText}>✓ {tHomeScreen('pwa.diagPromptAvailable')}</Text>
+-      ) : null}
++      ) : (
++        <>
++          <Text style={styles.diagText}>• {tHomeScreen('pwa.diagPromptAbsent')}</Text>
++          <Text style={styles.diagTextInfo}>ℹ {tHomeScreen('pwa.diagPromptWorkaround')}</Text>
++        </>
++      )}
+       {versionRef.current ? (
+         <Text style={styles.diagText}>
+           {tHomeScreen('pwa.diagVersion')}: {versionRef.current}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 04408e2..e2084cf 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,21 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **393** (репорт владельца: «установщик
++· последний сданный патч: **394** (владелец: «в тесте на установку pwa
++всё серое, всё с галочкой. А самого pwa нигде не установилось»).
++Развязка: ВСЕ проверки зелёные = сайт валиден (392 починил иконки),
++приложения нет, нативного диалога нет. Проводка HomeScreen перечитана
++целиком — правильная (window.__pwaInstallPrompt + событие + prompt() в
++handleInstallPress). Вывод: событие beforeinstallprompt у владельца НЕ
++ПРИХОДИТ — шлют его не все браузеры (Яндекс/Samsung/Firefox — нет),
++Chrome держит паузу после отмен. 394: в диагностике строка «Браузер: …»
++(detectBrowserId по userAgent; Edge/Opera/Samsung/Yandex ДО Chrome —
++в них есть «Chrome/»), при отсутствии диалога — серая «пока не
++приходил, это нормально» + янтарный обходной путь «через меню браузера:
++Установить приложение / Добавить на главный экран — получится
++настоящее приложение». ЖДЁМ ОТ ВЛАДЕЛЬЦА: имя браузера из новой строки
++диагностики и/или результат установки через меню · предыдущий:
++**393** (репорт владельца: «установщик
+ перескочил патч 391, а поставил сразу 392»). Это ШТАТНАЯ работа отсечки
+ (содержимое до ключа приходит из истории, 391 не попадает в «Применено»),
+ но вывод не объяснял это явно. 393: установщик говорит прямо — при
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 173af7f..b1950f9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,16 @@
+ ---
+ ---
+ ---
++---
++## Diagnostics names the browser and the no-prompt path (patch 394)
++
++If every check is green but the native install prompt never arrives,
++that is browser behavior, not a fault: not every browser sends the
++prompt, and even Chrome shows it with a delay. The check now displays
++the browser name; when there is no prompt it explains: install via the
++browser menu («Install app» / «Add to Home screen») — you still get a
++real app with an icon and no address bar.
++
+ ---
+ ## The installer explains the cutoff in plain words (patch 393)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2e88743..8a6b77d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Диагностика называет браузер и путь без диалога (патч 394)
++
++Если все проверки зелёные, а нативный диалог установки не приходит —
++это поведение браузера, а не поломка: диалог шлют не все браузеры, и
++даже Chrome показывает его не сразу. В проверке теперь видно имя
++браузера; когда диалога нет — появилась подсказка: установка делается
++через меню браузера («Установить приложение» / «Добавить на главный
++экран»), получится настоящее приложение с иконкой и без адресной
++строки.
++
+ ---
+ ## Установщик объясняет отсечку словами (патч 393)
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 513a76d..21e3e04 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -99,7 +99,18 @@
+     "diagManifestNo": "Manifest failed to load — the build is incomplete, re-upload the app to the host.",
+     "diagIconsYes": "App icons load fine.",
+     "diagIconsNo": "Icons DO NOT load — a PWA cannot be installed without them: re-upload the build (pwa-icon*.png files).",
+-    "diagVersion": "App version"
++    "diagVersion": "App version",
++    "diagBrowser": "Browser",
++    "browserChrome": "Chrome",
++    "browserSamsung": "Samsung Internet",
++    "browserYandex": "Yandex Browser",
++    "browserFirefox": "Firefox",
++    "browserOpera": "Opera",
++    "browserEdge": "Edge",
++    "browserSafari": "Safari",
++    "browserOther": "other",
++    "diagPromptAbsent": "The native prompt hasn't arrived yet — that happens: browsers show it with a delay, and after a dismissed install they may pause for a while. Close the site and open it again, then try once more.",
++    "diagPromptWorkaround": "Installation also works without the prompt — via the browser menu: «Install app» / «Add to Home screen». You still get a real app: a home-screen icon and a full-screen window."
+   },
+   "settings": {
+     "title": "Settings",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 4ea692c..a48335e 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -99,7 +99,18 @@
+     "diagManifestNo": "Манифест не загружается — сборка неполная, перезалейте приложение на хост.",
+     "diagIconsYes": "Иконки приложения загружаются.",
+     "diagIconsNo": "Иконки НЕ загружаются — без них PWA не установить: перезалейте сборку (файлы pwa-icon*.png).",
+-    "diagVersion": "Версия приложения"
++    "diagVersion": "Версия приложения",
++    "diagBrowser": "Браузер",
++    "browserChrome": "Chrome",
++    "browserSamsung": "Samsung Internet",
++    "browserYandex": "Яндекс Браузер",
++    "browserFirefox": "Firefox",
++    "browserOpera": "Opera",
++    "browserEdge": "Edge",
++    "browserSafari": "Safari",
++    "browserOther": "другой",
++    "diagPromptAbsent": "Нативный диалог пока не приходил — так бывает: браузер показывает его не сразу, а после отменённой установки может держать паузу. Закройте сайт и откройте заново, попробуйте ещё раз.",
++    "diagPromptWorkaround": "Установка работает и без диалога — через меню браузера: «Установить приложение» или «Добавить на главный экран». Получится настоящее приложение: иконка на столе, полный экран без адресной строки."
+   },
+   "settings": {
+     "title": "Настройки",
+diff --git a/public/version.json b/public/version.json
+index 08d42d3..8df212e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "393",
++  "version": "394",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
