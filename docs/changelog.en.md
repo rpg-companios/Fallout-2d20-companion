@@ -16,6 +16,19 @@
 ---
 ---
 ---
+## Mods unified as «stack ↔ slots» (patch 399)
+
+Following the owner's model («a mod is a tangible entry; being
+installed is just its status» — like bottles: empty ones form one
+stack, filled ones change state): on every character load, mod entries
+are reconciled with weapon slots by deficiency — missing ones are
+bound or created, surplus ones return to the stack. Reloading never
+duplicates anything. Factory mods of kit weapons are ordinary mods:
+they can be removed and live their own life. Selling a weapon still
+takes its mods with it. An installed mod «knows» the weapon and slot
+it sits in; screens show only names, no service keys.
+
+---
 ## Old saves: bag mods get their names back (patch 398)
 
 A serious bug fixed: saves made before the mod catalog revision kept

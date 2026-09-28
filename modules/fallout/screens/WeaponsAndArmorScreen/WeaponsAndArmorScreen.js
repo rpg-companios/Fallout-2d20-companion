@@ -1058,10 +1058,13 @@ const WeaponsAndArmorScreen = () => {
       // 351 (закон владельца 343/344): мод-предмет оружия при установке
       // получает флаг «экипирован» и привязывается к предмету оружия;
       // снятие/замена возвращает прежние моды в сумку. Дифф — чистый.
+      // 399: записи остаётся и слот («мод знает, куда он вставлен»).
       const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
-      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
-      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
       const patch = weaponModPatchToStore(modifiedWeapon);
+      const slotOfMod = (id) => Object.entries(patch.appliedMods || {})
+        .find(([, modId]) => modId === id)?.[0];
+      plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: modPlan.itemId }));
+      plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: modPlan.itemId, slot: slotOfMod(id) }));
       debugLog('weapon.mod.apply.screen.patch', { itemId: modPlan.itemId, patch });
       updateItem(modPlan.itemId, patch);
       return;
@@ -1072,8 +1075,10 @@ const WeaponsAndArmorScreen = () => {
       // виртуальный носитель, флага нет). Снятие/замена — прежние моды видны.
       if (itemId) {
         const plan = diffModInstallPlan(modIdList(selectedWeaponForModification), modIdList(modifiedWeapon));
+        const applied = modifiedWeapon?.appliedMods || {};
+        const slotOfMod = (id) => Object.entries(applied).find(([, modId]) => modId === id)?.[0];
         plan.uninstall.forEach((id) => uninstallWeaponModFlag({ modId: id, hostKey: itemId }));
-        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId }));
+        plan.install.forEach((id) => installWeaponModFlag({ modId: id, hostKey: itemId, slot: slotOfMod(id) }));
       }
       // Патч 237: альбом модификаций (modifiedItems) больше не пишется —
       // предмет несёт id модов на себе (схема id+моды), обновляется на месте.
