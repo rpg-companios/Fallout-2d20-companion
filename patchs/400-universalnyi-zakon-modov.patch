@@ -1,0 +1,291 @@
+diff --git a/__tests__/equipment/mods-universal-law-400.test.js b/__tests__/equipment/mods-universal-law-400.test.js
+new file mode 100644
+index 0000000..2a77bf9
+--- /dev/null
++++ b/__tests__/equipment/mods-universal-law-400.test.js
+@@ -0,0 +1,96 @@
++// ПРИЁМОЧНЫЙ (патч 400): «мы делаем универсальное приложение… поведение
++// модов же универсально» (владелец). Один закон для всех семей модов:
++// те же правила «бутылок» (пачка, связка «хост+слот», сирота — в пачку,
++// анти-двоение) действуют для броняных и одёжных модов — по их именным
++// слотам на предмете (appliedArmorModId / appliedUniqueArmorModId /
++// appliedClothingModId). Связки robotSlot: не судятся сверкой — их
++// освобождает замена конечности (releaseRobotSlotMods, 359).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++import { syncWeaponModInstances } from '../../domain/weaponModInstances';
++import weaponCatalog from '../../modules/fallout/data/equipment/weapon_mods.json';
++import armorCatalog from '../../modules/fallout/data/equipment/armor_mods.json';
++import uniqCatalog from '../../modules/fallout/data/equipment/uniq_armor_mods.json';
++
++// Как в точке чтения сейва (400): оружейные + броняные + уникальные.
++const modIds = new Set([
++  ...weaponCatalog.map((m) => m.id),
++  ...armorCatalog.map((m) => m.id),
++  ...uniqCatalog.map((m) => m.id),
++]);
++// Настоящие id каталога (не фикстуры): мод и уникальный мод брони.
++const ARMOR_MOD = 'mod_std_soft_padding';
++const UNIQ_MOD = 'uniq_leather_boiled';
++
++const clone = (v) => JSON.parse(JSON.stringify(v));
++
++describe('патч 400: один закон модов для всех семей', () => {
++  it('броня: поле appliedArmorModId без записи → запись создаётся; повтор — ничего', () => {
++    const state = { items: {
++      armor1: { id: 'armor1', weaponId: 'armor_leather_chest_001', itemType: 'armor', appliedArmorModId: ARMOR_MOD },
++    } };
++    syncWeaponModInstances(state, modIds);
++    const bound = Object.entries(state.items).filter(([, i]) => i.installedOn === 'armor1');
++    expect(bound.length).toBe(1);
++    expect(bound[0][1].weaponId).toBe(ARMOR_MOD);
++    expect(bound[0][1].installedSlot).toBe('armor');
++    const snapshot = clone(state.items);
++    syncWeaponModInstances(state, modIds);
++    expect(state.items).toEqual(snapshot);
++  });
++
++  it('одежда и уникальный мод: три именных слота — три записи', () => {
++    const state = { items: {
++      c1: {
++        id: 'c1', weaponId: 'clothing_vault_jumpsuit', itemType: 'clothing',
++        appliedArmorModId: ARMOR_MOD,
++        appliedUniqueArmorModId: UNIQ_MOD,
++      },
++    } };
++    syncWeaponModInstances(state, modIds);
++    const bound = Object.entries(state.items).filter(([, i]) => i.installedOn === 'c1');
++    expect(bound.length).toBe(2);
++    expect(bound.find(([, i]) => i.installedSlot === 'armor')[1].weaponId).toBe(ARMOR_MOD);
++    expect(bound.some(([, i]) => i.installedSlot === 'uniqueArmor')).toBe(true);
++  });
++
++  it('мод сняли с брони (поле очищено) — запись вернулась в пачку без памяти', () => {
++    const state = { items: {
++      armor1: { id: 'armor1', weaponId: 'armor_leather_chest_001', itemType: 'armor' },
++      m1: { id: 'm1', weaponId: ARMOR_MOD, itemType: 'armorMod', equipped: true, installedOn: 'armor1', installedSlot: 'armor' },
++    } };
++    syncWeaponModInstances(state, modIds);
++    expect(state.items.m1.equipped).toBe(false);
++    expect(state.items.m1.installedOn).toBeUndefined();
++    expect(state.items.m1.installedSlot).toBeUndefined();
++  });
++
++  it('броняный мод не двоится при повторных загрузках (создан китом)', () => {
++    const state = { items: {
++      armor1: { id: 'armor1', weaponId: 'armor_leather_chest_001', itemType: 'armor', appliedArmorModId: ARMOR_MOD },
++    } };
++    for (let run = 0; run < 3; run += 1) {
++      const before = clone(state.items);
++      syncWeaponModInstances(state, modIds);
++      if (run > 0) expect(state.items).toEqual(before);
++    }
++  });
++
++  it('связки robotSlot: не судятся сверкой (их ведёт замена конечности, 359)', () => {
++    const state = { items: {
++      roboMod: { id: 'roboMod', weaponId: 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v', itemType: 'weaponMod', equipped: true, installedOn: 'robotSlot:leftArm:weapon_flamer' },
++    } };
++    const snapshot = clone(state.items);
++    syncWeaponModInstances(state, modIds);
++    expect(state.items).toEqual(snapshot);
++  });
++
++  it('точка чтения: сверка получает общий набор (оружейные + броняные + уникальные)', () => {
++    const src = readFileSync('src/saves/characterSaves.js', 'utf8');
++    expect(src).toContain('const allModIds = new Set(weaponModIds);');
++    expect(src).toContain('(catalog.armorMods || []).forEach');
++    expect(src).toContain('(catalog.uniqArmorMods || []).forEach');
++    expect(src).toContain('syncWeaponModInstances(migrated, allModIds)');
++  });
++});
+diff --git a/__tests__/equipment/weapon-mod-sync-399.test.js b/__tests__/equipment/weapon-mod-sync-399.test.js
+index e9df76c..bf225cc 100644
+--- a/__tests__/equipment/weapon-mod-sync-399.test.js
++++ b/__tests__/equipment/weapon-mod-sync-399.test.js
+@@ -127,11 +127,13 @@ describe('патч 399: мод — осязаемая запись; сверка
+     expect(state.items).toEqual(snapshot);
+   });
+ 
+-  it('броня и робо-моды не тронуты', () => {
++  it('броня и робо-моды подчиняются переданному набору (400: универсальный закон — в pwa-mod-sync-400)', () => {
+     const state = { items: {
+       armorMod: { id: 'armorMod', weaponId: 'mod_std_boiled_leather', itemType: 'armorMod', equipped: true, installedOn: 'armor1' },
+       roboMod: { id: 'roboMod', weaponId: 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_v', itemType: 'weaponMod', equipped: true, installedOn: 'robotSlot:leftArm:weapon_x' },
+     } };
++    // 399-прогон с чисто оружейным набором: броняный мод вне набора —
++    // запись не тронута; robotSlot-хост не судится сверкой (его ведёт 359).
+     const snapshot = clone(state.items);
+     syncWeaponModInstances(state, weaponModIds);
+     expect(state.items).toEqual(snapshot);
+@@ -159,7 +161,8 @@ describe('патч 399: мод — осязаемая запись; сверка
+   it('карта 375 покрывает репорт-мод; проводка: deserializeState зовёт сверку до ремонта 381', () => {
+     expect(WEAPON_MOD_ID_MAP['mod_043']).toBe('mod_beta_wave_tuner');
+     const src = readFileSync('src/saves/characterSaves.js', 'utf8');
+-    expect(src).toContain('syncWeaponModInstances(migrated, weaponModIds)');
++    // 400: сверке даётся общий набор (оружейные + броняные + уникальные).
++    expect(src).toContain('syncWeaponModInstances(migrated, allModIds)');
+     expect(src.indexOf('syncWeaponModInstances(migrated'))
+       .toBeLessThan(src.indexOf('migrateRepairMisroutedWeaponMods(migrated'));
+   });
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 00ba48b..d9a2ca6 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -8,7 +8,20 @@
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+ Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **399** (модель владельца, обдумана с ним
++· последний сданный патч: **400** (владелец: «мы делаем универсальное
++приложение… поведение модов же универсально» — запрет на исключения
++«броня/робо-моды живут по своим законам»). ЗАКОН МОДОВ ТЕПЕРЬ ОДИН:
++сверка «записи ↔ слоты» при загрузке ведёт все семьи — оружие
++(appliedMods), слоты роботов (heldWeapon/builtinWeapons), броня/одежда
++(три именных поля appliedArmorModId / appliedUniqueArmorModId /
++appliedClothingModId). Набор = оружейные (включая робо-моды) + броняные
+++ уникальные (armor_mods.json / uniq_armor_mods.json). Связки
++robotSlot: сверкой НЕ судятся — их освобождает releaseRobotSlotMods
++при замене конечности (359); limb.ownWeaponMods не перечисляются
++(их пишет экран). Настоящие id броняных модов: mod_std_* (12 шт) и
++uniq_* (uniq_armor_mods.json); «mod_std_boiled_leather» — старый
++тестовый фикс, в каталоге его НЕТ. Заслон: mods-universal-law-400 ·
++предыдущий: **399** (модель владельца, обдумана с ним
+ ДО кода: «мод — осязаемая запись, установленность — статус; правила
+ бутылок»). КОНТРАКТ: свободные одинаковые моды — одна пачка ×N,
+ безличны; установка = штука из пачки получает пару «хост+слот»
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2d6a4ae..eb4aad5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,17 @@
+ ---
+ ---
+ ---
++---
++## One law for all mods (patch 400)
++
++Mod rules are no longer split into «weapon» and «the rest»: armor and
++clothing follow the same rules as weapons — a mod is tangible, can be
++installed and removed, and on every character load entries are
++reconciled with slots by deficiency (missing ones are bound/created,
++surplus ones return to the stack, reloading never duplicates). Factory
++loadouts, mods leaving with a sold host, and «no service keys on
++screen» are just as universal.
++
+ ---
+ ## Mods unified as «stack ↔ slots» (patch 399)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 82c1c68..d0eba7b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Один закон для всех модов (патч 400)
++
++Правила модов больше не делятся на «оружейные» и «остальные»: броня и
++одежда живут по тем же правилам, что и оружие — мод осязаем, ставится
++и снимается, а при загрузке персонажа записи сверяются со слотами по
++недостатку (недостающее связывается/создаётся, лишнее — в пачку,
++повторная загрузка ничего не удваивает). Заводские сборки, продажа
++вместе с носителем и «никаких служебных номеров на экране» — так же
++едино.
++
+ ---
+ ## Моды — единая система «пачка ↔ слоты» (патч 399)
+ 
+diff --git a/domain/weaponModInstances.js b/domain/weaponModInstances.js
+index e46097a..a33117a 100644
+--- a/domain/weaponModInstances.js
++++ b/domain/weaponModInstances.js
+@@ -18,12 +18,24 @@
+ //   • моды из комплекта = обычные моды («пульт с батарейками со старта
+ //     внутри — тот же пульт, в который батарейки вставили позже»).
+ //
+-// Транслируются только моды оружия из каталога (weaponModIds): броня
+-// (mod_std_*) и робо-моды (robot_weapon_mod_*) живут по своим законам
+-// 343/359 и здесь не трогаются.
++// 400 (владелец: «поведение модов универсально»): закон ОДИН для всех
++// семей модов. Роли «хост|мод» дают: оружие (appliedMods), слоты роботов
++// (heldWeapon/builtinWeapons: modIds+appliedMods), броня/одежда (три
++// именных поля appliedArmorModId / appliedUniqueArmorModId /
++// appliedClothingModId). Моды «своей атаки» лапы (limb.ownWeaponMods)
++// не перечисляются здесь: их записи ведёт экран (359), а освобождение
++// при замене конечности делает releaseRobotSlotMods — связки robotSlot:
++// сверкой не трогаются, чтобы не судить о синтетическом хосте ошибочно.
+ 
+ import { generateStackKey } from './itemIdentity';
+ 
++// 400: три именных слота брони/одежды (по одному моду каждого вида).
++const ARMOR_MOD_FIELDS = [
++  ['appliedArmorModId', 'armor'],
++  ['appliedUniqueArmorModId', 'uniqueArmor'],
++  ['appliedClothingModId', 'clothing'],
++];
++
+ // Синтетический ключ-носитель оружия в слоте робота. Формат владельца —
+ // robotWeaponHostKey в src/engine/items/weaponMods.ts; заслон 399
+ // фиксирует совпадение формата (domain не импортирует engine).
+@@ -64,6 +76,10 @@ export function syncWeaponModInstances(state, weaponModIds) {
+   };
+   for (const [key, item] of Object.entries(items)) {
+     if (!item || typeof item !== 'object') continue;
++    // 400: броня/одежда — три именных слота на предмете.
++    for (const [field, label] of ARMOR_MOD_FIELDS) {
++      if (typeof item[field] === 'string' && item[field]) addRole(key, item[field], label);
++    }
+     const hostId = String(item.weaponId || '');
+     if (!hostId.startsWith('weapon_') || isTrackedMod(hostId)) continue;
+     const applied = item.appliedMods;
+@@ -173,9 +189,12 @@ export function syncWeaponModInstances(state, weaponModIds) {
+ 
+   // 4) Осиротевшие связанные записи (хост пропал или мод со слота снят) —
+   // обратно в пачку, без памяти о прошлом («сольёл воду — пустая бутылка»).
++  // Связки robotSlot: не судятся здесь: их хост синтетический, освобождение
++  // при замене конечности делает releaseRobotSlotMods (закон 359).
+   for (const key of boundKeys) {
+     const item = next[key];
+     if (!item || !item.installedOn) continue;
++    if (String(item.installedOn).startsWith('robotSlot:')) continue;
+     const pair = `${item.installedOn}|${item.weaponId}`;
+     if (!roles.has(pair)) unbind(key);
+   }
+diff --git a/public/version.json b/public/version.json
+index a82f58f..8a10717 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "399",
++  "version": "400",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index 05ac37e..bd6a290 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -173,10 +173,15 @@ const deserializeState = (data) => {
+   // в сумку. Идемпотентно, робо-привязки не тронуты.
+   if (catalog?.weaponMods?.length) {
+     const weaponModIds = new Set(catalog.weaponMods.map((m) => m.id));
+-    // 399: сначала сверка «записи ↔ слоты» (создать недостающие/вернуть
+-    // лишние в пачку), затем ремонт 381 (мусор не-оружия). Оба — по
+-    // недостатку и идемпотентно: повторная загрузка ничего не меняет.
+-    syncWeaponModInstances(migrated, weaponModIds);
++    // 400: универсальный закон — сверка ведёт ВСЕ семьи модов: оружейные,
++    // броняные и уникальные броняные (оружейные уже включают робо-моды).
++    const allModIds = new Set(weaponModIds);
++    (catalog.armorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
++    (catalog.uniqArmorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
++    // Сначала сверка «записи ↔ слоты» (создать недостающие/вернуть лишние
++    // в пачку), затем ремонт 381 (мусор оружейных модов на не-оружии).
++    // Оба — по недостатку и идемпотентно: повторная загрузка ничего не меняет.
++    syncWeaponModInstances(migrated, allModIds);
+     migrateRepairMisroutedWeaponMods(migrated, weaponModIds);
+   }
+   const restored = catalog
