@@ -1,0 +1,136 @@
+diff --git a/__tests__/screens/pwa-no-prompt-suppression-396.test.js b/__tests__/screens/pwa-no-prompt-suppression-396.test.js
+new file mode 100644
+index 0000000..053086c
+--- /dev/null
++++ b/__tests__/screens/pwa-no-prompt-suppression-396.test.js
+@@ -0,0 +1,32 @@
++// ПРИЁМОЧНЫЙ (патч 396): «когда-то был диалог на яндексе, pwa было…
++// проблема где-то в правках» (владелец). По истории репозитория перехват
++// beforeinstallprompt с preventDefault стоял с первых коммитов и ГЛУШИЛ
++// родной диалог браузера; в сегодняшнем Яндексе отложенный prompt() не
++// поднимает UI — итого диалога не было ВООБЩЕ. 396 снимает preventDefault:
++// браузер волен показать свой родной путь установки; событие только
++// запоминается (диагностика/кнопка). Заслон против возврата глушения.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const html = () => readFileSync('public/index.html', 'utf8');
++
++describe('патч 396: родной диалог установки браузера больше не глушится', () => {
++  it('перехват события есть, preventDefault — НЕТ', () => {
++    const src = html();
++    expect(src).toContain("addEventListener('beforeinstallprompt'");
++    // Активного вызова нет (комментарий-объяснение «НЕ вызываем
++    // event.preventDefault().» — не код: у вызова была бы точка с запятой).
++    expect(src.includes('event.preventDefault();')).toBe(false);
++  });
++
++  it('событие по-прежнему запоминается для диагностики и кнопки', () => {
++    const src = html();
++    expect(src).toContain('window.__pwaInstallPrompt = event');
++    expect(src).toContain("dispatchEvent(new CustomEvent('pwaInstallPromptReady'");
++  });
++
++  it('в комментарии объяснено, почему глушение убрано (396)', () => {
++    expect(html()).toContain('396');
++    expect(html()).toContain('НЕ вызываем event.preventDefault()');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 199a114..81daaf2 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -18,6 +18,23 @@
+ живые галочки зелёные); разнесение PWA не ломало. Диагноз финален:
+ виноват браузер владельца — Mi Browser НЕ ставит PWA вообще, Яндекс
+ делает ярлык-ссылку; старое рабочее PWA ставилось из Chrome-семейства.
++ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
++ПРОВЕРКА ГИПОТЕЗЫ владельца («проблема в правках после жалобы про
++кнопку») → патч **396**: в index.html снят event.preventDefault() на
++beforeinstallprompt — с первых коммитов проекта мы ГЛУШИЛИ родной
++диалог браузера, оставляя установку только через нашу кнопку (prompt());
++в сегодняшнем Яндексе отложенный prompt() UI не поднимает → диалога
++не было ВООБЩЕ. Теперь браузер волен показать родной путь; событие
++лишь запоминается (диагностика/кнопка). По истории (клон GitHub):
++перехват стоял ДО разнесения — тогдашний диалог Яндекса шёл через нашу
++кнопку; сегодня это не подтверждается — Яндекс изменил поведение со
++своей стороны. Заслон: pwa-no-prompt-suppression-396 (нет
++'event.preventDefault();' в index.html) · (перед этим) ПОДТВЕРЖДЕНО владельцем (сразу после сдачи 395): Chrome на его телефоне
++ПОКАЗАЛ нативный диалог установки — Mi и Яндекс не показали ничего;
++Chrome он раньше не пользовал — «старое работавшее PWA», вероятно,
++было ярлыком Яндекса/Mi, открывавшимся без адресной строки. УСТАНОВКА
++РЕШЕНА: через Chrome; хранилище на-браузер — напомнить экспорт/синк
++из старого браузера перед первой установкой.
+ 395: строка обходного пути зелёная ✓ (янтарный владелец читал как
+ красный), текст называет Chrome (меню ⋮ → «Установить приложение»,
+ Samsung Internet тоже) + правда о Mi/Яндексе; распознан Mi Browser
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 325e169..c9f7783 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -15,6 +15,16 @@
+ ---
+ ---
+ ---
++---
++## Nothing on our side blocks installation anymore (patch 396)
++
++Since the earliest versions the app intercepted the install event and
++forbade the browser from showing its native dialog — installation went
++only through the in-app button. In some browsers (today's Yandex) that
++path never raises a window, so there was no dialog at all. The
++interception is relaxed: the browser is free to show its native
++install path again; the button and diagnostics keep working.
++
+ ---
+ ## The install check tells the truth about browsers (patch 395)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8fd0573..850396b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Установке больше ничего не мешает на нашей стороне (патч 396)
++
++С самых первых версий приложение перехватывало событие установки и
++запрещало браузеру показывать его родной диалог — установка шла только
++через кнопку приложения. В части браузеров (сегодняшний Яндекс) такой
++путь не поднимает окно, и диалога не было вовсе. Перехват ослаблен:
++браузер снова волен показать свой родной путь установки; кнопка и
++диагностика продолжают работать.
++
+ ---
+ ## Честно о браузерах в диагностике установки (патч 395)
+ 
+diff --git a/public/index.html b/public/index.html
+index 463f741..bdb6ed8 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -27,7 +27,12 @@
+       window.__pwaInstallPrompt = null;
+ 
+       window.addEventListener('beforeinstallprompt', (event) => {
+-        event.preventDefault();
++        // 396: НЕ вызываем event.preventDefault(). Раньше мы глушили родной
++        // диалог браузера, оставляя установку только через нашу кнопку —
++        // а в части браузеров (сегодняшний Яндекс) отложенный prompt()
++        // своего UI не поднимает, и диалог не показывался ВООБЩЕ. Теперь
++        // браузер волен показать свой родной путь установки; событие лишь
++        // запоминаем — для диагностики и кнопки.
+         window.__pwaInstallPrompt = event;
+         // Notify React if it is already listening
+         window.dispatchEvent(new CustomEvent('pwaInstallPromptReady', { detail: event }));
+diff --git a/public/version.json b/public/version.json
+index 6a15baa..b8a1c88 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "395",
++  "version": "396",
+   "release": "1",
+   "notes": {
+     "ru-RU": [
