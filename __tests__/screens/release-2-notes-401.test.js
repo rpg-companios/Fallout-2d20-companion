@@ -6,9 +6,11 @@ import { describe, expect, it } from 'vitest';
 import notes from '../../public/version.json';
 
 describe('патч 401: релиз 2 — заметки «Что нового»', () => {
-  it('релиз поднят до 2, версия = 400; заметки парные', () => {
+  it('релиз поднят до 2; версия = номер последнего патча (движется каждым); заметки парные', () => {
     expect(notes.release).toBe(2);
-    expect(notes.version).toBe('400');
+    // version.json.version — номер ПОСЛЕДНЕГО ПАТЧА: каждый патч его двигает,
+    // зажимать константой нельзя (402-й урок: заслон упал на version '402').
+    expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
     expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
     expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
   });

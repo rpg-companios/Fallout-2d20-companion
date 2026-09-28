@@ -16,6 +16,12 @@
 ---
 ---
 ---
+## The «What's new» window scrolls (patch 402)
+
+Long release notes no longer fall off the screen: the list scrolls,
+the title and the button stay put.
+
+---
 ## Release 2 (declared by the owner)
 
 The «What's new» notes now cover patches 336–400: mod crafting (weapons
