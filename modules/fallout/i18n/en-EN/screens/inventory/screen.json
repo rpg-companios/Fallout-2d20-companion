@@ -126,8 +126,14 @@
       "storeMessage": "Could not spend the materials — check the inventory and try again."
     },
     "actions": {
-      "repair": "Repair",
-      "close": "Close"
-    }
+      "repair": "Fix",
+      "close": "Close",
+      "remake": "Repair"
+    },
+    "donorTitle": "A second identical item",
+    "donorOffer": "There is a second identical item — scrap it instead of the materials: difficulty −1.",
+    "useDonor": "Scrap the donor and repair",
+    "withoutDonor": "Repair without the donor",
+    "cancel": "Cancel"
   }
 }

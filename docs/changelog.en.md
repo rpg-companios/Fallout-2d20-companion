@@ -1,5 +1,21 @@
 # Changelog
 ---
+## Repair — as you said (patch 414)
+
+By your corrections there are two buttons now. «Fix» is the old
+instant free repair. «Repair» is the book test with materials. The
+repair window offers a donor when a second identical item is in the
+bag; with no donor there is no selection window — pressing the button
+attempts the repair right away and shows the report. The report comes
+from the Crafting window: the same check and dice lines, the same 2 AP
+question and time — only instead of «received: item» it says «the
+item's durability has been restored». When materials are missing (and
+no donor), the «Repair» button is disabled; when the durability
+setting is off, there is no «Repair» button at all. Power armor is
+repaired one piece at a time: one test — one piece, the rest of the
+stack waits for its own tests.
+
+---
 ## Repair — by the book (patch 413)
 
 The repair mechanics you provided is implemented in full. The «Repair»

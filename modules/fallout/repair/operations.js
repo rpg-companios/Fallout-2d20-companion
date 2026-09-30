@@ -23,10 +23,83 @@ import { REPAIR_RULES, repairMaterialsPlan } from './rules';
 import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
 import powerArmorCatalog from '../data/equipment/powerArmor.json';
+import { getScrapMaterials } from '../../../domain/registry';
+import { getCurrentModuleLocale } from '../../../i18n/locale';
+import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
+import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
 
 // ── Редкость по каноническому id ─────────────────────────────────────────
 
 let rarityIndexCache = null;
+
+const repairDict = () => (getCurrentModuleLocale() === 'en-EN' ? enCraft : ruCraft);
+
+const materialNames = () => {
+  const names = {};
+  for (const material of getScrapMaterials() ?? []) {
+    if (material?.id) names[material.id] = material.name ?? material.id;
+  }
+  return names;
+};
+
+/**
+ * Отчёт о ремонте — ПО ОБРАЗЦУ крафта (слово владельца 414: «окно отчёта
+ * с тратой ОД уже есть в окне Крафта, его берём за основу; тут почти всё
+ * то же самое, только прочность предмета повышается вместо предмета»).
+ * Те же строки словаря крафта (проверка, кубики, осложнения, вопрос про
+ * 2 ОД), отрисовка — общий CraftReportView. Отличия: вместо «получено:
+ * предмет» — «прочность восстановлена»; свои строки потери материалов,
+ * донора и провала (словарь craftingModal.json → repair).
+ */
+export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
+  const d = repairDict();
+  const ru = d.ui ?? {};
+  const rep = d.repair ?? {};
+  const check = run?.check ?? null;
+  const target = check?.targetNumber
+    ?? ((Number(attributeName) >= 0 ? '' : '') || '');
+  const names = materialNames();
+  const lines = [];
+  if (check?.targetNumber != null) {
+    lines.push(`${attributeName ?? REPAIR_RULES.testAttribute} + ${skillName ?? REPAIR_RULES.testSkill}`
+      + ` = ${check.targetNumber}`);
+  }
+  if (run?.auto) {
+    lines.push(ru.autoNote);
+  } else if (check) {
+    const rolls = (check.rolls ?? []).join(', ');
+    lines.push(check.passed
+      ? `${ru.rollsSuccess ? ru.rollsSuccess.replace('{rolls}', rolls).replace('{n}', check.successes ?? 0) : ''}`
+      : `${ru.rollsFail ? ru.rollsFail.replace('{rolls}', rolls) : ''}`);
+    const complications = check.complicationCount ?? 0;
+    if (complications > 0) {
+      lines.push(`${ru.complicationNote ? ru.complicationNote.replace('{n}', complications * REPAIR_RULES.complicationExtraMinutes) : ''} `
+        + `${rep.complicationResolve ?? ''}`.trim());
+    }
+  }
+  if (run?.resolution?.kind === 'lost-materials') {
+    lines.push((rep.lostMaterials ?? '').replace('{face}', run.resolution.face));
+  }
+  if (run?.donorSpent) lines.push(rep.donorUsed ?? '');
+  if (run?.done) {
+    lines.push(rep.success ?? '');
+  } else {
+    lines.push(rep.failed ?? '');
+  }
+  const spentRows = run?.spent ?? [];
+  if (spentRows.length > 0) {
+    const items = spentRows
+      .map((row) => `${names[row.itemId] ?? row.itemId} ×${row.count}`)
+      .join(', ');
+    if (ru.spent) lines.push(ru.spent.replace('{items}', items));
+  }
+  return {
+    title: rep.title ?? '',
+    lines: lines.filter(Boolean),
+    // pendingTime: CraftReportView спросит про 2 ОД (успех можно вдвое).
+    pendingTime: { hasSuccess: run?.done === true },
+  };
+};
 
 const collectPairs = (node, sink) => {
   if (!node || typeof node !== 'object') return;
@@ -85,6 +158,25 @@ export const repairTargetFor = (item) => {
 export const repairModsCountFor = (storeItemId) => Object.values(
   useCharacterStore.getState().items || {},
 ).filter((entry) => entry?.installedOn && entry.installedOn === storeItemId).length;
+
+/**
+ * Слово владельца 414: «если материалов нет, кнопка ремонта не активна».
+ * Хватает материалов ИЛИ есть валидный донор — кнопка активна.
+ */
+export const repairAffordableFor = (storeItemId, { donorStoreItemId = null } = {}) => {
+  const preview = repairPreview(storeItemId, { donorStoreItemId });
+  if (!preview?.canRepair) return false;
+  return preview.evaluation.ready;
+};
+
+/** То же для НАДЕТОЙ части СБ (по catalogId — цели нет в items). */
+export const repairAffordableForPiece = (catalogId) => {
+  if (!catalogId) return false;
+  const plan = repairMaterialsPlan(itemRarityFor(catalogId));
+  const counts = countInventoryByCatalogId(useCharacterStore.getState().items);
+  if (plan.every((entry) => (counts[entry.itemId] || 0) >= entry.count)) return true;
+  return donorCandidatesFor({ id: catalogId, weaponId: catalogId }, null).length > 0;
+};
 
 /**
  * Валидный донор: другой экземпляр ТОГО ЖЕ канонического id — не сам
@@ -286,18 +378,38 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
     }
   }
 
+  // Слово владельца 414: «каждый элемент отдельно!» — пачка частей СБ
+  // чинится по ОДНОЙ штуке за тест: штука отделяется и чинится сама
+  // (станет целой — сольётся с целой пачкой общим законом стеков).
+  let repairTargetId = storeItemId;
+  if (result.done && preview.target.kind === 'powerArmor') {
+    const item = useCharacterStore.getState().items?.[storeItemId];
+    if (item && !item.paSlot && (Number(item.quantity) || 1) > 1) {
+      const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
+      useCharacterStore.setState((prev) => ({
+        items: {
+          ...prev.items,
+          [singleKey]: { ...item, quantity: 1 },
+          [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
+        },
+      }));
+      repairTargetId = singleKey;
+    }
+  }
+
   // Успех чинит предмет существующими экшнами стора (цена — в движке выше).
   if (result.done) {
     const state = useCharacterStore.getState();
     if (preview.target.kind === 'weapon') {
-      state.repairWeapon(storeItemId);
+      state.repairWeapon(repairTargetId);
     } else if (preview.target.kind === 'powerArmor') {
-      // Надетая (в контейнере) часть чинится по слоту, пачка — по записи.
-      const item = state.items?.[storeItemId];
+      // Надетая (в контейнере) часть чинится по слоту, пачка/штука — по записи.
+      const item = state.items?.[repairTargetId];
       if (item?.paSlot) state.repairPowerArmorPieceAt(item.paSlot);
-      else state.repairPowerArmorStack(storeItemId);
+      else state.repairPowerArmorStack(repairTargetId);
     }
   }
+  result.repairedStoreItemId = repairTargetId;
 
   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
   result.repairTime = {

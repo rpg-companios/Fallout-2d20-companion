@@ -71,5 +71,13 @@
   },
   "attributes": {
     "INT": "Intelligence"
+  },
+  "repair": {
+    "title": "Repair",
+    "success": "The item’s durability has been restored.",
+    "failed": "Repair failed — durability unchanged, materials kept.",
+    "lostMaterials": "Complication (d20 roll: {face}) — one more set of materials was lost.",
+    "donorUsed": "Donor scrapped: materials came from it, difficulty −1.",
+    "complicationResolve": "d20: {face}."
   }
 }

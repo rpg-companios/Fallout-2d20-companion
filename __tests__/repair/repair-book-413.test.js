@@ -22,6 +22,8 @@ import {
   donorCandidatesFor,
 } from '../../modules/fallout/repair/operations';
 import { readFileSync } from 'node:fs';
+import { buildRepairReport } from '../../modules/fallout/repair/operations';
+import { setCurrentModuleLocale } from '../../i18n/locale';
 
 const state = () => useCharacterStore.getState();
 
@@ -281,6 +283,50 @@ describe('Патч 413: операции — редкость, моды, дон�
     expect(full.spendActionPoints).toBe(false);
   });
 
+  it('слово владельца 414: пачка СБ чинится по ОДНОЙ штуке за тест', () => {
+    // Пачка из 3 побитых частей (настоящий каталог СБ: hp 10).
+    useCharacterStore.setState((prev) => ({
+      items: {
+        ...prev.items,
+        seed_pa_stack: {
+          id: 'power_armor_raider_chest', weaponId: 'power_armor_raider_chest', itemType: 'powerArmor',
+          hpCurrent: 2, maxHp: 10, quantity: 3,
+        },
+      },
+    }));
+    seedMaterials('item_common_materials', 6);
+    seedMaterials('item_uncommon_materials', 3); // редкость 2: 2 Обычных + 1 Необычный за тест
+    const before = Object.values(state().items)
+      .filter((i) => i.weaponId === 'power_armor_raider_chest')
+      .reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+    const result = performRepair('seed_pa_stack', {
+      ports: { rollD20: dice(1, 2) },
+    });
+    expect(result.done).toBe(true);
+    const pieces = Object.values(state().items).filter((i) => i.weaponId === 'power_armor_raider_chest');
+    const whole = pieces.find((i) => Number(i.hpCurrent) === 10);
+    const damaged = pieces.find((i) => Number(i.hpCurrent) === 2);
+    expect(whole?.quantity ?? 0).toBe(1);          // починена ОДНА
+    expect(damaged?.quantity ?? 0).toBe(before - 1); // остальные ждут своих тестов
+  });
+
+  it('отчёт — по образцу крафта: строки словаря крафта + прочность вместо предмета', () => {
+    setCurrentModuleLocale('ru-RU');
+    const run = {
+      done: true,
+      check: { rolls: [2, 3], passed: true, successes: 2, complicationCount: 0, targetNumber: 5 },
+      spent: [{ itemId: 'item_common_materials', count: 2 }],
+      resolution: null,
+      donorSpent: false,
+    };
+    const report = buildRepairReport(run, { attributeName: 'ИНТ', skillName: 'Ремонт' });
+    expect(report.title).toBe('Ремонт');
+    expect(report.lines[0]).toContain('ИНТ + Ремонт = 5');
+    expect(report.lines.join(' ')).toContain('Выпало 2, 3');
+    expect(report.lines.join(' ')).toContain('Прочность предмета восстановлена');
+    expect(report.pendingTime).toEqual({ hasSuccess: true }); // CraftReportView спросит про 2 ОД
+  });
+
   it('донор списывается вместе со своими модами (закон 343/344)', () => {
     const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
     const donorKey = seedWeapon({ durability: 55, weaponId: 'weapon_10mm_pistol' });
@@ -309,31 +355,41 @@ describe('Патч 413: операции — редкость, моды, дон�
   });
 });
 
-describe('Патч 413: проводка — кнопка открывает модалку, мгновенного ремонта нет', () => {
-  it('все три кнопки «Починить» зовут setRepairTarget, экшны стора напрямую не зовутся', () => {
-    const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
-    expect(src).toContain('RepairModal');
-    expect(src).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
-    expect(src).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
-    // Мгновенные вызовы ремонта из карточек исчезли.
-    expect(src).not.toContain('onPress={() => repairWeapon(item.id)}');
-    expect(src).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
-    expect(src).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+describe('Проводка (слово владельца 414): «Починить» мгновенно + «Ремонт» по книге', () => {
+  const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+
+  it('две кнопки: «Починить» зовёт экшн стора, «Ремонт» открывает модалку', () => {
+    const code = src();
+    expect(code).toContain('RepairModal');
+    // «Починить» — мгновенные экшны (прежнее поведение).
+    expect(code).toContain('onPress={() => repairWeapon(item.id)}');
+    expect(code).toContain('onPress={() => repairPowerArmorStack(item.id)}');
+    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+    // «Ремонт» — модалка (все три формы цели).
+    expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
+    expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
+    expect(code).toContain("tInventory('repair.actions.remake')");
   });
 
-  it('модалка: скролл-закон (заголовок/футер фиксированы, контент в ScrollView)', () => {
-    const src = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
-    const scrollStart = src.indexOf('<ScrollView');
-    const scrollEnd = src.indexOf('</ScrollView>');
-    expect(scrollStart).toBeGreaterThan(-1);
-    expect(scrollEnd).toBeGreaterThan(scrollStart);
-    const inner = src.slice(scrollStart, scrollEnd);
-    expect(inner.length).toBeGreaterThan(400); // содержимое живёт в прокрутке
-    // Заголовок и футер — вне прокрутки.
-    const before = src.slice(0, scrollStart);
-    const after = src.slice(scrollEnd);
-    expect(before).toContain("tInventory('repair.title')");
-    expect(after).toContain("tInventory('repair.actions.close')");
+  it('гейты кнопки «Ремонт»: настройка прочности и доступность материалов', () => {
+    const code = src();
+    // «Кнопки ремонта нет, если настройка прочности не активна».
+    expect(code).toContain('weaponDurabilityLossEnabled && (');
+    // «Если материалов нет, кнопка ремонта не активна».
+    expect(code).toContain('!repairAffordable && styles.applyButtonDisabled');
+    expect(code).toContain('disabled={!repairAffordable}');
+    expect(code).toContain('repairAffordableFor');
+    expect(code).toContain('repairAffordableForPiece');
+  });
+
+  it('донор: модалка предлагает, автостарт без донора — сразу отчёт', () => {
+    const modal = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
+    // донора нет → окно выбора не открывается, сразу попытка и отчёт.
+    expect(modal).toContain("preview.donors ?? []).length === 0");
+    // донор есть → предложение в окне.
+    expect(modal).toContain("tInventory('repair.donorOffer')");
+    // отчёт — крафтовый компонент (слово владельца: берём отчёт крафта за основу).
+    expect(modal).toContain('CraftReportView');
   });
 
   it('словари ремонта есть в обоих языках (без фолбэков)', () => {
@@ -344,9 +400,22 @@ describe('Патч 413: проводка — кнопка открывает м�
       expect(dict.repair.testLine).toContain('{difficulty}');
       expect(dict.repair.materialLine).toContain('{need}');
       expect(typeof dict.repair.materials.item_common_materials).toBe('string');
-      expect(typeof dict.repair.report.apQuestion).toBe('string');
       expect(typeof dict.repair.actions.repair).toBe('string');
+      expect(typeof dict.repair.actions.remake).toBe('string');
+      expect(typeof dict.repair.donorOffer).toBe('string');
     }
+    expect(ru.repair.actions.repair).toBe('Починить');
+    expect(ru.repair.actions.remake).toBe('Ремонт');
     expect(ru.repair.materials.item_common_materials).toBe('Обычные материалы');
+    // en: «Fix»/«Repair» — кнопки различаются.
+    expect(en.repair.actions.repair).toBe('Fix');
+    expect(en.repair.actions.remake).toBe('Repair');
+    // repair-строки отчёта в словаре крафта (общий компонент).
+    for (const loc of ['ru-RU', 'en-EN']) {
+      const craft = JSON.parse(readFileSync(`modules/fallout/i18n/${loc}/screens/inventory/craftingModal.json`, 'utf8'));
+      expect(typeof craft.repair.title).toBe('string');
+      expect(craft.repair.success).toContain('Прочность'.slice(0, loc === 'ru-RU' ? 8 : 0) || craft.repair.success);
+      expect(typeof craft.repair.lostMaterials).toBe('string');
+    }
   });
 });

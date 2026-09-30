@@ -13,6 +13,7 @@ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/moda
 // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
 // «Починить» больше не чинят мгновенно и бесплатно).
 import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
+import { repairAffordableFor, repairAffordableForPiece } from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
 import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
@@ -151,9 +152,14 @@ const InventoryScreen = () => {
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
-  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
-  // 413: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name).
+  // 413/414: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name);
+  // «Починить» — прежнее мгновенное действие (3 экшна ниже).
   const [repairTarget, setRepairTarget] = useState(null);
+  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
+  // Слово владельца 414: «кнопки ремонта нет, если настройка прочности
+  // не активна» — используем существующий селектор weaponDurabilityLossEnabled.
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
@@ -1286,6 +1292,7 @@ const InventoryScreen = () => {
       rows.push({
         uniqueId: `pa-content-${slot}`,
         paPieceContent: true,
+        pieceCatalogId: piece.catalogId,
         paSlot: slot,
         itemType: 'powerArmor',
         name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
@@ -1457,6 +1464,9 @@ const InventoryScreen = () => {
     }
 
     if (item.paPieceContent) {
+      const pieceAffordable = item?.pieceCatalogId
+        ? repairAffordableForPiece(item.pieceCatalogId)
+        : true;
       // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
       // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
       // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
@@ -1471,8 +1481,16 @@ const InventoryScreen = () => {
             {item.showRepair && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
                 <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
+            )}
+            {item.showRepair && weaponDurabilityLossEnabled && (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                disabled={!repairAffordable}
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -1551,6 +1569,9 @@ const InventoryScreen = () => {
     );
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+    // Слово владельца 414: «если материалов нет, кнопка ремонта не
+    // активна» (донор тоже делает кнопку активной).
+    const repairAffordable = repairAffordableFor(item.id);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable =
       item.itemType === 'chem' || item.itemType === 'chems'
@@ -1654,16 +1675,32 @@ const InventoryScreen = () => {
           {showWeaponRepair && (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  onPress={() => repairWeapon(item.id)}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
+          )}
+          {showWeaponRepair && weaponDurabilityLossEnabled && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
           )}
 
           {showPARepair && (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  onPress={() => repairPowerArmorStack(item.id)}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+              </TouchableOpacity>
+          )}
+          {showPARepair && weaponDurabilityLossEnabled && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
           )}
 

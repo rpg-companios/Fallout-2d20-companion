@@ -1,48 +1,153 @@
-// Модалка ремонта (патч 413, механика от владельца — книга): тест ИНТ +
-// Ремонт со сложностью = редкость (+моды, −донор), материалы по редкости
-// (или разборка донора), полчаса (успех + 2 ОД → 15 минут), осложнение —
-// д20 19–20 теряет материалы, иначе +15 минут. Скролл-закон (402):
-// заголовок и кнопки фиксированы, содержимое в ScrollView. Отчёт о
-// попытке — в той же модалке (закон 357). Сложность 0 — окно спрашивает,
-// бросать ли кубики (закон 356). Вся механика — в repair/operations.js;
-// здесь только кнопки, списки и строки словаря.
-import React, { useMemo, useState } from 'react';
+// Модалка ремонта (патчи 413–414, механика от владельца). Слово владельца
+// 414: донора предлагать в окне (если есть); отчёт — крафтовый (окно
+// отчёта крафта берём за основу: те же строки, вопрос про 2 ОД, «только
+// прочность предмета повышается вместо предмета»). Отчёт рисует общий
+// CraftReportView (357); строки — словари крафта + repair-секция.
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/RepairModal.styles';
 import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
-import { showRawAlert } from '../../../../../components/alerts/alertService';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectAttributeTotal, selectSkillTotal } from '../../../../../src/store/selectors';
-import { evaluateRepair } from '../../../../../domain/repairEngine';
+import { getCurrentModuleLocale } from '../../../../../i18n/locale';
+import CraftReportView from '../../../crafting/CraftReportView';
 import {
   repairPreview,
   performRepair,
   performEquippedPieceRepair,
   settleRepairTime,
-  itemRarityFor,
-  donorCandidatesFor,
-  pieceCatalogMaxHp,
+  buildRepairReport,
 } from '../../../repair/operations';
 import { REPAIR_RULES, repairMaterialsPlan } from '../../../repair/rules';
+import { evaluateRepair } from '../../../../../domain/repairEngine';
+import { itemRarityFor, donorCandidatesFor, pieceCatalogMaxHp } from '../../../repair/operations';
 
-const fmt = (template, params) => {
-  let out = template;
-  for (const [key, value] of Object.entries(params || {})) {
-    out = out.split(`{${key}}`).join(String(value));
+const RepairModal = ({ target, onClose }) => {
+  // target: { storeItemId, name } | { equippedSlot, name } — две формы строки.
+  const storeItemId = target?.storeItemId ?? null;
+  const equippedSlot = target?.equippedSlot ?? null;
+
+  const [donorId, setDonorId] = useState(null);
+  const [run, setRun] = useState(null);
+  const [report, setReport] = useState(null);
+  const [settledTime, setSettledTime] = useState(null);
+
+  const preview = useMemo(() => {
+    if (equippedSlot != null) return repairEquippedPreview(equippedSlot, donorId);
+    if (storeItemId != null) return repairPreview(storeItemId, { donorStoreItemId: donorId });
+    return null;
+  }, [storeItemId, equippedSlot, donorId]);
+
+  const executeRef = useRef(() => {});
+  const startedRef = useRef(false);
+  useEffect(() => {
+    // Слово владельца 414: донора нет — окно выбора не нужно, сразу
+    // попытка и крафтовый отчёт о ремонте.
+    if (!startedRef.current && preview && (preview.donors ?? []).length === 0) {
+      startedRef.current = true;
+      executeRef.current();
+    }
+  }, [preview]);
+
+  if (!preview) return null;
+
+  const execute = () => {
+    const result = equippedSlot != null
+      ? performEquippedPieceRepair(equippedSlot, { donorStoreItemId: donorId })
+      : performRepair(storeItemId, { donorStoreItemId: donorId });
+    if (result.stage === 'gate') { onClose(); return; }
+    setRun(result);
+    const names = localeNames();
+    setReport(buildRepairReport(result, { attributeName: names.attribute, skillName: names.skill }));
+    setSettledTime(null);
+  };
+
+  const onSettleTime = (spendAp) => {
+    setSettledTime(settleRepairTime(run, { spendActionPoints: spendAp }));
+  };
+  executeRef.current = execute;
+
+  const requirementLines = [];
+  if (!run) {
+    requirementLines.push(tInventory('repair.testLine')
+      .replace('{attribute}', tInventory('repair.attribute'))
+      .replace('{skill}', tInventory('repair.skill'))
+      .replace('{difficulty}', preview.complexity));
+    for (const material of preview.evaluation?.materials ?? []) {
+      requirementLines.push(tInventory('repair.materialLine')
+        .replace('{name}', tInventory(`repair.materials.${material.itemId}`))
+        .replace('{have}', material.have)
+        .replace('{need}', material.need));
+    }
   }
-  return out;
+
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.backdrop}>
+        <View style={styles.window}>
+          {!run && (
+            <>
+              <Text style={styles.title}>{tInventory('repair.title')}</Text>
+              <Text style={styles.subtitle}>{target?.name ?? ''}</Text>
+              <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+                <View style={styles.block}>
+                  {requirementLines.map((line, index) => (
+                    <Text key={index} style={styles.requirementLine}>{line}</Text>
+                  ))}
+                </View>
+                {(preview.donors ?? []).length > 0 && (
+                  <View style={styles.block}>
+                    <Text style={styles.donorTitle}>{tInventory('repair.donorTitle')}</Text>
+                    <Text style={styles.requirementLine}>{tInventory('repair.donorOffer')}</Text>
+                    {preview.donors.map((id) => (
+                      <TouchableOpacity
+                        key={id}
+                        style={[styles.donorRow, donorId === id && styles.donorRowSelected]}
+                        onPress={() => setDonorId(donorId === id ? null : id)}
+                      >
+                        <Text style={styles.donorText}>
+                          {donorId === id ? '☑' : '☐'} {tInventory('repair.useDonor')}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+              <View style={styles.footer}>
+                <TouchableOpacity
+                  style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
+                  onPress={execute}
+                  disabled={!preview.evaluation?.ready}
+                >
+                  <Text style={styles.mainButtonText}>{tInventory('repair.actions.remake')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                  <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {run && (
+            <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+              <Text style={styles.title}>{report.title}</Text>
+              <CraftReportView
+                report={report}
+                settledTime={settledTime}
+                onSettleTime={onSettleTime}
+                onDone={onClose}
+              />
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
 };
 
-const countFreeItems = (items) => {
-  const counts = {};
-  for (const item of Object.values(items || {})) {
-    if (!item || item.installedOn || item.equipped) continue;
-    const id = item.weaponId || item.id;
-    if (!id) continue;
-    counts[id] = (counts[id] || 0) + (Number(item.quantity) || 1);
-  }
-  return counts;
-};
+const localeNames = () => (getCurrentModuleLocale() === 'en-EN'
+  ? { attribute: 'INT', skill: 'Repair' }
+  : { attribute: 'ИНТ', skill: 'Ремонт' });
 
 // Сводка по надетой части СБ (цели нет в items — см. performEquippedPieceRepair).
 const repairEquippedPreview = (slot, donorId) => {
@@ -77,197 +182,15 @@ const repairEquippedPreview = (slot, donorId) => {
   };
 };
 
-const RepairModal = ({ target, onClose }) => {
-  // target: { storeItemId, name } | { equippedSlot, name } — две формы строки.
-  const storeItemId = target?.storeItemId ?? null;
-  const equippedSlot = target?.equippedSlot ?? null;
-
-  const [donorId, setDonorId] = useState(null);
-  const [report, setReport] = useState(null);
-  const [settled, setSettled] = useState(null);
-  const [askZero, setAskZero] = useState(false);
-
-  const preview = useMemo(() => {
-    if (equippedSlot != null) return repairEquippedPreview(equippedSlot, donorId);
-    if (storeItemId != null) return repairPreview(storeItemId, { donorStoreItemId: donorId });
-    return null;
-  }, [storeItemId, equippedSlot, donorId]);
-
-  if (!preview) return null;
-
-  const evaluation = preview.evaluation;
-  const run = (zeroDifficulty) => {
-    setAskZero(false);
-    const result = equippedSlot != null
-      ? performEquippedPieceRepair(equippedSlot, { donorStoreItemId: donorId })
-      : performRepair(storeItemId, { donorStoreItemId: donorId, ...(zeroDifficulty ? { zeroDifficulty } : {}) });
-    setReport(result);
-    setSettled(null);
-    if (result.stage === 'store') {
-      showRawAlert(tInventory('repair.alerts.storeTitle'), tInventory('repair.alerts.storeMessage'));
-    }
-  };
-
-  const onRepairPress = () => {
-    if (!evaluation?.ready) return;
-    if (evaluation.auto && report == null) {
-      setAskZero(true); // закон 356: сложность 0 — окно спрашивает
-      return;
-    }
-    run();
-  };
-
-  const requirementLines = [
-    fmt(tInventory('repair.testLine'), {
-      attribute: tInventory('repair.attribute'),
-      skill: tInventory('repair.skill'),
-      difficulty: preview.complexity,
-    }),
-  ];
-  for (const material of evaluation?.materials ?? []) {
-    requirementLines.push(fmt(tInventory('repair.materialLine'), {
-      name: tInventory(`repair.materials.${material.itemId}`),
-      have: material.have,
-      need: material.need,
-    }));
+const countFreeItems = (items) => {
+  const counts = {};
+  for (const item of Object.values(items || {})) {
+    if (!item || item.installedOn || item.equipped) continue;
+    const id = item.weaponId || item.id;
+    if (!id) continue;
+    counts[id] = (counts[id] || 0) + (Number(item.quantity) || 1);
   }
-
-  return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.window}>
-          <Text style={styles.title}>{tInventory('repair.title')}</Text>
-          <Text style={styles.subtitle}>{target?.name ?? ''}</Text>
-
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
-            {!report && (
-              <>
-                <View style={styles.block}>
-                  {requirementLines.map((line, index) => (
-                    <Text key={index} style={styles.requirementLine}>{line}</Text>
-                  ))}
-                </View>
-
-                {(preview.donors ?? []).length > 0 && (
-                  <View style={styles.block}>
-                    {preview.donors.map((id) => (
-                      <TouchableOpacity
-                        key={id}
-                        style={[styles.donorRow, donorId === id && styles.donorRowSelected]}
-                        onPress={() => setDonorId(donorId === id ? null : id)}
-                      >
-                        <Text style={styles.donorText}>
-                          {donorId === id ? '☑' : '☐'} {tInventory('repair.donorLine')}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                <Text style={styles.timeLine}>
-                  {fmt(tInventory('repair.timeLine'), { minutes: REPAIR_RULES.baseMinutes })}
-                </Text>
-                {evaluation?.blocked?.length > 0 && (
-                  <Text style={styles.blockedLine}>{tInventory('repair.notReady')}</Text>
-                )}
-              </>
-            )}
-
-            {report && (
-              <View style={styles.block}>
-                <Text style={[styles.reportLine, report.done ? styles.success : styles.failure]}>
-                  {report.done ? tInventory('repair.report.success') : tInventory('repair.report.failure')}
-                </Text>
-                {report.check && (
-                  <Text style={styles.reportLine}>
-                    {fmt(tInventory('repair.report.rolls'), {
-                      rolls: (report.check.rolls ?? report.check.dice ?? []).join(', '),
-                    })}
-                  </Text>
-                )}
-                {(report.complications ?? 0) > 0 && (
-                  <Text style={styles.reportLine}>
-                    {fmt(tInventory('repair.report.complications'), {
-                      n: report.complications,
-                      minutes: report.complications * REPAIR_RULES.complicationExtraMinutes,
-                    })}
-                  </Text>
-                )}
-                {report.resolution?.kind === 'lost-materials' && (
-                  <Text style={styles.reportLine}>
-                    {fmt(tInventory('repair.report.lostMaterials'), { face: report.resolution.face })}
-                  </Text>
-                )}
-                {(report.spent ?? []).length > 0 && (
-                  <Text style={styles.reportLine}>
-                    {report.spent.map((row) => fmt(tInventory('repair.materialShort'), {
-                      name: tInventory(`repair.materials.${row.itemId}`),
-                      n: row.count,
-                    })).join(', ')}
-                  </Text>
-                )}
-                {report.done && settled == null && (
-                  <View style={styles.apBlock}>
-                    <Text style={styles.apQuestion}>{tInventory('repair.report.apQuestion')}</Text>
-                    <View style={styles.apRow}>
-                      <TouchableOpacity style={styles.apButton} onPress={() => settle(true)}>
-                        <Text style={styles.apButtonText}>{tInventory('repair.report.spendAp')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.apButton} onPress={() => settle(false)}>
-                        <Text style={styles.apButtonText}>{tInventory('repair.report.fullTime')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-                {settled != null && (
-                  <Text style={styles.reportLine}>
-                    {fmt(tInventory('repair.report.timeSpent'), {
-                      minutes: settled.minutes,
-                      pool: settled.pool,
-                    })}
-                  </Text>
-                )}
-                {!report.done && settled == null && (
-                  <TouchableOpacity style={styles.apButton} onPress={() => settle(false)}>
-                    <Text style={styles.apButtonText}>{tInventory('repair.report.confirmTime')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {askZero && (
-              <View style={styles.block}>
-                <Text style={styles.apQuestion}>{tInventory('repair.zeroDiffQuestion')}</Text>
-                <View style={styles.apRow}>
-                  <TouchableOpacity style={styles.apButton} onPress={() => run('roll')}>
-                    <Text style={styles.apButtonText}>{tInventory('repair.zeroDiffRoll')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.apButton} onPress={() => run(undefined)}>
-                    <Text style={styles.apButtonText}>{tInventory('repair.zeroDiffAuto')}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </ScrollView>
-
-          <View style={styles.footer}>
-            {!report && (
-              <TouchableOpacity
-                style={[styles.mainButton, !evaluation?.ready && styles.mainButtonDisabled]}
-                onPress={onRepairPress}
-                disabled={!evaluation?.ready}
-              >
-                <Text style={styles.mainButtonText}>{tInventory('repair.actions.repair')}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>{tInventory('repair.actions.close')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
+  return counts;
 };
 
 export default RepairModal;
