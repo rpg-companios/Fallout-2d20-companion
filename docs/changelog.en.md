@@ -1,5 +1,23 @@
 # Changelog
 ---
+## Eleven more perks now work (patch 406)
+
+«Ghoulish»: radiation from food and drinks heals instead of harm, HP
+for HP. «Bloodsucker»: blood packs (already in the gear list) heal
+twice as much. «Super Duper»: every craft rolls a combat die — on an
+Effect, half of the spent materials go back to your inventory, and the
+craft report shows it. «Rejuvenated»: +2 max HP while fully fed, and
+fullness/thirst last twice as long. «Dromedary»: any drink quench
+thirst one step better, purified water — three steps at once. «Field
+Surgeon»: stimpaks heal +3 HP, RadAway removes 1 more radiation;
+«Pharmacist» adds another 1 (2 together). «Power User»: fusion cores
+hold 1 more charge (4 with the Nuclear Physicist). «Cap Collector»:
+the buy window opens with the 10% discount already applied. «Natural
+Resistance»: sleeping rough no longer rolls for disease. The «Chemist»
+now also doubles chem duration. «Quack Surgeon» and the night perks
+stay text until first aid and a day cycle exist.
+
+---
 ## Book conditions restored to perks (patch 405)
 
 Your question prompted a full re-check, which found two gaps. «Load and

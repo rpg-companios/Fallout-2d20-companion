@@ -245,6 +245,18 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
   }
 
+  // 406: «Омолодившийся» — на высшей ступени сытости Макс. ОЗ +2
+  // (флаг wellFed считает стор из состояния выживания).
+  const rejuvenatedHp = Number(perkBonuses.rejuvenatedSatedMaxHp) || 0;
+  if (rejuvenatedHp > 0 && equipmentState.wellFed) {
+    stats.maxHealth.modifiers.push({
+      source: 'perks.rejuvenated',
+      value: rejuvenatedHp,
+      operation: '+',
+    });
+    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+  }
+
   // carryWeightBonus (strongBack)
   const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
   if (carryFromPerks !== 0 && !equipmentState.isRobot) {

@@ -17,7 +17,7 @@ import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { getPerkSelectionCount } from '../../../domain/perks';
 import { getItemId } from '../../../domain/itemIdentity';
-import { rollByType } from '../../../domain/diceRollsLogic';
+import { rollByType, rollCombatDiceEffects } from '../../../domain/diceRollsLogic';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
 import { CRAFT_RULES } from './rules';
 // 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
@@ -371,6 +371,29 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
       instanceId: store.addNewItem({ itemId, quantity }),
     }),
   });
+
+  // 406: Super Duper — при каждом создании бросается боевой кубик;
+  // выпал Эффект — половина потраченного возвращается в сумку (floor).
+  if (result.done === true && Array.isArray(result.spent) && result.spent.length > 0
+    && Boolean(useCharacterStore.getState().perkBonuses?.superDuper)) {
+    const roll = ports.superDuperRoll
+      ? ports.superDuperRoll()
+      : rollCombatDiceEffects(1);
+    const faces = roll?.faces ?? [];
+    if ((Number(roll?.effectCount) || 0) > 0) {
+      const returned = [];
+      for (const row of result.spent) {
+        const back = Math.floor((Number(row.count) || 0) / 2);
+        if (back > 0) {
+          store.addNewItem({ itemId: row.itemId, quantity: back });
+          returned.push({ itemId: row.itemId, quantity: back });
+        }
+      }
+      result.superDuper = { faces, effectCount: 1, returned };
+    } else {
+      result.superDuper = { faces, effectCount: 0, returned: [] };
+    }
+  }
 
   // Время (патч 262; книга — 323): любая работа, дошедшая до проверки, идёт
   // по часам — и удачная, и сорванная (провал = зря потраченное время). Отказ

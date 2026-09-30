@@ -65,6 +65,9 @@ import { denormalizeCharacterState } from './migrations.js';
 import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
+// 406: потолок лестниц выживания — флаг «высшая ступень сытости»
+// для «Омолодившегося» (survival.ts — чистый домен, без настроек/UI).
+import { SURVIVAL_LADDER_MAX } from '../../modules/fallout/survival/survival';
 import { selectPerkBonuses } from '../../domain/perks.js';
 // 404: префикс металлической брони для «В сияющих доспехах»;
 // 405: светозащитная оптика (ранг 2 того же перка).
@@ -252,12 +255,15 @@ const deriveFromSnapshot = (state, options = {}) => {
       const catalogId = piece?.weaponId || piece?.id || '';
       return isMetalArmorCatalogId(catalogId);
     });
+  // 406: «Омолодившийся» — персонаж на высшей ступени сытости?
+  const wellFed = (state.stateExtensions?.survival?.food ?? 0) >= SURVIVAL_LADDER_MAX.food;
   const equipmentState = {
     ...(context.equipmentState || {}),
     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
     wearingMetalArmor,
     wearingGlareOptics: wearingGlareOpticsInEquippedArmor(state.equippedArmor || {}),
+    wellFed,
   };
   return calculateDerivedStats(
     state.attributes,
@@ -1358,9 +1364,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         set({ stateExtensions: dict });
       },
 
-      setStateExtension: (fieldKey, value) => set((state) => ({
-        stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
-      })),
+      setStateExtension: (fieldKey, value) => {
+        set((state) => ({
+          stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
+        }));
+        // 406: «Омолодившийся» — +2 Макс. ОЗ на высшей ступени сытости:
+        // движение лестниц выживания меняет производные. Точечный пересчёт
+        // (глобальный каскад по stateExtensions дёргал бы подписчиков
+        // лишний раз на каждом тике — слайс-тест 209 это честно ловит).
+        if (fieldKey === 'survival'
+          && (Number(get().perkBonuses?.rejuvenatedSatedMaxHp) || 0) > 0) {
+          get().recalculateDerivedStats();
+        }
+      },
 
       /**
        * Комплект снаряжения персонажа: { id, name, weight, price, items,

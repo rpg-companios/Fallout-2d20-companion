@@ -294,6 +294,20 @@ export const buildCraftReport = (recipeId, run) => {
     for (const row of attempt.spent ?? []) {
       spent.set(row.itemId, (spent.get(row.itemId) ?? 0) + (Number(row.count) || 0));
     }
+    // 406: Super Duper — бросок боевого кубика при создании; Эффект
+    // возвращает половину потраченного (строки attempt.superDuper.returned).
+    if (attempt.superDuper && attempt.done) {
+      const sd = attempt.superDuper;
+      const facesLine = (sd.faces ?? []).join(', ');
+      if ((sd.returned ?? []).length > 0) {
+        const items = (sd.returned ?? [])
+          .map((row) => `${itemName(catalog, row.itemId, null)} ×${row.quantity}`)
+          .join(', ');
+        lines.push(fmt(d.superDuperReturned, { faces: facesLine, items }));
+      } else if ((sd.faces ?? []).length > 0) {
+        lines.push(fmt(d.superDuperNothing, { faces: facesLine }));
+      }
+    }
     // 323: отложенное время (окно ещё спросит про 2 ОД) в «потраченное» не идёт.
     if (attempt.time) {
       if (attempt.time.pending) {
