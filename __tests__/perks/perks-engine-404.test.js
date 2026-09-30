@@ -1,4 +1,5 @@
-// ПРИЁМОЧНЫЙ (патч 404): три перка из адаптируемой четвёрки 403 встроены в движок.
+// ПРИЁМОЧНЫЙ (патч 404; уточнено патчем 405 — бонус «Заряжай и стреляй»
+// только у тяжёлого со скорострельностью 2+): перки 403 встроены в движок.
 // - Гурман старого мира: preserved-еда — +2 ОЗ к лечению, радиация еды на 1 меньше.
 // - Заряжай и стреляй: тяжёлое оружие — скорострельность +1/+2 по рангам.
 // - В сияющих доспехах: в металлической брони СУ энергия +2 (ранг 2 — текст перка).
@@ -133,10 +134,12 @@ describe('Патч 404: Заряжай и стреляй (скорострель
     expect(applyLoadAndFireToWeapon(minigun, 1).fireRate).toBe(6);
     expect(applyLoadAndFireToWeapon(minigun, 2).fireRate).toBe(7);
 
+    // 405: «Толстяк» (0 очередей) — медленное оружие, перк его НЕ усиливает
+    // (в тексте перка: «со скорострельностью 2 или выше»).
     const fatMan = byId(weaponsList, 'weapon_fat_man');
     expect(fatMan.fireRate).toBe(0);
-    expect(applyLoadAndFireToWeapon(fatMan, 1).fireRate).toBe(1);
-    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(2);
+    expect(applyLoadAndFireToWeapon(fatMan, 1).fireRate).toBe(0);
+    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(0);
   });
 
   it('не-тяжёлое оружие и предметы без очередей не трогаются; вход не мутируется', () => {

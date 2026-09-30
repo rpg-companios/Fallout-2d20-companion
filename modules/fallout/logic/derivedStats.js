@@ -282,6 +282,15 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     });
     stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
   }
+  // 405: ранг 2 — светозащитная оптика (Щиток сварщика) даёт ещё +1.
+  if (shiningRank >= 2 && equipmentState.wearingGlareOptics) {
+    stats.damageResistance.energy.modifiers.push({
+      source: 'perks.inShiningArmor.optics',
+      value: 1,
+      operation: '+',
+    });
+    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
+  }
 
   return stats;
 };

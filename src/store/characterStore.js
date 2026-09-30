@@ -66,8 +66,12 @@ import { createInitialPowerArmorState, createPowerArmorActions } from './powerAr
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
-// 404: префикс металлической брони для «В сияющих доспехах».
-import { isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
+// 404: префикс металлической брони для «В сияющих доспехах»;
+// 405: светозащитная оптика (ранг 2 того же перка).
+import {
+  isMetalArmorCatalogId,
+  wearingGlareOpticsInEquippedArmor,
+} from '../../domain/perks/inShiningArmor';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
@@ -253,6 +257,7 @@ const deriveFromSnapshot = (state, options = {}) => {
     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
     wearingMetalArmor,
+    wearingGlareOptics: wearingGlareOpticsInEquippedArmor(state.equippedArmor || {}),
   };
   return calculateDerivedStats(
     state.attributes,

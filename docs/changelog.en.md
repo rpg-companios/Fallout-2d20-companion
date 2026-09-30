@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Book conditions restored to perks (patch 405)
+
+Your question prompted a full re-check, which found two gaps. «Load and
+Fire» now boosts only heavy weapons with a fire rate of 2 or higher —
+the Fat Man and other single-shot launchers are no longer sped up, as
+the book says. «In Shining Armor» rank 2 got its second half: while
+wearing glare-blocking optics (currently the Welding Shield — the only
+optics in the gear list) energy damage resistance gains another +1,
+for +3 total in metal armor with the shield. All active perks were
+also audited — every mechanic is in place.
+
+---
 ## Four perks now actually work (patch 404)
 
 As you asked, all four adaptable perks from the previous step landed in
