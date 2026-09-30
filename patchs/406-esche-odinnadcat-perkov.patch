@@ -1,0 +1,1107 @@
+diff --git a/__tests__/perks/perks-engine-406.test.js b/__tests__/perks/perks-engine-406.test.js
+new file mode 100644
+index 0000000..52a8a47
+--- /dev/null
++++ b/__tests__/perks/perks-engine-406.test.js
+@@ -0,0 +1,255 @@
++// ПРИЁМОЧНЫЙ (патч 406): одиннадцать перков по механикам, согласованным
++// с владельцем — Гуль, Кровопийца, Super Duper, Омолодившийся, Мохавский
++// верблюд, Полевой хирург, Фармацевт, Power User, Коллекционер крышек,
++// Естественная стойкость, вторая половина ХИМИКА.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import {
++  resolveConsumableVitalChanges,
++  scaleDuration,
++  getInstantHealAmount,
++} from '../../domain/effects';
++import { selectPerkBonuses } from '../../domain/perks';
++import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
++import { createSurvivalState, advanceHours, consumeDrink, SURVIVAL_LADDER_MAX, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
++import { sleepSurvival } from '../../modules/fallout/survival/operations';
++import { craftRecipe } from '../../modules/fallout/crafting/operations';
++import perksCatalog from '../../modules/fallout/data/perks/perks.json';
++import drinksData from '../../modules/fallout/data/consumables/drinks.json';
++import chemsData from '../../modules/fallout/data/consumables/chems.json';
++
++const state = () => useCharacterStore.getState();
++const byId = (list, id) => (Array.isArray(list) ? list : Object.values(list)).find((x) => x.id === id);
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const takePerks = (...ids) => {
++  // ЭКШН стора (не setState напрямую): он пересчитывает perkBonuses.
++  state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
++};
++
++describe('Патч 406: перк-бонусы и их слияние', () => {
++  it('все одиннадцать перков кладут свои ключи', () => {
++    const cases = {
++      fieldSurgeon: { stimpakHpBonus: 3, antiradRadiationBonus: 1 },
++      pharmacist: { antiradRadiationBonus: 1 },
++      powerUser: { fusionCoreChargeBonus: 1 },
++      capCollector: { capCollectorDiscountPercent: 10 },
++      naturalResistance: { sleepOnGroundDiseaseImmune: true },
++      rejuvenated: { rejuvenatedSatedMaxHp: 2, ladderAccRates: { food: 0.5, water: 0.5 } },
++      dromedary: { dromedaryExtraWaterStep: 1 },
++      superDuper: { superDuper: true },
++      ghoulish: { ghoulish: true },
++      chemist: { chemDurationMultiplier: 2 },
++    };
++    for (const [id, expected] of Object.entries(cases)) {
++      const bonuses = selectPerkBonuses({ selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
++      expect(bonuses, id).toMatchObject(expected);
++    }
++    const blood = selectPerkBonuses({ selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
++    expect(blood.bloodPackHealMultiplier).toBe(2);
++    expect(blood.bloodPackDrinkIds).toContain('drink_blood_pack');
++  });
++
++  it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: +4 заряда', () => {
++    const bonuses = selectPerkBonuses(
++      { selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
++      perksCatalog,
++    );
++    expect(bonuses.antiradRadiationBonus).toBe(2);
++    const cores = selectPerkBonuses(
++      { selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
++      perksCatalog,
++    );
++    expect(cores.fusionCoreChargeBonus).toBe(4); // 3 + 1
++  });
++});
++
++describe('Патч 406: конвейер употребления', () => {
++  it('стимпак лечит +3 с перком (реальные данные каталога)', () => {
++    const chems = chemsData;
++    const stimpak = byId(chems, 'chem_stimpak');
++    expect(getInstantHealAmount(stimpak)).toBe(5);
++    const withPerk = resolveConsumableVitalChanges(stimpak, {
++      currentHealth: 5, maxHealth: 20, radiation: 0, stimpakHpBonus: 3,
++    });
++    expect(withPerk.healAmount).toBe(8);
++    const without = resolveConsumableVitalChanges(stimpak, {
++      currentHealth: 5, maxHealth: 20, radiation: 0,
++    });
++    expect(without.healAmount).toBe(5);
++  });
++
++  it('Рад-а-вей: −4 базово, −5 с одним перком, −6 с двумя (клампится дном)', () => {
++    const radaway = byId(chemsData, 'chem_radaway');
++    const run = (bonus, current = 3) => resolveConsumableVitalChanges(radaway, {
++      currentHealth: 10, maxHealth: 20, radiation: current, antiradRadiationBonus: bonus,
++    });
++    expect(run(0).radiationAmount).toBe(-3); // есть только 3 радиации
++    expect(run(1, 10).radiationAmount).toBe(-5);
++    expect(run(2, 10).radiationAmount).toBe(-6);
++  });
++
++  it('Гуль: радиация еды лечит вместо вреда; с Гурманом — после его скидки', () => {
++    const irradiated = {
++      id: 'test_meat', itemType: 'food',
++      radiationModifier: { op: '+', value: 2 },
++    };
++    const ghoul = resolveConsumableVitalChanges(irradiated, {
++      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
++    });
++    expect(ghoul.healAmount).toBe(2);
++    expect(ghoul.radiationAmount).toBe(0);
++    expect(ghoul.radiationAfter).toBe(0);
++
++    // Гурман уменьшает радиацию preserved-еды (2 → 1), Гуль лечит на остаток.
++    const canned = {
++      id: 'test_canned', itemType: 'food', preserved: true,
++      radiationModifier: { op: '+', value: 2 },
++    };
++    const both = resolveConsumableVitalChanges(canned, {
++      currentHealth: 5, maxHealth: 20, radiation: 0,
++      ghoulish: true, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
++    });
++    expect(both.radiationAmount).toBe(0);
++    expect(both.healAmount).toBe(3); // +1 (остаток радиации) + 2 (гурман)
++  });
++
++  it('Кровопийца: пакет крови лечит 3 → 6 (id уже в каталоге напитков)', () => {
++    const pack = byId(drinksData, 'drink_blood_pack');
++    expect(pack.hpHealed).toBe(3);
++    const result = resolveConsumableVitalChanges(pack, {
++      currentHealth: 5, maxHealth: 20, radiation: 0,
++      hpHealMultiplier: 2, // так его применяет applyConsumableFull
++    });
++    expect(result.healAmount).toBe(6);
++  });
++
++  it('ХИМИК: длительность ×2 (lasting → 2 сцены, 3 сцены → 6, instant не тронут)', () => {
++    expect(scaleDuration('lasting', 2)).toBe(2);
++    expect(scaleDuration(3, 2)).toBe(6);
++    expect(scaleDuration('instant', 2)).toBe('instant');
++    expect(scaleDuration('lasting', 1)).toBe('lasting');
++  });
++});
++
++describe('Патч 406: Мохавский верблюд и Омолодившийся (выживание)', () => {
++  it('верблюд: обычный напиток +2 ступени, чистая вода +3 (базово 1 и 2)', () => {
++    // Свежий персонаж сыт (лестницы на потолке, питьё не двигает) —
++    // для теста ступеней опускаем воду к «обезвожен».
++    const thirsty = () => {
++      const s = createSurvivalState('human');
++      s.water = 1;
++      return s;
++    };
++    const water = { id: 'test_w', itemType: 'drinks' };
++    expect(consumeDrink(thirsty(), water).gained.water).toBe(1);
++    expect(consumeDrink(thirsty(), water, { extraWaterSteps: 1 }).gained.water).toBe(2);
++
++    const purified = { id: 'test_p', itemType: 'drinks', purified: true };
++    expect(consumeDrink(thirsty(), purified).gained.water).toBe(2);
++    expect(consumeDrink(thirsty(), purified, { extraWaterSteps: 1 }).gained.water).toBe(3);
++  });
++
++  it('омолодившийся: лестницы еды и воды спускаются вдвое медленнее', () => {
++    const fed = createSurvivalState('human');
++    fed.food = 3;
++    fed.water = 3;
++    // Часов ровно на порог спуска с 3-й ступени: обычная скорость — спуск,
++    // половинная (омолодившийся) — порог не достигнут, без спуска.
++    const hours = SURVIVAL_RULES.stepHours.food[3];
++    const slow = advanceHours(fed, hours, { ladderAccRates: { food: 0.5, water: 0.5 } });
++    const fast = advanceHours(fed, hours);
++    expect(fast.state.food).toBe(2);
++    expect(slow.state.food).toBe(3);
++    // Вода: порог другой, но соотношение то же (взял удвоенный порог воды).
++    const hoursW = SURVIVAL_RULES.stepHours.water[3];
++    const slowW = advanceHours(fed, hoursW, { ladderAccRates: { food: 0.5, water: 0.5 } });
++    const fastW = advanceHours(fed, hoursW);
++    expect(fastW.state.water).toBe(2);
++    expect(slowW.state.water).toBe(3);
++  });
++
++  it('омолодившийся: +2 Макс. ОЗ только на высшей ступени сытости', () => {
++    const ATTRS = Object.fromEntries(
++      ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'].map((id) => [id, { id, base: 5, modifiers: [], total: 5 }]),
++    );
++    const mk = (food) => {
++      // ЭКШН стора: каскад пересчёта сидит в экшенах, сырой set его не зовёт.
++      state().setStateExtension('survival', { ...createSurvivalState('human'), food });
++    };
++    takePerks('rejuvenated');
++    mk(SURVIVAL_LADDER_MAX.food);
++    const sated = state().derivedStats.maxHealth;
++    mk(SURVIVAL_LADDER_MAX.food - 1);
++    const notSated = state().derivedStats.maxHealth.total;
++    // Сыт: +2 модификатором перка; ушёл с высшей ступени — модификатор снялся.
++    expect(sated.total).toBe(notSated + 2);
++    expect(sated.modifiers).toContainEqual({
++      source: 'perks.rejuvenated', value: 2, operation: '+',
++    });
++    expect(state().derivedStats.maxHealth.modifiers).not.toContainEqual(
++      expect.objectContaining({ source: 'perks.rejuvenated' }),
++    );
++  });
++});
++
++describe('Патч 406: Естественная стойкость и Super Duper', () => {
++  it('сон в пустоши с перком: проверка на болезнь не запускается', () => {
++    useAppSettingsStore.getState().setValue('survivalModeEnabled', true);
++    state().setStateExtension('survival', createSurvivalState('human'));
++    takePerks('naturalResistance');
++    const result = sleepSurvival({ place: 'wasteland', hours: 3 });
++    expect(result.ok).toBe(true);
++    expect(result.diseaseRiskResult).toEqual({ skipped: 'naturalResistance' });
++  });
++
++  it('Super Duper: Эффект на кубике возвращает половину потраченного (floor)', () => {
++    takePerks('superDuper', 'ammosmith');
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 1, total: 1 } },
++    }));
++    const seed = (itemId, quantity) => {
++      useCharacterStore.setState((prev) => ({
++        items: { ...prev.items, [`sd_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: { weaponId: itemId, quantity } },
++      }));
++    };
++    const count = (itemId) => Object.values(state().items)
++      .filter((item) => item.weaponId === itemId)
++      .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
++
++    seed('item_common_materials', 5);
++    const result = craftRecipe('ammo_38', {
++      rollCD: (cd) => cd * 2,
++      superDuperRoll: () => ({ faces: [6], effectCount: 1 }),
++    });
++    expect(result.done).toBe(true);
++    // Потрачено 2 материала, вернулась половина = 1.
++    expect(result.superDuper).toEqual({ faces: [6], effectCount: 1, returned: [{ itemId: 'item_common_materials', quantity: 1 }] });
++    expect(count('item_common_materials')).toBe(5 - 2 + 1);
++  });
++
++  it('Super Duper без Эффекта: возврата нет', () => {
++    takePerks('superDuper', 'ammosmith');
++    useCharacterStore.setState((prev) => ({
++      skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 1, total: 1 } },
++    }));
++    useCharacterStore.setState((prev) => ({
++      items: { ...prev.items, sd_x: { weaponId: 'item_common_materials', quantity: 5 } },
++    }));
++    const result = craftRecipe('ammo_38', {
++      rollCD: (cd) => cd * 2,
++      superDuperRoll: () => ({ faces: [3], effectCount: 0 }),
++    });
++    expect(result.done).toBe(true);
++    expect(result.superDuper).toEqual({ faces: [3], effectCount: 0, returned: [] });
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/BuyItemModal.js b/components/screens/InventoryScreen/modals/BuyItemModal.js
+index 15df61c..6b2fa29 100644
+--- a/components/screens/InventoryScreen/modals/BuyItemModal.js
++++ b/components/screens/InventoryScreen/modals/BuyItemModal.js
+@@ -3,6 +3,8 @@ import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvo
+ import { showRawAlert } from '../../../alerts/alertService';
+ import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
+ import { useLocale } from '../../../../i18n/locale';
++// 406: КОЛЛЕКЦИОНЕР КРЫШЕК — покупки на 10% дешевле (предзаполнение цены).
++import useCharacterStore from '../../../../src/store/characterStore';
+ 
+ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
+   useLocale();
+@@ -12,7 +14,12 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
+   useEffect(() => {
+     if (!item) return;
+     setQuantity('1');
+-    setPricePerItem(String(item.cost ?? item.price ?? 0));
++    const baseCost = Number(item.cost ?? item.price ?? 0);
++    // 406: с «Коллекционером крышек» цена при открытии уже со скидкой 10%
++    // (торговая формулировка книги «можете уменьшить цену на 10%»).
++    const discount = Number(useCharacterStore.getState().perkBonuses?.capCollectorDiscountPercent) || 0;
++    const price = discount > 0 ? Math.round(baseCost * (1 - Math.min(100, discount) / 100)) : baseCost;
++    setPricePerItem(String(price));
+   }, [item]);
+ 
+   const changeQuantity = (delta) => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b3ed747..3330617 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (405)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
++Снимок: **2026-09-30 (406)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+ fallout2d20_perks (1) (184: структурированные op/modifier/when),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1a82952..2be4617 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,22 @@
+ # Changelog
++---
++## Eleven more perks now work (patch 406)
++
++«Ghoulish»: radiation from food and drinks heals instead of harm, HP
++for HP. «Bloodsucker»: blood packs (already in the gear list) heal
++twice as much. «Super Duper»: every craft rolls a combat die — on an
++Effect, half of the spent materials go back to your inventory, and the
++craft report shows it. «Rejuvenated»: +2 max HP while fully fed, and
++fullness/thirst last twice as long. «Dromedary»: any drink quench
++thirst one step better, purified water — three steps at once. «Field
++Surgeon»: stimpaks heal +3 HP, RadAway removes 1 more radiation;
++«Pharmacist» adds another 1 (2 together). «Power User»: fusion cores
++hold 1 more charge (4 with the Nuclear Physicist). «Cap Collector»:
++the buy window opens with the 10% discount already applied. «Natural
++Resistance»: sleeping rough no longer rolls for disease. The «Chemist»
++now also doubles chem duration. «Quack Surgeon» and the night perks
++stay text until first aid and a day cycle exist.
++
+ ---
+ ## Book conditions restored to perks (patch 405)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 49bafd8..daab640 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,24 @@
+ # История изменений
+ 
++---
++## Ещё одиннадцать перков заработали (патч 406)
++
++«Гуль»: радиация из еды и питья вместо вреда лечит столько же ОЗ.
++«Кровопийца»: пакеты крови (они уже были в снаряжении) лечат вдвое
++сильнее. «Super Duper»: при каждом создании предмета бросается боевой
++кубик — на Эффекте половина потраченных материалов возвращается в
++сумку, отчёт крафта это показывает. «Омолодившийся»: на высшей ступени
++сытости +2 к Макс. ОЗ, а сытость и жажда держатся вдвое дольше.
++«Мохавский верблюд»: любой напиток утоляет жажду на ступень лучше,
++чистая вода — сразу на 3 ступени. «Полевой хирург»: стимпак лечит на
+++3 ОЗ, Рад-а-вей снимает на 1 радиацию больше; «Фармацевт» добавляет
++ещё 1 (вместе — 2). «Power User»: энергоядра держат на 1 заряд больше
++(с Физиком-ядерщиком — на 4). «Коллекционер крышек»: цена в окне
++покупки уже со скидкой 10%. «Естественная стойкость»: сон в пустоши
++не проверяется на болезнь. «Химик»: теперь и «в два раза дольше» для
++препаратов. «Хирург-шарлатан» и ночные перки — ждут механики первой
++помощи и времени суток, пока текстом.
++
+ ---
+ ## Перкам вернули книжные условия (патч 405)
+ 
+diff --git a/domain/effects.js b/domain/effects.js
+index 7fd0968..d68da34 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -287,6 +287,22 @@ export const applyRemoveConditions = (item, conditions = []) => {
+     return { conditions: next, removed, requested };
+ };
+ 
++/**
++ * 406: множитель длительности положительного эффекта расходника
++ * (ХИМИК ×2). 'instant' не трогаем; 'lasting' («до конца сцены») и числа
++ * умножаются на N. Неизвестное/пустое возвращается как есть.
++ */
++export const scaleDuration = (duration, multiplier = 1) => {
++    const m = Number(multiplier) || 1;
++    if (m <= 1 || duration == null) return duration;
++    if (duration === 'instant') return duration;
++    if (duration === 'lasting') return Math.max(1, Math.round(1 * m));
++    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
++        return Math.max(1, Math.round(duration * m));
++    }
++    return duration;
++};
++
+ export const applyConsumableToEffects = (item, currentEffects = []) => {
+     const name = toStringSafe(item?.name || item?.Name);
+     let nextEffects = [...currentEffects];
+@@ -666,6 +682,12 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         // 404: Гурман старого мира — preserved-еда: +2 ОЗ и радиация еды на
+         // 1 меньше (до минимума 0). Приходит из perkBonuses (см. перк).
+         oldWorldGourmet = null,
++        // 406: Полевой хирург — стимпак лечит на +3 больше; он же и
++        // Фармацевт складываются в antiradRadiationBonus (Рад-а-вей сильнее).
++        stimpakHpBonus = 0,
++        antiradRadiationBonus = 0,
++        // 406: Ghoulish — прибавка радиации вместо вреда лечит.
++        ghoulish = false,
+     } = options;
+     if (
+         !Number.isFinite(currentHealth)
+@@ -684,7 +706,11 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+     const gourmet = oldWorldGourmet && item?.itemType === 'food' && item?.preserved === true
+         ? oldWorldGourmet
+         : null;
+-    const healBase = instantHealAmount + (gourmet ? Number(gourmet.hpBonus) || 0 : 0);
++    const stimpakBonus = stimpakHpBonus > 0
++        && String(item?.id || '').startsWith('chem_stimpak')
++        ? stimpakHpBonus
++        : 0;
++    let healBase = instantHealAmount + (gourmet ? Number(gourmet.hpBonus) || 0 : 0) + stimpakBonus;
+     const healAmount = healBase > 0
+         ? Math.max(0, healBase + hpHealBonus)
+         : 0;
+@@ -702,6 +728,16 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+     if (gourmet && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
+         requestedRadiationAmount = Math.max(0, requestedRadiationAmount - (Number(gourmet.radiationReduction) || 0));
+     }
++    // 406: Рад-а-вей сильнее (Полевой хирург + Фармацевт): снятие глубже.
++    if (antiradRadiationBonus > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount < 0) {
++        requestedRadiationAmount -= antiradRadiationBonus;
++    }
++    // 406: Ghoulish — прибавка радиации вместо вреда лечит на то же число.
++    if (ghoulish && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
++        healBase += requestedRadiationAmount;
++        requestedRadiationAmount = 0;
++    }
++    const finalHealAmount = healBase > 0 ? Math.max(0, healBase + hpHealBonus) : 0;
+     const radiationAfter = requestedRadiationAmount === null
+         ? radiation
+         : Math.max(0, radiation + requestedRadiationAmount);
+@@ -711,9 +747,17 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         ? null
+         : radiationAfter - radiation;
+ 
++    // 406: Ghoulish мог добавить лечение после чернового healthAfter —
++    // пересчитываем итоговый максимум здоровья честно.
++    const finalHealthAfter = finalHealAmount !== healAmount
++        ? (finalHealAmount > 0
++            ? Math.min(maxHealth, currentHealth + finalHealAmount)
++            : currentHealth)
++        : healthAfter;
++
+     return {
+-        healAmount,
+-        healthAfter,
++        healAmount: finalHealAmount,
++        healthAfter: finalHealthAfter,
+         radiationAmount,
+         radiationAfter,
+     };
+diff --git a/domain/perks/bloodsucker.js b/domain/perks/bloodsucker.js
+new file mode 100644
+index 0000000..9c0ea8f
+--- /dev/null
++++ b/domain/perks/bloodsucker.js
+@@ -0,0 +1,21 @@
++// domain/perks/bloodsucker.js
++// Bloodsucker (406): пакеты крови лечат вдвое сильнее (×2 к мгновенному
++// лечению; удвоение прибавки Гурмана не входит — множитель до неё).
++// Пакеты крови — напитки: жажду утоляют сами (база +1 ступень).
++// Список id — данные заведены патчем 406 (data/consumables/drinks.json).
++
++export const BLOOD_PACK_DRINK_IDS = [
++  'drink_blood_pack',
++  'drink_glowing_blood_pack',
++  'drink_irradiated_blood',
++];
++
++export const bloodsuckerPerk = {
++  id: 'bloodsucker',
++  apply() {
++    return {
++      bloodPackDrinkIds: BLOOD_PACK_DRINK_IDS,
++      bloodPackHealMultiplier: 2,
++    };
++  },
++};
+diff --git a/domain/perks/capCollector.js b/domain/perks/capCollector.js
+new file mode 100644
+index 0000000..dc22159
+--- /dev/null
++++ b/domain/perks/capCollector.js
+@@ -0,0 +1,10 @@
++// domain/perks/capCollector.js
++// КОЛЛЕКЦИОНЕР КРЫШЕК (406): покупки обходятся на 10% дешевле —
++// окно покупки предзаполняет цену со скидкой (поле остаётся editable).
++
++export const capCollectorPerk = {
++  id: 'capCollector',
++  apply() {
++    return { capCollectorDiscountPercent: 10 };
++  },
++};
+diff --git a/domain/perks/chemist.js b/domain/perks/chemist.js
+new file mode 100644
+index 0000000..0e1a25e
+--- /dev/null
++++ b/domain/perks/chemist.js
+@@ -0,0 +1,12 @@
++// domain/perks/chemist.js
++// ХИМИК — вторая половина (406): созданные/употреблённые препараты
++// действуют в два раза дольше (числовая длительность ×2; «lasting» =
++// 1 сцена → 2 сцены). Первая половина (гейт рецептов) работала с 251.
++// Множитель применяется в applyConsumableFull перед созданием эффектов.
++
++export const chemistPerk = {
++  id: 'chemist',
++  apply() {
++    return { chemDurationMultiplier: 2 };
++  },
++};
+diff --git a/domain/perks/dromedary.js b/domain/perks/dromedary.js
+new file mode 100644
+index 0000000..1efcc66
+--- /dev/null
++++ b/domain/perks/dromedary.js
+@@ -0,0 +1,11 @@
++// domain/perks/dromedary.js
++// МОХАВСКИЙ ВЕРБЛЮД (406, слово владельца): любой напиток сдвигает
++// жажду на 1 ступень лучше обычного; чистая вода (purified) — базово
++// +2, с перком +3 («на 3 ступени в лучшую сторону»).
++
++export const dromedaryPerk = {
++  id: 'dromedary',
++  apply() {
++    return { dromedaryExtraWaterStep: 1 };
++  },
++};
+diff --git a/domain/perks/fieldSurgeon.js b/domain/perks/fieldSurgeon.js
+new file mode 100644
+index 0000000..cc75dfa
+--- /dev/null
++++ b/domain/perks/fieldSurgeon.js
+@@ -0,0 +1,13 @@
++// domain/perks/fieldSurgeon.js
++// Полевой хирург (406): стимпак лечит на +3 ОЗ больше, Рад-а-вей снимает
++// на 1 радиацию больше. Применяется в resolveConsumableVitalChanges
++// (домен/effects.js) при употреблении; стимпаки опознаются префиксом id.
++
++export const STIMPAK_ID_PREFIX = 'chem_stimpak';
++
++export const fieldSurgeonPerk = {
++  id: 'fieldSurgeon',
++  apply() {
++    return { stimpakHpBonus: 3, antiradRadiationBonus: 1 };
++  },
++};
+diff --git a/domain/perks/ghoulish.js b/domain/perks/ghoulish.js
+new file mode 100644
+index 0000000..f235461
+--- /dev/null
++++ b/domain/perks/ghoulish.js
+@@ -0,0 +1,12 @@
++// domain/perks/ghoulish.js
++// Ghoulish (406, слово владельца): повышение радиации вместо вреда
++// восстанавливает Текущие ОЗ — на то же количество. В приложении
++// радиация приходит с едой/питьём/химией: перк читается в
++// resolveConsumableVitalChanges (радиация не растёт, лечение растёт).
++
++export const ghoulishPerk = {
++  id: 'ghoulish',
++  apply() {
++    return { ghoulish: true };
++  },
++};
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index 5409517..0f29b26 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -24,6 +24,17 @@ import { oldWorldGourmetPerk } from './oldWorldGourmet';
+ import { inShiningArmorPerk } from './inShiningArmor';
+ import { loadAndFirePerk } from './loadAndFire';
+ import { juryRiggedAmmoPerk } from './juryRiggedAmmo';
++import { fieldSurgeonPerk } from './fieldSurgeon';
++import { pharmacistPerk } from './pharmacist';
++import { powerUserPerk } from './powerUser';
++import { capCollectorPerk } from './capCollector';
++import { naturalResistancePerk } from './naturalResistance';
++import { rejuvenatedPerk } from './rejuvenated';
++import { dromedaryPerk } from './dromedary';
++import { superDuperPerk } from './superDuper';
++import { ghoulishPerk } from './ghoulish';
++import { bloodsuckerPerk } from './bloodsucker';
++import { chemistPerk } from './chemist';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -52,6 +63,17 @@ export const perkEffects = {
+   [inShiningArmorPerk.id]: inShiningArmorPerk,
+   [loadAndFirePerk.id]: loadAndFirePerk,
+   [juryRiggedAmmoPerk.id]: juryRiggedAmmoPerk,
++  [fieldSurgeonPerk.id]: fieldSurgeonPerk,
++  [pharmacistPerk.id]: pharmacistPerk,
++  [powerUserPerk.id]: powerUserPerk,
++  [capCollectorPerk.id]: capCollectorPerk,
++  [naturalResistancePerk.id]: naturalResistancePerk,
++  [rejuvenatedPerk.id]: rejuvenatedPerk,
++  [dromedaryPerk.id]: dromedaryPerk,
++  [superDuperPerk.id]: superDuperPerk,
++  [ghoulishPerk.id]: ghoulishPerk,
++  [bloodsuckerPerk.id]: bloodsuckerPerk,
++  [chemistPerk.id]: chemistPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/domain/perks/naturalResistance.js b/domain/perks/naturalResistance.js
+new file mode 100644
+index 0000000..213157d
+--- /dev/null
++++ b/domain/perks/naturalResistance.js
+@@ -0,0 +1,11 @@
++// domain/perks/naturalResistance.js
++// Естественная стойкость (406, слово владельца): сон в пустоши
++// («сон на земле» книги) не проверяется на болезнь. Токсичные пары
++// в приложении не считаются — остаётся текстом перка.
++
++export const naturalResistancePerk = {
++  id: 'naturalResistance',
++  apply() {
++    return { sleepOnGroundDiseaseImmune: true };
++  },
++};
+diff --git a/domain/perks/pharmacist.js b/domain/perks/pharmacist.js
+new file mode 100644
+index 0000000..3b0624e
+--- /dev/null
++++ b/domain/perks/pharmacist.js
+@@ -0,0 +1,10 @@
++// domain/perks/pharmacist.js
++// Фармацевт (406): Рад-а-вей снимает на 1 радиацию больше
++// (складывается с «Полевым хирургом» через mergePerkBonuses).
++
++export const pharmacistPerk = {
++  id: 'pharmacist',
++  apply() {
++    return { antiradRadiationBonus: 1 };
++  },
++};
+diff --git a/domain/perks/powerUser.js b/domain/perks/powerUser.js
+new file mode 100644
+index 0000000..380adfe
+--- /dev/null
++++ b/domain/perks/powerUser.js
+@@ -0,0 +1,10 @@
++// domain/perks/powerUser.js
++// Power User (406): энергоядро при получении держит +1 заряд
++// (складывается с «Физиком-ядерщиком»: 3 + 1 = 4).
++
++export const powerUserPerk = {
++  id: 'powerUser',
++  apply() {
++    return { fusionCoreChargeBonus: 1 };
++  },
++};
+diff --git a/domain/perks/rejuvenated.js b/domain/perks/rejuvenated.js
+new file mode 100644
+index 0000000..033c5ed
+--- /dev/null
++++ b/domain/perks/rejuvenated.js
+@@ -0,0 +1,18 @@
++// domain/perks/rejuvenated.js
++// ОМОЛОДИВШИЙСЯ (406, слово владельца): на высшей ступени сытости
++// Макс. ОЗ +2 (применяется в derivedStats, флаг wellFed считает стор).
++// «Держится дольше»: сытость и жажда спускаются вдвое медленнее
++// (множитель накопления часов лестниц в тике выживания).
++// Перебросы и +1 ОД из книги — бой/проверки, живут текстом.
++
++export const REJUVENATED_SATED_MAX_HP = 2;
++
++export const rejuvenatedPerk = {
++  id: 'rejuvenated',
++  apply() {
++    return {
++      rejuvenatedSatedMaxHp: REJUVENATED_SATED_MAX_HP,
++      ladderAccRates: { food: 0.5, water: 0.5 },
++    };
++  },
++};
+diff --git a/domain/perks/superDuper.js b/domain/perks/superDuper.js
+new file mode 100644
+index 0000000..b3cd0dc
+--- /dev/null
++++ b/domain/perks/superDuper.js
+@@ -0,0 +1,12 @@
++// domain/perks/superDuper.js
++// Super Duper (406, слово владельца): при каждом создании предмета
++// бросается боевой кубик; выпал Эффект — половина потраченных материалов
++// возвращается в сумку (по каждой строке floor, «округление в меньшую»).
++// Механика в адаптере крафта (modules/fallout/crafting/operations.js).
++
++export const superDuperPerk = {
++  id: 'superDuper',
++  apply() {
++    return { superDuper: true };
++  },
++};
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 0ada74f..3386bad 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -17,7 +17,7 @@ import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
+ import { isSkillTagged } from '../../../domain/d20Checks';
+ import { getPerkSelectionCount } from '../../../domain/perks';
+ import { getItemId } from '../../../domain/itemIdentity';
+-import { rollByType } from '../../../domain/diceRollsLogic';
++import { rollByType, rollCombatDiceEffects } from '../../../domain/diceRollsLogic';
+ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+ import { CRAFT_RULES } from './rules';
+ // 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
+@@ -372,6 +372,29 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
+     }),
+   });
+ 
++  // 406: Super Duper — при каждом создании бросается боевой кубик;
++  // выпал Эффект — половина потраченного возвращается в сумку (floor).
++  if (result.done === true && Array.isArray(result.spent) && result.spent.length > 0
++    && Boolean(useCharacterStore.getState().perkBonuses?.superDuper)) {
++    const roll = ports.superDuperRoll
++      ? ports.superDuperRoll()
++      : rollCombatDiceEffects(1);
++    const faces = roll?.faces ?? [];
++    if ((Number(roll?.effectCount) || 0) > 0) {
++      const returned = [];
++      for (const row of result.spent) {
++        const back = Math.floor((Number(row.count) || 0) / 2);
++        if (back > 0) {
++          store.addNewItem({ itemId: row.itemId, quantity: back });
++          returned.push({ itemId: row.itemId, quantity: back });
++        }
++      }
++      result.superDuper = { faces, effectCount: 1, returned };
++    } else {
++      result.superDuper = { faces, effectCount: 0, returned: [] };
++    }
++  }
++
+   // Время (патч 262; книга — 323): любая работа, дошедшая до проверки, идёт
+   // по часам — и удачная, и сорванная (провал = зря потраченное время). Отказ
+   // гейта или стора — бросок не делался, время не тратится. Осложнение —
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 96a7814..28d8088 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -294,6 +294,20 @@ export const buildCraftReport = (recipeId, run) => {
+     for (const row of attempt.spent ?? []) {
+       spent.set(row.itemId, (spent.get(row.itemId) ?? 0) + (Number(row.count) || 0));
+     }
++    // 406: Super Duper — бросок боевого кубика при создании; Эффект
++    // возвращает половину потраченного (строки attempt.superDuper.returned).
++    if (attempt.superDuper && attempt.done) {
++      const sd = attempt.superDuper;
++      const facesLine = (sd.faces ?? []).join(', ');
++      if ((sd.returned ?? []).length > 0) {
++        const items = (sd.returned ?? [])
++          .map((row) => `${itemName(catalog, row.itemId, null)} ×${row.quantity}`)
++          .join(', ');
++        lines.push(fmt(d.superDuperReturned, { faces: facesLine, items }));
++      } else if ((sd.faces ?? []).length > 0) {
++        lines.push(fmt(d.superDuperNothing, { faces: facesLine }));
++      }
++    }
+     // 323: отложенное время (окно ещё спросит про 2 ОД) в «потраченное» не идёт.
+     if (attempt.time) {
+       if (attempt.time.pending) {
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index e2ae893..5ecf21d 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -65,7 +65,9 @@
+     "askZeroRoll": "Roll dice",
+     "askZeroAuto": "Auto-success",
+     "junkAny": "Junk (any)",
+-    "junkRigNote": "Junk ammo: attacks with it get a Complication Range +1."
++    "junkRigNote": "Junk ammo: attacks with it get a Complication Range +1.",
++    "superDuperReturned": "Super Duper: Effect on the combat die ({faces}) — returned: {items}",
++    "superDuperNothing": "Super Duper: Effect on the combat die ({faces}) — nothing to return (half rounds to 0)"
+   },
+   "attributes": {
+     "INT": "Intelligence"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 8985af7..b18edaf 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -65,7 +65,9 @@
+     "askZeroRoll": "Бросить кубики",
+     "askZeroAuto": "Автоуспех",
+     "junkAny": "Хлам (любой)",
+-    "junkRigNote": "Патроны из хлама: атаки ими получают Диапазон осложнений +1."
++    "junkRigNote": "Патроны из хлама: атаки ими получают Диапазон осложнений +1.",
++    "superDuperReturned": "Super Duper: на боевом кубике Эффект ({faces}) — возвращено: {items}",
++    "superDuperNothing": "Super Duper: на боевом кубике Эффект ({faces}) — возвращать нечего (по половине выходит 0)"
+   },
+   "attributes": {
+     "INT": "Интеллект"
+diff --git a/modules/fallout/logic/derivedStats.js b/modules/fallout/logic/derivedStats.js
+index c07d4d6..80f705b 100644
+--- a/modules/fallout/logic/derivedStats.js
++++ b/modules/fallout/logic/derivedStats.js
+@@ -245,6 +245,18 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+     stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+   }
+ 
++  // 406: «Омолодившийся» — на высшей ступени сытости Макс. ОЗ +2
++  // (флаг wellFed считает стор из состояния выживания).
++  const rejuvenatedHp = Number(perkBonuses.rejuvenatedSatedMaxHp) || 0;
++  if (rejuvenatedHp > 0 && equipmentState.wellFed) {
++    stats.maxHealth.modifiers.push({
++      source: 'perks.rejuvenated',
++      value: rejuvenatedHp,
++      operation: '+',
++    });
++    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
++  }
++
+   // carryWeightBonus (strongBack)
+   const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
+   if (carryFromPerks !== 0 && !equipmentState.isRobot) {
+diff --git a/modules/fallout/survival/operations.js b/modules/fallout/survival/operations.js
+index 163a132..cfc3d54 100644
+--- a/modules/fallout/survival/operations.js
++++ b/modules/fallout/survival/operations.js
+@@ -16,6 +16,16 @@ import useCharacterStore from '../../../src/store/characterStore';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest } from './survival';
++// 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
++// лестниц), естественная стойкость (сон в пустоши без болезни).
++const survivalPerkOptions = () => {
++  const perkBonuses = useCharacterStore.getState().perkBonuses || {};
++  return {
++    extraWaterSteps: Math.max(0, Number(perkBonuses.dromedaryExtraWaterStep) || 0),
++    ladderAccRates: perkBonuses.ladderAccRates || null,
++    sleepOnGroundDiseaseImmune: Boolean(perkBonuses.sleepOnGroundDiseaseImmune),
++  };
++};
+ 
+ // Хранилище выживания — слайс stateExtensions стора (патч 209). Операции
+ // читают СВЕЖЕЕ состояние прямо из стора (не из замыканий рендеров), а
+@@ -54,7 +64,9 @@ export const survivalConsumableListener = (item, ctx) => {
+     return apply(consumeFood(survival, item));
+   }
+   if (item?.itemType === 'drinks') {
+-    return apply(consumeDrink(survival, item));
++    return apply(consumeDrink(survival, item, {
++      extraWaterSteps: survivalPerkOptions().extraWaterSteps,
++    }));
+   }
+   return null;
+ };
+@@ -73,7 +85,9 @@ export const sleepSurvival = ({ place, hours }) => {
+   const survival = currentSurvival();
+   if (!survival) return { ok: false, reason: 'notCapable' };
+ 
+-  const result = rest(survival, { place, hours });
++  // 406: перки выживания — до первого использования (rest и проверка болезни).
++  const { sleepOnGroundDiseaseImmune, ladderAccRates } = survivalPerkOptions();
++  const result = rest(survival, { place, hours, ladderAccRates: ladderAccRates || undefined });
+   setStateExtension('survival', result.state);
+ 
+   // Отдых в постели (патч 215): каждая накопленная порция 12 часов сна
+@@ -87,8 +101,9 @@ export const sleepSurvival = ({ place, hours }) => {
+   const { expired } = advanceEffectsByGameHours(hours);
+ 
+   // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
++  // 406: Естественная стойкость — «сон на земле» не проверяется на болезнь.
+   const diseaseRiskResult = place === 'wasteland'
+-    ? store.applyDiseaseExposureEvent('sleepOnGround')
++    ? (sleepOnGroundDiseaseImmune ? { skipped: 'naturalResistance' } : store.applyDiseaseExposureEvent('sleepOnGround'))
+     : null;
+ 
+   debugLog('survival.sleep.apply', {
+@@ -133,7 +148,9 @@ export const applyActivityMinutes = (minutes, cause = 'activity') => {
+ 
+   const store = useCharacterStore.getState();
+   const gameHours = minutes / 60;
+-  const result = advanceHours(survival, gameHours);
++  const result = advanceHours(survival, gameHours, {
++    ladderAccRates: survivalPerkOptions().ladderAccRates || undefined,
++  });
+   store.setStateExtension('survival', result.state);
+ 
+   // Потеря текущих ОЗ за истёкшие рабочие часы (то же, что тик часов, патч 232).
+diff --git a/modules/fallout/survival/survival.ts b/modules/fallout/survival/survival.ts
+index a191205..69c5047 100644
+--- a/modules/fallout/survival/survival.ts
++++ b/modules/fallout/survival/survival.ts
+@@ -112,6 +112,10 @@ export const SURVIVAL_RULES: SurvivalRules = {
+ 
+ const LADDERS: SurvivalLadder[] = ['food', 'water', 'sleep'];
+ 
++// 406: потолок лестниц для внешних потребителей (стор считает флаг
++// «высшая ступень сытости» для Омолодившегося; осознанно без правил).
++export const SURVIVAL_LADDER_MAX: Record<SurvivalLadder, number> = SURVIVAL_RULES.max;
++
+ export interface ConsumeGain {
+     food: number;
+     water: number;
+@@ -294,6 +298,9 @@ function stepLadder(state: SurvivalState, key: SurvivalLadder, events: SurvivalE
+ 
+ export interface TickOptions {
+     sleepMode?: boolean;
++    // 406: множитель скорости накопления часов по лестницам (Омолодившийся:
++    // сытость и жажда держатся вдвое дольше → 0.5). 1 = как в книге.
++    ladderAccRates?: Partial<Record<SurvivalLadder, number>>;
+ }
+ 
+ // Один часовой тик (три шага, §5). Мутирует рабочую копию.
+@@ -303,7 +310,9 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
+     // 1. Лестницы + начисление Усталости.
+     for (const key of LADDERS) {
+         if (options.sleepMode && key === 'sleep') continue;
+-        state.acc[key] += 1;
++        const rate = options.ladderAccRates?.[key];
++        const rateValue = rate != null && Number.isFinite(rate) && rate > 0 ? rate : 1;
++        state.acc[key] += rateValue;
+         stepLadder(state, key, events);
+     }
+     // 2. Снятие: −1 очко, если все лестницы вне зон начисления
+@@ -400,18 +409,26 @@ export function consumeFood(state: SurvivalState, item: SurvivalConsumable | nul
+ }
+ 
+ // Питьё. На потолке пить МОЖНО — шкала не двигается, эффекты работают.
+-export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
++// 406: options.extraWaterSteps — доп. ступени перка (Мохавский верблюд +1).
++export function consumeDrink(
++    state: SurvivalState,
++    item: SurvivalConsumable | null | undefined,
++    options: { extraWaterSteps?: number } = {},
++): ConsumeResult {
+     if (!item || item.itemType !== 'drinks') {
+         return { ok: false, reason: 'notDrink', state, gained: { food: 0, water: 0 } };
+     }
+     const wk = cloneState(state);
+-    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water);
++    const extra = Math.max(0, Math.floor(Number(options.extraWaterSteps) || 0));
++    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water + extra);
+     return { ok: true, state: wk, gained: { food: 0, water: waterSteps } };
+ }
+ 
+ export interface RestOptions {
+     place: SleepPlace;
+     hours: number;
++    // 406: скорость лестниц (Омолодившийся) — во сне еда/вода тоже тикают.
++    ladderAccRates?: Partial<Record<SurvivalLadder, number>>;
+ }
+ 
+ export interface RestResult {
+@@ -425,7 +442,7 @@ export interface RestResult {
+ // Сон. place: 'bed' | 'wasteland', часы 1–24.
+ // Текущие ОЗ сон не трогает: усталость снижает максимум (производная, §6,
+ // патч 213) — прогноз в модали показывает итоговый максимум ОЗ после сна.
+-export function rest(state: SurvivalState, { place, hours }: RestOptions): RestResult {
++export function rest(state: SurvivalState, { place, hours, ladderAccRates }: RestOptions): RestResult {
+     const rules = SURVIVAL_RULES.sleep;
+     if (!['bed', 'wasteland'].includes(place)) {
+         throw new Error(`rest: некорректное место сна: ${place}`);
+@@ -447,7 +464,7 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
+         wk.bedRestHours -= bedRestCompleted * SURVIVAL_RULES.bedRestHealHours;
+     }
+     for (let h = 1; h <= hours; h += 1) {
+-        const hourEvents = tickHour(wk, { sleepMode: true });
++        const hourEvents = tickHour(wk, { sleepMode: true, ladderAccRates });
+         for (const e of hourEvents) events.push({ hour: h, ...e });
+         if (h === rules.fatigueClearHours) {
+             const removed = fatigueFromSource(wk, 'sleep');
+diff --git a/patchs/277-docs-triage-and-ts-migration-plan.patch b/patchs/277-docs-triage-and-ts-migration-plan.patch
+index 8322f34..d38470c 100644
+--- a/patchs/277-docs-triage-and-ts-migration-plan.patch
++++ b/patchs/277-docs-triage-and-ts-migration-plan.patch
+@@ -3619,7 +3619,7 @@ index b3c4a7a..21c0491 100644
+  - **0.1 (2026-08-17):** первый черновик: текстовые строки в карточке
+    «Эффекты», переход в инвентарь для еды/питья, предварительные названия
+    ступеней (более не действуют).
+-+�ствуют).
+++�ствуют).
+ diff --git a/docs/translation-proposal-robot-parts.md b/docs/translation-proposal-robot-parts.md
+ deleted file mode 100644
+ index a83d3f4..0000000
+@@ -3904,7 +3904,7 @@ index a952560..e1caf01 100644
+  - Сжатый i18n в один `ru-RU.json` — нет; зеркало объявленных файлов.
+  - Любой `.zip` с чужим расширением.
+  - Клон `.git` прямо в браузере.
+--�ркало объявленных файлов.
++-�ркало объявленных файлов.
+ +�ркало объявленных файлов.
+  - Любой `.zip` с чужим расширением.
+  - Клон `.git` прямо в браузере.
+diff --git a/patchs/406-esche-odinnadcat-perkov.patch b/patchs/406-esche-odinnadcat-perkov.patch
+new file mode 100644
+index 0000000..e69de29
+diff --git a/public/version.json b/public/version.json
+index cf03b25..e319a31 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "405",
++  "version": "406",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 1aba814..60b4c32 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -65,6 +65,9 @@ import { denormalizeCharacterState } from './migrations.js';
+ import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
+ import { debugLog } from '../debug/falloutDebug.js';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
++// 406: потолок лестниц выживания — флаг «высшая ступень сытости»
++// для «Омолодившегося» (survival.ts — чистый домен, без настроек/UI).
++import { SURVIVAL_LADDER_MAX } from '../../modules/fallout/survival/survival';
+ import { selectPerkBonuses } from '../../domain/perks.js';
+ // 404: префикс металлической брони для «В сияющих доспехах»;
+ // 405: светозащитная оптика (ранг 2 того же перка).
+@@ -252,12 +255,15 @@ const deriveFromSnapshot = (state, options = {}) => {
+       const catalogId = piece?.weaponId || piece?.id || '';
+       return isMetalArmorCatalogId(catalogId);
+     });
++  // 406: «Омолодившийся» — персонаж на высшей ступени сытости?
++  const wellFed = (state.stateExtensions?.survival?.food ?? 0) >= SURVIVAL_LADDER_MAX.food;
+   const equipmentState = {
+     ...(context.equipmentState || {}),
+     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
+     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+     wearingMetalArmor,
+     wearingGlareOptics: wearingGlareOpticsInEquippedArmor(state.equippedArmor || {}),
++    wellFed,
+   };
+   return calculateDerivedStats(
+     state.attributes,
+@@ -1358,9 +1364,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         set({ stateExtensions: dict });
+       },
+ 
+-      setStateExtension: (fieldKey, value) => set((state) => ({
+-        stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
+-      })),
++      setStateExtension: (fieldKey, value) => {
++        set((state) => ({
++          stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
++        }));
++        // 406: «Омолодившийся» — +2 Макс. ОЗ на высшей ступени сытости:
++        // движение лестниц выживания меняет производные. Точечный пересчёт
++        // (глобальный каскад по stateExtensions дёргал бы подписчиков
++        // лишний раз на каждом тике — слайс-тест 209 это честно ловит).
++        if (fieldKey === 'survival'
++          && (Number(get().perkBonuses?.rejuvenatedSatedMaxHp) || 0) > 0) {
++          get().recalculateDerivedStats();
++        }
++      },
+ 
+       /**
+        * Комплект снаряжения персонажа: { id, name, weight, price, items,
+diff --git a/src/store/orchestratorsSlice.js b/src/store/orchestratorsSlice.js
+index 8249404..7f61e34 100644
+--- a/src/store/orchestratorsSlice.js
++++ b/src/store/orchestratorsSlice.js
+@@ -300,10 +300,22 @@ export const createOrchestrationActions = (set, get) => {
+       colaNutDrinkIds,
+       colaNutHealMultiplier = 1,
+       oldWorldGourmet = null,
++      // 406: Полевой хирург + Фармацевт + Ghoulish + Bloodsucker.
++      stimpakHpBonus = 0,
++      antiradRadiationBonus = 0,
++      ghoulish = false,
++      bloodPackDrinkIds,
++      bloodPackHealMultiplier = 1,
++      chemDurationMultiplier = 1,
+     } = state.perkBonuses || {};
+-    const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
++    // Множители мгновенного лечения перемножаются (кола × пакет крови не
++    // пересекаются, но правило общее — «один мод — один закон всюду»).
++    let hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
+       ? Number(colaNutHealMultiplier) || 1
+       : 1;
++    if (Array.isArray(bloodPackDrinkIds) && bloodPackDrinkIds.includes(item?.id)) {
++      hpHealMultiplier *= Number(bloodPackHealMultiplier) || 1;
++    }
+     const vitalOptions = {
+       currentHealth: state.currentHealth,
+       maxHealth: calculateMaxHealth(
+@@ -316,6 +328,9 @@ export const createOrchestrationActions = (set, get) => {
+       radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
+       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+       oldWorldGourmet,
++      stimpakHpBonus,
++      antiradRadiationBonus,
++      ghoulish,
+     };
+     if (Object.hasOwn(options, 'radiationRequestedAmount')) {
+       vitalOptions.radiationRequestedAmount = options.radiationRequestedAmount;
+@@ -335,7 +350,14 @@ export const createOrchestrationActions = (set, get) => {
+     const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
+     normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
+ 
+-    const timedResult = applyConsumableToEffects(item, normalizedCurrent.effects);
++    // 406: ХИМИК — препараты действуют в два раза дольше (числовая
++    // длительность ×2; «lasting» = 1 сцена → 2). Работает только у химии.
++    const chemItem = item?.itemType === 'chem' || item?.itemType === 'chems';
++    const durationMultiplier = chemItem ? (Number(chemDurationMultiplier) || 1) : 1;
++    const itemForEffects = durationMultiplier > 1
++      ? { ...item, positiveEffectDuration: scaleDuration(item?.positiveEffectDuration, durationMultiplier) }
++      : item;
++    const timedResult = applyConsumableToEffects(itemForEffects, normalizedCurrent.effects);
+     const normalizedResult = pruneExpiredTimedEffects(timedResult.effects);
+     syncTimedEffectsToStore(normalizedResult.effects, store);
+ 
