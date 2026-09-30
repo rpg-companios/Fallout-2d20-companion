@@ -962,31 +962,6 @@ index a191205..69c5047 100644
          for (const e of hourEvents) events.push({ hour: h, ...e });
          if (h === rules.fatigueClearHours) {
              const removed = fatigueFromSource(wk, 'sleep');
-diff --git a/patchs/277-docs-triage-and-ts-migration-plan.patch b/patchs/277-docs-triage-and-ts-migration-plan.patch
-index 8322f34..d38470c 100644
---- a/patchs/277-docs-triage-and-ts-migration-plan.patch
-+++ b/patchs/277-docs-triage-and-ts-migration-plan.patch
-@@ -3619,7 +3619,7 @@ index b3c4a7a..21c0491 100644
-  - **0.1 (2026-08-17):** первый черновик: текстовые строки в карточке
-    «Эффекты», переход в инвентарь для еды/питья, предварительные названия
-    ступеней (более не действуют).
--+�ствуют).
-++�ствуют).
- diff --git a/docs/translation-proposal-robot-parts.md b/docs/translation-proposal-robot-parts.md
- deleted file mode 100644
- index a83d3f4..0000000
-@@ -3904,7 +3904,7 @@ index a952560..e1caf01 100644
-  - Сжатый i18n в один `ru-RU.json` — нет; зеркало объявленных файлов.
-  - Любой `.zip` с чужим расширением.
-  - Клон `.git` прямо в браузере.
---�ркало объявленных файлов.
-+-�ркало объявленных файлов.
- +�ркало объявленных файлов.
-  - Любой `.zip` с чужим расширением.
-  - Клон `.git` прямо в браузере.
-diff --git a/patchs/406-esche-odinnadcat-perkov.patch b/patchs/406-esche-odinnadcat-perkov.patch
-new file mode 100644
-index 0000000..e69de29
 diff --git a/public/version.json b/public/version.json
 index cf03b25..e319a31 100644
 --- a/public/version.json
