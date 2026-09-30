@@ -9,6 +9,16 @@ import {
 import { calculatePerkEffects } from '../../domain/perks';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -33,8 +43,8 @@ describe('leadBelly data', () => {
 
 describe('leadBelly bonuses', () => {
   it('offers a reroll at rank 1 and skips irradiated radiation at rank 2', () => {
-    const rank1 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 1 }]);
-    const rank2 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 2 }]);
+    const rank1 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 1 }], BOOK);
+    const rank2 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 2 }], BOOK);
     expect(rank1.bonuses).toEqual({ irradiatedConsumableRadiationRerollIfDamage: 1 });
     expect(rank2.bonuses).toEqual({ irradiatedConsumableRadiationImmune: true });
   });

@@ -8,11 +8,13 @@ import {
   annotatePerks,
   applyPerkSelection,
   collapseSelectedPerks,
+  evaluateSelectedPerkPicks,
   getPerkMaxRanks,
   getPerkSelectionCount,
   removeSelectedPerkAt,
   withAssignedPerkRanks,
 } from '../../../../domain/perks';
+import { isRobotCharacter } from '../../../../domain/origins';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import perksData from '../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
@@ -32,6 +34,7 @@ const PerksAndTraitsScreen = () => {
   // Шаг 8а: выбранные перки и перковые помощники — стор/домен напрямую
   // (экран больше не зависит от контекста useCharacter()).
   const trait = useCharacterStore((s) => s.trait);
+  const origin = useCharacterStore((s) => s.origin);
   const level = useCharacterStore((s) => s.level);
   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
   const setSelectedPerks = useCharacterStore((s) => s.setSelectedPerks);
@@ -48,6 +51,42 @@ const PerksAndTraitsScreen = () => {
   const extraPerkSlots = trait?.modifiers?.extraPerkSlots || 0;
   const perkLimit = level + extraPerkSlots;
   const rankedPerks = useMemo(() => withAssignedPerkRanks(selectedPerks), [selectedPerks]);
+
+  // 412 (слово владельца «пусть сам решает»): перки, погашенные книжными
+  // требованиями, остаются в списке — серые и неработающие. Каждая группа
+  // (перк) получает статус: сколько рангов действует и почему погас
+  // первый недействующий.
+  const dormancyById = useMemo(() => {
+    const { picks } = evaluateSelectedPerkPicks(selectedPerks, perksData, {
+      attributes: storeAttributes,
+      level,
+      isRobot: isRobotCharacter({ origin, trait }),
+    });
+    const map = {};
+    for (const p of picks) {
+      const entry = map[p.id] || (map[p.id] = { total: 0, active: 0, note: null });
+      entry.total += 1;
+      if (p.active) entry.active += 1;
+      else if (!entry.note) entry.note = p;
+    }
+    return map;
+  }, [selectedPerks, storeAttributes, level, origin, trait]);
+
+  const dormantNoteFor = (status) => {
+    const n = status.note;
+    const detail = n.reason === 'level'
+      ? tPerksAndTraits('dormant.level').replace('{need}', n.need).replace('{have}', n.have)
+      : n.reason === 'attributes'
+        ? tPerksAndTraits('dormant.attributes')
+          .replace('{code}', tPerksAndTraits(`modal.attributeFilters.${n.code}`))
+          .replace('{need}', n.need).replace('{have}', n.have)
+        : n.reason === 'robot'
+          ? tPerksAndTraits('dormant.robot')
+          : n.reason === 'excluded'
+            ? tPerksAndTraits('dormant.excluded').replace('{perk}', getPerkSheetDisplay({ id: n.otherId }).name)
+            : tPerksAndTraits('dormant.rankLimit');
+    return `${tPerksAndTraits('dormant.prefix')}: ${detail}`;
+  };
 
   const perkSpoilers = useMemo(() => {
     const grouped = collapseSelectedPerks(rankedPerks);
@@ -189,18 +228,30 @@ const PerksAndTraitsScreen = () => {
     closePerkModal();
   };
 
-  const renderSpoiler = ({ spoilerKey, title, rankLabel, description, onChange }) => {
+  const renderSpoiler = ({ spoilerKey, title, rankLabel, description, onChange, inactive, inactiveNote }) => {
     const open = openSpoilers[spoilerKey] === true;
     return (
       <View key={spoilerKey} style={styles.spoiler}>
         <TouchableOpacity
-          style={styles.spoilerHeader}
+          style={inactive ? [styles.spoilerHeader, styles.spoilerHeaderInactive] : styles.spoilerHeader}
           onPress={() => toggleSpoiler(spoilerKey)}
         >
-          <Text style={styles.spoilerTitle} numberOfLines={1}>{title}</Text>
-          {rankLabel ? <Text style={styles.spoilerRank}>{rankLabel}</Text> : null}
+          <Text
+            style={inactive ? [styles.spoilerTitle, styles.spoilerTitleInactive] : styles.spoilerTitle}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {rankLabel ? (
+            <Text style={inactive ? [styles.spoilerRank, styles.spoilerRankInactive] : styles.spoilerRank}>
+              {rankLabel}
+            </Text>
+          ) : null}
           <Text style={styles.spoilerArrow}>{open ? '▼' : '►'}</Text>
         </TouchableOpacity>
+        {inactive && inactiveNote ? (
+          <Text style={styles.spoilerInactiveNote}>{inactiveNote}</Text>
+        ) : null}
         {open && (
           <View style={styles.spoilerBody}>
             {renderTextWithIcons(description, styles.spoilerDescription)}
@@ -231,12 +282,16 @@ const PerksAndTraitsScreen = () => {
           const rankLabel = perk?.rank != null
             ? tPerksAndTraits('labels.rankValue').replace('{rank}', perk.rank)
             : '';
+          const status = dormancyById[perk?.id];
+          const inactive = !!status && status.active < status.total;
           return renderSpoiler({
             spoilerKey,
             title: display.name,
             rankLabel,
             description: display.description,
             onChange: replaceIndex != null ? () => handleReassignPerk(replaceIndex) : undefined,
+            inactive,
+            inactiveNote: inactive ? dormantNoteFor(status) : null,
           });
         })}
       </ScrollView>

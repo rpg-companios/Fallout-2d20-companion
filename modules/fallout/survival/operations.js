@@ -16,6 +16,23 @@ import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest } from './survival';
+// 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
+// лестниц), естественная стойкость (сон в пустоши без болезни).
+const survivalPerkOptions = (item = null) => {
+  const perkBonuses = useCharacterStore.getState().perkBonuses || {};
+  let extraWaterSteps = Math.max(0, Number(perkBonuses.dromedaryExtraWaterStep) || 0);
+  // 409: «Кровосос» — пакет крови и так напиток, по книге он дополнительно
+  // поднимает Жажду на ступень (сверка с notepad: '+1 ступень при пакете').
+  if (item && Array.isArray(perkBonuses.bloodPackDrinkIds)
+    && perkBonuses.bloodPackDrinkIds.includes(item.id)) {
+    extraWaterSteps += 1;
+  }
+  return {
+    extraWaterSteps,
+    ladderAccRates: perkBonuses.ladderAccRates || null,
+    sleepOnGroundDiseaseImmune: Boolean(perkBonuses.sleepOnGroundDiseaseImmune),
+  };
+};
 
 // Хранилище выживания — слайс stateExtensions стора (патч 209). Операции
 // читают СВЕЖЕЕ состояние прямо из стора (не из замыканий рендеров), а
@@ -54,7 +71,9 @@ export const survivalConsumableListener = (item, ctx) => {
     return apply(consumeFood(survival, item));
   }
   if (item?.itemType === 'drinks') {
-    return apply(consumeDrink(survival, item));
+    return apply(consumeDrink(survival, item, {
+      extraWaterSteps: survivalPerkOptions(item).extraWaterSteps,
+    }));
   }
   return null;
 };
@@ -73,7 +92,9 @@ export const sleepSurvival = ({ place, hours }) => {
   const survival = currentSurvival();
   if (!survival) return { ok: false, reason: 'notCapable' };
 
-  const result = rest(survival, { place, hours });
+  // 406: перки выживания — до первого использования (rest и проверка болезни).
+  const { sleepOnGroundDiseaseImmune, ladderAccRates } = survivalPerkOptions();
+  const result = rest(survival, { place, hours, ladderAccRates: ladderAccRates || undefined });
   setStateExtension('survival', result.state);
 
   // Отдых в постели (патч 215): каждая накопленная порция 12 часов сна
@@ -87,8 +108,9 @@ export const sleepSurvival = ({ place, hours }) => {
   const { expired } = advanceEffectsByGameHours(hours);
 
   // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
+  // 406: Естественная стойкость — «сон на земле» не проверяется на болезнь.
   const diseaseRiskResult = place === 'wasteland'
-    ? store.applyDiseaseExposureEvent('sleepOnGround')
+    ? (sleepOnGroundDiseaseImmune ? { skipped: 'naturalResistance' } : store.applyDiseaseExposureEvent('sleepOnGround'))
     : null;
 
   debugLog('survival.sleep.apply', {
@@ -133,7 +155,9 @@ export const applyActivityMinutes = (minutes, cause = 'activity') => {
 
   const store = useCharacterStore.getState();
   const gameHours = minutes / 60;
-  const result = advanceHours(survival, gameHours);
+  const result = advanceHours(survival, gameHours, {
+    ladderAccRates: survivalPerkOptions().ladderAccRates || undefined,
+  });
   store.setStateExtension('survival', result.state);
 
   // Потеря текущих ОЗ за истёкшие рабочие часы (то же, что тик часов, патч 232).

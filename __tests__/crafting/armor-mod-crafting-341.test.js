@@ -16,6 +16,16 @@ import { findCatalogEntry } from '../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -81,6 +91,7 @@ describe('Крафт модов брони (341): квадрат «Броня»,
     seedStack('item_uncommon_materials', 5);
     seedStack('item_rare_materials', 3);
     // ранг перка = число выбранных рангов (getPerkSelectionCount): 3 выбора = Бронник 3
+    grantBookProfile(9, { STR: 5, INT: 6 }); // книга: Бронник — СИЛ5+ИНТ6, 3-й ранг с 9-го уровня
     useCharacterStore.setState((prev) => ({
       selectedPerks: [
         ...(prev.selectedPerks || []),

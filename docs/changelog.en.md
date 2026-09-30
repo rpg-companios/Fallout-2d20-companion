@@ -1,4 +1,132 @@
 # Changelog
+---
+## Dormant perks: the game warns and leaves the call to you (patch 412)
+
+By your word, the migrator no longer removes perks taken under the old
+rules. If a perk does not meet the book (missing level or attributes,
+unavailable to robots, mutually exclusive with another perk, a rank the
+book does not have) — it stays in the list, shown greyed with a «Not
+active» note explaining exactly what is missing. Such a perk grants no
+bonuses and no recipes; once you meet the requirements it wakes up on
+its own — or do not wait: the «Replace» button swaps it for any other
+perk, the character decides. On load the game names the list of such
+perks once; reloading the same character does not repeat the notice.
+Only perks missing from the catalog entirely are still removed. Perk
+requirements now apply uniformly everywhere: a dormant rank unlocks no
+crafting recipes and does not affect salvage.
+
+---
+## Old saves' perks repair themselves (patch 411)
+
+The app is now public, and the book rules for perks have changed — so
+on every character load the perks are checked against the book and
+repaired automatically, without bumping the save version. If a perk
+had more ranks than allowed, the extras are removed and the picks are
+freed; if a perk was taken under the old rules (wrong level, wrong
+attributes, a robot, mutually exclusive with another perk) — it is
+removed and its slot is freed too. After such a cleanup the game shows
+a short notice naming the changed perks, in the interface language.
+Reloading changes nothing and shows no notice. Also fixed the load-time
+perk notices themselves: their text dictionary was missing, so they
+silently never worked.
+
+---
+## Perks follow the book (patch 410)
+
+By your word «the book takes priority», all perk ranks and
+requirements now match the book, guided by its descriptions wherever
+the rank number itself looked wrong. Result: 45 perks got book ranks
+(Ammosmith all 3 — this also fixed ammo recipes of rarity 2–3 that
+were unreachable before), 48 perks got book requirements (level, step
+per rank, attributes). The Pharmacist now removes +2/+3/+4 radiation
+by rank, Power User grants +3/+6/+10 charges — exactly per the book.
+Armorer, Science and Gun Nut keep 4 ranks: their descriptions
+(«and so on») continue the series to mod rank 4, otherwise rank-4 mod
+recipes would be lost. «Whatever the description says is what works»
+is now pinned by a test.
+
+---
+## Perk audit against your list (patch 409)
+
+Audited every perk against your prepared list of descriptions. Main
+fix: 123 perks still had short English blurbs in the Russian UI — now
+all 185 perks carry full Russian names and texts, verbatim from your
+catalog (Патронщик, Фанат колы, Кровосос, Водохлёб, etc.). Exceptions:
+three perks work by your word rather than the book — Field Surgeon,
+Pharmacist and Power User — their texts now describe the actual app
+behavior. The Bloodsucker gained its book detail: a blood pack also
+quenches thirst one step better than a regular drink. No coverage
+gaps: 184 from your list plus our EMT.
+
+---
+## «Гулеподобный» as written (patch 408)
+
+The perk is now three ranks, as in the book: 1 HP for every 4 points
+of radiation taken, at rank 2 — every 3, at rank 3 — every 2 (level
+requirement +8 per rank). Radiation now applies normally — the counter
+grows — and the healing comes on top. The rate counts radiation from
+food and drinks (shown in the consumption report) and manual counter
+changes; removing radiation grants no healing. Note: the book line
+«your maximum HP is still reduced» changes nothing in the app —
+radiation never reduces max HP here; that is app-wide behavior, not
+the perk's.
+
+---
+## Ghoulish and the glowing pack (patch 407)
+
+«Гулеподобный» (the Russian name of Ghoulish) now accounts for every
+radiation increase — including manual counter changes: instead of harm
+the character heals the same amount of HP, and the counter does not
+grow. The Glowing blood pack got its written mechanics: +5 radiation
+DR until the end of the scene (the +4 HP heal stays). The catalog
+split is now pinned: 43 of 185 perks have explicit mechanics, the
+other 142 are descriptive.
+
+---
+## Eleven more perks now work (patch 406)
+
+«Ghoulish»: radiation from food and drinks heals instead of harm, HP
+for HP. «Bloodsucker»: blood packs (already in the gear list) heal
+twice as much. «Super Duper»: every craft rolls a combat die — on an
+Effect, half of the spent materials go back to your inventory, and the
+craft report shows it. «Rejuvenated»: +2 max HP while fully fed, and
+fullness/thirst last twice as long. «Dromedary»: any drink quench
+thirst one step better, purified water — three steps at once. «Field
+Surgeon»: stimpaks heal +3 HP, RadAway removes 1 more radiation;
+«Pharmacist» adds another 1 (2 together). «Power User»: fusion cores
+hold 1 more charge (4 with the Nuclear Physicist). «Cap Collector»:
+the buy window opens with the 10% discount already applied. «Natural
+Resistance»: sleeping rough no longer rolls for disease. The «Chemist»
+now also doubles chem duration. «Quack Surgeon» and the night perks
+stay text until first aid and a day cycle exist.
+
+---
+## Book conditions restored to perks (patch 405)
+
+Your question prompted a full re-check, which found two gaps. «Load and
+Fire» now boosts only heavy weapons with a fire rate of 2 or higher —
+the Fat Man and other single-shot launchers are no longer sped up, as
+the book says. «In Shining Armor» rank 2 got its second half: while
+wearing glare-blocking optics (currently the Welding Shield — the only
+optics in the gear list) energy damage resistance gains another +1,
+for +3 total in metal armor with the shield. All active perks were
+also audited — every mechanic is in place.
+
+---
+## Four perks now actually work (patch 404)
+
+As you asked, all four adaptable perks from the previous step landed in
+one patch. «Old World Gourmet»: packaged and canned food heals 2 HP
+more and deals 1 less radiation (down to zero). «Load and Fire»: heavy
+weapons fire 1 (rank 1) or 2 (rank 2) more shots — visible on weapon
+cards in inventory and on the gear screen. «In Shining Armor»: +2
+energy damage resistance while wearing metal armor (the rank-2
+dazzle protection stays perk text — combat scenes are out of the
+app's scope). «Jury-Rigged Ammo»: at a workbench, ammo of rarity 1
+(and 2 with rank 2) can be made from any junk — 5 pieces and 10
+minutes instead of regular materials and an hour of work; the craft
+report reminds you: attacks with such ammo get a Complication Range +1.
+
 
 ---
 ---
@@ -15,6 +143,14 @@
 ---
 ---
 ---
+---
+## Eight new perks from your references (patch 403)
+
+The perk catalog grows from 177 to 185: Crippler, Crushing Blow,
+Fierce Loyalty, In Shining Armor, Jury-Rigged Ammo, Load and Fire,
+Miss Fortune, Old World Gourmet. Texts follow your compiled reference
+(full Russian, concise English); ranks and requirements unchanged.
+
 ---
 ## The «What's new» window scrolls (patch 402)
 

@@ -112,6 +112,10 @@ export const SURVIVAL_RULES: SurvivalRules = {
 
 const LADDERS: SurvivalLadder[] = ['food', 'water', 'sleep'];
 
+// 406: потолок лестниц для внешних потребителей (стор считает флаг
+// «высшая ступень сытости» для Омолодившегося; осознанно без правил).
+export const SURVIVAL_LADDER_MAX: Record<SurvivalLadder, number> = SURVIVAL_RULES.max;
+
 export interface ConsumeGain {
     food: number;
     water: number;
@@ -294,6 +298,9 @@ function stepLadder(state: SurvivalState, key: SurvivalLadder, events: SurvivalE
 
 export interface TickOptions {
     sleepMode?: boolean;
+    // 406: множитель скорости накопления часов по лестницам (Омолодившийся:
+    // сытость и жажда держатся вдвое дольше → 0.5). 1 = как в книге.
+    ladderAccRates?: Partial<Record<SurvivalLadder, number>>;
 }
 
 // Один часовой тик (три шага, §5). Мутирует рабочую копию.
@@ -303,7 +310,9 @@ function tickHour(state: SurvivalState, options: TickOptions = {}): SurvivalEven
     // 1. Лестницы + начисление Усталости.
     for (const key of LADDERS) {
         if (options.sleepMode && key === 'sleep') continue;
-        state.acc[key] += 1;
+        const rate = options.ladderAccRates?.[key];
+        const rateValue = rate != null && Number.isFinite(rate) && rate > 0 ? rate : 1;
+        state.acc[key] += rateValue;
         stepLadder(state, key, events);
     }
     // 2. Снятие: −1 очко, если все лестницы вне зон начисления
@@ -400,18 +409,26 @@ export function consumeFood(state: SurvivalState, item: SurvivalConsumable | nul
 }
 
 // Питьё. На потолке пить МОЖНО — шкала не двигается, эффекты работают.
-export function consumeDrink(state: SurvivalState, item: SurvivalConsumable | null | undefined): ConsumeResult {
+// 406: options.extraWaterSteps — доп. ступени перка (Мохавский верблюд +1).
+export function consumeDrink(
+    state: SurvivalState,
+    item: SurvivalConsumable | null | undefined,
+    options: { extraWaterSteps?: number } = {},
+): ConsumeResult {
     if (!item || item.itemType !== 'drinks') {
         return { ok: false, reason: 'notDrink', state, gained: { food: 0, water: 0 } };
     }
     const wk = cloneState(state);
-    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water);
+    const extra = Math.max(0, Math.floor(Number(options.extraWaterSteps) || 0));
+    const waterSteps = bumpLadder(wk, 'water', drinkGain(item).water + extra);
     return { ok: true, state: wk, gained: { food: 0, water: waterSteps } };
 }
 
 export interface RestOptions {
     place: SleepPlace;
     hours: number;
+    // 406: скорость лестниц (Омолодившийся) — во сне еда/вода тоже тикают.
+    ladderAccRates?: Partial<Record<SurvivalLadder, number>>;
 }
 
 export interface RestResult {
@@ -425,7 +442,7 @@ export interface RestResult {
 // Сон. place: 'bed' | 'wasteland', часы 1–24.
 // Текущие ОЗ сон не трогает: усталость снижает максимум (производная, §6,
 // патч 213) — прогноз в модали показывает итоговый максимум ОЗ после сна.
-export function rest(state: SurvivalState, { place, hours }: RestOptions): RestResult {
+export function rest(state: SurvivalState, { place, hours, ladderAccRates }: RestOptions): RestResult {
     const rules = SURVIVAL_RULES.sleep;
     if (!['bed', 'wasteland'].includes(place)) {
         throw new Error(`rest: некорректное место сна: ${place}`);
@@ -447,7 +464,7 @@ export function rest(state: SurvivalState, { place, hours }: RestOptions): RestR
         wk.bedRestHours -= bedRestCompleted * SURVIVAL_RULES.bedRestHealHours;
     }
     for (let h = 1; h <= hours; h += 1) {
-        const hourEvents = tickHour(wk, { sleepMode: true });
+        const hourEvents = tickHour(wk, { sleepMode: true, ladderAccRates });
         for (const e of hourEvents) events.push({ hour: h, ...e });
         if (h === rules.fatigueClearHours) {
             const removed = fatigueFromSource(wk, 'sleep');
