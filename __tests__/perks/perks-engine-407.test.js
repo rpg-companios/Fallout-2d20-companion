@@ -25,6 +25,14 @@ afterEach(async () => {
 });
 
 const takePerks = (...ids) => {
+  // 412: книжный профиль — иначе перк честно погас (ВЫН 9, уровни рангов).
+  useCharacterStore.setState({
+    level: 30,
+    attributes: {
+      STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+      INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+    },
+  });
   // Экшн стора (не setState): он пересчитывает perkBonuses.
   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
 };

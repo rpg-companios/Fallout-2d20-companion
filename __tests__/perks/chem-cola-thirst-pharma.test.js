@@ -7,6 +7,16 @@ import { DIRTY_WATER_ID } from '../../domain/perks/thirstQuencher';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import drinks from '../../modules/fallout/data/consumables/drinks.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -22,8 +32,8 @@ const getHeal = (item) => {
 
 describe('chemResistant', () => {
   it('penalizes addiction dice at rank 1 and grants immunity at rank 2', () => {
-    const rank1 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 1 }]);
-    const rank2 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 2 }]);
+    const rank1 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 1 }], BOOK);
+    const rank2 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 2 }], BOOK);
     expect(rank1.bonuses).toEqual({ chemAddictionDicePenalty: 1 });
     expect(rank2.bonuses).toEqual({ chemAddictionImmune: true });
   });
@@ -38,7 +48,7 @@ describe('chemResistant', () => {
 
 describe('colaNut', () => {
   it('binds to the three Nuka-Cola ids', () => {
-    const result = calculatePerkEffects([byId('colaNut')], [{ id: 'colaNut', rank: 1 }]);
+    const result = calculatePerkEffects([byId('colaNut')], [{ id: 'colaNut', rank: 1 }], BOOK);
     expect(result.bonuses.colaNutDrinkIds).toEqual(COLA_NUT_DRINK_IDS);
     expect(result.bonuses.colaNutHealMultiplier).toBe(2);
     expect(COLA_NUT_DRINK_IDS).toEqual([
@@ -62,7 +72,7 @@ describe('colaNut', () => {
 
 describe('thirstQuencher', () => {
   it('flags dirty water disease skip', () => {
-    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }]);
+    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }], BOOK);
     expect(result.bonuses).toEqual({ dirtyWaterDiseaseImmune: true });
     expect(DIRTY_WATER_ID).toBe('drink_dirty_water');
   });
@@ -70,7 +80,7 @@ describe('thirstQuencher', () => {
 
 describe('pharmaFarmer', () => {
   it('adds one random chem from the catalog, not extra of the looted chem', () => {
-    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }]);
+    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }], BOOK);
     expect(result.bonuses.foundItemBonuses).toEqual([
       { perkId: 'pharmaFarmer', itemType: 'chem', extra: 1, extraRandom: true },
     ]);

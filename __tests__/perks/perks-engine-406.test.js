@@ -19,6 +19,16 @@ import perksCatalog from '../../modules/fallout/data/perks/perks.json';
 import drinksData from '../../modules/fallout/data/consumables/drinks.json';
 import chemsData from '../../modules/fallout/data/consumables/chems.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 const state = () => useCharacterStore.getState();
 const byId = (list, id) => (Array.isArray(list) ? list : Object.values(list)).find((x) => x.id === id);
 
@@ -32,6 +42,14 @@ afterEach(async () => {
 });
 
 const takePerks = (...ids) => {
+  // 412: книжный профиль — иначе перк честно погас (требования книги).
+  useCharacterStore.setState({
+    level: 30,
+    attributes: {
+      STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+      INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+    },
+  });
   // ЭКШН стора (не setState напрямую): он пересчитывает perkBonuses.
   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
 };
@@ -51,27 +69,27 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
       chemist: { chemDurationMultiplier: 2 },
     };
     for (const [id, expected] of Object.entries(cases)) {
-      const bonuses = selectPerkBonuses({ selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
+      const bonuses = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
       expect(bonuses, id).toMatchObject(expected);
     }
     // 410: книжные нормы по рангам — Фармацевт 2/3/4, Мощный 3/6/10.
-    expect(selectPerkBonuses({ selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
+    expect(selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
       .toMatchObject({ antiradRadiationBonus: 4 });
-    expect(selectPerkBonuses({ selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
+    expect(selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
       .toMatchObject({ fusionCoreChargeBonus: 10 });
-    const blood = selectPerkBonuses({ selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
+    const blood = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
     expect(blood.bloodPackHealMultiplier).toBe(2);
     expect(blood.bloodPackDrinkIds).toContain('drink_blood_pack');
   });
 
   it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: заряды по книге', () => {
     const bonuses = selectPerkBonuses(
-      { selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
+      { ...BOOK, selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
       perksCatalog,
     );
     expect(bonuses.antiradRadiationBonus).toBe(3); // +1 хирург + 2 фармацевт
     const cores = selectPerkBonuses(
-      { selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
+      { ...BOOK, selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
       perksCatalog,
     );
     expect(cores.fusionCoreChargeBonus).toBe(6); // 3 (ядерщик) + 3 (книга, ранг 1)

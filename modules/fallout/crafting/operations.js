@@ -15,7 +15,8 @@ import { debugLog } from '../../../src/debug/falloutDebug';
 import { getCraftingCategoryRules, getCraftingRecipeById, getScrapMaterials } from '../../../domain/registry';
 import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
 import { isSkillTagged } from '../../../domain/d20Checks';
-import { getPerkSelectionCount } from '../../../domain/perks';
+import { countActivePerkSelections } from '../../../domain/perks';
+import perksCatalog from '../data/perks/perks.json';
 import { getItemId } from '../../../domain/itemIdentity';
 import { rollByType, rollCombatDiceEffects } from '../../../domain/diceRollsLogic';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
@@ -150,10 +151,12 @@ const expandSpendPlan = (plan, counts) => {
   return out;
 };
 
-const perkRanksFor = (recipe, selectedPerks) => {
+// 412: ранг для гейтов — только ДЕЙСТВУЮЩИЕ выборы (погасший перк
+// рецептов не открывает; «не работает» значит «не работает нигде»).
+const perkRanksFor = (recipe, store) => {
   const ranks = {};
   for (const perk of recipe?.requires?.perks ?? []) {
-    ranks[perk.perkId] = getPerkSelectionCount(selectedPerks ?? [], perk.perkId);
+    ranks[perk.perkId] = countActivePerkSelections(store ?? {}, perk.perkId, perksCatalog);
   }
   return ranks;
 };
@@ -178,7 +181,7 @@ const junkIdSet = () => {
 export const juryRigFor = (recipe) => {
   if (recipe?.category !== 'ammo') return null;
   const store = useCharacterStore.getState();
-  const rank = getPerkSelectionCount(store.selectedPerks ?? [], 'juryRiggedAmmo');
+  const rank = countActivePerkSelections(store ?? {}, 'juryRiggedAmmo', perksCatalog);
   if (rank < 1) return null;
   const complexity = Number(recipe.requires?.complexity) || 0;
   if (complexity < 1 || complexity > juryRigMaxRarityByRank(rank)) return null;
@@ -245,7 +248,7 @@ const heroView = (recipe) => {
     store,
     engineRecipe,
     skillRank: selectSkillTotal(store, recipe.requires.skill),
-    perkRanks: perkRanksFor(recipe, store.selectedPerks),
+    perkRanks: perkRanksFor(recipe, store),
     inventoryCounts: countsForEngine(
       engineRecipe,
       withJunkAnyCount(engineRecipe, countInventoryByCatalogId(store.items)),

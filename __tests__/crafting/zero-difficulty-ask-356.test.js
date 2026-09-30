@@ -13,6 +13,16 @@ import { buildCategoryModel } from '../../modules/fallout/crafting/windowModel';
 import { readFileSync } from 'node:fs';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 const seed = (weaponId, quantity = 1) => {
   useCharacterStore.setState((prev) => ({
     items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId, quantity } },
@@ -105,6 +115,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
   it('крафт по кнопке: craftRecipe проксирует zeroDifficulty в движок', () => {
     seed('item_common_materials', 4);
     seed('item_uncommon_materials', 2);
+    grantBookProfile(2, { INT: 6 });
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
@@ -124,6 +135,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
   });
 
   it('строки окна крафта знают zeroDifficulty; оба UI спрашивают игрока', () => {
+    grantBookProfile(2, { INT: 6 });
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },

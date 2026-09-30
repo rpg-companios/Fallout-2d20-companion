@@ -22,6 +22,16 @@ import {
 import { getCraftingRecipeById } from '../../domain/registry';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -66,6 +76,7 @@ describe('Крафт по книге (323): времена, осложнения
 
   it('отложенное время: throw гейта не списывает часы; успех+осложнение = база+30', () => {
     seedStack('item_common_materials', 4);
+    grantBookProfile(2, { INT: 7 });
     useCharacterStore.setState((prev) => ({
       selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
       // навык 0: сложность 1 − 0 = 1 → бросок БЫВАЕТ (при ранге 5+ была бы автоуспех)
@@ -104,6 +115,7 @@ describe('Крафт по книге (323): времена, осложнения
     // патроны (gear): настройка OFF → при провале материалы целы
     useAppSettingsStore.getState().setValue('craftFailLossGear', false);
     seedStack('item_common_materials', 4);
+    grantBookProfile(2, { INT: 7 });
     useCharacterStore.setState((prev) => ({
       selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
     }));

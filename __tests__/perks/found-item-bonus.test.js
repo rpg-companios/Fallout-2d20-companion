@@ -3,6 +3,16 @@ import { rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemB
 import { calculatePerkEffects } from '../../domain/perks';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -14,9 +24,9 @@ const butchersBounty = perksData.find((perk) => perk.id === 'butchersBounty');
 
 describe('found item perk bonuses', () => {
   it('gives Scrounger extra ammo combat dice by rank', () => {
-    const rank1 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 1 }]);
-    const rank2 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 2 }]);
-    const rank3 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 3 }]);
+    const rank1 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 1 }], BOOK);
+    const rank2 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 2 }], BOOK);
+    const rank3 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 3 }], BOOK);
     expect(rank1.bonuses.foundItemBonuses).toEqual([
       { perkId: 'scrounger', itemType: 'ammo', combatDice: 3 },
     ]);
@@ -29,9 +39,9 @@ describe('found item perk bonuses', () => {
   });
 
   it('gives Fortune Finder extra caps combat dice by rank', () => {
-    const rank1 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 1 }]);
-    const rank2 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 2 }]);
-    const rank3 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 3 }]);
+    const rank1 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 1 }], BOOK);
+    const rank2 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 2 }], BOOK);
+    const rank3 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 3 }], BOOK);
     expect(rank1.bonuses.foundItemBonuses).toEqual([
       { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 3 },
     ]);
@@ -44,14 +54,14 @@ describe('found item perk bonuses', () => {
   });
 
   it('gives Can Opener +1 cooked food', () => {
-    const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
+    const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }], BOOK);
     expect(result.bonuses.foundItemBonuses).toEqual([
       { perkId: 'canOpener', itemType: 'food', extra: 1, match: { state: 'cooked' } },
     ]);
   });
 
   it('gives Butcher\'s Bounty +1 raw meat', () => {
-    const result = calculatePerkEffects([butchersBounty], [{ id: 'butchersBounty', rank: 1 }]);
+    const result = calculatePerkEffects([butchersBounty], [{ id: 'butchersBounty', rank: 1 }], BOOK);
     expect(result.bonuses.foundItemBonuses).toEqual([
       { perkId: 'butchersBounty', itemType: 'food', extra: 1, match: { rawMeat: true } },
     ]);

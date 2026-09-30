@@ -19,6 +19,16 @@ import catalog from '../../modules/fallout/data/perks/perks.json';
 import foodData from '../../modules/fallout/data/consumables/food.json';
 import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 const foodList = Array.isArray(foodData) ? foodData : Object.values(foodData);
 const weaponsList = Array.isArray(weaponsData) ? weaponsData : Object.values(weaponsData);
 const byId = (list, id) => list.find((x) => x.id === id);
@@ -111,7 +121,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
 
   it('перк кладёт в perkBonuses параметры гурмана; хелпер металла работает', () => {
     const bonuses = selectPerkBonuses(
-      { selectedPerks: [{ id: 'oldWorldGourmet', rank: 1 }] },
+      { ...BOOK, selectedPerks: [{ id: 'oldWorldGourmet', rank: 1 }] },
       catalog,
     );
     expect(bonuses.oldWorldGourmet).toEqual({ hpBonus: 2, radiationReduction: 1 });
@@ -158,7 +168,7 @@ describe('Патч 404: Заряжай и стреляй (скорострель
 
   it('селектор перка: ранг 2 → loadAndFireBonus 2', () => {
     const bonuses = selectPerkBonuses(
-      { selectedPerks: [{ id: 'loadAndFire', rank: 2 }] },
+      { ...BOOK, selectedPerks: [{ id: 'loadAndFire', rank: 2 }] },
       catalog,
     );
     expect(bonuses.loadAndFireBonus).toBe(2);
@@ -191,7 +201,7 @@ describe('Патч 404: В сияющих доспехах (энергоСУ в 
   it('перк кладёт ранг в perkBonuses', () => {
     expect(inShiningArmorPerk.apply({ state: { rank: 2 } })).toEqual({ inShiningArmorRank: 2 });
     const bonuses = selectPerkBonuses(
-      { selectedPerks: [{ id: 'inShiningArmor', rank: 1 }] },
+      { ...BOOK, selectedPerks: [{ id: 'inShiningArmor', rank: 1 }] },
       catalog,
     );
     expect(bonuses.inShiningArmorRank).toBe(1);

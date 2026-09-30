@@ -533,19 +533,21 @@ export const loadCharacter = async (id) => {
       attributes: loadedAttributes,
     });
 
-    // 411 (публичное приложение): мигратор перков при загрузке — «книга
-    // приоритетнее». Работает ПОСЛЕ нормализации атрибутов/уровня
-    // (loadFromLegacyData), чтобы требования книги сверялись честно.
-    // Идемпотентно: повторная загрузка уведомление не показывает.
+    // 412 (публичное приложение): мигратор перков при загрузке. Слово
+    // владельца: «пусть сам решает» — недоступные по книге перки остаются
+    // серыми и неработающими, снимаются только неизвестные каталогу id
+    // (о них — отдельное уведомление perkMissingId выше). Уведомление
+    // о погасших — один показ на изменение множества (fingerprint в сторе).
     const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
-    if (reconciliation?.changed && reconciliation.removed?.length > 0) {
-      const removedList = reconciliation.removed
-        .map((entry) => perkDisplayName(entry.id))
-        .filter(Boolean)
-        .join(', ');
+    if (reconciliation?.shouldNotify && reconciliation.dormant?.length > 0) {
+      const dormantNames = [...new Set(
+        reconciliation.dormant
+          .map((entry) => perkDisplayName(entry.id))
+          .filter(Boolean),
+      )].join(', ');
       paAlert(
-        tPerkAlert('perksBookAdjustedTitle'),
-        tPerkAlert('perksBookAdjustedMessage').replace('{perks}', removedList),
+        tPerkAlert('dormantPerksTitle'),
+        tPerkAlert('dormantPerksMessage').replace('{perks}', dormantNames),
       );
     }
 

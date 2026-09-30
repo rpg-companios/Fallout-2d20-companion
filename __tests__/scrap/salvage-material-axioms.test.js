@@ -17,6 +17,8 @@ const readJson = (rel) => JSON.parse(readFileSync(ROOT + rel, 'utf8'));
 
 const state = () => useCharacterStore.getState();
 const scrapperRank = (n) => useCharacterStore.setState({
+  // 412: книга — Мусорщик с 3-го уровня, 2-й ранг с 8-го; иначе ранг погас.
+  level: n >= 2 ? 8 : (n >= 1 ? 3 : 1),
   selectedPerks: Array.from({ length: n }, () => ({ perkId: 'scrapper' })),
 });
 const stackOf = (itemId, quantity = 1) => {

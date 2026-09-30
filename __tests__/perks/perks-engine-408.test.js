@@ -12,6 +12,16 @@ import catalog from '../../modules/fallout/data/perks/perks.json';
 import ruCatalog from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
 import enCatalog from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
 
+// 412: книжный профиль теста — перки проходят требования книги
+// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
+const BOOK = {
+  level: 30,
+  attributes: {
+    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
+    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
+  },
+};
+
 const state = () => useCharacterStore.getState();
 
 beforeEach(() => {
@@ -24,6 +34,14 @@ afterEach(async () => {
 });
 
 const takeGhoulish = (rank) => {
+  // 412: книга — Гулеподобный ВЫН 9 с 7-го уровня, шаг +8; иначе ранг погас.
+  useCharacterStore.setState({
+    level: 7 + 8 * (Math.max(1, rank) - 1),
+    attributes: {
+      STR: { total: 5 }, PER: { total: 5 }, END: { total: 9 }, CHA: { total: 5 },
+      INT: { total: 5 }, AGI: { total: 5 }, LCK: { total: 5 },
+    },
+  });
   state().setSelectedPerks(
     Array.from({ length: rank }, (_, index) => ({ perkId: 'ghoulish', index })),
   );
@@ -59,8 +77,8 @@ describe('Патч 408: данные перка — канонический т�
     expect(ghoulishHpPerUnitsByRank(2)).toBe(3);
     expect(ghoulishHpPerUnitsByRank(3)).toBe(2);
     expect(ghoulishHpPerUnitsByRank(4)).toBe(2);
-    const b1 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 1 }] }, catalog);
-    const b3 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 3 }] }, catalog);
+    const b1 = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'ghoulish', rank: 1 }] }, catalog);
+    const b3 = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'ghoulish', rank: 3 }] }, catalog);
     expect(b1.ghoulish).toEqual({ hpPerUnits: 4 });
     expect(b3.ghoulish).toEqual({ hpPerUnits: 2 });
   });

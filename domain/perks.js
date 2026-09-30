@@ -3,6 +3,7 @@
 
 import { getCanonicalAttributeKey } from './characterCreation';
 import { getPerkEffect } from './perks/index';
+import { isRobotCharacter } from './origins';
 
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
@@ -167,20 +168,25 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
 }
 
 /**
- * 411 (публичное приложение): мигратор перков при ЗАГРУЗКЕ персонажа —
- * «книга приоритетнее» (слово владельца 410). Чистая функция, без стора:
- *   1) лишние ранги сверх каталога снимаются (trimSelectedPerksToMaxRanks);
- *   2) каждый оставшийся выбор проверяется по требованиям книги на СВОЙ
- *      ранг: уровень, характеристики, «не для роботов», взаимоисключение
- *      (excludedPerks — остаётся более ранний выбор).
- * Неизвестные каталогу id снимаются тоже (слот освобождается).
- * Идемпотентна: на уже сверенном списке возвращает его без изменений.
- * context: { attributes, level, isRobot } — всё, что нужно книге.
+ * 412 (публичное приложение): ЕДИНЫЙ ЗАКОН активности перков —
+ * «книга приоритетнее» (слово владельца 410), «недоступные оставлять
+ * серыми, персонаж решает сам» (слово владельца 412). Чистая функция
+ * оценивает КАЖДЫЙ выбор по книге:
+ *   - id нет в каталоге → «unknown» (оставить нельзя вовсе — снимает
+ *     мигратор);
+ *   - ранг выше книжного maxRanks → «rank-limit»;
+ *   - требования книги на СВОЙ ранг не выполнены → «level» / «attributes»
+ *     (с payload need/have) / «robot»;
+ *   - взаимоисключение: уже держится АКТИВНЫЙ перк-конфликт → «excluded»
+ *     (остаётся взятый первым; otherId — с кем конфликт).
+ * Активный выбор получает ранг = номер среди активных выборов того же
+ * перка. Недоступные выборы ОСТАЮТСЯ в списке (слот занят, перк не
+ * действует) — снова заработают, когда выполнятся условия, либо их
+ * заменит игрок. Идемпотентно.
+ * context: { attributes ({STR:8}|{STR:{total}}), level, isRobot }.
  */
-export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
+export function evaluateSelectedPerkPicks(selectedPerks = [], perkCatalog = [], context = {}) {
     const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
-    // Атрибуты принимаются в обоих форматах: {STR: 8} и {STR: {total: 8}}
-    // (форма стора). Итоговое значение — уже с бонусами.
     const attributeMap = {};
     for (const [code, value] of Object.entries(context.attributes || {})) {
       attributeMap[String(code).toUpperCase()] = typeof value === 'number'
@@ -189,60 +195,115 @@ export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalo
     }
     const level = Number(context.level) || 1;
 
-    const meetsRequirements = (perk, rank) => {
-        const req = getPrerequisites(perk) || {};
-        if (req.notForRobots && context.isRobot) return 'robot';
-        const requiredLevel = getRequiredLevelForRank(perk, rank);
-        if (level < requiredLevel) return 'level';
-        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
-            if ((attributeMap[String(code).toUpperCase()] || 0) < Number(need)) return 'attributes';
-        }
-        return null;
-    };
+    const picks = [];
+    const seenCounts = {};
+    const activeCounts = {};
+    const heldActiveIds = new Set();
 
-    // trimSelectedPerksToMaxRanks уже присваивает оставшимся копиям их
-    // прежние ранги (первые копии списка) — отдельного сопоставления не нужно.
-    const trimmed = trimSelectedPerksToMaxRanks(selectedPerks, perkCatalog);
-
-    const heldIds = new Set();
-    const kept = [];
-    // Срезанные лишние ранги тоже попадают в отчёт (причина rank-limit).
-    const removed = (trimmed.removed || []).map((selected) => ({
-        selected,
-        id: toSelectedPerkId(selected),
-        rank: null,
-        reason: 'rank-limit',
-    }));
-    const counts = {};
-    for (const selected of trimmed.selectedPerks || []) {
+    (selectedPerks || []).forEach((selected, index) => {
         const id = toSelectedPerkId(selected);
         const perk = id ? catalogById.get(id) : null;
         if (!perk) {
-            removed.push({ selected, id: id || null, rank: null, reason: 'unknown' });
-            continue;
+            picks.push({ id: id || null, index, rank: null, active: false, reason: 'unknown' });
+            return;
         }
-        const rank = Number(selected?.rank) || 1;
-        const reason = meetsRequirements(perk, rank);
-        if (reason) {
-            removed.push({ selected, id, rank, reason });
-            continue;
+        seenCounts[id] = (seenCounts[id] || 0) + 1;
+        // Ранг = номер копии в списке; запись с ЯВНЫМ рангом (старые сейвы,
+        // тесты: {id, rank: 3}) сохраняет его — как в collapseSelectedPerks.
+        const explicitRank = Number(toSelectedPerkRank(selected)) || 0;
+        const rank = explicitRank > 0
+          ? Math.max(explicitRank, seenCounts[id])
+          : seenCounts[id];
+        const base = { id, index, rank };
+        // Ранг-лимит — только при ЯВНОМ числовом maxRanks каталога (как в
+        // trimSelectedPerksToMaxRanks): дескрипторы эффектов реестра без
+        // maxRanks лимита не имеют.
+        const rawMaxRanks = perk?.maxRanks;
+        const maxRanks = (typeof rawMaxRanks === 'number' && Number.isFinite(rawMaxRanks) && rawMaxRanks >= 1)
+          ? rawMaxRanks
+          : null;
+        if (maxRanks != null && rank > maxRanks) {
+            picks.push({ ...base, active: false, reason: 'rank-limit' });
+            return;
         }
-        const exclusions = Array.isArray(perk.prerequisites?.excludedPerks)
-            ? perk.prerequisites.excludedPerks
-            : (Array.isArray(perk.requirements?.excludedPerks) ? perk.requirements.excludedPerks : []);
-        if (exclusions.some((other) => heldIds.has(other))) {
-            removed.push({ selected, id, rank, reason: 'excluded' });
-            continue;
+        const req = getPrerequisites(perk) || {};
+        if (req.notForRobots && context.isRobot) {
+            picks.push({ ...base, active: false, reason: 'robot' });
+            return;
         }
-        heldIds.add(id);
-        counts[id] = (counts[id] || 0) + 1;
-        kept.push({ id, rank: counts[id] });
-    }
+        const requiredLevel = getRequiredLevelForRank(perk, rank);
+        if (typeof requiredLevel === 'number' && level < requiredLevel) {
+            picks.push({ ...base, active: false, reason: 'level', need: requiredLevel, have: level });
+            return;
+        }
+        let attributeMiss = null;
+        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
+            const have = attributeMap[String(code).toUpperCase()] || 0;
+            if (have < Number(need)) { attributeMiss = { code: String(code).toUpperCase(), need: Number(need), have }; break; }
+        }
+        if (attributeMiss) {
+            picks.push({ ...base, active: false, reason: 'attributes', ...attributeMiss });
+            return;
+        }
+        const exclusions = Array.isArray(req.excludedPerks) ? req.excludedPerks : [];
+        const conflict = exclusions.find((other) => heldActiveIds.has(other));
+        if (conflict) {
+            picks.push({ ...base, active: false, reason: 'excluded', otherId: conflict });
+            return;
+        }
+        activeCounts[id] = (activeCounts[id] || 0) + 1;
+        // Действующий ранг: явный ранг записи сохраняется; безранговые
+        // строки нумеруются по порядку среди ДЕЙСТВУЮЩИХ копий перка.
+        picks.push({
+          ...base,
+          active: true,
+          rank: explicitRank > 0 ? base.rank : activeCounts[id],
+        });
+        heldActiveIds.add(id);
+    });
 
     return {
-        selectedPerks: kept,
-        removed,
-        changed: removed.length > 0 || kept.length !== (selectedPerks || []).length,
+        picks,
+        activePicks: picks.filter((p) => p.active),
+        inactivePicks: picks.filter((p) => !p.active),
+    };
+}
+
+/** Контекст книги из состояния стора (атрибуты-объекты, уровень, робот). */
+export function perkContextFromState(state = {}) {
+    return {
+        attributes: state.attributes || {},
+        level: state.level,
+        isRobot: state.isRobot === true || isRobotCharacter({ origin: state.origin, trait: state.trait }) === true,
+    };
+}
+
+/**
+ * Число ДЕЙСТВУЮЩИХ рангов перка (для гейтов рецептов и разборки):
+ * погасшие выборы не считаются — «не работает» значит «не работает нигде».
+ */
+export function countActivePerkSelections(state = {}, perkId, perkCatalog = []) {
+    if (!perkId) return 0;
+    const { activePicks } = evaluateSelectedPerkPicks(state?.selectedPerks || [], perkCatalog, perkContextFromState(state));
+    return activePicks.filter((p) => p.id === perkId).length;
+}
+
+/**
+ * 412: мигратор при ЗАГРУЗКЕ — слово владельца «пусть сам решает»:
+ * недоступные по книге перки НЕ снимаются (остаются серыми и
+ * неработающими — их гасит evaluateSelectedPerkPicks), снимаются только
+ * неизвестные каталогу id: у них нет ни имени, ни текста, серым их
+ * показать нельзя. Идемпотентно.
+ */
+export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
+    const { inactivePicks } = evaluateSelectedPerkPicks(selectedPerks, perkCatalog, context);
+    const unknown = inactivePicks.filter((p) => p.reason === 'unknown');
+    const unknownIndexes = new Set(unknown.map((p) => p.index));
+    return {
+        selectedPerks: (selectedPerks || []).filter((_, index) => !unknownIndexes.has(index)),
+        removed: unknown.map((p) => ({ selected: (selectedPerks || [])[p.index], id: p.id, rank: null, reason: 'unknown' })),
+        inactivePicks: inactivePicks.filter((p) => p.reason !== 'unknown'),
+        changed: unknown.length > 0,
     };
 }
 
@@ -401,7 +462,14 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
     let bonuses = {};
     const applied = [];
 
-    for (const selected of collapseSelectedPerks(selectedPerks)) {
+    // 412: действуют только выборы, прошедшие книжную проверку
+    // (evaluateSelectedPerkPicks); погасшие перк не даёт — нигде.
+    const { activePicks } = evaluateSelectedPerkPicks(
+      selectedPerks,
+      perks,
+      perkContextFromState(state),
+    );
+    for (const selected of collapseSelectedPerks(activePicks)) {
         const id = toSelectedPerkId(selected);
         if (!id) continue;
         const perk = byId.get(id) || (isObject(selected) ? selected : null);

@@ -13,6 +13,16 @@ import {
 } from '../../modules/fallout/crafting/windowModel';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -56,6 +66,7 @@ describe('Модалка крафта (318): квадраты, спойлеры,
 
   it('ammo_38: сводка редкости, максимальная партия, гейт перка', () => {
     seedStack('item_common_materials', 10);
+    grantBookProfile(2, { INT: 7 });
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 5, total: 5 } },

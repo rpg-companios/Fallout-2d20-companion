@@ -21,7 +21,15 @@
     "duplicatePerksFixedMessage": "Extra perk copies were removed — the freed picks can be spent again.",
     "perkMissingIdTitle": "Unknown perk in the save",
     "perkMissingIdMessage": "These perks were not found in the catalog and were removed: {perks}.",
-    "perksBookAdjustedTitle": "Perks aligned with the book",
-    "perksBookAdjustedMessage": "After the book check these were removed: {perks}. The freed picks can be spent once you meet the requirements."
+    "dormantPerksTitle": "Perks that are not active yet",
+    "dormantPerksMessage": "By the book rules these are not working right now: {perks}. They will come back once you meet the requirements — or replace them with the «Replace» button in the perk list."
+  },
+  "dormant": {
+    "prefix": "Not active",
+    "level": "requires level {need} (now {have})",
+    "attributes": "requires {code} {need} (now {have})",
+    "robot": "perk is unavailable to robots",
+    "excluded": "conflicts with «{perk}» — the two are mutually exclusive",
+    "rankLimit": "no such rank in the book — the rank can be replaced"
   }
 }

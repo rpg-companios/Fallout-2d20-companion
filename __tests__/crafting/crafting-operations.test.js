@@ -20,6 +20,16 @@ import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
 import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -85,6 +95,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
   it('.38: материалы сгорели в работе, патроны выданы пачкой base+CD', () => {
     const recipe = getCraftingRecipeById('ammo_38');
     setSkill('REPAIR', recipe.requires.complexity); // автоуспех
+    grantBookProfile(2, { INT: 7 }); // книга: Патронщик — ИНТ7, со 2-го уровня
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] }); // книга: патроны gated перком
     seedStack('item_common_materials', 3);
 
@@ -97,6 +108,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
   });
 
   it('нехватка материала — отказ, состояние стора не тронуто', () => {
+    grantBookProfile(2, { INT: 7 });
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] });
     const before = state().items;
     const result = craftRecipe('ammo_38');
@@ -116,6 +128,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
     expect(craftRecipe('chem_fury').done).toBe(false); // нет перка
     expect(countStack('chem_buffout')).toBe(1); // и ничего не списано
 
+    grantBookProfile(1, { INT: 7 }); // книга: Химик — ИНТ7
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'chemist' }] });
     const result = craftRecipe('chem_fury');
     expect(result.done).toBe(true);
@@ -153,6 +166,7 @@ describe('craftRecipe: провал проверки и цена проверк�
     expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка выключена — не жжёт').toBe(false);
     useAppSettingsStore.getState().setValue('craftFailLossGear', true);
     expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка включена — жжёт').toBe(true);
+    grantBookProfile(6, { INT: 7 }); // книга: 2-й ранг Патронщика с 6-го уровня
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }, { perkId: 'ammosmith' }] }); // ранг 2
     for (const material of shell.materials) seedStack(material.itemId, material.count);
 

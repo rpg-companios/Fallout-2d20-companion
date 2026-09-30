@@ -377,7 +377,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        */
       currency: 0,
       selectedPerks: [],
-      pendingPerksBookAdjusted: [],
+      pendingPerksDormant: [],
+      dormantNoticeFingerprint: null,
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
@@ -413,12 +414,16 @@ const useCharacterStore = create(withDerivedCascade(devtools(
       },
 
       /**
-       * 411 (публичное приложение): мигратор перков при загрузке персонажа.
-       * «Книга приоритетнее» (слово владельца 410): лишние ранги и перки,
-       * не отвечающие книжным требованиям, снимаются; слоты освобождаются.
-       * Идемпотентно — на здоровом списке ничего не меняет. Списанные
-       * перки попадают в pendingPerksBookAdjusted (не персистится) —
-       * слой загрузки показывает игроку уведомление.
+       * 412 (публичное приложение): мигратор перков при загрузке персонажа.
+       * Слово владельца: «пусть сам решает» — недоступные по книге перки
+       * (уровень/характеристики/робот/«или-или»/ранг сверх книжного) НЕ
+       * снимаются: остаются в списке серыми и НЕ ДЕЙСТВУЮТ (гасит
+       * evaluateSelectedPerkPicks — и бонусы, и гейты рецептов), снова
+       * заработают, когда выполнятся условия, либо игрок заменит их сам.
+       * Снимаются только неизвестные каталогу id (нет имени — нечего
+       * показывать серым). pendingPerksDormant (не персистится) — список
+       * погасших для уведомления; dormantNoticeFingerprint — то же
+       * множество повторно не уведомляет (один показ на изменение).
        */
       reconcilePerksAtLoad: () => {
         const state = get();
@@ -431,17 +436,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
             isRobot: isRobotCharacter({ origin: state.origin, trait: state.trait }),
           },
         );
-        if (!result.changed) {
-          set({ pendingPerksBookAdjusted: [] });
-          return { changed: false, removed: [] };
+        const dormant = result.inactivePicks;
+        const fingerprint = JSON.stringify(dormant.map((p) => [p.id, p.rank, p.reason]));
+        const shouldNotify = fingerprint !== state.dormantNoticeFingerprint;
+        if (result.changed) {
+          set({ selectedPerks: result.selectedPerks });
+          get().recalculatePerkBonuses();
+          debugLog('perks.reconcileAtLoad.removedUnknown', { removed: result.removed });
         }
         set({
-          selectedPerks: result.selectedPerks,
-          pendingPerksBookAdjusted: result.removed,
+          pendingPerksDormant: dormant,
+          dormantNoticeFingerprint: fingerprint,
         });
-        get().recalculatePerkBonuses();
-        debugLog('perks.reconcileAtLoad', { removed: result.removed });
-        return { changed: true, removed: result.removed };
+        return { changed: result.changed, removed: result.removed, dormant, shouldNotify };
       },
 
       markSkillsAsRewarded: (skills = []) => set((state) => ({

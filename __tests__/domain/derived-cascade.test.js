@@ -42,6 +42,8 @@ describe('МК-3 шаг 2: каскад производных в хранили
   });
 
   it('перк взят действием → perkBonuses и ОЗ пересчитались сами', () => {
+    // 412: «Дающий жизнь» по книге с 5-го уровня — иначе перк погас.
+    useCharacterStore.setState({ level: 5 });
     const store = useCharacterStore.getState();
     const base = store.derivedStats.maxHealth.total;
     store.setSelectedPerks([{ perkId: 'lifeGiver', index: 0 }]);
