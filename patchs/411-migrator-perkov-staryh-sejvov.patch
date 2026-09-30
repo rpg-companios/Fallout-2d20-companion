@@ -1,0 +1,527 @@
+diff --git a/__tests__/perks/perk-migrator-411.test.js b/__tests__/perks/perk-migrator-411.test.js
+new file mode 100644
+index 0000000..e65a501
+--- /dev/null
++++ b/__tests__/perks/perk-migrator-411.test.js
+@@ -0,0 +1,172 @@
++// ПРИЁМОЧНЫЙ (патч 411): мигратор перков при загрузке персонажа — публичное
++// приложение, «книга приоритетнее» (слово владельца 410). При каждой
++// загрузке (персист-кэш и каноническая запись) список перков сверяется
++// с каталогом: лишние ранги и перки, не отвечающие книжным требованиям
++// (уровень/характеристики/робот/взаимоисключение), снимаются; слоты
++// освобождаются. Идемпотентно. Уведомление — игровыми терминами,
++// словарь alerts обязан существовать в обоих языках (латентное падение
++// tPerkAlert до 411 — чинится здесь же).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { reconcileSelectedPerksWithCatalog } from '../../domain/perks';
++import catalog from '../../modules/fallout/data/perks/perks.json';
++import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
++import enScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
++import ruPerksI18n from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import enPerksI18n from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const CTX = (over = {}) => ({
++  attributes: {
++    STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5,
++    ...over,
++  },
++  level: 12,
++  isRobot: false,
++  ...over, // level/isRobot поверх значений по умолчанию
++});
++
++const ids = (list) => list.map((entry) => entry.id);
++
++describe('Патч 411: чистый мигратор (книга приоритетнее)', () => {
++  it('Крепкий хребет ×3 (было 3 ранга) → 1: лишние сняты, слоты свободны', () => {
++    const result = reconcileSelectedPerksWithCatalog(
++      [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(result.changed).toBe(true);
++    expect(ids(result.selectedPerks)).toEqual(['strongBack']);
++    expect(result.removed).toHaveLength(2);
++    expect(result.removed[0].reason).toBe('rank-limit');
++  });
++
++  it('идемпотентен: второй прогон не меняет ничего', () => {
++    const seed = [{ id: 'strongBack' }, { id: 'strongBack' }];
++    const first = reconcileSelectedPerksWithCatalog(seed, catalog, CTX({ STR: 8 }));
++    const second = reconcileSelectedPerksWithCatalog(first.selectedPerks, catalog, CTX({ STR: 8 }));
++    expect(second.changed).toBe(false);
++    expect(second.selectedPerks).toEqual(first.selectedPerks);
++  });
++
++  it('уровень: «Прицел с подсветкой» теперь с 8-го уровня — на 3-м снимается, на 8-м остаётся', () => {
++    const glow = [{ id: 'glowSight' }];
++    const early = reconcileSelectedPerksWithCatalog(glow, catalog, CTX({ level: 3, PER: 8 }));
++    expect(early.changed).toBe(true);
++    expect(early.removed[0]).toMatchObject({ id: 'glowSight', reason: 'level' });
++    const grown = reconcileSelectedPerksWithCatalog(glow, catalog, CTX({ level: 8, PER: 8 }));
++    expect(grown.changed).toBe(false);
++    expect(ids(grown.selectedPerks)).toEqual(['glowSight']);
++  });
++
++  it('характеристики: «Тренированный рывок» требует СИЛ 6 — СИЛ 5 снимается, СИЛ 6 остаётся', () => {
++    const weak = reconcileSelectedPerksWithCatalog([{ id: 'painTrain' }], catalog, CTX({ STR: 5 }));
++    expect(weak.removed[0]).toMatchObject({ id: 'painTrain', reason: 'attributes' });
++    const strong = reconcileSelectedPerksWithCatalog([{ id: 'painTrain' }], catalog, CTX({ STR: 6 }));
++    expect(strong.changed).toBe(false);
++  });
++
++  it('роботу «не для роботов» перки не полагаются', () => {
++    const result = reconcileSelectedPerksWithCatalog(
++      [{ id: 'ghoulish' }],
++      catalog,
++      CTX({ END: 9, level: 12, isRobot: true }),
++    );
++    expect(result.removed[0]).toMatchObject({ id: 'ghoulish', reason: 'robot' });
++  });
++
++  it('взаимоисключение: Дерзкий + Осмотрительный — остаётся взятый первым', () => {
++    const result = reconcileSelectedPerksWithCatalog(
++      [{ id: 'daringNature' }, { id: 'cautiousNature' }],
++      catalog,
++      CTX({ LCK: 5, PER: 7 }),
++    );
++    expect(ids(result.selectedPerks)).toEqual(['daringNature']);
++    expect(result.removed[0]).toMatchObject({ id: 'cautiousNature', reason: 'excluded' });
++  });
++
++  it('неизвестный каталогу id снимается; здоровый список не трогается', () => {
++    const withUnknown = reconcileSelectedPerksWithCatalog(
++      [{ id: 'lifeGiver' }, { id: 'perk_from_the_past' }],
++      catalog,
++      CTX(),
++    );
++    expect(ids(withUnknown.selectedPerks)).toEqual(['lifeGiver']);
++    expect(withUnknown.removed[0].reason).toBe('unknown');
++
++    const healthy = reconcileSelectedPerksWithCatalog(
++      [{ id: 'lifeGiver' }, { id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(healthy.changed).toBe(false);
++    expect(healthy.selectedPerks).toHaveLength(2);
++  });
++});
++
++describe('Патч 411: экшн стора — каскад и флаг уведомления', () => {
++  it('срезает ранги, пересчитывает бонусы перков, выставляет pendingPerksBookAdjusted', () => {
++    // Персонаж, отвечающий книжному требованию Крепкого хребта (СИЛ 5,
++    // форма стора: {total}).
++    useCharacterStore.setState({
++      attributes: {
++        STR: { total: 8 }, PER: { total: 5 }, END: { total: 5 },
++        CHA: { total: 5 }, INT: { total: 5 }, AGI: { total: 5 }, LCK: { total: 5 },
++      },
++      level: 12,
++    });
++    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }]);
++    const before = state().perkBonuses.carryWeightBonus;
++    const result = state().reconcilePerksAtLoad();
++    expect(result.changed).toBe(true);
++    expect(ids(state().selectedPerks)).toEqual(['strongBack']);
++    // Бонус пересчитался под книжный ранг 1 (был за 3 ранга: 25/ранг).
++    expect(state().perkBonuses.carryWeightBonus).toBe(25);
++    expect(before).toBe(75);
++    expect(state().pendingPerksBookAdjusted).toHaveLength(2);
++  });
++
++  it('повторный прогон — changed:false, уведомление пустое (идемпотентность)', () => {
++    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'strongBack' }]);
++    state().reconcilePerksAtLoad();
++    const second = state().reconcilePerksAtLoad();
++    expect(second.changed).toBe(false);
++    expect(state().pendingPerksBookAdjusted).toEqual([]);
++  });
++});
++
++describe('Патч 411: словарь уведомлений обязан существовать (оба языка)', () => {
++  const KEYS = [
++    'duplicatePerksFixedTitle',
++    'duplicatePerksFixedMessage',
++    'perkMissingIdTitle',
++    'perkMissingIdMessage',
++    'perksBookAdjustedTitle',
++    'perksBookAdjustedMessage',
++  ];
++
++  it.each(['ru-RU', 'en-EN'])('%s: alerts со всеми ключами, не пустые строки', (loc) => {
++    const dict = loc === 'ru-RU' ? ruScreen : enScreen;
++    for (const key of KEYS) {
++      expect(typeof dict.alerts?.[key], `${loc}.${key}`).toBe('string');
++      expect(dict.alerts[key].length).toBeGreaterThan(0);
++    }
++  });
++
++  it('русские имена перков для уведомления берутся из i18n (без латиницы)', () => {
++    const name = (id) => ruPerksI18n.find((p) => p.id === id)?.name;
++    expect(name('strongBack')).toBe('КРЕПКИЙ ХРЕБЕТ');
++    expect(name('glowSight')).not.toMatch(/^[A-Za-z ]+$/);
++    expect(enPerksI18n.find((p) => p.id === 'strongBack')?.name).toBeTruthy();
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index c53f0d6..3f8de83 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (410)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (411)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **411** (приложение публичное — мигратор перков старых сейвов БЕЗ подъёма версии схемы). При каждой загрузке (персист-кэш zustand И каноническая запись) список перков сверяется с каталогом: чистая функция `reconcileSelectedPerksWithCatalog` (domain/perks.js) — срез рангов сверх maxRanks (причина rank-limit), снятие перков не по книжным требованиям СВОЙ ранг (уровень/характеристики/notForRobots/excludedPerks — остаётся взятый первым; причины level/attributes/robot/excluded) и неизвестных каталогу id (unknown); слоты освобождаются; идемпотентно. Точки врезки: экшн `reconcilePerksAtLoad` стора (паспорт characterActions.ts) зовётся в onRehydrateStorage ПЕРЕД recalculateAll и в loadCharacter ПОСЛЕ loadFromLegacyData; список списанного → `pendingPerksBookAdjusted` (не персистится) → уведомление с именами из i18n (showRawAlert). Существующие миграции сейвов (v16/v17) НЕ тронуты. ПОЧИНЕН ЛАТЕНТНЫЙ БАГ: в screen.json перков (ru и en) не было словаря `alerts` → tPerkAlert отдавал undefined и алерты загрузки молча не работали; словарь добавлен (6 ключей), tPerkAlert устойчив к отсутствию ключа. ЗАЩЁЛКА perk-migrator-411: 12 тестов (срез рангов/уровень/характеристики/робот/взаимоисключение/unknown/идемпотентность/каскад стора/словари обоих языков). Предыдущий снимок — **410** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **410** (слово владельца: «книга приоритетнее, в книге по рангам могут быть ошибки, ориентируемся на описания» — ОТМЕНЯЕТ правило 403 «ранги и требования как в приложении»). Применено: maxRanks = max(книга, ранг из описания, для тройки открывателей модов 4); требования (атрибуты/уровень/шаг) = notepad, шаг сверен с текстом «требование к уровню увеличивается на N». Изменено: 45 рангов (Патронщик 1→3 — чинит РЕАЛЬНУЮ недостижимость рецептов 2–3 ранга!; Крепкий хребет 3→1; Мохавский... нет — 44 одноранговых → книжные 2–3; Бронник/НАУКА!/Фанат оружия остались 4: описания «и т.д.» + рецепты 4-го ранга), 48 требований (Мисс Удача +5, Осмотрительный ЛОВ8/уровень 3, Ночной глаз уровень 8, Стабилизированный ИНТ6/ур.5, Везунчик ХАР8+ИНТ8/ур.15, Дерзкий ЛОВ8…). ЗАЩЁЛКА perks-book-priority-410: maxRanks=max(книга, описание) для всех 185 + рецепты не выше рангов. МЕХАНИКА по книге: Фармацевт +2/+3/+4 антирада (было +1), Мощный пользователь +3/+6/+10 заряда (было +1) — по рангам; тексты трёх исключений = книжные (теперь ВСЕ 185 == catalog_ru, 409-защёлка без overrides). Остальные 40 механических перков сверены — расхождений с описаниями нет · предыдущий: **409** (КОНТРОЛЬНАЯ СВЕРКА по слову владельца: он добавил на main f99db52 docs/reference-data/fallout2d20_perks_notepad.json — «описания перков всех что я знаю»). ФАКТ: notepad ПОБАЙТОВО равен fallout2d20_perks (1).json (184 перка, f2-схема) — сверка прошла по полному набору. Итог: покрытие 184+emt=185 ЦЕЛОЕ; у ~123 перков в ru-i18n оставались КРАТКИЕ АНГЛИЙСКИЕ АННОТАЦИИ (наследие до-403) — теперь ИМЕНА И ТЕКСТЫ ВСЕХ 185 = perks_catalog_ru дословно (87 имён + 81 текст обновлены; catalog_ru ↔ notepad: 136 точных, 44 различия ТОЛЬКО оформления — кавычки/{/CD}/маркеры); латинских имён в ru больше нет (АММОСМИТ, ФАНАТ КОЛЫ, КРОВОСОС, ВОДОХЛЁБ…). ТРИ ИСКЛЮЧЕНИЯ — тексты по одобренному слову владельца (406), книжный текст противоречит работающей механике: Полевой хирург (книга: 3 ОЗ за ОД первой помощи), Фармацевт (книга: +2/+3/+4 по рангам), Мощный пользователь (книга: +3/+6/+10) — в приложении +3 ОЗ/+1 антирад, +1 антирад, +1 заряд. ЗАЩЁЛКА tests/perks-canon-409: все 185 == catalog_ru (кроме 3), notepad кроется приложением. РАНГИ/ТРЕБОВАНИЯ: 44 перка ранги и 53 требования расходятся notepad↔приложение — СОЗНАТЕЛЬНО, слово владельца 403 «ранги и требования — без изменений, как в приложении» + perks_discrepancies «значения НЕ менять»; владельцу предложил переключить канон по его слову. Механика 43 действующих сверена с notepad: Варвар (ступени СИЛ 7/9/11) и др. — точно; ДОБАВЛЕНО Кровососу: пакет крови поднимает Жажду на +1 ступень сверх напитка (книга; через survivalPerkOptions(item)). Нюанс: Химик — книга «созданные вами препараты», в приложении ×2 для ВСЕХ препаратов (слово владельца 406) · предыдущий: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a5f163f..7f71aa2 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,19 @@
+ # Changelog
++---
++## Old saves' perks repair themselves (patch 411)
++
++The app is now public, and the book rules for perks have changed — so
++on every character load the perks are checked against the book and
++repaired automatically, without bumping the save version. If a perk
++had more ranks than allowed, the extras are removed and the picks are
++freed; if a perk was taken under the old rules (wrong level, wrong
++attributes, a robot, mutually exclusive with another perk) — it is
++removed and its slot is freed too. After such a cleanup the game shows
++a short notice naming the changed perks, in the interface language.
++Reloading changes nothing and shows no notice. Also fixed the load-time
++perk notices themselves: their text dictionary was missing, so they
++silently never worked.
++
+ ---
+ ## Perks follow the book (patch 410)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index e99c5af..4b2aad4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,20 @@
+ # История изменений
+ 
++---
++## Перки старых сохранений чинятся сами (патч 411)
++
++Приложение стало публичным, а правила перков по книге изменились —
++теперь при каждой загрузке персонажа его перки сверяются с книгой и
++чинятся автоматически, без поднятия версии сохранений. Если у перка
++было больше рангов, чем полагается, лишние снимаются, а выборы
++освобождаются; если перк взят по старым правилам (не по уровню, не по
++характеристикам, роботу, «или-или» с другим перком) — он снимается, и
++слот тоже освобождается. После такой чистки игра покажет короткое
++уведомление с названиями изменённых перков — по-русски, как в книге.
++Повторная загрузка ничего не меняет и не показывает уведомление.
++Заодно починили сами уведомления о перках при загрузке: их словарь
++текстов отсутствовал, и они молча не работали.
++
+ ---
+ ## Перки — по книге (патч 410)
+ 
+diff --git a/domain/perks.js b/domain/perks.js
+index a1c25da..cabc2a8 100644
+--- a/domain/perks.js
++++ b/domain/perks.js
+@@ -166,6 +166,86 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
+     };
+ }
+ 
++/**
++ * 411 (публичное приложение): мигратор перков при ЗАГРУЗКЕ персонажа —
++ * «книга приоритетнее» (слово владельца 410). Чистая функция, без стора:
++ *   1) лишние ранги сверх каталога снимаются (trimSelectedPerksToMaxRanks);
++ *   2) каждый оставшийся выбор проверяется по требованиям книги на СВОЙ
++ *      ранг: уровень, характеристики, «не для роботов», взаимоисключение
++ *      (excludedPerks — остаётся более ранний выбор).
++ * Неизвестные каталогу id снимаются тоже (слот освобождается).
++ * Идемпотентна: на уже сверенном списке возвращает его без изменений.
++ * context: { attributes, level, isRobot } — всё, что нужно книге.
++ */
++export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
++    const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
++    // Атрибуты принимаются в обоих форматах: {STR: 8} и {STR: {total: 8}}
++    // (форма стора). Итоговое значение — уже с бонусами.
++    const attributeMap = {};
++    for (const [code, value] of Object.entries(context.attributes || {})) {
++      attributeMap[String(code).toUpperCase()] = typeof value === 'number'
++        ? value
++        : (Number(value?.total) || 0);
++    }
++    const level = Number(context.level) || 1;
++
++    const meetsRequirements = (perk, rank) => {
++        const req = getPrerequisites(perk) || {};
++        if (req.notForRobots && context.isRobot) return 'robot';
++        const requiredLevel = getRequiredLevelForRank(perk, rank);
++        if (level < requiredLevel) return 'level';
++        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
++            if ((attributeMap[String(code).toUpperCase()] || 0) < Number(need)) return 'attributes';
++        }
++        return null;
++    };
++
++    // trimSelectedPerksToMaxRanks уже присваивает оставшимся копиям их
++    // прежние ранги (первые копии списка) — отдельного сопоставления не нужно.
++    const trimmed = trimSelectedPerksToMaxRanks(selectedPerks, perkCatalog);
++
++    const heldIds = new Set();
++    const kept = [];
++    // Срезанные лишние ранги тоже попадают в отчёт (причина rank-limit).
++    const removed = (trimmed.removed || []).map((selected) => ({
++        selected,
++        id: toSelectedPerkId(selected),
++        rank: null,
++        reason: 'rank-limit',
++    }));
++    const counts = {};
++    for (const selected of trimmed.selectedPerks || []) {
++        const id = toSelectedPerkId(selected);
++        const perk = id ? catalogById.get(id) : null;
++        if (!perk) {
++            removed.push({ selected, id: id || null, rank: null, reason: 'unknown' });
++            continue;
++        }
++        const rank = Number(selected?.rank) || 1;
++        const reason = meetsRequirements(perk, rank);
++        if (reason) {
++            removed.push({ selected, id, rank, reason });
++            continue;
++        }
++        const exclusions = Array.isArray(perk.prerequisites?.excludedPerks)
++            ? perk.prerequisites.excludedPerks
++            : (Array.isArray(perk.requirements?.excludedPerks) ? perk.requirements.excludedPerks : []);
++        if (exclusions.some((other) => heldIds.has(other))) {
++            removed.push({ selected, id, rank, reason: 'excluded' });
++            continue;
++        }
++        heldIds.add(id);
++        counts[id] = (counts[id] || 0) + 1;
++        kept.push({ id, rank: counts[id] });
++    }
++
++    return {
++        selectedPerks: kept,
++        removed,
++        changed: removed.length > 0 || kept.length !== (selectedPerks || []).length,
++    };
++}
++
+ export function identifySelectedPerk(selected, index) {
+     if (typeof selected === 'string' && selected) return selected;
+     return toSelectedPerkId(selected)
+diff --git a/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json b/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
+index cc4f6b5..b5b4a99 100644
+--- a/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -15,5 +15,13 @@
+       "CHA": "CHA",
+       "LCK": "LCK"
+     }
++  },
++  "alerts": {
++    "duplicatePerksFixedTitle": "Duplicate perks removed",
++    "duplicatePerksFixedMessage": "Extra perk copies were removed — the freed picks can be spent again.",
++    "perkMissingIdTitle": "Unknown perk in the save",
++    "perkMissingIdMessage": "These perks were not found in the catalog and were removed: {perks}.",
++    "perksBookAdjustedTitle": "Perks aligned with the book",
++    "perksBookAdjustedMessage": "After the book check these were removed: {perks}. The freed picks can be spent once you meet the requirements."
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json b/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
+index feed37e..e567791 100644
+--- a/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -15,5 +15,13 @@
+       "CHA": "ХАР",
+       "LCK": "УДЧ"
+     }
++  },
++  "alerts": {
++    "duplicatePerksFixedTitle": "Дубли перков убраны",
++    "duplicatePerksFixedMessage": "Лишние копии перков сняты — освободившиеся выборы можно потратить заново.",
++    "perkMissingIdTitle": "В сохранении найден неизвестный перк",
++    "perkMissingIdMessage": "Эти перки не найдены в каталоге и сняты: {perks}.",
++    "perksBookAdjustedTitle": "Перки приведены к книге",
++    "perksBookAdjustedMessage": "После сверки с книгой снято: {perks}. Освободившиеся выборы можно потратить заново, когда выполнятся условия."
+   }
+ }
+diff --git a/public/version.json b/public/version.json
+index 399dcfe..134e2e0 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "410",
++  "version": "411",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index bd6a290..2ee4838 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -24,6 +24,9 @@ import { debugLog } from '../debug/falloutDebug';
+ import { showRawAlert } from '../../components/alerts/alertService';
+ import ruPerksAndTraitsScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
+ import enPerksAndTraitsScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
++// 411: имена перков для уведомления мигратора — по языку интерфейса.
++import ruPerksI18n from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import enPerksI18n from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+ import useCharacterStore from '../store/characterStore';
+ import {
+   denormalizeCharacterState,
+@@ -66,10 +69,16 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
+ const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+ 
+ const PERK_ALERTS_DICT = {
+-  'ru-RU': ruPerksAndTraitsScreen.alerts,
+-  'en-EN': enPerksAndTraitsScreen.alerts,
++  'ru-RU': ruPerksAndTraitsScreen.alerts || {},
++  'en-EN': enPerksAndTraitsScreen.alerts || {},
++};
++// 411: отсутствие ключа больше не роняет загрузку — вернётся сам ключ.
++const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()]?.[key] ?? key;
++const PERK_NAMES_DICT = { 'ru-RU': ruPerksI18n, 'en-EN': enPerksI18n };
++const perkDisplayName = (id) => {
++  const list = PERK_NAMES_DICT[getCurrentLocale()] || [];
++  return list.find((perk) => perk?.id === id)?.name || id;
+ };
+-const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
+ // Диалоги идут через общий AlertHost — одна React-модалка на вебе и на нативе.
+ const paAlert = (title, message = '') => showRawAlert({ title, message });
+ 
+@@ -524,6 +533,22 @@ export const loadCharacter = async (id) => {
+       attributes: loadedAttributes,
+     });
+ 
++    // 411 (публичное приложение): мигратор перков при загрузке — «книга
++    // приоритетнее». Работает ПОСЛЕ нормализации атрибутов/уровня
++    // (loadFromLegacyData), чтобы требования книги сверялись честно.
++    // Идемпотентно: повторная загрузка уведомление не показывает.
++    const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
++    if (reconciliation?.changed && reconciliation.removed?.length > 0) {
++      const removedList = reconciliation.removed
++        .map((entry) => perkDisplayName(entry.id))
++        .filter(Boolean)
++        .join(', ');
++      paAlert(
++        tPerkAlert('perksBookAdjustedTitle'),
++        tPerkAlert('perksBookAdjustedMessage').replace('{perks}', removedList),
++      );
++    }
++
+     // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
+     // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
+     // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index 53e5d37..24a6441 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -180,6 +180,8 @@ export interface CharacterActions {
+     equipmentState?: EquipmentStatePush;
+   }) => void;
+   recalculatePerkBonuses: () => void;
++  /** 411: мигратор перков при загрузке («книга приоритетнее»). */
++  reconcilePerksAtLoad: () => { changed: boolean; removed: Array<{ id: string | null; rank: number | null; reason: string }> };
+   /** Фабрика полей сеттингов (экс-эффект провайдера, патч 243). */
+   ensureStateExtensionFields: () => void;
+   /** Мост legacy-формата (массивы) → словари стора. */
+@@ -350,6 +352,7 @@ export const NAMED_OP_KEYS = [
+   'recalculateAll',
+   'recalculateDerivedStats',
+   'recalculatePerkBonuses',
++  'reconcilePerksAtLoad',
+   'ensureStateExtensionFields',
+   'loadFromLegacyData',
+   'exportToLegacyData',
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 44ee72a..54e0151 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -68,7 +68,7 @@ import perksData from '../../modules/fallout/data/perks/perks.json';
+ // 406: потолок лестниц выживания — флаг «высшая ступень сытости»
+ // для «Омолодившегося» (survival.ts — чистый домен, без настроек/UI).
+ import { SURVIVAL_LADDER_MAX } from '../../modules/fallout/survival/survival';
+-import { selectPerkBonuses } from '../../domain/perks.js';
++import { selectPerkBonuses, reconcileSelectedPerksWithCatalog } from '../../domain/perks.js';
+ // 404: префикс металлической брони для «В сияющих доспехах»;
+ // 405: светозащитная оптика (ранг 2 того же перка).
+ import {
+@@ -377,6 +377,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+        */
+       currency: 0,
+       selectedPerks: [],
++      pendingPerksBookAdjusted: [],
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
+@@ -411,6 +412,38 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         get().recalculatePerkBonuses();
+       },
+ 
++      /**
++       * 411 (публичное приложение): мигратор перков при загрузке персонажа.
++       * «Книга приоритетнее» (слово владельца 410): лишние ранги и перки,
++       * не отвечающие книжным требованиям, снимаются; слоты освобождаются.
++       * Идемпотентно — на здоровом списке ничего не меняет. Списанные
++       * перки попадают в pendingPerksBookAdjusted (не персистится) —
++       * слой загрузки показывает игроку уведомление.
++       */
++      reconcilePerksAtLoad: () => {
++        const state = get();
++        const result = reconcileSelectedPerksWithCatalog(
++          state.selectedPerks || [],
++          perksData,
++          {
++            attributes: state.attributes,
++            level: state.level,
++            isRobot: isRobotCharacter({ origin: state.origin, trait: state.trait }),
++          },
++        );
++        if (!result.changed) {
++          set({ pendingPerksBookAdjusted: [] });
++          return { changed: false, removed: [] };
++        }
++        set({
++          selectedPerks: result.selectedPerks,
++          pendingPerksBookAdjusted: result.removed,
++        });
++        get().recalculatePerkBonuses();
++        debugLog('perks.reconcileAtLoad', { removed: result.removed });
++        return { changed: true, removed: result.removed };
++      },
++
+       markSkillsAsRewarded: (skills = []) => set((state) => ({
+         rewardedSkills: [...new Set([...(state.rewardedSkills || []), ...skills])],
+       })),
+@@ -2042,6 +2075,9 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+             // Шаг 8в (патч 243): сначала фабрики расширений (эффект
+             // провайдера снесён), затем пересчёт производных.
+             state.ensureStateExtensionFields?.();
++            // 411: мигратор перков («книга приоритетнее») — до пересчёта,
++            // чтобы производные считались уже по сверенному списку.
++            state.reconcilePerksAtLoad?.();
+             state.recalculateAll();
+           } catch (error) {
+             debugLog('characterStore.rehydrate.recalculateFailed', {

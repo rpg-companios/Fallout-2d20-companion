@@ -1,5 +1,20 @@
 # Changelog
 ---
+## Old saves' perks repair themselves (patch 411)
+
+The app is now public, and the book rules for perks have changed — so
+on every character load the perks are checked against the book and
+repaired automatically, without bumping the save version. If a perk
+had more ranks than allowed, the extras are removed and the picks are
+freed; if a perk was taken under the old rules (wrong level, wrong
+attributes, a robot, mutually exclusive with another perk) — it is
+removed and its slot is freed too. After such a cleanup the game shows
+a short notice naming the changed perks, in the interface language.
+Reloading changes nothing and shows no notice. Also fixed the load-time
+perk notices themselves: their text dictionary was missing, so they
+silently never worked.
+
+---
 ## Perks follow the book (patch 410)
 
 By your word «the book takes priority», all perk ranks and
