@@ -1,0 +1,529 @@
+diff --git a/__tests__/perks/perks-engine-406.test.js b/__tests__/perks/perks-engine-406.test.js
+index 52a8a47..893ee54 100644
+--- a/__tests__/perks/perks-engine-406.test.js
++++ b/__tests__/perks/perks-engine-406.test.js
+@@ -47,7 +47,7 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
+       rejuvenated: { rejuvenatedSatedMaxHp: 2, ladderAccRates: { food: 0.5, water: 0.5 } },
+       dromedary: { dromedaryExtraWaterStep: 1 },
+       superDuper: { superDuper: true },
+-      ghoulish: { ghoulish: true },
++      ghoulish: { ghoulish: { hpPerUnits: 4 } },
+       chemist: { chemDurationMultiplier: 2 },
+     };
+     for (const [id, expected] of Object.entries(cases)) {
+@@ -98,19 +98,21 @@ describe('Патч 406: конвейер употребления', () => {
+     expect(run(2, 10).radiationAmount).toBe(-6);
+   });
+ 
+-  it('Гуль: радиация еды лечит вместо вреда; с Гурманом — после его скидки', () => {
++  it('Гулеподобный (канон 408): радиация действует, лечение по норме 1 за 4', () => {
+     const irradiated = {
+       id: 'test_meat', itemType: 'food',
+       radiationModifier: { op: '+', value: 2 },
+     };
++    // +2 радиации: счётчик растёт, лечение floor(2/4) = 0 ОЗ.
+     const ghoul = resolveConsumableVitalChanges(irradiated, {
+       currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
+     });
+-    expect(ghoul.healAmount).toBe(2);
+-    expect(ghoul.radiationAmount).toBe(0);
+-    expect(ghoul.radiationAfter).toBe(0);
++    expect(ghoul.healAmount).toBe(0);
++    expect(ghoul.radiationAmount).toBe(2);
++    expect(ghoul.radiationAfter).toBe(2);
+ 
+-    // Гурман уменьшает радиацию preserved-еды (2 → 1), Гуль лечит на остаток.
++    // Гурман уменьшает радиацию preserved-еды (2 → 1) — полученная единица
++    // меньше нормы, лечение только гурманское.
+     const canned = {
+       id: 'test_canned', itemType: 'food', preserved: true,
+       radiationModifier: { op: '+', value: 2 },
+@@ -119,8 +121,8 @@ describe('Патч 406: конвейер употребления', () => {
+       currentHealth: 5, maxHealth: 20, radiation: 0,
+       ghoulish: true, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
+     });
+-    expect(both.radiationAmount).toBe(0);
+-    expect(both.healAmount).toBe(3); // +1 (остаток радиации) + 2 (гурман)
++    expect(both.radiationAmount).toBe(1);
++    expect(both.healAmount).toBe(2); // только +2 от гурмана
+   });
+ 
+   it('Кровопийца: пакет крови лечит 3 → 6 (id уже в каталоге напитков)', () => {
+diff --git a/__tests__/perks/perks-engine-407.test.js b/__tests__/perks/perks-engine-407.test.js
+index d3d794c..2caf199 100644
+--- a/__tests__/perks/perks-engine-407.test.js
++++ b/__tests__/perks/perks-engine-407.test.js
+@@ -29,13 +29,13 @@ const takePerks = (...ids) => {
+   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
+ };
+ 
+-describe('Патч 407: Гулеподобный — любая радиация лечит', () => {
+-  it('ручной подъём счётчика лечит вместо роста радиации', () => {
++describe('Патч 407→408: Гулеподобный — ручная радиация по норме перка', () => {
++  it('ручной подъём +5 (ранг 1, норма 4): счётчик растёт, ОЗ +1', () => {
+     takePerks('ghoulish');
+     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
+-    state().setRadiation((prev) => prev + 2);
+-    expect(state().radiation).toBe(0);
+-    expect(state().currentHealth).toBe(7);
++    state().setRadiation((prev) => prev + 5);
++    expect(state().radiation).toBe(5);
++    expect(state().currentHealth).toBe(6);
+   });
+ 
+   it('без перка ручной подъём растит счётчик, ОЗ не трогает', () => {
+@@ -49,33 +49,34 @@ describe('Патч 407: Гулеподобный — любая радиация
+     takePerks('ghoulish');
+     const ceiling = state().derivedStats.maxHealth.total;
+     useCharacterStore.setState({ currentHealth: ceiling, radiation: 1 });
+-    state().setRadiation((prev) => prev + 3); // ОЗ полные — лечить некого
+-    expect(state().radiation).toBe(1); // счётчик всё равно не растёт
++    state().setRadiation((prev) => prev + 8); // ОЗ полные — лечить некого
++    expect(state().radiation).toBe(9); // счётчик растёт как обычно
+     expect(state().currentHealth).toBe(ceiling);
+ 
+     useCharacterStore.setState({ currentHealth: 5, radiation: 4 });
+-    state().setRadiation(1); // спад — обычное поведение
++    state().setRadiation(1); // спад — обычное поведение, без лечения
+     expect(state().radiation).toBe(1);
+     expect(state().currentHealth).toBe(5);
+   });
+ 
+-  it('конвейер расходников с перком: двойного лечения нет', () => {
++  it('конвейер расходников: норма в отчёте, повторного лечения нет', () => {
+     takePerks('ghoulish');
+     const irradiated = {
+       id: 'test_meat', itemType: 'food',
+-      radiationModifier: { op: '+', value: 2 },
++      radiationModifier: { op: '+', value: 8 },
+     };
+     // Как и в конвейере (applyConsumableFull), перк приходит опцией.
+     const vital = resolveConsumableVitalChanges(irradiated, {
+-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
++      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 4 },
+     });
+-    expect(vital.healAmount).toBe(2);
+-    expect(vital.radiationAfter).toBe(0);
+-    // applyConsumableFull зовёт setRadiation(radiationAfter) — повторного
+-    // лечения быть не должно (счётчик не менялся).
++    expect(vital.healAmount).toBe(2); // floor(8/4)
++    expect(vital.radiationAfter).toBe(8); // радиация действует как обычно
++    // applyConsumableFull зовёт setRadiation(radiationAfter, skip) —
++    // повторного лечения быть не должно.
+     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
+-    state().setRadiation(vital.radiationAfter);
++    state().setRadiation(vital.radiationAfter, { skipGhoulishHeal: true });
+     expect(state().currentHealth).toBe(5);
++    expect(state().radiation).toBe(8);
+   });
+ });
+ 
+diff --git a/__tests__/perks/perks-engine-408.test.js b/__tests__/perks/perks-engine-408.test.js
+new file mode 100644
+index 0000000..abe87fc
+--- /dev/null
++++ b/__tests__/perks/perks-engine-408.test.js
+@@ -0,0 +1,152 @@
++// ПРИЁМОЧНЫЙ (патч 408): «ГУЛЕПОДОБНЫЙ» по каноническому тексту владельца —
++// перк 3 рангов (+8 к требованию уровня за ранг), радиация действует как
++// обычно, перк добавляет 1 ОЗ за каждые 4/3/2 полученные единицы (по рангу).
++// Норма считается и для ручного изменения счётчика; конвейер расходников
++// показывает её в отчёте и не дублирует при установке счётчика.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { resolveConsumableVitalChanges } from '../../domain/effects';
++import { selectPerkBonuses } from '../../domain/perks';
++import { ghoulishHpPerUnitsByRank } from '../../domain/perks/ghoulish';
++import catalog from '../../modules/fallout/data/perks/perks.json';
++import ruCatalog from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
++import enCatalog from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const takeGhoulish = (rank) => {
++  state().setSelectedPerks(
++    Array.from({ length: rank }, (_, index) => ({ perkId: 'ghoulish', index })),
++  );
++};
++
++describe('Патч 408: данные перка — канонический текст', () => {
++  it('в каталоге 3 ранга, шаг уровня +8, требование END 9 / уровень 7', () => {
++    const perk = catalog.find((p) => p.id === 'ghoulish');
++    expect(perk.maxRanks).toBe(3);
++    expect(perk.prerequisites).toMatchObject({
++      special: { END: 9 },
++      level: 7,
++      levelIncreasePerRank: 8,
++    });
++  });
++
++  it('ru-текст — дословно текст владельца; en-текст синхронно про 4/3/2', () => {
++    const ru = ruCatalog.find((p) => p.id === 'ghoulish');
++    expect(ru.name).toBe('ГУЛЕПОДОБНЫЙ');
++    expect(ru.effect).toContain('восстанавливаете 1 ОЗ за каждые 4 единицы');
++    expect(ru.effect).toContain('за каждые 3 единицы');
++    expect(ru.effect).toContain('за каждые 2 единицы');
++    expect(ru.effect).toContain('максимальный запас ОЗ по-прежнему снижается');
++    expect(ru.effect).toContain('увеличивается на 8');
++    const en = enCatalog.find((p) => p.id === 'ghoulish');
++    expect(en.effect).toContain('1 HP for every 4 points');
++    expect(en.effect).toContain('every 3 points');
++    expect(en.effect).toContain('every 2 points');
++  });
++
++  it('норма по рангам: 4 / 3 / 2 (и не ниже 2)', () => {
++    expect(ghoulishHpPerUnitsByRank(1)).toBe(4);
++    expect(ghoulishHpPerUnitsByRank(2)).toBe(3);
++    expect(ghoulishHpPerUnitsByRank(3)).toBe(2);
++    expect(ghoulishHpPerUnitsByRank(4)).toBe(2);
++    const b1 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 1 }] }, catalog);
++    const b3 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 3 }] }, catalog);
++    expect(b1.ghoulish).toEqual({ hpPerUnits: 4 });
++    expect(b3.ghoulish).toEqual({ hpPerUnits: 2 });
++  });
++});
++
++describe('Патч 408: расходники — радиация действует, лечение по норме', () => {
++  const irradiated = (value) => ({
++    id: 'test_meat', itemType: 'food',
++    radiationModifier: { op: '+', value },
++  });
++
++  it('ранг 1: +8 радиации → счётчик +8, лечение +2 ОЗ', () => {
++    const r = resolveConsumableVitalChanges(irradiated(8), {
++      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 4 },
++    });
++    expect(r.radiationAfter).toBe(8);
++    expect(r.radiationAmount).toBe(8);
++    expect(r.healAmount).toBe(2);
++  });
++
++  it('ранг 2: +8 радиации → лечение floor(8/3) = 2; ранг 3: +7 → 3 ОЗ', () => {
++    const rank2 = resolveConsumableVitalChanges(irradiated(8), {
++      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 3 },
++    });
++    expect(rank2.healAmount).toBe(2);
++    const rank3 = resolveConsumableVitalChanges(irradiated(7), {
++      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 2 },
++    });
++    expect(rank3.healAmount).toBe(3);
++    expect(rank3.radiationAfter).toBe(7);
++  });
++
++  it('снятие радиации (Рад-а-вей) нормы не включает, лечение не отрицательное', () => {
++    const radaway = {
++      id: 'test_radaway', itemType: 'chem',
++      radiationModifier: { op: '-', value: 5 },
++    };
++    const r = resolveConsumableVitalChanges(radaway, {
++      currentHealth: 5, maxHealth: 20, radiation: 6, ghoulish: { hpPerUnits: 2 },
++    });
++    expect(r.radiationAmount).toBe(-5);
++    expect(r.healAmount).toBe(0);
++  });
++
++  it('лечение складывается с лечением предмета и капом макс. ОЗ', () => {
++    const item = {
++      id: 'test_snack', itemType: 'food', preserved: true,
++      positiveEffect: { hpModifier: { op: '+', value: 3 } },
++      radiationModifier: { op: '+', value: 8 },
++    };
++    const r = resolveConsumableVitalChanges(item, {
++      currentHealth: 10, maxHealth: 14, radiation: 0,
++      ghoulish: { hpPerUnits: 4 }, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
++    });
++    // Радиация после гурманской скидки: 8 → 7 (полученные единицы).
++    // Лечение: 3 предмета + 2 гурмана + floor(7/4) = 1 гулеподобного = 6,
++    // но потолок 14 − 10 = 4.
++    expect(r.radiationAmount).toBe(7);
++    expect(r.healAmount).toBe(6);
++    expect(r.healthAfter).toBe(14);
++  });
++});
++
++describe('Патч 408: ручной счётчик — по той же норме', () => {
++  it('ранг 2: +9 радиации вручную → счётчик 9, ОЗ +3', () => {
++    takeGhoulish(2);
++    useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
++    state().setRadiation((prev) => prev + 9);
++    expect(state().radiation).toBe(9);
++    expect(state().currentHealth).toBe(8); // floor(9/3)
++  });
++
++  it('два подъёма по +2 при норме 4 лечат по 0, вместе не копятся (каждый сам)', () => {
++    takeGhoulish(1);
++    useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
++    state().setRadiation((prev) => prev + 2);
++    state().setRadiation((prev) => prev + 2);
++    expect(state().radiation).toBe(4);
++    expect(state().currentHealth).toBe(5); // floor(2/4) = 0 в каждом шаге
++  });
++
++  it('конвейер: setRadiation со skip-флагом не дублирует норму из отчёта', () => {
++    takeGhoulish(1);
++    useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
++    state().setRadiation(8, { skipGhoulishHeal: true });
++    expect(state().radiation).toBe(8);
++    expect(state().currentHealth).toBe(5); // лечение уже учёл резолвер
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index e981258..9c6a0b4 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (407)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
++Снимок: **2026-09-30 (408)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+ fallout2d20_perks (1) (184: структурированные op/modifier/when),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1948c8e..e2e1b78 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,17 @@
+ # Changelog
++---
++## «Гулеподобный» as written (patch 408)
++
++The perk is now three ranks, as in the book: 1 HP for every 4 points
++of radiation taken, at rank 2 — every 3, at rank 3 — every 2 (level
++requirement +8 per rank). Radiation now applies normally — the counter
++grows — and the healing comes on top. The rate counts radiation from
++food and drinks (shown in the consumption report) and manual counter
++changes; removing radiation grants no healing. Note: the book line
++«your maximum HP is still reduced» changes nothing in the app —
++radiation never reduces max HP here; that is app-wide behavior, not
++the perk's.
++
+ ---
+ ## Ghoulish and the glowing pack (patch 407)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index bf4c84f..cf6d64d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,18 @@
+ # История изменений
+ 
++---
++## «Гулеподобный» по книге (патч 408)
++
++Перк стал трёхранговым, как в книге: 1 ОЗ за каждые 4 единицы
++полученной радиации, на 2-м ранге — за каждые 3, на 3-м — за каждые 2
++(требование уровня +8 за ранг). Радиация при этом действует как
++обычно — счётчик растёт, а лечение идёт поверх. Норма учитывает и
++радиацию из еды/питья (видна в отчёте об употреблении), и ручные
++движения счётчика; снятие радиации лечения не даёт. Замечание: строка
++книги «максимальный запас ОЗ по-прежнему снижается» в приложении
++ничего не меняет — у нас радиация вообще не снижает Макс. ОЗ, это
++поведение всего приложения, не перка.
++
+ ---
+ ## Гулеподобный и светящийся пакет (патч 407)
+ 
+diff --git a/domain/effects.js b/domain/effects.js
+index d68da34..11bfb92 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -686,8 +686,9 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         // Фармацевт складываются в antiradRadiationBonus (Рад-а-вей сильнее).
+         stimpakHpBonus = 0,
+         antiradRadiationBonus = 0,
+-        // 406: Ghoulish — прибавка радиации вместо вреда лечит.
+-        ghoulish = false,
++        // 408: Гулеподобный (канон) — { hpPerUnits: N }; радиация действует
++        // как обычно, перк добавляет 1 ОЗ за каждые N полученных единиц.
++        ghoulish = null,
+     } = options;
+     if (
+         !Number.isFinite(currentHealth)
+@@ -732,10 +733,14 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+     if (antiradRadiationBonus > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount < 0) {
+         requestedRadiationAmount -= antiradRadiationBonus;
+     }
+-    // 406: Ghoulish — прибавка радиации вместо вреда лечит на то же число.
+-    if (ghoulish && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
+-        healBase += requestedRadiationAmount;
+-        requestedRadiationAmount = 0;
++    // 408: Гулеподобный — радиация применяется как обычно, лечение
++    // добавляется по норме «1 ОЗ за каждые N единиц» от ФАКТИЧЕСКИ
++    // полученных единиц (после гурманской скидки и клампа дном).
++    const ghoulishUnits = ghoulish
++        ? (Number(ghoulish?.hpPerUnits) || 4)
++        : 0;
++    if (ghoulishUnits > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
++        healBase += Math.floor(requestedRadiationAmount / ghoulishUnits);
+     }
+     const finalHealAmount = healBase > 0 ? Math.max(0, healBase + hpHealBonus) : 0;
+     const radiationAfter = requestedRadiationAmount === null
+diff --git a/domain/perks/ghoulish.js b/domain/perks/ghoulish.js
+index f235461..b898ccf 100644
+--- a/domain/perks/ghoulish.js
++++ b/domain/perks/ghoulish.js
+@@ -1,12 +1,22 @@
+ // domain/perks/ghoulish.js
+-// Ghoulish (406, слово владельца): повышение радиации вместо вреда
+-// восстанавливает Текущие ОЗ — на то же количество. В приложении
+-// радиация приходит с едой/питьём/химией: перк читается в
+-// resolveConsumableVitalChanges (радиация не растёт, лечение растёт).
++// ГУЛЕПОДОБНЫЙ (канонический текст владельца, 408):
++// радиация действует как обычно (счётчик растёт, в книге снижает Макс. ОЗ),
++// перк добавляет лечение — 1 ОЗ за каждые N единиц ПОЛУЧЕННОЙ радиации:
++// ранг 1 — N=4, ранг 2 — N=3, ранг 3+ — N=2.
++// Конвертация считается в двух точках (одна норма):
++//   resolveConsumableVitalChanges — радиация из еды/питья/химии (видна в
++//   отчёте об употреблении);
++//   setRadiation — любое ручное изменение счётчика (слово владельца 407:
++//   «учитывает всё влияние радиации, в т.ч. ручное изменение»).
++
++export const ghoulishHpPerUnitsByRank = (rank) => {
++  const r = Math.max(1, Number(rank) || 1);
++  return Math.max(2, 5 - r); // 4 / 3 / 2
++};
+ 
+ export const ghoulishPerk = {
+   id: 'ghoulish',
+-  apply() {
+-    return { ghoulish: true };
++  apply(ctx) {
++    return { ghoulish: { hpPerUnits: ghoulishHpPerUnitsByRank(ctx.state.rank || 1) } };
+   },
+ };
+diff --git a/modules/fallout/data/perks/perks.json b/modules/fallout/data/perks/perks.json
+index 7b2c4c6..a2b4578 100644
+--- a/modules/fallout/data/perks/perks.json
++++ b/modules/fallout/data/perks/perks.json
+@@ -1540,13 +1540,14 @@
+   {
+     "id": "ghoulish",
+     "nameKey": "perks.ghoulish.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "END": 9
+       },
+       "level": 7,
+-      "notForRobots": true
++      "notForRobots": true,
++      "levelIncreasePerRank": 8
+     },
+     "effectKey": "perks.ghoulish.effect",
+     "effect": "ghoulish"
+diff --git a/modules/fallout/i18n/en-EN/data/perks/perks.json b/modules/fallout/i18n/en-EN/data/perks/perks.json
+index 8affa70..4e0d34c 100644
+--- a/modules/fallout/i18n/en-EN/data/perks/perks.json
++++ b/modules/fallout/i18n/en-EN/data/perks/perks.json
+@@ -671,7 +671,7 @@
+   {
+     "id": "ghoulish",
+     "name": "Ghoulish",
+-    "effect": "Radiation heals you."
++    "effect": "Like a ghoul, your body heals under radiation exposure. You recover 1 HP for every 4 points of radiation damage you take. At rank 2, you instead recover 1 HP for every 3 points. At rank 3, you instead recover 1 HP for every 2 points. Your maximum HP is still reduced by radiation damage. Each time you take this perk, the level requirement increases by 8."
+   },
+   {
+     "id": "gladiator",
+diff --git a/modules/fallout/i18n/ru-RU/data/perks/perks.json b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+index 016c245..752bd54 100644
+--- a/modules/fallout/i18n/ru-RU/data/perks/perks.json
++++ b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+@@ -699,7 +699,7 @@
+   {
+     "id": "ghoulish",
+     "name": "ГУЛЕПОДОБНЫЙ",
+-    "effect": "Radiation heals you."
++    "effect": "Подобно гулю, ваше тело исцеляется под воздействием радиации. Вы восстанавливаете 1 ОЗ за каждые 4 единицы полученного радиационного урона. На 2 ранге вы вместо этого восстанавливаете 1 ОЗ за каждые 3 единицы полученного радиационного урона. На 3 ранге вы вместо этого восстанавливаете 1 ОЗ за каждые 2 единицы полученного радиационного урона. Ваш максимальный запас ОЗ по-прежнему снижается от радиационного урона. Каждый раз, когда вы берете этот перк, требование к уровню увеличивается на 8."
+   },
+   {
+     "id": "gladiator",
+diff --git a/public/version.json b/public/version.json
+index 4e8d63b..eecd84a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "407",
++  "version": "408",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index d21f4ae..44ee72a 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -1628,25 +1628,32 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+           ).current,
+         });
+       },
+-      /** Установка радиации (значение или функция), нижняя граница 0. */
+-      setRadiation: (updater) => set((state) => {
++      /**
++       * Установка радиации (значение или функция), нижняя граница 0.
++       * 408: «Гулеподобный» — при ЛЮБОМ подъёме (включая ручное изменение
++       * счётчика) персонаж дополнительно лечит 1 ОЗ за каждые N полученных
++       * единиц (норма по рангу перка: 4/3/2); счётчик растёт как обычно.
++       * options.skipGhoulishHeal — конвейер расходников уже учёл норму в
++       * своём отчёте (resolveConsumableVitalChanges), здесь не дублируем.
++       */
++      setRadiation: (updater, options = {}) => set((state) => {
+         const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
+         const next = setCounter(
+           { id: 'radiation', current: state.radiation, max: null, min: 0 },
+           requested,
+         ).current;
+-        // 407: «Гулеподобный» — ЛЮБОЙ подъём радиации (в том числе ручное
+-        // изменение счётчика) вместо вреда лечит Текущие ОЗ на ту же
+-        // величину; счётчик не растёт. Спад (Рад-а-вей, лечение) — как
+-        // обычно. Конвейер расходников конвертирует сам (в resolver
+-        // радиация не растёт), здесь двойного лечения не возникает.
+-        if (next > state.radiation && Boolean(state.perkBonuses?.ghoulish)) {
+-          const ceiling = calculateMaxHealth(
+-            selectLegacyAttributes({ attributes: state.attributes }),
+-            state.level,
+-          );
+-          const healed = Math.min(next - state.radiation, Math.max(0, ceiling - state.currentHealth));
+-          return { radiation: state.radiation, currentHealth: state.currentHealth + healed };
++        const ghoulish = state.perkBonuses?.ghoulish;
++        if (!options?.skipGhoulishHeal && ghoulish && next > state.radiation) {
++          const units = Number(ghoulish?.hpPerUnits) || 4;
++          const heal = Math.floor((next - state.radiation) / units);
++          if (heal > 0) {
++            const ceiling = calculateMaxHealth(
++              selectLegacyAttributes({ attributes: state.attributes }),
++              state.level,
++            );
++            const applied = Math.min(heal, Math.max(0, ceiling - state.currentHealth));
++            return { radiation: next, currentHealth: state.currentHealth + applied };
++          }
+         }
+         return { radiation: next };
+       }),
+diff --git a/src/store/orchestratorsSlice.js b/src/store/orchestratorsSlice.js
+index 7f61e34..0e1c4f1 100644
+--- a/src/store/orchestratorsSlice.js
++++ b/src/store/orchestratorsSlice.js
+@@ -341,7 +341,8 @@ export const createOrchestrationActions = (set, get) => {
+     }
+     if (vitalChanges.radiationAmount !== null) {
+       // Радиация расходника напрямую меняет счётчик: DR частей тела не участвует.
+-      get().setRadiation(vitalChanges.radiationAfter);
++      // 408: норма «Гулеподобного» уже в healAmount (и в отчёте) — не дублируем.
++      get().setRadiation(vitalChanges.radiationAfter, { skipGhoulishHeal: true });
+     }
+ 
+     // 2. Timed-эффекты через стор.
