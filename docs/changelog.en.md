@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Ghoulish and the glowing pack (patch 407)
+
+«Гулеподобный» (the Russian name of Ghoulish) now accounts for every
+radiation increase — including manual counter changes: instead of harm
+the character heals the same amount of HP, and the counter does not
+grow. The Glowing blood pack got its written mechanics: +5 radiation
+DR until the end of the scene (the +4 HP heal stays). The catalog
+split is now pinned: 43 of 185 perks have explicit mechanics, the
+other 142 are descriptive.
+
+---
 ## Eleven more perks now work (patch 406)
 
 «Ghoulish»: radiation from food and drinks heals instead of harm, HP
