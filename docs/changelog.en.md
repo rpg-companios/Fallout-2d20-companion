@@ -16,6 +16,14 @@
 ---
 ---
 ---
+## Eight new perks from your references (patch 403)
+
+The perk catalog grows from 177 to 185: Crippler, Crushing Blow,
+Fierce Loyalty, In Shining Armor, Jury-Rigged Ammo, Load and Fire,
+Miss Fortune, Old World Gourmet. Texts follow your compiled reference
+(full Russian, concise English); ranks and requirements unchanged.
+
+---
 ## The «What's new» window scrolls (patch 402)
 
 Long release notes no longer fall off the screen: the list scrolls,

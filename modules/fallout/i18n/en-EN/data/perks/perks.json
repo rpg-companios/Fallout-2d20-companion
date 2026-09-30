@@ -952,5 +952,45 @@
     "id": "vaccinated",
     "name": "Vaccinated",
     "effect": "Cannot catch diseases from animal attacks."
+  },
+  {
+    "id": "crippler",
+    "name": "Crippler",
+    "effect": "When you choose a body part before an attack, the attack difficulty does not increase if you target the character's legs."
+  },
+  {
+    "id": "crushingBlow",
+    "name": "Crushing Blow",
+    "effect": "When you deal damage with a Melee or Unarmed attack and roll 3+ Effects, the target is knocked prone. Rank 2: 2+ Effects suffice. Each time you take this perk again, it applies to a different weapon type."
+  },
+  {
+    "id": "fierceLoyalty",
+    "name": "Fierce Loyalty",
+    "effect": "When you suffer an Injury, choose one allied character who can see and hear you: their Physical and Energy Damage Resistance increases by 1 until the end of the scene. Each new rank raises the requirement [of the Injury] by one."
+  },
+  {
+    "id": "inShiningArmor",
+    "name": "In Shining Armor",
+    "effect": "Rank 1: while wearing metal armor, your Energy Damage Resistance increases by 2. Rank 2: additionally, while wearing a welding mask or similar protective optics set, you ignore the effect of blinding light and flashes."
+  },
+  {
+    "id": "juryRiggedAmmo",
+    "name": "Jury-Rigged Ammo",
+    "effect": "At a workbench, you may craft ammunition of rarity up to 1 by spending 5 units of Junk and 10 minutes of work. Rank 2: rarity up to 2. Attacks made with such ammo [suffer a complication on an effect, see the book]."
+  },
+  {
+    "id": "loadAndFire",
+    "name": "Load and Fire",
+    "effect": "When you use a heavy weapon with fire rate 2+, its fire rate increases by +1. Rank 2: +2 instead. Each time you take this perk, it applies to a different weapon type."
+  },
+  {
+    "id": "missFortune",
+    "name": "Miss Fortune",
+    "effect": "Once per battle, either after being attacked or when you attack an enemy, you may spend a Luck Point: Miss Fortune appears and attacks that enemy. Roll 1d20 and apply the matching result [from the table]."
+  },
+  {
+    "id": "oldWorldGourmet",
+    "name": "Old World Gourmet",
+    "effect": "Increase by 2 the HP restored when consuming packaged, canned or other preserved pre-War food. Additionally, reduce the Radiation value of such food by 1 (to a minimum of 0)."
   }
 ]

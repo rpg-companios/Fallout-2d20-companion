@@ -8,7 +8,28 @@
 > `docs/agents/README.md` и `docs/agents/data-flows.md`.
 
 Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
-· последний сданный патч: **402** (владелец: «ты снова забыл про скролл
+· последний сданный патч: **403** (владелец добавил на main 22b5add
+ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+fallout2d20_perks (1) (184: структурированные op/modifier/when),
+perks_mapping (177→185, matched 184, appOnly emt), perks_discrepancies
+(значения приложения НЕ менять — слово владельца)). 403: каталог
+177→185 (+crippler, crushingBlow, fierceLoyalty, inShiningArmor,
+juryRiggedAmmo, loadAndFire, missFortune, oldWorldGourmet; требования
+= structure точно), ru-имена/тексты из catalog_ru, en — составлены
+(в локальных референсах en-имён восьми НЕТ). Реализовано автодействий
+22 из 185 (domain/perks/*, реестр index.js). Оценка адаптируемости
+f2-диалекта (op: +/set/unlock/restore/reroll/trigger/immune…):
+статика ложится на ctx-шаблон; бой/спутники/целевые выстрелы — вне
+движка (текст). Из новых 8 адаптируемы: oldWorldGourmet (еда/рад),
+loadAndFire (скорострельность тяжёлого), juryRiggedAmmo (крафт патронов),
+частично inShiningArmor; crippler/crushingBlow/fierceLoyalty/
+missFortune — только текст. Реализация — ПО СЛОВУ владельца. Уроки
+403: (1) апостроф в «What's new» ронял python-скрипт ДО записи —
+строки с апострофами в двойных кавычках; (2) .git снова сбросился
+к базе в момент коммита — коммит лёг на 529824d со всеми файлами;
+лечение штатное (fetch+reset --hard, файлы спасти show-ом) ·
+предыдущий: **402** (владелец: «ты снова забыл про скролл
 длинных окон. Как читать релиз, если оно за пределами экрана и не
 двигается?»). Окно «Что нового» (UpdateNoticeModal): список заметок
 обёрнут в ScrollView (flexShrink:1, nestedScrollEnabled), окно

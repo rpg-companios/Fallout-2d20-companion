@@ -2283,19 +2283,6 @@
     "effect": "vaccinated"
   },
   {
-    "id": "crippler",
-    "nameKey": "perks.crippler.name",
-    "maxRanks": 1,
-    "prerequisites": {
-      "special": {
-        "PER": 7
-      },
-      "level": 12
-    },
-    "effectKey": "perks.crippler.effect",
-    "effect": "crippler"
-  },
-  {
     "id": "crushingBlow",
     "nameKey": "perks.crushingBlow.name",
     "maxRanks": 2,
@@ -2308,48 +2295,6 @@
     },
     "effectKey": "perks.crushingBlow.effect",
     "effect": "crushingBlow"
-  },
-  {
-    "id": "fierceLoyalty",
-    "nameKey": "perks.fierceLoyalty.name",
-    "maxRanks": 3,
-    "prerequisites": {
-      "special": {
-        "CHA": 6
-      },
-      "level": 6,
-      "levelIncreasePerRank": 6
-    },
-    "effectKey": "perks.fierceLoyalty.effect",
-    "effect": "fierceLoyalty"
-  },
-  {
-    "id": "inShiningArmor",
-    "nameKey": "perks.inShiningArmor.name",
-    "maxRanks": 2,
-    "prerequisites": {
-      "special": {
-        "AGI": 6
-      },
-      "level": 8,
-      "levelIncreasePerRank": 6
-    },
-    "effectKey": "perks.inShiningArmor.effect",
-    "effect": "inShiningArmor"
-  },
-  {
-    "id": "juryRiggedAmmo",
-    "nameKey": "perks.juryRiggedAmmo.name",
-    "maxRanks": 2,
-    "prerequisites": {
-      "special": {
-        "LCK": 6
-      },
-      "level": 6,
-      "levelIncreasePerRank": 4
-    },
-    "effectKey": "perks.juryRiggedAmmo.effect",
-    "effect": "juryRiggedAmmo"
   },
   {
     "id": "loadAndFire",
@@ -2379,6 +2324,47 @@
     "effect": "missFortune"
   },
   {
+    "id": "juryRiggedAmmo",
+    "nameKey": "perks.juryRiggedAmmo.name",
+    "maxRanks": 2,
+    "prerequisites": {
+      "special": {
+        "LCK": 6
+      },
+      "level": 6,
+      "levelIncreasePerRank": 4
+    },
+    "effectKey": "perks.juryRiggedAmmo.effect",
+    "effect": "juryRiggedAmmo"
+  },
+  {
+    "id": "crippler",
+    "nameKey": "perks.crippler.name",
+    "maxRanks": 1,
+    "prerequisites": {
+      "special": {
+        "PER": 7
+      },
+      "level": 12
+    },
+    "effectKey": "perks.crippler.effect",
+    "effect": "crippler"
+  },
+  {
+    "id": "inShiningArmor",
+    "nameKey": "perks.inShiningArmor.name",
+    "maxRanks": 2,
+    "prerequisites": {
+      "special": {
+        "AGI": 6
+      },
+      "level": 8,
+      "levelIncreasePerRank": 6
+    },
+    "effectKey": "perks.inShiningArmor.effect",
+    "effect": "inShiningArmor"
+  },
+  {
     "id": "oldWorldGourmet",
     "nameKey": "perks.oldWorldGourmet.name",
     "maxRanks": 1,
@@ -2390,5 +2376,19 @@
     },
     "effectKey": "perks.oldWorldGourmet.effect",
     "effect": "oldWorldGourmet"
+  },
+  {
+    "id": "fierceLoyalty",
+    "nameKey": "perks.fierceLoyalty.name",
+    "maxRanks": 3,
+    "prerequisites": {
+      "special": {
+        "CHA": 6
+      },
+      "level": 6,
+      "levelIncreasePerRank": 6
+    },
+    "effectKey": "perks.fierceLoyalty.effect",
+    "effect": "fierceLoyalty"
   }
 ]
