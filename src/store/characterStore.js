@@ -66,6 +66,8 @@ import { createInitialPowerArmorState, createPowerArmorActions } from './powerAr
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import { selectPerkBonuses } from '../../domain/perks.js';
+// 404: префикс металлической брони для «В сияющих доспехах».
+import { isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
@@ -238,10 +240,19 @@ const deriveFromSnapshot = (state, options = {}) => {
     ...(state._characterContext || {}),
     ...options,
   };
+  // 404: «В сияющих доспехах» — металл на теле? Любая надетая деталь
+  // armor_metal_* (префикс металлической брони каталога).
+  const wearingMetalArmor = Object.values(state.equippedArmor || {})
+    .some((slotRow) => {
+      const piece = slotRow?.armor || null;
+      const catalogId = piece?.weaponId || piece?.id || '';
+      return isMetalArmorCatalogId(catalogId);
+    });
   const equipmentState = {
     ...(context.equipmentState || {}),
     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+    wearingMetalArmor,
   };
   return calculateDerivedStats(
     state.attributes,

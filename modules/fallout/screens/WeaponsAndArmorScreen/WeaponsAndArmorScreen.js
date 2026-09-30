@@ -24,6 +24,8 @@ import { resolveBodyPlan } from '../../../../domain/bodyplan';
 import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
 // Единый путь записи модов (311): классификация места хранения — движок.
 import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
+// 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+import { applyLoadAndFireToWeapon } from '../../../../domain/perks/loadAndFire';
 import { diffModInstallPlan } from '../../../../domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
@@ -847,8 +849,10 @@ const WeaponsAndArmorScreen = () => {
     origin?.bodyPlan,
     inventoryItems,
   );
+  // 404: «Заряжай и стреляй» — скорострельность тяжёлого оружия с перком.
+  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
-    (weapon) => findLocalizedWeapon(equipmentCatalog, weapon),
+    (weapon) => applyLoadAndFireToWeapon(findLocalizedWeapon(equipmentCatalog, weapon), loadAndFireBonus),
   );
   useEffect(() => {
     debugLog('weapon.display.list', {

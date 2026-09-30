@@ -11,6 +11,8 @@ import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
 import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+// 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import {
   isFusionCoreItem,
@@ -103,7 +105,16 @@ const InventoryScreen = () => {
   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
   // Read-хелпер альбома модификаций: с патча 237 альбом только читается
   // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
-  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
+  // 404: «Заряжай и стреляй» — тяжёлое оружие на карточках инвентаря
+  // показывает скорострельность с перковой прибавкой (единая точка с
+  // экраном снаряжения — domain/perks/loadAndFire).
+  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
+  const getModifiedItem = (item) => {
+    const base = storeModifiedItems[getItemId(item)] || item;
+    return base?.weaponType === 'Heavy'
+      ? applyLoadAndFireToWeapon(base, loadAndFireBonus)
+      : base;
+  };
   // Шаг 7: origin/trait — стор напрямую.
   // Шаг 8а: слоты робота и производный вес — стор напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);

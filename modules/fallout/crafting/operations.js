@@ -20,6 +20,14 @@ import { getItemId } from '../../../domain/itemIdentity';
 import { rollByType } from '../../../domain/diceRollsLogic';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
 import { CRAFT_RULES } from './rules';
+// 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
+import {
+  JUNK_RIG_ANY_ID,
+  JUNK_RIG_JUNK_COST,
+  JUNK_RIG_MINUTES,
+  juryRigMaxRarityByRank,
+} from '../../../domain/perks/juryRiggedAmmo';
+import { getScrapJunkItems } from '../../../domain/registry';
 import { applyActivityMinutes } from '../survival/operations';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { earnActionPoints, getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
@@ -150,13 +158,98 @@ const perkRanksFor = (recipe, selectedPerks) => {
   return ranks;
 };
 
+// --- 404: «Ломовые патроны» ----------------------------------------------
+// Ранг перка меряется тем же способом, что и гейты рецептов (число
+// выбранных рангов в selectedPerks) — превью и крафт видят одно и то же.
+
+let junkIdSetCache = null;
+const junkIdSet = () => {
+  if (!junkIdSetCache) {
+    junkIdSetCache = new Set(getScrapJunkItems().map((j) => j?.id).filter(Boolean));
+  }
+  return junkIdSetCache;
+};
+
+/**
+ * Активен ли «ломовой» режим для рецепта. Патроны, сложность (редкость)
+ * которых не выше ранга перка: 5 хлама вместо материалов, 10 минут.
+ * null — режим не действует (не патроны / перка нет / редкость велика).
+ */
+export const juryRigFor = (recipe) => {
+  if (recipe?.category !== 'ammo') return null;
+  const store = useCharacterStore.getState();
+  const rank = getPerkSelectionCount(store.selectedPerks ?? [], 'juryRiggedAmmo');
+  if (rank < 1) return null;
+  const complexity = Number(recipe.requires?.complexity) || 0;
+  if (complexity < 1 || complexity > juryRigMaxRarityByRank(rank)) return null;
+  return {
+    maxRarity: juryRigMaxRarityByRank(rank),
+    junkCost: JUNK_RIG_JUNK_COST,
+    minutes: JUNK_RIG_MINUTES,
+  };
+};
+
+// Подменённый рецепт для движка: движок непрозрачно ест id материалов,
+// поэтому строку материалов заменяем виртуальной «любой хлам».
+const withJuryRig = (recipe) => {
+  const jury = juryRigFor(recipe);
+  if (!jury) return recipe;
+  return {
+    ...recipe,
+    materials: [{ itemId: JUNK_RIG_ANY_ID, count: jury.junkCost }],
+  };
+};
+
+// Сколько в сумке свободного хлама — для виртуальной строки «любой хлам».
+const withJunkAnyCount = (recipe, counts) => {
+  if (!recipe.materials.some((m) => m.itemId === JUNK_RIG_ANY_ID)) return counts;
+  const junkIds = junkIdSet();
+  let total = 0;
+  for (const [id, count] of Object.entries(counts)) {
+    if (junkIds.has(id)) total += count;
+  }
+  return { ...counts, [JUNK_RIG_ANY_ID]: total };
+};
+
+// Разложить виртуальный «любой хлам» на реальные предметы: крупные пачки
+// первыми, при равенстве — по id (детерминизм «превью = действие»).
+const takeJunk = (want, counts) => {
+  const junkIds = junkIdSet();
+  const rows = [...junkIds]
+    .map((id) => ({ id, have: Math.max(0, Number(counts[id]) || 0) }))
+    .filter((r) => r.have > 0)
+    .sort((a, b) => b.have - a.have || (a.id < b.id ? -1 : 1));
+  let left = want;
+  const out = [];
+  for (const row of rows) {
+    if (left <= 0) break;
+    const grab = Math.min(row.have, left);
+    out.push({ itemId: row.id, count: grab });
+    left -= grab;
+  }
+  if (left > 0) out.push({ itemId: JUNK_RIG_ANY_ID, count: left }); // путь отказа стора
+  return out;
+};
+
+const expandJunkSpend = (plan, counts) =>
+  plan.flatMap((row) => (
+    row.itemId === JUNK_RIG_ANY_ID ? takeJunk(row.count, counts) : [{ itemId: row.itemId, count: row.count }]
+  ));
+// --- конец «Ломовых патронов» ---------------------------------------------
+
 const heroView = (recipe) => {
   const store = useCharacterStore.getState();
+  // 404: гейты и материалы движок видит ПОСЛЕ ломовой подмены.
+  const engineRecipe = withJuryRig(recipe);
   return {
     store,
+    engineRecipe,
     skillRank: selectSkillTotal(store, recipe.requires.skill),
     perkRanks: perkRanksFor(recipe, store.selectedPerks),
-    inventoryCounts: countsForEngine(recipe, countInventoryByCatalogId(store.items)),
+    inventoryCounts: countsForEngine(
+      engineRecipe,
+      withJunkAnyCount(engineRecipe, countInventoryByCatalogId(store.items)),
+    ),
     attributeValue: selectAttributeTotal(store, CRAFT_RULES.testAttribute),
     isTagged: isSkillTagged({
       skillId: recipe.requires.skill,
@@ -173,10 +266,10 @@ const heroView = (recipe) => {
 export const craftingPreview = (recipeId) => {
   const recipe = getCraftingRecipeById(recipeId);
   if (!recipe) return null;
-  const { skillRank, perkRanks, inventoryCounts } = heroView(recipe);
+  const { skillRank, perkRanks, inventoryCounts, engineRecipe } = heroView(recipe);
   return {
     recipe,
-    evaluation: evaluateCraft({ recipe, skillRank, perkRanks, inventoryCounts }),
+    evaluation: evaluateCraft({ recipe: engineRecipe, skillRank, perkRanks, inventoryCounts }),
     // Цена проверки — свойство рецепта (реформа 269): право провала сжигать
     // материалы записано в самой строке (failBurnsMaterials), карт верстаков нет.
     rulesView: {
@@ -189,10 +282,14 @@ export const craftingPreview = (recipeId) => {
 
 // Базовые минуты работы по книге (патч 323): час для всех категорий,
 // 20 минут — станция приготовления пищи (еда и напитки).
-export const craftMinutesForRecipe = (recipe) =>
-  CRAFT_RULES.stationCategories.includes(recipe?.category)
+// 404: «Ломовые патроны» — патроны низкой редкости из хлама за 10 минут.
+export const craftMinutesForRecipe = (recipe) => {
+  const jury = juryRigFor(recipe);
+  if (jury) return jury.minutes;
+  return CRAFT_RULES.stationCategories.includes(recipe?.category)
     ? CRAFT_RULES.stationMinutes
     : CRAFT_RULES.craftBaseMinutes;
+};
 
 // Надбавка за КАЖДОЕ осложнение (книга, 323): +30 минут, на станции +10.
 export const complicationExtraMinutesFor = (recipe) =>
@@ -245,14 +342,14 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
   }
 
-  const { store, skillRank, perkRanks, inventoryCounts, attributeValue, isTagged } = heroView(recipe);
+  const { store, skillRank, perkRanks, inventoryCounts, attributeValue, isTagged, engineRecipe } = heroView(recipe);
 
   // Фактическое списание (с закрытием пачек) — помечаем в замыкании, чтобы
   // вернуть в контракте spent/burned честными строками, а не планом движка.
   let expandedSpend = null;
 
   const result = runCraft({
-    recipe,
+    recipe: engineRecipe,
     skillRank,
     attributeValue,
     isTagged,
@@ -265,7 +362,9 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
     rollCD: ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
     spend: (plan) => {
-      expandedSpend = expandSpendPlan(plan, countInventoryByCatalogId(useCharacterStore.getState().items));
+      const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
+      // 404: виртуальный «любой хлам» раскладывается на реальные предметы.
+      expandedSpend = expandSpendPlan(expandJunkSpend(plan, freeCounts), freeCounts);
       return store.spendItemStacks({ spend: expandedSpend });
     },
     grant: ({ itemId, quantity }) => ({

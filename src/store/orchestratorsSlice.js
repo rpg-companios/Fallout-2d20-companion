@@ -299,6 +299,7 @@ export const createOrchestrationActions = (set, get) => {
       irradiatedConsumableRadiationImmune = false,
       colaNutDrinkIds,
       colaNutHealMultiplier = 1,
+      oldWorldGourmet = null,
     } = state.perkBonuses || {};
     const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
       ? Number(colaNutHealMultiplier) || 1
@@ -314,6 +315,7 @@ export const createOrchestrationActions = (set, get) => {
       hpHealMultiplier,
       radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
+      oldWorldGourmet,
     };
     if (Object.hasOwn(options, 'radiationRequestedAmount')) {
       vitalOptions.radiationRequestedAmount = options.radiationRequestedAmount;

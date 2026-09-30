@@ -270,6 +270,19 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     }
   });
 
+  // 404: В сияющих доспехах (ранг 1+) — в металлической брони СУ энергия +2.
+  // Ношение металлической брони считает store (wearingMetalArmor, детали
+  // armor_metal_*), сюда приходит готовым флагом equipmentState.
+  const shiningRank = Number(perkBonuses.inShiningArmorRank) || 0;
+  if (shiningRank > 0 && equipmentState.wearingMetalArmor) {
+    stats.damageResistance.energy.modifiers.push({
+      source: 'perks.inShiningArmor',
+      value: 2,
+      operation: '+',
+    });
+    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
+  }
+
   return stats;
 };
 

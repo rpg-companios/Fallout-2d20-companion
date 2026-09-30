@@ -20,6 +20,10 @@ import { chemResistantPerk } from './chemResistant';
 import { colaNutPerk } from './colaNut';
 import { thirstQuencherPerk } from './thirstQuencher';
 import { pharmaFarmerPerk } from './pharmaFarmer';
+import { oldWorldGourmetPerk } from './oldWorldGourmet';
+import { inShiningArmorPerk } from './inShiningArmor';
+import { loadAndFirePerk } from './loadAndFire';
+import { juryRiggedAmmoPerk } from './juryRiggedAmmo';
 
 export const perkEffects = {
   [intenseTrainingPerk.id]: intenseTrainingPerk,
@@ -44,6 +48,10 @@ export const perkEffects = {
   [colaNutPerk.id]: colaNutPerk,
   [thirstQuencherPerk.id]: thirstQuencherPerk,
   [pharmaFarmerPerk.id]: pharmaFarmerPerk,
+  [oldWorldGourmetPerk.id]: oldWorldGourmetPerk,
+  [inShiningArmorPerk.id]: inShiningArmorPerk,
+  [loadAndFirePerk.id]: loadAndFirePerk,
+  [juryRiggedAmmoPerk.id]: juryRiggedAmmoPerk,
 };
 
 export function getPerkEffect(effectId) {

@@ -663,6 +663,9 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         hpHealMultiplier = 1,
         radiationImmune = false,
         skipIrradiatedRadiation = false,
+        // 404: Гурман старого мира — preserved-еда: +2 ОЗ и радиация еды на
+        // 1 меньше (до минимума 0). Приходит из perkBonuses (см. перк).
+        oldWorldGourmet = null,
     } = options;
     if (
         !Number.isFinite(currentHealth)
@@ -676,17 +679,29 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
     }
 
     const instantHealAmount = getInstantHealAmount(item) * hpHealMultiplier;
-    const healAmount = instantHealAmount > 0
-        ? Math.max(0, instantHealAmount + hpHealBonus)
+    // 404: гурман — плоская прибавка к лечению preserved-еды (даже если
+    // предмет сам не лечит: «+2 к восстанавливаемым ОЗ» — буквально).
+    const gourmet = oldWorldGourmet && item?.itemType === 'food' && item?.preserved === true
+        ? oldWorldGourmet
+        : null;
+    const healBase = instantHealAmount + (gourmet ? Number(gourmet.hpBonus) || 0 : 0);
+    const healAmount = healBase > 0
+        ? Math.max(0, healBase + hpHealBonus)
         : 0;
     const healthAfter = healAmount > 0
         ? Math.min(maxHealth, currentHealth + healAmount)
         : currentHealth;
 
     // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
-    const requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
+    let requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
         ? options.radiationRequestedAmount
         : resolveConsumableRadiationAmount(item, { radiationImmune, skipIrradiatedRadiation });
+    // 404: гурман — радиация preserved-еды на 1 меньше, но не «в плюс»
+    // (здесь положительное число = радиация прибавляется: 2 → 1, 1 → 0;
+    // отрицательное — предмет СНИМАЕТ радиацию, его не трогаем).
+    if (gourmet && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
+        requestedRadiationAmount = Math.max(0, requestedRadiationAmount - (Number(gourmet.radiationReduction) || 0));
+    }
     const radiationAfter = requestedRadiationAmount === null
         ? radiation
         : Math.max(0, radiation + requestedRadiationAmount);

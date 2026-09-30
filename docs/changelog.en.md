@@ -1,4 +1,19 @@
 # Changelog
+---
+## Four perks now actually work (patch 404)
+
+As you asked, all four adaptable perks from the previous step landed in
+one patch. «Old World Gourmet»: packaged and canned food heals 2 HP
+more and deals 1 less radiation (down to zero). «Load and Fire»: heavy
+weapons fire 1 (rank 1) or 2 (rank 2) more shots — visible on weapon
+cards in inventory and on the gear screen. «In Shining Armor»: +2
+energy damage resistance while wearing metal armor (the rank-2
+dazzle protection stays perk text — combat scenes are out of the
+app's scope). «Jury-Rigged Ammo»: at a workbench, ammo of rarity 1
+(and 2 with rank 2) can be made from any junk — 5 pieces and 10
+minutes instead of regular materials and an hour of work; the craft
+report reminds you: attacks with such ammo get a Complication Range +1.
+
 
 ---
 ---

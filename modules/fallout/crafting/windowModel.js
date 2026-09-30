@@ -22,7 +22,9 @@ import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
 import enPerks from '../i18n/en-EN/data/perks/perks.json';
 import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
-import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime } from './operations';
+import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime, juryRigFor } from './operations';
+// 404: «Ломовые патроны» — виртуальная строка материалов «любой хлам».
+import { JUNK_RIG_ANY_ID } from '../../../domain/perks/juryRiggedAmmo';
 import { CRAFT_RULES } from './rules';
 
 // Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
@@ -78,7 +80,9 @@ const hintByPrefix = (id) => {
 const itemName = (catalog, id, typeHint) => {
   const hint = typeHint ?? hintByPrefix(id);
   const entry = (hint ? findCatalogEntry(catalog, id, hint) : null)
-    ?? findCatalogEntry(catalog, id, 'misc');
+    ?? findCatalogEntry(catalog, id, 'misc')
+    // 404: списанный хлам (id без узнаваемого префикса) зовётся по имени.
+    ?? findCatalogEntry(catalog, id, 'junk');
   return entry?.name ?? id;
 };
 
@@ -160,7 +164,8 @@ const buildRowsForCategory = (category) => {
       : 0;
     const materials = evaluation.materials.map((row) => ({
       itemId: row.itemId,
-      name: itemName(catalog, row.itemId, null),
+      // 404: виртуальная строка «любой хлам» подписывается словами, не id.
+      name: row.itemId === JUNK_RIG_ANY_ID ? d.junkAny : itemName(catalog, row.itemId, null),
       rarity: materialRarityOf(row.itemId),
       need: row.need,
       have: row.have,
@@ -315,6 +320,11 @@ export const buildCraftReport = (recipeId, run) => {
     lines.push(fmt(d.apEarnedLine, { n: apGained, pool: apPool }));
   }
   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
+  // 404: «Ломовые патроны» — напоминалка про книжное свойство таких патронов
+  // (Диапазон осложнений +1 в бою; сцена боя — вне движка приложения).
+  if (juryRigFor(recipe) && run.attempts.some((a) => a.done === true)) {
+    lines.push(d.junkRigNote);
+  }
   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
   return { title: d.resultTitle, lines, recipeId, pendingTime };
 };
