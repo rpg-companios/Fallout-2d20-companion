@@ -1,0 +1,376 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index f61efaa..8cdddd9 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -5,8 +5,10 @@
+ //   при успехе 2 ОД сокращают вдвое; осложнение: д20 19–20 = потеря
+ //   дополнительных материалов, иначе +15 минут. Материалы — книжная
+ //   таблица по редкости. Провал: материалы остаются (закон верстака),
+-//   время зря. Кнопка «Починить» открывает модалку (мгновенного
+-//   бесплатного ремонта больше нет).
++//   время зря. Слово владельца 414/415: КНОПКА ОДНА — при включённой
++//   настройке прочности это «Ремонт» (окно: донор/материалы/отчёт как в
++//   Крафте), при выключенной — мгновенная бесплатная «Починить»; ремонт
++//   и его затраты — на 1 ШТУКУ (пачки разделяются).
+ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+ import useCharacterStore from '../../src/store/characterStore';
+ import {
+@@ -20,6 +22,7 @@ import {
+   settleRepairTime,
+   repairModsCountFor,
+   donorCandidatesFor,
++  splitOnePieceFromStack,
+ } from '../../modules/fallout/repair/operations';
+ import { readFileSync } from 'node:fs';
+ import { buildRepairReport } from '../../modules/fallout/repair/operations';
+@@ -37,14 +40,14 @@ afterEach(async () => {
+ });
+ 
+ // Оружие-экземпляр в инвентаре (как seedStack крафта — weaponId = канон).
+-const seedWeapon = ({ durability = 40, weaponId = 'weapon_10mm_pistol', id }) => {
++const seedWeapon = ({ durability = 40, weaponId = 'weapon_10mm_pistol', id, quantity = 1 }) => {
+   const key = id ?? `seed_${weaponId}_${Math.random().toString(36).slice(2, 7)}`;
+   useCharacterStore.setState((prev) => ({
+     items: {
+       ...prev.items,
+       [key]: {
+         id: weaponId, weaponId, itemType: 'weapon',
+-        durability, durabilityTracked: true, quantity: 1,
++        durability, durabilityTracked: true, quantity,
+       },
+     },
+   }));
+@@ -327,6 +330,39 @@ describe('Патч 413: операции — редкость, моды, дон
+     expect(report.pendingTime).toEqual({ hasSuccess: true }); // CraftReportView спросит про 2 ОД
+   });
+ 
++  it('слово владельца 415: пачка ОРУЖИЯ тоже чинится по одной штуке', () => {
++    seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol', quantity: 3, id: 'seed_pistol_stack' });
++    seedMaterials('item_common_materials', 2); // редкость 1 → 2 Обычных за тест
++    setRepairHero({ int: 5, repair: 0 });
++    const result = performRepair('seed_pistol_stack', {
++      ports: { rollD20: dice(2, 3) },
++    });
++    expect(result.done).toBe(true);
++    const pistols = Object.values(state().items).filter((i) => i.weaponId === 'weapon_10mm_pistol');
++    const whole = pistols.find((i) => Number(i.durability) === 100);
++    const damaged = pistols.find((i) => Number(i.durability) === 40);
++    expect(whole?.quantity ?? 0).toBe(1);          // починена ОДНА
++    expect(damaged?.quantity ?? 0).toBe(2);        // остальные ждут своих тестов
++  });
++
++  it('мгновенная бесплатная починка тоже по 1 шт: splitOnePieceFromStack', () => {
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_stack: {
++          id: 'power_armor_raider_chest', weaponId: 'power_armor_raider_chest',
++          itemType: 'powerArmor', hpCurrent: 2, maxHp: 10, quantity: 2,
++        },
++      },
++    }));
++    const singleId = splitOnePieceFromStack('seed_stack');
++    expect(singleId).not.toBe('seed_stack');
++    expect(state().items[singleId].quantity).toBe(1);
++    expect(state().items.seed_stack.quantity).toBe(1);
++    // одиночка не разделяется.
++    expect(splitOnePieceFromStack(singleId)).toBe(singleId);
++  });
++
+   it('донор списывается вместе со своими модами (закон 343/344)', () => {
+     const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
+     const donorKey = seedWeapon({ durability: 55, weaponId: 'weapon_10mm_pistol' });
+@@ -355,29 +391,35 @@ describe('Патч 413: операции — редкость, моды, дон
+   });
+ });
+ 
+-describe('Проводка (слово владельца 414): «Починить» мгновенно + «Ремонт» по книге', () => {
++describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
+   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+ 
+-  it('две кнопки: «Починить» зовёт экшн стора, «Ремонт» открывает модалку', () => {
++  it('одна кнопка у всех целей: настройка ВКЛ — «Ремонт» (окно), ВЫКЛ — мгновенная «Починить»', () => {
+     const code = src();
+     expect(code).toContain('RepairModal');
+-    // «Починить» — мгновенные экшны (прежнее поведение).
+-    expect(code).toContain('onPress={() => repairWeapon(item.id)}');
+-    expect(code).toContain('onPress={() => repairPowerArmorStack(item.id)}');
+-    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+-    // «Ремонт» — модалка (все три формы цели).
++    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
++    expect((code.match(/weaponDurabilityLossEnabled \?/g) ?? []).length).toBe(3);
++    // Книжный режим открывает окно (обе формы цели).
+     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
+     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
++    // Бесплатный режим — мгновенный и по 1 шт (через отделение штуки).
++    expect(code).toContain('repairOnePieceInstant(item.id)');
++    expect(code).toContain('splitOnePieceFromStack');
++    expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
++    expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
++    // Надетая часть — всегда 1 шт, сразу экшн.
++    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
++    // Подписи режимов различаются.
+     expect(code).toContain("tInventory('repair.actions.remake')");
++    expect(code).toContain("tInventory('repair.actions.repair')");
+   });
+ 
+-  it('гейты кнопки «Ремонт»: настройка прочности и доступность материалов', () => {
++  it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
+     const code = src();
+-    // «Кнопки ремонта нет, если настройка прочности не активна».
+-    expect(code).toContain('weaponDurabilityLossEnabled && (');
+-    // «Если материалов нет, кнопка ремонта не активна».
+     expect(code).toContain('!repairAffordable && styles.applyButtonDisabled');
++    expect(code).toContain('!pieceAffordable && styles.applyButtonDisabled');
+     expect(code).toContain('disabled={!repairAffordable}');
++    expect(code).toContain('disabled={!pieceAffordable}');
+     expect(code).toContain('repairAffordableFor');
+     expect(code).toContain('repairAffordableForPiece');
+   });
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index c0c262f..8f7f374 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -13,7 +13,7 @@ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/moda
+ // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
+ // «Починить» больше не чинят мгновенно и бесплатно).
+ import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
+-import { repairAffordableFor, repairAffordableForPiece } from '../../../modules/fallout/repair/operations';
++import { repairAffordableFor, repairAffordableForPiece, splitOnePieceFromStack } from '../../../modules/fallout/repair/operations';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+ import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
+@@ -164,6 +164,19 @@ const InventoryScreen = () => {
+   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
+ 
++  // Слово владельца 414/415: бесплатная починка — на ОДНУ штуку: отделяем
++  // штуку от пачки (если пачка) и чиним только её.
++  const repairOnePieceInstant = (storeItemId) => {
++    const id = splitOnePieceFromStack(storeItemId);
++    const piece = useCharacterStore.getState().items?.[id];
++    if (piece?.itemType === 'powerArmor') {
++      if (piece.paSlot) repairPowerArmorPieceAt(id);
++      else repairPowerArmorStack(id);
++    } else {
++      repairWeapon(id);
++    }
++  };
++
+   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
+     if (!stackKey) return undefined;
+     // Прямое совпадение (сторовый stackKey: "weapon_10mm_pistol")
+@@ -1478,21 +1491,20 @@ const InventoryScreen = () => {
+             </View>
+           </View>
+           <View style={styles.actionContainer}>
+-            {item.showRepair && (
+-              <TouchableOpacity
+-                style={[styles.actionButton, styles.applyButton]}
+-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
+-                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+-              </TouchableOpacity>
+-            )}
+-            {item.showRepair && weaponDurabilityLossEnabled && (
++            {item.showRepair && (weaponDurabilityLossEnabled ? (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+-                disabled={!repairAffordable}
++                disabled={!pieceAffordable}
+                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
+-            )}
++            ) : (
++              <TouchableOpacity
++                style={[styles.actionButton, styles.applyButton]}
++                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
++                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
++            ))}
+             <TouchableOpacity
+               style={[styles.actionButton, styles.unequipButton]}
+               onPress={() => unequipPowerArmorPieceAt(item.paSlot)}>
+@@ -1672,37 +1684,35 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
+-          {showWeaponRepair && (
+-              <TouchableOpacity
+-                  style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairWeapon(item.id)}>
+-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+-              </TouchableOpacity>
+-          )}
+-          {showWeaponRepair && weaponDurabilityLossEnabled && (
++          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
+-          )}
+-
+-          {showPARepair && (
++          ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairPowerArmorStack(item.id)}>
+-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
++                  onPress={() => repairOnePieceInstant(item.id)}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+-          )}
+-          {showPARepair && weaponDurabilityLossEnabled && (
++          ))}
++
++          {showPARepair && (weaponDurabilityLossEnabled ? (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
+-          )}
++          ) : (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => repairOnePieceInstant(item.id)}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
++          ))}
+ 
+           {salvage && (
+               <TouchableOpacity
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4e9f682..88d7276 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (414)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (415)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **415** (СЛОВО ВЛАДЕЛЬЦА: «Бесплатная починка только при отключенных настройках или перке. Кнопка одна для обоих случаев. Ремонт и его затраты даны на 1шт, а не карточку, пачку, стопку или как ты называешь количество >1»). ПРИМЕНЕНО: КНОПКА ОДНА (тернарник weaponDurabilityLossEnabled у всех 3 целей): настройка ВЫКЛ → мгновенная бесплатная «Починить» (en Fix), ВКЛ → книжный «Ремонт» (en Repair, окно 413/414 с донором/материалами/крафт-отчётом, гейт repairAffordable/pieceAffordable — серая без материалов и донора). ЗАКОН 1 ШТ ВЕЗДЕ: splitOnePieceFromStack (operations) — performRepair отделяет штуку для ЛЮБОГО вида (оружие тоже), мгновенная кнопка зовёт repairOnePieceInstant (инвентарь) = split + экшн по отделённой штуке; надетая часть СБ — всегда 1 шт (прямой экшн). Фикс бага 414: у кнопки надетой части disabled={!pieceAffordable} (была чужая переменная). Бесплатная при перке = «Очумелые ручки» — СЛЕДУЮЩИЙ патч (та же кнопка). Защёлка 413 = закон 415 (23 теста). 1473/152, tsc 0. Предыдущий снимок — **414** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **414** (СЛОВО ВЛАДЕЛЬЦА на мои три сверх-книжных решения 413: «Не согласен. Донора предлагать в окне ремонта (если есть). Если нет, то в инвентаре по нажатии кнопки ремонт (что рядом с починить), просто отчёт о ремонте. Если материалов нет, кнопка ремонта не активна. Кнопки ремонт нет, если настройка прочности не активна. Окно отчёта с тратой ОД уже есть в окне Крафта — его берём за основу, тут почти всё то же самое, только прочность предмета повышается вместо предмета. …с чего ты решил силовую броню чинить всю?? Каждый элемент отдельно!»). ПРИМЕНЕНО: ДВЕ кнопки — «Починить» (мгновенно бесплатно, прежнее) + «Ремонт» (книжный тест 413); донор предлагается в окне, донора НЕТ → окно выбора не открывается (автостарт в RepairModal), сразу попытка и отчёт; отчёт = крафтовый (общий CraftReportView, buildRepairReport, строки из craftingModal.json repair.*) — «прочность предмета восстановлена» вместо «получено: предмет»; кнопка «Ремонт» disabled если материалов нет (и донора нет — repairAffordableFor / repairAffordableForPiece для надетой части); кнопки «Ремонт» НЕТ при выключенной настройке прочности (weaponDurabilityLossEnabled); СБ чинится по ОДНОЙ штуке (performRepair отделяет 1 шт от пачки — клон quantity:1, repairPowerArmorStack сольёт её с целыми; en-кнопки Fix/Repair). СЛОВО ВЛАДЕЛЬЦА про слово «карточка»: не использовать; один тест = одна деталь. Защёлка 413 дополнена до закона 414 (21 тест). 1471/152, tsc 0. Процессуальное: .git снова сбросился на 529824d посреди 414 — спасён tar-бэкапом дерева + reset --hard FETCH_HEAD (5f5e29a) + возврат правок поверх; порядок прежний. Предыдущий снимок — **413** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **413** (МЕХАНИКА РЕМОНТА ОТ ВЛАДЕЛЬЦА — внедрена целиком, отменяет правило «Починить бесплатно до максимума»). ЗАКОН: тест ИНТ + Ремонт, сложность = редкость предмета (+1 за каждую установленную модификацию-запись installedOn; донор −1, мин 0); материалы — книжная таблица по редкости (repair/rules.js REPAIR_MATERIALS_BY_RARITY: 0→1 Обыч; 1→2 Обыч; 2→2+1 Необыч; 3→2+2; 4→2+2+1 Редк; 5+→3+3+1); донор = второй предмет ТОГО ЖЕ канонического id (не надет/не мод/не locked) — даёт материалы (план пуст, списывается adjustItemQuantity(−1), моды уходят с ним 343) и −1 сложность; время 30 мин (успех + 2 ОД → 15, закон 323/324; осложнение +15 каждое; при осложнении д20 19–20 → потеря ЕЩЁ одного комплекта, иначе +15; разрешение осложнения ТОЛЬКО при успехе); провал — материалы остаются (закон верстака 323), время зря; сложность 0 — окно спрашивает бросать ли (закон 356). КОД: domain/repairEngine.js (evaluateRepair/runRepair, чистый по образцу craftingEngine), modules/fallout/repair/rules.js + operations.js (редкость из каталогов collectPairs, modsCount по installedOn, preview/performRepair/performEquippedPieceRepair/settleRepairTime; успех чинит СУЩЕСТВУЮЩИМИ экшнами repairWeapon/repairPowerArmorStack/repairPowerArmorPieceAt — охват прежний, цена новая), модалка modules/fallout/screens/InventoryScreen/modals/RepairModal.js (скролл-закон 402, отчёт в модалке 357, инлайн-диалоги 364), три кнопки «Починить» (оружие/пачка СБ/надетая часть) открывают её, i18n repair.* в inventory screen.json (ru/en). Существующие экшны стора не менялись — паспорт не трогали. СЛОВО ВЛАДЕЛЬЦА: «Для ремонта нужно: тест на ИНТ + Ремонт со сложностью, равной редкости предмета… донор… полчаса (2 ОД → 15 минут, осложнения +15)… таблица материалов… +1 за модификацию… осложнения: время или потеря материалов (д20 19–20)». Сверх книги принято агентом (пометить при разборе): разрешение осложнения только при успехе; при провале материалы остаются; сложность-0 вопрос по закону 356. ЗАЩЁЛКА repair-book-413 (18 тестов). 1468/152, tsc 0. УРОК 413 (установщик): запись в state.md МЕЖДУ патчами (коммит без патч-файла — «Очумелые ручки», 00b0cac) ломает контекст хунка state.md следующего патча у владельца → патч целиком откладывается, установщик останавливается. Правило: ЛЮБАЯ правка docs/state.md — только В СОСТАВЕ патча; патч-файл генерировать diff(финал предыдущего патча → HEAD), не от промежуточных коммитов. Предыдущий снимок — **412** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **412** (СЛОВО ВЛАДЕЛЬЦА на вопрос «почему снимать перки?»: «Показать уведомление о недоступных перках. Оставить серым и не рабочим, персонаж может вручную его заменить или дождаться условий, пусть сам решает» — ОТМЕНЯЕТ снятие недоступных перков из 411). ЗАКОН: единая чистая функция `evaluateSelectedPerkPicks` (domain/perks.js) оценивает КАЖДЫЙ выбор по книге: unknown (нет в каталоге — снимает мигратор), rank-limit (только при явном числовом maxRanks), level/attributes (payload need/have/code), robot, excluded (otherId; остаётся взятый первым). Погасшие ОСТАЮТСЯ в списке: не дают бонусов (calculatePerkEffects считает только активные, ранг = по активным копиям; явный ранг записи {id,rank:N} сохраняется), не открывают гейты (крафт perkRanksFor/juryRigFor, разборка scrapperCeiling — через countActivePerkSelections), на экране перков серые (спойлер-хедер стилем *Inactive) со строкой-пояснением i18n dormant.* («Не работает: нужен уровень N (сейчас M)» и т.п.); сами заработают при выполнении условий (пересчёт на каждом уровне/атрибуте) или заменяются кнопкой «Заменить». Уведомление при загрузке (characterSaves): alerts.dormantPerks* + имена из i18n; ОДИН показ на изменение множества — dormantNoticeFingerprint в сторе (не персистится, как и pendingPerksDormant); повторная загрузка молчит. Существующие миграции v16/v17 НЕ тронуты; подъёма версии сейва нет. Защёлка perk-migrator-411 УДАЛЕНА, заменена perk-dormant-412 (18 тестов: оценка/миграция/бонусы/гейты/словари/проводка экрана). Тесты-профили приведены к книге (grantBookProfile/BOOK): персонажи тестов отвечают требованиям выданных перков — 1445/151 файл, tsc 0. ПОЧИНКА УСТАНОВЩИКА (после первого прогона владельцем): патч 406 нёс артефактную секцию правки старого patchs/277 (эпоха «файлов патчей»; файл у владельца отсутствовал → ОСТАНОВКА на 406) — файл 406 перегенерирован как diff(405→406) без patchs/ (заодно ушёл мусор кодировки 0xb9); цепочка 392–412 больше не трогает чужих patchs/-артефактов. ЖДЁТ СЛОВА ВЛАДЕЛЬЦА — «ОЧУМЕЛЫЕ РУЧКИ» (juryRigging, 1 ранг, сейчас только текст): вопрос «можем механику добавить?» разобран (книжная механика: бесплатная починка БЕЗ компонентов, но временная — при следующем осложнении при использовании предмет снова ломается, диапазон осложнений при использовании 19–20; в приложении есть прочность/износ и бесплатный ремонт для всех — коллизия показана владельцу). СЛОВО ВЛАДЕЛЬЦА (принять к сведению, код НЕ трогать): «При активированной настройке "случайная прочность" и/или "уменьшение прочности при выстреле" и при наличии этого перка починить предмет можно бесплатно, но временно. Пока прими это к сведению, а позже я дам механику ремонта». Настройки: selectWeaponDurabilityLossEnabled + selectWeaponDurabilityLossPer10Shots ( WeaponsAndArmorScreen) и rollWeaponDurability при добывании предмета (InventoryScreen). Реализация — ОТДЕЛЬНЫМ патчем после механики ремонта от владельца. Предыдущий снимок — **411** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 3ecab09..ecb96fa 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,18 @@
+ # Changelog
++---
++## One repair button (patch 415)
++
++By your word there is one button again. With the durability setting
++off it is the old instant free «Fix». With it on — the book «Repair»:
++a window with the donor, materials and the crafting-style report; no
++materials (and no donor) — the button is grey. Free repair exists only
++when the settings are off (later — also with the «Jury Rigging» perk,
++on the same button). The «repair is per one piece» law now covers
++everything: a weapon stack is also repaired one instance per test,
++like power armor pieces; even the instant free fix separates one piece
++from the stack and repairs only it. The repaired piece merges with the
++whole ones.
++
+ ---
+ ## Repair — as you said (patch 414)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 1ae0787..a0a8669 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,18 @@
+ # История изменений
+ 
++---
++## Одна кнопка ремонта (патч 415)
++
++По вашему слову кнопка снова одна. При выключенной настройке прочности
++это прежняя мгновенная бесплатная «Починить». При включённой — книжный
++«Ремонт»: окно с донором, материалами и крафтовым отчётом; материалов
++нет (и донора нет) — кнопка серая. Бесплатная починка бывает только
++при выключенных настройках (позже — ещё с перком «Очумелые ручки»,
++на той же кнопке). Закон «ремонт — на 1 штуку» распространён на всё:
++пачка оружия теперь тоже чинится по одному экземпляру за тест, как и
++детали силовой брони; даже мгновенная бесплатная починка отделяет одну
++штуку от пачки и чинит только её. Починенное сольётся с целыми.
++
+ ---
+ ## Ремонт — как вы сказали (патч 414)
+ 
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+index bb78522..c99ccb5 100644
+--- a/modules/fallout/repair/operations.js
++++ b/modules/fallout/repair/operations.js
+@@ -159,6 +159,27 @@ export const repairModsCountFor = (storeItemId) => Object.values(
+   useCharacterStore.getState().items || {},
+ ).filter((entry) => entry?.installedOn && entry.installedOn === storeItemId).length;
+ 
++/**
++ * Слово владельца 415: «Ремонт и его затраты даны на 1 шт, а не карточку,
++ * пачку, стопку или как ты называешь количество >1». Отделяет ОДНУ штуку
++ * от пачки (quantity > 1) и возвращает её id (для quantity = 1 — сам id).
++ * Починенная штука сольётся с целыми общим законом стеков (СБ — сразу,
++ * оружие останется отдельной целой записью).
++ */
++export const splitOnePieceFromStack = (storeItemId) => {
++  const item = useCharacterStore.getState().items?.[storeItemId];
++  if (!item || (Number(item.quantity) || 1) <= 1) return storeItemId;
++  const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
++  useCharacterStore.setState((prev) => ({
++    items: {
++      ...prev.items,
++      [singleKey]: { ...item, quantity: 1 },
++      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
++    },
++  }));
++  return singleKey;
++};
++
+ /**
+  * Слово владельца 414: «если материалов нет, кнопка ремонта не активна».
+  * Хватает материалов ИЛИ есть валидный донор — кнопка активна.
+@@ -378,23 +399,11 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+     }
+   }
+ 
+-  // Слово владельца 414: «каждый элемент отдельно!» — пачка частей СБ
+-  // чинится по ОДНОЙ штуке за тест: штука отделяется и чинится сама
+-  // (станет целой — сольётся с целой пачкой общим законом стеков).
++  // Слово владельца 414/415: ремонт и его затраты — на ОДНУ штуку, не на
++  // пачку: при успехе штука отделяется от пачки и чинится сама.
+   let repairTargetId = storeItemId;
+-  if (result.done && preview.target.kind === 'powerArmor') {
+-    const item = useCharacterStore.getState().items?.[storeItemId];
+-    if (item && !item.paSlot && (Number(item.quantity) || 1) > 1) {
+-      const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
+-      useCharacterStore.setState((prev) => ({
+-        items: {
+-          ...prev.items,
+-          [singleKey]: { ...item, quantity: 1 },
+-          [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
+-        },
+-      }));
+-      repairTargetId = singleKey;
+-    }
++  if (result.done) {
++    repairTargetId = splitOnePieceFromStack(storeItemId);
+   }
+ 
+   // Успех чинит предмет существующими экшнами стора (цена — в движке выше).
+diff --git a/public/version.json b/public/version.json
+index 1636b7d..b5f5bcd 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "414",
++  "version": "415",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
