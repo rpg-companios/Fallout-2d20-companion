@@ -1,0 +1,1916 @@
+diff --git a/__tests__/crafting/action-points-324.test.js b/__tests__/crafting/action-points-324.test.js
+index 4d0bcbf..c933abb 100644
+--- a/__tests__/crafting/action-points-324.test.js
++++ b/__tests__/crafting/action-points-324.test.js
+@@ -21,6 +21,16 @@ import {
+ import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -42,6 +52,7 @@ const seedStack = (itemId, quantity) => {
+ 
+ const takeAmmo = (rolls) => {
+   seedStack('item_common_materials', 2);
++  grantBookProfile(2, { INT: 7 });
+   useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
+   let i = 0;
+   return craftRecipe('ammo_38', { rollD20: () => rolls[Math.min(i++, rolls.length - 1)] }, { deferTime: true });
+@@ -59,7 +70,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
+   });
+ 
+   it('успех со сложностью 1 и 2 успехами даёт +1 ОД (пример владельца)', () => {
+-    // ИНТ 4 + навык 0 = цель 4: броски 3, 4 — два успеха; сложность 1−0 = 1.
++    // ИНТ 7 (книжный Патронщик, 412) + навык 0 = цель 7: броски 3, 4 — два успеха; сложность 1−0 = 1.
+     const result = takeAmmo([3, 4]);
+     expect(result.done).toBe(true);
+     expect(result.check.difficulty).toBe(1);
+@@ -77,7 +88,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
+   });
+ 
+   it('провал ОД не приносит', () => {
+-    // цель 4: броски 19, 18 — ноль успехов, провал
++    // цель 7: броски 19, 18 — ноль успехов, провал
+     const result = takeAmmo([19, 18]);
+     expect(result.done).toBe(false);
+     expect(result.stage).toBe('check');
+@@ -88,6 +99,8 @@ describe('Общий пул ОД (324): 6, пополнение проверка
+   it('автоуспех (сложность 0) — броска не было, ОД нет', () => {
+     seedStack('item_common_materials', 2);
+     useCharacterStore.setState({
++      level: 2,
++      attributes: { STR: { total: 5 }, INT: { total: 7 } },
+       selectedPerks: [{ perkId: 'ammosmith', index: 0 }],
+       skills: { ...state().skills, REPAIR: { base: 2, total: 2 } }, // сложность 1−2 → 0
+     });
+@@ -101,6 +114,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
+   it('трата 2 ОД требует пула: хватило — время вдвое, не хватило — полное', () => {
+     spendActionPoints(4); // пул 2
+     seedStack('item_common_materials', 2);
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
+ 
+     // проверка: 2 успеха при сложности 1 → сама приносит +1 (пул 3)
+@@ -116,7 +130,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
+ 
+     // пул 1 < 2: проверка без прибыли (1 успех = сложности) не пополняет —
+     // трата невозможна, время полное
+-    const lean = takeAmmo([4, 5]);
++    const lean = takeAmmo([2, 8]); // при цели 7 ровно один успех (2 — да, 8 — нет)
+     expect(lean.done).toBe(true);
+     expect(lean.apEarned.gained).toBe(0);
+     expect(lean.apEarned.pool).toBe(1);
+diff --git a/__tests__/crafting/armor-mod-crafting-341.test.js b/__tests__/crafting/armor-mod-crafting-341.test.js
+index f8221e9..c254798 100644
+--- a/__tests__/crafting/armor-mod-crafting-341.test.js
++++ b/__tests__/crafting/armor-mod-crafting-341.test.js
+@@ -16,6 +16,16 @@ import { findCatalogEntry } from '../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -81,6 +91,7 @@ describe('Крафт модов брони (341): квадрат «Броня»,
+     seedStack('item_uncommon_materials', 5);
+     seedStack('item_rare_materials', 3);
+     // ранг перка = число выбранных рангов (getPerkSelectionCount): 3 выбора = Бронник 3
++    grantBookProfile(9, { STR: 5, INT: 6 }); // книга: Бронник — СИЛ5+ИНТ6, 3-й ранг с 9-го уровня
+     useCharacterStore.setState((prev) => ({
+       selectedPerks: [
+         ...(prev.selectedPerks || []),
+diff --git a/__tests__/crafting/crafting-book-rules-323.test.js b/__tests__/crafting/crafting-book-rules-323.test.js
+index c9b784a..6254e0f 100644
+--- a/__tests__/crafting/crafting-book-rules-323.test.js
++++ b/__tests__/crafting/crafting-book-rules-323.test.js
+@@ -22,6 +22,16 @@ import {
+ import { getCraftingRecipeById } from '../../domain/registry';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -66,6 +76,7 @@ describe('Крафт по книге (323): времена, осложнения
+ 
+   it('отложенное время: throw гейта не списывает часы; успех+осложнение = база+30', () => {
+     seedStack('item_common_materials', 4);
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState((prev) => ({
+       selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
+       // навык 0: сложность 1 − 0 = 1 → бросок БЫВАЕТ (при ранге 5+ была бы автоуспех)
+@@ -104,6 +115,7 @@ describe('Крафт по книге (323): времена, осложнения
+     // патроны (gear): настройка OFF → при провале материалы целы
+     useAppSettingsStore.getState().setValue('craftFailLossGear', false);
+     seedStack('item_common_materials', 4);
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState((prev) => ({
+       selectedPerks: [...(prev.selectedPerks || []), { perkId: 'ammosmith', index: 0 }],
+     }));
+diff --git a/__tests__/crafting/crafting-operations.test.js b/__tests__/crafting/crafting-operations.test.js
+index a2c79a3..eaa237e 100644
+--- a/__tests__/crafting/crafting-operations.test.js
++++ b/__tests__/crafting/crafting-operations.test.js
+@@ -20,6 +20,16 @@ import weaponsFile from '../../modules/fallout/data/recipes/weapons.json';
+ import drinksFile from '../../modules/fallout/data/recipes/drinks.json';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -85,6 +95,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
+   it('.38: материалы сгорели в работе, патроны выданы пачкой base+CD', () => {
+     const recipe = getCraftingRecipeById('ammo_38');
+     setSkill('REPAIR', recipe.requires.complexity); // автоуспех
++    grantBookProfile(2, { INT: 7 }); // книга: Патронщик — ИНТ7, со 2-го уровня
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] }); // книга: патроны gated перком
+     seedStack('item_common_materials', 3);
+ 
+@@ -97,6 +108,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
+   });
+ 
+   it('нехватка материала — отказ, состояние стора не тронуто', () => {
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] });
+     const before = state().items;
+     const result = craftRecipe('ammo_38');
+@@ -116,6 +128,7 @@ describe('craftRecipe: автоуспех, списание и выдача', ()
+     expect(craftRecipe('chem_fury').done).toBe(false); // нет перка
+     expect(countStack('chem_buffout')).toBe(1); // и ничего не списано
+ 
++    grantBookProfile(1, { INT: 7 }); // книга: Химик — ИНТ7
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'chemist' }] });
+     const result = craftRecipe('chem_fury');
+     expect(result.done).toBe(true);
+@@ -153,6 +166,7 @@ describe('craftRecipe: провал проверки и цена проверк
+     expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка выключена — не жжёт').toBe(false);
+     useAppSettingsStore.getState().setValue('craftFailLossGear', true);
+     expect(craftingPreview('ammo_45').rulesView.failBurnsMaterials, 'настройка включена — жжёт').toBe(true);
++    grantBookProfile(6, { INT: 7 }); // книга: 2-й ранг Патронщика с 6-го уровня
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }, { perkId: 'ammosmith' }] }); // ранг 2
+     for (const material of shell.materials) seedStack(material.itemId, material.count);
+ 
+diff --git a/__tests__/crafting/crafting-window-tiles.test.js b/__tests__/crafting/crafting-window-tiles.test.js
+index 15d3dff..910ba5e 100644
+--- a/__tests__/crafting/crafting-window-tiles.test.js
++++ b/__tests__/crafting/crafting-window-tiles.test.js
+@@ -13,6 +13,16 @@ import {
+ } from '../../modules/fallout/crafting/windowModel';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -56,6 +66,7 @@ describe('Модалка крафта (318): квадраты, спойлеры,
+ 
+   it('ammo_38: сводка редкости, максимальная партия, гейт перка', () => {
+     seedStack('item_common_materials', 10);
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 5, total: 5 } },
+diff --git a/__tests__/crafting/jury-rigged-ammo-404.test.js b/__tests__/crafting/jury-rigged-ammo-404.test.js
+index fb12a57..66f19e2 100644
+--- a/__tests__/crafting/jury-rigged-ammo-404.test.js
++++ b/__tests__/crafting/jury-rigged-ammo-404.test.js
+@@ -15,6 +15,16 @@ import perksCatalog from '../../modules/fallout/data/perks/perks.json';
+ import { setCurrentModuleLocale } from '../../i18n/locale';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ // Строки окна крафта локализованы — тесты идут по русским словарям.
+ setCurrentModuleLocale('ru-RU');
+@@ -52,6 +62,8 @@ const takePerk = (rank) => {
+   const jury = Array.from({ length: rank }, (_, index) => ({ perkId: 'juryRiggedAmmo', index }));
+   // ammosmith той же глубины: редкость 2 закрыта перком 2-го ранга (книга).
+   const smith = Array.from({ length: rank }, (_, index) => ({ perkId: 'ammosmith', index }));
++  // книга: Ломовые патроны 2-го ранга — УДЧ6 с 10-го уровня; Патронщик — ИНТ7
++  grantBookProfile(10, { LCK: 6, INT: 7 });
+   useCharacterStore.setState({ selectedPerks: [...jury, ...smith] });
+ };
+ 
+@@ -66,7 +78,7 @@ describe('Патч 404: Ломовые патроны — перк и селек
+       juryRiggedAmmo: { maxRarity: 2, junkCost: 5, minutes: 10 },
+     });
+     const bonuses = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'juryRiggedAmmo', rank: 1 }] },
++      { selectedPerks: [{ id: 'juryRiggedAmmo', rank: 1 }], level: 6, attributes: { LCK: { total: 6 } } },
+       perksCatalog,
+     );
+     expect(bonuses.juryRiggedAmmo).toEqual({ maxRarity: 1, junkCost: 5, minutes: 10 });
+@@ -172,6 +184,7 @@ describe('Патч 404: Ломовые патроны — окно крафта
+ 
+   it('обычный (не ломовой) крафт отчёт без напоминалки', () => {
+     setSkill('REPAIR', 1);
++    grantBookProfile(2, { INT: 7 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] });
+     seedStack('item_common_materials', 3);
+     const result = craftRecipe('ammo_38', AUTO);
+diff --git a/__tests__/crafting/weapon-mod-crafting-348.test.js b/__tests__/crafting/weapon-mod-crafting-348.test.js
+index 68049a4..dcb47c0 100644
+--- a/__tests__/crafting/weapon-mod-crafting-348.test.js
++++ b/__tests__/crafting/weapon-mod-crafting-348.test.js
+@@ -18,6 +18,16 @@ import { findCatalogEntry } from '../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ 
+ beforeEach(() => {
+   state().resetCharacterStore();
+@@ -68,6 +78,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи
+ 
+     seedStack('item_common_materials', 4);
+     seedStack('item_uncommon_materials', 2);
++    grantBookProfile(2, { INT: 6 }); // книга: Фанат оружия — ИНТ6, со 2-го уровня
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
+@@ -97,6 +108,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи
+     seedStack('item_common_materials', 6);
+     seedStack('item_uncommon_materials', 4);
+     seedStack('item_rare_materials', 2);
++    grantBookProfile(10, { INT: 6 }); // книга: 3-й ранг Фаната — с 10-го уровня
+     useCharacterStore.setState({
+       selectedPerks: [
+         { perkId: 'gunNut', index: 0 }, { perkId: 'gunNut', index: 1 }, { perkId: 'gunNut', index: 2 },
+@@ -124,6 +136,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи
+ 
+     seedStack('item_common_materials', 4);
+     seedStack('item_uncommon_materials', 2);
++    grantBookProfile(2, { INT: 6 }); // книга: НАУКА! — ИНТ6, со 2-го уровня
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'science', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, SCIENCE: { ...(prev.skills?.SCIENCE ?? {}), base: 6, total: 6 } },
+@@ -138,6 +151,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи
+   it('провал жжёт материалы по правилу gear (настройка 323, как у модов брони)', () => {
+     seedStack('item_common_materials', 4);
+     seedStack('item_uncommon_materials', 2);
++    grantBookProfile(2, { INT: 6 }); // книга: Фанат оружия — ИНТ6, со 2-го уровня
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     // ранг 0 против сложности 3 + провал на броске → крафт не удался
+     const failed = craftRecipe('mod_rapid', { rollD20: () => 20 });
+diff --git a/__tests__/crafting/zero-difficulty-ask-356.test.js b/__tests__/crafting/zero-difficulty-ask-356.test.js
+index 175f334..9be99c7 100644
+--- a/__tests__/crafting/zero-difficulty-ask-356.test.js
++++ b/__tests__/crafting/zero-difficulty-ask-356.test.js
+@@ -13,6 +13,16 @@ import { buildCategoryModel } from '../../modules/fallout/crafting/windowModel';
+ import { readFileSync } from 'node:fs';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ const seed = (weaponId, quantity = 1) => {
+   useCharacterStore.setState((prev) => ({
+     items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId, quantity } },
+@@ -105,6 +115,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
+   it('крафт по кнопке: craftRecipe проксирует zeroDifficulty в движок', () => {
+     seed('item_common_materials', 4);
+     seed('item_uncommon_materials', 2);
++    grantBookProfile(2, { INT: 6 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
+@@ -124,6 +135,7 @@ describe('ПРИЁМОЧНЫЙ (патч 356): сложность 0 — брос
+   });
+ 
+   it('строки окна крафта знают zeroDifficulty; оба UI спрашивают игрока', () => {
++    grantBookProfile(2, { INT: 6 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
+diff --git a/__tests__/domain/derived-cascade.test.js b/__tests__/domain/derived-cascade.test.js
+index 5059897..b2dd737 100644
+--- a/__tests__/domain/derived-cascade.test.js
++++ b/__tests__/domain/derived-cascade.test.js
+@@ -42,6 +42,8 @@ describe('МК-3 шаг 2: каскад производных в хранили
+   });
+ 
+   it('перк взят действием → perkBonuses и ОЗ пересчитались сами', () => {
++    // 412: «Дающий жизнь» по книге с 5-го уровня — иначе перк погас.
++    useCharacterStore.setState({ level: 5 });
+     const store = useCharacterStore.getState();
+     const base = store.derivedStats.maxHealth.total;
+     store.setSelectedPerks([{ perkId: 'lifeGiver', index: 0 }]);
+diff --git a/__tests__/equipment/weapon-mod-craft-report-357.test.js b/__tests__/equipment/weapon-mod-craft-report-357.test.js
+index 1a695fa..24df2cc 100644
+--- a/__tests__/equipment/weapon-mod-craft-report-357.test.js
++++ b/__tests__/equipment/weapon-mod-craft-report-357.test.js
+@@ -13,6 +13,16 @@ import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/ope
+ import { buildCraftReport } from '../../modules/fallout/crafting/windowModel';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ const seed = (id, quantity = 1) => {
+   useCharacterStore.setState((prev) => ({
+     items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId: id, quantity } },
+@@ -31,6 +41,7 @@ const singleReport = ({ skill, rolls, zeroDifficulty }) => {
+ beforeEach(() => {
+   state().resetCharacterStore();
+   useAppSettingsStore.getState().setValue('craftFailLossGear', true);
++  grantBookProfile(2, { INT: 6 });
+   useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+   useCharacterStore.setState((prev) => ({
+     skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 2, total: 2 } },
+diff --git a/__tests__/equipment/weapon-mod-create-button-352.test.js b/__tests__/equipment/weapon-mod-create-button-352.test.js
+index 29aa015..306c1fa 100644
+--- a/__tests__/equipment/weapon-mod-create-button-352.test.js
++++ b/__tests__/equipment/weapon-mod-create-button-352.test.js
+@@ -15,6 +15,16 @@ import { buildModCraftHint } from '../../modules/fallout/crafting/windowModel';
+ import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
+ 
+ const state = () => useCharacterStore.getState();
++// 412: персонаж в тестах отвечает книжным требованиям выданных перков
++// (недоступные по книге ранги теперь честно гасятся мигратором 412).
++const grantBookProfile = (level, attrs = {}) => {
++  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
++  useCharacterStore.setState({
++    level,
++    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
++  });
++};
++
+ const seed = (weaponId, quantity = 1) => {
+   useCharacterStore.setState((prev) => ({
+     items: { ...prev.items, [`s_${Math.random().toString(36).slice(2, 8)}`]: { weaponId, quantity } },
+@@ -23,7 +33,7 @@ const seed = (weaponId, quantity = 1) => {
+ 
+ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» в модалке оружия', () => {
+   it('материалов хватает → enabled (зелёная); не хватает → dimmed', () => {
+-    useCharacterStore.setState({ items: {}, selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
++    useCharacterStore.setState({ items: {}, level: 2, attributes: { INT: { total: 6 } }, selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     // «Скорострельный»: Обычные ×4 + Необычные ×2
+     const ok = buildModCraftHint('mod_rapid', { items: state().items, selectedPerks: state().selectedPerks });
+     expect(ok.enabled).toBe(false); // пустая сумка
+@@ -83,6 +93,7 @@ describe('ПРИЁМОЧНЫЙ (патч 352): кнопка «Создать» 
+ 
+     seed('item_common_materials', 4);
+     seed('item_uncommon_materials', 2);
++    grantBookProfile(2, { INT: 6 });
+     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
+     useCharacterStore.setState((prev) => ({
+       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
+diff --git a/__tests__/perks/chem-cola-thirst-pharma.test.js b/__tests__/perks/chem-cola-thirst-pharma.test.js
+index 7d4c631..3749066 100644
+--- a/__tests__/perks/chem-cola-thirst-pharma.test.js
++++ b/__tests__/perks/chem-cola-thirst-pharma.test.js
+@@ -7,6 +7,16 @@ import { DIRTY_WATER_ID } from '../../domain/perks/thirstQuencher';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+ import drinks from '../../modules/fallout/data/consumables/drinks.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ afterEach(() => {
+   vi.restoreAllMocks();
+ });
+@@ -22,8 +32,8 @@ const getHeal = (item) => {
+ 
+ describe('chemResistant', () => {
+   it('penalizes addiction dice at rank 1 and grants immunity at rank 2', () => {
+-    const rank1 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 1 }]);
+-    const rank2 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 2 }]);
++    const rank1 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 1 }], BOOK);
++    const rank2 = calculatePerkEffects([byId('chemResistant')], [{ id: 'chemResistant', rank: 2 }], BOOK);
+     expect(rank1.bonuses).toEqual({ chemAddictionDicePenalty: 1 });
+     expect(rank2.bonuses).toEqual({ chemAddictionImmune: true });
+   });
+@@ -38,7 +48,7 @@ describe('chemResistant', () => {
+ 
+ describe('colaNut', () => {
+   it('binds to the three Nuka-Cola ids', () => {
+-    const result = calculatePerkEffects([byId('colaNut')], [{ id: 'colaNut', rank: 1 }]);
++    const result = calculatePerkEffects([byId('colaNut')], [{ id: 'colaNut', rank: 1 }], BOOK);
+     expect(result.bonuses.colaNutDrinkIds).toEqual(COLA_NUT_DRINK_IDS);
+     expect(result.bonuses.colaNutHealMultiplier).toBe(2);
+     expect(COLA_NUT_DRINK_IDS).toEqual([
+@@ -62,7 +72,7 @@ describe('colaNut', () => {
+ 
+ describe('thirstQuencher', () => {
+   it('flags dirty water disease skip', () => {
+-    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }]);
++    const result = calculatePerkEffects([byId('thirstQuencher')], [{ id: 'thirstQuencher', rank: 1 }], BOOK);
+     expect(result.bonuses).toEqual({ dirtyWaterDiseaseImmune: true });
+     expect(DIRTY_WATER_ID).toBe('drink_dirty_water');
+   });
+@@ -70,7 +80,7 @@ describe('thirstQuencher', () => {
+ 
+ describe('pharmaFarmer', () => {
+   it('adds one random chem from the catalog, not extra of the looted chem', () => {
+-    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }]);
++    const result = calculatePerkEffects([byId('pharmaFarmer')], [{ id: 'pharmaFarmer', rank: 1 }], BOOK);
+     expect(result.bonuses.foundItemBonuses).toEqual([
+       { perkId: 'pharmaFarmer', itemType: 'chem', extra: 1, extraRandom: true },
+     ]);
+diff --git a/__tests__/perks/found-item-bonus.test.js b/__tests__/perks/found-item-bonus.test.js
+index b43567a..53f2db8 100644
+--- a/__tests__/perks/found-item-bonus.test.js
++++ b/__tests__/perks/found-item-bonus.test.js
+@@ -3,6 +3,16 @@ import { rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemB
+ import { calculatePerkEffects } from '../../domain/perks';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ afterEach(() => {
+   vi.restoreAllMocks();
+ });
+@@ -14,9 +24,9 @@ const butchersBounty = perksData.find((perk) => perk.id === 'butchersBounty');
+ 
+ describe('found item perk bonuses', () => {
+   it('gives Scrounger extra ammo combat dice by rank', () => {
+-    const rank1 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 1 }]);
+-    const rank2 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 2 }]);
+-    const rank3 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 3 }]);
++    const rank1 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 1 }], BOOK);
++    const rank2 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 2 }], BOOK);
++    const rank3 = calculatePerkEffects([scrounger], [{ id: 'scrounger', rank: 3 }], BOOK);
+     expect(rank1.bonuses.foundItemBonuses).toEqual([
+       { perkId: 'scrounger', itemType: 'ammo', combatDice: 3 },
+     ]);
+@@ -29,9 +39,9 @@ describe('found item perk bonuses', () => {
+   });
+ 
+   it('gives Fortune Finder extra caps combat dice by rank', () => {
+-    const rank1 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 1 }]);
+-    const rank2 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 2 }]);
+-    const rank3 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 3 }]);
++    const rank1 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 1 }], BOOK);
++    const rank2 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 2 }], BOOK);
++    const rank3 = calculatePerkEffects([fortuneFinder], [{ id: 'fortuneFinder', rank: 3 }], BOOK);
+     expect(rank1.bonuses.foundItemBonuses).toEqual([
+       { perkId: 'fortuneFinder', itemType: 'caps', combatDice: 3 },
+     ]);
+@@ -44,14 +54,14 @@ describe('found item perk bonuses', () => {
+   });
+ 
+   it('gives Can Opener +1 cooked food', () => {
+-    const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }]);
++    const result = calculatePerkEffects([canOpener], [{ id: 'canOpener', rank: 1 }], BOOK);
+     expect(result.bonuses.foundItemBonuses).toEqual([
+       { perkId: 'canOpener', itemType: 'food', extra: 1, match: { state: 'cooked' } },
+     ]);
+   });
+ 
+   it('gives Butcher\'s Bounty +1 raw meat', () => {
+-    const result = calculatePerkEffects([butchersBounty], [{ id: 'butchersBounty', rank: 1 }]);
++    const result = calculatePerkEffects([butchersBounty], [{ id: 'butchersBounty', rank: 1 }], BOOK);
+     expect(result.bonuses.foundItemBonuses).toEqual([
+       { perkId: 'butchersBounty', itemType: 'food', extra: 1, match: { rawMeat: true } },
+     ]);
+diff --git a/__tests__/perks/lead-belly.test.js b/__tests__/perks/lead-belly.test.js
+index fdf0279..c520a89 100644
+--- a/__tests__/perks/lead-belly.test.js
++++ b/__tests__/perks/lead-belly.test.js
+@@ -9,6 +9,16 @@ import {
+ import { calculatePerkEffects } from '../../domain/perks';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ afterEach(() => {
+   vi.restoreAllMocks();
+ });
+@@ -33,8 +43,8 @@ describe('leadBelly data', () => {
+ 
+ describe('leadBelly bonuses', () => {
+   it('offers a reroll at rank 1 and skips irradiated radiation at rank 2', () => {
+-    const rank1 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 1 }]);
+-    const rank2 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 2 }]);
++    const rank1 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 1 }], BOOK);
++    const rank2 = calculatePerkEffects([leadBelly], [{ id: 'leadBelly', rank: 2 }], BOOK);
+     expect(rank1.bonuses).toEqual({ irradiatedConsumableRadiationRerollIfDamage: 1 });
+     expect(rank2.bonuses).toEqual({ irradiatedConsumableRadiationImmune: true });
+   });
+diff --git a/__tests__/perks/perk-dormant-412.test.js b/__tests__/perks/perk-dormant-412.test.js
+new file mode 100644
+index 0000000..24b336e
+--- /dev/null
++++ b/__tests__/perks/perk-dormant-412.test.js
+@@ -0,0 +1,253 @@
++// ПРИЁМОЧНЫЙ (патч 412): закон погашенных перков. Слово владельца:
++// «показать уведомление о недоступных перках. Оставить серым и не
++// рабочим, персонаж может вручную его заменить или дождаться условий,
++// пусть сам решает». Недоступные по книге перки («книга приоритетнее»,
++// 410) остаются в списке, НЕ ДЕЙСТВУЮТ (бонусы и гейты рецептов/разборки
++// их не видят) и снова заработают, когда выполнятся условия. Снимаются
++// только неизвестные каталогу id. Уведомление при загрузке — один показ
++// на изменение множества погасших.
++import { readFileSync } from 'node:fs';
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  evaluateSelectedPerkPicks,
++  reconcileSelectedPerksWithCatalog,
++  calculatePerkEffects,
++  selectPerkBonuses,
++  countActivePerkSelections,
++} from '../../domain/perks';
++import catalog from '../../modules/fallout/data/perks/perks.json';
++import { juryRigFor } from '../../modules/fallout/crafting/operations';
++import { scrapperCeiling } from '../../modules/fallout/salvage/operations';
++import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
++import enScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const CTX = (over = {}) => ({
++  attributes: { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...over },
++  level: 12,
++  isRobot: false,
++  ...over, // level/isRobot поверх значений по умолчанию
++});
++
++const ids = (list) => list.map((entry) => entry.id);
++
++describe('Патч 412: оценка выбора — кто действует, кто погас', () => {
++  it('здоровый список: все активны, ранги по порядку', () => {
++    const { picks, inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'lifeGiver' }, { id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(inactivePicks).toEqual([]);
++    expect(picks.map((p) => p.rank)).toEqual([1, 1]);
++    expect(picks.every((p) => p.active)).toBe(true);
++  });
++
++  it('Крепкий хребет ×3: действует ранг 1 (книга), два лишних — rank-limit', () => {
++    const { activePicks, inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(activePicks).toHaveLength(1);
++    expect(inactivePicks).toHaveLength(2);
++    expect(inactivePicks.every((p) => p.reason === 'rank-limit')).toBe(true);
++    expect(activePicks[0].rank).toBe(1);
++  });
++
++  it('СИЛ 4: Крепкий хребет погас с пояснением «нужна СИЛ 5 (есть 4)»', () => {
++    const { inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 4 }),
++    );
++    expect(inactivePicks[0]).toMatchObject({
++      id: 'strongBack', reason: 'attributes', code: 'STR', need: 5, have: 4,
++    });
++  });
++
++  it('уровень: «Прицел с подсветкой» с 8-го — на 3-м погас (payload), на 8-м действует', () => {
++    const early = evaluateSelectedPerkPicks([{ id: 'glowSight' }], catalog, CTX({ level: 3, PER: 8 }));
++    expect(early.inactivePicks[0]).toMatchObject({ id: 'glowSight', reason: 'level', need: 8, have: 3 });
++    const grown = evaluateSelectedPerkPicks([{ id: 'glowSight' }], catalog, CTX({ level: 8, PER: 8 }));
++    expect(grown.inactivePicks).toEqual([]);
++  });
++
++  it('роботу «не для роботов» перк погас (reason robot)', () => {
++    const { inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'ghoulish' }],
++      catalog,
++      CTX({ END: 9, level: 12, isRobot: true }),
++    );
++    expect(inactivePicks[0]).toMatchObject({ id: 'ghoulish', reason: 'robot' });
++  });
++
++  it('«или-или»: Дерзкий действует (взят первым), Осмотрительный погас с otherId', () => {
++    const { activePicks, inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'daringNature' }, { id: 'cautiousNature' }],
++      catalog,
++      CTX({ LCK: 5, PER: 7 }),
++    );
++    expect(ids(activePicks)).toEqual(['daringNature']);
++    expect(inactivePicks[0]).toMatchObject({ id: 'cautiousNature', reason: 'excluded', otherId: 'daringNature' });
++  });
++
++  it('неизвестный каталогу id — reason unknown', () => {
++    const { inactivePicks } = evaluateSelectedPerkPicks(
++      [{ id: 'perk_from_the_past' }],
++      catalog,
++      CTX(),
++    );
++    expect(inactivePicks[0]).toMatchObject({ id: 'perk_from_the_past', reason: 'unknown' });
++  });
++
++  it('идемпотентность: повторная оценка — тот же результат', () => {
++    const list = [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }];
++    const first = evaluateSelectedPerkPicks(list, catalog, CTX({ STR: 8 }));
++    const second = evaluateSelectedPerkPicks(list, catalog, CTX({ STR: 8 }));
++    expect(second).toEqual(first);
++  });
++});
++
++describe('Патч 412: мигратор — серые остаются, неизвестные снимаются', () => {
++  it('погасшие перки НЕ снимаются (changed false), список в отчете inactivePicks', () => {
++    const result = reconcileSelectedPerksWithCatalog(
++      [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(result.changed).toBe(false);
++    expect(result.selectedPerks).toHaveLength(3);
++    expect(result.inactivePicks).toHaveLength(2);
++    expect(result.removed).toEqual([]);
++  });
++
++  it('неизвестный id снимается — слот освобождается', () => {
++    const result = reconcileSelectedPerksWithCatalog(
++      [{ id: 'strongBack' }, { id: 'perk_from_the_past' }],
++      catalog,
++      CTX({ STR: 8 }),
++    );
++    expect(result.changed).toBe(true);
++    expect(ids(result.selectedPerks)).toEqual(['strongBack']);
++    expect(result.removed[0]).toMatchObject({ id: 'perk_from_the_past', reason: 'unknown' });
++  });
++});
++
++describe('Патч 412: погасший перк не действует — нигде', () => {
++  it('бонусы: Крепкий хребет ×3 при СИЛ 8 даёт ранг 1 (25), при СИЛ 4 — ноль', () => {
++    const three = [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }];
++    const strong = calculatePerkEffects(catalog, three, CTX({ STR: 8 }));
++    expect(strong.bonuses.carryWeightBonus).toBe(25);
++    const weak = calculatePerkEffects(catalog, three, CTX({ STR: 4 }));
++    expect(weak.bonuses.carryWeightBonus).toBeUndefined();
++  });
++
++  it('Фармацевт ×2 при уровне ниже 2-го ранга действует как ранг 1 (+2 антирада)', () => {
++    const bonuses = selectPerkBonuses(
++      {
++        selectedPerks: [{ id: 'pharmacist' }, { id: 'pharmacist' }],
++        attributes: { INT: { total: 8 } },
++        level: 2, // 2-й ранг Фармацевта с 8-го уровня — погас
++      },
++      catalog,
++    );
++    expect(bonuses.antiradRadiationBonus).toBe(2);
++  });
++
++  it('стор: setSelectedPerks → пересчёт уже без погасших; reconcile выставляет флаги', () => {
++    useCharacterStore.setState({
++      level: 12,
++      attributes: {
++        STR: { total: 8 }, PER: { total: 5 }, END: { total: 5 },
++        CHA: { total: 5 }, INT: { total: 5 }, AGI: { total: 5 }, LCK: { total: 5 },
++      },
++    });
++    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }]);
++    expect(state().perkBonuses.carryWeightBonus).toBe(25);
++
++    const first = state().reconcilePerksAtLoad();
++    expect(first.changed).toBe(false);
++    expect(first.dormant).toHaveLength(2);
++    expect(first.shouldNotify).toBe(true); // множество изменилось (впервые)
++    expect(state().pendingPerksDormant).toHaveLength(2);
++
++    const second = state().reconcilePerksAtLoad();
++    expect(second.shouldNotify).toBe(false); // то же множество — не повторяем
++  });
++
++  it('стор: неизвестный id снимается при загрузке (changed true)', () => {
++    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'perk_from_the_past' }]);
++    const result = state().reconcilePerksAtLoad();
++    expect(result.changed).toBe(true);
++    expect(ids(state().selectedPerks)).toEqual(['strongBack']);
++  });
++
++  it('гейт крафта: погасший «Ломовые патроны» режим не открывает', () => {
++    const ammo = { category: 'ammo', requires: { complexity: 1 } };
++    useCharacterStore.setState({
++      level: 1,
++      selectedPerks: [{ perkId: 'juryRiggedAmmo' }, { perkId: 'juryRiggedAmmo' }],
++    });
++    expect(juryRigFor(ammo)).toBeNull(); // УДЧ6/уровень 6 не набраны — перк погас
++
++    useCharacterStore.setState({
++      level: 10,
++      attributes: { LCK: { total: 6 } },
++    });
++    expect(juryRigFor(ammo)).toMatchObject({ maxRarity: 2 }); // оба ранга действуют
++  });
++
++  it('гейт разборки: Мусорщик — только действующие ранги', () => {
++    useCharacterStore.setState({
++      level: 1,
++      selectedPerks: [{ perkId: 'scrapper' }, { perkId: 'scrapper' }],
++    });
++    expect(scrapperCeiling(state())).toBe(0); // погас (нужен 3-й уровень)
++
++    useCharacterStore.setState({ level: 8 });
++    expect(scrapperCeiling(state())).toBe(2);
++  });
++});
++
++describe('Патч 412: словари уведомлений и пояснений (оба языка, без фолбэков)', () => {
++  it('alerts.dormantPerks* и dormant.* присутствуют; perksBookAdjusted* удалены', () => {
++    for (const dict of [ruScreen, enScreen]) {
++      expect(typeof dict.alerts.dormantPerksTitle).toBe('string');
++      expect(dict.alerts.dormantPerksMessage).toContain('{perks}');
++      expect(dict.alerts.perksBookAdjustedTitle).toBeUndefined();
++      for (const key of ['prefix', 'level', 'attributes', 'robot', 'excluded', 'rankLimit']) {
++        expect(typeof dict.dormant[key], key).toBe('string');
++        expect(dict.dormant[key].length).toBeGreaterThan(0);
++      }
++      for (const code of ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK']) {
++        expect(typeof dict.modal.attributeFilters[code]).toBe('string');
++      }
++    }
++  });
++
++  it('экран проводит погашенные перки: серые стили и пояснение', () => {
++    const screen = readFileSync('modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js', 'utf8');
++    expect(screen).toContain('evaluateSelectedPerkPicks');
++    expect(screen).toContain('dormancyById');
++    expect(screen).toContain('dormantNoteFor');
++    expect(screen).toContain('styles.spoilerHeaderInactive');
++    expect(screen).toContain('styles.spoilerInactiveNote');
++
++    const styles = readFileSync('modules/fallout/styles/PerksAndTraitsScreen.styles.js', 'utf8');
++    for (const key of ['spoilerHeaderInactive', 'spoilerTitleInactive', 'spoilerRankInactive', 'spoilerInactiveNote']) {
++      expect(styles).toContain(key);
++    }
++  });
++});
+diff --git a/__tests__/perks/perk-migrator-411.test.js b/__tests__/perks/perk-migrator-411.test.js
+deleted file mode 100644
+index e65a501..0000000
+--- a/__tests__/perks/perk-migrator-411.test.js
++++ /dev/null
+@@ -1,172 +0,0 @@
+-// ПРИЁМОЧНЫЙ (патч 411): мигратор перков при загрузке персонажа — публичное
+-// приложение, «книга приоритетнее» (слово владельца 410). При каждой
+-// загрузке (персист-кэш и каноническая запись) список перков сверяется
+-// с каталогом: лишние ранги и перки, не отвечающие книжным требованиям
+-// (уровень/характеристики/робот/взаимоисключение), снимаются; слоты
+-// освобождаются. Идемпотентно. Уведомление — игровыми терминами,
+-// словарь alerts обязан существовать в обоих языках (латентное падение
+-// tPerkAlert до 411 — чинится здесь же).
+-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+-import useCharacterStore from '../../src/store/characterStore';
+-import { reconcileSelectedPerksWithCatalog } from '../../domain/perks';
+-import catalog from '../../modules/fallout/data/perks/perks.json';
+-import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
+-import enScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
+-import ruPerksI18n from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+-import enPerksI18n from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+-
+-const state = () => useCharacterStore.getState();
+-
+-beforeEach(() => {
+-  state().resetCharacterStore();
+-});
+-
+-afterEach(async () => {
+-  state().resetCharacterStore();
+-  await useCharacterStore.persist.clearStorage();
+-});
+-
+-const CTX = (over = {}) => ({
+-  attributes: {
+-    STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5,
+-    ...over,
+-  },
+-  level: 12,
+-  isRobot: false,
+-  ...over, // level/isRobot поверх значений по умолчанию
+-});
+-
+-const ids = (list) => list.map((entry) => entry.id);
+-
+-describe('Патч 411: чистый мигратор (книга приоритетнее)', () => {
+-  it('Крепкий хребет ×3 (было 3 ранга) → 1: лишние сняты, слоты свободны', () => {
+-    const result = reconcileSelectedPerksWithCatalog(
+-      [{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }],
+-      catalog,
+-      CTX({ STR: 8 }),
+-    );
+-    expect(result.changed).toBe(true);
+-    expect(ids(result.selectedPerks)).toEqual(['strongBack']);
+-    expect(result.removed).toHaveLength(2);
+-    expect(result.removed[0].reason).toBe('rank-limit');
+-  });
+-
+-  it('идемпотентен: второй прогон не меняет ничего', () => {
+-    const seed = [{ id: 'strongBack' }, { id: 'strongBack' }];
+-    const first = reconcileSelectedPerksWithCatalog(seed, catalog, CTX({ STR: 8 }));
+-    const second = reconcileSelectedPerksWithCatalog(first.selectedPerks, catalog, CTX({ STR: 8 }));
+-    expect(second.changed).toBe(false);
+-    expect(second.selectedPerks).toEqual(first.selectedPerks);
+-  });
+-
+-  it('уровень: «Прицел с подсветкой» теперь с 8-го уровня — на 3-м снимается, на 8-м остаётся', () => {
+-    const glow = [{ id: 'glowSight' }];
+-    const early = reconcileSelectedPerksWithCatalog(glow, catalog, CTX({ level: 3, PER: 8 }));
+-    expect(early.changed).toBe(true);
+-    expect(early.removed[0]).toMatchObject({ id: 'glowSight', reason: 'level' });
+-    const grown = reconcileSelectedPerksWithCatalog(glow, catalog, CTX({ level: 8, PER: 8 }));
+-    expect(grown.changed).toBe(false);
+-    expect(ids(grown.selectedPerks)).toEqual(['glowSight']);
+-  });
+-
+-  it('характеристики: «Тренированный рывок» требует СИЛ 6 — СИЛ 5 снимается, СИЛ 6 остаётся', () => {
+-    const weak = reconcileSelectedPerksWithCatalog([{ id: 'painTrain' }], catalog, CTX({ STR: 5 }));
+-    expect(weak.removed[0]).toMatchObject({ id: 'painTrain', reason: 'attributes' });
+-    const strong = reconcileSelectedPerksWithCatalog([{ id: 'painTrain' }], catalog, CTX({ STR: 6 }));
+-    expect(strong.changed).toBe(false);
+-  });
+-
+-  it('роботу «не для роботов» перки не полагаются', () => {
+-    const result = reconcileSelectedPerksWithCatalog(
+-      [{ id: 'ghoulish' }],
+-      catalog,
+-      CTX({ END: 9, level: 12, isRobot: true }),
+-    );
+-    expect(result.removed[0]).toMatchObject({ id: 'ghoulish', reason: 'robot' });
+-  });
+-
+-  it('взаимоисключение: Дерзкий + Осмотрительный — остаётся взятый первым', () => {
+-    const result = reconcileSelectedPerksWithCatalog(
+-      [{ id: 'daringNature' }, { id: 'cautiousNature' }],
+-      catalog,
+-      CTX({ LCK: 5, PER: 7 }),
+-    );
+-    expect(ids(result.selectedPerks)).toEqual(['daringNature']);
+-    expect(result.removed[0]).toMatchObject({ id: 'cautiousNature', reason: 'excluded' });
+-  });
+-
+-  it('неизвестный каталогу id снимается; здоровый список не трогается', () => {
+-    const withUnknown = reconcileSelectedPerksWithCatalog(
+-      [{ id: 'lifeGiver' }, { id: 'perk_from_the_past' }],
+-      catalog,
+-      CTX(),
+-    );
+-    expect(ids(withUnknown.selectedPerks)).toEqual(['lifeGiver']);
+-    expect(withUnknown.removed[0].reason).toBe('unknown');
+-
+-    const healthy = reconcileSelectedPerksWithCatalog(
+-      [{ id: 'lifeGiver' }, { id: 'strongBack' }],
+-      catalog,
+-      CTX({ STR: 8 }),
+-    );
+-    expect(healthy.changed).toBe(false);
+-    expect(healthy.selectedPerks).toHaveLength(2);
+-  });
+-});
+-
+-describe('Патч 411: экшн стора — каскад и флаг уведомления', () => {
+-  it('срезает ранги, пересчитывает бонусы перков, выставляет pendingPerksBookAdjusted', () => {
+-    // Персонаж, отвечающий книжному требованию Крепкого хребта (СИЛ 5,
+-    // форма стора: {total}).
+-    useCharacterStore.setState({
+-      attributes: {
+-        STR: { total: 8 }, PER: { total: 5 }, END: { total: 5 },
+-        CHA: { total: 5 }, INT: { total: 5 }, AGI: { total: 5 }, LCK: { total: 5 },
+-      },
+-      level: 12,
+-    });
+-    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'strongBack' }, { id: 'strongBack' }]);
+-    const before = state().perkBonuses.carryWeightBonus;
+-    const result = state().reconcilePerksAtLoad();
+-    expect(result.changed).toBe(true);
+-    expect(ids(state().selectedPerks)).toEqual(['strongBack']);
+-    // Бонус пересчитался под книжный ранг 1 (был за 3 ранга: 25/ранг).
+-    expect(state().perkBonuses.carryWeightBonus).toBe(25);
+-    expect(before).toBe(75);
+-    expect(state().pendingPerksBookAdjusted).toHaveLength(2);
+-  });
+-
+-  it('повторный прогон — changed:false, уведомление пустое (идемпотентность)', () => {
+-    state().setSelectedPerks([{ id: 'strongBack' }, { id: 'strongBack' }]);
+-    state().reconcilePerksAtLoad();
+-    const second = state().reconcilePerksAtLoad();
+-    expect(second.changed).toBe(false);
+-    expect(state().pendingPerksBookAdjusted).toEqual([]);
+-  });
+-});
+-
+-describe('Патч 411: словарь уведомлений обязан существовать (оба языка)', () => {
+-  const KEYS = [
+-    'duplicatePerksFixedTitle',
+-    'duplicatePerksFixedMessage',
+-    'perkMissingIdTitle',
+-    'perkMissingIdMessage',
+-    'perksBookAdjustedTitle',
+-    'perksBookAdjustedMessage',
+-  ];
+-
+-  it.each(['ru-RU', 'en-EN'])('%s: alerts со всеми ключами, не пустые строки', (loc) => {
+-    const dict = loc === 'ru-RU' ? ruScreen : enScreen;
+-    for (const key of KEYS) {
+-      expect(typeof dict.alerts?.[key], `${loc}.${key}`).toBe('string');
+-      expect(dict.alerts[key].length).toBeGreaterThan(0);
+-    }
+-  });
+-
+-  it('русские имена перков для уведомления берутся из i18n (без латиницы)', () => {
+-    const name = (id) => ruPerksI18n.find((p) => p.id === id)?.name;
+-    expect(name('strongBack')).toBe('КРЕПКИЙ ХРЕБЕТ');
+-    expect(name('glowSight')).not.toMatch(/^[A-Za-z ]+$/);
+-    expect(enPerksI18n.find((p) => p.id === 'strongBack')?.name).toBeTruthy();
+-  });
+-});
+diff --git a/__tests__/perks/perks-engine-404.test.js b/__tests__/perks/perks-engine-404.test.js
+index 029c2f7..6a78eff 100644
+--- a/__tests__/perks/perks-engine-404.test.js
++++ b/__tests__/perks/perks-engine-404.test.js
+@@ -19,6 +19,16 @@ import catalog from '../../modules/fallout/data/perks/perks.json';
+ import foodData from '../../modules/fallout/data/consumables/food.json';
+ import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ const foodList = Array.isArray(foodData) ? foodData : Object.values(foodData);
+ const weaponsList = Array.isArray(weaponsData) ? weaponsData : Object.values(weaponsData);
+ const byId = (list, id) => list.find((x) => x.id === id);
+@@ -111,7 +121,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
+ 
+   it('перк кладёт в perkBonuses параметры гурмана; хелпер металла работает', () => {
+     const bonuses = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'oldWorldGourmet', rank: 1 }] },
++      { ...BOOK, selectedPerks: [{ id: 'oldWorldGourmet', rank: 1 }] },
+       catalog,
+     );
+     expect(bonuses.oldWorldGourmet).toEqual({ hpBonus: 2, radiationReduction: 1 });
+@@ -158,7 +168,7 @@ describe('Патч 404: Заряжай и стреляй (скорострель
+ 
+   it('селектор перка: ранг 2 → loadAndFireBonus 2', () => {
+     const bonuses = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'loadAndFire', rank: 2 }] },
++      { ...BOOK, selectedPerks: [{ id: 'loadAndFire', rank: 2 }] },
+       catalog,
+     );
+     expect(bonuses.loadAndFireBonus).toBe(2);
+@@ -191,7 +201,7 @@ describe('Патч 404: В сияющих доспехах (энергоСУ в
+   it('перк кладёт ранг в perkBonuses', () => {
+     expect(inShiningArmorPerk.apply({ state: { rank: 2 } })).toEqual({ inShiningArmorRank: 2 });
+     const bonuses = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'inShiningArmor', rank: 1 }] },
++      { ...BOOK, selectedPerks: [{ id: 'inShiningArmor', rank: 1 }] },
+       catalog,
+     );
+     expect(bonuses.inShiningArmorRank).toBe(1);
+diff --git a/__tests__/perks/perks-engine-406.test.js b/__tests__/perks/perks-engine-406.test.js
+index 70df54b..f299db3 100644
+--- a/__tests__/perks/perks-engine-406.test.js
++++ b/__tests__/perks/perks-engine-406.test.js
+@@ -19,6 +19,16 @@ import perksCatalog from '../../modules/fallout/data/perks/perks.json';
+ import drinksData from '../../modules/fallout/data/consumables/drinks.json';
+ import chemsData from '../../modules/fallout/data/consumables/chems.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ const state = () => useCharacterStore.getState();
+ const byId = (list, id) => (Array.isArray(list) ? list : Object.values(list)).find((x) => x.id === id);
+ 
+@@ -32,6 +42,14 @@ afterEach(async () => {
+ });
+ 
+ const takePerks = (...ids) => {
++  // 412: книжный профиль — иначе перк честно погас (требования книги).
++  useCharacterStore.setState({
++    level: 30,
++    attributes: {
++      STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++      INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++    },
++  });
+   // ЭКШН стора (не setState напрямую): он пересчитывает perkBonuses.
+   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
+ };
+@@ -51,27 +69,27 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
+       chemist: { chemDurationMultiplier: 2 },
+     };
+     for (const [id, expected] of Object.entries(cases)) {
+-      const bonuses = selectPerkBonuses({ selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
++      const bonuses = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
+       expect(bonuses, id).toMatchObject(expected);
+     }
+     // 410: книжные нормы по рангам — Фармацевт 2/3/4, Мощный 3/6/10.
+-    expect(selectPerkBonuses({ selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
++    expect(selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
+       .toMatchObject({ antiradRadiationBonus: 4 });
+-    expect(selectPerkBonuses({ selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
++    expect(selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
+       .toMatchObject({ fusionCoreChargeBonus: 10 });
+-    const blood = selectPerkBonuses({ selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
++    const blood = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
+     expect(blood.bloodPackHealMultiplier).toBe(2);
+     expect(blood.bloodPackDrinkIds).toContain('drink_blood_pack');
+   });
+ 
+   it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: заряды по книге', () => {
+     const bonuses = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
++      { ...BOOK, selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
+       perksCatalog,
+     );
+     expect(bonuses.antiradRadiationBonus).toBe(3); // +1 хирург + 2 фармацевт
+     const cores = selectPerkBonuses(
+-      { selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
++      { ...BOOK, selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
+       perksCatalog,
+     );
+     expect(cores.fusionCoreChargeBonus).toBe(6); // 3 (ядерщик) + 3 (книга, ранг 1)
+diff --git a/__tests__/perks/perks-engine-407.test.js b/__tests__/perks/perks-engine-407.test.js
+index 2caf199..2707409 100644
+--- a/__tests__/perks/perks-engine-407.test.js
++++ b/__tests__/perks/perks-engine-407.test.js
+@@ -25,6 +25,14 @@ afterEach(async () => {
+ });
+ 
+ const takePerks = (...ids) => {
++  // 412: книжный профиль — иначе перк честно погас (ВЫН 9, уровни рангов).
++  useCharacterStore.setState({
++    level: 30,
++    attributes: {
++      STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++      INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++    },
++  });
+   // Экшн стора (не setState): он пересчитывает perkBonuses.
+   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
+ };
+diff --git a/__tests__/perks/perks-engine-408.test.js b/__tests__/perks/perks-engine-408.test.js
+index abe87fc..1d8bc3e 100644
+--- a/__tests__/perks/perks-engine-408.test.js
++++ b/__tests__/perks/perks-engine-408.test.js
+@@ -12,6 +12,16 @@ import catalog from '../../modules/fallout/data/perks/perks.json';
+ import ruCatalog from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
+ import enCatalog from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
+ 
++// 412: книжный профиль теста — перки проходят требования книги
++// (иначе они честно гасятся: уровень 30 закрывает ранги, характеристики 9).
++const BOOK = {
++  level: 30,
++  attributes: {
++    STR: { total: 9 }, PER: { total: 9 }, END: { total: 9 }, CHA: { total: 9 },
++    INT: { total: 9 }, AGI: { total: 9 }, LCK: { total: 9 },
++  },
++};
++
+ const state = () => useCharacterStore.getState();
+ 
+ beforeEach(() => {
+@@ -24,6 +34,14 @@ afterEach(async () => {
+ });
+ 
+ const takeGhoulish = (rank) => {
++  // 412: книга — Гулеподобный ВЫН 9 с 7-го уровня, шаг +8; иначе ранг погас.
++  useCharacterStore.setState({
++    level: 7 + 8 * (Math.max(1, rank) - 1),
++    attributes: {
++      STR: { total: 5 }, PER: { total: 5 }, END: { total: 9 }, CHA: { total: 5 },
++      INT: { total: 5 }, AGI: { total: 5 }, LCK: { total: 5 },
++    },
++  });
+   state().setSelectedPerks(
+     Array.from({ length: rank }, (_, index) => ({ perkId: 'ghoulish', index })),
+   );
+@@ -59,8 +77,8 @@ describe('Патч 408: данные перка — канонический т
+     expect(ghoulishHpPerUnitsByRank(2)).toBe(3);
+     expect(ghoulishHpPerUnitsByRank(3)).toBe(2);
+     expect(ghoulishHpPerUnitsByRank(4)).toBe(2);
+-    const b1 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 1 }] }, catalog);
+-    const b3 = selectPerkBonuses({ selectedPerks: [{ id: 'ghoulish', rank: 3 }] }, catalog);
++    const b1 = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'ghoulish', rank: 1 }] }, catalog);
++    const b3 = selectPerkBonuses({ ...BOOK, selectedPerks: [{ id: 'ghoulish', rank: 3 }] }, catalog);
+     expect(b1.ghoulish).toEqual({ hpPerUnits: 4 });
+     expect(b3.ghoulish).toEqual({ hpPerUnits: 2 });
+   });
+diff --git a/__tests__/scrap/salvage-material-axioms.test.js b/__tests__/scrap/salvage-material-axioms.test.js
+index 3ef6c67..f776028 100644
+--- a/__tests__/scrap/salvage-material-axioms.test.js
++++ b/__tests__/scrap/salvage-material-axioms.test.js
+@@ -17,6 +17,8 @@ const readJson = (rel) => JSON.parse(readFileSync(ROOT + rel, 'utf8'));
+ 
+ const state = () => useCharacterStore.getState();
+ const scrapperRank = (n) => useCharacterStore.setState({
++  // 412: книга — Мусорщик с 3-го уровня, 2-й ранг с 8-го; иначе ранг погас.
++  level: n >= 2 ? 8 : (n >= 1 ? 3 : 1),
+   selectedPerks: Array.from({ length: n }, () => ({ perkId: 'scrapper' })),
+ });
+ const stackOf = (itemId, quantity = 1) => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3f8de83..1a84eca 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (411)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (412)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **412** (СЛОВО ВЛАДЕЛЬЦА на вопрос «почему снимать перки?»: «Показать уведомление о недоступных перках. Оставить серым и не рабочим, персонаж может вручную его заменить или дождаться условий, пусть сам решает» — ОТМЕНЯЕТ снятие недоступных перков из 411). ЗАКОН: единая чистая функция `evaluateSelectedPerkPicks` (domain/perks.js) оценивает КАЖДЫЙ выбор по книге: unknown (нет в каталоге — снимает мигратор), rank-limit (только при явном числовом maxRanks), level/attributes (payload need/have/code), robot, excluded (otherId; остаётся взятый первым). Погасшие ОСТАЮТСЯ в списке: не дают бонусов (calculatePerkEffects считает только активные, ранг = по активным копиям; явный ранг записи {id,rank:N} сохраняется), не открывают гейты (крафт perkRanksFor/juryRigFor, разборка scrapperCeiling — через countActivePerkSelections), на экране перков серые (спойлер-хедер стилем *Inactive) со строкой-пояснением i18n dormant.* («Не работает: нужен уровень N (сейчас M)» и т.п.); сами заработают при выполнении условий (пересчёт на каждом уровне/атрибуте) или заменяются кнопкой «Заменить». Уведомление при загрузке (characterSaves): alerts.dormantPerks* + имена из i18n; ОДИН показ на изменение множества — dormantNoticeFingerprint в сторе (не персистится, как и pendingPerksDormant); повторная загрузка молчит. Существующие миграции v16/v17 НЕ тронуты; подъёма версии сейва нет. Защёлка perk-migrator-411 УДАЛЕНА, заменена perk-dormant-412 (18 тестов: оценка/миграция/бонусы/гейты/словари/проводка экрана). Тесты-профили приведены к книге (grantBookProfile/BOOK): персонажи тестов отвечают требованиям выданных перков — 1445/151 файл, tsc 0. Предыдущий снимок — **411** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **411** (приложение публичное — мигратор перков старых сейвов БЕЗ подъёма версии схемы). При каждой загрузке (персист-кэш zustand И каноническая запись) список перков сверяется с каталогом: чистая функция `reconcileSelectedPerksWithCatalog` (domain/perks.js) — срез рангов сверх maxRanks (причина rank-limit), снятие перков не по книжным требованиям СВОЙ ранг (уровень/характеристики/notForRobots/excludedPerks — остаётся взятый первым; причины level/attributes/robot/excluded) и неизвестных каталогу id (unknown); слоты освобождаются; идемпотентно. Точки врезки: экшн `reconcilePerksAtLoad` стора (паспорт characterActions.ts) зовётся в onRehydrateStorage ПЕРЕД recalculateAll и в loadCharacter ПОСЛЕ loadFromLegacyData; список списанного → `pendingPerksBookAdjusted` (не персистится) → уведомление с именами из i18n (showRawAlert). Существующие миграции сейвов (v16/v17) НЕ тронуты. ПОЧИНЕН ЛАТЕНТНЫЙ БАГ: в screen.json перков (ru и en) не было словаря `alerts` → tPerkAlert отдавал undefined и алерты загрузки молча не работали; словарь добавлен (6 ключей), tPerkAlert устойчив к отсутствию ключа. ЗАЩЁЛКА perk-migrator-411: 12 тестов (срез рангов/уровень/характеристики/робот/взаимоисключение/unknown/идемпотентность/каскад стора/словари обоих языков). Предыдущий снимок — **410** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **410** (слово владельца: «книга приоритетнее, в книге по рангам могут быть ошибки, ориентируемся на описания» — ОТМЕНЯЕТ правило 403 «ранги и требования как в приложении»). Применено: maxRanks = max(книга, ранг из описания, для тройки открывателей модов 4); требования (атрибуты/уровень/шаг) = notepad, шаг сверен с текстом «требование к уровню увеличивается на N». Изменено: 45 рангов (Патронщик 1→3 — чинит РЕАЛЬНУЮ недостижимость рецептов 2–3 ранга!; Крепкий хребет 3→1; Мохавский... нет — 44 одноранговых → книжные 2–3; Бронник/НАУКА!/Фанат оружия остались 4: описания «и т.д.» + рецепты 4-го ранга), 48 требований (Мисс Удача +5, Осмотрительный ЛОВ8/уровень 3, Ночной глаз уровень 8, Стабилизированный ИНТ6/ур.5, Везунчик ХАР8+ИНТ8/ур.15, Дерзкий ЛОВ8…). ЗАЩЁЛКА perks-book-priority-410: maxRanks=max(книга, описание) для всех 185 + рецепты не выше рангов. МЕХАНИКА по книге: Фармацевт +2/+3/+4 антирада (было +1), Мощный пользователь +3/+6/+10 заряда (было +1) — по рангам; тексты трёх исключений = книжные (теперь ВСЕ 185 == catalog_ru, 409-защёлка без overrides). Остальные 40 механических перков сверены — расхождений с описаниями нет · предыдущий: **409** (КОНТРОЛЬНАЯ СВЕРКА по слову владельца: он добавил на main f99db52 docs/reference-data/fallout2d20_perks_notepad.json — «описания перков всех что я знаю»). ФАКТ: notepad ПОБАЙТОВО равен fallout2d20_perks (1).json (184 перка, f2-схема) — сверка прошла по полному набору. Итог: покрытие 184+emt=185 ЦЕЛОЕ; у ~123 перков в ru-i18n оставались КРАТКИЕ АНГЛИЙСКИЕ АННОТАЦИИ (наследие до-403) — теперь ИМЕНА И ТЕКСТЫ ВСЕХ 185 = perks_catalog_ru дословно (87 имён + 81 текст обновлены; catalog_ru ↔ notepad: 136 точных, 44 различия ТОЛЬКО оформления — кавычки/{/CD}/маркеры); латинских имён в ru больше нет (АММОСМИТ, ФАНАТ КОЛЫ, КРОВОСОС, ВОДОХЛЁБ…). ТРИ ИСКЛЮЧЕНИЯ — тексты по одобренному слову владельца (406), книжный текст противоречит работающей механике: Полевой хирург (книга: 3 ОЗ за ОД первой помощи), Фармацевт (книга: +2/+3/+4 по рангам), Мощный пользователь (книга: +3/+6/+10) — в приложении +3 ОЗ/+1 антирад, +1 антирад, +1 заряд. ЗАЩЁЛКА tests/perks-canon-409: все 185 == catalog_ru (кроме 3), notepad кроется приложением. РАНГИ/ТРЕБОВАНИЯ: 44 перка ранги и 53 требования расходятся notepad↔приложение — СОЗНАТЕЛЬНО, слово владельца 403 «ранги и требования — без изменений, как в приложении» + perks_discrepancies «значения НЕ менять»; владельцу предложил переключить канон по его слову. Механика 43 действующих сверена с notepad: Варвар (ступени СИЛ 7/9/11) и др. — точно; ДОБАВЛЕНО Кровососу: пакет крови поднимает Жажду на +1 ступень сверх напитка (книга; через survivalPerkOptions(item)). Нюанс: Химик — книга «созданные вами препараты», в приложении ×2 для ВСЕХ препаратов (слово владельца 406) · предыдущий: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 7f71aa2..a41020e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,20 @@
+ # Changelog
++---
++## Dormant perks: the game warns and leaves the call to you (patch 412)
++
++By your word, the migrator no longer removes perks taken under the old
++rules. If a perk does not meet the book (missing level or attributes,
++unavailable to robots, mutually exclusive with another perk, a rank the
++book does not have) — it stays in the list, shown greyed with a «Not
++active» note explaining exactly what is missing. Such a perk grants no
++bonuses and no recipes; once you meet the requirements it wakes up on
++its own — or do not wait: the «Replace» button swaps it for any other
++perk, the character decides. On load the game names the list of such
++perks once; reloading the same character does not repeat the notice.
++Only perks missing from the catalog entirely are still removed. Perk
++requirements now apply uniformly everywhere: a dormant rank unlocks no
++crafting recipes and does not affect salvage.
++
+ ---
+ ## Old saves' perks repair themselves (patch 411)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4b2aad4..4acb2f1 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## Погасшие перки: игра предупреждает и отдаёт решение вам (патч 412)
++
++По вашему слову мигратор больше не снимает перки, взятые по старым
++правилам. Если перок не отвечает книге (не хватило уровня или
++характеристики, перк роботу не положен, «или-или» с другим перком,
++ранга нет в книге) — он остаётся в списке, но показывается серым с
++пометкой «Не работает» и объяснением, чего именно не хватает. Такой
++перк не даёт ни бонусов, ни рецептов; когда условия выполнятся, он
++сам снова заработает — а можете и не ждать: кнопка «Заменить» меняет
++его на любой другой перок, решение за персонажем. При загрузке игра
++один раз называет список таких перков; повторная загрузка того же
++персонажа не повторяет уведомление. Снимаются по-прежнему только перки,
++которых нет в каталоге вовсе. Требования перков теперь действуют везде
++единообразно: погасший ранг не открывает рецепты крафта и не меняет
++разборку.
++
+ ---
+ ## Перки старых сохранений чинятся сами (патч 411)
+ 
+diff --git a/domain/perks.js b/domain/perks.js
+index cabc2a8..b744c61 100644
+--- a/domain/perks.js
++++ b/domain/perks.js
+@@ -3,6 +3,7 @@
+ 
+ import { getCanonicalAttributeKey } from './characterCreation';
+ import { getPerkEffect } from './perks/index';
++import { isRobotCharacter } from './origins';
+ 
+ const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
+ 
+@@ -167,20 +168,25 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
+ }
+ 
+ /**
+- * 411 (публичное приложение): мигратор перков при ЗАГРУЗКЕ персонажа —
+- * «книга приоритетнее» (слово владельца 410). Чистая функция, без стора:
+- *   1) лишние ранги сверх каталога снимаются (trimSelectedPerksToMaxRanks);
+- *   2) каждый оставшийся выбор проверяется по требованиям книги на СВОЙ
+- *      ранг: уровень, характеристики, «не для роботов», взаимоисключение
+- *      (excludedPerks — остаётся более ранний выбор).
+- * Неизвестные каталогу id снимаются тоже (слот освобождается).
+- * Идемпотентна: на уже сверенном списке возвращает его без изменений.
+- * context: { attributes, level, isRobot } — всё, что нужно книге.
++ * 412 (публичное приложение): ЕДИНЫЙ ЗАКОН активности перков —
++ * «книга приоритетнее» (слово владельца 410), «недоступные оставлять
++ * серыми, персонаж решает сам» (слово владельца 412). Чистая функция
++ * оценивает КАЖДЫЙ выбор по книге:
++ *   - id нет в каталоге → «unknown» (оставить нельзя вовсе — снимает
++ *     мигратор);
++ *   - ранг выше книжного maxRanks → «rank-limit»;
++ *   - требования книги на СВОЙ ранг не выполнены → «level» / «attributes»
++ *     (с payload need/have) / «robot»;
++ *   - взаимоисключение: уже держится АКТИВНЫЙ перк-конфликт → «excluded»
++ *     (остаётся взятый первым; otherId — с кем конфликт).
++ * Активный выбор получает ранг = номер среди активных выборов того же
++ * перка. Недоступные выборы ОСТАЮТСЯ в списке (слот занят, перк не
++ * действует) — снова заработают, когда выполнятся условия, либо их
++ * заменит игрок. Идемпотентно.
++ * context: { attributes ({STR:8}|{STR:{total}}), level, isRobot }.
+  */
+-export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
++export function evaluateSelectedPerkPicks(selectedPerks = [], perkCatalog = [], context = {}) {
+     const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
+-    // Атрибуты принимаются в обоих форматах: {STR: 8} и {STR: {total: 8}}
+-    // (форма стора). Итоговое значение — уже с бонусами.
+     const attributeMap = {};
+     for (const [code, value] of Object.entries(context.attributes || {})) {
+       attributeMap[String(code).toUpperCase()] = typeof value === 'number'
+@@ -189,60 +195,115 @@ export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalo
+     }
+     const level = Number(context.level) || 1;
+ 
+-    const meetsRequirements = (perk, rank) => {
+-        const req = getPrerequisites(perk) || {};
+-        if (req.notForRobots && context.isRobot) return 'robot';
+-        const requiredLevel = getRequiredLevelForRank(perk, rank);
+-        if (level < requiredLevel) return 'level';
+-        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
+-            if ((attributeMap[String(code).toUpperCase()] || 0) < Number(need)) return 'attributes';
+-        }
+-        return null;
+-    };
+-
+-    // trimSelectedPerksToMaxRanks уже присваивает оставшимся копиям их
+-    // прежние ранги (первые копии списка) — отдельного сопоставления не нужно.
+-    const trimmed = trimSelectedPerksToMaxRanks(selectedPerks, perkCatalog);
++    const picks = [];
++    const seenCounts = {};
++    const activeCounts = {};
++    const heldActiveIds = new Set();
+ 
+-    const heldIds = new Set();
+-    const kept = [];
+-    // Срезанные лишние ранги тоже попадают в отчёт (причина rank-limit).
+-    const removed = (trimmed.removed || []).map((selected) => ({
+-        selected,
+-        id: toSelectedPerkId(selected),
+-        rank: null,
+-        reason: 'rank-limit',
+-    }));
+-    const counts = {};
+-    for (const selected of trimmed.selectedPerks || []) {
++    (selectedPerks || []).forEach((selected, index) => {
+         const id = toSelectedPerkId(selected);
+         const perk = id ? catalogById.get(id) : null;
+         if (!perk) {
+-            removed.push({ selected, id: id || null, rank: null, reason: 'unknown' });
+-            continue;
++            picks.push({ id: id || null, index, rank: null, active: false, reason: 'unknown' });
++            return;
+         }
+-        const rank = Number(selected?.rank) || 1;
+-        const reason = meetsRequirements(perk, rank);
+-        if (reason) {
+-            removed.push({ selected, id, rank, reason });
+-            continue;
++        seenCounts[id] = (seenCounts[id] || 0) + 1;
++        // Ранг = номер копии в списке; запись с ЯВНЫМ рангом (старые сейвы,
++        // тесты: {id, rank: 3}) сохраняет его — как в collapseSelectedPerks.
++        const explicitRank = Number(toSelectedPerkRank(selected)) || 0;
++        const rank = explicitRank > 0
++          ? Math.max(explicitRank, seenCounts[id])
++          : seenCounts[id];
++        const base = { id, index, rank };
++        // Ранг-лимит — только при ЯВНОМ числовом maxRanks каталога (как в
++        // trimSelectedPerksToMaxRanks): дескрипторы эффектов реестра без
++        // maxRanks лимита не имеют.
++        const rawMaxRanks = perk?.maxRanks;
++        const maxRanks = (typeof rawMaxRanks === 'number' && Number.isFinite(rawMaxRanks) && rawMaxRanks >= 1)
++          ? rawMaxRanks
++          : null;
++        if (maxRanks != null && rank > maxRanks) {
++            picks.push({ ...base, active: false, reason: 'rank-limit' });
++            return;
+         }
+-        const exclusions = Array.isArray(perk.prerequisites?.excludedPerks)
+-            ? perk.prerequisites.excludedPerks
+-            : (Array.isArray(perk.requirements?.excludedPerks) ? perk.requirements.excludedPerks : []);
+-        if (exclusions.some((other) => heldIds.has(other))) {
+-            removed.push({ selected, id, rank, reason: 'excluded' });
+-            continue;
++        const req = getPrerequisites(perk) || {};
++        if (req.notForRobots && context.isRobot) {
++            picks.push({ ...base, active: false, reason: 'robot' });
++            return;
+         }
+-        heldIds.add(id);
+-        counts[id] = (counts[id] || 0) + 1;
+-        kept.push({ id, rank: counts[id] });
+-    }
++        const requiredLevel = getRequiredLevelForRank(perk, rank);
++        if (typeof requiredLevel === 'number' && level < requiredLevel) {
++            picks.push({ ...base, active: false, reason: 'level', need: requiredLevel, have: level });
++            return;
++        }
++        let attributeMiss = null;
++        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
++            const have = attributeMap[String(code).toUpperCase()] || 0;
++            if (have < Number(need)) { attributeMiss = { code: String(code).toUpperCase(), need: Number(need), have }; break; }
++        }
++        if (attributeMiss) {
++            picks.push({ ...base, active: false, reason: 'attributes', ...attributeMiss });
++            return;
++        }
++        const exclusions = Array.isArray(req.excludedPerks) ? req.excludedPerks : [];
++        const conflict = exclusions.find((other) => heldActiveIds.has(other));
++        if (conflict) {
++            picks.push({ ...base, active: false, reason: 'excluded', otherId: conflict });
++            return;
++        }
++        activeCounts[id] = (activeCounts[id] || 0) + 1;
++        // Действующий ранг: явный ранг записи сохраняется; безранговые
++        // строки нумеруются по порядку среди ДЕЙСТВУЮЩИХ копий перка.
++        picks.push({
++          ...base,
++          active: true,
++          rank: explicitRank > 0 ? base.rank : activeCounts[id],
++        });
++        heldActiveIds.add(id);
++    });
+ 
+     return {
+-        selectedPerks: kept,
+-        removed,
+-        changed: removed.length > 0 || kept.length !== (selectedPerks || []).length,
++        picks,
++        activePicks: picks.filter((p) => p.active),
++        inactivePicks: picks.filter((p) => !p.active),
++    };
++}
++
++/** Контекст книги из состояния стора (атрибуты-объекты, уровень, робот). */
++export function perkContextFromState(state = {}) {
++    return {
++        attributes: state.attributes || {},
++        level: state.level,
++        isRobot: state.isRobot === true || isRobotCharacter({ origin: state.origin, trait: state.trait }) === true,
++    };
++}
++
++/**
++ * Число ДЕЙСТВУЮЩИХ рангов перка (для гейтов рецептов и разборки):
++ * погасшие выборы не считаются — «не работает» значит «не работает нигде».
++ */
++export function countActivePerkSelections(state = {}, perkId, perkCatalog = []) {
++    if (!perkId) return 0;
++    const { activePicks } = evaluateSelectedPerkPicks(state?.selectedPerks || [], perkCatalog, perkContextFromState(state));
++    return activePicks.filter((p) => p.id === perkId).length;
++}
++
++/**
++ * 412: мигратор при ЗАГРУЗКЕ — слово владельца «пусть сам решает»:
++ * недоступные по книге перки НЕ снимаются (остаются серыми и
++ * неработающими — их гасит evaluateSelectedPerkPicks), снимаются только
++ * неизвестные каталогу id: у них нет ни имени, ни текста, серым их
++ * показать нельзя. Идемпотентно.
++ */
++export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
++    const { inactivePicks } = evaluateSelectedPerkPicks(selectedPerks, perkCatalog, context);
++    const unknown = inactivePicks.filter((p) => p.reason === 'unknown');
++    const unknownIndexes = new Set(unknown.map((p) => p.index));
++    return {
++        selectedPerks: (selectedPerks || []).filter((_, index) => !unknownIndexes.has(index)),
++        removed: unknown.map((p) => ({ selected: (selectedPerks || [])[p.index], id: p.id, rank: null, reason: 'unknown' })),
++        inactivePicks: inactivePicks.filter((p) => p.reason !== 'unknown'),
++        changed: unknown.length > 0,
+     };
+ }
+ 
+@@ -401,7 +462,14 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
+     let bonuses = {};
+     const applied = [];
+ 
+-    for (const selected of collapseSelectedPerks(selectedPerks)) {
++    // 412: действуют только выборы, прошедшие книжную проверку
++    // (evaluateSelectedPerkPicks); погасшие перк не даёт — нигде.
++    const { activePicks } = evaluateSelectedPerkPicks(
++      selectedPerks,
++      perks,
++      perkContextFromState(state),
++    );
++    for (const selected of collapseSelectedPerks(activePicks)) {
+         const id = toSelectedPerkId(selected);
+         if (!id) continue;
+         const perk = byId.get(id) || (isObject(selected) ? selected : null);
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 3386bad..419dbb5 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -15,7 +15,8 @@ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { getCraftingCategoryRules, getCraftingRecipeById, getScrapMaterials } from '../../../domain/registry';
+ import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
+ import { isSkillTagged } from '../../../domain/d20Checks';
+-import { getPerkSelectionCount } from '../../../domain/perks';
++import { countActivePerkSelections } from '../../../domain/perks';
++import perksCatalog from '../data/perks/perks.json';
+ import { getItemId } from '../../../domain/itemIdentity';
+ import { rollByType, rollCombatDiceEffects } from '../../../domain/diceRollsLogic';
+ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+@@ -150,10 +151,12 @@ const expandSpendPlan = (plan, counts) => {
+   return out;
+ };
+ 
+-const perkRanksFor = (recipe, selectedPerks) => {
++// 412: ранг для гейтов — только ДЕЙСТВУЮЩИЕ выборы (погасший перк
++// рецептов не открывает; «не работает» значит «не работает нигде»).
++const perkRanksFor = (recipe, store) => {
+   const ranks = {};
+   for (const perk of recipe?.requires?.perks ?? []) {
+-    ranks[perk.perkId] = getPerkSelectionCount(selectedPerks ?? [], perk.perkId);
++    ranks[perk.perkId] = countActivePerkSelections(store ?? {}, perk.perkId, perksCatalog);
+   }
+   return ranks;
+ };
+@@ -178,7 +181,7 @@ const junkIdSet = () => {
+ export const juryRigFor = (recipe) => {
+   if (recipe?.category !== 'ammo') return null;
+   const store = useCharacterStore.getState();
+-  const rank = getPerkSelectionCount(store.selectedPerks ?? [], 'juryRiggedAmmo');
++  const rank = countActivePerkSelections(store ?? {}, 'juryRiggedAmmo', perksCatalog);
+   if (rank < 1) return null;
+   const complexity = Number(recipe.requires?.complexity) || 0;
+   if (complexity < 1 || complexity > juryRigMaxRarityByRank(rank)) return null;
+@@ -245,7 +248,7 @@ const heroView = (recipe) => {
+     store,
+     engineRecipe,
+     skillRank: selectSkillTotal(store, recipe.requires.skill),
+-    perkRanks: perkRanksFor(recipe, store.selectedPerks),
++    perkRanks: perkRanksFor(recipe, store),
+     inventoryCounts: countsForEngine(
+       engineRecipe,
+       withJunkAnyCount(engineRecipe, countInventoryByCatalogId(store.items)),
+diff --git a/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json b/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
+index b5b4a99..a62c020 100644
+--- a/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json
+@@ -21,7 +21,15 @@
+     "duplicatePerksFixedMessage": "Extra perk copies were removed — the freed picks can be spent again.",
+     "perkMissingIdTitle": "Unknown perk in the save",
+     "perkMissingIdMessage": "These perks were not found in the catalog and were removed: {perks}.",
+-    "perksBookAdjustedTitle": "Perks aligned with the book",
+-    "perksBookAdjustedMessage": "After the book check these were removed: {perks}. The freed picks can be spent once you meet the requirements."
++    "dormantPerksTitle": "Perks that are not active yet",
++    "dormantPerksMessage": "By the book rules these are not working right now: {perks}. They will come back once you meet the requirements — or replace them with the «Replace» button in the perk list."
++  },
++  "dormant": {
++    "prefix": "Not active",
++    "level": "requires level {need} (now {have})",
++    "attributes": "requires {code} {need} (now {have})",
++    "robot": "perk is unavailable to robots",
++    "excluded": "conflicts with «{perk}» — the two are mutually exclusive",
++    "rankLimit": "no such rank in the book — the rank can be replaced"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json b/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
+index e567791..21b1468 100644
+--- a/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json
+@@ -21,7 +21,15 @@
+     "duplicatePerksFixedMessage": "Лишние копии перков сняты — освободившиеся выборы можно потратить заново.",
+     "perkMissingIdTitle": "В сохранении найден неизвестный перк",
+     "perkMissingIdMessage": "Эти перки не найдены в каталоге и сняты: {perks}.",
+-    "perksBookAdjustedTitle": "Перки приведены к книге",
+-    "perksBookAdjustedMessage": "После сверки с книгой снято: {perks}. Освободившиеся выборы можно потратить заново, когда выполнятся условия."
++    "dormantPerksTitle": "Перки, которые пока не работают",
++    "dormantPerksMessage": "По правилам книги сейчас не действуют: {perks}. Они снова заработают, когда выполнятся условия, — или замените их кнопкой «Заменить» в списке перков."
++  },
++  "dormant": {
++    "prefix": "Не работает",
++    "level": "нужен уровень {need} (сейчас {have})",
++    "attributes": "нужна характеристика {code} {need} (сейчас {have})",
++    "robot": "перк недоступен роботам",
++    "excluded": "конфликтует с «{perk}» — работают взаимоисключающие",
++    "rankLimit": "такого ранга в книге нет — ранг можно заменить"
+   }
+ }
+diff --git a/modules/fallout/salvage/operations.js b/modules/fallout/salvage/operations.js
+index e97ccdd..d7b5f13 100644
+--- a/modules/fallout/salvage/operations.js
++++ b/modules/fallout/salvage/operations.js
+@@ -14,7 +14,8 @@ import { debugLog } from '../../../src/debug/falloutDebug';
+ import { getSalvageComposition, getScrapMaterials } from '../../../domain/registry';
+ import { runSalvage } from '../../../domain/salvageEngine';
+ import { isSkillTagged } from '../../../domain/d20Checks';
+-import { getPerkSelectionCount } from '../../../domain/perks';
++import { countActivePerkSelections } from '../../../domain/perks';
++import perksCatalog from '../data/perks/perks.json';
+ import { getCanonicalItemId } from '../../../domain/itemIdentity';
+ import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
+ import { rollCombatDiceEffects, facesToCombatUnits } from '../../../domain/diceRollsLogic';
+@@ -60,7 +61,7 @@ export const isScrapMaterial = (canonical) => {
+ // Потолок редкости по «Мусорщику» (общий для обеих веток, патч 263):
+ // без перка — только common, ранг 1 — и unusual, ранг 2 — и rare.
+ export const scrapperCeiling = (store) => {
+-  const rank = getPerkSelectionCount(store.selectedPerks ?? [], SALVAGE_RULES.scrapperPerkId);
++  const rank = countActivePerkSelections(store ?? {}, SALVAGE_RULES.scrapperPerkId, perksCatalog);
+   return rank >= SALVAGE_RULES.scrapperRareRank ? 2
+     : rank >= SALVAGE_RULES.scrapperUncommonRank ? 1 : 0;
+ };
+diff --git a/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js b/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+index 162e93b..a482adb 100644
+--- a/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
++++ b/modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js
+@@ -8,11 +8,13 @@ import {
+   annotatePerks,
+   applyPerkSelection,
+   collapseSelectedPerks,
++  evaluateSelectedPerkPicks,
+   getPerkMaxRanks,
+   getPerkSelectionCount,
+   removeSelectedPerkAt,
+   withAssignedPerkRanks,
+ } from '../../../../domain/perks';
++import { isRobotCharacter } from '../../../../domain/origins';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import perksData from '../../data/perks/perks.json';
+ import PerkSelectModal from './PerkSelectModal';
+@@ -32,6 +34,7 @@ const PerksAndTraitsScreen = () => {
+   // Шаг 8а: выбранные перки и перковые помощники — стор/домен напрямую
+   // (экран больше не зависит от контекста useCharacter()).
+   const trait = useCharacterStore((s) => s.trait);
++  const origin = useCharacterStore((s) => s.origin);
+   const level = useCharacterStore((s) => s.level);
+   const selectedPerks = useCharacterStore((s) => s.selectedPerks);
+   const setSelectedPerks = useCharacterStore((s) => s.setSelectedPerks);
+@@ -49,6 +52,42 @@ const PerksAndTraitsScreen = () => {
+   const perkLimit = level + extraPerkSlots;
+   const rankedPerks = useMemo(() => withAssignedPerkRanks(selectedPerks), [selectedPerks]);
+ 
++  // 412 (слово владельца «пусть сам решает»): перки, погашенные книжными
++  // требованиями, остаются в списке — серые и неработающие. Каждая группа
++  // (перк) получает статус: сколько рангов действует и почему погас
++  // первый недействующий.
++  const dormancyById = useMemo(() => {
++    const { picks } = evaluateSelectedPerkPicks(selectedPerks, perksData, {
++      attributes: storeAttributes,
++      level,
++      isRobot: isRobotCharacter({ origin, trait }),
++    });
++    const map = {};
++    for (const p of picks) {
++      const entry = map[p.id] || (map[p.id] = { total: 0, active: 0, note: null });
++      entry.total += 1;
++      if (p.active) entry.active += 1;
++      else if (!entry.note) entry.note = p;
++    }
++    return map;
++  }, [selectedPerks, storeAttributes, level, origin, trait]);
++
++  const dormantNoteFor = (status) => {
++    const n = status.note;
++    const detail = n.reason === 'level'
++      ? tPerksAndTraits('dormant.level').replace('{need}', n.need).replace('{have}', n.have)
++      : n.reason === 'attributes'
++        ? tPerksAndTraits('dormant.attributes')
++          .replace('{code}', tPerksAndTraits(`modal.attributeFilters.${n.code}`))
++          .replace('{need}', n.need).replace('{have}', n.have)
++        : n.reason === 'robot'
++          ? tPerksAndTraits('dormant.robot')
++          : n.reason === 'excluded'
++            ? tPerksAndTraits('dormant.excluded').replace('{perk}', getPerkSheetDisplay({ id: n.otherId }).name)
++            : tPerksAndTraits('dormant.rankLimit');
++    return `${tPerksAndTraits('dormant.prefix')}: ${detail}`;
++  };
++
+   const perkSpoilers = useMemo(() => {
+     const grouped = collapseSelectedPerks(rankedPerks);
+     const lastIndexById = {};
+@@ -189,18 +228,30 @@ const PerksAndTraitsScreen = () => {
+     closePerkModal();
+   };
+ 
+-  const renderSpoiler = ({ spoilerKey, title, rankLabel, description, onChange }) => {
++  const renderSpoiler = ({ spoilerKey, title, rankLabel, description, onChange, inactive, inactiveNote }) => {
+     const open = openSpoilers[spoilerKey] === true;
+     return (
+       <View key={spoilerKey} style={styles.spoiler}>
+         <TouchableOpacity
+-          style={styles.spoilerHeader}
++          style={inactive ? [styles.spoilerHeader, styles.spoilerHeaderInactive] : styles.spoilerHeader}
+           onPress={() => toggleSpoiler(spoilerKey)}
+         >
+-          <Text style={styles.spoilerTitle} numberOfLines={1}>{title}</Text>
+-          {rankLabel ? <Text style={styles.spoilerRank}>{rankLabel}</Text> : null}
++          <Text
++            style={inactive ? [styles.spoilerTitle, styles.spoilerTitleInactive] : styles.spoilerTitle}
++            numberOfLines={1}
++          >
++            {title}
++          </Text>
++          {rankLabel ? (
++            <Text style={inactive ? [styles.spoilerRank, styles.spoilerRankInactive] : styles.spoilerRank}>
++              {rankLabel}
++            </Text>
++          ) : null}
+           <Text style={styles.spoilerArrow}>{open ? '▼' : '►'}</Text>
+         </TouchableOpacity>
++        {inactive && inactiveNote ? (
++          <Text style={styles.spoilerInactiveNote}>{inactiveNote}</Text>
++        ) : null}
+         {open && (
+           <View style={styles.spoilerBody}>
+             {renderTextWithIcons(description, styles.spoilerDescription)}
+@@ -231,12 +282,16 @@ const PerksAndTraitsScreen = () => {
+           const rankLabel = perk?.rank != null
+             ? tPerksAndTraits('labels.rankValue').replace('{rank}', perk.rank)
+             : '';
++          const status = dormancyById[perk?.id];
++          const inactive = !!status && status.active < status.total;
+           return renderSpoiler({
+             spoilerKey,
+             title: display.name,
+             rankLabel,
+             description: display.description,
+             onChange: replaceIndex != null ? () => handleReassignPerk(replaceIndex) : undefined,
++            inactive,
++            inactiveNote: inactive ? dormantNoteFor(status) : null,
+           });
+         })}
+       </ScrollView>
+diff --git a/modules/fallout/styles/PerksAndTraitsScreen.styles.js b/modules/fallout/styles/PerksAndTraitsScreen.styles.js
+index 0379535..359e1a0 100644
+--- a/modules/fallout/styles/PerksAndTraitsScreen.styles.js
++++ b/modules/fallout/styles/PerksAndTraitsScreen.styles.js
+@@ -59,6 +59,23 @@ const styles = StyleSheet.create({
+     borderColor: '#0369a1',
+   },
+   addPerkButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
++
++  // 412: перки, погашенные книжными требованиями, — серые и с пояснением.
++  spoilerHeaderInactive: { backgroundColor: '#202020', borderColor: '#3d3d3d' },
++  spoilerTitleInactive: { color: '#8f8f8f' },
++  spoilerRankInactive: { color: '#8f8f8f' },
++  spoilerInactiveNote: {
++    color: '#d97706',
++    fontSize: 12,
++    paddingHorizontal: 12,
++    paddingVertical: 6,
++    backgroundColor: '#1c1c1c',
++    borderWidth: 1,
++    borderTopWidth: 0,
++    borderColor: '#3d3d3d',
++    borderBottomLeftRadius: 5,
++    borderBottomRightRadius: 5,
++  },
+ });
+ 
+ export default styles;
+diff --git a/public/version.json b/public/version.json
+index 134e2e0..cb2fb6b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "411",
++  "version": "412",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index 2ee4838..c554b09 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -533,19 +533,21 @@ export const loadCharacter = async (id) => {
+       attributes: loadedAttributes,
+     });
+ 
+-    // 411 (публичное приложение): мигратор перков при загрузке — «книга
+-    // приоритетнее». Работает ПОСЛЕ нормализации атрибутов/уровня
+-    // (loadFromLegacyData), чтобы требования книги сверялись честно.
+-    // Идемпотентно: повторная загрузка уведомление не показывает.
++    // 412 (публичное приложение): мигратор перков при загрузке. Слово
++    // владельца: «пусть сам решает» — недоступные по книге перки остаются
++    // серыми и неработающими, снимаются только неизвестные каталогу id
++    // (о них — отдельное уведомление perkMissingId выше). Уведомление
++    // о погасших — один показ на изменение множества (fingerprint в сторе).
+     const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
+-    if (reconciliation?.changed && reconciliation.removed?.length > 0) {
+-      const removedList = reconciliation.removed
+-        .map((entry) => perkDisplayName(entry.id))
+-        .filter(Boolean)
+-        .join(', ');
++    if (reconciliation?.shouldNotify && reconciliation.dormant?.length > 0) {
++      const dormantNames = [...new Set(
++        reconciliation.dormant
++          .map((entry) => perkDisplayName(entry.id))
++          .filter(Boolean),
++      )].join(', ');
+       paAlert(
+-        tPerkAlert('perksBookAdjustedTitle'),
+-        tPerkAlert('perksBookAdjustedMessage').replace('{perks}', removedList),
++        tPerkAlert('dormantPerksTitle'),
++        tPerkAlert('dormantPerksMessage').replace('{perks}', dormantNames),
+       );
+     }
+ 
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index 24a6441..a65d503 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -180,8 +180,13 @@ export interface CharacterActions {
+     equipmentState?: EquipmentStatePush;
+   }) => void;
+   recalculatePerkBonuses: () => void;
+-  /** 411: мигратор перков при загрузке («книга приоритетнее»). */
+-  reconcilePerksAtLoad: () => { changed: boolean; removed: Array<{ id: string | null; rank: number | null; reason: string }> };
++  /** 412: мигратор перков при загрузке («книга приоритетнее», серые перки). */
++  reconcilePerksAtLoad: () => {
++    changed: boolean;
++    removed: Array<{ id: string | null; rank: number | null; reason: string }>;
++    dormant: Array<{ id: string; rank: number; reason: string; need?: number; have?: number; code?: string; otherId?: string }>;
++    shouldNotify: boolean;
++  };
+   /** Фабрика полей сеттингов (экс-эффект провайдера, патч 243). */
+   ensureStateExtensionFields: () => void;
+   /** Мост legacy-формата (массивы) → словари стора. */
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 54e0151..bafe812 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -377,7 +377,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+        */
+       currency: 0,
+       selectedPerks: [],
+-      pendingPerksBookAdjusted: [],
++      pendingPerksDormant: [],
++      dormantNoticeFingerprint: null,
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
+       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
+@@ -413,12 +414,16 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+       },
+ 
+       /**
+-       * 411 (публичное приложение): мигратор перков при загрузке персонажа.
+-       * «Книга приоритетнее» (слово владельца 410): лишние ранги и перки,
+-       * не отвечающие книжным требованиям, снимаются; слоты освобождаются.
+-       * Идемпотентно — на здоровом списке ничего не меняет. Списанные
+-       * перки попадают в pendingPerksBookAdjusted (не персистится) —
+-       * слой загрузки показывает игроку уведомление.
++       * 412 (публичное приложение): мигратор перков при загрузке персонажа.
++       * Слово владельца: «пусть сам решает» — недоступные по книге перки
++       * (уровень/характеристики/робот/«или-или»/ранг сверх книжного) НЕ
++       * снимаются: остаются в списке серыми и НЕ ДЕЙСТВУЮТ (гасит
++       * evaluateSelectedPerkPicks — и бонусы, и гейты рецептов), снова
++       * заработают, когда выполнятся условия, либо игрок заменит их сам.
++       * Снимаются только неизвестные каталогу id (нет имени — нечего
++       * показывать серым). pendingPerksDormant (не персистится) — список
++       * погасших для уведомления; dormantNoticeFingerprint — то же
++       * множество повторно не уведомляет (один показ на изменение).
+        */
+       reconcilePerksAtLoad: () => {
+         const state = get();
+@@ -431,17 +436,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+             isRobot: isRobotCharacter({ origin: state.origin, trait: state.trait }),
+           },
+         );
+-        if (!result.changed) {
+-          set({ pendingPerksBookAdjusted: [] });
+-          return { changed: false, removed: [] };
++        const dormant = result.inactivePicks;
++        const fingerprint = JSON.stringify(dormant.map((p) => [p.id, p.rank, p.reason]));
++        const shouldNotify = fingerprint !== state.dormantNoticeFingerprint;
++        if (result.changed) {
++          set({ selectedPerks: result.selectedPerks });
++          get().recalculatePerkBonuses();
++          debugLog('perks.reconcileAtLoad.removedUnknown', { removed: result.removed });
+         }
+         set({
+-          selectedPerks: result.selectedPerks,
+-          pendingPerksBookAdjusted: result.removed,
++          pendingPerksDormant: dormant,
++          dormantNoticeFingerprint: fingerprint,
+         });
+-        get().recalculatePerkBonuses();
+-        debugLog('perks.reconcileAtLoad', { removed: result.removed });
+-        return { changed: true, removed: result.removed };
++        return { changed: result.changed, removed: result.removed, dormant, shouldNotify };
+       },
+ 
+       markSkillsAsRewarded: (skills = []) => set((state) => ({

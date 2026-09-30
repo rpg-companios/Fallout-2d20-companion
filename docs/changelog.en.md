@@ -1,5 +1,21 @@
 # Changelog
 ---
+## Dormant perks: the game warns and leaves the call to you (patch 412)
+
+By your word, the migrator no longer removes perks taken under the old
+rules. If a perk does not meet the book (missing level or attributes,
+unavailable to robots, mutually exclusive with another perk, a rank the
+book does not have) — it stays in the list, shown greyed with a «Not
+active» note explaining exactly what is missing. Such a perk grants no
+bonuses and no recipes; once you meet the requirements it wakes up on
+its own — or do not wait: the «Replace» button swaps it for any other
+perk, the character decides. On load the game names the list of such
+perks once; reloading the same character does not repeat the notice.
+Only perks missing from the catalog entirely are still removed. Perk
+requirements now apply uniformly everywhere: a dormant rank unlocks no
+crafting recipes and does not affect salvage.
+
+---
 ## Old saves' perks repair themselves (patch 411)
 
 The app is now public, and the book rules for perks have changed — so
