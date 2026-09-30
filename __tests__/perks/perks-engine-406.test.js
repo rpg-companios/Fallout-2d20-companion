@@ -40,8 +40,8 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
   it('все одиннадцать перков кладут свои ключи', () => {
     const cases = {
       fieldSurgeon: { stimpakHpBonus: 3, antiradRadiationBonus: 1 },
-      pharmacist: { antiradRadiationBonus: 1 },
-      powerUser: { fusionCoreChargeBonus: 1 },
+      pharmacist: { antiradRadiationBonus: 2 },
+      powerUser: { fusionCoreChargeBonus: 3 },
       capCollector: { capCollectorDiscountPercent: 10 },
       naturalResistance: { sleepOnGroundDiseaseImmune: true },
       rejuvenated: { rejuvenatedSatedMaxHp: 2, ladderAccRates: { food: 0.5, water: 0.5 } },
@@ -54,22 +54,27 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
       const bonuses = selectPerkBonuses({ selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
       expect(bonuses, id).toMatchObject(expected);
     }
+    // 410: книжные нормы по рангам — Фармацевт 2/3/4, Мощный 3/6/10.
+    expect(selectPerkBonuses({ selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
+      .toMatchObject({ antiradRadiationBonus: 4 });
+    expect(selectPerkBonuses({ selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
+      .toMatchObject({ fusionCoreChargeBonus: 10 });
     const blood = selectPerkBonuses({ selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
     expect(blood.bloodPackHealMultiplier).toBe(2);
     expect(blood.bloodPackDrinkIds).toContain('drink_blood_pack');
   });
 
-  it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: +4 заряда', () => {
+  it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: заряды по книге', () => {
     const bonuses = selectPerkBonuses(
       { selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
       perksCatalog,
     );
-    expect(bonuses.antiradRadiationBonus).toBe(2);
+    expect(bonuses.antiradRadiationBonus).toBe(3); // +1 хирург + 2 фармацевт
     const cores = selectPerkBonuses(
       { selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
       perksCatalog,
     );
-    expect(cores.fusionCoreChargeBonus).toBe(4); // 3 + 1
+    expect(cores.fusionCoreChargeBonus).toBe(6); // 3 (ядерщик) + 3 (книга, ранг 1)
   });
 });
 

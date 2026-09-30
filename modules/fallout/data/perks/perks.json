@@ -30,12 +30,12 @@
   {
     "id": "radResistant",
     "nameKey": "perks.radResistant.name",
-    "maxRanks": 2,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "END": 8
+        "END": 6
       },
-      "level": 1,
+      "level": 2,
       "levelIncreasePerRank": 4
     },
     "effectKey": "perks.radResistant.effect",
@@ -525,7 +525,7 @@
   {
     "id": "fastHealer",
     "nameKey": "perks.fastHealer.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "END": 6
@@ -573,7 +573,8 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "PER": 8
+        "PER": 6,
+        "LCK": 6
       }
     },
     "effectKey": "perks.infiltrator.effect",
@@ -585,8 +586,10 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "INT": 8
-      }
+        "INT": 7
+      },
+      "level": 1,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.nurse.effect",
     "effect": "nurse"
@@ -611,8 +614,7 @@
     "maxRanks": 2,
     "prerequisites": {
       "special": {
-        "STR": 9,
-        "END": 7
+        "STR": 6
       },
       "level": 1,
       "levelIncreasePerRank": 5
@@ -690,7 +692,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "LCK": 7
+        "LCK": 5
       },
       "excludedPerks": [
         "cautiousNature"
@@ -800,12 +802,13 @@
   {
     "id": "pathfinder",
     "nameKey": "perks.pathfinder.name",
-    "maxRanks": 1,
+    "maxRanks": 5,
     "prerequisites": {
       "special": {
         "PER": 6,
         "END": 6
-      }
+      },
+      "level": 5
     },
     "effectKey": "perks.pathfinder.effect",
     "effect": "pathfinder"
@@ -934,7 +937,7 @@
   {
     "id": "strongBack",
     "nameKey": "perks.strongBack.name",
-    "maxRanks": 3,
+    "maxRanks": 1,
     "prerequisites": {
       "special": {
         "STR": 5
@@ -1028,7 +1031,7 @@
   {
     "id": "sniper",
     "nameKey": "perks.sniper.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "PER": 8,
@@ -1130,7 +1133,7 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "CHA": 8
+        "LCK": 8
       }
     },
     "effectKey": "perks.killer.effect",
@@ -1201,12 +1204,13 @@
   {
     "id": "ammosmith",
     "nameKey": "perks.ammosmith.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "INT": 7
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 4
     },
     "effectKey": "perks.ammosmith.effect",
     "effect": "ammosmith"
@@ -1214,12 +1218,13 @@
   {
     "id": "archer",
     "nameKey": "perks.archer.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "PER": 6
       },
-      "level": 1
+      "level": 1,
+      "levelIncreasePerRank": 7
     },
     "effectKey": "perks.archer.effect",
     "effect": "archer"
@@ -1227,11 +1232,13 @@
   {
     "id": "blocker",
     "nameKey": "perks.blocker.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 6
-      }
+      },
+      "level": 1,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.blocker.effect",
     "effect": "blocker"
@@ -1265,12 +1272,13 @@
   {
     "id": "bornSurvivor",
     "nameKey": "perks.bornSurvivor.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "AGI": 8
       },
-      "level": 3
+      "level": 3,
+      "levelIncreasePerRank": 8
     },
     "effectKey": "perks.bornSurvivor.effect",
     "effect": "bornSurvivor"
@@ -1291,12 +1299,13 @@
   {
     "id": "bulletShield",
     "nameKey": "perks.bulletShield.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 8
       },
-      "level": 8
+      "level": 8,
+      "levelIncreasePerRank": 6
     },
     "effectKey": "perks.bulletShield.effect",
     "effect": "bulletShield"
@@ -1304,12 +1313,13 @@
   {
     "id": "butchersBounty",
     "nameKey": "perks.butchersBounty.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "PER": 8
       },
-      "level": 3
+      "level": 3,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.butchersBounty.effect",
     "effect": "butchersBounty"
@@ -1317,13 +1327,14 @@
   {
     "id": "cannibal",
     "nameKey": "perks.cannibal.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "END": 8
       },
       "level": 10,
-      "notForRobots": true
+      "notForRobots": true,
+      "levelIncreasePerRank": 9
     },
     "effectKey": "perks.cannibal.effect",
     "effect": "cannibal"
@@ -1357,12 +1368,14 @@
   {
     "id": "communityOrganizer",
     "nameKey": "perks.communityOrganizer.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 5,
         "END": 5
-      }
+      },
+      "level": 1,
+      "levelIncreasePerRank": 3
     },
     "effectKey": "perks.communityOrganizer.effect",
     "effect": "communityOrganizer"
@@ -1370,13 +1383,14 @@
   {
     "id": "contractor",
     "nameKey": "perks.contractor.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 5,
         "INT": 5
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 4
     },
     "effectKey": "perks.contractor.effect",
     "effect": "contractor"
@@ -1412,9 +1426,9 @@
     "maxRanks": 1,
     "prerequisites": {
       "special": {
-        "AGI": 7
+        "AGI": 8
       },
-      "level": 8
+      "level": 3
     },
     "effectKey": "perks.deadManSprinting.effect",
     "effect": "deadManSprinting"
@@ -1500,7 +1514,7 @@
   {
     "id": "fieldSurgeon",
     "nameKey": "perks.fieldSurgeon.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 8,
@@ -1527,12 +1541,13 @@
   {
     "id": "fireproof",
     "nameKey": "perks.fireproof.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "END": 6
       },
-      "level": 7
+      "level": 7,
+      "levelIncreasePerRank": 7
     },
     "effectKey": "perks.fireproof.effect",
     "effect": "fireproof"
@@ -1555,12 +1570,13 @@
   {
     "id": "gladiator",
     "nameKey": "perks.gladiator.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 6
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.gladiator.effect",
     "effect": "gladiator"
@@ -1568,12 +1584,13 @@
   {
     "id": "glowSight",
     "nameKey": "perks.glowSight.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "PER": 8
       },
-      "level": 3
+      "level": 8,
+      "levelIncreasePerRank": 8
     },
     "effectKey": "perks.glowSight.effect",
     "effect": "glowSight"
@@ -1581,12 +1598,13 @@
   {
     "id": "goatLegs",
     "nameKey": "perks.goatLegs.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "AGI": 7
       },
-      "level": 7
+      "level": 7,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.goatLegs.effect",
     "effect": "goatLegs"
@@ -1620,13 +1638,14 @@
   {
     "id": "happyCamper",
     "nameKey": "perks.happyCamper.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "CHA": 7,
         "END": 6
       },
-      "level": 3
+      "level": 3,
+      "levelIncreasePerRank": 4
     },
     "effectKey": "perks.happyCamper.effect",
     "effect": "happyCamper"
@@ -1634,12 +1653,14 @@
   {
     "id": "happyGoLucky",
     "nameKey": "perks.happyGoLucky.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "CHA": 9
+        "CHA": 8,
+        "INT": 8
       },
-      "level": 17
+      "level": 15,
+      "levelIncreasePerRank": 6
     },
     "effectKey": "perks.happyGoLucky.effect",
     "effect": "happyGoLucky"
@@ -1673,12 +1694,13 @@
   {
     "id": "homeDefense",
     "nameKey": "perks.homeDefense.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "INT": 6
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.homeDefense.effect",
     "effect": "homeDefense"
@@ -1686,12 +1708,13 @@
   {
     "id": "homebody",
     "nameKey": "perks.homebody.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "END": 6
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.homebody.effect",
     "effect": "homebody"
@@ -1699,12 +1722,13 @@
   {
     "id": "incisor",
     "nameKey": "perks.incisor.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 6
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 9
     },
     "effectKey": "perks.incisor.effect",
     "effect": "incisor"
@@ -1712,12 +1736,13 @@
   {
     "id": "ironclad",
     "nameKey": "perks.ironclad.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "END": 7
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.ironclad.effect",
     "effect": "ironclad"
@@ -1725,12 +1750,13 @@
   {
     "id": "junkShield",
     "nameKey": "perks.junkShield.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "LCK": 7
       },
-      "level": 1
+      "level": 1,
+      "levelIncreasePerRank": 8
     },
     "effectKey": "perks.junkShield.effect",
     "effect": "junkShield"
@@ -1751,12 +1777,13 @@
   {
     "id": "localLeader",
     "nameKey": "perks.localLeader.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "CHA": 6
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.localLeader.effect",
     "effect": "localLeader"
@@ -1764,12 +1791,13 @@
   {
     "id": "lockAndLoad",
     "nameKey": "perks.lockAndLoad.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 7
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 4
     },
     "effectKey": "perks.lockAndLoad.effect",
     "effect": "lockAndLoad"
@@ -1820,7 +1848,8 @@
     "prerequisites": {
       "special": {
         "LCK": 7
-      }
+      },
+      "level": 1
     },
     "effectKey": "perks.mysteriousSavior.effect",
     "effect": "mysteriousSavior"
@@ -1846,7 +1875,7 @@
       "special": {
         "PER": 8
       },
-      "level": 7
+      "level": 8
     },
     "effectKey": "perks.nightEyes.effect",
     "effect": "nightEyes"
@@ -1906,12 +1935,13 @@
   {
     "id": "pharmacist",
     "nameKey": "perks.pharmacist.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "INT": 8
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 6
     },
     "effectKey": "perks.pharmacist.effect",
     "effect": "pharmacist"
@@ -1919,12 +1949,13 @@
   {
     "id": "photosynthetic",
     "nameKey": "perks.photosynthetic.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "END": 7
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 10
     },
     "effectKey": "perks.photosynthetic.effect",
     "effect": "photosynthetic"
@@ -1932,12 +1963,13 @@
   {
     "id": "powerPatcher",
     "nameKey": "perks.powerPatcher.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "INT": 6
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 7
     },
     "effectKey": "perks.powerPatcher.effect",
     "effect": "powerPatcher"
@@ -1945,12 +1977,13 @@
   {
     "id": "powerUser",
     "nameKey": "perks.powerUser.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "INT": 9
       },
-      "level": 10
+      "level": 10,
+      "levelIncreasePerRank": 10
     },
     "effectKey": "perks.powerUser.effect",
     "effect": "powerUser"
@@ -1958,12 +1991,13 @@
   {
     "id": "psychopath",
     "nameKey": "perks.psychopath.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "LCK": 8
       },
-      "level": 11
+      "level": 11,
+      "levelIncreasePerRank": 6
     },
     "effectKey": "perks.psychopath.effect",
     "effect": "psychopath"
@@ -2011,13 +2045,14 @@
   {
     "id": "responder",
     "nameKey": "perks.responder.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 8,
         "INT": 7
       },
-      "level": 9
+      "level": 9,
+      "levelIncreasePerRank": 7
     },
     "effectKey": "perks.responder.effect",
     "effect": "responder"
@@ -2025,13 +2060,14 @@
   {
     "id": "retribution",
     "nameKey": "perks.retribution.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "END": 8,
         "LCK": 8
       },
-      "level": 2
+      "level": 2,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.retribution.effect",
     "effect": "retribution"
@@ -2077,12 +2113,13 @@
   {
     "id": "secretAgent",
     "nameKey": "perks.secretAgent.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "AGI": 9
       },
-      "level": 7
+      "level": 7,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.secretAgent.effect",
     "effect": "secretAgent"
@@ -2090,12 +2127,13 @@
   {
     "id": "serendipity",
     "nameKey": "perks.serendipity.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "LCK": 7
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 6
     },
     "effectKey": "perks.serendipity.effect",
     "effect": "serendipity"
@@ -2117,12 +2155,13 @@
   {
     "id": "spiritualHealer",
     "nameKey": "perks.spiritualHealer.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 7
       },
-      "level": 6
+      "level": 6,
+      "levelIncreasePerRank": 9
     },
     "effectKey": "perks.spiritualHealer.effect",
     "effect": "spiritualHealer"
@@ -2130,7 +2169,7 @@
   {
     "id": "squadManeuvers",
     "nameKey": "perks.squadManeuvers.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "CHA": 7
@@ -2142,12 +2181,12 @@
   {
     "id": "stabilized",
     "nameKey": "perks.stabilized.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
-        "INT": 7
+        "INT": 6
       },
-      "level": 16
+      "level": 5
     },
     "effectKey": "perks.stabilized.effect",
     "effect": "stabilized"
@@ -2168,12 +2207,13 @@
   {
     "id": "sturdyFrame",
     "nameKey": "perks.sturdyFrame.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "STR": 8
       },
-      "level": 5
+      "level": 5,
+      "levelIncreasePerRank": 8
     },
     "effectKey": "perks.sturdyFrame.effect",
     "effect": "sturdyFrame"
@@ -2181,12 +2221,13 @@
   {
     "id": "superDuper",
     "nameKey": "perks.superDuper.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "LCK": 6
       },
-      "level": 3
+      "level": 3,
+      "levelIncreasePerRank": 4
     },
     "effectKey": "perks.superDuper.effect",
     "effect": "superDuper"
@@ -2194,12 +2235,13 @@
   {
     "id": "suppressor",
     "nameKey": "perks.suppressor.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 6
       },
-      "level": 10
+      "level": 10,
+      "levelIncreasePerRank": 10
     },
     "effectKey": "perks.suppressor.effect",
     "effect": "suppressor"
@@ -2221,12 +2263,13 @@
   {
     "id": "tenderizer",
     "nameKey": "perks.tenderizer.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "CHA": 7
       },
-      "level": 8
+      "level": 8,
+      "levelIncreasePerRank": 10
     },
     "effectKey": "perks.tenderizer.effect",
     "effect": "tenderizer"
@@ -2260,7 +2303,7 @@
   {
     "id": "trueFriends",
     "nameKey": "perks.trueFriends.name",
-    "maxRanks": 1,
+    "maxRanks": 2,
     "prerequisites": {
       "special": {
         "PER": 6,
@@ -2374,7 +2417,8 @@
       "special": {
         "LCK": 6
       },
-      "level": 10
+      "level": 10,
+      "levelIncreasePerRank": 5
     },
     "effectKey": "perks.missFortune.effect",
     "effect": "missFortune"

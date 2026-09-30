@@ -1,5 +1,20 @@
 # Changelog
 ---
+## Perks follow the book (patch 410)
+
+By your word «the book takes priority», all perk ranks and
+requirements now match the book, guided by its descriptions wherever
+the rank number itself looked wrong. Result: 45 perks got book ranks
+(Ammosmith all 3 — this also fixed ammo recipes of rarity 2–3 that
+were unreachable before), 48 perks got book requirements (level, step
+per rank, attributes). The Pharmacist now removes +2/+3/+4 radiation
+by rank, Power User grants +3/+6/+10 charges — exactly per the book.
+Armorer, Science and Gun Nut keep 4 ranks: their descriptions
+(«and so on») continue the series to mod rank 4, otherwise rank-4 mod
+recipes would be lost. «Whatever the description says is what works»
+is now pinned by a test.
+
+---
 ## Perk audit against your list (patch 409)
 
 Audited every perk against your prepared list of descriptions. Main

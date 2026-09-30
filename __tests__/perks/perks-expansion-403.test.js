@@ -27,12 +27,16 @@ describe('патч 403: пополнение перков по референс�
     expect(new Set(en.map((p) => p.id))).toEqual(new Set(catalog.map((p) => p.id)));
   });
 
-  it('8 новых: требования и ранги — точная копия референса structure', () => {
+  it('8 новых: требования и ранги — structure, с 410 поправлено на книгу (Мисс Удача +5/ранг)', () => {
     const st = byId(structure);
     const cat = byId(catalog);
+    // 410 (слово владельца: «книга приоритетнее»): требования из notepad.
+    const BOOK_OVERRIDES = {
+      missFortune: { ...st.missFortune.prerequisites, levelIncreasePerRank: 5 },
+    };
     for (const id of NEW_IDS) {
       expect(cat[id].maxRanks).toBe(st[id].maxRanks);
-      expect(cat[id].prerequisites).toEqual(st[id].prerequisites);
+      expect(cat[id].prerequisites).toEqual(BOOK_OVERRIDES[id] ?? st[id].prerequisites);
       expect(cat[id].effectKey).toBe(`perks.${id}.effect`);
       expect(cat[id].nameKey).toBe(`perks.${id}.name`);
     }
