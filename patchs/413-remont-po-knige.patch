@@ -1,0 +1,1545 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+new file mode 100644
+index 0000000..4270a9d
+--- /dev/null
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -0,0 +1,352 @@
++// ПРИЁМОЧНЫЙ (патч 413): ремонт по книге — механика от владельца.
++//   Тест ИНТ + Ремонт, сложность = редкость предмета (+1 за каждую
++//   установленную модификацию; разборка донора — второго предмета того же
++//   типа — даёт материалы и снижает сложность на 1). Время — полчаса;
++//   при успехе 2 ОД сокращают вдвое; осложнение: д20 19–20 = потеря
++//   дополнительных материалов, иначе +15 минут. Материалы — книжная
++//   таблица по редкости. Провал: материалы остаются (закон верстака),
++//   время зря. Кнопка «Починить» открывает модалку (мгновенного
++//   бесплатного ремонта больше нет).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  evaluateRepair,
++  runRepair,
++} from '../../domain/repairEngine';
++import { repairMaterialsPlan } from '../../modules/fallout/repair/rules';
++import {
++  repairPreview,
++  performRepair,
++  settleRepairTime,
++  repairModsCountFor,
++  donorCandidatesFor,
++} from '../../modules/fallout/repair/operations';
++import { readFileSync } from 'node:fs';
++
++const state = () => useCharacterStore.getState();
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++// Оружие-экземпляр в инвентаре (как seedStack крафта — weaponId = канон).
++const seedWeapon = ({ durability = 40, weaponId = 'weapon_10mm_pistol', id }) => {
++  const key = id ?? `seed_${weaponId}_${Math.random().toString(36).slice(2, 7)}`;
++  useCharacterStore.setState((prev) => ({
++    items: {
++      ...prev.items,
++      [key]: {
++        id: weaponId, weaponId, itemType: 'weapon',
++        durability, durabilityTracked: true, quantity: 1,
++      },
++    },
++  }));
++  return key;
++};
++
++const seedMaterials = (itemId, count) => {
++  useCharacterStore.setState((prev) => ({
++    items: {
++      ...prev.items,
++      [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++        id: itemId, weaponId: itemId, quantity: count,
++      },
++    },
++  }));
++};
++
++const setRepairHero = ({ int = 5, repair = 0 } = {}) => {
++  useCharacterStore.setState((prev) => ({
++    attributes: { ...prev.attributes, INT: { total: int } },
++    skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: repair, total: repair } },
++  }));
++};
++
++// rollD20 движка выдаёт ПО ОДНОЙ грани за вызов (diceCount раз).
++const dice = (...faces) => {
++  let i = 0;
++  return () => faces[i++ % faces.length];
++};
++
++describe('Патч 413: книжная таблица материалов по редкости', () => {
++  it('редкость 0 → 1 Обычные; 1 → 2 Обычные; 2 → 2 Обычные + 1 Необычные', () => {
++    expect(repairMaterialsPlan(0)).toEqual([{ itemId: 'item_common_materials', count: 1 }]);
++    expect(repairMaterialsPlan(1)).toEqual([{ itemId: 'item_common_materials', count: 2 }]);
++    expect(repairMaterialsPlan(2)).toEqual([
++      { itemId: 'item_common_materials', count: 2 },
++      { itemId: 'item_uncommon_materials', count: 1 },
++    ]);
++  });
++
++  it('3 → 2+2; 4 → 2+2+1 Редкие; 5+ → 3+3+1', () => {
++    expect(repairMaterialsPlan(3)).toEqual([
++      { itemId: 'item_common_materials', count: 2 },
++      { itemId: 'item_uncommon_materials', count: 2 },
++    ]);
++    expect(repairMaterialsPlan(4)).toEqual([
++      { itemId: 'item_common_materials', count: 2 },
++      { itemId: 'item_uncommon_materials', count: 2 },
++      { itemId: 'item_rare_materials', count: 1 },
++    ]);
++    expect(repairMaterialsPlan(5)).toEqual([
++      { itemId: 'item_common_materials', count: 3 },
++      { itemId: 'item_uncommon_materials', count: 3 },
++      { itemId: 'item_rare_materials', count: 1 },
++    ]);
++    expect(repairMaterialsPlan(9)).toEqual(repairMaterialsPlan(5));
++  });
++});
++
++describe('Патч 413: движок — тест, материалы, осложнения', () => {
++  const PLAN = [{ itemId: 'item_common_materials', count: 2 }];
++
++  it('сложность 0 — автоуспех без броска; сложность >0 — бросок 2d20', () => {
++    const auto = runRepair({
++      complexity: 0, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 2 },
++      rollD20: () => { throw new Error('броска не должно быть'); },
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(auto.done).toBe(true);
++    expect(auto.check).toBeNull();
++
++    const rolled = runRepair({
++      complexity: 1, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 2 },
++      attributeValue: 5, skillValue: 3,
++      rollD20: dice(3, 4),
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(rolled.done).toBe(true);
++    expect(rolled.check.rolls).toEqual([3, 4]);
++  });
++
++  it('провал: материалы остаются, предмет не чинится, время зря', () => {
++    let spent = 0;
++    const result = runRepair({
++      complexity: 2, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 5 },
++      attributeValue: 0, skillValue: 0, // цель 2: 19,18 — ноль успехов
++      rollD20: dice(19, 18),
++      spend: (plan) => { spent += plan.length; return { ok: true }; },
++      spendDonor: () => ({ ok: true }),
++    });
++    expect(result.done).toBe(false);
++    expect(result.stage).toBe('check');
++    expect(spent).toBe(0);
++  });
++
++  it('осложнение при успехе: д20 19–20 → потеря материалов; иначе +15 минут', () => {
++    const lost = runRepair({
++      complexity: 1, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 2 },
++      attributeValue: 5, skillValue: 0, // цель 5: 3 + натуральная 20 = осложнение + успех
++      rollD20: dice(3, 20),
++      complicationRoll: () => 20,
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(lost.done).toBe(true);
++    expect(lost.resolution).toEqual({ kind: 'lost-materials', face: 20 });
++
++    const extra = runRepair({
++      complexity: 1, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 2 },
++      attributeValue: 5, skillValue: 0,
++      rollD20: dice(3, 20),
++      complicationRoll: () => 18,
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(extra.resolution).toEqual({ kind: 'extra-minutes', face: 18 });
++  });
++
++  it('осложнение при провале разрешение не получает (терять нечего)', () => {
++    const result = runRepair({
++      complexity: 1, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 2 },
++      attributeValue: 5, skillValue: 0, // цель 5: 19,18 — провал + осложнение
++      rollD20: dice(19, 18),
++      complicationRoll: () => 20,
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(result.done).toBe(false);
++    expect(result.resolution).toBeNull();
++  });
++
++  it('донор: вместо материалов списывается донор (порт spendDonor)', () => {
++    let spentPlan = null;
++    let donorSpent = false;
++    const result = runRepair({
++      complexity: 1, materialsPlan: [], inventoryCounts: {},
++      attributeValue: 5, skillValue: 0,
++      rollD20: dice(2, 3),
++      spend: (plan) => { spentPlan = plan; return { ok: true }; },
++      spendDonor: () => { donorSpent = true; return { ok: true }; },
++    });
++    expect(result.done).toBe(true);
++    expect(result.donorSpent).toBe(true);
++    expect(donorSpent).toBe(true);
++    expect(spentPlan).toBeNull();
++  });
++
++  it('не хватает материалов — отказ на гейте до броска', () => {
++    const result = runRepair({
++      complexity: 1, materialsPlan: PLAN, inventoryCounts: { item_common_materials: 1 },
++      rollD20: () => { throw new Error('броска не должно быть'); },
++      spend: () => ({ ok: true }), spendDonor: () => ({ ok: true }),
++    });
++    expect(result).toMatchObject({ done: false, stage: 'gate' });
++  });
++});
++
++describe('Патч 413: операции — редкость, моды, донор, ремонт оружия', () => {
++  it('сложность = редкость + моды − донор (мин 0)', () => {
++    // 10-мм пистолет: редкость 1 в каталоге оружия.
++    const weaponId = seedWeapon({ durability: 40 });
++    expect(repairPreview(weaponId)).toMatchObject({ canRepair: true, rarity: 1, complexity: 1, modsCount: 0 });
++  });
++
++  it('модификация повышает сложность на 1; донор снижает на 1', () => {
++    const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_smg' });
++    // Установленный мод — запись с installedOn (закон 367).
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mod: { id: 'mod_x', weaponId: 'mod_x', installedOn: weaponId, quantity: 1 },
++      },
++    }));
++    expect(repairModsCountFor(weaponId)).toBe(1);
++    const withMod = repairPreview(weaponId);
++    expect(withMod.complexity).toBe(withMod.rarity + 1);
++
++    const donorKey = seedWeapon({ durability: 55, weaponId: 'weapon_10mm_smg' });
++    const donors = donorCandidatesFor(state().items[weaponId], weaponId);
++    expect(donors).toContain(donorKey);
++    const withDonor = repairPreview(weaponId, { donorStoreItemId: donorKey });
++    expect(withDonor.complexity).toBe(withMod.rarity); // +1 мод, −1 донор
++    expect(withDonor.materialsPlan).toEqual([]); // донор вместо материалов
++  });
++
++  it('целый предмет не чинится; записей с прочностью чинится', () => {
++    const whole = seedWeapon({ durability: 100 });
++    expect(repairPreview(whole)).toMatchObject({ canRepair: false, reason: 'not-damaged' });
++    const damaged = seedWeapon({ durability: 40 });
++    expect(repairPreview(damaged).canRepair).toBe(true);
++  });
++
++  it('успешный ремонт: материалы списаны, прочность 100, время отложено', () => {
++    const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
++    seedMaterials('item_common_materials', 2);
++    setRepairHero({ int: 5, repair: 0 });
++
++    const result = performRepair(weaponId, {
++      ports: { rollD20: dice(2, 3) },
++    });
++    expect(result.done).toBe(true);
++    expect(result.spent).toEqual([{ itemId: 'item_common_materials', count: 2 }]);
++    expect(state().items[weaponId].durability).toBe(100);
++    expect(result.repairTime).toMatchObject({ baseMinutes: 30, pending: true, halvedOnAp: true });
++    // Материалы в сумке кончились.
++    const counts = Object.values(state().items).filter((i) => i.weaponId === 'item_common_materials').length;
++    expect(counts).toBe(0);
++  });
++
++  it('осложнение с потерей: списан ДОПОЛНИТЕЛЬНЫЙ комплект', () => {
++    const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
++    seedMaterials('item_common_materials', 4); // 2 на ремонт + 2 на потерю
++    setRepairHero();
++    const result = performRepair(weaponId, {
++      ports: { rollD20: dice(3, 20), complicationRoll: () => 19 },
++    });
++    expect(result.done).toBe(true);
++    expect(result.resolution.kind).toBe('lost-materials');
++    const left = Object.values(state().items)
++      .filter((i) => i.weaponId === 'item_common_materials')
++      .reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
++    expect(left).toBe(0); // 4 − 2 (ремонт) − 2 (потеря)
++  });
++
++  it('время: успех + 2 ОД → 15 минут; провал — всегда полные 30', () => {
++    const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
++    seedMaterials('item_common_materials', 6);
++    setRepairHero();
++
++    const ok = performRepair(weaponId, { ports: { rollD20: dice(2, 2) } });
++    const halved = settleRepairTime(ok, { spendActionPoints: true });
++    expect(halved.minutes).toBe(15);
++    expect(halved.spendActionPoints).toBe(true);
++
++    const second = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
++    const fail = performRepair(second, { ports: { rollD20: dice(19, 19) } });
++    const full = settleRepairTime(fail, { spendActionPoints: true });
++    expect(full.minutes).toBe(30); // ОД на провал не тратятся
++    expect(full.spendActionPoints).toBe(false);
++  });
++
++  it('донор списывается вместе со своими модами (закон 343/344)', () => {
++    const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
++    const donorKey = seedWeapon({ durability: 55, weaponId: 'weapon_10mm_pistol' });
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_donor_mod: { id: 'mod_y', weaponId: 'mod_y', installedOn: donorKey, quantity: 1 },
++      },
++    }));
++    seedMaterials('item_common_materials', 5); // лишние — донор их не тратит
++    const before = Object.keys(state().items).length;
++
++    const result = performRepair(weaponId, {
++      donorStoreItemId: donorKey,
++      ports: { rollD20: dice(1, 2) },
++    });
++    expect(result.done).toBe(true);
++    expect(result.donorSpent).toBe(true);
++    const items = state().items;
++    expect(items[donorKey]).toBeUndefined(); // донор ушёл
++    expect(items.seed_donor_mod).toBeUndefined(); // мод ушёл вместе
++    expect(items[weaponId].durability).toBe(100);
++    // Из «лишних» материалов ничего не списалось (донор вместо материалов).
++    const mats = Object.values(items).filter((i) => i.weaponId === 'item_common_materials');
++    expect(mats).toHaveLength(before - 3 >= 0 ? 1 : 1);
++  });
++});
++
++describe('Патч 413: проводка — кнопка открывает модалку, мгновенного ремонта нет', () => {
++  it('все три кнопки «Починить» зовут setRepairTarget, экшны стора напрямую не зовутся', () => {
++    const src = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    expect(src).toContain('RepairModal');
++    expect(src).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
++    expect(src).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
++    // Мгновенные вызовы ремонта из карточек исчезли.
++    expect(src).not.toContain('onPress={() => repairWeapon(item.id)}');
++    expect(src).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
++    expect(src).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
++  });
++
++  it('модалка: скролл-закон (заголовок/футер фиксированы, контент в ScrollView)', () => {
++    const src = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
++    const scrollStart = src.indexOf('<ScrollView');
++    const scrollEnd = src.indexOf('</ScrollView>');
++    expect(scrollStart).toBeGreaterThan(-1);
++    expect(scrollEnd).toBeGreaterThan(scrollStart);
++    const inner = src.slice(scrollStart, scrollEnd);
++    expect(inner.length).toBeGreaterThan(400); // содержимое живёт в прокрутке
++    // Заголовок и футер — вне прокрутки.
++    const before = src.slice(0, scrollStart);
++    const after = src.slice(scrollEnd);
++    expect(before).toContain("tInventory('repair.title')");
++    expect(after).toContain("tInventory('repair.actions.close')");
++  });
++
++  it('словари ремонта есть в обоих языках (без фолбэков)', () => {
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/screen.json', 'utf8'));
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/screen.json', 'utf8'));
++    for (const dict of [ru, en]) {
++      expect(typeof dict.repair.title).toBe('string');
++      expect(dict.repair.testLine).toContain('{difficulty}');
++      expect(dict.repair.materialLine).toContain('{need}');
++      expect(typeof dict.repair.materials.item_common_materials).toBe('string');
++      expect(typeof dict.repair.report.apQuestion).toBe('string');
++      expect(typeof dict.repair.actions.repair).toBe('string');
++    }
++    expect(ru.repair.materials.item_common_materials).toBe('Обычные материалы');
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 8779c8c..2cc7790 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -10,6 +10,9 @@ import SellItemModal from './modals/SellItemModal';
+ import AddItemModal from './modals/AddItemModal';
+ import BuyItemModal from './modals/BuyItemModal';
+ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
++// 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
++// «Починить» больше не чинят мгновенно и бесплатно).
++import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+ import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
+@@ -134,8 +137,6 @@ const InventoryScreen = () => {
+   const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
+   const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
+   const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
+-  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+-  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
+   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
+   // минуя фасад useCharacter().
+   const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
+@@ -151,6 +152,8 @@ const InventoryScreen = () => {
+   const updateItem = useCharacterStore((state) => state.updateItem);
+   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
++  // 413: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name).
++  const [repairTarget, setRepairTarget] = useState(null);
+   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
+   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
+@@ -1468,7 +1471,7 @@ const InventoryScreen = () => {
+             {item.showRepair && (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton]}
+-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
++                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                 <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+               </TouchableOpacity>
+             )}
+@@ -1651,7 +1654,7 @@ const InventoryScreen = () => {
+           {showWeaponRepair && (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairWeapon(item.id)}>
++                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+               </TouchableOpacity>
+           )}
+@@ -1659,7 +1662,7 @@ const InventoryScreen = () => {
+           {showPARepair && (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairPowerArmorStack(item.id)}>
++                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+               </TouchableOpacity>
+           )}
+@@ -1876,6 +1879,12 @@ const InventoryScreen = () => {
+           visible={isCraftModalVisible}
+           onClose={() => setCraftModalVisible(false)}
+         />
++        {repairTarget != null && (
++          <RepairModal
++            target={repairTarget}
++            onClose={() => setRepairTarget(null)}
++          />
++        )}
+         <BuyItemModal
+           visible={isBuyItemModalVisible}
+           onClose={() => {
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 38b1e01..7afb93b 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,9 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (412)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **412** (СЛОВО ВЛАДЕЛЬЦА на вопрос «почему снимать перки?»: «Показать уведомление о недоступных перках. Оставить серым и не рабочим, персонаж может вручную его заменить или дождаться условий, пусть сам решает» — ОТМЕНЯЕТ снятие недоступных перков из 411). ЗАКОН: единая чистая функция `evaluateSelectedPerkPicks` (domain/perks.js) оценивает КАЖДЫЙ выбор по книге: unknown (нет в каталоге — снимает мигратор), rank-limit (только при явном числовом maxRanks), level/attributes (payload need/have/code), robot, excluded (otherId; остаётся взятый первым). Погасшие ОСТАЮТСЯ в списке: не дают бонусов (calculatePerkEffects считает только активные, ранг = по активным копиям; явный ранг записи {id,rank:N} сохраняется), не открывают гейты (крафт perkRanksFor/juryRigFor, разборка scrapperCeiling — через countActivePerkSelections), на экране перков серые (спойлер-хедер стилем *Inactive) со строкой-пояснением i18n dormant.* («Не работает: нужен уровень N (сейчас M)» и т.п.); сами заработают при выполнении условий (пересчёт на каждом уровне/атрибуте) или заменяются кнопкой «Заменить». Уведомление при загрузке (characterSaves): alerts.dormantPerks* + имена из i18n; ОДИН показ на изменение множества — dormantNoticeFingerprint в сторе (не персистится, как и pendingPerksDormant); повторная загрузка молчит. Существующие миграции v16/v17 НЕ тронуты; подъёма версии сейва нет. Защёлка perk-migrator-411 УДАЛЕНА, заменена perk-dormant-412 (18 тестов: оценка/миграция/бонусы/гейты/словари/проводка экрана). Тесты-профили приведены к книге (grantBookProfile/BOOK): персонажи тестов отвечают требованиям выданных перков — 1445/151 файл, tsc 0. ПОЧИНКА УСТАНОВЩИКА (после первого прогона владельцем): патч 406 нёс артефактную секцию правки старого patchs/277 (эпоха «файлов патчей»; файл у владельца отсутствовал → ОСТАНОВКА на 406) — файл 406 перегенерирован как diff(405→406) без patchs/ (заодно ушёл мусор кодировки 0xb9); цепочка 392–412 больше не трогает чужих patchs/-артефактов. Предыдущий снимок — **411** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (413)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **413** (МЕХАНИКА РЕМОНТА ОТ ВЛАДЕЛЬЦА — внедрена целиком, отменяет правило «Починить бесплатно до максимума»). ЗАКОН: тест ИНТ + Ремонт, сложность = редкость предмета (+1 за каждую установленную модификацию-запись installedOn; донор −1, мин 0); материалы — книжная таблица по редкости (repair/rules.js REPAIR_MATERIALS_BY_RARITY: 0→1 Обыч; 1→2 Обыч; 2→2+1 Необыч; 3→2+2; 4→2+2+1 Редк; 5+→3+3+1); донор = второй предмет ТОГО ЖЕ канонического id (не надет/не мод/не locked) — даёт материалы (план пуст, списывается adjustItemQuantity(−1), моды уходят с ним 343) и −1 сложность; время 30 мин (успех + 2 ОД → 15, закон 323/324; осложнение +15 каждое; при осложнении д20 19–20 → потеря ЕЩЁ одного комплекта, иначе +15; разрешение осложнения ТОЛЬКО при успехе); провал — материалы остаются (закон верстака 323), время зря; сложность 0 — окно спрашивает бросать ли (закон 356). КОД: domain/repairEngine.js (evaluateRepair/runRepair, чистый по образцу craftingEngine), modules/fallout/repair/rules.js + operations.js (редкость из каталогов collectPairs, modsCount по installedOn, preview/performRepair/performEquippedPieceRepair/settleRepairTime; успех чинит СУЩЕСТВУЮЩИМИ экшнами repairWeapon/repairPowerArmorStack/repairPowerArmorPieceAt — охват прежний, цена новая), модалка modules/fallout/screens/InventoryScreen/modals/RepairModal.js (скролл-закон 402, отчёт в модалке 357, инлайн-диалоги 364), три кнопки «Починить» (оружие/пачка СБ/надетая часть) открывают её, i18n repair.* в inventory screen.json (ru/en). Существующие экшны стора не менялись — паспорт не трогали. СЛОВО ВЛАДЕЛЬЦА: «Для ремонта нужно: тест на ИНТ + Ремонт со сложностью, равной редкости предмета… донор… полчаса (2 ОД → 15 минут, осложнения +15)… таблица материалов… +1 за модификацию… осложнения: время или потеря материалов (д20 19–20)». Сверх книги принято агентом (пометить при разборе): разрешение осложнения только при успехе; при провале материалы остаются; сложность-0 вопрос по закону 356. ЗАЩЁЛКА repair-book-413 (18 тестов). 1468/152, tsc 0. УРОК 413 (установщик): запись в state.md МЕЖДУ патчами (коммит без патч-файла — «Очумелые ручки», 00b0cac) ломает контекст хунка state.md следующего патча у владельца → патч целиком откладывается, установщик останавливается. Правило: ЛЮБАЯ правка docs/state.md — только В СОСТАВЕ патча; патч-файл генерировать diff(финал предыдущего патча → HEAD), не от промежуточных коммитов. Предыдущий снимок — **412** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **412** (СЛОВО ВЛАДЕЛЬЦА на вопрос «почему снимать перки?»: «Показать уведомление о недоступных перках. Оставить серым и не рабочим, персонаж может вручную его заменить или дождаться условий, пусть сам решает» — ОТМЕНЯЕТ снятие недоступных перков из 411). ЗАКОН: единая чистая функция `evaluateSelectedPerkPicks` (domain/perks.js) оценивает КАЖДЫЙ выбор по книге: unknown (нет в каталоге — снимает мигратор), rank-limit (только при явном числовом maxRanks), level/attributes (payload need/have/code), robot, excluded (otherId; остаётся взятый первым). Погасшие ОСТАЮТСЯ в списке: не дают бонусов (calculatePerkEffects считает только активные, ранг = по активным копиям; явный ранг записи {id,rank:N} сохраняется), не открывают гейты (крафт perkRanksFor/juryRigFor, разборка scrapperCeiling — через countActivePerkSelections), на экране перков серые (спойлер-хедер стилем *Inactive) со строкой-пояснением i18n dormant.* («Не работает: нужен уровень N (сейчас M)» и т.п.); сами заработают при выполнении условий (пересчёт на каждом уровне/атрибуте) или заменяются кнопкой «Заменить». Уведомление при загрузке (characterSaves): alerts.dormantPerks* + имена из i18n; ОДИН показ на изменение множества — dormantNoticeFingerprint в сторе (не персистится, как и pendingPerksDormant); повторная загрузка молчит. Существующие миграции v16/v17 НЕ тронуты; подъёма версии сейва нет. Защёлка perk-migrator-411 УДАЛЕНА, заменена perk-dormant-412 (18 тестов: оценка/миграция/бонусы/гейты/словари/проводка экрана). Тесты-профили приведены к книге (grantBookProfile/BOOK): персонажи тестов отвечают требованиям выданных перков — 1445/151 файл, tsc 0. ПОЧИНКА УСТАНОВЩИКА (после первого прогона владельцем): патч 406 нёс артефактную секцию правки старого patchs/277 (эпоха «файлов патчей»; файл у владельца отсутствовал → ОСТАНОВКА на 406) — файл 406 перегенерирован как diff(405→406) без patchs/ (заодно ушёл мусор кодировки 0xb9); цепочка 392–412 больше не трогает чужих patchs/-артефактов. ЖДЁТ СЛОВА ВЛАДЕЛЬЦА — «ОЧУМЕЛЫЕ РУЧКИ» (juryRigging, 1 ранг, сейчас только текст): вопрос «можем механику добавить?» разобран (книжная механика: бесплатная починка БЕЗ компонентов, но временная — при следующем осложнении при использовании предмет снова ломается, диапазон осложнений при использовании 19–20; в приложении есть прочность/износ и бесплатный ремонт для всех — коллизия показана владельцу). СЛОВО ВЛАДЕЛЬЦА (принять к сведению, код НЕ трогать): «При активированной настройке "случайная прочность" и/или "уменьшение прочности при выстреле" и при наличии этого перка починить предмет можно бесплатно, но временно. Пока прими это к сведению, а позже я дам механику ремонта». Настройки: selectWeaponDurabilityLossEnabled + selectWeaponDurabilityLossPer10Shots ( WeaponsAndArmorScreen) и rollWeaponDurability при добывании предмета (InventoryScreen). Реализация — ОТДЕЛЬНЫМ патчем после механики ремонта от владельца. Предыдущий снимок — **411** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **411** (приложение публичное — мигратор перков старых сейвов БЕЗ подъёма версии схемы). При каждой загрузке (персист-кэш zustand И каноническая запись) список перков сверяется с каталогом: чистая функция `reconcileSelectedPerksWithCatalog` (domain/perks.js) — срез рангов сверх maxRanks (причина rank-limit), снятие перков не по книжным требованиям СВОЙ ранг (уровень/характеристики/notForRobots/excludedPerks — остаётся взятый первым; причины level/attributes/robot/excluded) и неизвестных каталогу id (unknown); слоты освобождаются; идемпотентно. Точки врезки: экшн `reconcilePerksAtLoad` стора (паспорт characterActions.ts) зовётся в onRehydrateStorage ПЕРЕД recalculateAll и в loadCharacter ПОСЛЕ loadFromLegacyData; список списанного → `pendingPerksBookAdjusted` (не персистится) → уведомление с именами из i18n (showRawAlert). Существующие миграции сейвов (v16/v17) НЕ тронуты. ПОЧИНЕН ЛАТЕНТНЫЙ БАГ: в screen.json перков (ru и en) не было словаря `alerts` → tPerkAlert отдавал undefined и алерты загрузки молча не работали; словарь добавлен (6 ключей), tPerkAlert устойчив к отсутствию ключа. ЗАЩЁЛКА perk-migrator-411: 12 тестов (срез рангов/уровень/характеристики/робот/взаимоисключение/unknown/идемпотентность/каскад стора/словари обоих языков). Предыдущий снимок — **410** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **410** (слово владельца: «книга приоритетнее, в книге по рангам могут быть ошибки, ориентируемся на описания» — ОТМЕНЯЕТ правило 403 «ранги и требования как в приложении»). Применено: maxRanks = max(книга, ранг из описания, для тройки открывателей модов 4); требования (атрибуты/уровень/шаг) = notepad, шаг сверен с текстом «требование к уровню увеличивается на N». Изменено: 45 рангов (Патронщик 1→3 — чинит РЕАЛЬНУЮ недостижимость рецептов 2–3 ранга!; Крепкий хребет 3→1; Мохавский... нет — 44 одноранговых → книжные 2–3; Бронник/НАУКА!/Фанат оружия остались 4: описания «и т.д.» + рецепты 4-го ранга), 48 требований (Мисс Удача +5, Осмотрительный ЛОВ8/уровень 3, Ночной глаз уровень 8, Стабилизированный ИНТ6/ур.5, Везунчик ХАР8+ИНТ8/ур.15, Дерзкий ЛОВ8…). ЗАЩЁЛКА perks-book-priority-410: maxRanks=max(книга, описание) для всех 185 + рецепты не выше рангов. МЕХАНИКА по книге: Фармацевт +2/+3/+4 антирада (было +1), Мощный пользователь +3/+6/+10 заряда (было +1) — по рангам; тексты трёх исключений = книжные (теперь ВСЕ 185 == catalog_ru, 409-защёлка без overrides). Остальные 40 механических перков сверены — расхождений с описаниями нет · предыдущий: **409** (КОНТРОЛЬНАЯ СВЕРКА по слову владельца: он добавил на main f99db52 docs/reference-data/fallout2d20_perks_notepad.json — «описания перков всех что я знаю»). ФАКТ: notepad ПОБАЙТОВО равен fallout2d20_perks (1).json (184 перка, f2-схема) — сверка прошла по полному набору. Итог: покрытие 184+emt=185 ЦЕЛОЕ; у ~123 перков в ru-i18n оставались КРАТКИЕ АНГЛИЙСКИЕ АННОТАЦИИ (наследие до-403) — теперь ИМЕНА И ТЕКСТЫ ВСЕХ 185 = perks_catalog_ru дословно (87 имён + 81 текст обновлены; catalog_ru ↔ notepad: 136 точных, 44 различия ТОЛЬКО оформления — кавычки/{/CD}/маркеры); латинских имён в ru больше нет (АММОСМИТ, ФАНАТ КОЛЫ, КРОВОСОС, ВОДОХЛЁБ…). ТРИ ИСКЛЮЧЕНИЯ — тексты по одобренному слову владельца (406), книжный текст противоречит работающей механике: Полевой хирург (книга: 3 ОЗ за ОД первой помощи), Фармацевт (книга: +2/+3/+4 по рангам), Мощный пользователь (книга: +3/+6/+10) — в приложении +3 ОЗ/+1 антирад, +1 антирад, +1 заряд. ЗАЩЁЛКА tests/perks-canon-409: все 185 == catalog_ru (кроме 3), notepad кроется приложением. РАНГИ/ТРЕБОВАНИЯ: 44 перка ранги и 53 требования расходятся notepad↔приложение — СОЗНАТЕЛЬНО, слово владельца 403 «ранги и требования — без изменений, как в приложении» + perks_discrepancies «значения НЕ менять»; владельцу предложил переключить канон по его слову. Механика 43 действующих сверена с notepad: Варвар (ступени СИЛ 7/9/11) и др. — точно; ДОБАВЛЕНО Кровососу: пакет крови поднимает Жажду на +1 ступень сверх напитка (книга; через survivalPerkOptions(item)). Нюанс: Химик — книга «созданные вами препараты», в приложении ×2 для ВСЕХ препаратов (слово владельца 406) · предыдущий: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a41020e..494ec50 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,20 @@
+ # Changelog
++---
++## Repair — by the book (patch 413)
++
++The repair mechanics you provided is implemented in full. The «Repair»
++button now opens a repair window: an INT + Repair test with difficulty
++equal to the item's rarity; +1 difficulty for each installed
++modification. If you have a second identical item in the bag, you can
++mark it as a donor: it is scrapped, provides the materials and lowers
++the difficulty by 1. Materials follow the book rarity table (the
++window shows «have / need» for every line). Time is half an hour; on
++a success you may spend 2 AP to halve it; each complication adds 15
++minutes, and a d20 rolled 19–20 on a complication loses one more set
++of materials. On a failure the materials stay in the bag, but the
++time is gone. Instant free repair is no more — an item's durability
++is now honestly earned.
++
+ ---
+ ## Dormant perks: the game warns and leaves the call to you (patch 412)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4acb2f1..9078050 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,21 @@
+ # История изменений
+ 
++---
++## Ремонт — по книге (патч 413)
++
++Механика ремонта, которую вы дали, внедрена целиком. Кнопка «Починить»
++теперь открывает окно ремонта: тест ИНТ + Ремонт со сложностью, равной
++редкости предмета; за каждую установленную модификацию сложность +1.
++Если в сумке есть второй такой же предмет — можно отметить его как
++донора: он разбирается, даёт материалы и снижает сложность на 1.
++Материалы — по книжной таблице редкости (окно показывает «есть/нужно»
++по каждой строке). Время — полчаса; при успехе можно потратить 2 ОД
++и сократить его вдвое; каждое осложнение добавляет 15 минут, а
++выпавший при осложнении д20 на 19–20 теряет ещё один комплект
++материалов. При провале материалы остаются в сумке, но время уходит.
++Мгновенного бесплатного ремонта больше нет — прочность предмета
++честно зарабатывается.
++
+ ---
+ ## Погасшие перки: игра предупреждает и отдаёт решение вам (патч 412)
+ 
+diff --git a/domain/repairEngine.js b/domain/repairEngine.js
+new file mode 100644
+index 0000000..d2605b2
+--- /dev/null
++++ b/domain/repairEngine.js
+@@ -0,0 +1,151 @@
++// domain/repairEngine.js
++//
++// Универсальный движок механики «ремонт» (патч 413, механика от владельца).
++//
++// Книжное правило: тест ИНТ + Ремонт со сложностью, равной редкости
++// предмета (+1 за каждую установленную модификацию; разборка донора —
++// второго предмета того же типа — даёт материалы и снижает сложность
++// на 1). Время — полчаса; при успехе можно потратить 2 ОД и сократить
++// вдвое (до 15 минут); осложнение добавляет ещё 15 минут.
++//
++// Таблица материалов по редкости — ЗНАНИЕ СЕТТИНГА, движок получает план
++// снаружи (materialsPlan: [{itemId, count}]); id материалов ему непрозрачны.
++//
++// Разрешение осложнения (правило владельца из механики): при УСПЕХЕ
++// бросается д20 — 19–20 означает потерю дополнительных материалов
++// (сверх потраченных — ещё один такой же комплект), иначе ремонт занял
++// больше времени (+15 минут). При провале потеря нечему (материалы
++// остаются в сумке — закон верстака, 323) — только время.
++//
++// Формы результата (контракт для экранов и тестов):
++//   { done: true,  check, complications, resolution, spent, donorSpent }
++//   { done: false, stage: 'gate', reasons }
++//   { done: false, stage: 'check', reason: 'check-failed', check, complications }
++
++import { resolveD20Check } from './d20Checks';
++
++const MIN_LOSS_FACE = 19;
++const MAX_LOSS_FACE = 20;
++
++export const REPAIR_ENGINE_LIMITS = { minLossFace: MIN_LOSS_FACE, maxLossFace: MAX_LOSS_FACE };
++
++const assertPlan = (materialsPlan) => {
++  for (const entry of materialsPlan || []) {
++    if (typeof entry?.itemId !== 'string' || !entry.itemId
++      || !Number.isInteger(entry.count) || entry.count <= 0) {
++      throw new Error('[repairEngine] materialsPlan entries must be { itemId, count > 0 }');
++    }
++  }
++};
++
++/**
++ * Гейты и сводка для окна: сложность (уже с модами и донором — считает
++ * адаптер, движку важно число), доступность материалов.
++ */
++export const evaluateRepair = ({
++  complexity,
++  materialsPlan = [],
++  inventoryCounts = {},
++}) => {
++  if (!Number.isInteger(complexity) || complexity < 0) {
++    throw new Error('[repairEngine] complexity must be an integer >= 0');
++  }
++  assertPlan(materialsPlan);
++  const blocked = [];
++  const materials = materialsPlan.map(({ itemId, count }) => {
++    const have = Math.max(0, Number(inventoryCounts?.[itemId]) || 0);
++    const enough = have >= count;
++    if (!enough) blocked.push({ code: 'missing-material', itemId, need: count, have });
++    return { itemId, need: count, have, enough };
++  });
++  return {
++    difficulty: complexity,
++    auto: complexity === 0,
++    blocked,
++    materials,
++    ready: blocked.length === 0,
++  };
++};
++
++/**
++ * Полный проход ремонта: проверка → обмен через порты. При провале
++ * материалы НЕ сгорают (закон верстака): потрачено только время.
++ * zeroDifficulty — как в крафте (356): 'auto' | 'roll'.
++ * complicationRoll — бросок д20 разрешения осложнения (19–20 = потеря
++ * дополнительных материалов, иначе +15 минут). Отсутствует — кубик настоящий.
++ */
++export const runRepair = ({
++  complexity,
++  materialsPlan = [],
++  inventoryCounts = {},
++  attributeValue = 0,
++  skillValue = 0,
++  isTagged = false,
++  zeroDifficulty = 'auto',
++  rollD20,
++  complicationRoll,
++  spend,
++  spendDonor,
++}) => {
++  if (typeof spendDonor !== 'function') {
++    throw new Error('[repairEngine] port { spendDonor } is required');
++  }
++  const evaluation = evaluateRepair({ complexity, materialsPlan, inventoryCounts });
++  if (!evaluation.ready) {
++    return { done: false, stage: 'gate', reasons: evaluation.blocked, check: null };
++  }
++
++  let check = null;
++  if (!evaluation.auto || zeroDifficulty === 'roll') {
++    check = resolveD20Check({
++      attributeValue,
++      skillValue: Math.max(0, Number(skillValue) || 0),
++      isTagged,
++      difficulty: evaluation.difficulty,
++      diceCount: 2,
++      ...(rollD20 ? { rollD20 } : {}),
++    });
++  }
++  const passed = (evaluation.auto && !check) || check.passed;
++
++  // Осложнения разрешаются ТОЛЬКО при успехе (см. шапку модуля).
++  let resolution = null;
++  let donorSpent = false;
++  if (passed) {
++    const complications = check?.complicationCount ?? 0;
++    if (complications > 0) {
++      const face = complicationRoll
++        ? complicationRoll()
++        : Math.floor(Math.random() * 20) + 1;
++      resolution = (face >= MIN_LOSS_FACE && face <= MAX_LOSS_FACE)
++        ? { kind: 'lost-materials', face }
++        : { kind: 'extra-minutes', face };
++    }
++    // Донор вместо материалов: предмет уходит целиком (моды — с ним).
++    if (materialsPlan.length === 0) {
++      const donorResult = spendDonor();
++      if (!donorResult || donorResult.ok !== true) {
++        return { done: false, stage: 'store', reason: 'donor-refused', check };
++      }
++      donorSpent = true;
++    } else {
++      const spendResult = spend(materialsPlan.map(({ itemId, count }) => ({ itemId, count })));
++      if (!spendResult || spendResult.ok !== true) {
++        return { done: false, stage: 'store', reason: 'spend-refused', storeReason: spendResult?.reason ?? null, check };
++      }
++    }
++  }
++
++  return {
++    done: passed,
++    stage: passed ? undefined : 'check',
++    reason: passed ? undefined : 'check-failed',
++    check,
++    complications: check?.complicationCount ?? 0,
++    resolution,
++    donorSpent,
++    spent: passed && materialsPlan.length > 0
++      ? materialsPlan.map(({ itemId, count }) => ({ itemId, count }))
++      : [],
++  };
++};
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index 703aac6..6a07cae 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -90,5 +90,44 @@
+     "noMaterials": "Nothing here you can extract — you need Scrapper (or a higher rank).",
+     "notStarted": "Salvage did not start ({reason}).",
+     "material": "Materials are not salvaged: they are already the end parts."
++  },
++  "repair": {
++    "title": "Repair",
++    "testLine": "Test: {attribute} + {skill}, difficulty {difficulty}",
++    "attribute": "INT",
++    "skill": "Repair",
++    "materialLine": "{name}: have {have} / need {need}",
++    "materials": {
++      "item_common_materials": "Common materials",
++      "item_uncommon_materials": "Uncommon materials",
++      "item_rare_materials": "Rare materials"
++    },
++    "donorLine": "Scrap a second identical item: −1 difficulty, materials come from it",
++    "timeLine": "Time: {minutes} minutes",
++    "notReady": "Not enough materials — scrap a second identical item or find materials.",
++    "zeroDiffQuestion": "Difficulty 0: roll the dice?",
++    "zeroDiffRoll": "Roll",
++    "zeroDiffAuto": "Automatic success",
++    "report": {
++      "success": "Repair succeeded!",
++      "failure": "Repair failed — materials kept, time spent.",
++      "rolls": "Dice: {rolls}",
++      "complications": "Complications: {n} — time +{minutes} min.",
++      "lostMaterials": "Complication (roll {face}): some materials were lost.",
++      "materialShort": "{name} ×{n}",
++      "apQuestion": "Success: spend 2 AP to halve the time?",
++      "spendAp": "Spend 2 AP (15 min)",
++      "fullTime": "Full 30 minutes",
++      "timeSpent": "Spent {minutes} min. AP pool: {pool}.",
++      "confirmTime": "Record the time"
++    },
++    "alerts": {
++      "storeTitle": "Repair interrupted",
++      "storeMessage": "Could not spend the materials — check the inventory and try again."
++    },
++    "actions": {
++      "repair": "Repair",
++      "close": "Close"
++    }
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index c036dd7..987a83a 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -90,5 +90,44 @@
+     "noMaterials": "Из этого хлама вам нечего вынуть — нужен «Мусорщик» (или его ранг повыше).",
+     "notStarted": "Разбор не начался ({reason}).",
+     "material": "Материалы не разбираются: они и есть конечные части."
++  },
++  "repair": {
++    "title": "Ремонт",
++    "testLine": "Тест: {attribute} + {skill}, сложность {difficulty}",
++    "attribute": "ИНТ",
++    "skill": "Ремонт",
++    "materialLine": "{name}: есть {have} / нужно {need}",
++    "materials": {
++      "item_common_materials": "Обычные материалы",
++      "item_uncommon_materials": "Необычные материалы",
++      "item_rare_materials": "Редкие материалы"
++    },
++    "donorLine": "Разобрать второй такой предмет: −1 к сложности, вместо материалов",
++    "timeLine": "Время: {minutes} минут",
++    "notReady": "Материалов не хватает — разберите второй такой предмет или найдите материалы.",
++    "zeroDiffQuestion": "Сложность 0: бросать кубики?",
++    "zeroDiffRoll": "Бросить",
++    "zeroDiffAuto": "Автоуспех",
++    "report": {
++      "success": "Ремонт удался!",
++      "failure": "Ремонт не удался — материалы остались, время потрачено.",
++      "rolls": "Кубики: {rolls}",
++      "complications": "Осложнений: {n} — время +{minutes} мин.",
++      "lostMaterials": "Осложнение (бросок {face}): часть материалов потеряна.",
++      "materialShort": "{name} ×{n}",
++      "apQuestion": "Успех: потратить 2 ОД и сократить время вдвое?",
++      "spendAp": "Потратить 2 ОД (15 мин)",
++      "fullTime": "Полные 30 минут",
++      "timeSpent": "Потрачено {minutes} мин. Пул ОД: {pool}.",
++      "confirmTime": "Записать время"
++    },
++    "alerts": {
++      "storeTitle": "Ремонт прерван",
++      "storeMessage": "Не удалось списать материалы — проверьте инвентарь и попробуйте ещё раз."
++    },
++    "actions": {
++      "repair": "Ремонтировать",
++      "close": "Закрыть"
++    }
+   }
+ }
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+new file mode 100644
+index 0000000..4ee2789
+--- /dev/null
++++ b/modules/fallout/repair/operations.js
+@@ -0,0 +1,330 @@
++// modules/fallout/repair/operations.js
++//
++// Сеттинг-адаптер ремонта (патч 413): соединяет книжный движок
++// (domain/repairEngine) с каталогами и стором. Движок не знает, что такое
++// предметы и редкость; здесь решается:
++//   - редкость предмета по каноническому id (оружие / части брони / части СБ);
++//   - +1 сложности за каждую установленную модификацию (записи installedOn);
++//   - донор — второй предмет того же канонического id (не надет, не мод,
++//     не заперт комплектом): материалы берутся из него, сложность −1 (мин 0);
++//   - успех чинит предмет существующими экшнами стора (repairWeapon /
++//     repairPowerArmorStack / repairPowerArmorPieceAt) — меняется только
++//     ЦЕНА ремонта, охват прежний;
++//   - время: 30 минут (успех + 2 ОД → 15; осложнение +15 каждое; провал —
++//     время зря, материалы остаются — закон верстака, 323).
++
++import useCharacterStore from '../../../src/store/characterStore';
++import { selectAttributeTotal, selectSkillTotal } from '../../../src/store/selectors';
++import { evaluateRepair, runRepair } from '../../../domain/repairEngine';
++import { isSkillTagged } from '../../../domain/d20Checks';
++import { applyActivityMinutes } from '../survival/operations';
++import { getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
++import { REPAIR_RULES, repairMaterialsPlan } from './rules';
++import weaponsCatalog from '../data/equipment/weapons.json';
++import armorCatalog from '../data/equipment/armor.json';
++import powerArmorCatalog from '../data/equipment/powerArmor.json';
++
++// ── Редкость по каноническому id ─────────────────────────────────────────
++
++let rarityIndexCache = null;
++
++const collectPairs = (node, sink) => {
++  if (!node || typeof node !== 'object') return;
++  if (Array.isArray(node)) {
++    for (const entry of node) collectPairs(entry, sink);
++    return;
++  }
++  if (typeof node.id === 'string' && Number.isFinite(Number(node.rarity))) {
++    sink.set(node.id, Math.max(0, Math.floor(Number(node.rarity))));
++  }
++  for (const value of Object.values(node)) collectPairs(value, sink);
++};
++
++/** Карта «канонический id → редкость» из всех каталогов снаряжения. */
++export const itemRarityIndex = () => {
++  if (rarityIndexCache) return rarityIndexCache;
++  const sink = new Map();
++  collectPairs(weaponsCatalog, sink);
++  collectPairs(armorCatalog, sink);
++  collectPairs(powerArmorCatalog, sink);
++  rarityIndexCache = sink;
++  return sink;
++};
++
++export const itemRarityFor = (canonicalId) => itemRarityIndex().get(canonicalId) ?? 0;
++
++// ── Цель ремонта ─────────────────────────────────────────────────────────
++
++/**
++ * Что чинится у записи инвентаря: оружие (durability 0–100) или часть СБ
++ * (hpCurrent/maxHp, в пачке или надета). null — предмет не изнашивается.
++ */
++export const repairTargetFor = (item) => {
++  if (!item) return null;
++  if (item.itemType === 'weapon' && item.durabilityTracked) {
++    return {
++      kind: 'weapon',
++      canonicalId: item.weaponId || item.id,
++      current: Number(item.durability) || 0,
++      max: 100,
++    };
++  }
++  if (item.itemType === 'powerArmor' && !item.paFrameContent && !item.paFrame
++    && Number.isFinite(Number(item.maxHp))) {
++    return {
++      kind: 'powerArmor',
++      canonicalId: item.weaponId || item.id,
++      current: Number(item.hpCurrent) || 0,
++      max: Number(item.maxHp),
++    };
++  }
++  return null;
++};
++
++/** +1 сложности за каждую установленную модификацию (записи installedOn). */
++export const repairModsCountFor = (storeItemId) => Object.values(
++  useCharacterStore.getState().items || {},
++).filter((entry) => entry?.installedOn && entry.installedOn === storeItemId).length;
++
++/**
++ * Валидный донор: другой экземпляр ТОГО ЖЕ канонического id — не сам
++ * предмет, не надетый, не установленный мод, не запертый комплектом.
++ */
++export const donorCandidatesFor = (storeItem, exceptStoreItemId) => {
++  const canonical = storeItem?.weaponId || storeItem?.id;
++  if (!canonical) return [];
++  return Object.entries(useCharacterStore.getState().items || {})
++    .filter(([key, entry]) => key !== exceptStoreItemId
++      && !entry?.installedOn
++      && !entry?.equipped
++      && !entry?.locked
++      && (entry.weaponId || entry.id) === canonical)
++    .map(([key]) => key);
++};
++
++// ── Сводка для окна ──────────────────────────────────────────────────────
++
++/**
++ * Всё, что нужно окну ремонта, без изменения состояния.
++ * Пересчёт по кнопке донора — просто ещё один вызов с другим donorStoreItemId.
++ */
++export const repairPreview = (storeItemId, { donorStoreItemId = null } = {}) => {
++  const store = useCharacterStore.getState();
++  const item = store.items?.[storeItemId];
++  const target = repairTargetFor(item);
++  if (!target) return { canRepair: false, reason: 'not-repairable' };
++  if (target.current >= target.max) return { canRepair: false, reason: 'not-damaged', target };
++
++  const rarity = itemRarityFor(target.canonicalId);
++  const modsCount = repairModsCountFor(storeItemId);
++  const donors = donorCandidatesFor(item, storeItemId);
++  const donorUsed = donorStoreItemId != null && donors.includes(donorStoreItemId);
++  const complexity = Math.max(0, rarity + modsCount - (donorUsed ? 1 : 0));
++  // Донор вместо материалов: план пуст — движок списывает донора портом.
++  const materialsPlan = donorUsed ? [] : repairMaterialsPlan(rarity);
++  const inventoryCounts = countInventoryByCatalogId(store.items);
++  const evaluation = evaluateRepair({ complexity, materialsPlan, inventoryCounts });
++
++  const attributeValue = selectAttributeTotal(store, REPAIR_RULES.testAttribute);
++  const skillValue = selectSkillTotal(store, REPAIR_RULES.testSkill);
++  const isTagged = isSkillTagged({
++    skillId: REPAIR_RULES.testSkill,
++    primaryTaggedSkillIds: store.selectedSkills ?? [],
++    extraTaggedSkillIds: store.extraTaggedSkills ?? [],
++  });
++
++  return {
++    canRepair: true,
++    target,
++    rarity,
++    modsCount,
++    complexity,
++    donors,
++    donorUsed,
++    materialsPlan,
++    evaluation,
++    hero: { attributeValue, skillValue, isTagged },
++  };
++};
++
++// Счётчики материалов по каноническим id (тот же закон, что в крафте).
++const countInventoryByCatalogId = (items) => {
++  const counts = {};
++  for (const item of Object.values(items || {})) {
++    if (!item || item.installedOn || item.equipped) continue;
++    const id = item.weaponId || item.id;
++    if (!id) continue;
++    counts[id] = (counts[id] || 0) + (Number(item.quantity) || 1);
++  }
++  return counts;
++};
++
++// ── Прогон ремонта ───────────────────────────────────────────────────────
++
++/**
++ * Совершить ремонт. Порты кубиков переопределяемы (тесты); экран зовёт
++ * без портов — настоящие кости. Отсрочка времени — как в крафте (323):
++ * ответ несёт time.pending, окно спрашивает про 2 ОД и зовёт settleRepairTime.
++ */
++/**
++ * Ремонт НАДЕТОЙ части СБ (строка внутри контейнера инвентаря — цели нет
++ * в items). Донор — пачка того же catalogId в инвентаре; успех чинит слот.
++ */
++export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, ports = {} } = {}) => {
++  const state = useCharacterStore.getState();
++  const piece = state.equippedPowerArmor?.pieces?.[slot];
++  if (!piece) return { done: false, stage: 'gate', reasons: [{ code: 'not-repairable' }] };
++  const maxHp = pieceCatalogMaxHp(piece.catalogId);
++  if (!Number.isFinite(maxHp) || piece.hpCurrent >= maxHp) {
++    return { done: false, stage: 'gate', reasons: [{ code: 'not-damaged' }] };
++  }
++  const rarity = itemRarityFor(piece.catalogId);
++  const donorUsed = donorStoreItemId != null
++    && donorCandidatesFor({ id: piece.catalogId, weaponId: piece.catalogId }, null).includes(donorStoreItemId);
++  if (donorStoreItemId != null && !donorUsed) {
++    return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
++  }
++  const complexity = Math.max(0, rarity - (donorUsed ? 1 : 0));
++  const materialsPlan = donorUsed ? [] : repairMaterialsPlan(rarity);
++  const store2 = useCharacterStore.getState();
++  const attributeValue = selectAttributeTotal(store2, REPAIR_RULES.testAttribute);
++  const skillValue = selectSkillTotal(store2, REPAIR_RULES.testSkill);
++  const result = runRepair({
++    complexity,
++    materialsPlan,
++    inventoryCounts: countInventoryByCatalogId(store2.items),
++    attributeValue,
++    skillValue,
++    isTagged: false,
++    ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
++    ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
++    spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
++    spendDonor: () => {
++      const s = useCharacterStore.getState();
++      if (!s.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
++      s.adjustItemQuantity(donorStoreItemId, -1);
++      return { ok: true };
++    },
++  });
++  if (result.done && result.resolution?.kind === 'lost-materials' && materialsPlan.length > 0) {
++    const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
++    const lossPlan = materialsPlan.filter((entry) => (freeCounts[entry.itemId] || 0) >= entry.count);
++    if (lossPlan.length > 0) {
++      useCharacterStore.getState().spendItemStacks({ spend: lossPlan });
++      result.lostMaterials = lossPlan;
++    } else {
++      result.resolution = { kind: 'extra-minutes', degenerate: true };
++    }
++  }
++  if (result.done) useCharacterStore.getState().repairPowerArmorPieceAt(slot);
++  const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
++  result.repairTime = {
++    baseMinutes: REPAIR_RULES.baseMinutes,
++    complicationMinutes,
++    minutes: REPAIR_RULES.baseMinutes + complicationMinutes,
++    pending: true,
++    halvedOnAp: result.done === true,
++  };
++  return result;
++};
++
++export const pieceCatalogMaxHp = (catalogId) => {
++  const sink = [];
++  collectPairsDeep(powerArmorCatalog, (node) => {
++    if (node?.id === catalogId && Number.isFinite(Number(node.hp))) sink.push(Number(node.hp));
++  });
++  return sink[0];
++};
++
++const collectPairsDeep = (node, visit) => {
++  if (!node || typeof node !== 'object') return;
++  visit(node);
++  for (const value of Object.values(node)) collectPairsDeep(value, visit);
++};
++
++export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}, zeroDifficulty } = {}) => {
++  const preview = repairPreview(storeItemId, { donorStoreItemId });
++  if (!preview.canRepair) {
++    return { done: false, stage: 'gate', reasons: [{ code: preview.reason }] };
++  }
++  if (donorStoreItemId != null && !preview.donorUsed) {
++    return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
++  }
++
++  const { attributeValue, skillValue, isTagged } = preview.hero;
++  const result = runRepair({
++    complexity: preview.complexity,
++    materialsPlan: preview.materialsPlan,
++    inventoryCounts: countInventoryByCatalogId(useCharacterStore.getState().items),
++    attributeValue,
++    skillValue,
++    isTagged,
++    ...(zeroDifficulty ? { zeroDifficulty } : {}),
++    ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
++    ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
++    spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
++    spendDonor: () => {
++      const state = useCharacterStore.getState();
++      if (!state.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
++      state.adjustItemQuantity(donorStoreItemId, -1);
++      return { ok: true };
++    },
++  });
++
++  // Потеря дополнительных материалов (осложнение 19–20): сверх потраченных
++  // списывается ещё один такой же комплект (если есть).
++  if (result.done && result.resolution?.kind === 'lost-materials' && preview.materialsPlan.length > 0) {
++    const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
++    const lossPlan = preview.materialsPlan
++      .filter((entry) => (freeCounts[entry.itemId] || 0) >= entry.count);
++    if (lossPlan.length > 0) {
++      useCharacterStore.getState().spendItemStacks({ spend: lossPlan });
++      result.lostMaterials = lossPlan;
++    } else {
++      // Материалов на второй комплект нет — осложнение вырождается во время.
++      result.resolution = { kind: 'extra-minutes', degenerate: true };
++    }
++  }
++
++  // Успех чинит предмет существующими экшнами стора (цена — в движке выше).
++  if (result.done) {
++    const state = useCharacterStore.getState();
++    if (preview.target.kind === 'weapon') {
++      state.repairWeapon(storeItemId);
++    } else if (preview.target.kind === 'powerArmor') {
++      // Надетая (в контейнере) часть чинится по слоту, пачка — по записи.
++      const item = state.items?.[storeItemId];
++      if (item?.paSlot) state.repairPowerArmorPieceAt(item.paSlot);
++      else state.repairPowerArmorStack(storeItemId);
++    }
++  }
++
++  const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
++  result.repairTime = {
++    baseMinutes: REPAIR_RULES.baseMinutes,
++    complicationMinutes,
++    minutes: REPAIR_RULES.baseMinutes + complicationMinutes,
++    pending: true,
++    halvedOnAp: result.done === true,
++  };
++  return result;
++};
++
++/**
++ * Списать отложенное время ремонта. Окно спрашивает после успеха: потратить
++ * 2 ОД и сократить вдвое (30 → 15 минут)? Провал — всегда полное время
++ * (ОД на провал не тратятся; пул не даст — закон 324).
++ */
++export const settleRepairTime = (run, { spendActionPoints: halveForAp = false } = {}) => {
++  const success = run?.done === true;
++  const apSpend = halveForAp && success
++    ? spendActionPoints(REPAIR_RULES.apCostToHalve)
++    : { ok: false, pool: getActionPoints() };
++  const halved = Boolean(halveForAp && success && apSpend.ok);
++  const time = run?.repairTime ?? { baseMinutes: REPAIR_RULES.baseMinutes, complicationMinutes: 0 };
++  let minutes = time.baseMinutes;
++  if (halved) minutes /= 2;
++  minutes += time.complicationMinutes ?? 0;
++  if (minutes > 0) applyActivityMinutes(minutes, 'repair');
++  return { minutes, spendActionPoints: halved, pool: apSpend.pool };
++};
+diff --git a/modules/fallout/repair/rules.js b/modules/fallout/repair/rules.js
+new file mode 100644
+index 0000000..d63a294
+--- /dev/null
++++ b/modules/fallout/repair/rules.js
+@@ -0,0 +1,39 @@
++// modules/fallout/repair/rules.js
++//
++// Правила ремонта (патч 413 — механика от владельца, книга):
++//   - тест ИНТ + Ремонт, сложность = редкость предмета
++//     (+1 за каждую установленную модификацию, −1 за разборку донора);
++//   - время — полчаса; при успехе 2 ОД сокращают вдвое (15 минут);
++//   - осложнение: д20 19–20 = потеря дополнительных материалов,
++//     иначе +15 минут;
++//   - материалы по редкости — книжная таблица ниже.
++
++export const REPAIR_RULES = {
++  testAttribute: 'INT',
++  testSkill: 'REPAIR',
++  baseMinutes: 30,
++  complicationExtraMinutes: 15,
++  apCostToHalve: 2,
++};
++
++const COMMON = 'item_common_materials';
++const UNCOMMON = 'item_uncommon_materials';
++const RARE = 'item_rare_materials';
++
++// Книжная таблица «Материалы, необходимые для ремонта»:
++// редкость → комплект материалов.
++export const REPAIR_MATERIALS_BY_RARITY = [
++  { maxRarity: 0, plan: [{ itemId: COMMON, count: 1 }] },
++  { maxRarity: 1, plan: [{ itemId: COMMON, count: 2 }] },
++  { maxRarity: 2, plan: [{ itemId: COMMON, count: 2 }, { itemId: UNCOMMON, count: 1 }] },
++  { maxRarity: 3, plan: [{ itemId: COMMON, count: 2 }, { itemId: UNCOMMON, count: 2 }] },
++  { maxRarity: 4, plan: [{ itemId: COMMON, count: 2 }, { itemId: UNCOMMON, count: 2 }, { itemId: RARE, count: 1 }] },
++  // 5+ (сверхредкие предметы)
++  { maxRarity: Infinity, plan: [{ itemId: COMMON, count: 3 }, { itemId: UNCOMMON, count: 3 }, { itemId: RARE, count: 1 }] },
++];
++
++export const repairMaterialsPlan = (rarity) => {
++  const value = Math.max(0, Math.floor(Number(rarity) || 0));
++  const row = REPAIR_MATERIALS_BY_RARITY.find((entry) => value <= entry.maxRarity);
++  return row ? row.plan.map((entry) => ({ ...entry })) : [];
++};
+diff --git a/modules/fallout/screens/InventoryScreen/modals/RepairModal.js b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+new file mode 100644
+index 0000000..c8b4dfd
+--- /dev/null
++++ b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+@@ -0,0 +1,273 @@
++// Модалка ремонта (патч 413, механика от владельца — книга): тест ИНТ +
++// Ремонт со сложностью = редкость (+моды, −донор), материалы по редкости
++// (или разборка донора), полчаса (успех + 2 ОД → 15 минут), осложнение —
++// д20 19–20 теряет материалы, иначе +15 минут. Скролл-закон (402):
++// заголовок и кнопки фиксированы, содержимое в ScrollView. Отчёт о
++// попытке — в той же модалке (закон 357). Сложность 0 — окно спрашивает,
++// бросать ли кубики (закон 356). Вся механика — в repair/operations.js;
++// здесь только кнопки, списки и строки словаря.
++import React, { useMemo, useState } from 'react';
++import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
++import styles from '../../../styles/RepairModal.styles';
++import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
++import { showRawAlert } from '../../../../../components/alerts/alertService';
++import useCharacterStore from '../../../../../src/store/characterStore';
++import { selectAttributeTotal, selectSkillTotal } from '../../../../../src/store/selectors';
++import { evaluateRepair } from '../../../../../domain/repairEngine';
++import {
++  repairPreview,
++  performRepair,
++  performEquippedPieceRepair,
++  settleRepairTime,
++  itemRarityFor,
++  donorCandidatesFor,
++  pieceCatalogMaxHp,
++} from '../../../repair/operations';
++import { REPAIR_RULES, repairMaterialsPlan } from '../../../repair/rules';
++
++const fmt = (template, params) => {
++  let out = template;
++  for (const [key, value] of Object.entries(params || {})) {
++    out = out.split(`{${key}}`).join(String(value));
++  }
++  return out;
++};
++
++const countFreeItems = (items) => {
++  const counts = {};
++  for (const item of Object.values(items || {})) {
++    if (!item || item.installedOn || item.equipped) continue;
++    const id = item.weaponId || item.id;
++    if (!id) continue;
++    counts[id] = (counts[id] || 0) + (Number(item.quantity) || 1);
++  }
++  return counts;
++};
++
++// Сводка по надетой части СБ (цели нет в items — см. performEquippedPieceRepair).
++const repairEquippedPreview = (slot, donorId) => {
++  const store = useCharacterStore.getState();
++  const piece = store.equippedPowerArmor?.pieces?.[slot];
++  if (!piece) return null;
++  const maxHp = pieceCatalogMaxHp(piece.catalogId);
++  if (!Number.isFinite(maxHp)) return null;
++  const current = Number(piece.hpCurrent) || 0;
++  if (current >= maxHp) {
++    return { canRepair: false, complexity: 0, donors: [], evaluation: { ready: false, materials: [], blocked: [] } };
++  }
++  const rarity = itemRarityFor(piece.catalogId);
++  const donors = donorCandidatesFor({ id: piece.catalogId, weaponId: piece.catalogId }, null);
++  const donorUsed = donorId != null && donors.includes(donorId);
++  const complexity = Math.max(0, rarity - (donorUsed ? 1 : 0));
++  const materialsPlan = donorUsed ? [] : repairMaterialsPlan(rarity);
++  return {
++    canRepair: true,
++    complexity,
++    donors,
++    donorUsed,
++    evaluation: evaluateRepair({
++      complexity,
++      materialsPlan,
++      inventoryCounts: countFreeItems(store.items),
++    }),
++    hero: {
++      attributeValue: selectAttributeTotal(store, REPAIR_RULES.testAttribute),
++      skillValue: selectSkillTotal(store, REPAIR_RULES.testSkill),
++    },
++  };
++};
++
++const RepairModal = ({ target, onClose }) => {
++  // target: { storeItemId, name } | { equippedSlot, name } — две формы строки.
++  const storeItemId = target?.storeItemId ?? null;
++  const equippedSlot = target?.equippedSlot ?? null;
++
++  const [donorId, setDonorId] = useState(null);
++  const [report, setReport] = useState(null);
++  const [settled, setSettled] = useState(null);
++  const [askZero, setAskZero] = useState(false);
++
++  const preview = useMemo(() => {
++    if (equippedSlot != null) return repairEquippedPreview(equippedSlot, donorId);
++    if (storeItemId != null) return repairPreview(storeItemId, { donorStoreItemId: donorId });
++    return null;
++  }, [storeItemId, equippedSlot, donorId]);
++
++  if (!preview) return null;
++
++  const evaluation = preview.evaluation;
++  const run = (zeroDifficulty) => {
++    setAskZero(false);
++    const result = equippedSlot != null
++      ? performEquippedPieceRepair(equippedSlot, { donorStoreItemId: donorId })
++      : performRepair(storeItemId, { donorStoreItemId: donorId, ...(zeroDifficulty ? { zeroDifficulty } : {}) });
++    setReport(result);
++    setSettled(null);
++    if (result.stage === 'store') {
++      showRawAlert(tInventory('repair.alerts.storeTitle'), tInventory('repair.alerts.storeMessage'));
++    }
++  };
++
++  const onRepairPress = () => {
++    if (!evaluation?.ready) return;
++    if (evaluation.auto && report == null) {
++      setAskZero(true); // закон 356: сложность 0 — окно спрашивает
++      return;
++    }
++    run();
++  };
++
++  const requirementLines = [
++    fmt(tInventory('repair.testLine'), {
++      attribute: tInventory('repair.attribute'),
++      skill: tInventory('repair.skill'),
++      difficulty: preview.complexity,
++    }),
++  ];
++  for (const material of evaluation?.materials ?? []) {
++    requirementLines.push(fmt(tInventory('repair.materialLine'), {
++      name: tInventory(`repair.materials.${material.itemId}`),
++      have: material.have,
++      need: material.need,
++    }));
++  }
++
++  return (
++    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
++      <View style={styles.backdrop}>
++        <View style={styles.window}>
++          <Text style={styles.title}>{tInventory('repair.title')}</Text>
++          <Text style={styles.subtitle}>{target?.name ?? ''}</Text>
++
++          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
++            {!report && (
++              <>
++                <View style={styles.block}>
++                  {requirementLines.map((line, index) => (
++                    <Text key={index} style={styles.requirementLine}>{line}</Text>
++                  ))}
++                </View>
++
++                {(preview.donors ?? []).length > 0 && (
++                  <View style={styles.block}>
++                    {preview.donors.map((id) => (
++                      <TouchableOpacity
++                        key={id}
++                        style={[styles.donorRow, donorId === id && styles.donorRowSelected]}
++                        onPress={() => setDonorId(donorId === id ? null : id)}
++                      >
++                        <Text style={styles.donorText}>
++                          {donorId === id ? '☑' : '☐'} {tInventory('repair.donorLine')}
++                        </Text>
++                      </TouchableOpacity>
++                    ))}
++                  </View>
++                )}
++
++                <Text style={styles.timeLine}>
++                  {fmt(tInventory('repair.timeLine'), { minutes: REPAIR_RULES.baseMinutes })}
++                </Text>
++                {evaluation?.blocked?.length > 0 && (
++                  <Text style={styles.blockedLine}>{tInventory('repair.notReady')}</Text>
++                )}
++              </>
++            )}
++
++            {report && (
++              <View style={styles.block}>
++                <Text style={[styles.reportLine, report.done ? styles.success : styles.failure]}>
++                  {report.done ? tInventory('repair.report.success') : tInventory('repair.report.failure')}
++                </Text>
++                {report.check && (
++                  <Text style={styles.reportLine}>
++                    {fmt(tInventory('repair.report.rolls'), {
++                      rolls: (report.check.rolls ?? report.check.dice ?? []).join(', '),
++                    })}
++                  </Text>
++                )}
++                {(report.complications ?? 0) > 0 && (
++                  <Text style={styles.reportLine}>
++                    {fmt(tInventory('repair.report.complications'), {
++                      n: report.complications,
++                      minutes: report.complications * REPAIR_RULES.complicationExtraMinutes,
++                    })}
++                  </Text>
++                )}
++                {report.resolution?.kind === 'lost-materials' && (
++                  <Text style={styles.reportLine}>
++                    {fmt(tInventory('repair.report.lostMaterials'), { face: report.resolution.face })}
++                  </Text>
++                )}
++                {(report.spent ?? []).length > 0 && (
++                  <Text style={styles.reportLine}>
++                    {report.spent.map((row) => fmt(tInventory('repair.materialShort'), {
++                      name: tInventory(`repair.materials.${row.itemId}`),
++                      n: row.count,
++                    })).join(', ')}
++                  </Text>
++                )}
++                {report.done && settled == null && (
++                  <View style={styles.apBlock}>
++                    <Text style={styles.apQuestion}>{tInventory('repair.report.apQuestion')}</Text>
++                    <View style={styles.apRow}>
++                      <TouchableOpacity style={styles.apButton} onPress={() => settle(true)}>
++                        <Text style={styles.apButtonText}>{tInventory('repair.report.spendAp')}</Text>
++                      </TouchableOpacity>
++                      <TouchableOpacity style={styles.apButton} onPress={() => settle(false)}>
++                        <Text style={styles.apButtonText}>{tInventory('repair.report.fullTime')}</Text>
++                      </TouchableOpacity>
++                    </View>
++                  </View>
++                )}
++                {settled != null && (
++                  <Text style={styles.reportLine}>
++                    {fmt(tInventory('repair.report.timeSpent'), {
++                      minutes: settled.minutes,
++                      pool: settled.pool,
++                    })}
++                  </Text>
++                )}
++                {!report.done && settled == null && (
++                  <TouchableOpacity style={styles.apButton} onPress={() => settle(false)}>
++                    <Text style={styles.apButtonText}>{tInventory('repair.report.confirmTime')}</Text>
++                  </TouchableOpacity>
++                )}
++              </View>
++            )}
++
++            {askZero && (
++              <View style={styles.block}>
++                <Text style={styles.apQuestion}>{tInventory('repair.zeroDiffQuestion')}</Text>
++                <View style={styles.apRow}>
++                  <TouchableOpacity style={styles.apButton} onPress={() => run('roll')}>
++                    <Text style={styles.apButtonText}>{tInventory('repair.zeroDiffRoll')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity style={styles.apButton} onPress={() => run(undefined)}>
++                    <Text style={styles.apButtonText}>{tInventory('repair.zeroDiffAuto')}</Text>
++                  </TouchableOpacity>
++                </View>
++              </View>
++            )}
++          </ScrollView>
++
++          <View style={styles.footer}>
++            {!report && (
++              <TouchableOpacity
++                style={[styles.mainButton, !evaluation?.ready && styles.mainButtonDisabled]}
++                onPress={onRepairPress}
++                disabled={!evaluation?.ready}
++              >
++                <Text style={styles.mainButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
++            )}
++            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
++              <Text style={styles.closeButtonText}>{tInventory('repair.actions.close')}</Text>
++            </TouchableOpacity>
++          </View>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++export default RepairModal;
+diff --git a/modules/fallout/styles/RepairModal.styles.js b/modules/fallout/styles/RepairModal.styles.js
+new file mode 100644
+index 0000000..ff4ab96
+--- /dev/null
++++ b/modules/fallout/styles/RepairModal.styles.js
+@@ -0,0 +1,116 @@
++// Стили модалки ремонта (патч 413). Скролл-закон (402): заголовок и футер
++// с кнопками фиксированы, содержимое — в ScrollView. Тёмная палитра окон
++// сеттинга; успех/провал — зелёный #22c55e / приглушённый красный.
++import { StyleSheet } from 'react-native';
++
++const styles = StyleSheet.create({
++  backdrop: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.7)',
++    alignItems: 'center',
++    justifyContent: 'center',
++    padding: 16,
++  },
++  window: {
++    width: '100%',
++    maxWidth: 460,
++    maxHeight: '85%',
++    backgroundColor: '#1e1e1e',
++    borderColor: '#5a5a5a',
++    borderWidth: 1,
++    borderRadius: 8,
++    padding: 14,
++  },
++  title: {
++    color: '#fff',
++    fontSize: 17,
++    fontWeight: 'bold',
++    textAlign: 'center',
++  },
++  subtitle: {
++    color: '#b8b8b8',
++    fontSize: 13,
++    textAlign: 'center',
++    marginTop: 2,
++    marginBottom: 8,
++  },
++  scroll: { flexGrow: 0 },
++  scrollContent: { paddingBottom: 8 },
++  block: {
++    backgroundColor: '#262626',
++    borderColor: '#3d3d3d',
++    borderWidth: 1,
++    borderRadius: 6,
++    padding: 10,
++    marginBottom: 8,
++  },
++  requirementLine: {
++    color: '#e6e6e6',
++    fontSize: 13,
++    paddingVertical: 2,
++  },
++  donorRow: {
++    paddingVertical: 6,
++    paddingHorizontal: 4,
++    borderRadius: 4,
++  },
++  donorRowSelected: { backgroundColor: '#333' },
++  donorText: { color: '#e6e6e6', fontSize: 13 },
++  timeLine: {
++    color: '#9fb4c7',
++    fontSize: 13,
++    marginBottom: 6,
++  },
++  blockedLine: {
++    color: '#e06c6c',
++    fontSize: 13,
++  },
++  reportLine: {
++    color: '#e6e6e6',
++    fontSize: 13,
++    paddingVertical: 2,
++  },
++  success: { color: '#22c55e', fontWeight: 'bold' },
++  failure: { color: '#e06c6c', fontWeight: 'bold' },
++  apBlock: { marginTop: 8 },
++  apQuestion: { color: '#d9c36c', fontSize: 13, marginBottom: 6 },
++  apRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
++  apButton: {
++    backgroundColor: '#2f3d33',
++    borderColor: '#22c55e',
++    borderWidth: 1,
++    borderRadius: 5,
++    paddingVertical: 8,
++    paddingHorizontal: 12,
++    marginRight: 8,
++    marginBottom: 6,
++  },
++  apButtonText: { color: '#22c55e', fontSize: 13, fontWeight: '600' },
++  footer: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    marginTop: 8,
++  },
++  mainButton: {
++    backgroundColor: '#22c55e',
++    borderRadius: 5,
++    paddingVertical: 10,
++    paddingHorizontal: 18,
++    flex: 1,
++    marginRight: 8,
++    alignItems: 'center',
++  },
++  mainButtonDisabled: { backgroundColor: '#3a4a3e' },
++  mainButtonText: { color: '#0b2416', fontWeight: 'bold', fontSize: 14 },
++  closeButton: {
++    borderColor: '#5a5a5a',
++    borderWidth: 1,
++    borderRadius: 5,
++    paddingVertical: 10,
++    paddingHorizontal: 18,
++    alignItems: 'center',
++  },
++  closeButtonText: { color: '#cfcfcf', fontSize: 14 },
++});
++
++export default styles;
+diff --git a/public/version.json b/public/version.json
+index cb2fb6b..fffaa07 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "412",
++  "version": "413",
+   "release": 2,
+   "notes": {
+     "ru-RU": [

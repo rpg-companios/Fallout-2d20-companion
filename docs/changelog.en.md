@@ -1,5 +1,21 @@
 # Changelog
 ---
+## Repair — by the book (patch 413)
+
+The repair mechanics you provided is implemented in full. The «Repair»
+button now opens a repair window: an INT + Repair test with difficulty
+equal to the item's rarity; +1 difficulty for each installed
+modification. If you have a second identical item in the bag, you can
+mark it as a donor: it is scrapped, provides the materials and lowers
+the difficulty by 1. Materials follow the book rarity table (the
+window shows «have / need» for every line). Time is half an hour; on
+a success you may spend 2 AP to halve it; each complication adds 15
+minutes, and a d20 rolled 19–20 on a complication loses one more set
+of materials. On a failure the materials stay in the bag, but the
+time is gone. Instant free repair is no more — an item's durability
+is now honestly earned.
+
+---
 ## Dormant perks: the game warns and leaves the call to you (patch 412)
 
 By your word, the migrator no longer removes perks taken under the old
