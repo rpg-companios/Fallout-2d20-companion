@@ -160,6 +160,27 @@ export const repairModsCountFor = (storeItemId) => Object.values(
 ).filter((entry) => entry?.installedOn && entry.installedOn === storeItemId).length;
 
 /**
+ * Слово владельца 415: «Ремонт и его затраты даны на 1 шт, а не карточку,
+ * пачку, стопку или как ты называешь количество >1». Отделяет ОДНУ штуку
+ * от пачки (quantity > 1) и возвращает её id (для quantity = 1 — сам id).
+ * Починенная штука сольётся с целыми общим законом стеков (СБ — сразу,
+ * оружие останется отдельной целой записью).
+ */
+export const splitOnePieceFromStack = (storeItemId) => {
+  const item = useCharacterStore.getState().items?.[storeItemId];
+  if (!item || (Number(item.quantity) || 1) <= 1) return storeItemId;
+  const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
+  useCharacterStore.setState((prev) => ({
+    items: {
+      ...prev.items,
+      [singleKey]: { ...item, quantity: 1 },
+      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
+    },
+  }));
+  return singleKey;
+};
+
+/**
  * Слово владельца 414: «если материалов нет, кнопка ремонта не активна».
  * Хватает материалов ИЛИ есть валидный донор — кнопка активна.
  */
@@ -378,23 +399,11 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
     }
   }
 
-  // Слово владельца 414: «каждый элемент отдельно!» — пачка частей СБ
-  // чинится по ОДНОЙ штуке за тест: штука отделяется и чинится сама
-  // (станет целой — сольётся с целой пачкой общим законом стеков).
+  // Слово владельца 414/415: ремонт и его затраты — на ОДНУ штуку, не на
+  // пачку: при успехе штука отделяется от пачки и чинится сама.
   let repairTargetId = storeItemId;
-  if (result.done && preview.target.kind === 'powerArmor') {
-    const item = useCharacterStore.getState().items?.[storeItemId];
-    if (item && !item.paSlot && (Number(item.quantity) || 1) > 1) {
-      const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
-      useCharacterStore.setState((prev) => ({
-        items: {
-          ...prev.items,
-          [singleKey]: { ...item, quantity: 1 },
-          [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
-        },
-      }));
-      repairTargetId = singleKey;
-    }
+  if (result.done) {
+    repairTargetId = splitOnePieceFromStack(storeItemId);
   }
 
   // Успех чинит предмет существующими экшнами стора (цена — в движке выше).

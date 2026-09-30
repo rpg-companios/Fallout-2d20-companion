@@ -13,7 +13,7 @@ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/moda
 // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
 // «Починить» больше не чинят мгновенно и бесплатно).
 import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
-import { repairAffordableFor, repairAffordableForPiece } from '../../../modules/fallout/repair/operations';
+import { repairAffordableFor, repairAffordableForPiece, splitOnePieceFromStack } from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
 import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
@@ -163,6 +163,19 @@ const InventoryScreen = () => {
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
+
+  // Слово владельца 414/415: бесплатная починка — на ОДНУ штуку: отделяем
+  // штуку от пачки (если пачка) и чиним только её.
+  const repairOnePieceInstant = (storeItemId) => {
+    const id = splitOnePieceFromStack(storeItemId);
+    const piece = useCharacterStore.getState().items?.[id];
+    if (piece?.itemType === 'powerArmor') {
+      if (piece.paSlot) repairPowerArmorPieceAt(id);
+      else repairPowerArmorStack(id);
+    } else {
+      repairWeapon(id);
+    }
+  };
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;
@@ -1478,21 +1491,20 @@ const InventoryScreen = () => {
             </View>
           </View>
           <View style={styles.actionContainer}>
-            {item.showRepair && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.applyButton]}
-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
-                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
-              </TouchableOpacity>
-            )}
-            {item.showRepair && weaponDurabilityLossEnabled && (
+            {item.showRepair && (weaponDurabilityLossEnabled ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
-                disabled={!repairAffordable}
+                disabled={!pieceAffordable}
                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
-            )}
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton]}
+                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
+                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity
               style={[styles.actionButton, styles.unequipButton]}
               onPress={() => unequipPowerArmorPieceAt(item.paSlot)}>
@@ -1672,37 +1684,35 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {showWeaponRepair && (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairWeapon(item.id)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
-              </TouchableOpacity>
-          )}
-          {showWeaponRepair && weaponDurabilityLossEnabled && (
+          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
-          )}
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => repairOnePieceInstant(item.id)}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+          ))}
 
-          {showPARepair && (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairPowerArmorStack(item.id)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
-              </TouchableOpacity>
-          )}
-          {showPARepair && weaponDurabilityLossEnabled && (
+          {showPARepair && (weaponDurabilityLossEnabled ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
-          )}
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => repairOnePieceInstant(item.id)}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+          ))}
 
           {salvage && (
               <TouchableOpacity

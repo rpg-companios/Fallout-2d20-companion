@@ -5,8 +5,10 @@
 //   при успехе 2 ОД сокращают вдвое; осложнение: д20 19–20 = потеря
 //   дополнительных материалов, иначе +15 минут. Материалы — книжная
 //   таблица по редкости. Провал: материалы остаются (закон верстака),
-//   время зря. Кнопка «Починить» открывает модалку (мгновенного
-//   бесплатного ремонта больше нет).
+//   время зря. Слово владельца 414/415: КНОПКА ОДНА — при включённой
+//   настройке прочности это «Ремонт» (окно: донор/материалы/отчёт как в
+//   Крафте), при выключенной — мгновенная бесплатная «Починить»; ремонт
+//   и его затраты — на 1 ШТУКУ (пачки разделяются).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
 import {
@@ -20,6 +22,7 @@ import {
   settleRepairTime,
   repairModsCountFor,
   donorCandidatesFor,
+  splitOnePieceFromStack,
 } from '../../modules/fallout/repair/operations';
 import { readFileSync } from 'node:fs';
 import { buildRepairReport } from '../../modules/fallout/repair/operations';
@@ -37,14 +40,14 @@ afterEach(async () => {
 });
 
 // Оружие-экземпляр в инвентаре (как seedStack крафта — weaponId = канон).
-const seedWeapon = ({ durability = 40, weaponId = 'weapon_10mm_pistol', id }) => {
+const seedWeapon = ({ durability = 40, weaponId = 'weapon_10mm_pistol', id, quantity = 1 }) => {
   const key = id ?? `seed_${weaponId}_${Math.random().toString(36).slice(2, 7)}`;
   useCharacterStore.setState((prev) => ({
     items: {
       ...prev.items,
       [key]: {
         id: weaponId, weaponId, itemType: 'weapon',
-        durability, durabilityTracked: true, quantity: 1,
+        durability, durabilityTracked: true, quantity,
       },
     },
   }));
@@ -327,6 +330,39 @@ describe('Патч 413: операции — редкость, моды, дон�
     expect(report.pendingTime).toEqual({ hasSuccess: true }); // CraftReportView спросит про 2 ОД
   });
 
+  it('слово владельца 415: пачка ОРУЖИЯ тоже чинится по одной штуке', () => {
+    seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol', quantity: 3, id: 'seed_pistol_stack' });
+    seedMaterials('item_common_materials', 2); // редкость 1 → 2 Обычных за тест
+    setRepairHero({ int: 5, repair: 0 });
+    const result = performRepair('seed_pistol_stack', {
+      ports: { rollD20: dice(2, 3) },
+    });
+    expect(result.done).toBe(true);
+    const pistols = Object.values(state().items).filter((i) => i.weaponId === 'weapon_10mm_pistol');
+    const whole = pistols.find((i) => Number(i.durability) === 100);
+    const damaged = pistols.find((i) => Number(i.durability) === 40);
+    expect(whole?.quantity ?? 0).toBe(1);          // починена ОДНА
+    expect(damaged?.quantity ?? 0).toBe(2);        // остальные ждут своих тестов
+  });
+
+  it('мгновенная бесплатная починка тоже по 1 шт: splitOnePieceFromStack', () => {
+    useCharacterStore.setState((prev) => ({
+      items: {
+        ...prev.items,
+        seed_stack: {
+          id: 'power_armor_raider_chest', weaponId: 'power_armor_raider_chest',
+          itemType: 'powerArmor', hpCurrent: 2, maxHp: 10, quantity: 2,
+        },
+      },
+    }));
+    const singleId = splitOnePieceFromStack('seed_stack');
+    expect(singleId).not.toBe('seed_stack');
+    expect(state().items[singleId].quantity).toBe(1);
+    expect(state().items.seed_stack.quantity).toBe(1);
+    // одиночка не разделяется.
+    expect(splitOnePieceFromStack(singleId)).toBe(singleId);
+  });
+
   it('донор списывается вместе со своими модами (закон 343/344)', () => {
     const weaponId = seedWeapon({ durability: 40, weaponId: 'weapon_10mm_pistol' });
     const donorKey = seedWeapon({ durability: 55, weaponId: 'weapon_10mm_pistol' });
@@ -355,29 +391,35 @@ describe('Патч 413: операции — редкость, моды, дон�
   });
 });
 
-describe('Проводка (слово владельца 414): «Починить» мгновенно + «Ремонт» по книге', () => {
+describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
 
-  it('две кнопки: «Починить» зовёт экшн стора, «Ремонт» открывает модалку', () => {
+  it('одна кнопка у всех целей: настройка ВКЛ — «Ремонт» (окно), ВЫКЛ — мгновенная «Починить»', () => {
     const code = src();
     expect(code).toContain('RepairModal');
-    // «Починить» — мгновенные экшны (прежнее поведение).
-    expect(code).toContain('onPress={() => repairWeapon(item.id)}');
-    expect(code).toContain('onPress={() => repairPowerArmorStack(item.id)}');
-    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
-    // «Ремонт» — модалка (все три формы цели).
+    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
+    expect((code.match(/weaponDurabilityLossEnabled \?/g) ?? []).length).toBe(3);
+    // Книжный режим открывает окно (обе формы цели).
     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
+    // Бесплатный режим — мгновенный и по 1 шт (через отделение штуки).
+    expect(code).toContain('repairOnePieceInstant(item.id)');
+    expect(code).toContain('splitOnePieceFromStack');
+    expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
+    expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
+    // Надетая часть — всегда 1 шт, сразу экшн.
+    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+    // Подписи режимов различаются.
     expect(code).toContain("tInventory('repair.actions.remake')");
+    expect(code).toContain("tInventory('repair.actions.repair')");
   });
 
-  it('гейты кнопки «Ремонт»: настройка прочности и доступность материалов', () => {
+  it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
     const code = src();
-    // «Кнопки ремонта нет, если настройка прочности не активна».
-    expect(code).toContain('weaponDurabilityLossEnabled && (');
-    // «Если материалов нет, кнопка ремонта не активна».
     expect(code).toContain('!repairAffordable && styles.applyButtonDisabled');
+    expect(code).toContain('!pieceAffordable && styles.applyButtonDisabled');
     expect(code).toContain('disabled={!repairAffordable}');
+    expect(code).toContain('disabled={!pieceAffordable}');
     expect(code).toContain('repairAffordableFor');
     expect(code).toContain('repairAffordableForPiece');
   });

@@ -1,5 +1,19 @@
 # Changelog
 ---
+## One repair button (patch 415)
+
+By your word there is one button again. With the durability setting
+off it is the old instant free «Fix». With it on — the book «Repair»:
+a window with the donor, materials and the crafting-style report; no
+materials (and no donor) — the button is grey. Free repair exists only
+when the settings are off (later — also with the «Jury Rigging» perk,
+on the same button). The «repair is per one piece» law now covers
+everything: a weapon stack is also repaired one instance per test,
+like power armor pieces; even the instant free fix separates one piece
+from the stack and repairs only it. The repaired piece merges with the
+whole ones.
+
+---
 ## Repair — as you said (patch 414)
 
 By your corrections there are two buttons now. «Fix» is the old
