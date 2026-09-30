@@ -68,7 +68,7 @@ import perksData from '../../modules/fallout/data/perks/perks.json';
 // 406: потолок лестниц выживания — флаг «высшая ступень сытости»
 // для «Омолодившегося» (survival.ts — чистый домен, без настроек/UI).
 import { SURVIVAL_LADDER_MAX } from '../../modules/fallout/survival/survival';
-import { selectPerkBonuses } from '../../domain/perks.js';
+import { selectPerkBonuses, reconcileSelectedPerksWithCatalog } from '../../domain/perks.js';
 // 404: префикс металлической брони для «В сияющих доспехах»;
 // 405: светозащитная оптика (ранг 2 того же перка).
 import {
@@ -377,6 +377,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        */
       currency: 0,
       selectedPerks: [],
+      pendingPerksBookAdjusted: [],
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
@@ -409,6 +410,38 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
         set({ selectedPerks: next });
         get().recalculatePerkBonuses();
+      },
+
+      /**
+       * 411 (публичное приложение): мигратор перков при загрузке персонажа.
+       * «Книга приоритетнее» (слово владельца 410): лишние ранги и перки,
+       * не отвечающие книжным требованиям, снимаются; слоты освобождаются.
+       * Идемпотентно — на здоровом списке ничего не меняет. Списанные
+       * перки попадают в pendingPerksBookAdjusted (не персистится) —
+       * слой загрузки показывает игроку уведомление.
+       */
+      reconcilePerksAtLoad: () => {
+        const state = get();
+        const result = reconcileSelectedPerksWithCatalog(
+          state.selectedPerks || [],
+          perksData,
+          {
+            attributes: state.attributes,
+            level: state.level,
+            isRobot: isRobotCharacter({ origin: state.origin, trait: state.trait }),
+          },
+        );
+        if (!result.changed) {
+          set({ pendingPerksBookAdjusted: [] });
+          return { changed: false, removed: [] };
+        }
+        set({
+          selectedPerks: result.selectedPerks,
+          pendingPerksBookAdjusted: result.removed,
+        });
+        get().recalculatePerkBonuses();
+        debugLog('perks.reconcileAtLoad', { removed: result.removed });
+        return { changed: true, removed: result.removed };
       },
 
       markSkillsAsRewarded: (skills = []) => set((state) => ({
@@ -2042,6 +2075,9 @@ const useCharacterStore = create(withDerivedCascade(devtools(
             // Шаг 8в (патч 243): сначала фабрики расширений (эффект
             // провайдера снесён), затем пересчёт производных.
             state.ensureStateExtensionFields?.();
+            // 411: мигратор перков («книга приоритетнее») — до пересчёта,
+            // чтобы производные считались уже по сверенному списку.
+            state.reconcilePerksAtLoad?.();
             state.recalculateAll();
           } catch (error) {
             debugLog('characterStore.rehydrate.recalculateFailed', {

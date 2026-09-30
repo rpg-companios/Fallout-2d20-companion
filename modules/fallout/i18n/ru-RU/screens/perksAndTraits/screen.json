@@ -15,5 +15,13 @@
       "CHA": "ХАР",
       "LCK": "УДЧ"
     }
+  },
+  "alerts": {
+    "duplicatePerksFixedTitle": "Дубли перков убраны",
+    "duplicatePerksFixedMessage": "Лишние копии перков сняты — освободившиеся выборы можно потратить заново.",
+    "perkMissingIdTitle": "В сохранении найден неизвестный перк",
+    "perkMissingIdMessage": "Эти перки не найдены в каталоге и сняты: {perks}.",
+    "perksBookAdjustedTitle": "Перки приведены к книге",
+    "perksBookAdjustedMessage": "После сверки с книгой снято: {perks}. Освободившиеся выборы можно потратить заново, когда выполнятся условия."
   }
 }

@@ -180,6 +180,8 @@ export interface CharacterActions {
     equipmentState?: EquipmentStatePush;
   }) => void;
   recalculatePerkBonuses: () => void;
+  /** 411: мигратор перков при загрузке («книга приоритетнее»). */
+  reconcilePerksAtLoad: () => { changed: boolean; removed: Array<{ id: string | null; rank: number | null; reason: string }> };
   /** Фабрика полей сеттингов (экс-эффект провайдера, патч 243). */
   ensureStateExtensionFields: () => void;
   /** Мост legacy-формата (массивы) → словари стора. */
@@ -350,6 +352,7 @@ export const NAMED_OP_KEYS = [
   'recalculateAll',
   'recalculateDerivedStats',
   'recalculatePerkBonuses',
+  'reconcilePerksAtLoad',
   'ensureStateExtensionFields',
   'loadFromLegacyData',
   'exportToLegacyData',

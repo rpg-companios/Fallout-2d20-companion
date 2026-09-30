@@ -15,5 +15,13 @@
       "CHA": "CHA",
       "LCK": "LCK"
     }
+  },
+  "alerts": {
+    "duplicatePerksFixedTitle": "Duplicate perks removed",
+    "duplicatePerksFixedMessage": "Extra perk copies were removed — the freed picks can be spent again.",
+    "perkMissingIdTitle": "Unknown perk in the save",
+    "perkMissingIdMessage": "These perks were not found in the catalog and were removed: {perks}.",
+    "perksBookAdjustedTitle": "Perks aligned with the book",
+    "perksBookAdjustedMessage": "After the book check these were removed: {perks}. The freed picks can be spent once you meet the requirements."
   }
 }

@@ -166,6 +166,86 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
     };
 }
 
+/**
+ * 411 (публичное приложение): мигратор перков при ЗАГРУЗКЕ персонажа —
+ * «книга приоритетнее» (слово владельца 410). Чистая функция, без стора:
+ *   1) лишние ранги сверх каталога снимаются (trimSelectedPerksToMaxRanks);
+ *   2) каждый оставшийся выбор проверяется по требованиям книги на СВОЙ
+ *      ранг: уровень, характеристики, «не для роботов», взаимоисключение
+ *      (excludedPerks — остаётся более ранний выбор).
+ * Неизвестные каталогу id снимаются тоже (слот освобождается).
+ * Идемпотентна: на уже сверенном списке возвращает его без изменений.
+ * context: { attributes, level, isRobot } — всё, что нужно книге.
+ */
+export function reconcileSelectedPerksWithCatalog(selectedPerks = [], perkCatalog = [], context = {}) {
+    const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
+    // Атрибуты принимаются в обоих форматах: {STR: 8} и {STR: {total: 8}}
+    // (форма стора). Итоговое значение — уже с бонусами.
+    const attributeMap = {};
+    for (const [code, value] of Object.entries(context.attributes || {})) {
+      attributeMap[String(code).toUpperCase()] = typeof value === 'number'
+        ? value
+        : (Number(value?.total) || 0);
+    }
+    const level = Number(context.level) || 1;
+
+    const meetsRequirements = (perk, rank) => {
+        const req = getPrerequisites(perk) || {};
+        if (req.notForRobots && context.isRobot) return 'robot';
+        const requiredLevel = getRequiredLevelForRank(perk, rank);
+        if (level < requiredLevel) return 'level';
+        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
+            if ((attributeMap[String(code).toUpperCase()] || 0) < Number(need)) return 'attributes';
+        }
+        return null;
+    };
+
+    // trimSelectedPerksToMaxRanks уже присваивает оставшимся копиям их
+    // прежние ранги (первые копии списка) — отдельного сопоставления не нужно.
+    const trimmed = trimSelectedPerksToMaxRanks(selectedPerks, perkCatalog);
+
+    const heldIds = new Set();
+    const kept = [];
+    // Срезанные лишние ранги тоже попадают в отчёт (причина rank-limit).
+    const removed = (trimmed.removed || []).map((selected) => ({
+        selected,
+        id: toSelectedPerkId(selected),
+        rank: null,
+        reason: 'rank-limit',
+    }));
+    const counts = {};
+    for (const selected of trimmed.selectedPerks || []) {
+        const id = toSelectedPerkId(selected);
+        const perk = id ? catalogById.get(id) : null;
+        if (!perk) {
+            removed.push({ selected, id: id || null, rank: null, reason: 'unknown' });
+            continue;
+        }
+        const rank = Number(selected?.rank) || 1;
+        const reason = meetsRequirements(perk, rank);
+        if (reason) {
+            removed.push({ selected, id, rank, reason });
+            continue;
+        }
+        const exclusions = Array.isArray(perk.prerequisites?.excludedPerks)
+            ? perk.prerequisites.excludedPerks
+            : (Array.isArray(perk.requirements?.excludedPerks) ? perk.requirements.excludedPerks : []);
+        if (exclusions.some((other) => heldIds.has(other))) {
+            removed.push({ selected, id, rank, reason: 'excluded' });
+            continue;
+        }
+        heldIds.add(id);
+        counts[id] = (counts[id] || 0) + 1;
+        kept.push({ id, rank: counts[id] });
+    }
+
+    return {
+        selectedPerks: kept,
+        removed,
+        changed: removed.length > 0 || kept.length !== (selectedPerks || []).length,
+    };
+}
+
 export function identifySelectedPerk(selected, index) {
     if (typeof selected === 'string' && selected) return selected;
     return toSelectedPerkId(selected)
