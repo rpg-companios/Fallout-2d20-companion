@@ -1,0 +1,360 @@
+diff --git a/__tests__/perks/perks-engine-404.test.js b/__tests__/perks/perks-engine-404.test.js
+index c359d0e..029c2f7 100644
+--- a/__tests__/perks/perks-engine-404.test.js
++++ b/__tests__/perks/perks-engine-404.test.js
+@@ -1,4 +1,5 @@
+-// ПРИЁМОЧНЫЙ (патч 404): три перка из адаптируемой четвёрки 403 встроены в движок.
++// ПРИЁМОЧНЫЙ (патч 404; уточнено патчем 405 — бонус «Заряжай и стреляй»
++// только у тяжёлого со скорострельностью 2+): перки 403 встроены в движок.
+ // - Гурман старого мира: preserved-еда — +2 ОЗ к лечению, радиация еды на 1 меньше.
+ // - Заряжай и стреляй: тяжёлое оружие — скорострельность +1/+2 по рангам.
+ // - В сияющих доспехах: в металлической брони СУ энергия +2 (ранг 2 — текст перка).
+@@ -133,10 +134,12 @@ describe('Патч 404: Заряжай и стреляй (скорострель
+     expect(applyLoadAndFireToWeapon(minigun, 1).fireRate).toBe(6);
+     expect(applyLoadAndFireToWeapon(minigun, 2).fireRate).toBe(7);
+ 
++    // 405: «Толстяк» (0 очередей) — медленное оружие, перк его НЕ усиливает
++    // (в тексте перка: «со скорострельностью 2 или выше»).
+     const fatMan = byId(weaponsList, 'weapon_fat_man');
+     expect(fatMan.fireRate).toBe(0);
+-    expect(applyLoadAndFireToWeapon(fatMan, 1).fireRate).toBe(1);
+-    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(2);
++    expect(applyLoadAndFireToWeapon(fatMan, 1).fireRate).toBe(0);
++    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(0);
+   });
+ 
+   it('не-тяжёлое оружие и предметы без очередей не трогаются; вход не мутируется', () => {
+diff --git a/__tests__/perks/perks-engine-405.test.js b/__tests__/perks/perks-engine-405.test.js
+new file mode 100644
+index 0000000..baf1d3a
+--- /dev/null
++++ b/__tests__/perks/perks-engine-405.test.js
+@@ -0,0 +1,124 @@
++// ПРИЁМОЧНЫЙ (патч 405): доводка перков 404 по тексту книги.
++// 1) «Заряжай и стреляй» — бонус только у тяжёлого оружия со
++//    скорострельностью 2+ (медленные «Толстяк»/гранатомёты не усиливаются).
++// 2) «В сияющих доспехах» ранг 2 — светозащитная оптика даёт ещё +1
++//    к Сопротивляемости энергетическому урону (в каталоге — Щиток сварщика).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++
++import { applyLoadAndFireToWeapon, loadAndFireBonusByRank, MIN_FIRE_RATE_FOR_BONUS } from '../../domain/perks/loadAndFire';
++import {
++  GLARE_OPTICS_IDS,
++  IN_SHINING_ARMOR_OPTICS_ENERGY_DR,
++  isGlareOpticsCatalogId,
++  wearingGlareOpticsInEquippedArmor,
++} from '../../domain/perks/inShiningArmor';
++import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
++import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
++import clothesData from '../../modules/fallout/data/equipment/clothes.json';
++
++const weaponsList = Array.isArray(weaponsData) ? weaponsData : Object.values(weaponsData);
++const byId = (list, id) => list.find((x) => x.id === id);
++
++describe('Патч 405: Заряжай и стреляй — условие «скорострельность 2+»', () => {
++  it('медленное тяжёлое (0–1 очередей) не усиливается: Толстяк и Мусорный джет', () => {
++    const fatMan = byId(weaponsList, 'weapon_fat_man'); // 0 очередей
++    const junkJet = byId(weaponsList, 'weapon_junk_jet'); // 1 очередь
++    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(0);
++    expect(applyLoadAndFireToWeapon(junkJet, 2).fireRate).toBe(1);
++  });
++
++  it('граница: автоматический гранатомёт (ровно 2) и миниган (5) усиливаются', () => {
++    const launcher = byId(weaponsList, 'weapon_auto_grenade_launcher');
++    expect(launcher.fireRate).toBe(2);
++    expect(applyLoadAndFireToWeapon(launcher, 1).fireRate).toBe(3);
++    expect(applyLoadAndFireToWeapon(launcher, 2).fireRate).toBe(4);
++
++    const minigun = byId(weaponsList, 'weapon_minigun');
++    expect(applyLoadAndFireToWeapon(minigun, 1).fireRate).toBe(6);
++    expect(applyLoadAndFireToWeapon(minigun, 2).fireRate).toBe(7);
++  });
++
++  it('скорострельность берётся С МОДАМИ: мод поднял 1 → 2 — перк уже действует', () => {
++    // Карточка приходит в хелпер уже обогащённой модами (единая точка),
++    // поэтому «медленное» оружие с модом на скорострельность усиливается.
++    const modded = { id: 'weapon_x', weaponType: 'Heavy', fireRate: 2, baseWeaponName: 'x' };
++    expect(applyLoadAndFireToWeapon(modded, 1).fireRate).toBe(3);
++    const stillSlow = { id: 'weapon_y', weaponType: 'Heavy', fireRate: 1 };
++    expect(applyLoadAndFireToWeapon(stillSlow, 1).fireRate).toBe(1);
++    expect(MIN_FIRE_RATE_FOR_BONUS).toBe(2);
++    expect(loadAndFireBonusByRank(3)).toBe(2);
++  });
++
++  it('у помощника та же логика, точка входа одна', () => {
++    for (const file of [
++      '../../components/screens/InventoryScreen/InventoryScreen.js',
++      '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js',
++    ]) {
++      const src = readFileSync(resolve(__dirname, file), 'utf8');
++      expect(src).toContain('applyLoadAndFireToWeapon');
++    }
++  });
++});
++
++describe('Патч 405: В сияющих доспехах — ранг 2, светозащитная оптика', () => {
++  const ATTRS = Object.fromEntries(
++    ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'].map((id) => [id, { id, base: 5, modifiers: [], total: 5 }]),
++  );
++
++  const derive = ({ rank = 0, metal = false, optics = false } = {}) =>
++    calculateDerivedStats(
++      ATTRS,
++      { perkBonuses: rank > 0 ? { inShiningArmorRank: rank } : {} },
++      null,
++      1,
++      { wearingMetalArmor: metal, wearingGlareOptics: optics },
++    );
++
++  it('в каталоге есть Щиток сварщика — единственная светозащитная оптика', () => {
++    // Формат clothes.json: группы { items: [...] } — id лежат на два уровня глубже.
++    const ids = new Set();
++    const walk = (x) => {
++      if (Array.isArray(x)) x.forEach(walk);
++      else if (x && typeof x === 'object') {
++        if (x.id) ids.add(x.id);
++        Object.values(x).forEach(walk);
++      }
++    };
++    walk(clothesData);
++    for (const opticsId of GLARE_OPTICS_IDS) {
++      expect(ids.has(opticsId)).toBe(true);
++    }
++    expect(isGlareOpticsCatalogId('headwear_welding_mask')).toBe(true);
++    expect(isGlareOpticsCatalogId('headwear_gas_mask')).toBe(false);
++  });
++
++  it('помощник находит оптику в слотах (одежда или броня)', () => {
++    const withOptics = {
++      head: { armor: null, clothing: { weaponId: 'headwear_welding_mask' } },
++      body: { armor: { weaponId: 'armor_metal_chest_001' }, clothing: null },
++    };
++    expect(wearingGlareOpticsInEquippedArmor(withOptics)).toBe(true);
++    expect(wearingGlareOpticsInEquippedArmor({
++      head: { armor: null, clothing: { weaponId: 'headwear_gas_mask' } },
++    })).toBe(false);
++    expect(wearingGlareOpticsInEquippedArmor({})).toBe(false);
++  });
++
++  it('ранг 2 + металл + оптика: энергоСУ +3 (две строки модификаторов)', () => {
++    const full = derive({ rank: 2, metal: true, optics: true });
++    expect(full.damageResistance.energy.modifiers).toEqual([
++      { source: 'perks.inShiningArmor', value: 2, operation: '+' },
++      { source: 'perks.inShiningArmor.optics', value: IN_SHINING_ARMOR_OPTICS_ENERGY_DR, operation: '+' },
++    ]);
++    expect(full.damageResistance.energy.total).toBe(3);
++  });
++
++  it('ранг 1: оптика ещё не помогает; ранг 2 без оптики: только металл', () => {
++    expect(derive({ rank: 1, optics: true }).damageResistance.energy.total).toBe(0);
++    expect(derive({ rank: 2, metal: true }).damageResistance.energy.total).toBe(2);
++    expect(derive({ rank: 2, optics: true }).damageResistance.energy.total).toBe(1);
++    expect(derive({}).damageResistance.energy.total).toBe(0);
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index b64a0ac..b3ed747 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
++Снимок: **2026-09-30 (405)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+ fallout2d20_perks (1) (184: структурированные op/modifier/when),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 12838db..1a82952 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,16 @@
+ # Changelog
++---
++## Book conditions restored to perks (patch 405)
++
++Your question prompted a full re-check, which found two gaps. «Load and
++Fire» now boosts only heavy weapons with a fire rate of 2 or higher —
++the Fat Man and other single-shot launchers are no longer sped up, as
++the book says. «In Shining Armor» rank 2 got its second half: while
++wearing glare-blocking optics (currently the Welding Shield — the only
++optics in the gear list) energy damage resistance gains another +1,
++for +3 total in metal armor with the shield. All active perks were
++also audited — every mechanic is in place.
++
+ ---
+ ## Four perks now actually work (patch 404)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ab7401d..49bafd8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## Перкам вернули книжные условия (патч 405)
++
++По вашему вопросу перепроверили всё и нашли две недоработки. «Заряжай и
++стреляй» теперь усиливает только тяжёлое оружие со скорострельностью 2
++и выше — «Толстяк» и прочие одиночные гранатомёты, как в книге, перком
++не ускоряются. «В сияющих доспехах» на 2-м ранге получила вторую
++половину: в светозащитной оптике (пока это Щиток сварщика — единственная
++оптика в снаряжении) Сопротивляемость энергетическому урону ещё +1,
++итого в металле с щитком +3. Заодно провели ревизию всех действующих
++перков — механика у всех на месте.
++
+ ---
+ ## Четыре перка заработали по-настоящему (патч 404)
+ 
+diff --git a/domain/perks/inShiningArmor.js b/domain/perks/inShiningArmor.js
+index 3a0415d..1da0efc 100644
+--- a/domain/perks/inShiningArmor.js
++++ b/domain/perks/inShiningArmor.js
+@@ -1,18 +1,36 @@
+ // domain/perks/inShiningArmor.js
+-// В сияющих доспехах (референс владельца, 403; автоматизация 404):
+-// ранг 1 — в металлической брони Сопротивляемость энергетическому урону +2
+-// (применяется в derivedStats, когда надета хоть одна металлическая деталь).
+-// Ранг 2 добавляет защиту от ослепления (светозащитная оптика) — боевая
+-// сцена вне движка приложения, живёт текстом перка.
++// В сияющих доспехах (текст перка — источник; ранг 2 добавлен 405):
++// ранг 1 — в металлической броне Сопротивляемость энергетическому урону +2;
++// ранг 2 — дополнительно +1, когда надета светозащитная оптика.
++// В каталоге из оптики есть только Щиток сварщика (headwear_welding_mask):
++// «Солнцезащитные очки» из примера книги в снаряжении приложения не заводились.
++// Обе прибавки применяются в derivedStats; ношение считает store.
+ 
+ export const IN_SHINING_ARMOR_ENERGY_DR = 2;
++export const IN_SHINING_ARMOR_OPTICS_ENERGY_DR = 1;
+ // Металлическая броня каталога: все детали штампуются префиксом armor_metal_
+ // (armor.json → metalArmor.tiers.*.pieces).
+ export const METAL_ARMOR_ID_PREFIX = 'armor_metal_';
++// Светозащитная оптика каталога (примеры книги: маска/щиток сварщика,
++// солнцезащитные очки; второй в данных нет — список расширяемый).
++export const GLARE_OPTICS_IDS = ['headwear_welding_mask'];
+ 
+ export const isMetalArmorCatalogId = (id) =>
+   typeof id === 'string' && id.startsWith(METAL_ARMOR_ID_PREFIX);
+ 
++export const isGlareOpticsCatalogId = (id) =>
++  GLARE_OPTICS_IDS.includes(id);
++
++/**
++ * Надета ли светозащитная оптика: любой слот брони/одежды с id из списка.
++ * Чистая функция — store вызывает на state.equippedArmor.
++ */
++export const wearingGlareOpticsInEquippedArmor = (equippedArmor = {}) =>
++  Object.values(equippedArmor).some((slotRow) => {
++    const ids = [slotRow?.clothing?.weaponId || slotRow?.clothing?.id, slotRow?.armor?.weaponId || slotRow?.armor?.id];
++    return ids.some(isGlareOpticsCatalogId);
++  });
++
+ export const inShiningArmorPerk = {
+   id: 'inShiningArmor',
+   apply(ctx) {
+diff --git a/domain/perks/loadAndFire.js b/domain/perks/loadAndFire.js
+index e04bbfc..7f3d3a2 100644
+--- a/domain/perks/loadAndFire.js
++++ b/domain/perks/loadAndFire.js
+@@ -1,12 +1,14 @@
+ // domain/perks/loadAndFire.js
+-// Заряжай и стреляй (референс владельца, 403; автоматизация 404):
+-// тяжёлое оружие (weaponType 'Heavy') — скорострельность +1 (ранг 1)
+-// или +2 (ранг 2+). «Каждый следующий перк — другой тип оружия» — книжная
+-// тонкость выбора, в приложении ранг даёт бонус на всё тяжёлое оружие.
+-// Применяется на карточках оружия (инвентарь и экран снаряжения) через
+-// applyLoadAndFireToWeapon — единая точка.
++// Заряжай и стреляй (текст перка — источник, уточнение 405):
++// «Когда вы используете тяжелое оружие со скорострельностью 2 или выше,
++// скорострельность этого оружия увеличивается на +1. На 2 ранге … +2».
++// Оружие с очередями 0–1 («Толстяк», гранатомёты-одиночки) перком не
++// усиливается. Скорострельность берётся УЖЕ С МОДАМИ: карточки оружия
++// (инвентарь и экран снаряжения) зовут applyLoadAndFireToWeapon на
++// обогащённом предмете — единая точка.
+ 
+ export const HEAVY_WEAPON_TYPE = 'Heavy';
++export const MIN_FIRE_RATE_FOR_BONUS = 2;
+ 
+ export const loadAndFireBonusByRank = (rank) => {
+   const r = Math.max(1, Number(rank) || 1);
+@@ -21,13 +23,13 @@ export const loadAndFirePerk = {
+ };
+ 
+ /**
+- * Тяжёлое оружие получает прибавку скорострельности; прочие предметы —
+- * как есть. Не мутирует вход.
++ * Тяжёлое оружие со скорострельностью 2+ (с учётом модов) получает
++ * прибавку; прочие предметы и «медленные» тяжёлые — как есть. Не мутирует вход.
+  */
+ export const applyLoadAndFireToWeapon = (item, bonus) => {
+   const b = Number(bonus) || 0;
+   if (!b || !item || item.weaponType !== HEAVY_WEAPON_TYPE) return item;
+   const base = Number(item.fireRate);
+-  if (!Number.isFinite(base)) return item;
++  if (!Number.isFinite(base) || base < MIN_FIRE_RATE_FOR_BONUS) return item;
+   return { ...item, fireRate: base + b };
+ };
+diff --git a/modules/fallout/logic/derivedStats.js b/modules/fallout/logic/derivedStats.js
+index df7ed34..c07d4d6 100644
+--- a/modules/fallout/logic/derivedStats.js
++++ b/modules/fallout/logic/derivedStats.js
+@@ -282,6 +282,15 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+     });
+     stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
+   }
++  // 405: ранг 2 — светозащитная оптика (Щиток сварщика) даёт ещё +1.
++  if (shiningRank >= 2 && equipmentState.wearingGlareOptics) {
++    stats.damageResistance.energy.modifiers.push({
++      source: 'perks.inShiningArmor.optics',
++      value: 1,
++      operation: '+',
++    });
++    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
++  }
+ 
+   return stats;
+ };
+diff --git a/public/version.json b/public/version.json
+index 41dd2ce..cf03b25 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "404",
++  "version": "405",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index dd3c2f3..1aba814 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -66,8 +66,12 @@ import { createInitialPowerArmorState, createPowerArmorActions } from './powerAr
+ import { debugLog } from '../debug/falloutDebug.js';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+ import { selectPerkBonuses } from '../../domain/perks.js';
+-// 404: префикс металлической брони для «В сияющих доспехах».
+-import { isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
++// 404: префикс металлической брони для «В сияющих доспехах»;
++// 405: светозащитная оптика (ранг 2 того же перка).
++import {
++  isMetalArmorCatalogId,
++  wearingGlareOpticsInEquippedArmor,
++} from '../../domain/perks/inShiningArmor';
+ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+@@ -253,6 +257,7 @@ const deriveFromSnapshot = (state, options = {}) => {
+     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
+     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
+     wearingMetalArmor,
++    wearingGlareOptics: wearingGlareOpticsInEquippedArmor(state.equippedArmor || {}),
+   };
+   return calculateDerivedStats(
+     state.attributes,
