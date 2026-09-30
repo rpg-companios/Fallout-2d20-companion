@@ -341,7 +341,8 @@ export const createOrchestrationActions = (set, get) => {
     }
     if (vitalChanges.radiationAmount !== null) {
       // Радиация расходника напрямую меняет счётчик: DR частей тела не участвует.
-      get().setRadiation(vitalChanges.radiationAfter);
+      // 408: норма «Гулеподобного» уже в healAmount (и в отчёте) — не дублируем.
+      get().setRadiation(vitalChanges.radiationAfter, { skipGhoulishHeal: true });
     }
 
     // 2. Timed-эффекты через стор.

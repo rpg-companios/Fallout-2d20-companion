@@ -1628,25 +1628,32 @@ const useCharacterStore = create(withDerivedCascade(devtools(
           ).current,
         });
       },
-      /** Установка радиации (значение или функция), нижняя граница 0. */
-      setRadiation: (updater) => set((state) => {
+      /**
+       * Установка радиации (значение или функция), нижняя граница 0.
+       * 408: «Гулеподобный» — при ЛЮБОМ подъёме (включая ручное изменение
+       * счётчика) персонаж дополнительно лечит 1 ОЗ за каждые N полученных
+       * единиц (норма по рангу перка: 4/3/2); счётчик растёт как обычно.
+       * options.skipGhoulishHeal — конвейер расходников уже учёл норму в
+       * своём отчёте (resolveConsumableVitalChanges), здесь не дублируем.
+       */
+      setRadiation: (updater, options = {}) => set((state) => {
         const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
         const next = setCounter(
           { id: 'radiation', current: state.radiation, max: null, min: 0 },
           requested,
         ).current;
-        // 407: «Гулеподобный» — ЛЮБОЙ подъём радиации (в том числе ручное
-        // изменение счётчика) вместо вреда лечит Текущие ОЗ на ту же
-        // величину; счётчик не растёт. Спад (Рад-а-вей, лечение) — как
-        // обычно. Конвейер расходников конвертирует сам (в resolver
-        // радиация не растёт), здесь двойного лечения не возникает.
-        if (next > state.radiation && Boolean(state.perkBonuses?.ghoulish)) {
-          const ceiling = calculateMaxHealth(
-            selectLegacyAttributes({ attributes: state.attributes }),
-            state.level,
-          );
-          const healed = Math.min(next - state.radiation, Math.max(0, ceiling - state.currentHealth));
-          return { radiation: state.radiation, currentHealth: state.currentHealth + healed };
+        const ghoulish = state.perkBonuses?.ghoulish;
+        if (!options?.skipGhoulishHeal && ghoulish && next > state.radiation) {
+          const units = Number(ghoulish?.hpPerUnits) || 4;
+          const heal = Math.floor((next - state.radiation) / units);
+          if (heal > 0) {
+            const ceiling = calculateMaxHealth(
+              selectLegacyAttributes({ attributes: state.attributes }),
+              state.level,
+            );
+            const applied = Math.min(heal, Math.max(0, ceiling - state.currentHealth));
+            return { radiation: next, currentHealth: state.currentHealth + applied };
+          }
         }
         return { radiation: next };
       }),

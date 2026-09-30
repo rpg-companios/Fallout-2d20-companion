@@ -1,5 +1,18 @@
 # Changelog
 ---
+## «Гулеподобный» as written (patch 408)
+
+The perk is now three ranks, as in the book: 1 HP for every 4 points
+of radiation taken, at rank 2 — every 3, at rank 3 — every 2 (level
+requirement +8 per rank). Radiation now applies normally — the counter
+grows — and the healing comes on top. The rate counts radiation from
+food and drinks (shown in the consumption report) and manual counter
+changes; removing radiation grants no healing. Note: the book line
+«your maximum HP is still reduced» changes nothing in the app —
+radiation never reduces max HP here; that is app-wide behavior, not
+the perk's.
+
+---
 ## Ghoulish and the glowing pack (patch 407)
 
 «Гулеподобный» (the Russian name of Ghoulish) now accounts for every

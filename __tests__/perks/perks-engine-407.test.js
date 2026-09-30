@@ -29,13 +29,13 @@ const takePerks = (...ids) => {
   state().setSelectedPerks(ids.map((id, index) => ({ perkId: id, index })));
 };
 
-describe('Патч 407: Гулеподобный — любая радиация лечит', () => {
-  it('ручной подъём счётчика лечит вместо роста радиации', () => {
+describe('Патч 407→408: Гулеподобный — ручная радиация по норме перка', () => {
+  it('ручной подъём +5 (ранг 1, норма 4): счётчик растёт, ОЗ +1', () => {
     takePerks('ghoulish');
     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
-    state().setRadiation((prev) => prev + 2);
-    expect(state().radiation).toBe(0);
-    expect(state().currentHealth).toBe(7);
+    state().setRadiation((prev) => prev + 5);
+    expect(state().radiation).toBe(5);
+    expect(state().currentHealth).toBe(6);
   });
 
   it('без перка ручной подъём растит счётчик, ОЗ не трогает', () => {
@@ -49,33 +49,34 @@ describe('Патч 407: Гулеподобный — любая радиация
     takePerks('ghoulish');
     const ceiling = state().derivedStats.maxHealth.total;
     useCharacterStore.setState({ currentHealth: ceiling, radiation: 1 });
-    state().setRadiation((prev) => prev + 3); // ОЗ полные — лечить некого
-    expect(state().radiation).toBe(1); // счётчик всё равно не растёт
+    state().setRadiation((prev) => prev + 8); // ОЗ полные — лечить некого
+    expect(state().radiation).toBe(9); // счётчик растёт как обычно
     expect(state().currentHealth).toBe(ceiling);
 
     useCharacterStore.setState({ currentHealth: 5, radiation: 4 });
-    state().setRadiation(1); // спад — обычное поведение
+    state().setRadiation(1); // спад — обычное поведение, без лечения
     expect(state().radiation).toBe(1);
     expect(state().currentHealth).toBe(5);
   });
 
-  it('конвейер расходников с перком: двойного лечения нет', () => {
+  it('конвейер расходников: норма в отчёте, повторного лечения нет', () => {
     takePerks('ghoulish');
     const irradiated = {
       id: 'test_meat', itemType: 'food',
-      radiationModifier: { op: '+', value: 2 },
+      radiationModifier: { op: '+', value: 8 },
     };
     // Как и в конвейере (applyConsumableFull), перк приходит опцией.
     const vital = resolveConsumableVitalChanges(irradiated, {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
+      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 4 },
     });
-    expect(vital.healAmount).toBe(2);
-    expect(vital.radiationAfter).toBe(0);
-    // applyConsumableFull зовёт setRadiation(radiationAfter) — повторного
-    // лечения быть не должно (счётчик не менялся).
+    expect(vital.healAmount).toBe(2); // floor(8/4)
+    expect(vital.radiationAfter).toBe(8); // радиация действует как обычно
+    // applyConsumableFull зовёт setRadiation(radiationAfter, skip) —
+    // повторного лечения быть не должно.
     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
-    state().setRadiation(vital.radiationAfter);
+    state().setRadiation(vital.radiationAfter, { skipGhoulishHeal: true });
     expect(state().currentHealth).toBe(5);
+    expect(state().radiation).toBe(8);
   });
 });
 

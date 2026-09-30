@@ -686,8 +686,9 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         // Фармацевт складываются в antiradRadiationBonus (Рад-а-вей сильнее).
         stimpakHpBonus = 0,
         antiradRadiationBonus = 0,
-        // 406: Ghoulish — прибавка радиации вместо вреда лечит.
-        ghoulish = false,
+        // 408: Гулеподобный (канон) — { hpPerUnits: N }; радиация действует
+        // как обычно, перк добавляет 1 ОЗ за каждые N полученных единиц.
+        ghoulish = null,
     } = options;
     if (
         !Number.isFinite(currentHealth)
@@ -732,10 +733,14 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
     if (antiradRadiationBonus > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount < 0) {
         requestedRadiationAmount -= antiradRadiationBonus;
     }
-    // 406: Ghoulish — прибавка радиации вместо вреда лечит на то же число.
-    if (ghoulish && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
-        healBase += requestedRadiationAmount;
-        requestedRadiationAmount = 0;
+    // 408: Гулеподобный — радиация применяется как обычно, лечение
+    // добавляется по норме «1 ОЗ за каждые N единиц» от ФАКТИЧЕСКИ
+    // полученных единиц (после гурманской скидки и клампа дном).
+    const ghoulishUnits = ghoulish
+        ? (Number(ghoulish?.hpPerUnits) || 4)
+        : 0;
+    if (ghoulishUnits > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
+        healBase += Math.floor(requestedRadiationAmount / ghoulishUnits);
     }
     const finalHealAmount = healBase > 0 ? Math.max(0, healBase + hpHealBonus) : 0;
     const radiationAfter = requestedRadiationAmount === null

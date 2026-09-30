@@ -1540,13 +1540,14 @@
   {
     "id": "ghoulish",
     "nameKey": "perks.ghoulish.name",
-    "maxRanks": 1,
+    "maxRanks": 3,
     "prerequisites": {
       "special": {
         "END": 9
       },
       "level": 7,
-      "notForRobots": true
+      "notForRobots": true,
+      "levelIncreasePerRank": 8
     },
     "effectKey": "perks.ghoulish.effect",
     "effect": "ghoulish"

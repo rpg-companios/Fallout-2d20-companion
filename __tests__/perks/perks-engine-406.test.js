@@ -47,7 +47,7 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
       rejuvenated: { rejuvenatedSatedMaxHp: 2, ladderAccRates: { food: 0.5, water: 0.5 } },
       dromedary: { dromedaryExtraWaterStep: 1 },
       superDuper: { superDuper: true },
-      ghoulish: { ghoulish: true },
+      ghoulish: { ghoulish: { hpPerUnits: 4 } },
       chemist: { chemDurationMultiplier: 2 },
     };
     for (const [id, expected] of Object.entries(cases)) {
@@ -98,19 +98,21 @@ describe('Патч 406: конвейер употребления', () => {
     expect(run(2, 10).radiationAmount).toBe(-6);
   });
 
-  it('Гуль: радиация еды лечит вместо вреда; с Гурманом — после его скидки', () => {
+  it('Гулеподобный (канон 408): радиация действует, лечение по норме 1 за 4', () => {
     const irradiated = {
       id: 'test_meat', itemType: 'food',
       radiationModifier: { op: '+', value: 2 },
     };
+    // +2 радиации: счётчик растёт, лечение floor(2/4) = 0 ОЗ.
     const ghoul = resolveConsumableVitalChanges(irradiated, {
       currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
     });
-    expect(ghoul.healAmount).toBe(2);
-    expect(ghoul.radiationAmount).toBe(0);
-    expect(ghoul.radiationAfter).toBe(0);
+    expect(ghoul.healAmount).toBe(0);
+    expect(ghoul.radiationAmount).toBe(2);
+    expect(ghoul.radiationAfter).toBe(2);
 
-    // Гурман уменьшает радиацию preserved-еды (2 → 1), Гуль лечит на остаток.
+    // Гурман уменьшает радиацию preserved-еды (2 → 1) — полученная единица
+    // меньше нормы, лечение только гурманское.
     const canned = {
       id: 'test_canned', itemType: 'food', preserved: true,
       radiationModifier: { op: '+', value: 2 },
@@ -119,8 +121,8 @@ describe('Патч 406: конвейер употребления', () => {
       currentHealth: 5, maxHealth: 20, radiation: 0,
       ghoulish: true, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
     });
-    expect(both.radiationAmount).toBe(0);
-    expect(both.healAmount).toBe(3); // +1 (остаток радиации) + 2 (гурман)
+    expect(both.radiationAmount).toBe(1);
+    expect(both.healAmount).toBe(2); // только +2 от гурмана
   });
 
   it('Кровопийца: пакет крови лечит 3 → 6 (id уже в каталоге напитков)', () => {
