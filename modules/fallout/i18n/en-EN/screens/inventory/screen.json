@@ -90,5 +90,44 @@
     "noMaterials": "Nothing here you can extract — you need Scrapper (or a higher rank).",
     "notStarted": "Salvage did not start ({reason}).",
     "material": "Materials are not salvaged: they are already the end parts."
+  },
+  "repair": {
+    "title": "Repair",
+    "testLine": "Test: {attribute} + {skill}, difficulty {difficulty}",
+    "attribute": "INT",
+    "skill": "Repair",
+    "materialLine": "{name}: have {have} / need {need}",
+    "materials": {
+      "item_common_materials": "Common materials",
+      "item_uncommon_materials": "Uncommon materials",
+      "item_rare_materials": "Rare materials"
+    },
+    "donorLine": "Scrap a second identical item: −1 difficulty, materials come from it",
+    "timeLine": "Time: {minutes} minutes",
+    "notReady": "Not enough materials — scrap a second identical item or find materials.",
+    "zeroDiffQuestion": "Difficulty 0: roll the dice?",
+    "zeroDiffRoll": "Roll",
+    "zeroDiffAuto": "Automatic success",
+    "report": {
+      "success": "Repair succeeded!",
+      "failure": "Repair failed — materials kept, time spent.",
+      "rolls": "Dice: {rolls}",
+      "complications": "Complications: {n} — time +{minutes} min.",
+      "lostMaterials": "Complication (roll {face}): some materials were lost.",
+      "materialShort": "{name} ×{n}",
+      "apQuestion": "Success: spend 2 AP to halve the time?",
+      "spendAp": "Spend 2 AP (15 min)",
+      "fullTime": "Full 30 minutes",
+      "timeSpent": "Spent {minutes} min. AP pool: {pool}.",
+      "confirmTime": "Record the time"
+    },
+    "alerts": {
+      "storeTitle": "Repair interrupted",
+      "storeMessage": "Could not spend the materials — check the inventory and try again."
+    },
+    "actions": {
+      "repair": "Repair",
+      "close": "Close"
+    }
   }
 }

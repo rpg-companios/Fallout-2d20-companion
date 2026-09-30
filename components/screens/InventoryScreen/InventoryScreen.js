@@ -10,6 +10,9 @@ import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
 import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
+// 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
+// «Починить» больше не чинят мгновенно и бесплатно).
+import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
 import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
@@ -134,8 +137,6 @@ const InventoryScreen = () => {
   const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
   const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
   const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
-  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
-  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
   // минуя фасад useCharacter().
   const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
@@ -151,6 +152,8 @@ const InventoryScreen = () => {
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+  // 413: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name).
+  const [repairTarget, setRepairTarget] = useState(null);
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
@@ -1468,7 +1471,7 @@ const InventoryScreen = () => {
             {item.showRepair && (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
                 <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
               </TouchableOpacity>
             )}
@@ -1651,7 +1654,7 @@ const InventoryScreen = () => {
           {showWeaponRepair && (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairWeapon(item.id)}>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
               </TouchableOpacity>
           )}
@@ -1659,7 +1662,7 @@ const InventoryScreen = () => {
           {showPARepair && (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairPowerArmorStack(item.id)}>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
               </TouchableOpacity>
           )}
@@ -1876,6 +1879,12 @@ const InventoryScreen = () => {
           visible={isCraftModalVisible}
           onClose={() => setCraftModalVisible(false)}
         />
+        {repairTarget != null && (
+          <RepairModal
+            target={repairTarget}
+            onClose={() => setRepairTarget(null)}
+          />
+        )}
         <BuyItemModal
           visible={isBuyItemModalVisible}
           onClose={() => {
