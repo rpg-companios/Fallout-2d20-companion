@@ -1,0 +1,1140 @@
+diff --git a/__tests__/perks/perks-book-priority-410.test.js b/__tests__/perks/perks-book-priority-410.test.js
+new file mode 100644
+index 0000000..9e44156
+--- /dev/null
++++ b/__tests__/perks/perks-book-priority-410.test.js
+@@ -0,0 +1,89 @@
++// ПРИЁМОЧНЫЙ (патч 410): «книга приоритетнее» (слово владельца) — ранги и
++// требования всех перков сверены с fallout2d20_perks_notepad. Правила:
++// 1) maxRanks = книга; 2) если описание книги упоминает ранг ВЫШЕ maxRank
++// («в книге по рангам могут быть ошибки») — берём из описания; 3) у трёх
++// открывателей модов (Бронник/НАУКА!/Фанат оружия) описания «и т.д.»
++// продолжают ряд до 4-го ранга модов — держим 4 (иначе рецепты 4-го ранга
++// недостижимы); 4) требования = книга (атрибуты/уровень/шаг), уровневый
++// шаг сверён с текстом «требование к уровню увеличивается на N».
++// Механика по книге: Фармацевт +2/+3/+4 антирада, Мощный пользователь
++// +3/+6/+10 зарядов (по рангам).
++import { describe, expect, it } from 'vitest';
++import notepad from '../../docs/reference-data/fallout2d20_perks_notepad.json';
++import perksMapping from '../../docs/reference-data/perks_mapping.json';
++import catalog from '../../modules/fallout/data/perks/perks.json';
++import recipesIndex from '../../modules/fallout/data/recipes/index.json';
++import { readFileSync } from 'node:fs';
++import { perkEffects } from '../../domain/perks/index';
++import { resolve } from 'node:path';
++
++const app2my = new Map(
++  perksMapping.matched.filter((m) => m && m.myId).map((m) => [m.appId, m.myId]),
++);
++const byId = (list) => new Map(list.map((p) => [p.id, p]));
++const MOD_UNLOCK_TRIO = new Set(['armorer', 'science', 'gunNut']);
++
++const impliedRanks = (desc) => {
++  const a = (String(desc).match(/[Нн]а\s+(\d+)[- ]?(?:м ранге|ранге|\s+ранге)/g) || [])
++    .map((s) => parseInt(s.replace(/\D+/g, ''), 10));
++  const b = (String(desc).match(/(\d+)[-й ]+ранг(?:а)?\s+открывает/g) || [])
++    .map((s) => parseInt(s.replace(/\D+/g, ''), 10));
++  return Math.max(0, ...a, ...b);
++};
++
++describe('Патч 410: ранги — книга (описания старше чисел maxRank)', () => {
++  it('у каждого перка maxRanks = max(книга, ранг из описания); мод-тройка держит 4', () => {
++    for (const [appId, myId] of app2my) {
++      const ref = notepad.perks.find((p) => p.id === myId);
++      const ours = catalog.find((p) => p.id === appId);
++      expect(ref, appId).toBeTruthy();
++      expect(ours, appId).toBeTruthy();
++      const expected = Math.max(
++        ref.maxRank || 1,
++        impliedRanks(ref.description || ''),
++        MOD_UNLOCK_TRIO.has(appId) ? 4 : 0,
++      );
++      expect(ours.maxRanks, appId).toBe(expected);
++    }
++  });
++
++  it('ключевые случаи книги: Патронщик 3, Мисс Удача шаг 5, Гулеподобный 3, Крепкий хребет 1', () => {
++    const c = byId(catalog);
++    expect(c.get('ammosmith').maxRanks).toBe(3);
++    expect(c.get('ammosmith').prerequisites).toMatchObject({ special: { INT: 7 }, level: 2, levelIncreasePerRank: 4 });
++    expect(c.get('missFortune').prerequisites).toMatchObject({ special: { LCK: 6 }, level: 10, levelIncreasePerRank: 5 });
++    expect(c.get('ghoulish').maxRanks).toBe(3);
++    expect(c.get('ghoulish').prerequisites).toMatchObject({ special: { END: 9 }, level: 7, levelIncreasePerRank: 8 });
++    expect(c.get('strongBack').maxRanks).toBe(1);
++    // мод-тройка: описания «и т.д.» — ранги до 4-го (рецепты модов живы)
++    for (const id of MOD_UNLOCK_TRIO) {
++      expect(c.get(id).maxRanks).toBe(4);
++    }
++  });
++
++  it('ни один рецепт не требует ранг перка выше доступного', () => {
++    const c = byId(catalog);
++    for (const entry of recipesIndex.recipes) {
++      const file = JSON.parse(
++        readFileSync(resolve(__dirname, '../../modules/fallout/data/recipes', entry.file), 'utf8'),
++      );
++      for (const recipe of file) {
++        for (const perk of recipe.requires?.perks ?? []) {
++          const maxRanks = c.get(perk.perkId)?.maxRanks ?? 1;
++          expect(maxRanks, `${recipe.id}: ${perk.perkId} rank ${perk.rank}`).toBeGreaterThanOrEqual(perk.rank || 1);
++        }
++      }
++    }
++  });
++
++  it('механика по книге: Фармацевт 2/3/4 антирада, Мощный пользователь 3/6/10 зарядов', () => {
++    expect(perkEffects.pharmacist.apply({ state: { rank: 2 } }))
++      .toEqual({ antiradRadiationBonus: 3 });
++    expect(perkEffects.pharmacist.apply({ state: { rank: 3 } }))
++      .toEqual({ antiradRadiationBonus: 4 });
++    expect(perkEffects.powerUser.apply({ state: { rank: 2 } }))
++      .toEqual({ fusionCoreChargeBonus: 6 });
++    expect(perkEffects.powerUser.apply({ state: { rank: 3 } }))
++      .toEqual({ fusionCoreChargeBonus: 10 });
++  });
++});
+diff --git a/__tests__/perks/perks-canon-409.test.js b/__tests__/perks/perks-canon-409.test.js
+index 8d60944..3c942e0 100644
+--- a/__tests__/perks/perks-canon-409.test.js
++++ b/__tests__/perks/perks-canon-409.test.js
+@@ -1,9 +1,8 @@
+ // ПРИЁМОЧНЫЙ (патч 409): контрольная сверка каталога перков с референсом
+ // владельца (fallout2d20_perks_notepad). Русские имена и тексты — дословно
+ // из perks_catalog_ru (канон владельца, совпадает с notepad по существу);
+-// три перка (Полевой хирург, Фармацевт, Мощный пользователь) несут тексты
+-// по одобренному слову владельца — книжный текст противоречит работающей
+-// механике (см. отчёт сверки). Кровосос: пакет крови поднимает Жажду на
++// 410: исключений больше нет — «книга приоритетнее», все 185 текстов =
++// perks_catalog_ru дословно. Кровосос: пакет крови поднимает Жажду на
+ // ступень (книга; +1 к ступеням напитка).
+ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -15,7 +14,6 @@ import perksMapping from '../../docs/reference-data/perks_mapping.json';
+ import { createSurvivalState, consumeDrink } from '../../modules/fallout/survival/survival';
+ 
+ const state = () => useCharacterStore.getState();
+-const overrides = new Set(['fieldSurgeon', 'pharmacist', 'powerUser']);
+ 
+ describe('Патч 409: канон текстов — каталог владельца', () => {
+   it('все 185 перков: имя и текст дословно из catalog_ru (кроме трёх по слову владельца)', () => {
+@@ -25,12 +23,7 @@ describe('Патч 409: канон текстов — каталог владе
+       const c = canon.get(entry.id);
+       expect(c, entry.id).toBeTruthy();
+       expect(entry.name, `${entry.id}.name`).toBe(c.name);
+-      if (overrides.has(entry.id)) {
+-        expect(entry.effect.length, entry.id).toBeGreaterThan(0);
+-        expect(entry.effect, entry.id).not.toBe(c.effect); // не книжный текст
+-      } else {
+-        expect(entry.effect, `${entry.id}.effect`).toBe(c.effect);
+-      }
++      expect(entry.effect, `${entry.id}.effect`).toBe(c.effect);
+       if (c.rankEffects) {
+         expect(entry.rankEffects, `${entry.id}.rankEffects`).toEqual(c.rankEffects);
+       }
+diff --git a/__tests__/perks/perks-engine-406.test.js b/__tests__/perks/perks-engine-406.test.js
+index 893ee54..70df54b 100644
+--- a/__tests__/perks/perks-engine-406.test.js
++++ b/__tests__/perks/perks-engine-406.test.js
+@@ -40,8 +40,8 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
+   it('все одиннадцать перков кладут свои ключи', () => {
+     const cases = {
+       fieldSurgeon: { stimpakHpBonus: 3, antiradRadiationBonus: 1 },
+-      pharmacist: { antiradRadiationBonus: 1 },
+-      powerUser: { fusionCoreChargeBonus: 1 },
++      pharmacist: { antiradRadiationBonus: 2 },
++      powerUser: { fusionCoreChargeBonus: 3 },
+       capCollector: { capCollectorDiscountPercent: 10 },
+       naturalResistance: { sleepOnGroundDiseaseImmune: true },
+       rejuvenated: { rejuvenatedSatedMaxHp: 2, ladderAccRates: { food: 0.5, water: 0.5 } },
+@@ -54,22 +54,27 @@ describe('Патч 406: перк-бонусы и их слияние', () => {
+       const bonuses = selectPerkBonuses({ selectedPerks: [{ id, rank: 1 }] }, perksCatalog);
+       expect(bonuses, id).toMatchObject(expected);
+     }
++    // 410: книжные нормы по рангам — Фармацевт 2/3/4, Мощный 3/6/10.
++    expect(selectPerkBonuses({ selectedPerks: [{ id: 'pharmacist', rank: 3 }] }, perksCatalog))
++      .toMatchObject({ antiradRadiationBonus: 4 });
++    expect(selectPerkBonuses({ selectedPerks: [{ id: 'powerUser', rank: 3 }] }, perksCatalog))
++      .toMatchObject({ fusionCoreChargeBonus: 10 });
+     const blood = selectPerkBonuses({ selectedPerks: [{ id: 'bloodsucker', rank: 1 }] }, perksCatalog);
+     expect(blood.bloodPackHealMultiplier).toBe(2);
+     expect(blood.bloodPackDrinkIds).toContain('drink_blood_pack');
+   });
+ 
+-  it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: +4 заряда', () => {
++  it('Полевой хирург + Фармацевт: антирад складывается; Физик-ядерщик + Power User: заряды по книге', () => {
+     const bonuses = selectPerkBonuses(
+       { selectedPerks: [{ id: 'fieldSurgeon', rank: 1 }, { id: 'pharmacist', rank: 1 }] },
+       perksCatalog,
+     );
+-    expect(bonuses.antiradRadiationBonus).toBe(2);
++    expect(bonuses.antiradRadiationBonus).toBe(3); // +1 хирург + 2 фармацевт
+     const cores = selectPerkBonuses(
+       { selectedPerks: [{ id: 'nuclearPhysicist', rank: 1 }, { id: 'powerUser', rank: 1 }] },
+       perksCatalog,
+     );
+-    expect(cores.fusionCoreChargeBonus).toBe(4); // 3 + 1
++    expect(cores.fusionCoreChargeBonus).toBe(6); // 3 (ядерщик) + 3 (книга, ранг 1)
+   });
+ });
+ 
+diff --git a/__tests__/perks/perks-expansion-403.test.js b/__tests__/perks/perks-expansion-403.test.js
+index 5583b43..17dd589 100644
+--- a/__tests__/perks/perks-expansion-403.test.js
++++ b/__tests__/perks/perks-expansion-403.test.js
+@@ -27,12 +27,16 @@ describe('патч 403: пополнение перков по референс
+     expect(new Set(en.map((p) => p.id))).toEqual(new Set(catalog.map((p) => p.id)));
+   });
+ 
+-  it('8 новых: требования и ранги — точная копия референса structure', () => {
++  it('8 новых: требования и ранги — structure, с 410 поправлено на книгу (Мисс Удача +5/ранг)', () => {
+     const st = byId(structure);
+     const cat = byId(catalog);
++    // 410 (слово владельца: «книга приоритетнее»): требования из notepad.
++    const BOOK_OVERRIDES = {
++      missFortune: { ...st.missFortune.prerequisites, levelIncreasePerRank: 5 },
++    };
+     for (const id of NEW_IDS) {
+       expect(cat[id].maxRanks).toBe(st[id].maxRanks);
+-      expect(cat[id].prerequisites).toEqual(st[id].prerequisites);
++      expect(cat[id].prerequisites).toEqual(BOOK_OVERRIDES[id] ?? st[id].prerequisites);
+       expect(cat[id].effectKey).toBe(`perks.${id}.effect`);
+       expect(cat[id].nameKey).toBe(`perks.${id}.name`);
+     }
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index df1de9a..c53f0d6 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (409)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **409** (КОНТРОЛЬНАЯ СВЕРКА по слову владельца: он добавил на main f99db52 docs/reference-data/fallout2d20_perks_notepad.json — «описания перков всех что я знаю»). ФАКТ: notepad ПОБАЙТОВО равен fallout2d20_perks (1).json (184 перка, f2-схема) — сверка прошла по полному набору. Итог: покрытие 184+emt=185 ЦЕЛОЕ; у ~123 перков в ru-i18n оставались КРАТКИЕ АНГЛИЙСКИЕ АННОТАЦИИ (наследие до-403) — теперь ИМЕНА И ТЕКСТЫ ВСЕХ 185 = perks_catalog_ru дословно (87 имён + 81 текст обновлены; catalog_ru ↔ notepad: 136 точных, 44 различия ТОЛЬКО оформления — кавычки/{/CD}/маркеры); латинских имён в ru больше нет (АММОСМИТ, ФАНАТ КОЛЫ, КРОВОСОС, ВОДОХЛЁБ…). ТРИ ИСКЛЮЧЕНИЯ — тексты по одобренному слову владельца (406), книжный текст противоречит работающей механике: Полевой хирург (книга: 3 ОЗ за ОД первой помощи), Фармацевт (книга: +2/+3/+4 по рангам), Мощный пользователь (книга: +3/+6/+10) — в приложении +3 ОЗ/+1 антирад, +1 антирад, +1 заряд. ЗАЩЁЛКА tests/perks-canon-409: все 185 == catalog_ru (кроме 3), notepad кроется приложением. РАНГИ/ТРЕБОВАНИЯ: 44 перка ранги и 53 требования расходятся notepad↔приложение — СОЗНАТЕЛЬНО, слово владельца 403 «ранги и требования — без изменений, как в приложении» + perks_discrepancies «значения НЕ менять»; владельцу предложил переключить канон по его слову. Механика 43 действующих сверена с notepad: Варвар (ступени СИЛ 7/9/11) и др. — точно; ДОБАВЛЕНО Кровососу: пакет крови поднимает Жажду на +1 ступень сверх напитка (книга; через survivalPerkOptions(item)). Нюанс: Химик — книга «созданные вами препараты», в приложении ×2 для ВСЕХ препаратов (слово владельца 406) · предыдущий: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
++Снимок: **2026-09-30 (410)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **410** (слово владельца: «книга приоритетнее, в книге по рангам могут быть ошибки, ориентируемся на описания» — ОТМЕНЯЕТ правило 403 «ранги и требования как в приложении»). Применено: maxRanks = max(книга, ранг из описания, для тройки открывателей модов 4); требования (атрибуты/уровень/шаг) = notepad, шаг сверен с текстом «требование к уровню увеличивается на N». Изменено: 45 рангов (Патронщик 1→3 — чинит РЕАЛЬНУЮ недостижимость рецептов 2–3 ранга!; Крепкий хребет 3→1; Мохавский... нет — 44 одноранговых → книжные 2–3; Бронник/НАУКА!/Фанат оружия остались 4: описания «и т.д.» + рецепты 4-го ранга), 48 требований (Мисс Удача +5, Осмотрительный ЛОВ8/уровень 3, Ночной глаз уровень 8, Стабилизированный ИНТ6/ур.5, Везунчик ХАР8+ИНТ8/ур.15, Дерзкий ЛОВ8…). ЗАЩЁЛКА perks-book-priority-410: maxRanks=max(книга, описание) для всех 185 + рецепты не выше рангов. МЕХАНИКА по книге: Фармацевт +2/+3/+4 антирада (было +1), Мощный пользователь +3/+6/+10 заряда (было +1) — по рангам; тексты трёх исключений = книжные (теперь ВСЕ 185 == catalog_ru, 409-защёлка без overrides). Остальные 40 механических перков сверены — расхождений с описаниями нет · предыдущий: **409** (КОНТРОЛЬНАЯ СВЕРКА по слову владельца: он добавил на main f99db52 docs/reference-data/fallout2d20_perks_notepad.json — «описания перков всех что я знаю»). ФАКТ: notepad ПОБАЙТОВО равен fallout2d20_perks (1).json (184 перка, f2-схема) — сверка прошла по полному набору. Итог: покрытие 184+emt=185 ЦЕЛОЕ; у ~123 перков в ru-i18n оставались КРАТКИЕ АНГЛИЙСКИЕ АННОТАЦИИ (наследие до-403) — теперь ИМЕНА И ТЕКСТЫ ВСЕХ 185 = perks_catalog_ru дословно (87 имён + 81 текст обновлены; catalog_ru ↔ notepad: 136 точных, 44 различия ТОЛЬКО оформления — кавычки/{/CD}/маркеры); латинских имён в ru больше нет (АММОСМИТ, ФАНАТ КОЛЫ, КРОВОСОС, ВОДОХЛЁБ…). ТРИ ИСКЛЮЧЕНИЯ — тексты по одобренному слову владельца (406), книжный текст противоречит работающей механике: Полевой хирург (книга: 3 ОЗ за ОД первой помощи), Фармацевт (книга: +2/+3/+4 по рангам), Мощный пользователь (книга: +3/+6/+10) — в приложении +3 ОЗ/+1 антирад, +1 антирад, +1 заряд. ЗАЩЁЛКА tests/perks-canon-409: все 185 == catalog_ru (кроме 3), notepad кроется приложением. РАНГИ/ТРЕБОВАНИЯ: 44 перка ранги и 53 требования расходятся notepad↔приложение — СОЗНАТЕЛЬНО, слово владельца 403 «ранги и требования — без изменений, как в приложении» + perks_discrepancies «значения НЕ менять»; владельцу предложил переключить канон по его слову. Механика 43 действующих сверена с notepad: Варвар (ступени СИЛ 7/9/11) и др. — точно; ДОБАВЛЕНО Кровососу: пакет крови поднимает Жажду на +1 ступень сверх напитка (книга; через survivalPerkOptions(item)). Нюанс: Химик — книга «созданные вами препараты», в приложении ×2 для ВСЕХ препаратов (слово владельца 406) · предыдущий: **408** (владелец дал КАНОНИЧЕСКИЙ текст ГУЛЕПОДОБНОГО — он переопределил механику 407). ПЕРК 3 РАНГОВ (maxRanks 3, шаг уровня +8, END 9/уровень 7 как было); радиация теперь ДЕЙСТВУЕТ КАК ОБЫЧНО (счётчик растёт — в 407 я ошибочно гасил рост), перк ДОБАВЛЯЕТ лечение: 1 ОЗ за каждые N ПОЛУЧЕННЫХ единиц (N=4/3/2 по рангу, floor; полученные = после гурманской скидки и клампа дном). Норма считается в двух точках с одним законом: resolveConsumable-VitalChanges (еды/питьё/химия — видна в отчёте об употреблении) и setRadiation (ручные движения счётчика); конвейер зовёт setRadiation с {skipGhoulishHeal:true} — без дубля. Снятие радиации нормы не даёт. «Макс. ОЗ по-прежнему снижается» — в приложении радиация НЕ снижает Макс.ОЗ вообще (счётчик-трекер, поведение общесистемное) — владельцу сказано честно. ru-текст = дословный канон, en — синхронный перевод; имя ГУЛЕПОДОБНЫЙ с 407. Урок: канонический текст перка сильнее ранней устной договорённости — при расхождении переспрашивать/править · предыдущий: **407** (уточнения владельца по 406). (1) ГУЛЕПОДОБНЫЙ — каноничное русское имя перка ghoulish (было латиницей; остальные латинские имена ru-i18n — отдельный заход по слову). (2) Перек теперь конвертирует ЛЮБОЙ подъём радиации в лечение Текущих ОЗ — включая РУЧНОЕ изменение счётчика (setRadiation: рост перехватывается, счётчик не растёт, лечение до потолка; спад — как обычно). Двойного лечения с конвейером расходников нет: там радиация уже не растёт, setRadiation видит нулевую дельту. (3) Светящийся пакет крови получил записанную механику: +5 Рад.СУ до конца сцены (positiveEffect.damageResistanceModifier, формат как у Рад-Икса; timed-эффект плоский {type,op,value}); лечение 4 ОЗ сохранено (hpHealed), Кровопийца ×2 поверх. (4) РАСКЛАД КАТАЛОГА закреплён тестом: явная механика 43 из 185 (37 реестра apply + 7 гейтов рецептов − 1 пересечение ХИМИК), описательных 142 · предыдущий: **406** (владелец раскрыл механики спорных перков — «Приблизительно понимаешь?»). Реализовано 11 перков. Гуль: прибавка радиации от еды/питья вместо вреда лечит те же ОЗ (в сторе радиация не снижает Макс.ОЗ — вред = счётчик). Кровопийца: пакеты крови УЖЕ БЫЛИ в каталоге (drink_blood_pack/glowing/irradiated, старое поле hpHealed — конвейер ест), лечение ×2 по id-списку. Super Duper: бросок боевого кубика при каждом создании (порт superDuperRoll), Эффект → возврат floor(половина) каждой строки потраченного через addNewItem, строки отчёта superDuperReturned/superDuperNothing. Омолодившийся: +2 Макс.ОЗ на высшей ступени сытости (SURVIVAL_LADDER_MAX.food=5; флаг wellFed в deriveFromSnapshot; пересчёт ТОЧЕЧНЫЙ в setStateExtension('survival') при активном перке — глобальный ключ stateExtensions в DERIVED_INPUT_KEYS ломал слайс-тест 209 двойным уведомлением) + лестницы еды/воды спускаются вдвое медленнее (TickOptions.ladderAccRates, в т.ч. во сне через RestOptions). Мохавский верблюд: consumeDrink extraWaterSteps (обычный +2, purified +3). Полевой хирург: стимпак +3 ОЗ (префикс chem_stimpak), антирад +1; Фармацевт антирад +1 (merge складывает). Power User +1 заряд (сложится с ядерщиком = 4). Коллекционер крышек: окно покупки предзаполняет цену ×0.9. Естественная стойкость: сон в пустоши без проверки болезни (diseaseRiskResult={skipped}). ХИМИК: вторая половина — scaleDuration ×2 для positiveEffectDuration химии (lasting → 2 сцены). Урок 406: useCharacterStore.setState МИНУЕТ каскад производных — в тестах только экшены (setSelectedPerks/setStateExtension) · предыдущий: **405** (вопрос владельца «ты уверен, что 4 перка?» вскрыл две недоработки 404 — текст перка источник, перечитывать ДО реализации). (1) Заряжай и стреляй: восстановлено условие книги «скорострельность 2 ИЛИ ВЫШЕ» — медленное тяжёлое (Толстяк 0, Мусорный джет 1, гранатомёты-одиночки) НЕ усиливается; граница = автогранатомёт (2); скорострельность берётся с модами. (2) В сияющих доспехах ранг 2: я ошибочно записал его «боевым текстом» — на деле это ещё стат-бонус: в светозащитной оптике энергоСУ +1 (в каталоге только Щиток сварщика headwear_welding_mask; «Солнцезащитные очки» книги в снаряжении НЕТ — список GLARE_OPTICS_IDS расширяемый); металл+оптика+ранг2 = +3. Ревизия перков по требованию владельца: 26 автоматических перков — у ВСЕХ ключи имеют потребителей (derivedStats 8, foundItemBonus 5, orchestratorsSlice 6, крафт/оружие/экраны/сейвы 7), сирот нет; остальные 4 из восьми (Хромоножка — сложность атаки по ногам, Сокрушительный удар — сбит с ног от эффектов урона, Свирепая преданность — бонус СОЮЗНИКУ при вашем Увечье, Мисс Удача — d20-таблица по врагу в бою) живут в сцене боя, которую приложение не считает — только текст. Урок 405: «частично адаптируем» проверять ПОЛНОСТЬЮ по рангам, а условие «когда…» в тексте перка — часть механики, не тонкость · предыдущий: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+ fallout2d20_perks (1) (184: структурированные op/modifier/when),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b2fd0f7..a5f163f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,19 @@
+ # Changelog
++---
++## Perks follow the book (patch 410)
++
++By your word «the book takes priority», all perk ranks and
++requirements now match the book, guided by its descriptions wherever
++the rank number itself looked wrong. Result: 45 perks got book ranks
++(Ammosmith all 3 — this also fixed ammo recipes of rarity 2–3 that
++were unreachable before), 48 perks got book requirements (level, step
++per rank, attributes). The Pharmacist now removes +2/+3/+4 radiation
++by rank, Power User grants +3/+6/+10 charges — exactly per the book.
++Armorer, Science and Gun Nut keep 4 ranks: their descriptions
++(«and so on») continue the series to mod rank 4, otherwise rank-4 mod
++recipes would be lost. «Whatever the description says is what works»
++is now pinned by a test.
++
+ ---
+ ## Perk audit against your list (patch 409)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8eef805..e99c5af 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,20 @@
+ # История изменений
+ 
++---
++## Перки — по книге (патч 410)
++
++По вашему слову «книга приоритетнее» перевели ранги и требования всех
++перков на книжные значения, а там, где у книги сомнителен сам номер
++ранга, шли по её описаниям. Итог: 45 перков получили книжные ранги
++(Патронщик — все 3, как в книге; заодно это починило рецепты патронов
++2-й и 3-й редкости, которые раньше были недостижимы), 48 перков —
++книжные требования (уровень, шаг за ранг, характеристики). Фармацевт
++теперь снимает +2/+3/+4 радиации по рангам, Мощный пользователь даёт
+++3/+6/+10 зарядов — ровно по книгам. У Бронника, НАУКИ! и Фаната
++оружия оставили 4 ранга: их описания («…и так далее») продолжают ряд
++до 4-го ранга модов, иначе рецепты модов 4-го ранга терялись бы.
++«Что написано в описании — то и работает» закреплено проверкой.
++
+ ---
+ ## Сверка перков с вашим списком (патч 409)
+ 
+diff --git a/domain/perks/pharmacist.js b/domain/perks/pharmacist.js
+index 3b0624e..697b7d3 100644
+--- a/domain/perks/pharmacist.js
++++ b/domain/perks/pharmacist.js
+@@ -1,10 +1,16 @@
+ // domain/perks/pharmacist.js
+-// Фармацевт (406): Рад-а-вей снимает на 1 радиацию больше
+-// (складывается с «Полевым хирургом» через mergePerkBonuses).
++// ФАРМАЦЕВТ (канон, приоритет книги 410): Антирадин, применённый вами,
++// снимает больше радиации — по рангам перка: +2 / +3 / +4.
++// Складывается с «Полевым хирургом» (+1) через mergePerkBonuses.
++
++export const pharmacistAntiradBonusByRank = (rank) => {
++  const r = Math.max(1, Number(rank) || 1);
++  return [2, 3, 4][Math.min(r, 3) - 1];
++};
+ 
+ export const pharmacistPerk = {
+   id: 'pharmacist',
+-  apply() {
+-    return { antiradRadiationBonus: 1 };
++  apply(ctx) {
++    return { antiradRadiationBonus: pharmacistAntiradBonusByRank(ctx.state.rank || 1) };
+   },
+ };
+diff --git a/domain/perks/powerUser.js b/domain/perks/powerUser.js
+index 380adfe..a4a33d1 100644
+--- a/domain/perks/powerUser.js
++++ b/domain/perks/powerUser.js
+@@ -1,10 +1,16 @@
+ // domain/perks/powerUser.js
+-// Power User (406): энергоядро при получении держит +1 заряд
+-// (складывается с «Физиком-ядерщиком»: 3 + 1 = 4).
++// МОЩНЫЙ ПОЛЬЗОВАТЕЛЬ (канон, приоритет книги 410): энергоядра содержат
++// больше зарядов — по рангам перка: +3 / +6 / +10.
++// Складывается с «Физиком-ядерщиком» (+3) через mergePerkBonuses.
++
++export const powerUserChargesByRank = (rank) => {
++  const r = Math.max(1, Number(rank) || 1);
++  return [3, 6, 10][Math.min(r, 3) - 1];
++};
+ 
+ export const powerUserPerk = {
+   id: 'powerUser',
+-  apply() {
+-    return { fusionCoreChargeBonus: 1 };
++  apply(ctx) {
++    return { fusionCoreChargeBonus: powerUserChargesByRank(ctx.state.rank || 1) };
+   },
+ };
+diff --git a/modules/fallout/data/perks/perks.json b/modules/fallout/data/perks/perks.json
+index a2b4578..faa9136 100644
+--- a/modules/fallout/data/perks/perks.json
++++ b/modules/fallout/data/perks/perks.json
+@@ -30,12 +30,12 @@
+   {
+     "id": "radResistant",
+     "nameKey": "perks.radResistant.name",
+-    "maxRanks": 2,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+-        "END": 8
++        "END": 6
+       },
+-      "level": 1,
++      "level": 2,
+       "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.radResistant.effect",
+@@ -525,7 +525,7 @@
+   {
+     "id": "fastHealer",
+     "nameKey": "perks.fastHealer.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "END": 6
+@@ -573,7 +573,8 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "PER": 8
++        "PER": 6,
++        "LCK": 6
+       }
+     },
+     "effectKey": "perks.infiltrator.effect",
+@@ -585,8 +586,10 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "INT": 8
+-      }
++        "INT": 7
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.nurse.effect",
+     "effect": "nurse"
+@@ -611,8 +614,7 @@
+     "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+-        "STR": 9,
+-        "END": 7
++        "STR": 6
+       },
+       "level": 1,
+       "levelIncreasePerRank": 5
+@@ -690,7 +692,7 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "LCK": 7
++        "LCK": 5
+       },
+       "excludedPerks": [
+         "cautiousNature"
+@@ -800,12 +802,13 @@
+   {
+     "id": "pathfinder",
+     "nameKey": "perks.pathfinder.name",
+-    "maxRanks": 1,
++    "maxRanks": 5,
+     "prerequisites": {
+       "special": {
+         "PER": 6,
+         "END": 6
+-      }
++      },
++      "level": 5
+     },
+     "effectKey": "perks.pathfinder.effect",
+     "effect": "pathfinder"
+@@ -934,7 +937,7 @@
+   {
+     "id": "strongBack",
+     "nameKey": "perks.strongBack.name",
+-    "maxRanks": 3,
++    "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+         "STR": 5
+@@ -1028,7 +1031,7 @@
+   {
+     "id": "sniper",
+     "nameKey": "perks.sniper.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "PER": 8,
+@@ -1130,7 +1133,7 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "CHA": 8
++        "LCK": 8
+       }
+     },
+     "effectKey": "perks.killer.effect",
+@@ -1201,12 +1204,13 @@
+   {
+     "id": "ammosmith",
+     "nameKey": "perks.ammosmith.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "INT": 7
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.ammosmith.effect",
+     "effect": "ammosmith"
+@@ -1214,12 +1218,13 @@
+   {
+     "id": "archer",
+     "nameKey": "perks.archer.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "PER": 6
+       },
+-      "level": 1
++      "level": 1,
++      "levelIncreasePerRank": 7
+     },
+     "effectKey": "perks.archer.effect",
+     "effect": "archer"
+@@ -1227,11 +1232,13 @@
+   {
+     "id": "blocker",
+     "nameKey": "perks.blocker.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 6
+-      }
++      },
++      "level": 1,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.blocker.effect",
+     "effect": "blocker"
+@@ -1265,12 +1272,13 @@
+   {
+     "id": "bornSurvivor",
+     "nameKey": "perks.bornSurvivor.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "AGI": 8
+       },
+-      "level": 3
++      "level": 3,
++      "levelIncreasePerRank": 8
+     },
+     "effectKey": "perks.bornSurvivor.effect",
+     "effect": "bornSurvivor"
+@@ -1291,12 +1299,13 @@
+   {
+     "id": "bulletShield",
+     "nameKey": "perks.bulletShield.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 8
+       },
+-      "level": 8
++      "level": 8,
++      "levelIncreasePerRank": 6
+     },
+     "effectKey": "perks.bulletShield.effect",
+     "effect": "bulletShield"
+@@ -1304,12 +1313,13 @@
+   {
+     "id": "butchersBounty",
+     "nameKey": "perks.butchersBounty.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "PER": 8
+       },
+-      "level": 3
++      "level": 3,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.butchersBounty.effect",
+     "effect": "butchersBounty"
+@@ -1317,13 +1327,14 @@
+   {
+     "id": "cannibal",
+     "nameKey": "perks.cannibal.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "END": 8
+       },
+       "level": 10,
+-      "notForRobots": true
++      "notForRobots": true,
++      "levelIncreasePerRank": 9
+     },
+     "effectKey": "perks.cannibal.effect",
+     "effect": "cannibal"
+@@ -1357,12 +1368,14 @@
+   {
+     "id": "communityOrganizer",
+     "nameKey": "perks.communityOrganizer.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 5,
+         "END": 5
+-      }
++      },
++      "level": 1,
++      "levelIncreasePerRank": 3
+     },
+     "effectKey": "perks.communityOrganizer.effect",
+     "effect": "communityOrganizer"
+@@ -1370,13 +1383,14 @@
+   {
+     "id": "contractor",
+     "nameKey": "perks.contractor.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 5,
+         "INT": 5
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.contractor.effect",
+     "effect": "contractor"
+@@ -1412,9 +1426,9 @@
+     "maxRanks": 1,
+     "prerequisites": {
+       "special": {
+-        "AGI": 7
++        "AGI": 8
+       },
+-      "level": 8
++      "level": 3
+     },
+     "effectKey": "perks.deadManSprinting.effect",
+     "effect": "deadManSprinting"
+@@ -1500,7 +1514,7 @@
+   {
+     "id": "fieldSurgeon",
+     "nameKey": "perks.fieldSurgeon.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 8,
+@@ -1527,12 +1541,13 @@
+   {
+     "id": "fireproof",
+     "nameKey": "perks.fireproof.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "END": 6
+       },
+-      "level": 7
++      "level": 7,
++      "levelIncreasePerRank": 7
+     },
+     "effectKey": "perks.fireproof.effect",
+     "effect": "fireproof"
+@@ -1555,12 +1570,13 @@
+   {
+     "id": "gladiator",
+     "nameKey": "perks.gladiator.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 6
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.gladiator.effect",
+     "effect": "gladiator"
+@@ -1568,12 +1584,13 @@
+   {
+     "id": "glowSight",
+     "nameKey": "perks.glowSight.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "PER": 8
+       },
+-      "level": 3
++      "level": 8,
++      "levelIncreasePerRank": 8
+     },
+     "effectKey": "perks.glowSight.effect",
+     "effect": "glowSight"
+@@ -1581,12 +1598,13 @@
+   {
+     "id": "goatLegs",
+     "nameKey": "perks.goatLegs.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "AGI": 7
+       },
+-      "level": 7
++      "level": 7,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.goatLegs.effect",
+     "effect": "goatLegs"
+@@ -1620,13 +1638,14 @@
+   {
+     "id": "happyCamper",
+     "nameKey": "perks.happyCamper.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "CHA": 7,
+         "END": 6
+       },
+-      "level": 3
++      "level": 3,
++      "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.happyCamper.effect",
+     "effect": "happyCamper"
+@@ -1634,12 +1653,14 @@
+   {
+     "id": "happyGoLucky",
+     "nameKey": "perks.happyGoLucky.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+-        "CHA": 9
++        "CHA": 8,
++        "INT": 8
+       },
+-      "level": 17
++      "level": 15,
++      "levelIncreasePerRank": 6
+     },
+     "effectKey": "perks.happyGoLucky.effect",
+     "effect": "happyGoLucky"
+@@ -1673,12 +1694,13 @@
+   {
+     "id": "homeDefense",
+     "nameKey": "perks.homeDefense.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "INT": 6
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.homeDefense.effect",
+     "effect": "homeDefense"
+@@ -1686,12 +1708,13 @@
+   {
+     "id": "homebody",
+     "nameKey": "perks.homebody.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "END": 6
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.homebody.effect",
+     "effect": "homebody"
+@@ -1699,12 +1722,13 @@
+   {
+     "id": "incisor",
+     "nameKey": "perks.incisor.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 6
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 9
+     },
+     "effectKey": "perks.incisor.effect",
+     "effect": "incisor"
+@@ -1712,12 +1736,13 @@
+   {
+     "id": "ironclad",
+     "nameKey": "perks.ironclad.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "END": 7
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.ironclad.effect",
+     "effect": "ironclad"
+@@ -1725,12 +1750,13 @@
+   {
+     "id": "junkShield",
+     "nameKey": "perks.junkShield.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "LCK": 7
+       },
+-      "level": 1
++      "level": 1,
++      "levelIncreasePerRank": 8
+     },
+     "effectKey": "perks.junkShield.effect",
+     "effect": "junkShield"
+@@ -1751,12 +1777,13 @@
+   {
+     "id": "localLeader",
+     "nameKey": "perks.localLeader.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "CHA": 6
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.localLeader.effect",
+     "effect": "localLeader"
+@@ -1764,12 +1791,13 @@
+   {
+     "id": "lockAndLoad",
+     "nameKey": "perks.lockAndLoad.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 7
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.lockAndLoad.effect",
+     "effect": "lockAndLoad"
+@@ -1820,7 +1848,8 @@
+     "prerequisites": {
+       "special": {
+         "LCK": 7
+-      }
++      },
++      "level": 1
+     },
+     "effectKey": "perks.mysteriousSavior.effect",
+     "effect": "mysteriousSavior"
+@@ -1846,7 +1875,7 @@
+       "special": {
+         "PER": 8
+       },
+-      "level": 7
++      "level": 8
+     },
+     "effectKey": "perks.nightEyes.effect",
+     "effect": "nightEyes"
+@@ -1906,12 +1935,13 @@
+   {
+     "id": "pharmacist",
+     "nameKey": "perks.pharmacist.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "INT": 8
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 6
+     },
+     "effectKey": "perks.pharmacist.effect",
+     "effect": "pharmacist"
+@@ -1919,12 +1949,13 @@
+   {
+     "id": "photosynthetic",
+     "nameKey": "perks.photosynthetic.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "END": 7
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 10
+     },
+     "effectKey": "perks.photosynthetic.effect",
+     "effect": "photosynthetic"
+@@ -1932,12 +1963,13 @@
+   {
+     "id": "powerPatcher",
+     "nameKey": "perks.powerPatcher.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "INT": 6
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 7
+     },
+     "effectKey": "perks.powerPatcher.effect",
+     "effect": "powerPatcher"
+@@ -1945,12 +1977,13 @@
+   {
+     "id": "powerUser",
+     "nameKey": "perks.powerUser.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "INT": 9
+       },
+-      "level": 10
++      "level": 10,
++      "levelIncreasePerRank": 10
+     },
+     "effectKey": "perks.powerUser.effect",
+     "effect": "powerUser"
+@@ -1958,12 +1991,13 @@
+   {
+     "id": "psychopath",
+     "nameKey": "perks.psychopath.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "LCK": 8
+       },
+-      "level": 11
++      "level": 11,
++      "levelIncreasePerRank": 6
+     },
+     "effectKey": "perks.psychopath.effect",
+     "effect": "psychopath"
+@@ -2011,13 +2045,14 @@
+   {
+     "id": "responder",
+     "nameKey": "perks.responder.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 8,
+         "INT": 7
+       },
+-      "level": 9
++      "level": 9,
++      "levelIncreasePerRank": 7
+     },
+     "effectKey": "perks.responder.effect",
+     "effect": "responder"
+@@ -2025,13 +2060,14 @@
+   {
+     "id": "retribution",
+     "nameKey": "perks.retribution.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "END": 8,
+         "LCK": 8
+       },
+-      "level": 2
++      "level": 2,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.retribution.effect",
+     "effect": "retribution"
+@@ -2077,12 +2113,13 @@
+   {
+     "id": "secretAgent",
+     "nameKey": "perks.secretAgent.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "AGI": 9
+       },
+-      "level": 7
++      "level": 7,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.secretAgent.effect",
+     "effect": "secretAgent"
+@@ -2090,12 +2127,13 @@
+   {
+     "id": "serendipity",
+     "nameKey": "perks.serendipity.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "LCK": 7
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 6
+     },
+     "effectKey": "perks.serendipity.effect",
+     "effect": "serendipity"
+@@ -2117,12 +2155,13 @@
+   {
+     "id": "spiritualHealer",
+     "nameKey": "perks.spiritualHealer.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 7
+       },
+-      "level": 6
++      "level": 6,
++      "levelIncreasePerRank": 9
+     },
+     "effectKey": "perks.spiritualHealer.effect",
+     "effect": "spiritualHealer"
+@@ -2130,7 +2169,7 @@
+   {
+     "id": "squadManeuvers",
+     "nameKey": "perks.squadManeuvers.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "CHA": 7
+@@ -2142,12 +2181,12 @@
+   {
+     "id": "stabilized",
+     "nameKey": "perks.stabilized.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+-        "INT": 7
++        "INT": 6
+       },
+-      "level": 16
++      "level": 5
+     },
+     "effectKey": "perks.stabilized.effect",
+     "effect": "stabilized"
+@@ -2168,12 +2207,13 @@
+   {
+     "id": "sturdyFrame",
+     "nameKey": "perks.sturdyFrame.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "STR": 8
+       },
+-      "level": 5
++      "level": 5,
++      "levelIncreasePerRank": 8
+     },
+     "effectKey": "perks.sturdyFrame.effect",
+     "effect": "sturdyFrame"
+@@ -2181,12 +2221,13 @@
+   {
+     "id": "superDuper",
+     "nameKey": "perks.superDuper.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "LCK": 6
+       },
+-      "level": 3
++      "level": 3,
++      "levelIncreasePerRank": 4
+     },
+     "effectKey": "perks.superDuper.effect",
+     "effect": "superDuper"
+@@ -2194,12 +2235,13 @@
+   {
+     "id": "suppressor",
+     "nameKey": "perks.suppressor.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 6
+       },
+-      "level": 10
++      "level": 10,
++      "levelIncreasePerRank": 10
+     },
+     "effectKey": "perks.suppressor.effect",
+     "effect": "suppressor"
+@@ -2221,12 +2263,13 @@
+   {
+     "id": "tenderizer",
+     "nameKey": "perks.tenderizer.name",
+-    "maxRanks": 1,
++    "maxRanks": 3,
+     "prerequisites": {
+       "special": {
+         "CHA": 7
+       },
+-      "level": 8
++      "level": 8,
++      "levelIncreasePerRank": 10
+     },
+     "effectKey": "perks.tenderizer.effect",
+     "effect": "tenderizer"
+@@ -2260,7 +2303,7 @@
+   {
+     "id": "trueFriends",
+     "nameKey": "perks.trueFriends.name",
+-    "maxRanks": 1,
++    "maxRanks": 2,
+     "prerequisites": {
+       "special": {
+         "PER": 6,
+@@ -2374,7 +2417,8 @@
+       "special": {
+         "LCK": 6
+       },
+-      "level": 10
++      "level": 10,
++      "levelIncreasePerRank": 5
+     },
+     "effectKey": "perks.missFortune.effect",
+     "effect": "missFortune"
+diff --git a/modules/fallout/i18n/ru-RU/data/perks/perks.json b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+index 6309e4f..c39e7d6 100644
+--- a/modules/fallout/i18n/ru-RU/data/perks/perks.json
++++ b/modules/fallout/i18n/ru-RU/data/perks/perks.json
+@@ -684,7 +684,7 @@
+   {
+     "id": "fieldSurgeon",
+     "name": "ПОЛЕВОЙ ХИРУРГ",
+-    "effect": "Стимпак восстанавливает на 3 ОЗ больше, а антирадин снимает на 1 единицу радиации больше."
++    "effect": "Когда вы используете Стимпак (включая Разбавленный стимпак или Суперстимпак) как часть действия «Первая помощь», вы можете восстановить 3 ОЗ за каждое потраченное ОД. Когда вы используете антирадин (включая разбавленный антирадин) как часть действия «Первая помощь», вы можете снять одну дополнительную единицу радиационного урона за каждое потраченное ОД."
+   },
+   {
+     "id": "fireInTheHole",
+@@ -839,7 +839,7 @@
+   {
+     "id": "pharmacist",
+     "name": "ФАРМАЦЕВТ",
+-    "effect": "Антирадин, применённый вами, снимает на 1 единицу радиации больше."
++    "effect": "АнтиРадин, которым вы владеете, теперь исцеляет дополнительно 2 повреждения от радиации. На втором ранге он исцеляет еще 3 урона от радиации, а на третьем - еще 4 урона от радиации. Каждый раз, когда вы берете этот перк, требование к уровню увеличивается на 6."
+   },
+   {
+     "id": "photosynthetic",
+@@ -854,7 +854,7 @@
+   {
+     "id": "powerUser",
+     "name": "МОЩНЫЙ ПОЛЬЗОВАТЕЛЬ",
+-    "effect": "Используемые вами энергоядра содержат на 1 заряд больше."
++    "effect": "Используемые вами ядерные блоки теперь содержат 3 дополнительных заряда. На 2 ранге это число увеличивается до 6 дополнительных зарядов. На 3 ранге оно увеличивается до 10 дополнительных зарядов. Каждый раз, когда вы берете этот перк, требование к уровню увеличивается на 10."
+   },
+   {
+     "id": "psychopath",
+diff --git a/public/version.json b/public/version.json
+index acf99b0..399dcfe 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "409",
++  "version": "410",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
