@@ -1,0 +1,1090 @@
+diff --git a/__tests__/crafting/jury-rigged-ammo-404.test.js b/__tests__/crafting/jury-rigged-ammo-404.test.js
+new file mode 100644
+index 0000000..fb12a57
+--- /dev/null
++++ b/__tests__/crafting/jury-rigged-ammo-404.test.js
+@@ -0,0 +1,182 @@
++// ПРИЁМОЧНЫЙ (патч 404): «Ломовые патроны» — у верстака патроны редкости
++// вплоть до 1 (ранг 1) / 2 (ранг 2) крафтятся из 5 единиц любого хлама
++// за 10 минут; атаки такими патронами получают Диапазон осложнений +1
++// (напоминалка в отчёте о крафте). Универсальный движок не тронут:
++// подмену делает адаптер сеттинга (operations.js).
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import useCharacterStore from '../../src/store/characterStore';
++import { craftRecipe, craftingPreview, craftMinutesForRecipe, juryRigFor } from '../../modules/fallout/crafting/operations';
++import { buildCategoryModel, buildCraftReport } from '../../modules/fallout/crafting/windowModel';
++import { getCraftingRecipeById } from '../../domain/registry';
++import { selectPerkBonuses } from '../../domain/perks';
++import { juryRiggedAmmoPerk, juryRigMaxRarityByRank, JUNK_RIG_ANY_ID } from '../../domain/perks/juryRiggedAmmo';
++import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
++import perksCatalog from '../../modules/fallout/data/perks/perks.json';
++import { setCurrentModuleLocale } from '../../i18n/locale';
++
++const state = () => useCharacterStore.getState();
++
++// Строки окна крафта локализованы — тесты идут по русским словарям.
++setCurrentModuleLocale('ru-RU');
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++// СТОК в сумку: канон — weaponId (та же цепочка, что у addNewItem).
++const seedStack = (itemId, quantity) => {
++  useCharacterStore.setState((prev) => ({
++    items: { ...prev.items, [`seed_${itemId}_${Math.random().toString(36).slice(2, 7)}`]: {
++      weaponId: itemId, quantity,
++    } },
++  }));
++};
++
++const countStack = (itemId) => Object.values(state().items)
++  .filter((item) => item.weaponId === itemId)
++  .reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
++
++const setSkill = (skillId, total) => {
++  useCharacterStore.setState((prev) => ({
++    skills: { ...prev.skills, [skillId]: { ...(prev.skills?.[skillId] ?? {}), base: total, total } },
++  }));
++};
++
++// Перк выбирается рангами (как в экране перков: ранг = число выбранных строк).
++const takePerk = (rank) => {
++  const jury = Array.from({ length: rank }, (_, index) => ({ perkId: 'juryRiggedAmmo', index }));
++  // ammosmith той же глубины: редкость 2 закрыта перком 2-го ранга (книга).
++  const smith = Array.from({ length: rank }, (_, index) => ({ perkId: 'ammosmith', index }));
++  useCharacterStore.setState({ selectedPerks: [...jury, ...smith] });
++};
++
++const AUTO = { rollD20: () => ({ rolled: [20], passed: true, successes: 1, complicationCount: 0 }) };
++
++describe('Патч 404: Ломовые патроны — перк и селектор', () => {
++  it('ранг 1 → редкость 1, ранг 2+ → редкость 2; хлам 5, время 10 минут', () => {
++    expect(juryRigMaxRarityByRank(1)).toBe(1);
++    expect(juryRigMaxRarityByRank(2)).toBe(2);
++    expect(juryRigMaxRarityByRank(3)).toBe(2);
++    expect(juryRiggedAmmoPerk.apply({ state: { rank: 2 } })).toEqual({
++      juryRiggedAmmo: { maxRarity: 2, junkCost: 5, minutes: 10 },
++    });
++    const bonuses = selectPerkBonuses(
++      { selectedPerks: [{ id: 'juryRiggedAmmo', rank: 1 }] },
++      perksCatalog,
++    );
++    expect(bonuses.juryRiggedAmmo).toEqual({ maxRarity: 1, junkCost: 5, minutes: 10 });
++  });
++});
++
++describe('Патч 404: Ломовые патроны — превью и крафт', () => {
++  it('.38 (редкость 1) с перком: материалы заменены «любой хлам ×5», время 10 минут', () => {
++    takePerk(1);
++    setSkill('REPAIR', 1); // сложность 1 − навык 1 = автоуспех
++    seedStack('duct_tape', 3);
++    seedStack('animal_hide', 2);
++
++    const { evaluation, recipe } = craftingPreview('ammo_38');
++    expect(evaluation.ready).toBe(true);
++    expect(evaluation.materials).toEqual([
++      { itemId: JUNK_RIG_ANY_ID, need: 5, have: 5, enough: true },
++    ]);
++    // Время в окне и в адаптере — ломовое.
++    expect(craftMinutesForRecipe(recipe)).toBe(10);
++
++    const result = craftRecipe('ammo_38', { rollCD: (cd) => cd * 3 });
++    expect(result.done).toBe(true);
++    expect(result.granted).toMatchObject({ itemId: 'ammo_38' });
++    expect(result.time.minutes).toBe(10);
++    // Списан реальный хлам (3 + 2), виртуального id в потраченном нет.
++    expect(result.spent).toEqual([
++      { itemId: 'duct_tape', count: 3 },
++      { itemId: 'animal_hide', count: 2 },
++    ]);
++    expect(countStack('duct_tape')).toBe(0);
++    expect(countStack('animal_hide')).toBe(0);
++    expect(countStack('ammo_38')).toBe(result.granted.quantity);
++  });
++
++  it('без перка подмены нет: рецепт требует обычные материалы, время — час', () => {
++    seedStack('duct_tape', 10);
++    const { evaluation, recipe } = craftingPreview('ammo_38');
++    expect(evaluation.ready).toBe(false);
++    expect(evaluation.blocked.some((b) => b.code === 'missing-material' && b.itemId === 'item_common_materials')).toBe(true);
++    expect(evaluation.materials.some((m) => m.itemId === JUNK_RIG_ANY_ID)).toBe(false);
++    expect(craftMinutesForRecipe(recipe)).toBe(CRAFT_RULES.craftBaseMinutes);
++    expect(juryRigFor(recipe)).toBeNull();
++  });
++
++  it('редкость 2 — только со 2-м рангом; редкость 3 не достаётся никому', () => {
++    takePerk(1);
++    seedStack('duct_tape', 10);
++    expect(craftingPreview('ammo_45').evaluation.ready).toBe(false); // редкость 2, ранг 1
++
++    takePerk(2);
++    setSkill('REPAIR', 1);
++    seedStack('duct_tape', 10);
++    expect(craftingPreview('ammo_45').evaluation.ready).toBe(true); // редкость 2, ранг 2
++    expect(craftingPreview('ammo_44_magnum').evaluation.ready).toBe(false); // редкость 3
++    expect(craftingPreview('ammo_44_magnum').evaluation.blocked.some((b) => b.code === 'missing-material' && b.itemId === 'item_common_materials')).toBe(true);
++  });
++
++  it('хлама меньше 5 — крафтить нельзя, стор не тронут', () => {
++    takePerk(1);
++    setSkill('REPAIR', 1);
++    seedStack('duct_tape', 4);
++    const before = state().items;
++    const result = craftRecipe('ammo_38');
++    expect(result.done).toBe(false);
++    expect(result.stage).toBe('gate');
++    expect(state().items).toBe(before);
++  });
++
++  it('гейты рецепта (перк ammosmith) ломовая подмена не отменяет', () => {
++    setSkill('REPAIR', 1);
++    seedStack('duct_tape', 5);
++    // Перка нет вовсе → .38 закрыт перком ammosmith, а не материалами.
++    const { evaluation } = craftingPreview('ammo_38');
++    expect(evaluation.blocked.some((b) => b.code === 'missing-perk' && b.perkId === 'ammosmith')).toBe(true);
++  });
++});
++
++describe('Патч 404: Ломовые патроны — окно крафта и отчёт', () => {
++  it('строка окна: «Хлам (любой)», 10 минут, зелёная кнопка при 5 хламе', () => {
++    takePerk(1);
++    setSkill('REPAIR', 1);
++    seedStack('duct_tape', 5);
++    const rows = buildCategoryModel('ammo');
++    const row = rows.find((r) => r.recipeId === 'ammo_38');
++    expect(row.canCraft).toBe(true);
++    expect(row.minutes).toBe(10);
++    expect(row.materials).toHaveLength(1);
++    expect(row.materials[0]).toMatchObject({ itemId: JUNK_RIG_ANY_ID, name: 'Хлам (любой)', need: 5, have: 5, enough: true });
++  });
++
++  it('в отчёте — имя хлама, а не id; напоминалка про Диапазон осложнений +1', () => {
++    takePerk(1);
++    setSkill('REPAIR', 1);
++    seedStack('duct_tape', 5);
++    const result = craftRecipe('ammo_38', AUTO);
++    expect(result.done).toBe(true);
++    const report = buildCraftReport('ammo_38', { attempts: [result], stoppedEarly: 0 });
++    const text = report.lines.join('\n');
++    expect(text).not.toContain(JUNK_RIG_ANY_ID);
++    expect(text).toContain('Диапазон осложнений +1');
++  });
++
++  it('обычный (не ломовой) крафт отчёт без напоминалки', () => {
++    setSkill('REPAIR', 1);
++    useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith' }] });
++    seedStack('item_common_materials', 3);
++    const result = craftRecipe('ammo_38', AUTO);
++    expect(result.done).toBe(true);
++    const report = buildCraftReport('ammo_38', { attempts: [result], stoppedEarly: 0 });
++    expect(report.lines.join('\n')).not.toContain('Диапазон осложнений +1');
++  });
++});
+diff --git a/__tests__/perks/perks-engine-404.test.js b/__tests__/perks/perks-engine-404.test.js
+new file mode 100644
+index 0000000..c359d0e
+--- /dev/null
++++ b/__tests__/perks/perks-engine-404.test.js
+@@ -0,0 +1,217 @@
++// ПРИЁМОЧНЫЙ (патч 404): три перка из адаптируемой четвёрки 403 встроены в движок.
++// - Гурман старого мира: preserved-еда — +2 ОЗ к лечению, радиация еды на 1 меньше.
++// - Заряжай и стреляй: тяжёлое оружие — скорострельность +1/+2 по рангам.
++// - В сияющих доспехах: в металлической брони СУ энергия +2 (ранг 2 — текст перка).
++// Ломовые патроны — отдельно, следующим патчем (владелец просил «разом», но крафт
++// требует своей точки подстановки материалов; гурман/заряжай/доспехи — разом здесь).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { resolve } from 'node:path';
++
++import { resolveConsumableVitalChanges } from '../../domain/effects';
++import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
++import { selectPerkBonuses } from '../../domain/perks.js';
++import { oldWorldGourmetPerk } from '../../domain/perks/oldWorldGourmet';
++import { inShiningArmorPerk, isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
++import { loadAndFirePerk, applyLoadAndFireToWeapon, loadAndFireBonusByRank } from '../../domain/perks/loadAndFire';
++import catalog from '../../modules/fallout/data/perks/perks.json';
++import foodData from '../../modules/fallout/data/consumables/food.json';
++import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
++
++const foodList = Array.isArray(foodData) ? foodData : Object.values(foodData);
++const weaponsList = Array.isArray(weaponsData) ? weaponsData : Object.values(weaponsData);
++const byId = (list, id) => list.find((x) => x.id === id);
++
++// --- Гурман старого мира -------------------------------------------------
++
++describe('Патч 404: Гурман старого мира (preserved-еда)', () => {
++  const GOURMET = { hpBonus: 2, radiationReduction: 1 };
++
++  it('консервов без лечения: перк даёт +2 ОЗ и снижает радиацию −2 → −1', () => {
++    // Формат как у настоящих консервов (food_cram): фиксированная радиация, лечения нет.
++    const canned = {
++      id: 'test_canned',
++      itemType: 'food',
++      preserved: true,
++      positiveEffect: null,
++      radiationModifier: { op: '+', value: 2 },
++    };
++    const withPerk = resolveConsumableVitalChanges(canned, {
++      currentHealth: 10, maxHealth: 12, radiation: 0,
++      oldWorldGourmet: GOURMET,
++    });
++    expect(withPerk.healAmount).toBe(2);
++    expect(withPerk.healthAfter).toBe(12);
++    expect(withPerk.radiationAmount).toBe(1); // −2 → −1: радиация всё же есть
++
++    const withoutPerk = resolveConsumableVitalChanges(canned, {
++      currentHealth: 10, maxHealth: 12, radiation: 0,
++    });
++    expect(withoutPerk.healAmount).toBe(0);
++    expect(withoutPerk.radiationAmount).toBe(2);
++  });
++
++  it('лечащая еда: 4 ОЗ → 6 ОЗ (сахарные бомбы, реальные данные каталога)', () => {
++    const sugarBombs = byId(foodList, 'food_sugar_bombs');
++    expect(sugarBombs.preserved).toBe(true);
++    const result = resolveConsumableVitalChanges(sugarBombs, {
++      currentHealth: 5, maxHealth: 12, radiation: 0,
++      radiationRequestedAmount: 3, // как будто АГНИ-бросок дал 3 радиации
++      oldWorldGourmet: GOURMET,
++    });
++    expect(result.healAmount).toBe(6); // 4 + 2
++    expect(result.radiationAmount).toBe(2); // 3 → 2
++  });
++
++  it('радиация −1 становится 0, чистая еда не портится, очистка радиации не разворачивается', () => {
++    const light = {
++      id: 'test_light', itemType: 'food', preserved: true,
++      radiationModifier: { op: '+', value: 1 },
++    };
++    expect(resolveConsumableVitalChanges(light, {
++      currentHealth: 5, maxHealth: 12, radiation: 1, oldWorldGourmet: GOURMET,
++    }).radiationAmount).toBe(0); // 1 радиация → 0 (прирост обнулился)
++
++    // Чистая еда без радиации: перк не создаёт радиацию из ничего.
++    const clean = { id: 'test_clean', itemType: 'food', preserved: true, radiationModifier: null };
++    expect(resolveConsumableVitalChanges(clean, {
++      currentHealth: 5, maxHealth: 12, radiation: 0, oldWorldGourmet: GOURMET,
++    }).radiationAmount).toBe(null);
++
++    // Предмет, СНИМАЮЩИЙ радиацию (op '−'): перк не должен ослаблять очистку.
++    const cleansing = {
++      id: 'test_cleansing', itemType: 'food', preserved: true,
++      radiationModifier: { op: '-', value: 3 },
++    };
++    expect(resolveConsumableVitalChanges(cleansing, {
++      currentHealth: 5, maxHealth: 12, radiation: 5, oldWorldGourmet: GOURMET,
++    }).radiationAmount).toBe(-3); // снято 3 радиации, перк не помешал
++  });
++
++  it('непресервированная еда и напитки перком не трогаются', () => {
++    const grilled = byId(foodList, 'food_grilled_bloatfly');
++    expect(grilled.preserved).toBe(false);
++    const food = resolveConsumableVitalChanges(grilled, {
++      currentHealth: 5, maxHealth: 20, radiation: 0, oldWorldGourmet: GOURMET,
++    });
++    // Жареная стрекоза лечит 6; перк НЕ добавил свои +2 (она не preserved).
++    expect(food.healAmount).toBe(6);
++
++    const drink = {
++      id: 'test_drink', itemType: 'drink', preserved: true,
++      positiveEffect: null, radiationModifier: { op: '+', value: 2 },
++    };
++    const drinkResult = resolveConsumableVitalChanges(drink, {
++      currentHealth: 5, maxHealth: 12, radiation: 0, oldWorldGourmet: GOURMET,
++    });
++    expect(drinkResult.healAmount).toBe(0);
++    expect(drinkResult.radiationAmount).toBe(2); // −2 у напитков не работает
++  });
++
++  it('перк кладёт в perkBonuses параметры гурмана; хелпер металла работает', () => {
++    const bonuses = selectPerkBonuses(
++      { selectedPerks: [{ id: 'oldWorldGourmet', rank: 1 }] },
++      catalog,
++    );
++    expect(bonuses.oldWorldGourmet).toEqual({ hpBonus: 2, radiationReduction: 1 });
++  });
++});
++
++// --- Заряжай и стреляй ---------------------------------------------------
++
++describe('Патч 404: Заряжай и стреляй (скорострельность тяжёлого)', () => {
++  it('ранг 1 даёт +1, ранг 2+ даёт +2', () => {
++    expect(loadAndFireBonusByRank(1)).toBe(1);
++    expect(loadAndFireBonusByRank(2)).toBe(2);
++    expect(loadAndFireBonusByRank(3)).toBe(2);
++    expect(loadAndFirePerk.apply({ state: { rank: 2 } })).toEqual({ loadAndFireBonus: 2 });
++  });
++
++  it('миниган (реальный id): 5 → 6/7; «Толстяк» с 0 очередей: 0 → 1/2', () => {
++    const minigun = byId(weaponsList, 'weapon_minigun');
++    expect(minigun.weaponType).toBe('Heavy');
++    expect(applyLoadAndFireToWeapon(minigun, 1).fireRate).toBe(6);
++    expect(applyLoadAndFireToWeapon(minigun, 2).fireRate).toBe(7);
++
++    const fatMan = byId(weaponsList, 'weapon_fat_man');
++    expect(fatMan.fireRate).toBe(0);
++    expect(applyLoadAndFireToWeapon(fatMan, 1).fireRate).toBe(1);
++    expect(applyLoadAndFireToWeapon(fatMan, 2).fireRate).toBe(2);
++  });
++
++  it('не-тяжёлое оружие и предметы без очередей не трогаются; вход не мутируется', () => {
++    const pistol = byId(weaponsList, 'weapon_10mm_pistol');
++    expect(pistol.weaponType).not.toBe('Heavy');
++    expect(applyLoadAndFireToWeapon(pistol, 2).fireRate).toBe(pistol.fireRate);
++
++    const noRate = { id: 'weapon_x', weaponType: 'Heavy' }; // нет поля fireRate
++    expect(applyLoadAndFireToWeapon(noRate, 2)).toBe(noRate);
++
++    const minigun = byId(weaponsList, 'weapon_minigun');
++    const before = minigun.fireRate;
++    applyLoadAndFireToWeapon(minigun, 2);
++    expect(minigun.fireRate).toBe(before);
++  });
++
++  it('селектор перка: ранг 2 → loadAndFireBonus 2', () => {
++    const bonuses = selectPerkBonuses(
++      { selectedPerks: [{ id: 'loadAndFire', rank: 2 }] },
++      catalog,
++    );
++    expect(bonuses.loadAndFireBonus).toBe(2);
++  });
++
++  it('проводка UI: обе точки показа оружия зовут единый хелпер', () => {
++    const inv = readFileSync(resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'), 'utf8');
++    expect(inv).toContain("from '../../../domain/perks/loadAndFire'");
++    const waa = readFileSync(resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'), 'utf8');
++    expect(waa).toContain("from '../../../../domain/perks/loadAndFire'");
++  });
++});
++
++// --- В сияющих доспехах --------------------------------------------------
++
++describe('Патч 404: В сияющих доспехах (энергоСУ в металле)', () => {
++  const ATTRS = Object.fromEntries(
++    ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'].map((id) => [id, { id, base: 5, modifiers: [], total: 5 }]),
++  );
++
++  const derive = ({ rank = 0, metal = false } = {}) =>
++    calculateDerivedStats(
++      ATTRS,
++      { perkBonuses: rank > 0 ? { inShiningArmorRank: rank } : {} },
++      null,
++      1,
++      { wearingMetalArmor: metal },
++    );
++
++  it('перк кладёт ранг в perkBonuses', () => {
++    expect(inShiningArmorPerk.apply({ state: { rank: 2 } })).toEqual({ inShiningArmorRank: 2 });
++    const bonuses = selectPerkBonuses(
++      { selectedPerks: [{ id: 'inShiningArmor', rank: 1 }] },
++      catalog,
++    );
++    expect(bonuses.inShiningArmorRank).toBe(1);
++  });
++
++  it('металл + перк: энергоСУ +2; без металла или без перка — ничего', () => {
++    const withBoth = derive({ rank: 1, metal: true });
++    expect(withBoth.damageResistance.energy.modifiers).toEqual([
++      { source: 'perks.inShiningArmor', value: 2, operation: '+' },
++    ]);
++    expect(withBoth.damageResistance.energy.total).toBe(2);
++
++    expect(derive({ rank: 1, metal: false }).damageResistance.energy.total).toBe(0);
++    expect(derive({ rank: 0, metal: true }).damageResistance.energy.total).toBe(0);
++    expect(derive({ rank: 2, metal: true }).damageResistance.energy.total).toBe(2); // ранг 2 = тот же +2 (текст про слепящий свет)
++  });
++
++  it('хелпер металла: все 4 детали metalArmor опознаются, чужие id — нет', () => {
++    ['head', 'chest', 'leg', 'hand'].forEach((part) => {
++      expect(isMetalArmorCatalogId(`armor_metal_${part}_001`)).toBe(true);
++    });
++    expect(isMetalArmorCatalogId('armor_leather_chest_001')).toBe(false);
++    expect(isMetalArmorCatalogId('weapon_10mm_pistol')).toBe(false);
++    expect(isMetalArmorCatalogId(undefined)).toBe(false);
++  });
++});
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 7feb68f..8779c8c 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -11,6 +11,8 @@ import AddItemModal from './modals/AddItemModal';
+ import BuyItemModal from './modals/BuyItemModal';
+ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
++// 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
++import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
+ import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
+ import {
+   isFusionCoreItem,
+@@ -103,7 +105,16 @@ const InventoryScreen = () => {
+   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
+   // Read-хелпер альбома модификаций: с патча 237 альбом только читается
+   // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
+-  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
++  // 404: «Заряжай и стреляй» — тяжёлое оружие на карточках инвентаря
++  // показывает скорострельность с перковой прибавкой (единая точка с
++  // экраном снаряжения — domain/perks/loadAndFire).
++  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
++  const getModifiedItem = (item) => {
++    const base = storeModifiedItems[getItemId(item)] || item;
++    return base?.weaponType === 'Heavy'
++      ? applyLoadAndFireToWeapon(base, loadAndFireBonus)
++      : base;
++  };
+   // Шаг 7: origin/trait — стор напрямую.
+   // Шаг 8а: слоты робота и производный вес — стор напрямую.
+   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index a03cd61..b64a0ac 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,8 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-25** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+-· последний сданный патч: **403** (владелец добавил на main 22b5add
++Снимок: **2026-09-30** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **404** (владелец: «давай тогда постараемся внедрить разом» — все ЧЕТЫРЕ адаптируемых перка 403 одним патчем). Гурман старого мира: preserved-еда (консервы, 17 позиций) — +2 ОЗ к лечению и радиация еды на 1 меньше (до нуля; очищающие предметы перк не ослабляет). Заряжай и стреляй: Heavy-оружие — скорострельность +1/+2 по рангам, единая точка domain/perks/loadAndFire, видна на карточках инвентаря и экрана снаряжения. В сияющих доспехах: в металлической броне (детали armor_metal_*, флаг wearingMetalArmor считает characterStore) СУ энергия +2; ранг 2 (защита от ослепления) — боевой текст. Ломовые патроны: ammo-рецепты сложности ≤ ранга — материалы заменяются «Хлам (любой) ×5», время 10 минут; виртуальный id item_junk_any раскладывается адаптером на реальные предметы (крупные пачки первыми), в сейв не пишется; отчёт крафта напоминает про Диапазон осложнений +1. УНИВЕРСАЛЬНЫЙ ДВИЖОК КРАФТА НЕ ТРОНУТ — подмена в modules/fallout/crafting/operations.js (juryRigFor/withJuryRig/expandJunkSpend); ранг перка меряется как в гейтах рецептов — числом выбранных строк (getPerkSelectionCount). Реестр перков 22→26 (domain/perks/index.js). Урок 404: у resolveConsumable-VitalChanges положительный радиационный запрос = радиация ПРИБАВЛЯЕТСЯ (отрицательный — предмет её СНИМАЕТ; перк трогает только прирост) · предыдущий: **403** (владелец добавил на main 22b5add
+ ПЯТЬ РЕФЕРЕНСОВ перков — perks_structure (185 в нашем формате),
+ perks_catalog_ru (185: имена КАПС + полные тексты rankEffects),
+ fallout2d20_perks (1) (184: структурированные op/modifier/when),
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index a3ee059..12838db 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,19 @@
+ # Changelog
++---
++## Four perks now actually work (patch 404)
++
++As you asked, all four adaptable perks from the previous step landed in
++one patch. «Old World Gourmet»: packaged and canned food heals 2 HP
++more and deals 1 less radiation (down to zero). «Load and Fire»: heavy
++weapons fire 1 (rank 1) or 2 (rank 2) more shots — visible on weapon
++cards in inventory and on the gear screen. «In Shining Armor»: +2
++energy damage resistance while wearing metal armor (the rank-2
++dazzle protection stays perk text — combat scenes are out of the
++app's scope). «Jury-Rigged Ammo»: at a workbench, ammo of rarity 1
++(and 2 with rank 2) can be made from any junk — 5 pieces and 10
++minutes instead of regular materials and an hour of work; the craft
++report reminds you: attacks with such ammo get a Complication Range +1.
++
+ 
+ ---
+ ---
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index dfa3d55..ab7401d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,21 @@
+ # История изменений
+ 
++---
++## Четыре перка заработали по-настоящему (патч 404)
++
++По вашей просьбе внедрили разом все четыре адаптируемых перка из
++прошлого шага. «Гурман старого мира»: консервы и прочая упакованная
++еда лечат на 2 ОЗ больше, а радиации дают на 1 меньше (вплоть до нуля).
++«Заряжай и стреляй»: тяжёлое оружие стреляет на 1 (ранг 1) или 2
++(ранг 2) очереди быстрее — это видно на карточках оружия в инвентаре
++и на экране снаряжения. «В сияющих доспехах»: в металлической броне
++Сопротивляемость энергетическому урону +2 (про защиту от ослепления
++на 2-м ранге — текст перка, бой в приложении не считается). «Ломовые
++патроны»: у верстака патроны 1-й (со 2-м рангом — и 2-й) редкости
++делаются из любого хлама — 5 штук и 10 минут вместо обычных материалов
++и часа работы; в отчёте о крафте напоминание: атаки такими патронами
++получают Диапазон осложнений +1.
++
+ ---
+ ## Восемь новых перков по вашим референсам (патч 403)
+ 
+diff --git a/domain/effects.js b/domain/effects.js
+index 9d2b063..7fd0968 100644
+--- a/domain/effects.js
++++ b/domain/effects.js
+@@ -663,6 +663,9 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+         hpHealMultiplier = 1,
+         radiationImmune = false,
+         skipIrradiatedRadiation = false,
++        // 404: Гурман старого мира — preserved-еда: +2 ОЗ и радиация еды на
++        // 1 меньше (до минимума 0). Приходит из perkBonuses (см. перк).
++        oldWorldGourmet = null,
+     } = options;
+     if (
+         !Number.isFinite(currentHealth)
+@@ -676,17 +679,29 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
+     }
+ 
+     const instantHealAmount = getInstantHealAmount(item) * hpHealMultiplier;
+-    const healAmount = instantHealAmount > 0
+-        ? Math.max(0, instantHealAmount + hpHealBonus)
++    // 404: гурман — плоская прибавка к лечению preserved-еды (даже если
++    // предмет сам не лечит: «+2 к восстанавливаемым ОЗ» — буквально).
++    const gourmet = oldWorldGourmet && item?.itemType === 'food' && item?.preserved === true
++        ? oldWorldGourmet
++        : null;
++    const healBase = instantHealAmount + (gourmet ? Number(gourmet.hpBonus) || 0 : 0);
++    const healAmount = healBase > 0
++        ? Math.max(0, healBase + hpHealBonus)
+         : 0;
+     const healthAfter = healAmount > 0
+         ? Math.min(maxHealth, currentHealth + healAmount)
+         : currentHealth;
+ 
+     // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
+-    const requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
++    let requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
+         ? options.radiationRequestedAmount
+         : resolveConsumableRadiationAmount(item, { radiationImmune, skipIrradiatedRadiation });
++    // 404: гурман — радиация preserved-еды на 1 меньше, но не «в плюс»
++    // (здесь положительное число = радиация прибавляется: 2 → 1, 1 → 0;
++    // отрицательное — предмет СНИМАЕТ радиацию, его не трогаем).
++    if (gourmet && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
++        requestedRadiationAmount = Math.max(0, requestedRadiationAmount - (Number(gourmet.radiationReduction) || 0));
++    }
+     const radiationAfter = requestedRadiationAmount === null
+         ? radiation
+         : Math.max(0, radiation + requestedRadiationAmount);
+diff --git a/domain/perks/inShiningArmor.js b/domain/perks/inShiningArmor.js
+new file mode 100644
+index 0000000..3a0415d
+--- /dev/null
++++ b/domain/perks/inShiningArmor.js
+@@ -0,0 +1,22 @@
++// domain/perks/inShiningArmor.js
++// В сияющих доспехах (референс владельца, 403; автоматизация 404):
++// ранг 1 — в металлической брони Сопротивляемость энергетическому урону +2
++// (применяется в derivedStats, когда надета хоть одна металлическая деталь).
++// Ранг 2 добавляет защиту от ослепления (светозащитная оптика) — боевая
++// сцена вне движка приложения, живёт текстом перка.
++
++export const IN_SHINING_ARMOR_ENERGY_DR = 2;
++// Металлическая броня каталога: все детали штампуются префиксом armor_metal_
++// (armor.json → metalArmor.tiers.*.pieces).
++export const METAL_ARMOR_ID_PREFIX = 'armor_metal_';
++
++export const isMetalArmorCatalogId = (id) =>
++  typeof id === 'string' && id.startsWith(METAL_ARMOR_ID_PREFIX);
++
++export const inShiningArmorPerk = {
++  id: 'inShiningArmor',
++  apply(ctx) {
++    const rank = ctx.state.rank || 1;
++    return { inShiningArmorRank: Math.min(2, Math.max(1, rank)) };
++  },
++};
+diff --git a/domain/perks/index.js b/domain/perks/index.js
+index 3a520bd..5409517 100644
+--- a/domain/perks/index.js
++++ b/domain/perks/index.js
+@@ -20,6 +20,10 @@ import { chemResistantPerk } from './chemResistant';
+ import { colaNutPerk } from './colaNut';
+ import { thirstQuencherPerk } from './thirstQuencher';
+ import { pharmaFarmerPerk } from './pharmaFarmer';
++import { oldWorldGourmetPerk } from './oldWorldGourmet';
++import { inShiningArmorPerk } from './inShiningArmor';
++import { loadAndFirePerk } from './loadAndFire';
++import { juryRiggedAmmoPerk } from './juryRiggedAmmo';
+ 
+ export const perkEffects = {
+   [intenseTrainingPerk.id]: intenseTrainingPerk,
+@@ -44,6 +48,10 @@ export const perkEffects = {
+   [colaNutPerk.id]: colaNutPerk,
+   [thirstQuencherPerk.id]: thirstQuencherPerk,
+   [pharmaFarmerPerk.id]: pharmaFarmerPerk,
++  [oldWorldGourmetPerk.id]: oldWorldGourmetPerk,
++  [inShiningArmorPerk.id]: inShiningArmorPerk,
++  [loadAndFirePerk.id]: loadAndFirePerk,
++  [juryRiggedAmmoPerk.id]: juryRiggedAmmoPerk,
+ };
+ 
+ export function getPerkEffect(effectId) {
+diff --git a/domain/perks/juryRiggedAmmo.js b/domain/perks/juryRiggedAmmo.js
+new file mode 100644
+index 0000000..b3c5ad4
+--- /dev/null
++++ b/domain/perks/juryRiggedAmmo.js
+@@ -0,0 +1,35 @@
++// domain/perks/juryRiggedAmmo.js
++// Ломовые патроны (референс владельца, 403; автоматизация 404):
++// у верстака можно создать патроны редкости вплоть до 1 (ранг 1) / 2
++// (ранг 2), потратив 5 единиц ХЛАМА вместо материалов и 10 минут работы.
++// Атаки такими патронами получают Диапазон осложнений +1 (напоминает
++// отчёт о крафте; сама боевая сцена — вне движка приложения).
++// Подмена материалов и времени живёт в адаптере крафта
++// (modules/fallout/crafting/operations.js): универсальный движок
++// получает рецепт уже с подменённой строкой материалов.
++
++// Виртуальный id строки материалов «любой хлам»: движок крафта считает
++// id непрозрачными, адаптер раскладывает строку на реальные предметы.
++export const JUNK_RIG_ANY_ID = 'item_junk_any';
++
++export const JUNK_RIG_JUNK_COST = 5;
++export const JUNK_RIG_MINUTES = 10;
++
++export const juryRigMaxRarityByRank = (rank) => {
++  const r = Math.max(1, Number(rank) || 1);
++  return r >= 2 ? 2 : 1;
++};
++
++export const juryRiggedAmmoPerk = {
++  id: 'juryRiggedAmmo',
++  apply(ctx) {
++    const rank = ctx.state.rank || 1;
++    return {
++      juryRiggedAmmo: {
++        maxRarity: juryRigMaxRarityByRank(rank),
++        junkCost: JUNK_RIG_JUNK_COST,
++        minutes: JUNK_RIG_MINUTES,
++      },
++    };
++  },
++};
+diff --git a/domain/perks/loadAndFire.js b/domain/perks/loadAndFire.js
+new file mode 100644
+index 0000000..e04bbfc
+--- /dev/null
++++ b/domain/perks/loadAndFire.js
+@@ -0,0 +1,33 @@
++// domain/perks/loadAndFire.js
++// Заряжай и стреляй (референс владельца, 403; автоматизация 404):
++// тяжёлое оружие (weaponType 'Heavy') — скорострельность +1 (ранг 1)
++// или +2 (ранг 2+). «Каждый следующий перк — другой тип оружия» — книжная
++// тонкость выбора, в приложении ранг даёт бонус на всё тяжёлое оружие.
++// Применяется на карточках оружия (инвентарь и экран снаряжения) через
++// applyLoadAndFireToWeapon — единая точка.
++
++export const HEAVY_WEAPON_TYPE = 'Heavy';
++
++export const loadAndFireBonusByRank = (rank) => {
++  const r = Math.max(1, Number(rank) || 1);
++  return r >= 2 ? 2 : 1;
++};
++
++export const loadAndFirePerk = {
++  id: 'loadAndFire',
++  apply(ctx) {
++    return { loadAndFireBonus: loadAndFireBonusByRank(ctx.state.rank || 1) };
++  },
++};
++
++/**
++ * Тяжёлое оружие получает прибавку скорострельности; прочие предметы —
++ * как есть. Не мутирует вход.
++ */
++export const applyLoadAndFireToWeapon = (item, bonus) => {
++  const b = Number(bonus) || 0;
++  if (!b || !item || item.weaponType !== HEAVY_WEAPON_TYPE) return item;
++  const base = Number(item.fireRate);
++  if (!Number.isFinite(base)) return item;
++  return { ...item, fireRate: base + b };
++};
+diff --git a/domain/perks/oldWorldGourmet.js b/domain/perks/oldWorldGourmet.js
+new file mode 100644
+index 0000000..f909f28
+--- /dev/null
++++ b/domain/perks/oldWorldGourmet.js
+@@ -0,0 +1,20 @@
++// domain/perks/oldWorldGourmet.js
++// Гурман старого мира (референс владельца, 403; автоматизация 404):
++// упакованная/консервированная (preserved) еда — +2 ОЗ к лечению и −1
++// к её радиации (до минимума 0). Механика живёт в resolveConsumableVitalChanges
++// (domain/effects.js): перк кладёт параметры, конвейер употребления применяет.
++
++export const OLD_WORLD_GOURMET_HP_BONUS = 2;
++export const OLD_WORLD_GOURMET_RADIATION_REDUCTION = 1;
++
++export const oldWorldGourmetPerk = {
++  id: 'oldWorldGourmet',
++  apply() {
++    return {
++      oldWorldGourmet: {
++        hpBonus: OLD_WORLD_GOURMET_HP_BONUS,
++        radiationReduction: OLD_WORLD_GOURMET_RADIATION_REDUCTION,
++      },
++    };
++  },
++};
+diff --git a/modules/fallout/crafting/operations.js b/modules/fallout/crafting/operations.js
+index 13d7104..0ada74f 100644
+--- a/modules/fallout/crafting/operations.js
++++ b/modules/fallout/crafting/operations.js
+@@ -20,6 +20,14 @@ import { getItemId } from '../../../domain/itemIdentity';
+ import { rollByType } from '../../../domain/diceRollsLogic';
+ import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+ import { CRAFT_RULES } from './rules';
++// 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
++import {
++  JUNK_RIG_ANY_ID,
++  JUNK_RIG_JUNK_COST,
++  JUNK_RIG_MINUTES,
++  juryRigMaxRarityByRank,
++} from '../../../domain/perks/juryRiggedAmmo';
++import { getScrapJunkItems } from '../../../domain/registry';
+ import { applyActivityMinutes } from '../survival/operations';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+ import { earnActionPoints, getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
+@@ -150,13 +158,98 @@ const perkRanksFor = (recipe, selectedPerks) => {
+   return ranks;
+ };
+ 
++// --- 404: «Ломовые патроны» ----------------------------------------------
++// Ранг перка меряется тем же способом, что и гейты рецептов (число
++// выбранных рангов в selectedPerks) — превью и крафт видят одно и то же.
++
++let junkIdSetCache = null;
++const junkIdSet = () => {
++  if (!junkIdSetCache) {
++    junkIdSetCache = new Set(getScrapJunkItems().map((j) => j?.id).filter(Boolean));
++  }
++  return junkIdSetCache;
++};
++
++/**
++ * Активен ли «ломовой» режим для рецепта. Патроны, сложность (редкость)
++ * которых не выше ранга перка: 5 хлама вместо материалов, 10 минут.
++ * null — режим не действует (не патроны / перка нет / редкость велика).
++ */
++export const juryRigFor = (recipe) => {
++  if (recipe?.category !== 'ammo') return null;
++  const store = useCharacterStore.getState();
++  const rank = getPerkSelectionCount(store.selectedPerks ?? [], 'juryRiggedAmmo');
++  if (rank < 1) return null;
++  const complexity = Number(recipe.requires?.complexity) || 0;
++  if (complexity < 1 || complexity > juryRigMaxRarityByRank(rank)) return null;
++  return {
++    maxRarity: juryRigMaxRarityByRank(rank),
++    junkCost: JUNK_RIG_JUNK_COST,
++    minutes: JUNK_RIG_MINUTES,
++  };
++};
++
++// Подменённый рецепт для движка: движок непрозрачно ест id материалов,
++// поэтому строку материалов заменяем виртуальной «любой хлам».
++const withJuryRig = (recipe) => {
++  const jury = juryRigFor(recipe);
++  if (!jury) return recipe;
++  return {
++    ...recipe,
++    materials: [{ itemId: JUNK_RIG_ANY_ID, count: jury.junkCost }],
++  };
++};
++
++// Сколько в сумке свободного хлама — для виртуальной строки «любой хлам».
++const withJunkAnyCount = (recipe, counts) => {
++  if (!recipe.materials.some((m) => m.itemId === JUNK_RIG_ANY_ID)) return counts;
++  const junkIds = junkIdSet();
++  let total = 0;
++  for (const [id, count] of Object.entries(counts)) {
++    if (junkIds.has(id)) total += count;
++  }
++  return { ...counts, [JUNK_RIG_ANY_ID]: total };
++};
++
++// Разложить виртуальный «любой хлам» на реальные предметы: крупные пачки
++// первыми, при равенстве — по id (детерминизм «превью = действие»).
++const takeJunk = (want, counts) => {
++  const junkIds = junkIdSet();
++  const rows = [...junkIds]
++    .map((id) => ({ id, have: Math.max(0, Number(counts[id]) || 0) }))
++    .filter((r) => r.have > 0)
++    .sort((a, b) => b.have - a.have || (a.id < b.id ? -1 : 1));
++  let left = want;
++  const out = [];
++  for (const row of rows) {
++    if (left <= 0) break;
++    const grab = Math.min(row.have, left);
++    out.push({ itemId: row.id, count: grab });
++    left -= grab;
++  }
++  if (left > 0) out.push({ itemId: JUNK_RIG_ANY_ID, count: left }); // путь отказа стора
++  return out;
++};
++
++const expandJunkSpend = (plan, counts) =>
++  plan.flatMap((row) => (
++    row.itemId === JUNK_RIG_ANY_ID ? takeJunk(row.count, counts) : [{ itemId: row.itemId, count: row.count }]
++  ));
++// --- конец «Ломовых патронов» ---------------------------------------------
++
+ const heroView = (recipe) => {
+   const store = useCharacterStore.getState();
++  // 404: гейты и материалы движок видит ПОСЛЕ ломовой подмены.
++  const engineRecipe = withJuryRig(recipe);
+   return {
+     store,
++    engineRecipe,
+     skillRank: selectSkillTotal(store, recipe.requires.skill),
+     perkRanks: perkRanksFor(recipe, store.selectedPerks),
+-    inventoryCounts: countsForEngine(recipe, countInventoryByCatalogId(store.items)),
++    inventoryCounts: countsForEngine(
++      engineRecipe,
++      withJunkAnyCount(engineRecipe, countInventoryByCatalogId(store.items)),
++    ),
+     attributeValue: selectAttributeTotal(store, CRAFT_RULES.testAttribute),
+     isTagged: isSkillTagged({
+       skillId: recipe.requires.skill,
+@@ -173,10 +266,10 @@ const heroView = (recipe) => {
+ export const craftingPreview = (recipeId) => {
+   const recipe = getCraftingRecipeById(recipeId);
+   if (!recipe) return null;
+-  const { skillRank, perkRanks, inventoryCounts } = heroView(recipe);
++  const { skillRank, perkRanks, inventoryCounts, engineRecipe } = heroView(recipe);
+   return {
+     recipe,
+-    evaluation: evaluateCraft({ recipe, skillRank, perkRanks, inventoryCounts }),
++    evaluation: evaluateCraft({ recipe: engineRecipe, skillRank, perkRanks, inventoryCounts }),
+     // Цена проверки — свойство рецепта (реформа 269): право провала сжигать
+     // материалы записано в самой строке (failBurnsMaterials), карт верстаков нет.
+     rulesView: {
+@@ -189,10 +282,14 @@ export const craftingPreview = (recipeId) => {
+ 
+ // Базовые минуты работы по книге (патч 323): час для всех категорий,
+ // 20 минут — станция приготовления пищи (еда и напитки).
+-export const craftMinutesForRecipe = (recipe) =>
+-  CRAFT_RULES.stationCategories.includes(recipe?.category)
++// 404: «Ломовые патроны» — патроны низкой редкости из хлама за 10 минут.
++export const craftMinutesForRecipe = (recipe) => {
++  const jury = juryRigFor(recipe);
++  if (jury) return jury.minutes;
++  return CRAFT_RULES.stationCategories.includes(recipe?.category)
+     ? CRAFT_RULES.stationMinutes
+     : CRAFT_RULES.craftBaseMinutes;
++};
+ 
+ // Надбавка за КАЖДОЕ осложнение (книга, 323): +30 минут, на станции +10.
+ export const complicationExtraMinutesFor = (recipe) =>
+@@ -245,14 +342,14 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
+     return { done: false, stage: 'unknown', reason: 'recipe-not-found', spent: [], granted: null, check: null };
+   }
+ 
+-  const { store, skillRank, perkRanks, inventoryCounts, attributeValue, isTagged } = heroView(recipe);
++  const { store, skillRank, perkRanks, inventoryCounts, attributeValue, isTagged, engineRecipe } = heroView(recipe);
+ 
+   // Фактическое списание (с закрытием пачек) — помечаем в замыкании, чтобы
+   // вернуть в контракте spent/burned честными строками, а не планом движка.
+   let expandedSpend = null;
+ 
+   const result = runCraft({
+-    recipe,
++    recipe: engineRecipe,
+     skillRank,
+     attributeValue,
+     isTagged,
+@@ -265,7 +362,9 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
+     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
+     rollCD: ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
+     spend: (plan) => {
+-      expandedSpend = expandSpendPlan(plan, countInventoryByCatalogId(useCharacterStore.getState().items));
++      const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
++      // 404: виртуальный «любой хлам» раскладывается на реальные предметы.
++      expandedSpend = expandSpendPlan(expandJunkSpend(plan, freeCounts), freeCounts);
+       return store.spendItemStacks({ spend: expandedSpend });
+     },
+     grant: ({ itemId, quantity }) => ({
+diff --git a/modules/fallout/crafting/windowModel.js b/modules/fallout/crafting/windowModel.js
+index 42c06aa..96a7814 100644
+--- a/modules/fallout/crafting/windowModel.js
++++ b/modules/fallout/crafting/windowModel.js
+@@ -22,7 +22,9 @@ import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
+ import enPerks from '../i18n/en-EN/data/perks/perks.json';
+ import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
+ import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
+-import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime } from './operations';
++import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime, juryRigFor } from './operations';
++// 404: «Ломовые патроны» — виртуальная строка материалов «любой хлам».
++import { JUNK_RIG_ANY_ID } from '../../../domain/perks/juryRiggedAmmo';
+ import { CRAFT_RULES } from './rules';
+ 
+ // Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,
+@@ -78,7 +80,9 @@ const hintByPrefix = (id) => {
+ const itemName = (catalog, id, typeHint) => {
+   const hint = typeHint ?? hintByPrefix(id);
+   const entry = (hint ? findCatalogEntry(catalog, id, hint) : null)
+-    ?? findCatalogEntry(catalog, id, 'misc');
++    ?? findCatalogEntry(catalog, id, 'misc')
++    // 404: списанный хлам (id без узнаваемого префикса) зовётся по имени.
++    ?? findCatalogEntry(catalog, id, 'junk');
+   return entry?.name ?? id;
+ };
+ 
+@@ -160,7 +164,8 @@ const buildRowsForCategory = (category) => {
+       : 0;
+     const materials = evaluation.materials.map((row) => ({
+       itemId: row.itemId,
+-      name: itemName(catalog, row.itemId, null),
++      // 404: виртуальная строка «любой хлам» подписывается словами, не id.
++      name: row.itemId === JUNK_RIG_ANY_ID ? d.junkAny : itemName(catalog, row.itemId, null),
+       rarity: materialRarityOf(row.itemId),
+       need: row.need,
+       have: row.have,
+@@ -315,6 +320,11 @@ export const buildCraftReport = (recipeId, run) => {
+     lines.push(fmt(d.apEarnedLine, { n: apGained, pool: apPool }));
+   }
+   if (run.stoppedEarly > 0) lines.push(fmt(d.stopped, { n: run.stoppedEarly }));
++  // 404: «Ломовые патроны» — напоминалка про книжное свойство таких патронов
++  // (Диапазон осложнений +1 в бою; сцена боя — вне движка приложения).
++  if (juryRigFor(recipe) && run.attempts.some((a) => a.done === true)) {
++    lines.push(d.junkRigNote);
++  }
+   // 323: recipeId и признак ожидания решения про 2 ОД — для окна крафта.
+   return { title: d.resultTitle, lines, recipeId, pendingTime };
+ };
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index 6d0725d..e2ae893 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -63,9 +63,11 @@
+     "askZeroTitle": "Difficulty cleared by skill",
+     "askZeroText": "Roll the dice? Success/Failure rules apply.",
+     "askZeroRoll": "Roll dice",
+-    "askZeroAuto": "Auto-success"
++    "askZeroAuto": "Auto-success",
++    "junkAny": "Junk (any)",
++    "junkRigNote": "Junk ammo: attacks with it get a Complication Range +1."
+   },
+   "attributes": {
+     "INT": "Intelligence"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index 6a5296c..8985af7 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -63,9 +63,11 @@
+     "askZeroTitle": "Сложность снята навыком",
+     "askZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
+     "askZeroRoll": "Бросить кубики",
+-    "askZeroAuto": "Автоуспех"
++    "askZeroAuto": "Автоуспех",
++    "junkAny": "Хлам (любой)",
++    "junkRigNote": "Патроны из хлама: атаки ими получают Диапазон осложнений +1."
+   },
+   "attributes": {
+     "INT": "Интеллект"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/modules/fallout/logic/derivedStats.js b/modules/fallout/logic/derivedStats.js
+index 642a6e6..df7ed34 100644
+--- a/modules/fallout/logic/derivedStats.js
++++ b/modules/fallout/logic/derivedStats.js
+@@ -270,6 +270,19 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
+     }
+   });
+ 
++  // 404: В сияющих доспехах (ранг 1+) — в металлической брони СУ энергия +2.
++  // Ношение металлической брони считает store (wearingMetalArmor, детали
++  // armor_metal_*), сюда приходит готовым флагом equipmentState.
++  const shiningRank = Number(perkBonuses.inShiningArmorRank) || 0;
++  if (shiningRank > 0 && equipmentState.wearingMetalArmor) {
++    stats.damageResistance.energy.modifiers.push({
++      source: 'perks.inShiningArmor',
++      value: 2,
++      operation: '+',
++    });
++    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
++  }
++
+   return stats;
+ };
+ 
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 2230c46..7490f19 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -24,6 +24,8 @@ import { resolveBodyPlan } from '../../../../domain/bodyplan';
+ import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
+ // Единый путь записи модов (311): классификация места хранения — движок.
+ import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
++// 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
++import { applyLoadAndFireToWeapon } from '../../../../domain/perks/loadAndFire';
+ import { diffModInstallPlan } from '../../../../domain/modsEquip';
+ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
+ import styles from '../../styles/CharacterScreen.styles';
+@@ -847,8 +849,10 @@ const WeaponsAndArmorScreen = () => {
+     origin?.bodyPlan,
+     inventoryItems,
+   );
++  // 404: «Заряжай и стреляй» — скорострельность тяжёлого оружия с перком.
++  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
+   const localizedEquippedWeapons = equippedWeaponsForDisplay.map(
+-    (weapon) => findLocalizedWeapon(equipmentCatalog, weapon),
++    (weapon) => applyLoadAndFireToWeapon(findLocalizedWeapon(equipmentCatalog, weapon), loadAndFireBonus),
+   );
+   useEffect(() => {
+     debugLog('weapon.display.list', {
+diff --git a/public/version.json b/public/version.json
+index 4d5b1dc..41dd2ce 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "403",
++  "version": "404",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index 81eaf9d..dd3c2f3 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -66,6 +66,8 @@ import { createInitialPowerArmorState, createPowerArmorActions } from './powerAr
+ import { debugLog } from '../debug/falloutDebug.js';
+ import perksData from '../../modules/fallout/data/perks/perks.json';
+ import { selectPerkBonuses } from '../../domain/perks.js';
++// 404: префикс металлической брони для «В сияющих доспехах».
++import { isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
+ import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
+ // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
+ // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
+@@ -238,10 +240,19 @@ const deriveFromSnapshot = (state, options = {}) => {
+     ...(state._characterContext || {}),
+     ...options,
+   };
++  // 404: «В сияющих доспехах» — металл на теле? Любая надетая деталь
++  // armor_metal_* (префикс металлической брони каталога).
++  const wearingMetalArmor = Object.values(state.equippedArmor || {})
++    .some((slotRow) => {
++      const piece = slotRow?.armor || null;
++      const catalogId = piece?.weaponId || piece?.id || '';
++      return isMetalArmorCatalogId(catalogId);
++    });
+   const equipmentState = {
+     ...(context.equipmentState || {}),
+     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
+     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
++    wearingMetalArmor,
+   };
+   return calculateDerivedStats(
+     state.attributes,
+diff --git a/src/store/orchestratorsSlice.js b/src/store/orchestratorsSlice.js
+index 735a8d3..8249404 100644
+--- a/src/store/orchestratorsSlice.js
++++ b/src/store/orchestratorsSlice.js
+@@ -299,6 +299,7 @@ export const createOrchestrationActions = (set, get) => {
+       irradiatedConsumableRadiationImmune = false,
+       colaNutDrinkIds,
+       colaNutHealMultiplier = 1,
++      oldWorldGourmet = null,
+     } = state.perkBonuses || {};
+     const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
+       ? Number(colaNutHealMultiplier) || 1
+@@ -314,6 +315,7 @@ export const createOrchestrationActions = (set, get) => {
+       hpHealMultiplier,
+       radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
+       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
++      oldWorldGourmet,
+     };
+     if (Object.hasOwn(options, 'radiationRequestedAmount')) {
+       vitalOptions.radiationRequestedAmount = options.radiationRequestedAmount;
