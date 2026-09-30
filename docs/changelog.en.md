@@ -1,5 +1,18 @@
 # Changelog
 ---
+## Perk audit against your list (patch 409)
+
+Audited every perk against your prepared list of descriptions. Main
+fix: 123 perks still had short English blurbs in the Russian UI — now
+all 185 perks carry full Russian names and texts, verbatim from your
+catalog (Патронщик, Фанат колы, Кровосос, Водохлёб, etc.). Exceptions:
+three perks work by your word rather than the book — Field Surgeon,
+Pharmacist and Power User — their texts now describe the actual app
+behavior. The Bloodsucker gained its book detail: a blood pack also
+quenches thirst one step better than a regular drink. No coverage
+gaps: 184 from your list plus our EMT.
+
+---
 ## «Гулеподобный» as written (patch 408)
 
 The perk is now three ranks, as in the book: 1 HP for every 4 points

@@ -18,10 +18,17 @@ import { debugLog } from '../../../src/debug/falloutDebug';
 import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest } from './survival';
 // 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
 // лестниц), естественная стойкость (сон в пустоши без болезни).
-const survivalPerkOptions = () => {
+const survivalPerkOptions = (item = null) => {
   const perkBonuses = useCharacterStore.getState().perkBonuses || {};
+  let extraWaterSteps = Math.max(0, Number(perkBonuses.dromedaryExtraWaterStep) || 0);
+  // 409: «Кровосос» — пакет крови и так напиток, по книге он дополнительно
+  // поднимает Жажду на ступень (сверка с notepad: '+1 ступень при пакете').
+  if (item && Array.isArray(perkBonuses.bloodPackDrinkIds)
+    && perkBonuses.bloodPackDrinkIds.includes(item.id)) {
+    extraWaterSteps += 1;
+  }
   return {
-    extraWaterSteps: Math.max(0, Number(perkBonuses.dromedaryExtraWaterStep) || 0),
+    extraWaterSteps,
     ladderAccRates: perkBonuses.ladderAccRates || null,
     sleepOnGroundDiseaseImmune: Boolean(perkBonuses.sleepOnGroundDiseaseImmune),
   };
@@ -65,7 +72,7 @@ export const survivalConsumableListener = (item, ctx) => {
   }
   if (item?.itemType === 'drinks') {
     return apply(consumeDrink(survival, item, {
-      extraWaterSteps: survivalPerkOptions().extraWaterSteps,
+      extraWaterSteps: survivalPerkOptions(item).extraWaterSteps,
     }));
   }
   return null;
