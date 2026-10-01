@@ -418,6 +418,32 @@ describe('Проводка (слово владельца 415/417): ОДНА к�
     expect(code).toContain("tInventory('repair.actions.repair')");
   });
 
+  it('законы владельца (418): окно вариантов — только при включённой прочности; «Без затрат» — только с перком', () => {
+    const code = src();
+    // Настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» без окна,
+    // у всех трёх целей: окно вариантов не выходит ТОЛЬКО при выключенной
+    // настройке прочности.
+    expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
+    expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
+    // Настройка ВКЛ + перк → окно выбора (кнопка «Починить» ведёт в окно).
+    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+    // Настройка ВКЛ без перка → окно «Ремонт» (донор/материалы), кнопка серая
+    // без материалов и донора — «Без затрат» в таком окне НЕТ.
+    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
+
+    const modal = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
+    // «Без затрат (некачественно)» живёт ТОЛЬКО в ветке активного перка.
+    const juryStart = modal.indexOf('{juryActive ? (');
+    expect(juryStart).toBeGreaterThan(-1);
+    const juryEnd = modal.indexOf(') : (', juryStart);
+    expect(juryEnd).toBeGreaterThan(juryStart);
+    const juryBranch = modal.slice(juryStart, juryEnd);
+    expect(juryBranch).toContain("tInventory('repair.choice.free')");
+    expect(juryBranch).not.toContain("tInventory('repair.actions.remake')");
+    const rest = modal.slice(0, juryStart) + modal.slice(juryEnd);
+    expect(rest).not.toContain("tInventory('repair.choice.free')");
+  });
+
   it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
     const code = src();
     expect(code).toContain('!repairAffordable && styles.applyButtonDisabled');

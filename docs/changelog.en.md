@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Repair rules locked in (patch 418)
+
+The app itself did not change — both of your rules were already in
+effect after the previous update; now they are locked by checks so
+they cannot be lost: the repair choice window appears only when the
+durability setting is on (off — the instant free «Fix» with no
+window), and the «Without cost (poor quality)» button in the window
+exists only with the «Jury Rigging» perk (without the perk the window
+has the donor and the materials).
+
+---
 ## Repair choice window (patch 417)
 
 By your word the unconditional free repair is gone. With the
