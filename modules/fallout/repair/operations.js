@@ -85,6 +85,8 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
   if (run?.donorSpent) lines.push(rep.donorUsed ?? '');
   if (run?.done) {
     lines.push(rep.success ?? '');
+    // 417: бесплатный режим «Очумелых ручек» — ремонт временный.
+    if (run.temporary) lines.push(rep.temporary ?? '');
   } else {
     lines.push(rep.failed ?? '');
   }
@@ -223,12 +225,12 @@ export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
 };
 
 /**
- * Бесплатная мгновенная починка (кнопка «Починить», слово владельца
- * 414/415): по ОДНОЙ штуке, без теста и материалов. Слово владельца 416:
- * с перком «Очумелые ручки» при включённой настройке прочности ремонт
- * бесплатен, но ВРЕМЕННЫЙ (temporary — книжные эффекты перка).
+ * Бесплатная мгновенная починка БЕЗ перка (настройка прочности выключена,
+ * слово владельца 415): по ОДНОЙ штуке, без теста и материалов. С перком
+ * «Очумелые ручки» бесплатный путь идёт через окно и тест (417), поэтому
+ * флаг временного ремонта здесь не ставится.
  */
-export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}) => {
+export const performInstantFreeRepair = (storeItemId) => {
   const before = useCharacterStore.getState().items?.[storeItemId];
   if (!before) return { ok: false, reason: 'not-found' };
   const id = splitOnePieceFromStack(storeItemId);
@@ -241,18 +243,16 @@ export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}
   } else {
     state.repairWeapon(id);
   }
-  if (temporary) markTemporaryRepairOnItem(id, true);
-  return { ok: true, repairedStoreItemId: id, temporary };
+  return { ok: true, repairedStoreItemId: id };
 };
 
 /** То же для надетой части СБ (всегда одна штука). */
-export const performInstantFreeRepairForEquippedPiece = (slot, { temporary = false } = {}) => {
+export const performInstantFreeRepairForEquippedPiece = (slot) => {
   const store = useCharacterStore.getState();
   const piece = store.equippedPowerArmor?.pieces?.[slot];
   if (!piece) return { ok: false, reason: 'not-found' };
   store.repairPowerArmorPieceAt(slot);
-  if (temporary) markTemporaryRepairOnEquippedPiece(slot, true);
-  return { ok: true, temporary };
+  return { ok: true };
 };
 
 /**
@@ -358,7 +358,9 @@ const countInventoryByCatalogId = (items) => {
  * Ремонт НАДЕТОЙ части СБ (строка внутри контейнера инвентаря — цели нет
  * в items). Донор — пачка того же catalogId в инвентаре; успех чинит слот.
  */
-export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, ports = {} } = {}) => {
+export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, ports = {}, mode = 'materials' } = {}) => {
+  // Бесплатный режим: без донора и без материалов (сложность полная).
+  if (mode === 'free') donorStoreItemId = null;
   const state = useCharacterStore.getState();
   const piece = state.equippedPowerArmor?.pieces?.[slot];
   if (!piece) return { done: false, stage: 'gate', reasons: [{ code: 'not-repairable' }] };
@@ -373,7 +375,7 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
     return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
   }
   const complexity = Math.max(0, rarity - (donorUsed ? 1 : 0));
-  const materialsPlan = donorUsed ? [] : repairMaterialsPlan(rarity);
+  const materialsPlan = (mode === 'free' || donorUsed) ? [] : repairMaterialsPlan(rarity);
   const store2 = useCharacterStore.getState();
   const attributeValue = selectAttributeTotal(store2, REPAIR_RULES.testAttribute);
   const skillValue = selectSkillTotal(store2, REPAIR_RULES.testSkill);
@@ -388,6 +390,8 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
     ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
     spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
     spendDonor: () => {
+      // «Очумелые ручки» (417): перк покрывает затраты без донора.
+      if (mode === 'free') return { ok: true };
       const s = useCharacterStore.getState();
       if (!s.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
       s.adjustItemQuantity(donorStoreItemId, -1);
@@ -406,8 +410,9 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
   }
   if (result.done) {
     useCharacterStore.getState().repairPowerArmorPieceAt(slot);
-    // Честный ремонт перезачитывает временный («Очумелые ручки»).
-    markTemporaryRepairOnEquippedPiece(slot, false);
+    // Честный ремонт перезачитывает временный; бесплатный ставит флаг.
+    markTemporaryRepairOnEquippedPiece(slot, mode === 'free');
+    result.temporary = mode === 'free';
   }
   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
   result.repairTime = {
@@ -434,7 +439,20 @@ const collectPairsDeep = (node, visit) => {
   for (const value of Object.values(node)) collectPairsDeep(value, visit);
 };
 
-export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}, zeroDifficulty } = {}) => {
+/**
+ * Режимы ремонта (слово владельца 417 — три кнопки в окне):
+ *  'materials' — за счёт материалов (обычный книжный ремонт);
+ *  'donor'     — за счёт донора (ускоренный: сложность −1, материалы из донора);
+ *  'free'      — «Очумелые ручки»: без затрат, но временный (книжный эффект
+ *                перка: снова сломается при следующем осложнении 19–20).
+ * Тест и время одинаковы во всех режимах — бесплатный путь не отменяет
+ * работу, только затраты.
+ */
+export const REPAIR_MODES = ['materials', 'donor', 'free'];
+
+export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}, zeroDifficulty, mode = 'materials' } = {}) => {
+  // Бесплатный режим: без донора и без материалов (сложность полная).
+  if (mode === 'free') donorStoreItemId = null;
   const preview = repairPreview(storeItemId, { donorStoreItemId });
   if (!preview.canRepair) {
     return { done: false, stage: 'gate', reasons: [{ code: preview.reason }] };
@@ -442,11 +460,12 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
   if (donorStoreItemId != null && !preview.donorUsed) {
     return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
   }
+  const materialsPlan = mode === 'free' ? [] : preview.materialsPlan;
 
   const { attributeValue, skillValue, isTagged } = preview.hero;
   const result = runRepair({
     complexity: preview.complexity,
-    materialsPlan: preview.materialsPlan,
+    materialsPlan,
     inventoryCounts: countInventoryByCatalogId(useCharacterStore.getState().items),
     attributeValue,
     skillValue,
@@ -456,6 +475,9 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
     ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
     spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
     spendDonor: () => {
+      // «Очумелые ручки» (417): донора нет и не нужно — перк покрывает
+      // затраты, движку не от чего отказывать.
+      if (mode === 'free') return { ok: true };
       const state = useCharacterStore.getState();
       if (!state.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
       state.adjustItemQuantity(donorStoreItemId, -1);
@@ -465,9 +487,9 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
 
   // Потеря дополнительных материалов (осложнение 19–20): сверх потраченных
   // списывается ещё один такой же комплект (если есть).
-  if (result.done && result.resolution?.kind === 'lost-materials' && preview.materialsPlan.length > 0) {
+  if (result.done && result.resolution?.kind === 'lost-materials' && materialsPlan.length > 0) {
     const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
-    const lossPlan = preview.materialsPlan
+    const lossPlan = materialsPlan
       .filter((entry) => (freeCounts[entry.itemId] || 0) >= entry.count);
     if (lossPlan.length > 0) {
       useCharacterStore.getState().spendItemStacks({ spend: lossPlan });
@@ -497,8 +519,13 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
       else state.repairPowerArmorStack(repairTargetId);
     }
   }
-  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки».
-  if (result.done) markTemporaryRepairOnItem(repairTargetId, false);
+  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки»;
+  // бесплатный режим «Очумелых ручек» наоборот ставит флаг (книга:
+  // ремонт временный — при осложнении 19–20 предмет снова сломается).
+  if (result.done) {
+    markTemporaryRepairOnItem(repairTargetId, mode === 'free');
+    result.temporary = mode === 'free';
+  }
   result.repairedStoreItemId = repairTargetId;
 
   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;

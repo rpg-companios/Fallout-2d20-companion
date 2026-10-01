@@ -135,6 +135,11 @@
     "useDonor": "Scrap the donor and repair",
     "withoutDonor": "Repair without the donor",
     "cancel": "Cancel",
-    "tempNote": "Temporarily repaired (Jury Rigging): a complication while using it (19–20) breaks it again"
+    "tempNote": "Temporarily repaired (Jury Rigging): a complication while using it (19–20) breaks it again",
+    "choice": {
+      "free": "Without cost (poor quality)",
+      "donor": "From a donor (quick repair)",
+      "materials": "From materials"
+    }
   }
 }

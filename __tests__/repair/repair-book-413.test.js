@@ -391,21 +391,25 @@ describe('Патч 413: операции — редкость, моды, дон�
   });
 });
 
-describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
+describe('Проводка (слово владельца 415/417): ОДНА кнопка; с перком — окно выбора', () => {
   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
 
-  it('одна кнопка у всех целей: настройка ВКЛ и без перка — «Ремонт» (окно), иначе — мгновенная «Починить»', () => {
+  it('одна кнопка у всех целей: без перка при включённой прочности — «Ремонт» (окно), иначе — «Починить»', () => {
     const code = src();
     expect(code).toContain('RepairModal');
-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая
-    // часть); с 416 в условии ещё и перк «Очумелые ручки».
+    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
     expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
     // Книжный режим открывает окно (обе формы цели).
     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
-    // Бесплатный режим — мгновенный, по 1 шт (операции сами отделяют штуку).
-    expect(code).toContain('performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
-    expect(code).toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
+    // С перком «Починить» тоже открывает окно (417: выбор из трёх) —
+    // и НЕ мгновенный (вторая ступень тернарника у всех трёх целей).
+    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
+    expect(code).not.toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary');
+    // Мгновенный путь остался только для «без перка и настройка выкл».
+    expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
+    expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
     expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');

@@ -1496,10 +1496,16 @@ const InventoryScreen = () => {
                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
+            ) : juryRiggingActive ? (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton]}
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot)}>
                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
             ))}
@@ -1697,10 +1703,16 @@ const InventoryScreen = () => {
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
+          ) : juryRiggingActive ? (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                  onPress={() => performInstantFreeRepair(item.id)}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
           ))}
@@ -1712,10 +1724,16 @@ const InventoryScreen = () => {
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
+          ) : juryRiggingActive ? (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                  onPress={() => performInstantFreeRepair(item.id)}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
           ))}

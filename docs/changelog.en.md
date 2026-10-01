@@ -1,5 +1,19 @@
 # Changelog
 ---
+## Repair choice window (patch 417)
+
+By your word the unconditional free repair is gone. With the
+«Jury Rigging» perk the button opens a choice window with three
+buttons: «Without cost (poor quality)», «From a donor (quick
+repair)», «From materials». No donor — the donor button is grey; no
+materials — the materials button is grey; neither — both grey, the
+free one remains. No more instant actions: every choice is the test
+and half an hour of work (2 AP halve it); the free option only spends
+nothing, and its result is temporary (a complication 19–20 breaks the
+item again — shown in the report and on the card). Without the perk
+the repair window is as before.
+
+---
 ## Jury Rigging (patch 416)
 
 The «Jury Rigging» perk works now. The same single «Fix» button is
