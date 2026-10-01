@@ -1,0 +1,361 @@
+diff --git a/__tests__/repair/jury-rigging-416.test.js b/__tests__/repair/jury-rigging-416.test.js
+index bc71cfa..fd6b4a1 100644
+--- a/__tests__/repair/jury-rigging-416.test.js
++++ b/__tests__/repair/jury-rigging-416.test.js
+@@ -272,6 +272,68 @@ describe('Патч 416: флаг временного ремонта снима
+   });
+ });
+ 
++describe('Патч 421: прочность распространяется на броню — чинится тем же окном', () => {
++  const seedArmor = ({ durability = 30, quantity = 1, id, flagged = false } = {}) => {
++    const key = id ?? `seed_armor_${Math.random().toString(36).slice(2, 7)}`;
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        [key]: {
++          id: 'armor_leather_chest_001', weaponId: 'armor_leather_chest_001', itemType: 'armor',
++          durability, durabilityTracked: true, quantity,
++          ...(flagged ? { temporaryRepair: true } : {}),
++        },
++      },
++    }));
++    return key;
++  };
++
++  it('repairTargetFor: броня — цель ремонта с редкостью из каталога', () => {
++    const key = seedArmor({ durability: 30 });
++    const preview = repairPreview(key);
++    expect(preview.canRepair).toBe(true);
++    expect(preview.target.kind).toBe('armor');
++    expect(preview.target.max).toBe(100);
++    expect(preview.rarity).toBe(1); // armor_leather_chest_001 из armor.json
++    expect(preview.complexity).toBe(1);
++  });
++
++  it('книжный ремонт брони: материалы по редкости, прочность 100, флаг временного снят', () => {
++    setCurrentModuleLocale('ru-RU');
++    const key = seedArmor({ durability: 30, flagged: true });
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 6 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair(key, { ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(result.spent).toEqual([{ itemId: 'item_common_materials', count: 2 }]); // редкость 1 → 2 Обычных
++    expect(state().items[key].durability).toBe(100);
++    expect(state().items[key].temporaryRepair).toBeUndefined();
++  });
++
++  it('бесплатный режим «Очумелых ручек» для брони: без трат, временно', () => {
++    seedPerk();
++    const key = seedArmor({ durability: 30, quantity: 2 });
++    useCharacterStore.setState((prev) => ({
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair(key, { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(result.temporary).toBe(true);
++    const armors = Object.values(state().items).filter((it) => it.weaponId === 'armor_leather_chest_001');
++    expect(armors.find((it) => Number(it.durability) === 100)?.quantity ?? 0).toBe(1);
++    expect(armors.find((it) => Number(it.durability) === 30)?.quantity ?? 0).toBe(1);
++  });
++});
++
+ describe('Патч 417: окно выбора — три кнопки, серые по наличию', () => {
+   const modal = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
+ 
+@@ -332,7 +394,9 @@ describe('Патч 416: настройка прочности включена 
+ 
+   it('старые сейвы без явного выбора получают включённую (fallback true в мерже стора)', () => {
+     const srcStore = readFileSync('src/store/appSettingsStore.js', 'utf8');
+-    expect(srcStore).toContain('old.weaponDurabilityLossEnabled ?? true');
++    // 421: три ветки — явный выбор, легаси-переключатель, иначе включена.
++    expect(srcStore).toContain('fallout.weaponDurabilityLossEnabled = true;');
++    expect(srcStore).toContain("Boolean(old.randomWeaponDurabilityEnabled)");
+   });
+ });
+ 
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index a2c12a6..e0dd405 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -394,27 +394,42 @@ describe('Патч 413: операции — редкость, моды, дон
+ describe('Проводка (слово владельца 415/417/420): одна кнопка, всегда через окно вариантов', () => {
+   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+ 
+-  it('слово владельца 420: есть отображение прочности → кнопка окна; нет — кнопки нет; мгновенной починки нет', () => {
++  it('слово владельца 420/421: отображается прочность (оружие И броня) → кнопка окна; нет — кнопки нет', () => {
+     const code = src();
+     expect(code).toContain('RepairModal');
+-    // Оружие: кнопка = showWeaponRepair && showWeaponDurability (отображение
+-    // прочности: настройка качества ИЛИ износа).
+-    expect((code.match(/showWeaponRepair && showWeaponDurability && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
++    // Оружие и броня: кнопка = повреждение И отображение прочности.
++    expect((code.match(/showItemRepair && showItemDurability && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
++    // Показ прочности: оружие И броня.
++    expect(code).toContain("localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor'");
++    expect(code).toContain("(item.itemType === 'weapon' || item.itemType === 'armor')");
+     // СБ: прочность отображается всегда → кнопка при повреждении, без гейта настроек.
+     expect((code.match(/showPARepair && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
+     expect((code.match(/item\.showRepair && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
+-    // Мгновенной починки больше нет совсем (ни одного вызова).
++    // Мгновенной починки нет совсем.
+     expect(code).not.toContain('performInstantFreeRepair');
+-    // Переключатель только перк/не перк: без перка кнопка серая без затрат.
++    // Без перка кнопка серая без затрат.
+     expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
+     expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
+-    // Прежний гейт «настройка → перк» исчез.
+     expect(code).not.toContain('weaponDurabilityLossEnabled ? (');
+-    // Подписи режимов.
+     expect(code).toContain("tInventory('repair.actions.remake')");
+     expect(code).toContain("tInventory('repair.actions.repair')");
+   });
+ 
++  it('слово владельца 421: качество и износ — самостоятельные пункты; броня рождается с прочностью', () => {
++    const settings = JSON.parse(readFileSync('modules/fallout/settings.json', 'utf8'));
++    const quality = settings.find((s) => s.id === 'randomWeaponQualityEnabled');
++    const wear = settings.find((s) => s.id === 'weaponDurabilityLossEnabled');
++    // Качество больше НЕ зависит от износа.
++    expect(quality.dependsOn).toBeUndefined();
++    expect(wear.dependsOn).toBeUndefined();
++    // Легаси-миграция стора не принуждает износ к false.
++    const storeSrc = readFileSync('src/store/appSettingsStore.js', 'utf8');
++    expect(storeSrc).not.toContain('fallout.weaponDurabilityLossEnabled = false;');
++    // Броня: добыча рождает каждый экземпляр своей прочности (как оружие).
++    const inv = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    expect(inv).toContain("&& (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')");
++  });
++
+   it('законы владельца (420): кнопки ремонта нет без отображения прочности; с отображением — окно; «Без затрат» — только с перком', () => {
+     const code = src();
+     // Таблица истинности 420:
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index dce2688..45769f1 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -620,12 +620,16 @@ const InventoryScreen = () => {
+     // Прочность — параметр стека (закон): два 100% идентичных экземпляра
+     // (та же прочность/моды/имя) склеиваются в один стек; разная прочность
+     // разделяет. addNewItem сам склеит совпавшие (ключ = id + dur + моды + имя).
+-    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
++    // Слово владельца 421: прочность распространяется и на БРОНЮ —
++    // при «Произвольном качестве» каждый экземпляр рождается своей прочности
++    // (покупка = 100, добыча = бросок), как оружие.
++    if (randomWeaponQualityEnabled
++        && (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')
++        && (localizedItem.itemType === 'armor' || isAmmoWeapon(localizedItem))) {
+       for (let index = 0; index < quantity; index += 1) {
+         const durability = source === 'buy' ? 100 : rollWeaponDurability();
+         addNewItem({
+           ...localizedItem,
+-          itemType: 'weapon',
+           quantity: 1,
+           durabilityTracked: true,
+           durability,
+@@ -1578,13 +1582,18 @@ const InventoryScreen = () => {
+     const showPARepair = Boolean(
+       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
+     );
+-    const showWeaponDurability = Boolean(
+-      localizedDisplayItem?.itemType === 'weapon'
++    // Слово владельца 421: прочность — и у ОРУЖИЯ, и у БРОНИ (отображение —
++    // при настройке качества или износа; кнопка окна — при повреждении).
++    const showItemDurability = Boolean(
++      (localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor')
+       && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
+-      && isAmmoWeapon(localizedDisplayItem),
++      && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)),
+     );
+     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
+-    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
++    const showItemRepair = Boolean(
++      (item.itemType === 'weapon' || item.itemType === 'armor')
++      && item.durabilityTracked && Number(item.durability) < 100,
++    );
+     // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
+     // при включённой прочности) — окно книжного ремонта не открываем.
+     const juryRiggingActive = juryRiggingRanksFor() > 0;
+@@ -1694,7 +1703,7 @@ const InventoryScreen = () => {
+           {/* Слово владельца 420: есть отображение прочности (качество ИЛИ
+               износ) → кнопка окна ремонта с вариантами; нет отображения —
+               кнопки нет. Мгновенной починки больше нет. */}
+-          {showWeaponRepair && showWeaponDurability && (juryRiggingActive ? (
++          {showItemRepair && showItemDurability && (juryRiggingActive ? (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+@@ -1758,7 +1767,7 @@ const InventoryScreen = () => {
+           {Number.isFinite(paMaxHp) && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
+           )}
+-          {showWeaponDurability && (
++          {showItemDurability && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+           )}
+           {item.temporaryRepair === true && (
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 5b167e0..0ddf7b8 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (420)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (421)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **421** (СЛОВО ВЛАДЕЛЬЦА: «поменяем зависимости износа оружия и случайного качества. Это теперь 2 самостоятельных пункта. И прочность ещё распространяется на броню. Её тоже нужно чинить»). ПРИМЕНЕНО: (1) settings.json randomWeaponQualityEnabled БЕЗ dependsOn (качество standalone); легаси-миграция стора развязана: явный weaponDurabilityLossEnabled > легаси randomWeaponDurabilityEnabled (поровну на оба пункта) > дефолт true (416 сохранён); (2) БРОНЯ (itemType 'armor', не одежда/не СБ) в системе прочности: addItem при качестве рождает каждый экземпляр своей прочности (buy=100, loot=rollWeaponDurability, стек по прочности), карточка показывает «Прочность N/100» при (качество ИЛИ износ), repairTargetFor kind 'armor' (rarity из armor.json через collectPairs — уже индексирована), performRepair → repairWeapon (общий экшн durability→100), кнопка окна = showItemRepair && showItemDurability (переименование showWeapon*→showItem*), донор/материалы/Очумелые ручки — как у оружия. Износа от выстрелов у брони НЕТ (нет источника урона в приложении) — сказано владельцу. ЛОВУШКА (учесть): замена в appSettingsStore не прошла с первого раза — анкер не учёл комментарий 416 внутри else; python-хередок с assert при падении МОЖЕТ оставить ЧАСТИЧНО применённое дерево если старых анкеров несколько — ВСЕГДА перепроверять grep'ом фактическое состояние после каждого скрипта. Защёлка 413-файла = 46 (+законы 421), 416-файла = 17 (+3 теста брони). 1499/153, tsc 0. Предыдущий снимок — **420** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **420** (СЛОВО ВЛАДЕЛЬЦА: «короче, в ui если прочность не включена, то и кнопки ремонта нет. А вот если есть отображение прочности, то и кнопка окна ремонта с вариантами есть» — после моего вопроса «что чинить при выключенной»). ПРИМЕНЕНО: МГНОВЕННОЙ ПОЧИНКИ БОЛЬШЕ НЕТ (performInstantFreeRepair/ForEquippedPiece удалены из operations и UI); кнопка = отображение прочности: оружие → showWeaponRepair && showWeaponDurability (качество ИЛИ износ), СБ → повреждение (прочность видна всегда); кнопка всегда открывает окно (перк: «Починить» активна всегда — free; без перка: «Ремонт», серая без донора/материалов). Окно не менялось (free только в juryActive). Таблица 420: прочность не видна → кнопки нет; видна без перка → окно (донор/материалы); видна с перком → окно трёх. Защёлка 413-файла = 45 (−1 мгновенный тест), 416-файл = 14. 1495/153, tsc 0. Предыдущий снимок — **419** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **419** (СЛОВО ВЛАДЕЛЬЦА: «Кнопка "Без затрат (некачественно)" есть только если есть перк. Кнопка ремонта дающая доступ к окну ремонта, показывается только при включенной настройке ремонта» — на мой ответ 418 «код уже работает» НАСТОЯЩИЙ БАГ: тернарник 417 `вкл && !перк ? окно-ремонта : перк ? окно-выбора : инстант` при настройке ВЫКЛ+перк уходил во ВТОРУЮ ветку → ОКНО ОТКРЫВАЛОСЬ без включённой настройки; моя таблица 418 это скрывала (структурные ассерты, не таблица). ИСПРАВЛЕНО: порядок проверки — СНАЧАЛА настройка, ПОТОМ перк: `weaponDurabilityLossEnabled ? (juryRiggingActive ? окно-выбора («Починить», всегда активна) : окно-ремонта («Ремонт», серая без материалов/донора)) : инстант-«Починить»` ×3 цели. Таблица 419: ВЫКЛ (перк любой) → инстант без окна; ВКЛ без перка → окно донор/материалы («Без затрат» НЕТ); ВКЛ с перком → окно трёх. Урок: структурные ассерты НЕ доказывают поведение — писать таблицу истинности через ветки, а не через счётчики регэкспов. Защёлка 413-файла = 46. 1496/153, tsc 0. Предыдущий снимок — **418** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **418** (СЛОВО ВЛАДЕЛЬЦА: «Без затрат (некачественно) только если есть перк. Окна с вариантами ремонта не выходит только если отключена настройка прочности»). ПРОВЕРЕНО ДО ПРАВОК: код 417 УЖЕ соответствует обоим правилам (таблица: настройка ВЫКЛ → мгновенная «Починить» без окна, перк не важен; ВКЛ без перка → окно «Ремонт» — донор/материалы, «Без затрат» НЕТ; ВКЛ с перком → окно трёх кнопок). Поправка была к МОЕМУ ОТЧЁТУ (написал «с перком кнопка всегда открывает окно» без упоминания настройки). Патч 418 = ТОЛЬКО тесты-таблица истинности в защёлке 413-файла (46) + честный changelog «приложение не менялось». 1496/153, tsc 0. Предыдущий снимок — **417** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 3e3e0aa..dc5a664 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,21 @@
+ # Changelog
++---
++## Independent settings; armor durability (patch 421)
++
++«Weapon durability loss» and «Random weapon quality» are now two
++independent settings: quality is no longer hidden behind wear (toggle
++them separately as you like). The old combined switch in saves splits
++evenly into both settings.
++
++Armor (regular, not power armor) now has durability too: with
++«Random quality» every found armor piece is born with its own
++durability (bought = whole), the card shows «Durability: N/100», and
++damaged armor is repaired by the same repair window: with the «Jury
++Rigging» perk — three buttons; without — donor and materials. Rarity
++and mods of the armor affect the difficulty like a weapon's. Armor
++cannot wear from shots — it is only damaged by being born with poor
++durability.
++
+ ---
+ ## Repair button follows durability display (patch 420)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 3fb2818..9051446 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## Самостоятельные настройки; прочность брони (патч 421)
++
++«Износ оружия при выстреле» и «Произвольное качество оружия» — теперь
++два независимых пункта: качество больше не прячется за износом
++(переключайся отдельно, как удобно). Старый общий переключатель в
++сейвах раскладывается на оба пункта поровну.
++
++Прочность теперь есть и у брони (обычной, не силовой): при
++«Произвольном качестве» каждый найденный экземпляр брони рождается со
++своей прочностью (купленное — целое), на карточке показывается
++«Прочность: N/100», а повреждённая броня чинится тем же окном
++ремонта: с перком «Очумелые ручки» — три кнопки, без — донор и
++материалы. Редкость и моды брони влияют на сложность, как у оружия.
++Изнашиваться от выстрелов броня не может — она повреждается только
++рождением с плохой прочностью.
++
+ ---
+ ## Кнопки ремонта по отображению прочности (патч 420)
+ 
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+index 33e19fc..f52e135 100644
+--- a/modules/fallout/repair/operations.js
++++ b/modules/fallout/repair/operations.js
+@@ -146,6 +146,16 @@ export const repairTargetFor = (item) => {
+       max: 100,
+     };
+   }
++  // Слово владельца 421: прочность распространяется на броню — чинится
++  // так же, как оружие (durability 0–100, редкость из armor.json).
++  if (item.itemType === 'armor' && item.durabilityTracked) {
++    return {
++      kind: 'armor',
++      canonicalId: item.weaponId || item.id,
++      current: Number(item.durability) || 0,
++      max: 100,
++    };
++  }
+   if (item.itemType === 'powerArmor' && !item.paFrameContent && !item.paFrame
+     && Number.isFinite(Number(item.maxHp))) {
+     return {
+@@ -476,10 +486,11 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+     repairTargetId = splitOnePieceFromStack(storeItemId);
+   }
+ 
+-  // Успех чинит предмет существующими экшнами стора (цена — в движке выше).
++  // Успех чинит предмет существующими экшнами стора (цена — в движке выше);
++  // ремонтWeaponDurability — общий для оружия и брони (durability → 100).
+   if (result.done) {
+     const state = useCharacterStore.getState();
+-    if (preview.target.kind === 'weapon') {
++    if (preview.target.kind === 'weapon' || preview.target.kind === 'armor') {
+       state.repairWeapon(repairTargetId);
+     } else if (preview.target.kind === 'powerArmor') {
+       // Надетая (в контейнере) часть чинится по слоту, пачка/штука — по записи.
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index 77e89ba..fe96901 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -49,8 +49,7 @@
+     "sectionKey": "survival",
+     "labelKey": "settings.qualityTitle",
+     "descriptionKey": "settings.qualityDescription",
+-    "defaultValue": false,
+-    "dependsOn": "weaponDurabilityLossEnabled"
++    "defaultValue": false
+   },
+   {
+     "id": "unarmedAttackVisible",
+diff --git a/public/version.json b/public/version.json
+index 02e3177..e5d6644 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "420",
++  "version": "421",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 25d25f0..261f24a 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -120,15 +120,19 @@ const migrateFlatState = (persistedState) => {
+     ?? old.randomWeaponDurabilityEnabled
+     ?? false;
+ 
+-  if (old.randomWeaponDurabilityEnabled !== undefined) {
+-    fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+-    fallout.weaponDurabilityLossEnabled = false;
++  // Слово владельца 421: «износ» и «произвольное качество» — два
++  // самостоятельных пункта, друг от друга не зависят. Старый общий
++  // переключатель (randomWeaponDurabilityEnabled) раскладывается на оба
++  // пункта поровну; явный выбор игрока всегда главнее (416: износ по
++  // умолчанию включён).
++  if (old.weaponDurabilityLossEnabled !== undefined) {
++    fallout.weaponDurabilityLossEnabled = Boolean(old.weaponDurabilityLossEnabled);
++  } else if (old.randomWeaponDurabilityEnabled !== undefined) {
++    fallout.weaponDurabilityLossEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+   } else {
+-    // Слово владельца 416: настройка прочности включена ПО УМОЛЧАНИЮ
+-    // (явно сохранённый выбор игрока не трогаем).
+-    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? true;
+-    fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
++    fallout.weaponDurabilityLossEnabled = true;
+   }
++  fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+ 
+   fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
+   fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;
