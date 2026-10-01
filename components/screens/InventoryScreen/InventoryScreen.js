@@ -13,7 +13,13 @@ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/moda
 // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
 // «Починить» больше не чинят мгновенно и бесплатно).
 import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
-import { repairAffordableFor, repairAffordableForPiece, splitOnePieceFromStack } from '../../../modules/fallout/repair/operations';
+import {
+  repairAffordableFor,
+  repairAffordableForPiece,
+  juryRiggingRanksFor,
+  performInstantFreeRepair,
+  performInstantFreeRepairForEquippedPiece,
+} from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
 import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
@@ -158,24 +164,14 @@ const InventoryScreen = () => {
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
   const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
   const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
+  // 416 «Очумелые ручки»: подписка на выборы перков — чтобы кнопка
+  // мгновенно переключилась на бесплатный режим.
+  useCharacterStore((state) => state.selectedPerks);
   // Слово владельца 414: «кнопки ремонта нет, если настройка прочности
   // не активна» — используем существующий селектор weaponDurabilityLossEnabled.
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
-
-  // Слово владельца 414/415: бесплатная починка — на ОДНУ штуку: отделяем
-  // штуку от пачки (если пачка) и чиним только её.
-  const repairOnePieceInstant = (storeItemId) => {
-    const id = splitOnePieceFromStack(storeItemId);
-    const piece = useCharacterStore.getState().items?.[id];
-    if (piece?.itemType === 'powerArmor') {
-      if (piece.paSlot) repairPowerArmorPieceAt(id);
-      else repairPowerArmorStack(id);
-    } else {
-      repairWeapon(id);
-    }
-  };
 
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;
@@ -1314,6 +1310,7 @@ const InventoryScreen = () => {
         }),
         hpCurrent: piece.hpCurrent,
         maxHp,
+        temporaryRepair: piece.temporaryRepair === true,
         // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
         showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
       });
@@ -1480,6 +1477,7 @@ const InventoryScreen = () => {
       const pieceAffordable = item?.pieceCatalogId
         ? repairAffordableForPiece(item.pieceCatalogId)
         : true;
+      const juryRiggingActive = juryRiggingRanksFor() > 0;
       // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
       // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
       // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
@@ -1491,7 +1489,7 @@ const InventoryScreen = () => {
             </View>
           </View>
           <View style={styles.actionContainer}>
-            {item.showRepair && (weaponDurabilityLossEnabled ? (
+            {item.showRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
                 disabled={!pieceAffordable}
@@ -1501,7 +1499,7 @@ const InventoryScreen = () => {
             ) : (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
+                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
             ))}
@@ -1515,6 +1513,11 @@ const InventoryScreen = () => {
             <Text style={styles.itemSubText}>
               {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
             </Text>
+            {item.temporaryRepair === true && (
+              <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+                {tInventory('repair.tempNote')}
+              </Text>
+            )}
           </View>
         </View>
       );
@@ -1581,6 +1584,9 @@ const InventoryScreen = () => {
     );
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+    // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
+    // при включённой прочности) — окно книжного ремонта не открываем.
+    const juryRiggingActive = juryRiggingRanksFor() > 0;
     // Слово владельца 414: «если материалов нет, кнопка ремонта не
     // активна» (донор тоже делает кнопку активной).
     const repairAffordable = repairAffordableFor(item.id);
@@ -1684,7 +1690,7 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
+          {showWeaponRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
@@ -1694,12 +1700,12 @@ const InventoryScreen = () => {
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairOnePieceInstant(item.id)}>
+                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
           ))}
 
-          {showPARepair && (weaponDurabilityLossEnabled ? (
+          {showPARepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
@@ -1709,7 +1715,7 @@ const InventoryScreen = () => {
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairOnePieceInstant(item.id)}>
+                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
               </TouchableOpacity>
           ))}
@@ -1750,6 +1756,11 @@ const InventoryScreen = () => {
           )}
           {showWeaponDurability && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+          )}
+          {item.temporaryRepair === true && (
+            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+              {tInventory('repair.tempNote')}
+            </Text>
           )}
           {mk2Blocked && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>

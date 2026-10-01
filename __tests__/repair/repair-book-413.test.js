@@ -394,21 +394,21 @@ describe('Патч 413: операции — редкость, моды, дон�
 describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
 
-  it('одна кнопка у всех целей: настройка ВКЛ — «Ремонт» (окно), ВЫКЛ — мгновенная «Починить»', () => {
+  it('одна кнопка у всех целей: настройка ВКЛ и без перка — «Ремонт» (окно), иначе — мгновенная «Починить»', () => {
     const code = src();
     expect(code).toContain('RepairModal');
-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
-    expect((code.match(/weaponDurabilityLossEnabled \?/g) ?? []).length).toBe(3);
+    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая
+    // часть); с 416 в условии ещё и перк «Очумелые ручки».
+    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
     // Книжный режим открывает окно (обе формы цели).
     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
-    // Бесплатный режим — мгновенный и по 1 шт (через отделение штуки).
-    expect(code).toContain('repairOnePieceInstant(item.id)');
-    expect(code).toContain('splitOnePieceFromStack');
+    // Бесплатный режим — мгновенный, по 1 шт (операции сами отделяют штуку).
+    expect(code).toContain('performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
+    expect(code).toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
-    // Надетая часть — всегда 1 шт, сразу экшн.
-    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+    expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
     // Подписи режимов различаются.
     expect(code).toContain("tInventory('repair.actions.remake')");
     expect(code).toContain("tInventory('repair.actions.repair')");

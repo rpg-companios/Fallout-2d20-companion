@@ -57,6 +57,12 @@ export const normalizeItemParameters = (item) => {
 
   const normalized = { ...item };
 
+  // Паспорт 416: флаг временного ремонта «Очумелые ручки» — только
+  // строго true; поломанные сейвы чинятся при загрузке без подъёма версии.
+  if (normalized.temporaryRepair !== undefined && normalized.temporaryRepair !== true) {
+    delete normalized.temporaryRepair;
+  }
+
   if (normalized.damage !== undefined) {
     normalized.damage = coerceToParameter(normalized.damage);
     normalized.damage.total = calculateItemParameterTotal(normalized.damage);

@@ -24,6 +24,8 @@ import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
 import powerArmorCatalog from '../data/equipment/powerArmor.json';
 import { getScrapMaterials } from '../../../domain/registry';
+import { countActivePerkSelections } from '../../../domain/perks';
+import perksCatalog from '../data/perks/perks.json';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
 import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
@@ -170,14 +172,87 @@ export const splitOnePieceFromStack = (storeItemId) => {
   const item = useCharacterStore.getState().items?.[storeItemId];
   if (!item || (Number(item.quantity) || 1) <= 1) return storeItemId;
   const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
+  // Флаг временного ремонта «Очумелых ручек» не наследуется: отделённая
+  // штука либо чинится честно (флаг снят), либо получает свой (ниже).
   useCharacterStore.setState((prev) => ({
     items: {
       ...prev.items,
-      [singleKey]: { ...item, quantity: 1 },
-      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
+      [singleKey]: { ...item, quantity: 1, temporaryRepair: undefined },
+      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1, temporaryRepair: undefined },
     },
   }));
   return singleKey;
+};
+
+/**
+ * Патч 416 «Очумелые ручки» (juryRigging): починить предмет бесплатно,
+ * БЕЗ компонентов — но временно: предмет снова сломается при следующем
+ * осложнении при использовании; диапазон осложнений при проверках на
+ * умение пользоваться предметом — 19–20 (книжный текст перка).
+ * countActivePerkSelections гасит погасшие выборы (закон 412).
+ */
+export const juryRiggingRanksFor = (store = useCharacterStore.getState()) =>
+  countActivePerkSelections(store, 'juryRigging', perksCatalog);
+
+/** Паспорт 416: флаг «временно починено» на экземпляре инвентаря. */
+export const markTemporaryRepairOnItem = (storeItemId, value) => {
+  useCharacterStore.setState((prev) => {
+    const item = prev.items?.[storeItemId];
+    if (!item) return prev;
+    return {
+      items: {
+        ...prev.items,
+        [storeItemId]: { ...item, temporaryRepair: value ? true : undefined },
+      },
+    };
+  });
+};
+
+/** Паспорт 416: тот же флаг на НАДЕТОЙ части СБ (живёт вне items). */
+export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
+  useCharacterStore.setState((prev) => {
+    const piece = prev.equippedPowerArmor?.pieces?.[slot];
+    if (!piece) return prev;
+    return {
+      equippedPowerArmor: {
+        ...prev.equippedPowerArmor,
+        pieces: { ...prev.equippedPowerArmor.pieces, [slot]: { ...piece, temporaryRepair: value ? true : undefined } },
+      },
+    };
+  });
+};
+
+/**
+ * Бесплатная мгновенная починка (кнопка «Починить», слово владельца
+ * 414/415): по ОДНОЙ штуке, без теста и материалов. Слово владельца 416:
+ * с перком «Очумелые ручки» при включённой настройке прочности ремонт
+ * бесплатен, но ВРЕМЕННЫЙ (temporary — книжные эффекты перка).
+ */
+export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}) => {
+  const before = useCharacterStore.getState().items?.[storeItemId];
+  if (!before) return { ok: false, reason: 'not-found' };
+  const id = splitOnePieceFromStack(storeItemId);
+  const state = useCharacterStore.getState();
+  const piece = state.items?.[id];
+  if (!piece) return { ok: false, reason: 'not-found' };
+  if (piece.itemType === 'powerArmor') {
+    if (piece.paSlot) state.repairPowerArmorPieceAt(id);
+    else state.repairPowerArmorStack(id);
+  } else {
+    state.repairWeapon(id);
+  }
+  if (temporary) markTemporaryRepairOnItem(id, true);
+  return { ok: true, repairedStoreItemId: id, temporary };
+};
+
+/** То же для надетой части СБ (всегда одна штука). */
+export const performInstantFreeRepairForEquippedPiece = (slot, { temporary = false } = {}) => {
+  const store = useCharacterStore.getState();
+  const piece = store.equippedPowerArmor?.pieces?.[slot];
+  if (!piece) return { ok: false, reason: 'not-found' };
+  store.repairPowerArmorPieceAt(slot);
+  if (temporary) markTemporaryRepairOnEquippedPiece(slot, true);
+  return { ok: true, temporary };
 };
 
 /**
@@ -329,7 +404,11 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
       result.resolution = { kind: 'extra-minutes', degenerate: true };
     }
   }
-  if (result.done) useCharacterStore.getState().repairPowerArmorPieceAt(slot);
+  if (result.done) {
+    useCharacterStore.getState().repairPowerArmorPieceAt(slot);
+    // Честный ремонт перезачитывает временный («Очумелые ручки»).
+    markTemporaryRepairOnEquippedPiece(slot, false);
+  }
   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
   result.repairTime = {
     baseMinutes: REPAIR_RULES.baseMinutes,
@@ -418,6 +497,8 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
       else state.repairPowerArmorStack(repairTargetId);
     }
   }
+  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки».
+  if (result.done) markTemporaryRepairOnItem(repairTargetId, false);
   result.repairedStoreItemId = repairTargetId;
 
   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;

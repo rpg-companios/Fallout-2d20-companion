@@ -1,5 +1,21 @@
 # Changelog
 ---
+## Jury Rigging (patch 416)
+
+The «Jury Rigging» perk works now. The same single «Fix» button is
+free with this perk too, even with the durability setting on. Per the
+book, such a repair is temporary: the item breaks again at the next
+complication while being used, and the complication range for skill
+checks with the item is 19–20. While the item is temporarily repaired,
+its card shows a yellow note. A proper repair with materials (the
+«Repair» button) removes the note — the item is fixed for good. Firing
+wear does not remove the note: only a complication releases the item.
+
+The «Weapon durability loss» setting is now on by default. If it was
+saved off in your save — turn it on once in the settings; an explicit
+choice is never overridden.
+
+---
 ## One repair button (patch 415)
 
 By your word there is one button again. With the durability setting

@@ -124,7 +124,9 @@ const migrateFlatState = (persistedState) => {
     fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
     fallout.weaponDurabilityLossEnabled = false;
   } else {
-    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
+    // Слово владельца 416: настройка прочности включена ПО УМОЛЧАНИЮ
+    // (явно сохранённый выбор игрока не трогаем).
+    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? true;
     fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
   }
 
