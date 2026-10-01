@@ -17,8 +17,6 @@ import { readFileSync } from 'node:fs';
 import useCharacterStore from '../../src/store/characterStore';
 import {
   juryRiggingRanksFor,
-  performInstantFreeRepair,
-  performInstantFreeRepairForEquippedPiece,
   markTemporaryRepairOnItem,
   markTemporaryRepairOnEquippedPiece,
   splitOnePieceFromStack,
@@ -106,14 +104,6 @@ describe('Патч 417: «Без затрат (некачественно)» —
     expect(damaged?.quantity ?? 0).toBe(1);          // вторая ждёт
     expect(whole?.temporaryRepair).toBe(true);       // ремонт ВРЕМЕННЫЙ
     expect(damaged?.temporaryRepair).toBeUndefined(); // остальные чисты
-  });
-
-  it('мгновенная бесплатная (без перка, настройка выкл) флага не ставит', () => {
-    const key = seedWeapon({ durability: 40 });
-    const result = performInstantFreeRepair(key);
-    expect(result.ok).toBe(true);
-    expect(state().items[key].durability).toBe(100);
-    expect(state().items[key].temporaryRepair).toBeUndefined();
   });
 
   it('пачка СБ: бесплатно по 1 шт, флаг на починенной', () => {

@@ -17,8 +17,6 @@ import {
   repairAffordableFor,
   repairAffordableForPiece,
   juryRiggingRanksFor,
-  performInstantFreeRepair,
-  performInstantFreeRepairForEquippedPiece,
 } from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
@@ -1489,26 +1487,21 @@ const InventoryScreen = () => {
             </View>
           </View>
           <View style={styles.actionContainer}>
-            {item.showRepair && (weaponDurabilityLossEnabled ? (
-              juryRiggingActive ? (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
-                  disabled={!pieceAffordable}
-                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-                </TouchableOpacity>
-              )
-            ) : (
+            {/* Слово владельца 420: прочность части СБ отображается всегда →
+                кнопка окна ремонта есть всегда при повреждении (перк: активна —
+                есть «Без затрат»; без перка — серая без донора/материалов). */}
+            {item.showRepair && (juryRiggingActive ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot)}>
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                disabled={!pieceAffordable}
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -1698,49 +1691,36 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
-              juryRiggingActive ? (
-                  <TouchableOpacity
-                      style={[styles.actionButton, styles.applyButton]}
-                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-                  </TouchableOpacity>
-              ) : (
-                  <TouchableOpacity
-                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                      disabled={!repairAffordable}
-                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-                  </TouchableOpacity>
-              )
-          ) : (
+          {/* Слово владельца 420: есть отображение прочности (качество ИЛИ
+              износ) → кнопка окна ремонта с вариантами; нет отображения —
+              кнопки нет. Мгновенной починки больше нет. */}
+          {showWeaponRepair && showWeaponDurability && (juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => performInstantFreeRepair(item.id)}>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
           ))}
 
-          {showPARepair && (weaponDurabilityLossEnabled ? (
-              juryRiggingActive ? (
-                  <TouchableOpacity
-                      style={[styles.actionButton, styles.applyButton]}
-                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-                  </TouchableOpacity>
-              ) : (
-                  <TouchableOpacity
-                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                      disabled={!repairAffordable}
-                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-                  </TouchableOpacity>
-              )
-          ) : (
+          {showPARepair && (juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => performInstantFreeRepair(item.id)}>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+              </TouchableOpacity>
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
               </TouchableOpacity>
           ))}
 

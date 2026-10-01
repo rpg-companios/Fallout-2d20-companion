@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Repair button follows durability display (patch 420)
+
+One simple rule, as you said: if durability is not displayed — there
+is no repair button at all. If durability is visible on the card —
+the button opens the choice window (with the «Jury Rigging» perk —
+three buttons including «Without cost (poor quality)»; without the
+perk — donor and materials). A weapon shows durability when either
+the quality or the wear setting is on; power armor always shows it,
+so a damaged piece always has the button. No more instant repair:
+everything goes through the window, the test and the time.
+
+---
 ## The window only when the setting is on (patch 419)
 
 You caught a real bug: with the «Jury Rigging» perk and the

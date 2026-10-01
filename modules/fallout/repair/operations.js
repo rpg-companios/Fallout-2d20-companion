@@ -225,37 +225,6 @@ export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
 };
 
 /**
- * Бесплатная мгновенная починка БЕЗ перка (настройка прочности выключена,
- * слово владельца 415): по ОДНОЙ штуке, без теста и материалов. С перком
- * «Очумелые ручки» бесплатный путь идёт через окно и тест (417), поэтому
- * флаг временного ремонта здесь не ставится.
- */
-export const performInstantFreeRepair = (storeItemId) => {
-  const before = useCharacterStore.getState().items?.[storeItemId];
-  if (!before) return { ok: false, reason: 'not-found' };
-  const id = splitOnePieceFromStack(storeItemId);
-  const state = useCharacterStore.getState();
-  const piece = state.items?.[id];
-  if (!piece) return { ok: false, reason: 'not-found' };
-  if (piece.itemType === 'powerArmor') {
-    if (piece.paSlot) state.repairPowerArmorPieceAt(id);
-    else state.repairPowerArmorStack(id);
-  } else {
-    state.repairWeapon(id);
-  }
-  return { ok: true, repairedStoreItemId: id };
-};
-
-/** То же для надетой части СБ (всегда одна штука). */
-export const performInstantFreeRepairForEquippedPiece = (slot) => {
-  const store = useCharacterStore.getState();
-  const piece = store.equippedPowerArmor?.pieces?.[slot];
-  if (!piece) return { ok: false, reason: 'not-found' };
-  store.repairPowerArmorPieceAt(slot);
-  return { ok: true };
-};
-
-/**
  * Слово владельца 414: «если материалов нет, кнопка ремонта не активна».
  * Хватает материалов ИЛИ есть валидный донор — кнопка активна.
  */
