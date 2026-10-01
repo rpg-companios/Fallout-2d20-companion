@@ -1,0 +1,123 @@
+From 0000000000000000000000000000001788540116 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 16:41:56 +0000
+Subject: [PATCH] fix: own limb attack must not be written as installed weapon
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Ужимка предметов вырезает из экземпляра конечности всё каталожное, включая
+builtinWeaponId, поэтому делить «своя атака / установленное оружие» по
+экземпляру нельзя: на круге «записали — загрузили» манипулятор попадал и в
+собственные атаки, и в установки, а после снятия дедупликации (174) это
+давало дубль карточки (12 → 18 на одиннадцати слотах из реальных сейвов).
+
+normalizeSlot теперь накладывает каталог на конечность (resolveLimb) до
+разделения: builtinWeaponId и attackId берутся из данных, а не из сейва.
+
+Плюс тесты, запирающие весь механизм худого сейва на настоящем каталоге:
+slimSaveData → restoreSaveData → collectAttacks не меняет состав атак, слоты
+после загрузки снова объекты с именами и статами, повторная запись
+загруженного персонажа даёт тот же результат (мусор не возвращается).
+
+287 тестов / 24 файла — зелёные.
+
+---
+ 2 files changed, 60 insertions(+), 2 deletions(-)
+
+diff --git a/__tests__/saves/robot-slot-slim-roundtrip.test.js b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+index 86a6744..30ab3e8 100644
+--- a/__tests__/saves/robot-slot-slim-roundtrip.test.js
++++ b/__tests__/saves/robot-slot-slim-roundtrip.test.js
+@@ -16,7 +16,9 @@ import {
+   slotAcceptsArmor,
+   totalDR,
+ } from '../../domain/robotSlots';
+-import { slimRobotSlots, restoreSaveData } from '../../domain/saveSlimming';
++import { slimSaveData, slimRobotSlots, restoreSaveData } from '../../domain/saveSlimming';
++import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+ import fixtures from '../fixtures/robot-slots-from-saves.json';
+ 
+ const slot = (key) => JSON.parse(JSON.stringify(fixtures[key]));
+@@ -88,6 +90,59 @@ describe('ужимка слота: что остаётся в сейве', () =>
+   });
+ });
+ 
++describe('полный круг «записали — загрузили» на настоящем каталоге', () => {
++  // Тот же путь, что в приложении: slimSaveData перед записью в базу и
++  // restoreSaveData на загрузке (components/CharacterContext.js).
++  const catalog = getEquipmentCatalog();
++  const getEntry = (id, itemType) => {
++    try { return findCatalogEntry(catalog, id, itemType); } catch { return null; }
++  };
++  const resolve = (item) => {
++    try { return resolveItem(item, catalog); } catch { return item; }
++  };
++  const allSlots = () => Object.fromEntries(
++    Object.entries(fixtures).map(([key, value]) => [key.replace('.', '__'), JSON.parse(JSON.stringify(value))]),
++  );
++  const written = () => slimSaveData({ schemaVersion: 20, equippedRobotSlots: allSlots() }, { getEntry });
++  const loaded = () => restoreSaveData(written(), { resolve });
++
++  it('атаки после записи и загрузки те же, что были', () => {
++    const before = collectAttacks(allSlots()).map((a) => `${a.id}@${a.sourceSlot}`);
++    const after = collectAttacks(loaded().equippedRobotSlots).map((a) => `${a.id}@${a.sourceSlot}`);
++    expect(after).toEqual(before);
++    expect(after.length).toBeGreaterThan(0);
++  });
++
++  it('собственная атака конечности не уезжает в установки', () => {
++    // Ужимка предметов вырезает из экземпляра конечности всё каталожное,
++    // включая builtinWeaponId: в сейве остаётся только состояние. Делить
++    // «своё / установленное» надо по каталогу, иначе манипулятор попадёт и в
++    // собственные атаки, и в установки — дубль карточки после перезагрузки.
++    const limbWithoutCatalog = {
++      id: 'robot_arm_securitron',
++      name: 'Рука Секьюритрона',
++      builtinWeapons: [{ id: 'robot_weapon_manipulator' }, { id: 'weapon_laser_gun' }],
++    };
++    expect(serializeSlot({ limb: limbWithoutCatalog }).installedWeapons)
++      .toEqual([{ id: 'weapon_laser_gun', modIds: [] }]);
++    expect(written().equippedRobotSlots.securitron__leftArm.installedWeapons)
++      .toEqual([{ id: 'weapon_laser_gun', modIds: [] }]);
++  });
++
++  it('после загрузки слоты снова объекты с именами и статами', () => {
++    const slots = loaded().equippedRobotSlots;
++    expect(slots.securitron__leftArm.limb.name).toBeTruthy();
++    expect(slots.securitron__leftArm.armor.damageResistance).toEqual({ physical: 1, energy: 1 });
++    expect(slots.misterHandy__arm1.heldWeapon.name).toBeTruthy();
++  });
++
++  it('повторная запись загруженного персонажа не возвращает мусор', () => {
++    const once = written().equippedRobotSlots;
++    const twice = slimSaveData(loaded(), { getEntry }).equippedRobotSlots;
++    expect(twice).toEqual(once);
++  });
++});
++
+ describe('круг «ужали — развернули» ничего не теряет', () => {
+   const keys = Object.keys(fixtures);
+ 
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 9b5038f..e9e033d 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -123,8 +123,11 @@ export function normalizeSlot(slot, options = {}) {
+     };
+   }
+   // Старый вид: установленное оружие живёт внутри экземпляра конечности.
++  // Делить нужно по КАТАЛОГУ: в сохранённом экземпляре нет ни builtinWeaponId,
++  // ни attackId — эти поля живут только в данных, и без наложения каталога
++  // собственная атака конечности уедет в установки.
+   const limb = slot.limb ?? null;
+-  const { installed } = splitLimbWeapons(limb, { catalog });
++  const { installed } = splitLimbWeapons(resolveLimb(catalog, limb), { catalog });
+   return {
+     content: limb,
+     armorLayers: {
+
+-- 
+2.47.3
+

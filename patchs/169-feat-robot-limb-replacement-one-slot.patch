@@ -1,0 +1,283 @@
+From 0000000000000000000000000000001788511059 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 08:37:39 +0000
+Subject: [PATCH] feat(robot): limb replacement changes one slot behind flag
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 3, шаг 5: замена конечностей по новой модели (за флагом).
+
+applyLimbReplacement и canReplaceLimb:
+  1. замена меняет РОВНО ОДИН слот. Пар конечностей в модели нет: старый код
+     обнулял rightArm, если обе руки держали один и тот же объект конечности
+     — игрок терял конечность, которую не трогал (для Хэнди это была бы
+     потеря arm3);
+  2. защита следует за конечностью: поставили вместо руки огнемёт — броня,
+     обшивка и рама снимаются. Инвариант «защита только на конечности»
+     теперь держится и при замене, а не только при сборке комплекта;
+  3. съёмность слота берётся из данных, а не из имени: swappable:false у
+     головы реально запрещает замену (equip.error.slotNotSwappable), а не
+     просто лежит в JSON.
+
+Старая ветка сохранена целиком: при выключенном флаге пары обнуляются,
+обшивка на оружии остаётся, голову заменить можно.
+
+Тесты: +7 в __tests__/robot/robot-slot-model-flag.test.js — пары
+протектрона в обеих моделях, Хэнди arm3, снятие защиты при установке
+оружия вместо руки, ладонь у недержащей конечности, съёмность головы.
+
+Прогон 253 тестов: флаг выключен — 253 зелёных; ROBOT_NEW_SLOT_MODEL=1 —
+253 зелёных.
+
+---
+ 3 files changed, 178 insertions(+), 5 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+index 1f4810c..1f1cffe 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -12,6 +12,8 @@ import {
+   initRobotSlots,
+   getBuiltinWeaponsFromSlots,
+   canEquipRobotArmor,
++  applyLimbReplacement,
++  canReplaceLimb,
+ } from '../../domain/robotEquip';
+ import {
+   getRobotSlotDamageResistance,
+@@ -467,3 +469,130 @@ describe('диапазоны попаданий в экране', () => {
+     expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull();
+   });
+ });
++
++describe('замена конечностей', () => {
++  // Протектрон: обе руки держат ОДИН И ТОТ ЖЕ объект конечности — ровно
++  // тот случай, который старая модель считала парой.
++  const pairedProtectron = () => {
++    const { slots } = initRobotSlots('protectron', [], robotCatalog);
++    slots.rightArm.limb = slots.leftArm.limb;
++    return slots;
++  };
++
++  it('старая модель: замена парной руки обнуляет соседа', () => {
++    setNewSlotModelEnabled(false);
++    const slots = pairedProtectron();
++    const replacement = { ...byId(armsCatalog, 'robot_arm_assaultron'), itemType: 'robotArm' };
++    const { slots: next } = applyLimbReplacement(slots, 'leftArm', replacement, weaponsCatalog);
++
++    expect(next.leftArm.limb?.id).toBe('robot_arm_assaultron');
++    expect(next.rightArm.limb).toBeNull();
++  });
++
++  it('новая модель: замена меняет ровно один слот', () => {
++    setNewSlotModelEnabled(true);
++    const slots = pairedProtectron();
++    const replacement = { ...byId(armsCatalog, 'robot_arm_assaultron'), itemType: 'robotArm' };
++    const { slots: next } = applyLimbReplacement(slots, 'leftArm', replacement, weaponsCatalog);
++
++    expect(next.leftArm.limb?.id).toBe('robot_arm_assaultron');
++    // Сосед остался при своей конечности: пар в модели нет.
++    expect(next.rightArm.limb?.id).toBe(slots.rightArm.limb?.id);
++  });
++
++  it('Хэнди: замена arm3 не трогает arm1 и arm2', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      const { slots } = initRobotSlots('misterHandy', [
++        { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++        { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++        { ...byId(armsCatalog, 'robot_arm_mister_handy'), itemType: 'robotArm' },
++      ], robotCatalog);
++      const before1 = slots.arm1.limb?.id;
++      const before2 = slots.arm2.limb?.id;
++
++      const { slots: next } = applyLimbReplacement(
++        slots,
++        'arm3',
++        { ...byId(armsCatalog, 'robot_weapon_circular_saw'), itemType: 'robotArm' },
++        weaponsCatalog,
++      );
++
++      expect(next.arm3.limb?.id).toBe('robot_weapon_circular_saw');
++      expect(next.arm1.limb?.id).toBe(before1);
++      expect(next.arm2.limb?.id).toBe(before2);
++    }
++  });
++
++  it('новая модель: защита снимается, если вместо руки ставится оружие', () => {
++    const prepare = () => {
++      const { slots } = initRobotSlots('protectron', [], robotCatalog);
++      slots.leftArm.plating = platingFor('Arms');
++      return slots;
++    };
++
++    setNewSlotModelEnabled(false);
++    const oldNext = applyLimbReplacement(
++      prepare(),
++      'leftArm',
++      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      weaponsCatalog,
++    ).slots;
++    expect(oldNext.leftArm.plating).toBeTruthy(); // старая модель оставляет обшивку
++
++    setNewSlotModelEnabled(true);
++    const next = applyLimbReplacement(
++      prepare(),
++      'leftArm',
++      { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++      weaponsCatalog,
++    ).slots;
++    expect(next.leftArm.limb?.id).toBe('robot_weapon_flamethrower');
++    expect(next.leftArm.plating).toBeFalsy();
++    expect(next.leftArm.armor).toBeFalsy();
++    expect(next.leftArm.frame).toBeFalsy();
++    // У соседней руки защита не тронута.
++    expect(next.rightArm.plating).toBeFalsy();
++  });
++
++  it('ладень: недержащая конечность weapon в руке не держит', () => {
++    for (const value of [false, true]) {
++      setNewSlotModelEnabled(value);
++      const { slots } = initRobotSlots('protectron', [], robotCatalog);
++      slots.leftArm.heldWeapon = byId(weaponsCatalog, 'robot_weapon_protectron_manipulator');
++
++      const { slots: next } = applyLimbReplacement(
++        slots,
++        'leftArm',
++        { ...byId(armsCatalog, 'robot_weapon_flamethrower'), itemType: 'robotArm' },
++        weaponsCatalog,
++      );
++      expect(next.leftArm.heldWeapon).toBeFalsy();
++    }
++  });
++});
++
++describe('съёмность слота (swappable)', () => {
++  const character = { origin: { bodyPlan: 'misterHandy' } };
++  // Голова, совместимая с планом Хэнди (иначе проверка упадёт на плане,
++  // а не на съёмности).
++  const newHead = {
++    ...byId(headsCatalog, 'robot_head_mister_handy_eye_stalk'),
++    itemType: 'robotHead',
++  };
++
++  it('старая модель: голову заменить можно', () => {
++    setNewSlotModelEnabled(false);
++    expect(canReplaceLimb('head', newHead, character).allowed).toBe(true);
++  });
++
++  it('новая модель: голова не снимается', () => {
++    setNewSlotModelEnabled(true);
++    const { allowed, reason } = canReplaceLimb('head', newHead, character);
++    expect(allowed).toBe(false);
++    expect(reason).toBe('equip.error.slotNotSwappable');
++    // Руку менять можно.
++    expect(canReplaceLimb('arm1', { ...byId(armsCatalog, 'robot_arm_assaultron') }, character).allowed)
++      .toBe(true);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 8f0c17d..6238157 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -359,13 +359,31 @@
+ Конечность-оружие — вещь уникальная, свою защиту иметь может; не имеет она
+ только **слоёв** защиты (броня/обшивка/рама). Отбрасывание полей убрано.
+ 
++#### Шаг 5 (патч 169): замена конечностей
++
++`applyLimbReplacement` и `canReplaceLimb` переведены на новую модель:
++
++1. **замена меняет ровно один слот.** Пар конечностей в модели нет: старый
++   код обнулял `rightArm`, если обе руки держали один и тот же объект
++   конечности, — игрок терял конечность, которую не трогал. Для Хэнди это
++   выглядело бы как потеря `arm3`;
++2. **защита следует за конечностью.** Поставили вместо руки огнемёт — броня,
++   обшивка и рама снимаются (инвариант «защита только на конечности»);
++3. **съёмность слота берётся из данных**, а не из имени: `swappable: false` у
++   головы теперь реально запрещает замену (`equip.error.slotNotSwappable`),
++   а не просто лежит в JSON.
++
++Старая ветка сохранена целиком: при выключенном флаге пары обнуляются,
++обшивка на оружии остаётся, голову заменить можно.
++
+ #### Что осталось по этапу 3
+ 
+-| Шаг | Точка использования | Сложность |
++| Шаг | Точка использования | Статус |
+ |---|---|---|
+-| 168 | замена конечностей: `applyLimbReplacement` считает парой только `leftArm/rightArm` | средняя |
+-| 169 | хардкоды `leftArm/rightArm` в `src/store/selectors.js`, `domain/powerArmor.js`, `LimbUpgradeModal.js` | средняя |
+-| — | подключение `resolveHit` / `hitTable`: пока нет потребителя, таблица ниоткуда не вызывается | нужна договорённость, где считается попадание |
++| 168 | диапазоны попаданий из плана тела + СУ конечности-оружия | сделано |
++| 169 | замена конечностей: `applyLimbReplacement` считает парой только `leftArm/rightArm` | сделано |
++| 170 | хардкоды `leftArm/rightArm` в `src/store/selectors.js`, `domain/powerArmor.js`, `LimbUpgradeModal.js` | осталось |
++| — | `hitTable` для `assaultron`, `sentryBot`, `robobrain`, `misterHandy` — данные от владельца | открытый вопрос №1 |
+ 
+ После этого этап 4 — флаг включён и старое удалено (один коммит), этап 5 —
+ миграция сейва, этап 6 — удаление мёртвых полей (`robotLocation`,
+diff --git a/domain/robotEquip.js b/domain/robotEquip.js
+index 7749068..c12d7de 100644
+--- a/domain/robotEquip.js
++++ b/domain/robotEquip.js
+@@ -12,6 +12,7 @@ import {
+   slotsForLimbType,
+   slotAcceptsArmor,
+   canEquip,
++  getSlotDef,
+   LIMB_TYPE_BY_ROBOT_LOCATION,
+ } from './robotSlots';
+ 
+@@ -730,6 +731,15 @@ export function canReplaceLimb(slotKey, newLimb, character) {
+ 
+   const bodyPlan = character?.origin?.bodyPlan;
+ 
++  // Новая модель: съёмность слота задана данными плана тела, а не именем.
++  // Голова не снимается ни у одного плана (решение владельца).
++  if (isNewSlotModelEnabled()) {
++    const def = getSlotDef(bodyPlan, slotKey);
++    if (def && def.swappable === false) {
++      return { allowed: false, reason: 'equip.error.slotNotSwappable' };
++    }
++  }
++
+   const compatiblePlans = newLimb.compatibleBodyPlans;
+   const defaultPlan = newLimb.defaultForBodyPlan;
+ 
+@@ -788,7 +798,14 @@ export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = [
+     },
+   };
+ 
+-  if ((slotKey === 'leftArm' || slotKey === 'rightArm') && slots.leftArm && slots.rightArm) {
++  // Новая модель: пар конечностей нет, замена меняет РОВНО ОДИН слот.
++  // Сбрасывать соседа за компанию — значит отбирать у игрока конечность,
++  // которую он не трогал (для Хэнди это была бы потеря arm3).
++  if (
++    !isNewSlotModelEnabled()
++    && (slotKey === 'leftArm' || slotKey === 'rightArm')
++    && slots.leftArm && slots.rightArm
++  ) {
+     const siblingKey = slotKey === 'leftArm' ? 'rightArm' : 'leftArm';
+     const oldLimb = slots[slotKey]?.limb;
+     if (oldLimb && slots[siblingKey]?.limb === oldLimb) {
+@@ -796,6 +813,15 @@ export function applyLimbReplacement(slots, slotKey, newLimb, weaponsCatalog = [
+     }
+   }
+ 
++  // Инвариант новой модели: защита живёт только на настоящей конечности.
++  // Поставили вместо руки огнемёт — броня, обшивка и рама снимаются.
++  if (isNewSlotModelEnabled()) {
++    const target = updatedSlots[slotKey];
++    if (target && !slotAcceptsArmor(target).allowed) {
++      updatedSlots[slotKey] = { ...target, armor: null, plating: null, frame: null };
++    }
++  }
++
+   const weapons = getBuiltinWeaponsFromSlots(updatedSlots);
+   return { slots: updatedSlots, weapons };
+ }
+
+-- 
+2.47.3
+

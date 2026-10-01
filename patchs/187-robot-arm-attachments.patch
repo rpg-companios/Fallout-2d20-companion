@@ -1,0 +1,183 @@
+From 0000000000000000000000000000001788699118 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 06 Sep 2026 12:51:58 +0000
+Subject: [PATCH] robot arm attachments: install requirements only for the book's five
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Книга (ARM ATTACHMENTS): на руку можно повесить любое дальнобойное или
+рукопашное оружие плюс робо-специфичные предметы из таблицы. Требования
+установки (сложность, перки, навык) есть только у пяти предметов таблицы —
+Buzz Saw, Construction Claw, Cryojet, Drill, Vice Grip.
+
+У Карабина Теслы (robot_weapon_tesla_arm) они были скопированы с Криоструи:
+в таблице его нет, для робомозга он навес из комплекта, как лазер и кувалда.
+Поля installComplexity/PerksRequired/Skill сняты в weaponAsLimb.json и в
+weapons.json (данные дублировались в обоих каталогах).
+
+Отдельного потока установки навеса в книге нет — всё учитывается при сборке;
+в приложении его тоже нет, installedWeapons меняются только комплектами.
+
+Тесты: __tests__/robot/robot-armor-catalog-book.test.js (+2) — требования
+установки только у пяти навесов; у Карабина Теслы их нет ни в одном каталоге.
+Итого 322/28.
+
+---
+ 4 files changed, 86 insertions(+), 12 deletions(-)
+
+diff --git a/__tests__/robot/robot-armor-catalog-book.test.js b/__tests__/robot/robot-armor-catalog-book.test.js
+index 484298d..8b2b4b4 100644
+--- a/__tests__/robot/robot-armor-catalog-book.test.js
++++ b/__tests__/robot/robot-armor-catalog-book.test.js
+@@ -12,6 +12,7 @@ import platingFile from '../../modules/fallout/data/equipment/robot/armor_platin
+ import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
+ import armorFile from '../../modules/fallout/data/equipment/robot/armor.json';
+ import weaponAsLimbFile from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import weaponsFile from '../../modules/fallout/data/equipment/robot/weapons.json';
+ 
+ const ARMORER = (rank) => `Armorer ${rank}`;
+ 
+@@ -68,6 +69,12 @@ const BOOK_ATTACHMENTS = [
+   ['robot_weapon_vice_grip', 4, ['Blacksmith 3'], 'REPAIR'],
+ ];
+ 
++// Навесы из таблицы ARM ATTACHMENTS — единственные, у кого есть требования
++// установки (сложность, перки, навык). Всё остальное оружие на руке — из
++// комплекта: учитывается само оружие (цена, раритет), отдельной строки в
++// таблице у него нет.
++const INSTALL_FIELDS = ['installComplexity', 'installPerksRequired', 'installSkill'];
++
+ const row = (entry) => {
+   const dr = entry.damageResistance || {};
+   return [
+@@ -109,4 +116,28 @@ describe('каталог защитных слоёв сверен с книго
+         .toEqual([id, complexity, perks, skill]);
+     }
+   });
++
++  it('требования установки — только у пяти навесов из таблицы', () => {
++    const entries = weaponAsLimbFile.weaponAsLimb || weaponAsLimbFile;
++    const withInstall = entries
++      .filter((entry) => INSTALL_FIELDS.some((field) => field in entry))
++      .map((entry) => entry.id);
++    expect(withInstall.sort()).toEqual(BOOK_ATTACHMENTS.map(([id]) => id).sort());
++  });
++
++  it('Карабин Теслы — оружие, а не навес из таблицы: требований установки нет', () => {
++    // Для робомозга он навес на руку (выбор комплекта), но в таблице ARM
++    // ATTACHMENTS его нет: требования у него были скопированы с Криоструи.
++    const entries = weaponAsLimbFile.weaponAsLimb || weaponAsLimbFile;
++    const tesla = entries.find((entry) => entry.id === 'robot_weapon_tesla_arm');
++    expect(tesla, 'Карабин Теслы должен остаться оружием-конечностью').toBeTruthy();
++    for (const field of INSTALL_FIELDS) {
++      expect(field in tesla, `${field} у Карабина Теслы`).toBe(false);
++    }
++    // И в каталоге оружия — тоже.
++    const weapon = (weaponsFile.weapons || weaponsFile).find((entry) => entry.id === 'robot_weapon_tesla_arm');
++    for (const field of INSTALL_FIELDS) {
++      expect(field in weapon, `${field} у Карабина Теслы в weapons.json`).toBe(false);
++    }
++  });
+ });
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index ad8b7e3..31ba947 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -949,3 +949,58 @@ armor }`) и новый (`{ content, armorLayers }`), причём в новом
+ книгой теперь падает тестом.
+ 
+ **Итог:** 320 тестов / 28 файлов, все зелёные.
++
++---
++
++## Навесы на руки: оружие и ARM ATTACHMENTS (патч 187)
++
++Правило книги (текст владельца):
++
++> Arms can have both ranged and melee weapons attached to them, as well as the
++> robot-specific items listed below. These attachments have their own
++> complexity, component cost, perks, skills, and rarities that need to be
++> accounted for when constructing your robot, but they can be part of the same
++> skill test to construct your automatron.
++
++Чтение:
++
++1. **Любое** дальнобойное или рукопашное оружие можно закрепить на руке
++   (лазер, кувалда, Карабин Теслы, огнемёт). Отдельной строки в таблице у
++   него нет — учитывается само оружие (цена, раритет).
++2. **Плюс** робо-специфичные предметы из таблицы ARM ATTACHMENTS (Buzz Saw,
++   Construction Claw, Cryojet, Drill, Vice Grip) — у каждого своя сложность,
++   стоимость в компонентах, перки, навык и раритет.
++3. Всё это учитывается **при сборке** робота и может входить в тот же бросок,
++   что и сборка автоматрона — отдельной процедуры «установить навес позже» в
++   книге нет. В приложении такого потока тоже нет: `installedWeapons`
++   меняются только комплектами, а в интерфейсе можно лишь заменить
++   конечность целиком.
++
++### Как это смоделировано
++
++Один и тот же id живёт в двух каталогах: `weapons.json` — оружие как таковое,
++`weaponAsLimb.json` — если оно может быть рукой (arm attachment). Карабин
++Теслы (`robot_weapon_tesla_arm`) лежит в обоих: для робомозга это навес,
++в остальных комплектах — обычное оружие (как кувалда: `weapon_sledgehammer`
++в комплекте защитрона — оружие, в комплекте робомозга — навес).
++
++Выбор «любых двух» уже реализован: `robobrain_nonordinary` содержит два
++независимых выбора (левая и правая рука), в каждом ровно книжный список —
++smoke claw (`robot_arm_smoke_manipulator`), Tesla rifle, flamer, laser gun,
++sledgehammer.
++
++### Что поправлено
++
++Требования установки остались **только у пяти навесов из таблицы**. У Карабина
++Теслы они были скопированы с Криоструи (сложность 4, Robotics Expert 1 +
++Science! 1, Science) — в таблице его нет, он навес из комплекта. Поля
++`installComplexity/PerksRequired/Skill` сняты и в `weaponAsLimb.json`, и в
++`weapons.json` (данные дублировались в обоих каталогах).
++
++### Что книга даёт, а мы не храним
++
++- стоимость навеса в компонентах;
++- раритет навеса (по книге все пять Uncommon) — числовое поле `rarity` у нас
++  есть только у самого оружия, легенда шкалы в данных не зафиксирована.
++
++**Итог:** 322 теста / 28 файлов, все зелёные.
+diff --git a/modules/fallout/data/equipment/robot/weaponAsLimb.json b/modules/fallout/data/equipment/robot/weaponAsLimb.json
+index 59c7629..7fc6184 100644
+--- a/modules/fallout/data/equipment/robot/weaponAsLimb.json
++++ b/modules/fallout/data/equipment/robot/weaponAsLimb.json
+@@ -88,12 +88,6 @@
+     "itemCategory": "weaponAsLimb",
+     "limbType": "arm",
+     "attackId": "robot_weapon_tesla_arm",
+-    "installComplexity": 4,
+-    "installPerksRequired": [
+-      "Robotics Expert 1",
+-      "Science! 1"
+-    ],
+-    "installSkill": "SCIENCE",
+     "name": "robot_weapon_tesla_arm"
+   },
+   {
+diff --git a/modules/fallout/data/equipment/robot/weapons.json b/modules/fallout/data/equipment/robot/weapons.json
+index 98b12d0..6625519 100644
+--- a/modules/fallout/data/equipment/robot/weapons.json
++++ b/modules/fallout/data/equipment/robot/weapons.json
+@@ -494,12 +494,6 @@
+     "cost": 0,
+     "rarity": 0,
+     "ammoId": "ammo_fusion_core",
+-    "installComplexity": 4,
+-    "installPerksRequired": [
+-      "Robotics Expert 1",
+-      "Science! 1"
+-    ],
+-    "installSkill": "Science",
+     "qualities": [],
+     "effects": [
+       {
+
+-- 
+2.47.3
+

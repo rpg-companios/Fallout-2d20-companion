@@ -1,0 +1,568 @@
+From 0000000000000000000000000000001788518167 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 10:36:07 +0000
+Subject: [PATCH] slot weapon state: id plus mod ids, resolve weapon from both catalogs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 5, шаг 0: движок читает новую форму оружия в слоте.
+
+Оружие в слоте хранится id базы + список id установленных модов:
+  heldWeaponId / heldWeaponMods, installedWeapons: [{ id, modIds }].
+
+- registry: в каталог конечностей добавлены generalWeapons (общий каталог
+  оружия сеттинга) и weaponMods.
+- robotSlots: resolveWeapon ищет и в каталоге роботов, и в общем — человеческое
+  оружие в ладони (рельсотрон, дробовик, ПП) больше не пустышка без урона;
+  materializeWeapon накладывает моды через applyWeaponMods.
+- normalizeSlot: новая форма + чтение старой (моды из appliedMods, установки из
+  массива builtinWeapons конечности минус её собственная атака каталога).
+- splitLimbWeapons: своя атака конечности vs установленное в неё оружие.
+- attacksFromSlot: порядок «ладонь → своя атака → установки»; из одного слота
+  бывает три атаки. Карточка несёт modIds и appliedMods.
+
+260 тестов / 22 файла — зелёные.
+
+---
+ 4 files changed, 337 insertions(+), 28 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-model.test.js b/__tests__/robot/robot-slot-model.test.js
+index 7c3cbbc..bfc0bba 100644
+--- a/__tests__/robot/robot-slot-model.test.js
++++ b/__tests__/robot/robot-slot-model.test.js
+@@ -18,10 +18,13 @@ import {
+   slotAcceptsArmor,
+   canEquip,
+   attacksFromSlot,
++  collectAttacks,
++  splitLimbWeapons,
+   resolveHit,
+   validateHitTable,
+ } from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
++import modsCatalog from '../../modules/fallout/data/equipment/weapon_mods.json';
+ 
+ const catalog = getRobotLimbCatalog();
+ const limbById = (id) => catalog.limbs.find((l) => l.id === id);
+@@ -51,9 +54,56 @@ describe('нормализация состояния слота', () => {
+         armor: null,
+       },
+       heldWeaponId: 'robot_weapon_manipulator',
++      heldWeaponMods: [],
++      installedWeapons: [],
+     });
+   });
+ 
++  it('установленное оружие из старого вида отделяется от встроенного', () => {
++    // Старый сейв: в экземпляре руки лежат и манипулятор (свой), и лазер
++    // (установлен игроком). Каталог называет своим только манипулятор.
++    const old = {
++      limb: {
++        id: 'robot_arm_securitron',
++        builtinWeaponId: 'robot_weapon_manipulator',
++        builtinWeapons: [
++          { id: 'robot_weapon_manipulator' },
++          { id: 'weapon_laser_gun', appliedMods: { Capacitor: 'mod_capacitor_x' } },
++        ],
++      },
++    };
++    const state = normalizeSlot(old);
++    expect(state.installedWeapons).toEqual([
++      { id: 'weapon_laser_gun', modIds: ['mod_capacitor_x'] },
++    ]);
++    // Собственная атака в установки не попадает.
++    expect(state.installedWeapons.map((w) => w.id)).not.toContain('robot_weapon_manipulator');
++  });
++
++  it('моды оружия в ладони читаются из appliedMods', () => {
++    const old = {
++      limb: { id: 'robot_arm_protectron' },
++      heldWeapon: { id: 'weapon_10mm_smg', appliedMods: { Receiver: 'mod_001' } },
++    };
++    expect(normalizeSlot(old).heldWeaponMods).toEqual(['mod_001']);
++  });
++
++  it('новый вид: оружие = база + id модов', () => {
++    const next = {
++      content: 'robot_arm_protectron',
++      heldWeaponId: 'weapon_combat_shotgun',
++      heldWeaponMods: ['mod_001'],
++      installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }, 'weapon_submachine_gun'],
++    };
++    const state = normalizeSlot(next);
++    expect(state.heldWeaponId).toBe('weapon_combat_shotgun');
++    expect(state.heldWeaponMods).toEqual(['mod_001']);
++    expect(state.installedWeapons).toEqual([
++      { id: 'weapon_laser_gun', modIds: [] },
++      { id: 'weapon_submachine_gun', modIds: [] },
++    ]);
++  });
++
+   it('новый вид остаётся новым', () => {
+     const next = {
+       content: 'limb_or_id',
+@@ -335,6 +385,61 @@ describe('attacksFromSlot', () => {
+     expect(attack.damageType).toBe('physical');
+     expect(attack.mainSkill).toBe('UNARMED');
+   });
++
++  it('человеческое оружие в ладони восстанавливается по id из общего каталога', () => {
++    // Рельсотрон — человеческое оружие; в каталоге роботов его нет.
++    const [held] = attacksFromSlot({
++      content: 'robot_arm_protectron',
++      heldWeaponId: 'weapon_railway_rifle',
++    }, { slotId: 'rightArm' }).filter((a) => a.source === 'held');
++    expect(held).toBeTruthy();
++    expect(held.damage).toBeGreaterThan(0);
++    expect(held.fireRate).toBeDefined();
++    expect(held.mainSkill).toBeTruthy();
++  });
++
++  it('из одного слота бывает три атаки: манипулятор + установка + оружие в ладони', () => {
++    const attacks = attacksFromSlot({
++      content: 'robot_arm_securitron',
++      heldWeaponId: 'weapon_combat_shotgun',
++      installedWeapons: [{ id: 'weapon_laser_gun', modIds: [] }],
++    }, { slotId: 'leftArm' });
++    expect(attacks.map((a) => a.source)).toEqual(['held', 'builtin', 'installed']);
++    expect(attacks.map((a) => a.id)).toEqual([
++      'weapon_combat_shotgun',
++      'robot_weapon_manipulator',
++      'weapon_laser_gun',
++    ]);
++  });
++
++  it('установленное оружие — встроенное: isBuiltin в карточке', () => {
++    const cards = collectAttacks({
++      leftArm: { content: 'robot_arm_securitron', installedWeapons: [{ id: 'weapon_laser_gun' }] },
++    });
++    const laser = cards.find((w) => w.id === 'weapon_laser_gun');
++    expect(laser?.isBuiltin).toBe(true);
++    expect(laser?.sourceSlot).toBe('leftArm');
++  });
++
++  it('моды оружия в ладони меняют характеристики карточки', () => {
++    const base = attacksFromSlot({
++      content: 'robot_arm_protectron',
++      heldWeaponId: 'weapon_10mm_smg',
++    }, { slotId: 'leftArm' }).find((a) => a.source === 'held');
++    const mod = modsCatalog.find((m) => m.damageModifier && m.applies_to_ids?.includes('weapon_10mm_smg'));
++    expect(mod, 'нужен мод с модификатором урона для ПП 10 мм').toBeTruthy();
++
++    const modded = attacksFromSlot({
++      content: 'robot_arm_protectron',
++      heldWeaponId: 'weapon_10mm_smg',
++      heldWeaponMods: [mod.id],
++    }, { slotId: 'leftArm' }).find((a) => a.source === 'held');
++
++    expect(modded.modIds).toEqual([mod.id]);
++    expect(modded.appliedMods).toEqual({ [mod.slot]: mod.id });
++    const delta = mod.damageModifier.op === '-' ? -mod.damageModifier.value : mod.damageModifier.value;
++    expect(modded.damage).toBe(base.damage + delta);
++  });
+ });
+ 
+ describe('таблица попаданий', () => {
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 4a3f07d..e48bec4 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -138,12 +138,24 @@
+ 
+ ```json
+ "leftArm": {
+-  "content": "limb_arm_protectron",
+-  "armorLayers": { "frame": null, "plating": "plating_standard_arms", "armor": null },
+-  "heldWeaponId": "attack_10mm_pistol"
++  "content": "robot_arm_securitron",
++  "armorLayers": { "frame": null, "plating": "robot_plating_standard_arms", "armor": null },
++  "heldWeaponId": "weapon_railway_rifle",
++  "heldWeaponMods": ["mod_001"],
++  "installedWeapons": [{ "id": "weapon_laser_gun", "modIds": [] }]
+ }
+ ```
+ 
++Оружие в слоте — **id базы + список id установленных модов** (решение
++владельца): характеристики восстанавливаются из каталога, моды накладываются
++`applyWeaponMods`. Ни имён, ни посчитанных характеристик в сейве нет.
++
++`installedWeapons` — оружие, **установленное в конечность** (апгрейд игрока:
++лазерная пушка секьюритрона). Это НЕ то же, что встроенная атака конечности:
++своя атака объявлена каталогом (`attackId` / `builtinWeaponId`), всё сверх неё
++— установка. Поле появилось из живых сейвов: у секьюритрона в руке лежат и
++манипулятор, и лазерная пушка, причём у левой — один состав, у правой — другой.
++
+ ---
+ 
+ ## 4. Этапы и патчи
+@@ -454,13 +466,51 @@
+ (источник диапазонов до `hitTable`) больше никто не читает — кандидат на
+ удаление в этапе 6.
+ 
++### Этап 5, шаг 0 (патч 173): форма оружия в слоте — id + моды
++
++Подготовка миграции сейва: движок умеет читать и отдавать новую форму.
++
++| Что | Где |
++|---|---|
++| общий каталог оружия и моды в реестре | `getRobotLimbCatalog()` ↔ `generalWeapons`, `weaponMods` |
++| поиск оружия по двум каталогам | `resolveWeapon`: robot/weapons.json → общий weapons.json |
++| оружие = база + моды | `materializeWeapon` → `applyWeaponMods` (domain/enrichItem.js) |
++| `heldWeaponMods`, `installedWeapons` в состоянии слота | `normalizeSlot` |
++| разделение «своя атака / установка» | `splitLimbWeapons` |
++| карточка несёт `modIds` и `appliedMods` | `attacksFromSlot`, `collectAttacks` |
++
++Зачем: в живых сейвах человеческое оружие лежит в ладони робота (рельсотрон,
++боевой дробовик, ПП 10 мм). Раньше `resolveWeapon` искал только по каталогу
++роботов, поэтому карточка получалась пустышкой `{ id }` без урона и темпа.
++Теперь:
++
++| Сейв | Оружие | Урон/темп по id |
++|---|---|---|
++| Протектрон | `weapon_railway_rifle` | 10 / 0 |
++| Робомозг | `weapon_combat_shotgun` | 5 / 2 |
++| Хэнди | `weapon_10mm_smg` | 4 / 3 |
++| Секьюритрон | `weapon_laser_gun`, `weapon_submachine_gun` | 4/2, 3/3 |
++
++Побочно: установки из старых сейвов (массив `limb.builtinWeapons` минус
++собственная атака каталога) теперь дают свои карточки — у секьюритрона и
++ассультрона их стало видно по две на руку, как и задумано.
++
++Из одного слота бывает три атаки: своя встроенная + установка + оружие в
++ладони (проверено тестом на руке секьюритрона).
++
++| Режим | Тестов | Зелёных |
++|---|---|---|
++| по умолчанию | 260 | **260** |
++| `ROBOT_NEW_SLOT_MODEL=0` (переменная не влияет) | 260 | **260** |
++
+ **Этап 4 завершён.** Вне области остались хардкоды `leftArm/rightArm` на
+ человеческой стороне (`src/store/selectors.js`, `domain/powerArmor.js`,
+ `InventoryScreen`) — ранее владелец вынес их за рамки: слоты людей статичны,
+ плана тела у них нет. Отдельный открытый вопрос №1 — `hitTable` для
+ `assaultron`, `sentryBot`, `robobrain`, `misterHandy`.
+ 
+-Дальше: этап 5 — миграция сейва, этап 6 — удаление мёртвых полей
++Дальше: этап 5 — миграция сейва (174) + перенос дедупа в экран (175),
++этап 6 — удаление мёртвых полей
+ (`robotLocation`, `builtinTo*`, `slotCapabilities`, `hitLocations`).
+ 
+ Оба acceptance-критерия Хэнди выполнены.
+diff --git a/domain/registry.js b/domain/registry.js
+index 0735adc..3c5f1ae 100644
+--- a/domain/registry.js
++++ b/domain/registry.js
+@@ -24,6 +24,7 @@ import moduleCategories from '../modules/fallout/data/equipment/categories.json'
+ import moduleTraits from '../modules/fallout/data/traits/traits.json';
+ import modulePerks from '../modules/fallout/data/perks/perks.json';
+ import moduleWeapons from '../modules/fallout/data/equipment/weapons.json';
++import moduleWeaponMods from '../modules/fallout/data/equipment/weapon_mods.json';
+ import moduleGeneralGoods from '../modules/fallout/data/equipment/general_goods.json';
+ import moduleDiseaseExposureRule from '../modules/fallout/data/rules/diseaseExposure.json';
+ import moduleEquipmentKits from '../modules/fallout/data/equipmentKits/index.js';
+@@ -123,6 +124,14 @@ const ROBOT_LIMB_CATALOG = Object.freeze({
+   limbs: robotLimbsJson,
+   weaponAsLimb: robotWeaponAsLimbJson,
+   weapons: robotWeaponsJson,
++  // Общий каталог оружия сеттинга: то, что робот может держать в ладони и что
++  // в конечность устанавливается (человеческое оружие — рельсотрон, дробовик,
++  // лазерный пистолет). Боевые характеристики оружия живут только здесь и в
++  // robot/weapons.json; в сейве хранится один id.
++  generalWeapons: moduleWeapons,
++  // Моды оружия: сейв хранит id установленных модов, характеристики
++  // восстанавливаются применением модов к базе (domain/enrichItem.js).
++  weaponMods: moduleWeaponMods,
+   // Слои защиты плоским списком; принадлежность слою — в поле layer.
+   armorLayers: [
+     ...(robotArmorJson.armor || []),
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 1dadb4d..d955af1 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -24,6 +24,7 @@
+ 
+ import { getBodyPlan } from './bodyplan';
+ import { getRobotLimbCatalog } from './registry';
++import { applyWeaponMods } from './enrichItem';
+ 
+ /** Слои защиты в порядке приоритета (armor и frame совместимы, plating — нет). */
+ export const LAYER_KEYS = ['armor', 'frame', 'plating'];
+@@ -57,41 +58,121 @@ const deny = (reason) => ({ allowed: false, reason });
+ // Состояние слота: старый вид → новый
+ // ---------------------------------------------------------------------------
+ 
++const EMPTY_ARMOR_LAYERS = () => ({ frame: null, plating: null, armor: null });
++
++/**
++ * id установленных модов из любого вида записи:
++ *   { modIds: [...] }  — новый вид;
++ *   { appliedMods: { слот: id } } — вид предмета инвентаря.
++ * @param {object} source
++ * @returns {string[]}
++ */
++export const toModIds = (source) => {
++  if (!source || typeof source !== 'object') return [];
++  if (Array.isArray(source.modIds)) return source.modIds.filter(Boolean);
++  const map = source.appliedMods;
++  if (map && typeof map === 'object') return Object.values(map).filter(Boolean);
++  return [];
++};
++
++/** Приводит список установленного оружия к виду [{ id, modIds }]. */
++const normalizeInstalled = (list) => (Array.isArray(list) ? list : [])
++  .map((entry) => {
++    if (typeof entry === 'string') return { id: entry, modIds: [] };
++    const id = entry?.id ?? entry?.weaponId ?? null;
++    if (!id) return null;
++    return { id, modIds: toModIds(entry) };
++  })
++  .filter(Boolean);
++
+ /**
+  * Приводит состояние слота к новому виду:
+- *   новый:  { content, armorLayers: { frame, plating, armor }, heldWeaponId }
++ *   новый:  { content, armorLayers: { frame, plating, armor }, heldWeaponId,
++ *             heldWeaponMods, installedWeapons: [{ id, modIds }] }
+  *   старый: { limb, armor, plating, frame, heldWeapon }
+  *
++ * Оружие в слоте хранится id + список id установленных модов: характеристики
++ * восстанавливаются из каталога, моды накладываются поверх базы. Установленное
++ * в конечность оружие (апгрейд) отличается от её собственной встроенной атаки:
++ * собственная задана каталогом, всё сверх неё — установленное.
++ *
+  * @param {object} slot
+- * @returns {{ content: any, armorLayers: object, heldWeaponId: string|null }}
++ * @param {object} options — { catalog? }
+  */
+-export function normalizeSlot(slot) {
++export function normalizeSlot(slot, options = {}) {
++  const { catalog = getRobotLimbCatalog() } = options;
+   if (!slot || typeof slot !== 'object') {
+     return {
+       content: null,
+-      armorLayers: { frame: null, plating: null, armor: null },
++      armorLayers: EMPTY_ARMOR_LAYERS(),
+       heldWeaponId: null,
++      heldWeaponMods: [],
++      installedWeapons: [],
+     };
+   }
+-  const isNewShape = 'content' in slot || 'armorLayers' in slot || 'heldWeaponId' in slot;
++  const isNewShape = 'content' in slot || 'armorLayers' in slot
++    || 'heldWeaponId' in slot || 'installedWeapons' in slot;
+   if (isNewShape) {
+     return {
+       content: slot.content ?? null,
+-      armorLayers: { frame: null, plating: null, armor: null, ...(slot.armorLayers || {}) },
++      armorLayers: { ...EMPTY_ARMOR_LAYERS(), ...(slot.armorLayers || {}) },
+       heldWeaponId: slot.heldWeaponId ?? null,
++      heldWeaponMods: toModIds({ modIds: slot.heldWeaponMods, appliedMods: slot.heldWeapon?.appliedMods }),
++      installedWeapons: normalizeInstalled(slot.installedWeapons),
+     };
+   }
++  // Старый вид: установленное оружие живёт внутри экземпляра конечности.
++  const limb = slot.limb ?? null;
++  const { installed } = splitLimbWeapons(limb, { catalog });
+   return {
+-    content: slot.limb ?? null,
++    content: limb,
+     armorLayers: {
+       frame: slot.frame ?? null,
+       plating: slot.plating ?? null,
+       armor: slot.armor ?? null,
+     },
+     heldWeaponId: slot.heldWeapon?.weaponId ?? slot.heldWeapon?.id ?? null,
++    heldWeaponMods: toModIds(slot.heldWeapon),
++    installedWeapons: installed.map((entry) => ({
++      id: typeof entry === 'string' ? entry : entry.id,
++      modIds: toModIds(entry),
++    })),
+   };
+ }
+ 
++/**
++ * Делит встроенные атаки конечности на две кучи:
++ *   own       — собственная атака конечности (её объявляет каталог);
++ *   installed — установленное в конечность оружие (апгрейд игрока).
++ *
++ * Каталог важнее экземпляра: что не названо собственной атакой, то установка.
++ * Для нового вида сейва массив берётся уже разделённым (installedWeapons).
++ *
++ * @param {object} limb — запись каталога или экземпляр конечности
++ * @param {object} options — { catalog? }
++ * @returns {{ own: any[], installed: any[] }}
++ */
++export function splitLimbWeapons(limb, options = {}) {
++  const { catalog = getRobotLimbCatalog() } = options;
++  const own = [];
++  const installed = [];
++  if (!limb) return { own, installed };
++
++  const ownId = limb.itemCategory === 'weaponAsLimb'
++    ? (limb.attackId ?? null)
++    : (limb.builtinWeaponId ?? (limb.builtinManipulator ? limb.id : null));
++
++  const list = Array.isArray(limb.builtinWeapons) ? limb.builtinWeapons : [];
++  for (const entry of list) {
++    const id = typeof entry === 'string' ? entry : entry?.id;
++    if (!id) continue;
++    // Первое совпадение с собственной атакой — она; повторы — установка.
++    if (ownId && id === ownId && own.length === 0) own.push(entry);
++    else installed.push(entry);
++  }
++  return { own, installed };
++}
++
+ /**
+  * Содержимое слота → запись каталога (limb или weaponAsLimb).
+  *
+@@ -127,7 +208,43 @@ export function resolveLimb(catalog, content) {
+ 
+ const resolveWeapon = (catalog, id) => {
+   if (!id) return null;
+-  return (catalog?.weapons || []).find((w) => w.id === id) || null;
++  return (catalog?.weapons || []).find((w) => w.id === id)
++    // Человеческое оружие в ладони робота (рельсотрон, дробовик, ПП) лежит в
++    // общем каталоге сеттинга — характеристики берутся оттуда же.
++    || (catalog?.generalWeapons || []).find((w) => w.id === id)
++    || null;
++};
++
++const resolveMods = (catalog, ids = []) => (ids || [])
++  .map((id) => (catalog?.weaponMods || []).find((m) => m.id === id))
++  .filter(Boolean);
++
++/**
++ * Карта применённых модов { слот: id } — вид, который ждут экраны и отпечаток
++ * карточки. Восстанавливается из списка id: каждый мод знает свой слот.
++ */
++const modMap = (catalog, ids = []) => Object.fromEntries(
++  resolveMods(catalog, ids).map((mod) => [mod.slot ?? mod.id, mod.id]),
++);
++
++/**
++ * Оружие из id + список id модов: база из каталога, поверх — моды.
++ * Экземпляр (если он есть) важнее каталога: в нём могут быть имя и состояние,
++ * но характеристики всё равно берутся из каталога.
++ *
++ * @returns {object}
++ */
++const materializeWeapon = (catalog, entry, modIds = []) => {
++  const id = typeof entry === 'string' ? entry : entry?.id ?? entry?.weaponId;
++  if (!id) return null;
++  const base = resolveWeapon(catalog, id);
++  const instance = typeof entry === 'object' && entry ? entry : null;
++  const merged = base
++    ? { ...base, ...(instance || {}) }
++    : (instance ? { ...instance } : { id });
++  const ids = modIds.length > 0 ? modIds : toModIds(instance);
++  const mods = resolveMods(catalog, ids);
++  return mods.length > 0 ? applyWeaponMods(merged, mods) : merged;
+ };
+ 
+ // ---------------------------------------------------------------------------
+@@ -378,14 +495,23 @@ export function attacksFromSlot(slot, options = {}) {
+   if (!limb) return result;
+ 
+   const seen = new Set();
+-  const push = (weapon, source) => {
++  const push = (weapon, source, modIds = []) => {
+     if (!weapon) return;
+-    const id = weapon.id || weapon.weaponId;
++    const id = typeof weapon === 'string' ? weapon : (weapon.id || weapon.weaponId);
+     if (!id) return;
+     const instanceKey = `${slotId ?? '?'}:${source}:${id}`;
+     if (seen.has(id)) return; // внутри одного слота одна и та же атака дважды не считается
+     seen.add(id);
+-    result.push({ ...weapon, id, source, slotId: slotId ?? null, instanceKey });
++    const resolved = materializeWeapon(catalog, weapon, modIds);
++    result.push({
++      ...resolved,
++      id,
++      source,
++      slotId: slotId ?? null,
++      instanceKey,
++      modIds,
++      appliedMods: modMap(catalog, modIds),
++    });
+   };
+ 
+   // Оружие в ладони: только если конечность вообще умеет держать.
+@@ -398,24 +524,37 @@ export function attacksFromSlot(slot, options = {}) {
+   if (state.heldWeaponId && canHold) {
+     const held = resolveWeapon(catalog, state.heldWeaponId);
+     if (!held || held.handheld !== false) {
+-      push(held || { id: state.heldWeaponId }, 'held');
++      push(held || { id: state.heldWeaponId }, 'held', state.heldWeaponMods);
+     }
+   }
+ 
+-  // Встроенные атаки конечности. Порядок источников — как в старом коде:
+-  // сначала то, что уже лежит в экземпляре (там могут быть моды), потом
+-  // то, что про конечность знает каталог.
+-  if (Array.isArray(limb.builtinWeapons) && limb.builtinWeapons.length > 0) {
+-    for (const weapon of limb.builtinWeapons) {
+-      push(typeof weapon === 'string' ? resolveWeapon(catalog, weapon) : weapon, 'builtin');
+-    }
++  // Собственная атака конечности. Экземпляр важнее каталога (в нём могут
++  // быть моды и имя), каталог — источник характеристик.
++  const { own } = splitLimbWeapons(limb, { catalog });
++  const ownEntry = own[0] ?? null;
++  if (ownEntry) {
++    push(ownEntry, 'builtin');
+   } else if (limb.itemCategory === 'weaponAsLimb' && limb.attackId) {
+-    push(resolveWeapon(catalog, limb.attackId), 'builtin');
++    push(limb.attackId, 'builtin');
+   } else if (limb.builtinWeaponId) {
+-    push(resolveWeapon(catalog, limb.builtinWeaponId), 'builtin');
++    push(limb.builtinWeaponId, 'builtin');
+   } else if (limb.builtinManipulator) {
+     // Наследие: рука-манипулятор без ссылки на оружие бьёт сама собой.
+-    push({ ...limb, isManipulator: true }, 'builtin');
++    result.push({
++      ...limb,
++      id: limb.id,
++      source: 'builtin',
++      slotId: slotId ?? null,
++      instanceKey: `${slotId ?? '?'}:builtin:${limb.id}`,
++      modIds: [],
++      appliedMods: {},
++      isManipulator: true,
++    });
++  }
++
++  // Установленное в конечность оружие (апгрейд): своя карточка на каждый id.
++  for (const installed of state.installedWeapons) {
++    push(installed.id, 'installed', installed.modIds);
+   }
+ 
+   return result;
+@@ -433,7 +572,9 @@ export function attacksFromSlot(slot, options = {}) {
+  * (id, weaponId, sourceSlot, sourceLimb, isBuiltin[, isManipulator]),
+  * чтобы экраны и сейвы не менялись. Отличие одно и главное: дедупликация
+  * идёт по ЭКЗЕМПЛЯРУ (слот + источник + id), а не по id оружия — две
+- * одинаковые руки дают две карточки.
++ * одинаковые руки дают две карточки (их склейка — дело экрана).
++ * Запись дополнительно несёт modIds и appliedMods: оружие в слоте хранится
++ * id базы плюс список id установленных модов.
+  *
+  * @param {object} slots — состояние слотов персонажа
+  * @param {object} options — { bodyPlan?, catalog? }
+@@ -474,7 +615,11 @@ export function collectAttacks(slots, options = {}) {
+         source: undefined,
+         slotId: undefined,
+         instanceKey: undefined,
+-        ...(attack.source === 'builtin' ? { isBuiltin: true } : {}),
++        // Встроенная атака конечности и установленное в неё оружие — одно и то
++        // же по смыслу: оружие, которым робот владеет сам, без инвентаря.
++        ...(attack.source === 'builtin' || attack.source === 'installed'
++          ? { isBuiltin: true }
++          : {}),
+         ...(attack.isManipulator ? { isManipulator: true } : {}),
+       });
+     }
+
+-- 
+2.47.3
+

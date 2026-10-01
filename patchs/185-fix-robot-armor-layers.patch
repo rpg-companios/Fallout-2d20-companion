@@ -1,0 +1,411 @@
+From 0000000000000000000000000000001788694500 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Sun, 06 Sep 2026 11:35:00 +0000
+Subject: [PATCH] fix robot armor layers: picker reset and shape-agnostic layer write
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Пикер защиты робота не сбрасывал выбранный слой при закрытии по фону/OK,
+поэтому при следующем открытии модалка слоя вылетала сразу, не давая
+выбрать обшивку/броню/раму (симптом владельца на старом сейве
+Штурмотрона).
+
+Плюс экраны читали и записывали слои защиты по-старому — на верхнем
+уровне слота, тогда как движок читает armorLayers/content. Добавлена
+withArmorLayer(), сохраняющая форму слота, чтение слоёв переведено на
+normalizeSlot, а мёртвая карточка робота в обычной сетке брони получила
+обработчики, bodyPlan и локализацию.
+
+Тесты: __tests__/robot/robot-armor-layer.test.js (+7), итого 312/27.
+
+---
+ 6 files changed, 266 insertions(+), 14 deletions(-)
+
+diff --git a/__tests__/robot/robot-armor-layer.test.js b/__tests__/robot/robot-armor-layer.test.js
+new file mode 100644
+index 0000000..6ba8f7b
+--- /dev/null
++++ b/__tests__/robot/robot-armor-layer.test.js
+@@ -0,0 +1,113 @@
++// __tests__/robot/robot-armor-layer.test.js
++//
++// Слой защиты в слоте: запись должна быть видна движку в ОБОИХ видах слота.
++// Сейв хранит старый «толстый» вид ({ limb, plating, frame }) и новый
++// ({ content, armorLayers }). Экраны писали слой на верхний уровень — у нового
++// вида он там ни на что не влиял: движок читает armorLayers, поэтому выбор
++// обшивки в модалке пропадал (баг со slim-сейвом Штурмотрона).
++import { describe, it, expect } from 'vitest';
++
++import {
++  initRobotSlots,
++} from '../../domain/robotEquip';
++import {
++  normalizeSlot,
++  serializeSlot,
++  deserializeSlot,
++  withArmorLayer,
++} from '../../domain/robotSlots';
++import { getRobotSlotDamageResistance } from '../../domain/robotDamageResistance';
++import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
++import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
++import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
++import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
++
++const robotCatalog = { limbs, weaponAsLimb, weapons: robotWeapons };
++const PLATING = platingFile.plating || [];
++const armPlating = () => PLATING.find((p) => p.limbType === 'arm');
++
++const freshSlot = () => {
++  const { slots } = initRobotSlots('assaultron', [], robotCatalog);
++  return slots.leftArm;
++};
++
++// То, что лежит в персонаже после загрузки slim-сейва (deserializeSlot
++// восстанавливает толстый вид с limb).
++const loadedSlot = () => deserializeSlot(serializeSlot(freshSlot()));
++
++// Слот в новом виде ({ content, armorLayers }) — его и не видели экраны,
++// писавшие слой на верхний уровень.
++const newShapeSlot = () => ({
++  content: 'robot_arm_assaultron',
++  armorLayers: { frame: null, plating: null, armor: null },
++  heldWeaponId: null,
++  installedWeapons: [],
++  weaponMods: {},
++});
++
++describe('запись слоя защиты в слот', () => {
++  it('новый вид слота: обшивка видна движку, конечность цела', () => {
++    const slot = newShapeSlot();
++
++    const plating = armPlating();
++    const next = withArmorLayer(slot, 'plating', plating);
++
++    expect(normalizeSlot(next).armorLayers.plating?.id).toBe(plating.id);
++    expect(normalizeSlot(next).content?.id).toBe(normalizeSlot(slot).content?.id);
++    expect(normalizeSlot(next).content).toBe(slot.content);
++  });
++
++  it('старый вид слота: запись осталась на верхнем уровне, конечность цела', () => {
++    const slot = freshSlot();
++    const plating = armPlating();
++    const next = withArmorLayer(slot, 'plating', plating);
++
++    // Форму слота не меняем: примешивать armorLayers к старому виду нельзя —
++    // он станет «новым» без content, и конечность потеряется.
++    expect('armorLayers' in next).toBe(false);
++    expect(next.plating?.id).toBe(plating.id);
++    expect(normalizeSlot(next).armorLayers.plating?.id).toBe(plating.id);
++    expect(normalizeSlot(next).content?.id).toBe('robot_arm_assaultron');
++  });
++
++  it('снять слой — null в обоих видах', () => {
++    for (const slot of [freshSlot(), loadedSlot(), newShapeSlot()]) {
++      const dressed = withArmorLayer(slot, 'plating', armPlating());
++      const bare = withArmorLayer(dressed, 'plating', null);
++      expect(normalizeSlot(bare).armorLayers.plating).toBeNull();
++    }
++  });
++
++  it('обшивка из модалки меняет СУ слота (все три вида слота)', () => {
++    for (const slot of [freshSlot(), loadedSlot(), newShapeSlot()]) {
++      const before = getRobotSlotDamageResistance(slot).physical;
++      const after = getRobotSlotDamageResistance(withArmorLayer(slot, 'plating', armPlating())).physical;
++      expect(after).toBeGreaterThan(before);
++    }
++  });
++
++  it('загруженный из slim-сейва слот остаётся толстым', () => {
++    const slot = loadedSlot();
++    expect(slot.limb?.id).toBe('robot_arm_assaultron');
++    const next = withArmorLayer(slot, 'plating', armPlating());
++    expect('armorLayers' in next).toBe(false);
++    expect(normalizeSlot(next).armorLayers.plating?.id).toBe(armPlating().id);
++  });
++
++  it('обшивка из модалки меняет СУ слота', () => {
++    const slot = loadedSlot();
++    const before = getRobotSlotDamageResistance(slot).physical;
++    const after = getRobotSlotDamageResistance(withArmorLayer(slot, 'plating', armPlating())).physical;
++    expect(after).toBeGreaterThan(before);
++  });
++
++  it('регрессия: запись на верхний уровень в новом виде слота пропадала', () => {
++    const slot = newShapeSlot();
++    const plating = armPlating();
++    // Так экраны писали раньше — движок этого не видел.
++    const oldWay = { ...slot, plating };
++    expect(normalizeSlot(oldWay).armorLayers.plating).toBeNull();
++    // А так — видит.
++    expect(normalizeSlot(withArmorLayer(slot, 'plating', plating)).armorLayers.plating?.id).toBe(plating.id);
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 9bd651f..601a840 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -810,3 +810,78 @@ resolveKitItems(кит) → initRobotSlots(план тела, записи, ка
+    которой существовал механизм «снятия парной конечности».
+ 4. Есть ли реальный файл старого сейва (протектрон + Хэнди) для теста
+    миграции на этапе 5?
++
++---
++
++## Слои защиты: чтение и запись экранами (патч 185)
++
++**Симптом (со слов владельца):** на старом сейве Штурмотрона хочу поменять
++обшивку на руке — «пытаюсь в модалке выбрать, а мне сразу модалка
++«Улучшить броню», не давая выбора». Плюс: обшивок и рам предлагается мало,
++хотя в каталоге их много.
++
++Разбор показал три разные причины.
++
++### 1. Пикер не сбрасывал выбранный слой (видимый баг)
++
++`ArmorPickerModal` хранит `activeLayer` и сбрасывал его только в
++`handleLayerClose` — то есть когда закрыта модалка **слоя**. Пикер же
++закрывали по фону или кнопкой OK: `activeLayer` оставался, и при следующем
++открытии модалка слоя вылетала **сразу**, поверх списка обшивка/броня/рама.
++Владелец именно это и описал: «сразу модалка, не давая выбора».
++
++Исправлено: сброс `activeLayer` при смене `visible` и `slotKey`.
++
++### 2. Экраны читали и писали слои по-старому (латентный баг)
++
++Сейв хранит слот в двух видах: старый «толстый» (`{ limb, plating, frame,
++armor }`) и новый (`{ content, armorLayers }`), причём в новом слои могут
++лежать одним id. Экраны работали с верхним уровнем:
++
++| Место | Было | Стало |
++|---|---|---|
++| `ArmorPickerModal` | `slot?.plating / .armor / .frame` | `normalizeSlot(slot).armorLayers` + разрешение id в запись каталога |
++| `ArmorLayerModal` | запись `{ ...slot, [layer]: item }` | `withArmorLayer(slot, layer, item)` |
++| `WeaponsAndArmorScreen` (`localizeRobotSlotData`) | `slotData.limb / .plating / …` | `normalizeSlot(slotData)` → `content` и `armorLayers` |
++
++`withArmorLayer` (domain/robotSlots.js) сохраняет форму слота: новому виду
++пишет в `armorLayers`, старому — на верхний уровень. Примешивать
++`armorLayers` к старому виду нельзя: слот станет «новым» без `content`, и
++конечность потеряется — это прямо проверено тестом.
++
++Пока `deserializeSlot` восстанавливает толстый вид (`limb` со встроенным
++оружием), так что в UI всегда лежит старая форма; правка не меняет
++поведение на текущих сейвах, но снимает минуту под slim-слотом.
++
++### 3. Мёртвая карточка робота в сетке не-робота
++
++`renderArmorPart` (путь обычной сетки брони) отдавал `<RobotSlot>` без
++обработчиков, без `bodyPlan` и без локализации: кнопки «Конечность» и
++«Броня» были немыми, подзаголовок с диапазоном попаданий не считался.
++Теперь карточка получает тот же набор пропсов, что и сетка плана тела.
++
++### Списки слоёв: почему их «мало»
++
++Кандидаты режутся по типу конечности слота
++(`getSlotDef(bodyPlan, slotKey).accepts[0]`), а не отказом
++`canEquipRobotArmor` — проверка на слоте `assaultron.leftArm` (принимает
++`arm`) даёт **ноль отказов**:
++
++| Каталог | Всего | Для руки |
++|---|---|---|
++| обшивка | 28 | 7 (стандартная, Храбрец, заводская, первобытная, зубчатая, ядовитая, радиоактивная) |
++| рама | 12 | 3 (раздвижная, вольтовая, гидравлическая) |
++| броня | 5 | 1 (заводская броня для руки) |
++
++То есть «мало» — это фильтр по конечности, а не потеря данных. Если по
++книге обшивка/рама не привязаны к типу конечности или у руки больше
++вариантов брони — это правка данных, не кода.
++
++### Тесты
++
++`__tests__/robot/robot-armor-layer.test.js` (+7): запись слоя видна движку
++в обоих видах слота, конечность не теряется, снятие слоя (`null`) работает,
++СУ слота растёт, и регрессия — запись на верхний уровень в новом виде
++слота движком не видна.
++
++**Итог:** 312 тестов / 27 файлов, все зелёные.
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index 9864103..30ad314 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -500,6 +500,32 @@ export function classifyItem(item) {
+  * Активные слои защиты: набор строится в порядке LAYER_KEYS, слой
+  * пропускается, если его incompatibleLayers пересекается с уже принятыми.
+  */
++/**
++ * Записать слой защиты в слот, сохранив форму самого слота.
++ *
++ * Сейв хранит два вида слота: старый «толстый» ({ limb, plating, frame, … })
++ * и новый ({ content, armorLayers }). Экраны писали слой на верхний уровень —
++ * у нового вида он там ни на что не влияет: движок читает armorLayers, и выбор
++ * обшивки в модалке просто пропадал.
++ *
++ * @param {object} slot — состояние слота
++ * @param {'frame'|'plating'|'armor'} layer
++ * @param {object|null} item — запись каталога слоёв (null — снять слой)
++ * @returns {object} новый слот той же формы
++ */
++export function withArmorLayer(slot, layer, item = null) {
++  if (!slot || typeof slot !== 'object') return slot;
++  const layers = { ...normalizeSlot(slot).armorLayers, [layer]: item ?? null };
++
++  const isNewShape = 'content' in slot || 'armorLayers' in slot
++    || 'heldWeaponId' in slot || 'installedWeapons' in slot;
++  if (isNewShape) return { ...slot, armorLayers: layers };
++
++  // Старый вид: слои лежали на верхнем уровне. Примешивать armorLayers нельзя —
++  // слот станет «новым» без content, и конечность потеряется.
++  return { ...slot, [layer]: item ?? null };
++}
++
+ export function activeArmorLayers(slot, options = {}) {
+   const { catalog = getRobotLimbCatalog() } = options;
+   const { armorLayers } = normalizeSlot(slot);
+diff --git a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+index 057869e..06f3129 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/ArmorLayerModal.js
+@@ -10,7 +10,7 @@ import {
+ } from 'react-native';
+ import { useCharacter, useRobotBodyPlan } from '../../../../../components/CharacterContext';
+ import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
+-import { getSlotDef } from '../../../../../domain/robotSlots';
++import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -146,10 +146,7 @@ const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
+     if (!equippedRobotSlots || !slotKey) return;
+     setEquippedRobotSlots((prev) => ({
+       ...prev,
+-      [slotKey]: {
+-        ...prev[slotKey],
+-        [layer]: selectedItem || null,
+-      },
++      [slotKey]: withArmorLayer(prev[slotKey], layer, selectedItem || null),
+     }));
+     onClose();
+   };
+diff --git a/modules/fallout/screens/CharacterScreen/modals/ArmorPickerModal.js b/modules/fallout/screens/CharacterScreen/modals/ArmorPickerModal.js
+index deaeecb..1ae476d 100644
+--- a/modules/fallout/screens/CharacterScreen/modals/ArmorPickerModal.js
++++ b/modules/fallout/screens/CharacterScreen/modals/ArmorPickerModal.js
+@@ -1,4 +1,4 @@
+-import React, { useMemo, useState } from 'react';
++import React, { useEffect, useMemo, useState } from 'react';
+ import {
+   Modal,
+   View,
+@@ -8,6 +8,7 @@ import {
+   Pressable,
+ } from 'react-native';
+ import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
++import { normalizeSlot } from '../../../../../domain/robotSlots';
+ import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+ import ArmorLayerModal from './ArmorLayerModal';
+ import { tCharacterScreen } from '../logic/characterScreenI18n';
+@@ -28,13 +29,31 @@ const ArmorPickerModal = ({ visible, slotKey, equippedRobotSlots, onClose }) =>
+   );
+   const [activeLayer, setActiveLayer] = useState(null);
+ 
++  // Пикер закрывали по фону или кнопкой OK, не закрыв модалку слоя —
++  // выбор слоя оставался в состоянии, и при следующем открытии модалка слоя
++  // вылетала сразу, не давая выбрать слой (обшивка / броня / рама).
++  useEffect(() => {
++    setActiveLayer(null);
++  }, [visible, slotKey]);
++
+   const handleLayerClose = () => {
+     setActiveLayer(null);
+   };
+ 
+-  const currentPlating = slotKey ? equippedRobotSlots?.[slotKey]?.plating : null;
+-  const currentArmor   = slotKey ? equippedRobotSlots?.[slotKey]?.armor   : null;
+-  const currentFrame   = slotKey ? equippedRobotSlots?.[slotKey]?.frame   : null;
++  // Слои читаются через движок: в новом виде сейва они лежат в armorLayers и
++  // могут храниться одним id, в старом — объектами на верхнем уровне.
++  const slotLayers = slotKey
++    ? normalizeSlot(equippedRobotSlots?.[slotKey]).armorLayers
++    : { frame: null, plating: null, armor: null };
++  const asItem = (catalogItems, raw) => {
++    if (!raw) return null;
++    return typeof raw === 'string'
++      ? (catalogItems || []).find((entry) => entry.id === raw) || null
++      : raw;
++  };
++  const currentPlating = asItem(equipmentCatalog.robotPlating || [], slotLayers.plating);
++  const currentArmor   = asItem(equipmentCatalog.robotArmorLayer || [], slotLayers.armor);
++  const currentFrame   = asItem(equipmentCatalog.robotFrames || [], slotLayers.frame);
+ 
+   const localizedName = (item, catalogItems) => {
+     if (!item) return null;
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index cf4cda2..27d984e 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -15,6 +15,7 @@ import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMe
+ import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
+ import { isRobotCharacter } from '../../../../domain/origins';
+ import { resolveBodyPlan } from '../../../../domain/bodyplan';
++import { normalizeSlot } from '../../../../domain/robotSlots';
+ import styles from '../../../../styles/CharacterScreen.styles';
+ import localStyles from '../../../../styles/WeaponsAndArmorScreen.styles';
+ import { renderTextWithIcons } from './textUtils';
+@@ -483,8 +484,18 @@ const findLocalizedRobotPart = (catalogItems, item) => {
+   return localized;
+ };
+ 
++// Слот сейва бывает двух видов: старый ({ limb, plating, frame }) и новый
++// ({ content, armorLayers }), причём в новом слои могут лежать одним id.
++// Читаем через движок, иначе на slim-сейве карточка показывала «нет
++// конечности» и пустые названия слоёв.
++const localizeRobotPart = (catalogItems, raw) => {
++  if (!raw) return raw;
++  return findLocalizedRobotPart(catalogItems, typeof raw === 'string' ? { id: raw } : raw);
++};
++
+ const localizeRobotSlotData = (catalog, slotData) => {
+   if (!slotData) return slotData;
++  const state = normalizeSlot(slotData);
+   const limbs = [
+     ...(catalog?.robotHeads || []),
+     ...(catalog?.robotBody || []),
+@@ -493,10 +504,10 @@ const localizeRobotSlotData = (catalog, slotData) => {
+   ];
+   return {
+     ...slotData,
+-    limb: findLocalizedRobotPart(limbs, slotData.limb),
+-    plating: findLocalizedRobotPart(catalog?.robotPlating, slotData.plating),
+-    armor: findLocalizedRobotPart(catalog?.robotArmorLayer, slotData.armor),
+-    frame: findLocalizedRobotPart(catalog?.robotFrames, slotData.frame),
++    limb: localizeRobotPart(limbs, state.content),
++    plating: localizeRobotPart(catalog?.robotPlating, state.armorLayers.plating),
++    armor: localizeRobotPart(catalog?.robotArmorLayer, state.armorLayers.armor),
++    frame: localizeRobotPart(catalog?.robotFrames, state.armorLayers.frame),
+   };
+ };
+ 
+@@ -850,7 +861,18 @@ const WeaponsAndArmorScreen = () => {
+     
+     // Если робот и есть equippedRobotSlots, отображаем RobotSlot
+     if (isRobot && equippedRobotSlots && equippedRobotSlots[slotKey]) {
+-      return <RobotSlot key={slotKey} slotKey={slotKey} slotData={equippedRobotSlots[slotKey]} />;
++      return (
++        <RobotSlot
++          key={slotKey}
++          slotKey={slotKey}
++          slotData={localizeRobotSlotData(equipmentCatalog, equippedRobotSlots[slotKey])}
++          bodyPlan={bodyPlan}
++          onUpgradeLimb={handleOpenLimbUpgradeModal}
++          onOpenArmorPicker={handleOpenArmorPicker}
++          onWeaponPress={handleWeaponPress}
++          hasRadImmunity={hasRadImmunity}
++        />
++      );
+     }
+     
+     // Иначе отображаем обычный ArmorPart
+
+-- 
+2.47.3
+

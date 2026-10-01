@@ -1,0 +1,280 @@
+From 0000000000000000000000000000001788510069 Mon Sep 17 00:00:00 2001
+From: arena-agent <297053741+arena-agent@users.noreply.github.com>
+Date: Fri, 04 Sep 2026 08:21:09 +0000
+Subject: [PATCH] feat(robot): hit ranges from body plan and weapon-limb own DR
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Этап 3, шаг 4. Две вещи.
+
+1. Таблица попаданий — свойство плана тела (решение владельца). Числа слотов
+   сейчас зашиты в UI: статичный словарь armor.slots в i18n (у людей слоты
+   статичны) плюс поле hitLocations у секьюритрона. Правильный источник —
+   hitTable в плане тела: у роботов области уникальны для каждого плана.
+
+   getSlotHitRange(bodyPlan, slotId) — обратная сторона resolveHit:
+   «слот -> диапазон d20» для экранов; resolveHit — «бросок -> слот» для боя.
+   robotSlotLogic.js при включённом флаге берёт подпись слота из hitTable.
+   Планы без таблицы пока показывают статику людей — допустимо, но не
+   окончательно (открытый вопрос №1).
+
+   Тест круговой: для каждого броска 1..20 resolveHit ведёт в слот, диапазон
+   которого этот бросок содержит.
+
+2. Коррекция патча 167 про СУ конечности-оружия. В 167 новая модель
+   отбрасывала physicalDR/energyDR/radDR у оружия вместо руки. Владелец
+   возразил: если поля есть в данных, их поставили руками и не просто так.
+   Конечность-оружие — вещь уникальная: свою защиту иметь может, а вот слоёв
+   защиты (броня/обшивка/рама) у неё нет. Отбрасывание полей убрано, тест
+   закрепляет оба факта: своя СУ считается, надетый слой — нет.
+
+Прогон 246 тестов: флаг выключен — 246 зелёных; ROBOT_NEW_SLOT_MODEL=1 —
+246 зелёных.
+
+---
+ 4 files changed, 147 insertions(+), 14 deletions(-)
+
+diff --git a/__tests__/robot/robot-slot-model-flag.test.js b/__tests__/robot/robot-slot-model-flag.test.js
+index 7ea4c0a..1f4810c 100644
+--- a/__tests__/robot/robot-slot-model-flag.test.js
++++ b/__tests__/robot/robot-slot-model-flag.test.js
+@@ -17,9 +17,16 @@ import {
+   getRobotSlotDamageResistance,
+   getActiveRobotLayers,
+ } from '../../domain/robotDamageResistance';
++import { buildRobotSlotStats } from '../../domain/robotSlotLogic';
++import screenI18n from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
+ import platingCatalogJson from '../../modules/fallout/data/equipment/robot/armor_plating.json';
+ import framesCatalogJson from '../../modules/fallout/data/equipment/robot/frames.json';
+-import { setNewSlotModelEnabled, isNewSlotModelEnabled } from '../../domain/robotSlots';
++import {
++  setNewSlotModelEnabled,
++  isNewSlotModelEnabled,
++  getSlotHitRange,
++  resolveHit,
++} from '../../domain/robotSlots';
+ import { getRobotLimbCatalog } from '../../domain/registry';
+ 
+ import armsCatalog from '../../modules/fallout/data/equipment/robot/robotarms.json';
+@@ -373,6 +380,34 @@ describe('СУ слота: чтение состояния', () => {
+       .toEqual({ physical: 0, energy: 0, rad: 0 });
+   });
+ 
++  it('своя СУ конечности-оружия считается, а слои — нет', () => {
++    // Правило владельца: конечность-оружие может иметь собственную защиту
++    // (если она проставлена в данных руками), но слоёв защиты не имеет.
++    const armedWeapon = () => ({
++      limb: {
++        id: 'robot_weapon_flamethrower',
++        itemType: 'robotArm',
++        physicalDR: 3,
++        energyDR: 2,
++        radDR: 1,
++      },
++      plating: platingFor('Arms'), // битое состояние старого сейва
++      frame: null,
++      armor: null,
++      heldWeapon: null,
++    });
++
++    setNewSlotModelEnabled(true);
++    // Своя защита есть, вклад обшивки не считается.
++    expect(getRobotSlotDamageResistance(armedWeapon()))
++      .toEqual({ physical: 3, energy: 2, rad: 1 });
++
++    // В каталоге у оружия вместо руки полей СУ нет — значит и защиты нет.
++    expect(getRobotSlotDamageResistance({
++      limb: { id: 'robot_weapon_flamethrower', itemType: 'robotArm' },
++    })).toEqual({ physical: 0, energy: 0, rad: 0 });
++  });
++
+   it('пустой слот защиты не несёт ни в одной модели', () => {
+     for (const value of [false, true]) {
+       setNewSlotModelEnabled(value);
+@@ -381,3 +416,54 @@ describe('СУ слота: чтение состояния', () => {
+     }
+   });
+ });
++
++describe('диапазоны попаданий в экране', () => {
++  it('getSlotHitRange — обратная сторона resolveHit', () => {
++    setNewSlotModelEnabled(true);
++    expect(getSlotHitRange('protectron', 'leftArm')).toEqual({ from: 4, to: 7 });
++    expect(getSlotHitRange('securitron', 'wheel')).toEqual({ from: 18, to: 20 });
++    expect(getSlotHitRange('protectron', 'нетТакогоСлота')).toBeNull();
++    expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull(); // таблицы пока нет
++  });
++
++  it('для каждого броска 1..20 таблица ведёт в слот, который его содержит', () => {
++    setNewSlotModelEnabled(true);
++    for (const planId of ['protectron', 'securitron']) {
++      for (let roll = 1; roll <= 20; roll += 1) {
++        const slotId = resolveHit(planId, roll);
++        expect(slotId, `${planId}: бросок ${roll} не попал ни в один слот`).toBeTruthy();
++        const range = getSlotHitRange(planId, slotId);
++        expect(roll).toBeGreaterThanOrEqual(range.from);
++        expect(roll).toBeLessThanOrEqual(range.to);
++      }
++    }
++  });
++
++  it('экран показывает диапазон из плана тела, а не из статики людей', () => {
++    const t = (key) => key.split('.').reduce((acc, part) => acc?.[part], screenI18n) ?? key;
++    const subtitle = (planId, slotKey) => buildRobotSlotStats(slotKey, { limb: null }, {
++      t, bodyPlan: planId,
++    }).slotSubtitle;
++
++    // Протектрон: у людей leftArm — 9-11, у протектрона по плану — 4-7.
++    setNewSlotModelEnabled(false);
++    expect(subtitle('protectron', 'leftArm')).toBe('9-11');
++
++    setNewSlotModelEnabled(true);
++    expect(subtitle('protectron', 'leftArm')).toBe('4-7');
++    expect(subtitle('protectron', 'head')).toBe('1-3');
++
++    // Секьюритрон: колесо 18-20 и так, и так — планы не противоречат.
++    expect(subtitle('securitron', 'wheel')).toBe('18-20');
++
++    // У Хэнди таблицы пока нет — остаётся статика людей.
++    expect(subtitle('misterHandy', 'arm1')).toBe('9-11');
++  });
++
++  it('у планов без таблицы диапазонов нет — экран берёт статику людей', () => {
++    setNewSlotModelEnabled(true);
++    // У Хэнди hitTable пока нет: экран показывает общую подпись из i18n.
++    expect(resolveHit('misterHandy', 10)).toBeNull();
++    expect(getSlotHitRange('misterHandy', 'arm1')).toBeNull();
++  });
++});
+diff --git a/docs/architecture/robot-slot-refactoring.md b/docs/architecture/robot-slot-refactoring.md
+index 6ac7827..8f0c17d 100644
+--- a/docs/architecture/robot-slot-refactoring.md
++++ b/docs/architecture/robot-slot-refactoring.md
+@@ -319,9 +319,9 @@
+ * **защита считается только там, где она законна.** Нет конечности или в
+   слоте оружие вместо руки — надетые слои вклада не дают. Для старых сейвов
+   (обшивка на огнемёте) это означает не «начислить СУ», а «не начислять»;
+-* **у оружия вместо конечности СУ нет по определению** — даже если в старых
+-  данных поля `physicalDR/energyDR/radDR` случайно проставлены, при
+-  разборе содержимого они отбрасываются.
++* ~~у оружия вместо конечности СУ нет по определению~~ — **снято владельцем в
++  патче 168**: данные, проставленные руками, стирать нельзя. Конечность-оружие
++  может иметь собственную СУ; слоёв защиты у неё по-прежнему нет.
+ 
+ Побочная польза: новая ветка уже читает **новый формат сейва**
+ (`content` + `armorLayers` с идентификаторами), старая — нет. Миграция на
+@@ -334,6 +334,31 @@
+ | флаг выключен (как в проде) | **241** | 0 |
+ | `ROBOT_NEW_SLOT_MODEL=1` | **241** | 0 |
+ 
++#### Шаг 4 (патч 168): диапазоны попаданий и СУ конечности-оружия
++
++**Таблица попаданий — свойство плана тела** (решение владельца). Сейчас
++числа слотов зашиты в UI: статичный словарь `armor.slots` в i18n (у людей
++слоты статичны) плюс поле `hitLocations` у секьюритрона. Правильный источник —
++`hitTable` в плане тела: у роботов области уникальны для каждого плана.
++
++Подключено:
++
++* `getSlotHitRange(bodyPlan, slotId)` — обратная сторона `resolveHit`:
++  «слот → диапазон d20» для экранов; `resolveHit` — «бросок → слот» для боя;
++* `robotSlotLogic.js` при включённом флаге берёт подпись слота из `hitTable`.
++  Планы без таблицы (Хэнди, робомозг, ассультрон, сторож) пока показывают
++  статику людей — это допустимо, но не окончательно: каждому плану нужна своя
++  таблица (открытый вопрос №1).
++
++Проверено круговым тестом: для каждого броска 1..20 `resolveHit` ведёт в слот,
++диапазон которого этот бросок содержит.
++
++**СУ конечности-оружия (коррекция шага 3).** В патче 167 новая модель
++отбрасывала `physicalDR/energyDR/radDR` у оружия вместо руки. Владелец
++возразил: если поля есть в данных, их поставили руками и не просто так.
++Конечность-оружие — вещь уникальная, свою защиту иметь может; не имеет она
++только **слоёв** защиты (броня/обшивка/рама). Отбрасывание полей убрано.
++
+ #### Что осталось по этапу 3
+ 
+ | Шаг | Точка использования | Сложность |
+diff --git a/domain/robotSlotLogic.js b/domain/robotSlotLogic.js
+index a8e4dcf..b6af857 100644
+--- a/domain/robotSlotLogic.js
++++ b/domain/robotSlotLogic.js
+@@ -4,6 +4,7 @@
+ import { tWeaponsAndArmorScreen } from '../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
+ import { getBodyPlan } from './bodyplan';
+ import { getRobotSlotDamageResistance } from './robotDamageResistance';
++import { isNewSlotModelEnabled, getSlotHitRange } from './robotSlots';
+ 
+ /**
+  * Builds the slot title, limb name, and stats array for a RobotSlot.
+@@ -35,7 +36,13 @@ export const buildRobotSlotStats = (slotKey, slotData, callbacks = {}) => {
+   const slotTitle = t(`robotSlot.slotNames.${slotKey}`) || slotKey;
+   // Диапазоны попаданий (d20) — из плана тела, если он их объявляет (секьюритрон),
+   // иначе общий словарь armor.slots (человекоподобная таблица).
+-  const planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] : null;
++  // Диапазоны попаданий: у робота — из таблицы плана тела (уникальны для
++  // каждого плана), у людей — статичный словарь armor.slots в i18n.
++  let planHitLocation = bodyPlan ? getBodyPlan(bodyPlan)?.hitLocations?.[slotKey] ?? null : null;
++  if (isNewSlotModelEnabled()) {
++    const range = getSlotHitRange(bodyPlan, slotKey);
++    planHitLocation = range ? `${range.from}-${range.to}` : planHitLocation;
++  }
+   const slotSubtitle = planHitLocation ?? (t(`armor.slots.${slotKey}.subtitle`) || '');
+ 
+   const stats = [];
+diff --git a/domain/robotSlots.js b/domain/robotSlots.js
+index e7ed2c9..d09524b 100644
+--- a/domain/robotSlots.js
++++ b/domain/robotSlots.js
+@@ -145,15 +145,10 @@ export function resolveLimb(catalog, content) {
+     itemCategory: entry.itemCategory,
+     limbType: entry.limbType,
+   };
+-  if (entry.itemCategory === 'weaponAsLimb') {
+-    // Защиты у оружия вместо конечности нет по определению модели — даже
+-    // если в старых данных поля СУ случайно проставлены.
+-    delete merged.physicalDR;
+-    delete merged.energyDR;
+-    delete merged.radDR;
+-    delete merged.canHoldWeapons;
+-    delete merged.weaponSlots;
+-  }
++  // Поля СУ и хвата экземпляра НЕ стираются: если в данных проставлены
++  // physicalDR/energyDR/radDR, их поставили руками и не просто так.
++  // Конечность-оружие — штука уникальная: свою защиту иметь может,
++  // а вот слон защиты (броня/обшивка/рама) — нет (правило владельца).
+   return merged;
+ }
+ 
+@@ -523,6 +518,26 @@ export function resolveHit(bodyPlan, roll) {
+   return null;
+ }
+ 
++/**
++ * Диапазон d20, который ведёт в этот слот, — обратная сторона resolveHit.
++ * Нужна экранам: таблица попаданий показывает «слот → числа», а бросок
++ * разбирается resolveHit.
++ *
++ * @param {string|object} bodyPlan
++ * @param {string} slotId
++ * @returns {{ from: number, to: number } | null} — null, если у плана нет
++ *          hitTable (такие планы пока есть; см. validateHitTable)
++ */
++export function getSlotHitRange(bodyPlan, slotId) {
++  const plan = typeof bodyPlan === 'string' ? getBodyPlan(bodyPlan) : bodyPlan;
++  const table = plan?.hitTable;
++  if (!Array.isArray(table) || !slotId) return null;
++  const row = table.find((entry) => entry?.slotId === slotId);
++  const [from, to] = row?.range || [];
++  if (!Number.isInteger(from) || !Number.isInteger(to)) return null;
++  return { from, to };
++}
++
+ /**
+  * Проверка целостности таблицы попаданий плана тела.
+  *
+
+-- 
+2.47.3
+
