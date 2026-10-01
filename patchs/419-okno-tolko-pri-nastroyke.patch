@@ -1,0 +1,243 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index d45e37d..773957f 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -394,42 +394,42 @@ describe('Патч 413: операции — редкость, моды, дон
+ describe('Проводка (слово владельца 415/417): ОДНА кнопка; с перком — окно выбора', () => {
+   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+ 
+-  it('одна кнопка у всех целей: без перка при включённой прочности — «Ремонт» (окно), иначе — «Починить»', () => {
++  it('одна кнопка у всех целей: настройка ВКЛ — окно (перк: выбор из трёх, без: донор/материалы), ВЫКЛ — мгновенная', () => {
+     const code = src();
+     expect(code).toContain('RepairModal');
+-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
+-    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
++    // Слово владельца 419: СНАЧАЛА настройка, потом перк — окно
++    // (любое) выходит только при включённой настройке прочности.
++    expect((code.match(/weaponDurabilityLossEnabled \? \(\s+juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+     // Книжный режим открывает окно (обе формы цели).
+-    expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
+-    expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
+-    // С перком «Починить» тоже открывает окно (417: выбор из трёх) —
+-    // и НЕ мгновенный (вторая ступень тернарника у всех трёх целей).
+-    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+-    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
+-    expect(code).not.toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary');
+-    // Мгновенный путь остался только для «без перка и настройка выкл».
++    expect((code.match(/setRepairTarget\(\{ storeItemId: item\.id, name: item\.name \}\)/g) ?? []).length).toBe(4);
++    // Надетая часть: обе кнопки окна (с перком «Починить», без — «Ремонт»).
++    expect((code.match(/setRepairTarget\(\{ equippedSlot: item\.paSlot, name: item\.name \}\)/g) ?? []).length).toBe(2);
++    // Мгновенный путь — только в ветке ВЫКЛЮЧЕННОЙ настройки.
+     expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
+     expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
++    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
+     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
+     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
+     expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+-    // Подписи режимов различаются.
++    // Подписи режимов различаются; окно без перка серое без материалов/донора.
+     expect(code).toContain("tInventory('repair.actions.remake')");
+     expect(code).toContain("tInventory('repair.actions.repair')");
++    expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
++    expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
+   });
+ 
+-  it('законы владельца (418): окно вариантов — только при включённой прочности; «Без затрат» — только с перком', () => {
++  it('законы владельца (419): окно ЛЮБОЕ — только при включённой прочности; «Без затрат» — только с перком', () => {
+     const code = src();
+-    // Настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» без окна,
+-    // у всех трёх целей: окно вариантов не выходит ТОЛЬКО при выключенной
+-    // настройке прочности.
++    // Таблица истинности (порядок проверки: настройка → перк):
++    //   настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» БЕЗ окна;
++    //   настройка ВКЛ, перка нет  → окно «Ремонт» (донор/материалы);
++    //   настройка ВКЛ, перк есть  → окно выбора (три кнопки).
++    // Окно вариантов не выходит ТОЛЬКО при выключенной настройке прочности
++    // — даже с перком (исправлено в 419: перк больше не перехватывает раньше
++    // настройки).
++    expect((code.match(/weaponDurabilityLossEnabled \? \(\s+juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+     expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
+     expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
+-    // Настройка ВКЛ + перк → окно выбора (кнопка «Починить» ведёт в окно).
+-    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
+-    // Настройка ВКЛ без перка → окно «Ремонт» (донор/материалы), кнопка серая
+-    // без материалов и донора — «Без затрат» в таком окне НЕТ.
+-    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
+ 
+     const modal = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
+     // «Без затрат (некачественно)» живёт ТОЛЬКО в ветке активного перка.
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 75df087..64e3223 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1489,19 +1489,21 @@ const InventoryScreen = () => {
+             </View>
+           </View>
+           <View style={styles.actionContainer}>
+-            {item.showRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+-              <TouchableOpacity
+-                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+-                disabled={!pieceAffordable}
+-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+-              </TouchableOpacity>
+-            ) : juryRiggingActive ? (
+-              <TouchableOpacity
+-                style={[styles.actionButton, styles.applyButton]}
+-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+-              </TouchableOpacity>
++            {item.showRepair && (weaponDurabilityLossEnabled ? (
++              juryRiggingActive ? (
++                <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                </TouchableOpacity>
++              ) : (
++                <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
++                  disabled={!pieceAffordable}
++                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                </TouchableOpacity>
++              )
+             ) : (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton]}
+@@ -1696,19 +1698,21 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
+-          {showWeaponRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+-              <TouchableOpacity
+-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+-                  disabled={!repairAffordable}
+-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+-              </TouchableOpacity>
+-          ) : juryRiggingActive ? (
+-              <TouchableOpacity
+-                  style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+-              </TouchableOpacity>
++          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
++              juryRiggingActive ? (
++                  <TouchableOpacity
++                      style={[styles.actionButton, styles.applyButton]}
++                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                  </TouchableOpacity>
++              ) : (
++                  <TouchableOpacity
++                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
++                      disabled={!repairAffordable}
++                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                  </TouchableOpacity>
++              )
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+@@ -1717,19 +1721,21 @@ const InventoryScreen = () => {
+               </TouchableOpacity>
+           ))}
+ 
+-          {showPARepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+-              <TouchableOpacity
+-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+-                  disabled={!repairAffordable}
+-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+-              </TouchableOpacity>
+-          ) : juryRiggingActive ? (
+-              <TouchableOpacity
+-                  style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+-              </TouchableOpacity>
++          {showPARepair && (weaponDurabilityLossEnabled ? (
++              juryRiggingActive ? (
++                  <TouchableOpacity
++                      style={[styles.actionButton, styles.applyButton]}
++                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                  </TouchableOpacity>
++              ) : (
++                  <TouchableOpacity
++                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
++                      disabled={!repairAffordable}
++                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                  </TouchableOpacity>
++              )
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index dfe9ff8..d80bfbb 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (418)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (419)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **419** (СЛОВО ВЛАДЕЛЬЦА: «Кнопка "Без затрат (некачественно)" есть только если есть перк. Кнопка ремонта дающая доступ к окну ремонта, показывается только при включенной настройке ремонта» — на мой ответ 418 «код уже работает» НАСТОЯЩИЙ БАГ: тернарник 417 `вкл && !перк ? окно-ремонта : перк ? окно-выбора : инстант` при настройке ВЫКЛ+перк уходил во ВТОРУЮ ветку → ОКНО ОТКРЫВАЛОСЬ без включённой настройки; моя таблица 418 это скрывала (структурные ассерты, не таблица). ИСПРАВЛЕНО: порядок проверки — СНАЧАЛА настройка, ПОТОМ перк: `weaponDurabilityLossEnabled ? (juryRiggingActive ? окно-выбора («Починить», всегда активна) : окно-ремонта («Ремонт», серая без материалов/донора)) : инстант-«Починить»` ×3 цели. Таблица 419: ВЫКЛ (перк любой) → инстант без окна; ВКЛ без перка → окно донор/материалы («Без затрат» НЕТ); ВКЛ с перком → окно трёх. Урок: структурные ассерты НЕ доказывают поведение — писать таблицу истинности через ветки, а не через счётчики регэкспов. Защёлка 413-файла = 46. 1496/153, tsc 0. Предыдущий снимок — **418** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **418** (СЛОВО ВЛАДЕЛЬЦА: «Без затрат (некачественно) только если есть перк. Окна с вариантами ремонта не выходит только если отключена настройка прочности»). ПРОВЕРЕНО ДО ПРАВОК: код 417 УЖЕ соответствует обоим правилам (таблица: настройка ВЫКЛ → мгновенная «Починить» без окна, перк не важен; ВКЛ без перка → окно «Ремонт» — донор/материалы, «Без затрат» НЕТ; ВКЛ с перком → окно трёх кнопок). Поправка была к МОЕМУ ОТЧЁТУ (написал «с перком кнопка всегда открывает окно» без упоминания настройки). Патч 418 = ТОЛЬКО тесты-таблица истинности в защёлке 413-файла (46) + честный changelog «приложение не менялось». 1496/153, tsc 0. Предыдущий снимок — **417** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **417** (СЛОВО ВЛАДЕЛЬЦА на безусловность 416: «Опять ты не спрашиваешь, а думаешь… Кнопка открывает окно с выбором: 3 кнопки "Без затрат (некачественно)", "За счёт донора (ускоренный ремонт)", "За счёт материалов". Если нет материалов, но есть донор — "За счёт материалов" не активна. Если нет донора — "За счёт донора" не активна. Если нет ни донора, ни материалов — соответствующие кнопки не активны»). ПРИМЕНЕНО: с перком кнопка ВСЕГДА открывает окно выбора (мгновенных срабатываний нет); REPAIR_MODES materials|donor|free в performRepair/performEquippedPieceRepair — free: план материалов пуст, донор null, spendDonor-порт возвращает ok (перк покрывает; иначе движок donor-refused), СЛОЖНОСТЬ ПОЛНАЯ, тест и время те же, успех → флаг temporaryRepair + result.temporary; donor: прежний поток (−1 сложность, донор списан, постоянно); materials: как было; автостарт без донора — ТОЛЬКО без перка (слово 414); донор в окне: выбор из списка (по умолчанию первый); отчёт бесплатного = строка craftingModal repair.temporary («Ремонт временный… 19–20»); проводка инвентаря: перк → setRepairTarget (кнопка НЕ серая — free всегда есть), без перка вкл → Ремонт (серая без материалов/донора), без перка выкл → performInstantFreeRepair (без temporary-параметра). АГЕНТСКОЕ (пометить): «ускоренный ремонт» в подписи донора — механика осталась «−1 сложность» (слово 413); если владелец имел в виду СКОРОСТЬ (меньше времени) — скажет, поменяю. Защёлка jury-rigging-416.test.js дополнена законами 417 (22 теста), 413-файл = 45. 1495/153, tsc 0. Предыдущий снимок — **416** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **416** (СЛОВО ВЛАДЕЛЬЦА: «Да делаем очумелые ручки и меняем настройку прочности включенной по-умолчанию»). ПРИМЕНЕНО: перк juryRigging (канон: 1 ранг, без требований; book: бесплатно без компонентов, ВРЕМЕННО, снова сломается при следующем осложнении при использовании, диапазон осложнений 19–20) — juryRiggingRanksFor (countActivePerkSelections, закон 412: погашенные не считаются; prereq {} → всегда активен при выборе); проводка: тернарник кнопки `weaponDurabilityLossEnabled && !juryRiggingActive ?` (×3 цели) — с перком кнопка = performInstantFreeRepair/ForEquippedPiece({temporary: настройка && перк}); флаг temporaryRepair (строго true; паспорт: normalizeItemParameters отбрасывает не-true; splitOnePieceFromStack не наследует; честный performRepair/performEquippedPieceRepair снимает; износ spendAmmoForWeapon НЕ снимает — перк отпускает только осложнение); жёлтая пометка repair.tempNote (2 места: общий подзаголовок карточки + надетая часть). Настройка weaponDurabilityLossEnabled defaultValue true (settings.json + мигр стора `?? true`; ЯВНО сохранённый false не трогается — владельцу сказать: в его сейве включить один раз). Боевая сцена вне приложения (закон 404): «сломается при осложнении» отмечает владелец сам, пометка исчезает когда предмет снова чинят/ломают вручную. АГЕНТСКОЕ (пометить): с перком книжный «Ремонт» с материалами недоступен из карточки (кнопка одна = бесплатная временная; по книге перк даёт ВЫБОР — если владельцу нужен и честный ремонт при перке, верну вторую кнопку/окно по его слову); слитая с целыми временно-починенная штука теряет флаг при слиянии (редкий край). Защёлка __tests__/repair/jury-rigging-416.test.js (15) + 413-файл=закон 415/416. 1488/153, tsc 0. node_modules исчезал дважды за сессию — npm ci по стандарту. Предыдущий снимок — **415** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 1ab4503..67a8db4 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,15 @@
+ # Changelog
++---
++## The window only when the setting is on (patch 419)
++
++You caught a real bug: with the «Jury Rigging» perk and the
++durability setting OFF, the repair window still opened — the perk
++intercepted the press before the setting was checked. The order is
++now reversed: the setting is checked first. Off — always the instant
++free «Fix» with no window, perk or not. On — the window: with the
++perk, three buttons («Without cost (poor quality)» exists only with
++the perk); without the perk — «From a donor» and «From materials».
++
+ ---
+ ## Repair rules locked in (patch 418)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 110dd85..6b3303e 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Окно — только при включённой настройке (патч 419)
++
++Вы поймали настоящий баг: с перком «Очумелые ручки» при ВЫКЛЮЧЕННОЙ
++настройке прочности окно ремонта всё равно открывалось — перк
++перехватывал нажатие раньше настройки. Теперь порядок другой: сначала
++проверяется настройка. Выключена — всегда мгновенная бесплатная
++«Починить» без окна, с перком или без. Включена — окно: с перком с
++тремя кнопками («Без затрат (некачественно)» — только она и есть при
++перке), без перка — «За счёт донора» и «За счёт материалов».
++
+ ---
+ ## Правила ремонта закреплены (патч 418)
+ 
+diff --git a/public/version.json b/public/version.json
+index e72fb92..9c528b6 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "418",
++  "version": "419",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
