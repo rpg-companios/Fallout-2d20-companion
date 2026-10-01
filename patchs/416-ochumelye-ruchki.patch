@@ -1,0 +1,723 @@
+diff --git a/__tests__/repair/jury-rigging-416.test.js b/__tests__/repair/jury-rigging-416.test.js
+new file mode 100644
+index 0000000..811ecd9
+--- /dev/null
++++ b/__tests__/repair/jury-rigging-416.test.js
+@@ -0,0 +1,245 @@
++// ПРИЁМОЧНЫЙ (патч 416): «Очумелые ручки» (juryRigging) + настройка
++// прочности включена по умолчанию. Книжный текст перка (канон 410,
++// modules/fallout/i18n/ru-RU/data/perks/perks.json): «Вы можете починить
++// предмет, не затрачивая на это никаких компонентов. Однако ремонт будет
++// временным, и предмет снова сломается при следующем осложнении, которое
++// вы получите при его использовании. Диапазон осложнений при проверках
++// на умение пользоваться этим предметом увеличивается на 1, до значения
++// на броске 19-20.» Слово владельца: кнопка ОДНА — бесплатная починка
++// при отключённых настройках ИЛИ при перке; с перком при включённой
++// настройке починка бесплатна, но ВРЕМЕННАЯ.
++import { afterEach, beforeEach, describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import useCharacterStore from '../../src/store/characterStore';
++import {
++  juryRiggingRanksFor,
++  performInstantFreeRepair,
++  performInstantFreeRepairForEquippedPiece,
++  markTemporaryRepairOnItem,
++  markTemporaryRepairOnEquippedPiece,
++  splitOnePieceFromStack,
++  performRepair,
++  repairPreview,
++} from '../../modules/fallout/repair/operations';
++import { performEquippedPieceRepair } from '../../modules/fallout/repair/operations';
++import { setCurrentModuleLocale } from '../../i18n/locale';
++
++const state = () => useCharacterStore.getState();
++const seedPerk = () => useCharacterStore.setState({ selectedPerks: [{ perkId: 'juryRigging', index: 0 }] });
++
++beforeEach(() => {
++  state().resetCharacterStore();
++});
++
++afterEach(async () => {
++  state().resetCharacterStore();
++  await useCharacterStore.persist.clearStorage();
++});
++
++const seedWeapon = ({ durability = 40, quantity = 1, id, flagged = false } = {}) => {
++  const key = id ?? `seed_pistol_${Math.random().toString(36).slice(2, 7)}`;
++  useCharacterStore.setState((prev) => ({
++    items: {
++      ...prev.items,
++      [key]: {
++        id: 'weapon_10mm_pistol', weaponId: 'weapon_10mm_pistol', itemType: 'weapon',
++        durability, durabilityTracked: true, quantity,
++        ...(flagged ? { temporaryRepair: true } : {}),
++      },
++    },
++  }));
++  return key;
++};
++
++const seedPaPiece = ({ hpCurrent = 2, quantity = 1, id } = {}) => {
++  const key = id ?? `seed_chest_${Math.random().toString(36).slice(2, 7)}`;
++  useCharacterStore.setState((prev) => ({
++    items: {
++      ...prev.items,
++      [key]: {
++        id: 'power_armor_raider_chest', weaponId: 'power_armor_raider_chest',
++        itemType: 'powerArmor', hpCurrent, maxHp: 10, quantity,
++      },
++    },
++  }));
++  return key;
++};
++
++describe('Патч 416: «Очумелые ручки» — активность перка', () => {
++  it('без выбора перка рангов 0; с выбором — 1 (требований нет, всегда действует)', () => {
++    expect(juryRiggingRanksFor()).toBe(0);
++    seedPerk();
++    expect(juryRiggingRanksFor()).toBe(1);
++  });
++});
++
++describe('Патч 416: бесплатная временная починка (кнопка «Починить» с перком)', () => {
++  it('оружие: бесплатно без материалов, по 1 шт, флаг временного ремонта', () => {
++    seedPerk();
++    const key = seedWeapon({ durability: 40, quantity: 2 });
++    const result = performInstantFreeRepair(key, { temporary: true });
++    expect(result.ok).toBe(true);
++    const pistols = Object.values(state().items).filter((i) => i.weaponId === 'weapon_10mm_pistol');
++    const whole = pistols.find((i) => Number(i.durability) === 100);
++    const damaged = pistols.find((i) => Number(i.durability) === 40);
++    expect(whole?.quantity ?? 0).toBe(1);            // починена ОДНА штука
++    expect(damaged?.quantity ?? 0).toBe(1);          // вторая ждёт
++    expect(whole?.temporaryRepair).toBe(true);       // ремонт ВРЕМЕННЫЙ
++    expect(damaged?.temporaryRepair).toBeUndefined(); // остальные чисты
++  });
++
++  it('без перка/при выключенной прочности (temporary: false) флага нет', () => {
++    const key = seedWeapon({ durability: 40 });
++    const result = performInstantFreeRepair(key, { temporary: false });
++    expect(result.ok).toBe(true);
++    expect(state().items[key].durability).toBe(100);
++    expect(state().items[key].temporaryRepair).toBeUndefined();
++  });
++
++  it('пачка СБ: бесплатно по 1 шт, флаг на починенной', () => {
++    seedPerk();
++    const key = seedPaPiece({ hpCurrent: 2, quantity: 2 });
++    const result = performInstantFreeRepair(key, { temporary: true });
++    expect(result.ok).toBe(true);
++    const pieces = Object.values(state().items).filter((i) => i.weaponId === 'power_armor_raider_chest');
++    const whole = pieces.find((i) => Number(i.hpCurrent) === 10);
++    expect(whole?.quantity ?? 0).toBe(1);
++    expect(whole?.temporaryRepair).toBe(true);
++  });
++
++  it('надетая часть СБ: бесплатно, флаг на части', () => {
++    seedPerk();
++    useCharacterStore.setState((prev) => ({
++      equippedPowerArmor: {
++        ...(prev.equippedPowerArmor || {}),
++        pieces: {
++          ...(prev.equippedPowerArmor?.pieces || {}),
++          torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3 },
++        },
++      },
++    }));
++    const result = performInstantFreeRepairForEquippedPiece('torso', { temporary: true });
++    expect(result.ok).toBe(true);
++    const piece = state().equippedPowerArmor.pieces.torso;
++    expect(piece.hpCurrent).toBe(10);
++    expect(piece.temporaryRepair).toBe(true);
++  });
++
++  it('износ при выстреле НЕ снимает флаг (перк снимает только осложнение)', () => {
++    const key = seedWeapon({ durability: 100, flagged: true });
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_ammo: { id: 'ammo_10mm', weaponId: 'ammo_10mm', itemType: 'ammo', quantity: 20 },
++      },
++    }));
++    const spend = state().spendAmmoForWeapon({
++      weaponInstanceId: key,
++      ammoIds: ['ammo_10mm'],
++      ammoAmount: 10,
++      durabilityEnabled: true,
++      baseLossPer10Shots: 1,
++    });
++    expect(spend.ok).toBe(true);
++    expect(state().items[key].durability).toBeLessThan(100);
++    expect(state().items[key].temporaryRepair).toBe(true);
++  });
++});
++
++describe('Патч 416: флаг временного ремонта снимается честным ремонтом', () => {
++  it('книжный ремонт (тест с материалами) перезачитывает «Очумелые ручки»', () => {
++    setCurrentModuleLocale('ru-RU');
++    const key = seedWeapon({ durability: 40, flagged: true });
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 4 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair(key, { ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(state().items[key].durability).toBe(100);
++    expect(state().items[key].temporaryRepair).toBeUndefined();
++  });
++
++  it('честный ремонт надетой части снимает флаг', () => {
++    setCurrentModuleLocale('ru-RU');
++    useCharacterStore.setState((prev) => ({
++      equippedPowerArmor: {
++        ...(prev.equippedPowerArmor || {}),
++        pieces: {
++          ...(prev.equippedPowerArmor?.pieces || {}),
++          torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3, temporaryRepair: true },
++        },
++      },
++      items: {
++        ...(prev.items || {}),
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 6 },
++        seed_mat2: { id: 'item_uncommon_materials', weaponId: 'item_uncommon_materials', quantity: 6 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performEquippedPieceRepair('torso', { ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(state().equippedPowerArmor.pieces.torso.temporaryRepair).toBeUndefined();
++  });
++
++  it('разделение пачки не наследует флаг (паспорт)', () => {
++    const key = seedWeapon({ durability: 40, quantity: 2, flagged: true });
++    const singleId = splitOnePieceFromStack(key);
++    expect(state().items[singleId].temporaryRepair).toBeUndefined();
++    expect(state().items[key].temporaryRepair).toBeUndefined();
++  });
++
++  it('паспорт загрузки: не-булев флаг отбрасывается (normalizeItemParameters)', async () => {
++    const { normalizeItemParameters } = await import('../../src/store/resolvers');
++    expect(normalizeItemParameters({ id: 'x', temporaryRepair: true }).temporaryRepair).toBe(true);
++    expect(normalizeItemParameters({ id: 'x', temporaryRepair: 'yes' }).temporaryRepair).toBeUndefined();
++    expect(normalizeItemParameters({ id: 'x', temporaryRepair: 0 }).temporaryRepair).toBeUndefined();
++  });
++});
++
++describe('Патч 416: настройка прочности включена по умолчанию (слово владельца)', () => {
++  it('settings.json: defaultValue = true', () => {
++    const settings = JSON.parse(readFileSync('modules/fallout/settings.json', 'utf8'));
++    const setting = settings.find((s) => s.id === 'weaponDurabilityLossEnabled');
++    expect(setting.defaultValue).toBe(true);
++  });
++
++  it('старые сейвы без явного выбора получают включённую (fallback true в мерже стора)', () => {
++    const srcStore = readFileSync('src/store/appSettingsStore.js', 'utf8');
++    expect(srcStore).toContain('old.weaponDurabilityLossEnabled ?? true');
++  });
++});
++
++describe('Патч 416: проводка и словари', () => {
++  it('заметка о временном ремонте показывается на карточке (оружие, СБ, надетая часть)', () => {
++    const code = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    // Два места: общий подзаголовок карточки (оружие И пачка СБ) + надетая часть.
++    expect((code.match(/tInventory\('repair\.tempNote'\)/g) ?? []).length).toBe(2);
++    expect(code).toContain('temporaryRepair: piece.temporaryRepair === true,');
++  });
++
++  it('словарь tempNote есть в обоих языках', () => {
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/screen.json', 'utf8'));
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/screen.json', 'utf8'));
++    expect(ru.repair.tempNote).toContain('19–20');
++    expect(en.repair.tempNote).toContain('19–20');
++  });
++
++  it('канон перка: 1 ранг, без требований; книга: бесплатно, временно, 19–20', () => {
++    const catalog = JSON.parse(readFileSync('modules/fallout/data/perks/perks.json', 'utf8'));
++    const perk = (Array.isArray(catalog) ? catalog : catalog.perks).find((p) => p.id === 'juryRigging');
++    expect(perk.maxRanks).toBe(1);
++    expect(perk.prerequisites).toEqual({});
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/data/perks/perks.json', 'utf8'));
++    const ruPerk = (Array.isArray(ru) ? ru : ru.perks).find((p) => p.id === 'juryRigging');
++    expect(ruPerk.effect).toContain('19-20');
++    expect(ruPerk.effect).toContain('временным');
++  });
++});
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index 8cdddd9..5fd40cb 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -394,21 +394,21 @@ describe('Патч 413: операции — редкость, моды, дон
+ describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
+   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+ 
+-  it('одна кнопка у всех целей: настройка ВКЛ — «Ремонт» (окно), ВЫКЛ — мгновенная «Починить»', () => {
++  it('одна кнопка у всех целей: настройка ВКЛ и без перка — «Ремонт» (окно), иначе — мгновенная «Починить»', () => {
+     const code = src();
+     expect(code).toContain('RepairModal');
+-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
+-    expect((code.match(/weaponDurabilityLossEnabled \?/g) ?? []).length).toBe(3);
++    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая
++    // часть); с 416 в условии ещё и перк «Очумелые ручки».
++    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
+     // Книжный режим открывает окно (обе формы цели).
+     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
+     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
+-    // Бесплатный режим — мгновенный и по 1 шт (через отделение штуки).
+-    expect(code).toContain('repairOnePieceInstant(item.id)');
+-    expect(code).toContain('splitOnePieceFromStack');
++    // Бесплатный режим — мгновенный, по 1 шт (операции сами отделяют штуку).
++    expect(code).toContain('performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
++    expect(code).toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
+     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
+     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
+-    // Надетая часть — всегда 1 шт, сразу экшн.
+-    expect(code).toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
++    expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+     // Подписи режимов различаются.
+     expect(code).toContain("tInventory('repair.actions.remake')");
+     expect(code).toContain("tInventory('repair.actions.repair')");
+diff --git a/__tests__/survival/survival-settings.test.js b/__tests__/survival/survival-settings.test.js
+index 3bcee17..92508ae 100644
+--- a/__tests__/survival/survival-settings.test.js
++++ b/__tests__/survival/survival-settings.test.js
+@@ -48,7 +48,8 @@ describe('survival settings: данные раздела «Выживание»'
+       expect(setting).toBeTruthy();
+       expect(setting.sectionKey).toBe('survival');
+     }
+-    expect(byId('weaponDurabilityLossEnabled').defaultValue).toBe(false);
++    // Слово владельца 416: включена по умолчанию.
++    expect(byId('weaponDurabilityLossEnabled').defaultValue).toBe(true);
+     expect(byId('weaponDurabilityLossPer10Shots').defaultValue).toBe(1);
+     expect(byId('randomWeaponQualityEnabled').defaultValue).toBe(false);
+   });
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 8f7f374..1179903 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -13,7 +13,13 @@ import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/moda
+ // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
+ // «Починить» больше не чинят мгновенно и бесплатно).
+ import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
+-import { repairAffordableFor, repairAffordableForPiece, splitOnePieceFromStack } from '../../../modules/fallout/repair/operations';
++import {
++  repairAffordableFor,
++  repairAffordableForPiece,
++  juryRiggingRanksFor,
++  performInstantFreeRepair,
++  performInstantFreeRepairForEquippedPiece,
++} from '../../../modules/fallout/repair/operations';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+ import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
+@@ -158,25 +164,15 @@ const InventoryScreen = () => {
+   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+   const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+   const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
++  // 416 «Очумелые ручки»: подписка на выборы перков — чтобы кнопка
++  // мгновенно переключилась на бесплатный режим.
++  useCharacterStore((state) => state.selectedPerks);
+   // Слово владельца 414: «кнопки ремонта нет, если настройка прочности
+   // не активна» — используем существующий селектор weaponDurabilityLossEnabled.
+   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
+   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
+ 
+-  // Слово владельца 414/415: бесплатная починка — на ОДНУ штуку: отделяем
+-  // штуку от пачки (если пачка) и чиним только её.
+-  const repairOnePieceInstant = (storeItemId) => {
+-    const id = splitOnePieceFromStack(storeItemId);
+-    const piece = useCharacterStore.getState().items?.[id];
+-    if (piece?.itemType === 'powerArmor') {
+-      if (piece.paSlot) repairPowerArmorPieceAt(id);
+-      else repairPowerArmorStack(id);
+-    } else {
+-      repairWeapon(id);
+-    }
+-  };
+-
+   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
+     if (!stackKey) return undefined;
+     // Прямое совпадение (сторовый stackKey: "weapon_10mm_pistol")
+@@ -1314,6 +1310,7 @@ const InventoryScreen = () => {
+         }),
+         hpCurrent: piece.hpCurrent,
+         maxHp,
++        temporaryRepair: piece.temporaryRepair === true,
+         // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
+         showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
+       });
+@@ -1480,6 +1477,7 @@ const InventoryScreen = () => {
+       const pieceAffordable = item?.pieceCatalogId
+         ? repairAffordableForPiece(item.pieceCatalogId)
+         : true;
++      const juryRiggingActive = juryRiggingRanksFor() > 0;
+       // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
+       // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
+       // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
+@@ -1491,7 +1489,7 @@ const InventoryScreen = () => {
+             </View>
+           </View>
+           <View style={styles.actionContainer}>
+-            {item.showRepair && (weaponDurabilityLossEnabled ? (
++            {item.showRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                 disabled={!pieceAffordable}
+@@ -1501,7 +1499,7 @@ const InventoryScreen = () => {
+             ) : (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton]}
+-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
++                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+             ))}
+@@ -1515,6 +1513,11 @@ const InventoryScreen = () => {
+             <Text style={styles.itemSubText}>
+               {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
+             </Text>
++            {item.temporaryRepair === true && (
++              <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
++                {tInventory('repair.tempNote')}
++              </Text>
++            )}
+           </View>
+         </View>
+       );
+@@ -1581,6 +1584,9 @@ const InventoryScreen = () => {
+     );
+     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
+     const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
++    // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
++    // при включённой прочности) — окно книжного ремонта не открываем.
++    const juryRiggingActive = juryRiggingRanksFor() > 0;
+     // Слово владельца 414: «если материалов нет, кнопка ремонта не
+     // активна» (донор тоже делает кнопку активной).
+     const repairAffordable = repairAffordableFor(item.id);
+@@ -1684,7 +1690,7 @@ const InventoryScreen = () => {
+               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+           )}
+ 
+-          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
++          {showWeaponRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+@@ -1694,12 +1700,12 @@ const InventoryScreen = () => {
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairOnePieceInstant(item.id)}>
++                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ))}
+ 
+-          {showPARepair && (weaponDurabilityLossEnabled ? (
++          {showPARepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+@@ -1709,7 +1715,7 @@ const InventoryScreen = () => {
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => repairOnePieceInstant(item.id)}>
++                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ))}
+@@ -1751,6 +1757,11 @@ const InventoryScreen = () => {
+           {showWeaponDurability && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+           )}
++          {item.temporaryRepair === true && (
++            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
++              {tInventory('repair.tempNote')}
++            </Text>
++          )}
+           {mk2Blocked && (
+             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>
+           )}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 88d7276..54b152c 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (415)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (416)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **416** (СЛОВО ВЛАДЕЛЬЦА: «Да делаем очумелые ручки и меняем настройку прочности включенной по-умолчанию»). ПРИМЕНЕНО: перк juryRigging (канон: 1 ранг, без требований; book: бесплатно без компонентов, ВРЕМЕННО, снова сломается при следующем осложнении при использовании, диапазон осложнений 19–20) — juryRiggingRanksFor (countActivePerkSelections, закон 412: погашенные не считаются; prereq {} → всегда активен при выборе); проводка: тернарник кнопки `weaponDurabilityLossEnabled && !juryRiggingActive ?` (×3 цели) — с перком кнопка = performInstantFreeRepair/ForEquippedPiece({temporary: настройка && перк}); флаг temporaryRepair (строго true; паспорт: normalizeItemParameters отбрасывает не-true; splitOnePieceFromStack не наследует; честный performRepair/performEquippedPieceRepair снимает; износ spendAmmoForWeapon НЕ снимает — перк отпускает только осложнение); жёлтая пометка repair.tempNote (2 места: общий подзаголовок карточки + надетая часть). Настройка weaponDurabilityLossEnabled defaultValue true (settings.json + мигр стора `?? true`; ЯВНО сохранённый false не трогается — владельцу сказать: в его сейве включить один раз). Боевая сцена вне приложения (закон 404): «сломается при осложнении» отмечает владелец сам, пометка исчезает когда предмет снова чинят/ломают вручную. АГЕНТСКОЕ (пометить): с перком книжный «Ремонт» с материалами недоступен из карточки (кнопка одна = бесплатная временная; по книге перк даёт ВЫБОР — если владельцу нужен и честный ремонт при перке, верну вторую кнопку/окно по его слову); слитая с целыми временно-починенная штука теряет флаг при слиянии (редкий край). Защёлка __tests__/repair/jury-rigging-416.test.js (15) + 413-файл=закон 415/416. 1488/153, tsc 0. node_modules исчезал дважды за сессию — npm ci по стандарту. Предыдущий снимок — **415** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **415** (СЛОВО ВЛАДЕЛЬЦА: «Бесплатная починка только при отключенных настройках или перке. Кнопка одна для обоих случаев. Ремонт и его затраты даны на 1шт, а не карточку, пачку, стопку или как ты называешь количество >1»). ПРИМЕНЕНО: КНОПКА ОДНА (тернарник weaponDurabilityLossEnabled у всех 3 целей): настройка ВЫКЛ → мгновенная бесплатная «Починить» (en Fix), ВКЛ → книжный «Ремонт» (en Repair, окно 413/414 с донором/материалами/крафт-отчётом, гейт repairAffordable/pieceAffordable — серая без материалов и донора). ЗАКОН 1 ШТ ВЕЗДЕ: splitOnePieceFromStack (operations) — performRepair отделяет штуку для ЛЮБОГО вида (оружие тоже), мгновенная кнопка зовёт repairOnePieceInstant (инвентарь) = split + экшн по отделённой штуке; надетая часть СБ — всегда 1 шт (прямой экшн). Фикс бага 414: у кнопки надетой части disabled={!pieceAffordable} (была чужая переменная). Бесплатная при перке = «Очумелые ручки» — СЛЕДУЮЩИЙ патч (та же кнопка). Защёлка 413 = закон 415 (23 теста). 1473/152, tsc 0. Предыдущий снимок — **414** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **414** (СЛОВО ВЛАДЕЛЬЦА на мои три сверх-книжных решения 413: «Не согласен. Донора предлагать в окне ремонта (если есть). Если нет, то в инвентаре по нажатии кнопки ремонт (что рядом с починить), просто отчёт о ремонте. Если материалов нет, кнопка ремонта не активна. Кнопки ремонт нет, если настройка прочности не активна. Окно отчёта с тратой ОД уже есть в окне Крафта — его берём за основу, тут почти всё то же самое, только прочность предмета повышается вместо предмета. …с чего ты решил силовую броню чинить всю?? Каждый элемент отдельно!»). ПРИМЕНЕНО: ДВЕ кнопки — «Починить» (мгновенно бесплатно, прежнее) + «Ремонт» (книжный тест 413); донор предлагается в окне, донора НЕТ → окно выбора не открывается (автостарт в RepairModal), сразу попытка и отчёт; отчёт = крафтовый (общий CraftReportView, buildRepairReport, строки из craftingModal.json repair.*) — «прочность предмета восстановлена» вместо «получено: предмет»; кнопка «Ремонт» disabled если материалов нет (и донора нет — repairAffordableFor / repairAffordableForPiece для надетой части); кнопки «Ремонт» НЕТ при выключенной настройке прочности (weaponDurabilityLossEnabled); СБ чинится по ОДНОЙ штуке (performRepair отделяет 1 шт от пачки — клон quantity:1, repairPowerArmorStack сольёт её с целыми; en-кнопки Fix/Repair). СЛОВО ВЛАДЕЛЬЦА про слово «карточка»: не использовать; один тест = одна деталь. Защёлка 413 дополнена до закона 414 (21 тест). 1471/152, tsc 0. Процессуальное: .git снова сбросился на 529824d посреди 414 — спасён tar-бэкапом дерева + reset --hard FETCH_HEAD (5f5e29a) + возврат правок поверх; порядок прежний. Предыдущий снимок — **413** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **413** (МЕХАНИКА РЕМОНТА ОТ ВЛАДЕЛЬЦА — внедрена целиком, отменяет правило «Починить бесплатно до максимума»). ЗАКОН: тест ИНТ + Ремонт, сложность = редкость предмета (+1 за каждую установленную модификацию-запись installedOn; донор −1, мин 0); материалы — книжная таблица по редкости (repair/rules.js REPAIR_MATERIALS_BY_RARITY: 0→1 Обыч; 1→2 Обыч; 2→2+1 Необыч; 3→2+2; 4→2+2+1 Редк; 5+→3+3+1); донор = второй предмет ТОГО ЖЕ канонического id (не надет/не мод/не locked) — даёт материалы (план пуст, списывается adjustItemQuantity(−1), моды уходят с ним 343) и −1 сложность; время 30 мин (успех + 2 ОД → 15, закон 323/324; осложнение +15 каждое; при осложнении д20 19–20 → потеря ЕЩЁ одного комплекта, иначе +15; разрешение осложнения ТОЛЬКО при успехе); провал — материалы остаются (закон верстака 323), время зря; сложность 0 — окно спрашивает бросать ли (закон 356). КОД: domain/repairEngine.js (evaluateRepair/runRepair, чистый по образцу craftingEngine), modules/fallout/repair/rules.js + operations.js (редкость из каталогов collectPairs, modsCount по installedOn, preview/performRepair/performEquippedPieceRepair/settleRepairTime; успех чинит СУЩЕСТВУЮЩИМИ экшнами repairWeapon/repairPowerArmorStack/repairPowerArmorPieceAt — охват прежний, цена новая), модалка modules/fallout/screens/InventoryScreen/modals/RepairModal.js (скролл-закон 402, отчёт в модалке 357, инлайн-диалоги 364), три кнопки «Починить» (оружие/пачка СБ/надетая часть) открывают её, i18n repair.* в inventory screen.json (ru/en). Существующие экшны стора не менялись — паспорт не трогали. СЛОВО ВЛАДЕЛЬЦА: «Для ремонта нужно: тест на ИНТ + Ремонт со сложностью, равной редкости предмета… донор… полчаса (2 ОД → 15 минут, осложнения +15)… таблица материалов… +1 за модификацию… осложнения: время или потеря материалов (д20 19–20)». Сверх книги принято агентом (пометить при разборе): разрешение осложнения только при успехе; при провале материалы остаются; сложность-0 вопрос по закону 356. ЗАЩЁЛКА repair-book-413 (18 тестов). 1468/152, tsc 0. УРОК 413 (установщик): запись в state.md МЕЖДУ патчами (коммит без патч-файла — «Очумелые ручки», 00b0cac) ломает контекст хунка state.md следующего патча у владельца → патч целиком откладывается, установщик останавливается. Правило: ЛЮБАЯ правка docs/state.md — только В СОСТАВЕ патча; патч-файл генерировать diff(финал предыдущего патча → HEAD), не от промежуточных коммитов. Предыдущий снимок — **412** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ecb96fa..f4c949f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,20 @@
+ # Changelog
++---
++## Jury Rigging (patch 416)
++
++The «Jury Rigging» perk works now. The same single «Fix» button is
++free with this perk too, even with the durability setting on. Per the
++book, such a repair is temporary: the item breaks again at the next
++complication while being used, and the complication range for skill
++checks with the item is 19–20. While the item is temporarily repaired,
++its card shows a yellow note. A proper repair with materials (the
++«Repair» button) removes the note — the item is fixed for good. Firing
++wear does not remove the note: only a complication releases the item.
++
++The «Weapon durability loss» setting is now on by default. If it was
++saved off in your save — turn it on once in the settings; an explicit
++choice is never overridden.
++
+ ---
+ ## One repair button (patch 415)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a0a8669..fac07e6 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## «Очумелые ручки» (патч 416)
++
++Перк «Очумелые ручки» заработал. Кнопка «Починить» — та же одна —
++теперь бесплатная и с этим перком, даже при включённой настройке
++прочности. По книге такой ремонт временный: предмет снова сломается
++при следующем осложнении при его использовании, а диапазон осложнений
++при проверках на умение пользоваться предметом — 19–20. Пока предмет
++временно починен, на его карточке висит жёлтая пометка. Честный ремонт
++с материалами (кнопка «Ремонт») снимает пометку — предмет починен
++насовсем. Износ при выстреле пометку не снимает: перк отпускает
++предмет только при осложнении.
++
++Настройка «Износ оружия при выстреле» теперь включена по умолчанию.
++Если в вашем сейве она была выключена — включите её один раз в
++настройках, явный выбор не перекрывается.
++
+ ---
+ ## Одна кнопка ремонта (патч 415)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index 1a47840..b5dbadb 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -134,6 +134,7 @@
+     "donorOffer": "There is a second identical item — scrap it instead of the materials: difficulty −1.",
+     "useDonor": "Scrap the donor and repair",
+     "withoutDonor": "Repair without the donor",
+-    "cancel": "Cancel"
++    "cancel": "Cancel",
++    "tempNote": "Temporarily repaired (Jury Rigging): a complication while using it (19–20) breaks it again"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index 0666fba..263f172 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -134,6 +134,7 @@
+     "donorOffer": "Есть второй такой же предмет — можно разобрать его вместо материалов: сложность −1.",
+     "useDonor": "Разобрать донора и ремонтировать",
+     "withoutDonor": "Ремонтировать без донора",
+-    "cancel": "Отмена"
++    "cancel": "Отмена",
++    "tempNote": "Временно починено («Очумелые ручки»): при осложнении при использовании (19–20) предмет снова сломается"
+   }
+ }
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+index c99ccb5..cba275b 100644
+--- a/modules/fallout/repair/operations.js
++++ b/modules/fallout/repair/operations.js
+@@ -24,6 +24,8 @@ import weaponsCatalog from '../data/equipment/weapons.json';
+ import armorCatalog from '../data/equipment/armor.json';
+ import powerArmorCatalog from '../data/equipment/powerArmor.json';
+ import { getScrapMaterials } from '../../../domain/registry';
++import { countActivePerkSelections } from '../../../domain/perks';
++import perksCatalog from '../data/perks/perks.json';
+ import { getCurrentModuleLocale } from '../../../i18n/locale';
+ import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
+ import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
+@@ -170,16 +172,89 @@ export const splitOnePieceFromStack = (storeItemId) => {
+   const item = useCharacterStore.getState().items?.[storeItemId];
+   if (!item || (Number(item.quantity) || 1) <= 1) return storeItemId;
+   const singleKey = `${storeItemId}_single_${Math.random().toString(36).slice(2, 7)}`;
++  // Флаг временного ремонта «Очумелых ручек» не наследуется: отделённая
++  // штука либо чинится честно (флаг снят), либо получает свой (ниже).
+   useCharacterStore.setState((prev) => ({
+     items: {
+       ...prev.items,
+-      [singleKey]: { ...item, quantity: 1 },
+-      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1 },
++      [singleKey]: { ...item, quantity: 1, temporaryRepair: undefined },
++      [storeItemId]: { ...item, quantity: (Number(item.quantity) || 1) - 1, temporaryRepair: undefined },
+     },
+   }));
+   return singleKey;
+ };
+ 
++/**
++ * Патч 416 «Очумелые ручки» (juryRigging): починить предмет бесплатно,
++ * БЕЗ компонентов — но временно: предмет снова сломается при следующем
++ * осложнении при использовании; диапазон осложнений при проверках на
++ * умение пользоваться предметом — 19–20 (книжный текст перка).
++ * countActivePerkSelections гасит погасшие выборы (закон 412).
++ */
++export const juryRiggingRanksFor = (store = useCharacterStore.getState()) =>
++  countActivePerkSelections(store, 'juryRigging', perksCatalog);
++
++/** Паспорт 416: флаг «временно починено» на экземпляре инвентаря. */
++export const markTemporaryRepairOnItem = (storeItemId, value) => {
++  useCharacterStore.setState((prev) => {
++    const item = prev.items?.[storeItemId];
++    if (!item) return prev;
++    return {
++      items: {
++        ...prev.items,
++        [storeItemId]: { ...item, temporaryRepair: value ? true : undefined },
++      },
++    };
++  });
++};
++
++/** Паспорт 416: тот же флаг на НАДЕТОЙ части СБ (живёт вне items). */
++export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
++  useCharacterStore.setState((prev) => {
++    const piece = prev.equippedPowerArmor?.pieces?.[slot];
++    if (!piece) return prev;
++    return {
++      equippedPowerArmor: {
++        ...prev.equippedPowerArmor,
++        pieces: { ...prev.equippedPowerArmor.pieces, [slot]: { ...piece, temporaryRepair: value ? true : undefined } },
++      },
++    };
++  });
++};
++
++/**
++ * Бесплатная мгновенная починка (кнопка «Починить», слово владельца
++ * 414/415): по ОДНОЙ штуке, без теста и материалов. Слово владельца 416:
++ * с перком «Очумелые ручки» при включённой настройке прочности ремонт
++ * бесплатен, но ВРЕМЕННЫЙ (temporary — книжные эффекты перка).
++ */
++export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}) => {
++  const before = useCharacterStore.getState().items?.[storeItemId];
++  if (!before) return { ok: false, reason: 'not-found' };
++  const id = splitOnePieceFromStack(storeItemId);
++  const state = useCharacterStore.getState();
++  const piece = state.items?.[id];
++  if (!piece) return { ok: false, reason: 'not-found' };
++  if (piece.itemType === 'powerArmor') {
++    if (piece.paSlot) state.repairPowerArmorPieceAt(id);
++    else state.repairPowerArmorStack(id);
++  } else {
++    state.repairWeapon(id);
++  }
++  if (temporary) markTemporaryRepairOnItem(id, true);
++  return { ok: true, repairedStoreItemId: id, temporary };
++};
++
++/** То же для надетой части СБ (всегда одна штука). */
++export const performInstantFreeRepairForEquippedPiece = (slot, { temporary = false } = {}) => {
++  const store = useCharacterStore.getState();
++  const piece = store.equippedPowerArmor?.pieces?.[slot];
++  if (!piece) return { ok: false, reason: 'not-found' };
++  store.repairPowerArmorPieceAt(slot);
++  if (temporary) markTemporaryRepairOnEquippedPiece(slot, true);
++  return { ok: true, temporary };
++};
++
+ /**
+  * Слово владельца 414: «если материалов нет, кнопка ремонта не активна».
+  * Хватает материалов ИЛИ есть валидный донор — кнопка активна.
+@@ -329,7 +404,11 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
+       result.resolution = { kind: 'extra-minutes', degenerate: true };
+     }
+   }
+-  if (result.done) useCharacterStore.getState().repairPowerArmorPieceAt(slot);
++  if (result.done) {
++    useCharacterStore.getState().repairPowerArmorPieceAt(slot);
++    // Честный ремонт перезачитывает временный («Очумелые ручки»).
++    markTemporaryRepairOnEquippedPiece(slot, false);
++  }
+   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
+   result.repairTime = {
+     baseMinutes: REPAIR_RULES.baseMinutes,
+@@ -418,6 +497,8 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+       else state.repairPowerArmorStack(repairTargetId);
+     }
+   }
++  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки».
++  if (result.done) markTemporaryRepairOnItem(repairTargetId, false);
+   result.repairedStoreItemId = repairTargetId;
+ 
+   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
+diff --git a/modules/fallout/settings.json b/modules/fallout/settings.json
+index feed522..77e89ba 100644
+--- a/modules/fallout/settings.json
++++ b/modules/fallout/settings.json
+@@ -28,7 +28,7 @@
+     "sectionKey": "survival",
+     "labelKey": "settings.durabilityTitle",
+     "descriptionKey": "settings.durabilityDescription",
+-    "defaultValue": false
++    "defaultValue": true
+   },
+   {
+     "id": "weaponDurabilityLossPer10Shots",
+diff --git a/public/version.json b/public/version.json
+index b5f5bcd..e451d2e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "415",
++  "version": "416",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 51c5518..25d25f0 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -124,7 +124,9 @@ const migrateFlatState = (persistedState) => {
+     fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+     fallout.weaponDurabilityLossEnabled = false;
+   } else {
+-    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
++    // Слово владельца 416: настройка прочности включена ПО УМОЛЧАНИЮ
++    // (явно сохранённый выбор игрока не трогаем).
++    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? true;
+     fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+   }
+ 
+diff --git a/src/store/resolvers.js b/src/store/resolvers.js
+index 3703a59..1e541da 100644
+--- a/src/store/resolvers.js
++++ b/src/store/resolvers.js
+@@ -57,6 +57,12 @@ export const normalizeItemParameters = (item) => {
+ 
+   const normalized = { ...item };
+ 
++  // Паспорт 416: флаг временного ремонта «Очумелые ручки» — только
++  // строго true; поломанные сейвы чинятся при загрузке без подъёма версии.
++  if (normalized.temporaryRepair !== undefined && normalized.temporaryRepair !== true) {
++    delete normalized.temporaryRepair;
++  }
++
+   if (normalized.damage !== undefined) {
+     normalized.damage = coerceToParameter(normalized.damage);
+     normalized.damage.total = calculateItemParameterTotal(normalized.damage);
