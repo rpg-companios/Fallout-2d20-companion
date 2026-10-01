@@ -1,0 +1,779 @@
+diff --git a/__tests__/repair/jury-rigging-416.test.js b/__tests__/repair/jury-rigging-416.test.js
+index 811ecd9..e00c482 100644
+--- a/__tests__/repair/jury-rigging-416.test.js
++++ b/__tests__/repair/jury-rigging-416.test.js
+@@ -1,13 +1,17 @@
+-// ПРИЁМОЧНЫЙ (патч 416): «Очумелые ручки» (juryRigging) + настройка
++// ПРИЁМОЧНЫЙ (патчи 416–417): «Очумелые ручки» (juryRigging) + настройка
+ // прочности включена по умолчанию. Книжный текст перка (канон 410,
+ // modules/fallout/i18n/ru-RU/data/perks/perks.json): «Вы можете починить
+ // предмет, не затрачивая на это никаких компонентов. Однако ремонт будет
+ // временным, и предмет снова сломается при следующем осложнении, которое
+ // вы получите при его использовании. Диапазон осложнений при проверках
+ // на умение пользоваться этим предметом увеличивается на 1, до значения
+-// на броске 19-20.» Слово владельца: кнопка ОДНА — бесплатная починка
+-// при отключённых настройках ИЛИ при перке; с перком при включённой
+-// настройке починка бесплатна, но ВРЕМЕННАЯ.
++// на броске 19-20.» Слово владельца 416: кнопка ОДНА — бесплатная починка
++// при отключённых настройках ИЛИ при перке. Слово владельца 417: с перком
++// кнопка ВСЕГДА открывает окно выбора — ТРИ кнопки: «Без затрат
++// (некачественно)» (активна всегда), «За счёт донора (ускоренный
++// ремонт)» (серая без донора), «За счёт материалов» (серая без
++// материалов); мгновенных срабатываний нет — бесплатный путь тоже тест
++// и время, только без затрат, и результат временный (книга).
+ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+ import { readFileSync } from 'node:fs';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -19,10 +23,12 @@ import {
+   markTemporaryRepairOnEquippedPiece,
+   splitOnePieceFromStack,
+   performRepair,
++  performEquippedPieceRepair,
+   repairPreview,
+ } from '../../modules/fallout/repair/operations';
+ import { performEquippedPieceRepair } from '../../modules/fallout/repair/operations';
+ import { setCurrentModuleLocale } from '../../i18n/locale';
++import { buildRepairReport } from '../../modules/fallout/repair/operations';
+ 
+ const state = () => useCharacterStore.getState();
+ const seedPerk = () => useCharacterStore.setState({ selectedPerks: [{ perkId: 'juryRigging', index: 0 }] });
+@@ -73,24 +79,38 @@ describe('Патч 416: «Очумелые ручки» — активность
+   });
+ });
+ 
+-describe('Патч 416: бесплатная временная починка (кнопка «Починить» с перком)', () => {
+-  it('оружие: бесплатно без материалов, по 1 шт, флаг временного ремонта', () => {
++describe('Патч 417: «Без затрат (некачественно)» — тот же тест, без затрат, результат временный', () => {
++  it('оружие: тест без траты материалов, по 1 шт, флаг временного ремонта', () => {
+     seedPerk();
+     const key = seedWeapon({ durability: 40, quantity: 2 });
+-    const result = performInstantFreeRepair(key, { temporary: true });
+-    expect(result.ok).toBe(true);
+-    const pistols = Object.values(state().items).filter((i) => i.weaponId === 'weapon_10mm_pistol');
+-    const whole = pistols.find((i) => Number(i.durability) === 100);
+-    const damaged = pistols.find((i) => Number(i.durability) === 40);
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 8 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair(key, { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(result.temporary).toBe(true);
++    // Материалы остались в сумке (бесплатно).
++    const mats = Object.values(state().items).filter((it) => it.weaponId === 'item_common_materials')
++      .reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
++    expect(mats).toBe(8);
++    const pistols = Object.values(state().items).filter((it) => it.weaponId === 'weapon_10mm_pistol');
++    const whole = pistols.find((it) => Number(it.durability) === 100);
++    const damaged = pistols.find((it) => Number(it.durability) === 40);
+     expect(whole?.quantity ?? 0).toBe(1);            // починена ОДНА штука
+     expect(damaged?.quantity ?? 0).toBe(1);          // вторая ждёт
+     expect(whole?.temporaryRepair).toBe(true);       // ремонт ВРЕМЕННЫЙ
+     expect(damaged?.temporaryRepair).toBeUndefined(); // остальные чисты
+   });
+ 
+-  it('без перка/при выключенной прочности (temporary: false) флага нет', () => {
++  it('мгновенная бесплатная (без перка, настройка выкл) флага не ставит', () => {
+     const key = seedWeapon({ durability: 40 });
+-    const result = performInstantFreeRepair(key, { temporary: false });
++    const result = performInstantFreeRepair(key);
+     expect(result.ok).toBe(true);
+     expect(state().items[key].durability).toBe(100);
+     expect(state().items[key].temporaryRepair).toBeUndefined();
+@@ -99,10 +119,20 @@ describe('Патч 416: бесплатная временная починка (
+   it('пачка СБ: бесплатно по 1 шт, флаг на починенной', () => {
+     seedPerk();
+     const key = seedPaPiece({ hpCurrent: 2, quantity: 2 });
+-    const result = performInstantFreeRepair(key, { temporary: true });
+-    expect(result.ok).toBe(true);
+-    const pieces = Object.values(state().items).filter((i) => i.weaponId === 'power_armor_raider_chest');
+-    const whole = pieces.find((i) => Number(i.hpCurrent) === 10);
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 8 },
++        seed_mat2: { id: 'item_uncommon_materials', weaponId: 'item_uncommon_materials', quantity: 8 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair(key, { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    const pieces = Object.values(state().items).filter((it) => it.weaponId === 'power_armor_raider_chest');
++    const whole = pieces.find((it) => Number(it.hpCurrent) === 10);
+     expect(whole?.quantity ?? 0).toBe(1);
+     expect(whole?.temporaryRepair).toBe(true);
+   });
+@@ -117,14 +147,62 @@ describe('Патч 416: бесплатная временная починка (
+           torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3 },
+         },
+       },
++      items: {
++        ...(prev.items || {}),
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 8 },
++        seed_mat2: { id: 'item_uncommon_materials', weaponId: 'item_uncommon_materials', quantity: 8 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
+     }));
+-    const result = performInstantFreeRepairForEquippedPiece('torso', { temporary: true });
+-    expect(result.ok).toBe(true);
++    let i = 0;
++    const result = performEquippedPieceRepair('torso', { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
++    expect(result.done).toBe(true);
++    expect(result.temporary).toBe(true);
+     const piece = state().equippedPowerArmor.pieces.torso;
+     expect(piece.hpCurrent).toBe(10);
+     expect(piece.temporaryRepair).toBe(true);
+   });
+ 
++  it('провал бесплатного ремонта: ничего не потрачено, флага нет', () => {
++    seedPerk();
++    const key = seedWeapon({ durability: 40 });
++    useCharacterStore.setState((prev) => ({
++      items: {
++        ...prev.items,
++        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 4 },
++      },
++      attributes: { ...prev.attributes, INT: { total: 0 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    const result = performRepair(key, { mode: 'free', ports: { rollD20: () => 19 } });
++    expect(result.done).toBe(false);
++    const mats = Object.values(state().items).filter((it) => it.weaponId === 'item_common_materials')
++      .reduce((sum, it) => sum + (Number(it.quantity) || 1), 0);
++    expect(mats).toBe(4);
++    expect(state().items[key].durability).toBe(40);
++    expect(state().items[key].temporaryRepair).toBeUndefined();
++  });
++
++  it('«За счёт донора» = прежний донорный поток (донор списан, постоянный ремонт)', () => {
++    seedPerk();
++    const key = seedWeapon({ durability: 40, id: 'seed_target' });
++    seedWeapon({ durability: 55, id: 'seed_donor' }); // донор — тот же тип
++    useCharacterStore.setState((prev) => ({
++      attributes: { ...prev.attributes, INT: { total: 5 } },
++      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
++    }));
++    let i = 0;
++    const result = performRepair('seed_target', {
++      donorStoreItemId: 'seed_donor', mode: 'donor',
++      ports: { rollD20: () => [2, 3][i++ % 2] },
++    });
++    expect(result.done).toBe(true);
++    expect(result.temporary).toBe(false);            // постоянный ремонт
++    expect(state().items.seed_target.durability).toBe(100);
++    expect(state().items.seed_donor).toBeUndefined(); // донор разобран
++  });
++
+   it('износ при выстреле НЕ снимает флаг (перк снимает только осложнение)', () => {
+     const key = seedWeapon({ durability: 100, flagged: true });
+     useCharacterStore.setState((prev) => ({
+@@ -204,6 +282,57 @@ describe('Патч 416: флаг временного ремонта снима
+   });
+ });
+ 
++describe('Патч 417: окно выбора — три кнопки, серые по наличию', () => {
++  const modal = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
++
++  it('три кнопки с книжными подписями; бесплатная — всегда активна', () => {
++    const code = modal();
++    expect(code).toContain("tInventory('repair.choice.free')");
++    expect(code).toContain("tInventory('repair.choice.donor')");
++    expect(code).toContain("tInventory('repair.choice.materials')");
++    // Кнопки зовут свои режимы.
++    expect(code).toContain("execute({ mode: 'free' })");
++    expect(code).toContain("execute({ mode: 'donor' })");
++    expect(code).toContain("execute({ mode: 'materials' })");
++    // «Без затрат» без disabled; донор — серая без доноров; материалы — серая без готовности.
++    expect(code).toContain("(preview.donors ?? []).length === 0 && styles.mainButtonDisabled");
++    expect(code).toContain("!preview.evaluation?.ready && styles.mainButtonDisabled");
++    // Бесплатная кнопка (первая в футере выбора) не имеет disabled.
++    const freeBlock = code.slice(code.indexOf("execute({ mode: 'free' })") - 400, code.indexOf("execute({ mode: 'free' })"));
++    expect(freeBlock).not.toContain('disabled=');
++  });
++
++  it('автостарта с перком нет: выбор всегда за игроком (слово 417)', () => {
++    const code = modal();
++    expect(code).toContain('!juryActive && (preview.donors ?? []).length === 0');
++  });
++
++  it('донор для «За счёт донора»: выбранный в списке или первый', () => {
++    const code = modal();
++    expect(code).toContain("mode === 'donor'");
++    expect(code).toContain('donorId ?? (preview.donors ?? [])[0] ?? null');
++  });
++
++  it('отчёт бесплатного ремонта говорит о временности (строка словаря крафта)', () => {
++    setCurrentModuleLocale('ru-RU');
++    const report = buildRepairReport({ done: true, temporary: true, check: { rolls: [2], passed: true, successes: 1, targetNumber: 5 }, spent: [] }, { attributeName: 'ИНТ', skillName: 'Ремонт' });
++    expect(report.lines.join(' ')).toContain('временный');
++    const reportOk = buildRepairReport({ done: true, check: { rolls: [2], passed: true, successes: 1, targetNumber: 5 }, spent: [] }, { attributeName: 'ИНТ', skillName: 'Ремонт' });
++    expect(reportOk.lines.join(' ')).not.toContain('временный');
++  });
++
++  it('подписи кнопок и строка «временно» в обоих языках', () => {
++    for (const loc of ['ru-RU', 'en-EN']) {
++      const screen = JSON.parse(readFileSync(`modules/fallout/i18n/${loc}/screens/inventory/screen.json`, 'utf8'));
++      expect(screen.repair.choice.free.length).toBeGreaterThan(3);
++      expect(screen.repair.choice.donor.length).toBeGreaterThan(3);
++      expect(screen.repair.choice.materials.length).toBeGreaterThan(3);
++      const craft = JSON.parse(readFileSync(`modules/fallout/i18n/${loc}/screens/inventory/craftingModal.json`, 'utf8'));
++      expect(craft.repair.temporary).toContain('19–20');
++    }
++  });
++});
++
+ describe('Патч 416: настройка прочности включена по умолчанию (слово владельца)', () => {
+   it('settings.json: defaultValue = true', () => {
+     const settings = JSON.parse(readFileSync('modules/fallout/settings.json', 'utf8'));
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index 5fd40cb..790c0c9 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -391,21 +391,25 @@ describe('Патч 413: операции — редкость, моды, дон
+   });
+ });
+ 
+-describe('Проводка (слово владельца 415): ОДНА кнопка, бесплатная — только при выключенной прочности', () => {
++describe('Проводка (слово владельца 415/417): ОДНА кнопка; с перком — окно выбора', () => {
+   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+ 
+-  it('одна кнопка у всех целей: настройка ВКЛ и без перка — «Ремонт» (окно), иначе — мгновенная «Починить»', () => {
++  it('одна кнопка у всех целей: без перка при включённой прочности — «Ремонт» (окно), иначе — «Починить»', () => {
+     const code = src();
+     expect(code).toContain('RepairModal');
+-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая
+-    // часть); с 416 в условии ещё и перк «Очумелые ручки».
++    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
+     expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
+     // Книжный режим открывает окно (обе формы цели).
+     expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
+     expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
+-    // Бесплатный режим — мгновенный, по 1 шт (операции сами отделяют штуку).
+-    expect(code).toContain('performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
+-    expect(code).toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })');
++    // С перком «Починить» тоже открывает окно (417: выбор из трёх) —
++    // и НЕ мгновенный (вторая ступень тернарника у всех трёх целей).
++    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
++    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
++    expect(code).not.toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary');
++    // Мгновенный путь остался только для «без перка и настройка выкл».
++    expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
++    expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
+     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
+     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
+     expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 1179903..75df087 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1496,10 +1496,16 @@ const InventoryScreen = () => {
+                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
++            ) : juryRiggingActive ? (
++              <TouchableOpacity
++                style={[styles.actionButton, styles.applyButton]}
++                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
++                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
+             ) : (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton]}
+-                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
++                onPress={() => performInstantFreeRepairForEquippedPiece(item.paSlot)}>
+                 <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+             ))}
+@@ -1697,10 +1703,16 @@ const InventoryScreen = () => {
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
++          ) : juryRiggingActive ? (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
++                  onPress={() => performInstantFreeRepair(item.id)}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ))}
+@@ -1712,10 +1724,16 @@ const InventoryScreen = () => {
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+               </TouchableOpacity>
++          ) : juryRiggingActive ? (
++              <TouchableOpacity
++                  style={[styles.actionButton, styles.applyButton]}
++                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
++                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++              </TouchableOpacity>
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+-                  onPress={() => performInstantFreeRepair(item.id, { temporary: weaponDurabilityLossEnabled && juryRiggingActive })}>
++                  onPress={() => performInstantFreeRepair(item.id)}>
+                   <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ))}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 54b152c..5507dc4 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (416)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (417)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **417** (СЛОВО ВЛАДЕЛЬЦА на безусловность 416: «Опять ты не спрашиваешь, а думаешь… Кнопка открывает окно с выбором: 3 кнопки "Без затрат (некачественно)", "За счёт донора (ускоренный ремонт)", "За счёт материалов". Если нет материалов, но есть донор — "За счёт материалов" не активна. Если нет донора — "За счёт донора" не активна. Если нет ни донора, ни материалов — соответствующие кнопки не активны»). ПРИМЕНЕНО: с перком кнопка ВСЕГДА открывает окно выбора (мгновенных срабатываний нет); REPAIR_MODES materials|donor|free в performRepair/performEquippedPieceRepair — free: план материалов пуст, донор null, spendDonor-порт возвращает ok (перк покрывает; иначе движок donor-refused), СЛОЖНОСТЬ ПОЛНАЯ, тест и время те же, успех → флаг temporaryRepair + result.temporary; donor: прежний поток (−1 сложность, донор списан, постоянно); materials: как было; автостарт без донора — ТОЛЬКО без перка (слово 414); донор в окне: выбор из списка (по умолчанию первый); отчёт бесплатного = строка craftingModal repair.temporary («Ремонт временный… 19–20»); проводка инвентаря: перк → setRepairTarget (кнопка НЕ серая — free всегда есть), без перка вкл → Ремонт (серая без материалов/донора), без перка выкл → performInstantFreeRepair (без temporary-параметра). АГЕНТСКОЕ (пометить): «ускоренный ремонт» в подписи донора — механика осталась «−1 сложность» (слово 413); если владелец имел в виду СКОРОСТЬ (меньше времени) — скажет, поменяю. Защёлка jury-rigging-416.test.js дополнена законами 417 (22 теста), 413-файл = 45. 1495/153, tsc 0. Предыдущий снимок — **416** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **416** (СЛОВО ВЛАДЕЛЬЦА: «Да делаем очумелые ручки и меняем настройку прочности включенной по-умолчанию»). ПРИМЕНЕНО: перк juryRigging (канон: 1 ранг, без требований; book: бесплатно без компонентов, ВРЕМЕННО, снова сломается при следующем осложнении при использовании, диапазон осложнений 19–20) — juryRiggingRanksFor (countActivePerkSelections, закон 412: погашенные не считаются; prereq {} → всегда активен при выборе); проводка: тернарник кнопки `weaponDurabilityLossEnabled && !juryRiggingActive ?` (×3 цели) — с перком кнопка = performInstantFreeRepair/ForEquippedPiece({temporary: настройка && перк}); флаг temporaryRepair (строго true; паспорт: normalizeItemParameters отбрасывает не-true; splitOnePieceFromStack не наследует; честный performRepair/performEquippedPieceRepair снимает; износ spendAmmoForWeapon НЕ снимает — перк отпускает только осложнение); жёлтая пометка repair.tempNote (2 места: общий подзаголовок карточки + надетая часть). Настройка weaponDurabilityLossEnabled defaultValue true (settings.json + мигр стора `?? true`; ЯВНО сохранённый false не трогается — владельцу сказать: в его сейве включить один раз). Боевая сцена вне приложения (закон 404): «сломается при осложнении» отмечает владелец сам, пометка исчезает когда предмет снова чинят/ломают вручную. АГЕНТСКОЕ (пометить): с перком книжный «Ремонт» с материалами недоступен из карточки (кнопка одна = бесплатная временная; по книге перк даёт ВЫБОР — если владельцу нужен и честный ремонт при перке, верну вторую кнопку/окно по его слову); слитая с целыми временно-починенная штука теряет флаг при слиянии (редкий край). Защёлка __tests__/repair/jury-rigging-416.test.js (15) + 413-файл=закон 415/416. 1488/153, tsc 0. node_modules исчезал дважды за сессию — npm ci по стандарту. Предыдущий снимок — **415** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **415** (СЛОВО ВЛАДЕЛЬЦА: «Бесплатная починка только при отключенных настройках или перке. Кнопка одна для обоих случаев. Ремонт и его затраты даны на 1шт, а не карточку, пачку, стопку или как ты называешь количество >1»). ПРИМЕНЕНО: КНОПКА ОДНА (тернарник weaponDurabilityLossEnabled у всех 3 целей): настройка ВЫКЛ → мгновенная бесплатная «Починить» (en Fix), ВКЛ → книжный «Ремонт» (en Repair, окно 413/414 с донором/материалами/крафт-отчётом, гейт repairAffordable/pieceAffordable — серая без материалов и донора). ЗАКОН 1 ШТ ВЕЗДЕ: splitOnePieceFromStack (operations) — performRepair отделяет штуку для ЛЮБОГО вида (оружие тоже), мгновенная кнопка зовёт repairOnePieceInstant (инвентарь) = split + экшн по отделённой штуке; надетая часть СБ — всегда 1 шт (прямой экшн). Фикс бага 414: у кнопки надетой части disabled={!pieceAffordable} (была чужая переменная). Бесплатная при перке = «Очумелые ручки» — СЛЕДУЮЩИЙ патч (та же кнопка). Защёлка 413 = закон 415 (23 теста). 1473/152, tsc 0. Предыдущий снимок — **414** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **414** (СЛОВО ВЛАДЕЛЬЦА на мои три сверх-книжных решения 413: «Не согласен. Донора предлагать в окне ремонта (если есть). Если нет, то в инвентаре по нажатии кнопки ремонт (что рядом с починить), просто отчёт о ремонте. Если материалов нет, кнопка ремонта не активна. Кнопки ремонт нет, если настройка прочности не активна. Окно отчёта с тратой ОД уже есть в окне Крафта — его берём за основу, тут почти всё то же самое, только прочность предмета повышается вместо предмета. …с чего ты решил силовую броню чинить всю?? Каждый элемент отдельно!»). ПРИМЕНЕНО: ДВЕ кнопки — «Починить» (мгновенно бесплатно, прежнее) + «Ремонт» (книжный тест 413); донор предлагается в окне, донора НЕТ → окно выбора не открывается (автостарт в RepairModal), сразу попытка и отчёт; отчёт = крафтовый (общий CraftReportView, buildRepairReport, строки из craftingModal.json repair.*) — «прочность предмета восстановлена» вместо «получено: предмет»; кнопка «Ремонт» disabled если материалов нет (и донора нет — repairAffordableFor / repairAffordableForPiece для надетой части); кнопки «Ремонт» НЕТ при выключенной настройке прочности (weaponDurabilityLossEnabled); СБ чинится по ОДНОЙ штуке (performRepair отделяет 1 шт от пачки — клон quantity:1, repairPowerArmorStack сольёт её с целыми; en-кнопки Fix/Repair). СЛОВО ВЛАДЕЛЬЦА про слово «карточка»: не использовать; один тест = одна деталь. Защёлка 413 дополнена до закона 414 (21 тест). 1471/152, tsc 0. Процессуальное: .git снова сбросился на 529824d посреди 414 — спасён tar-бэкапом дерева + reset --hard FETCH_HEAD (5f5e29a) + возврат правок поверх; порядок прежний. Предыдущий снимок — **413** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index f4c949f..3d57c5e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,18 @@
+ # Changelog
++---
++## Repair choice window (patch 417)
++
++By your word the unconditional free repair is gone. With the
++«Jury Rigging» perk the button opens a choice window with three
++buttons: «Without cost (poor quality)», «From a donor (quick
++repair)», «From materials». No donor — the donor button is grey; no
++materials — the materials button is grey; neither — both grey, the
++free one remains. No more instant actions: every choice is the test
++and half an hour of work (2 AP halve it); the free option only spends
++nothing, and its result is temporary (a complication 19–20 breaks the
++item again — shown in the report and on the card). Without the perk
++the repair window is as before.
++
+ ---
+ ## Jury Rigging (patch 416)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index fac07e6..a6d0bf4 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Окно выбора ремонта (патч 417)
++
++По вашему слову убрана безусловность бесплатной починки. С перком
++«Очумелые ручки» кнопка открывает окно выбора с тремя кнопками:
++«Без затрат (некачественно)», «За счёт донора (ускоренный ремонт)»,
++«За счёт материалов». Нет донора — кнопка донора серая; нет
++материалов — кнопка материалов серая; нет ни того ни другого — серые
++обе, остаётся бесплатная. Мгновенных срабатываний больше нет: любой
++выбор — это тест и полчаса работы (2 ОД сокращают вдвое), бесплатный
++вариант отличается только тем, что ничего не тратит, а результат
++временный (при осложнении 19–20 предмет снова сломается — в отчёте и
++на карточке). Без перка окно ремонта прежнее.
++
+ ---
+ ## «Очумелые ручки» (патч 416)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+index 4563bd2..85e1a4d 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/craftingModal.json
+@@ -78,6 +78,7 @@
+     "failed": "Repair failed — durability unchanged, materials kept.",
+     "lostMaterials": "Complication (d20 roll: {face}) — one more set of materials was lost.",
+     "donorUsed": "Donor scrapped: materials came from it, difficulty −1.",
+-    "complicationResolve": "d20: {face}."
++    "complicationResolve": "d20: {face}.",
++    "temporary": "The repair is temporary (Jury Rigging): a complication while using it (19–20) breaks the item again"
+   }
+ }
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index b5dbadb..63d0fca 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -135,6 +135,11 @@
+     "useDonor": "Scrap the donor and repair",
+     "withoutDonor": "Repair without the donor",
+     "cancel": "Cancel",
+-    "tempNote": "Temporarily repaired (Jury Rigging): a complication while using it (19–20) breaks it again"
++    "tempNote": "Temporarily repaired (Jury Rigging): a complication while using it (19–20) breaks it again",
++    "choice": {
++      "free": "Without cost (poor quality)",
++      "donor": "From a donor (quick repair)",
++      "materials": "From materials"
++    }
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+index f96d91b..db87894 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/craftingModal.json
+@@ -78,6 +78,7 @@
+     "failed": "Ремонт не удался — прочность не изменилась, материалы остались.",
+     "lostMaterials": "Осложнение (бросок д20: {face}) — потерян ещё один комплект материалов.",
+     "donorUsed": "Донор разобран: материалы из него, сложность −1.",
+-    "complicationResolve": "д20: {face}."
++    "complicationResolve": "д20: {face}.",
++    "temporary": "Ремонт временный («Очумелые ручки»): при осложнении при использовании (19–20) предмет снова сломается"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index 263f172..9dd1091 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -135,6 +135,11 @@
+     "useDonor": "Разобрать донора и ремонтировать",
+     "withoutDonor": "Ремонтировать без донора",
+     "cancel": "Отмена",
+-    "tempNote": "Временно починено («Очумелые ручки»): при осложнении при использовании (19–20) предмет снова сломается"
++    "tempNote": "Временно починено («Очумелые ручки»): при осложнении при использовании (19–20) предмет снова сломается",
++    "choice": {
++      "free": "Без затрат (некачественно)",
++      "donor": "За счёт донора (ускоренный ремонт)",
++      "materials": "За счёт материалов"
++    }
+   }
+ }
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+index cba275b..52b0e19 100644
+--- a/modules/fallout/repair/operations.js
++++ b/modules/fallout/repair/operations.js
+@@ -85,6 +85,8 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
+   if (run?.donorSpent) lines.push(rep.donorUsed ?? '');
+   if (run?.done) {
+     lines.push(rep.success ?? '');
++    // 417: бесплатный режим «Очумелых ручек» — ремонт временный.
++    if (run.temporary) lines.push(rep.temporary ?? '');
+   } else {
+     lines.push(rep.failed ?? '');
+   }
+@@ -223,12 +225,12 @@ export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
+ };
+ 
+ /**
+- * Бесплатная мгновенная починка (кнопка «Починить», слово владельца
+- * 414/415): по ОДНОЙ штуке, без теста и материалов. Слово владельца 416:
+- * с перком «Очумелые ручки» при включённой настройке прочности ремонт
+- * бесплатен, но ВРЕМЕННЫЙ (temporary — книжные эффекты перка).
++ * Бесплатная мгновенная починка БЕЗ перка (настройка прочности выключена,
++ * слово владельца 415): по ОДНОЙ штуке, без теста и материалов. С перком
++ * «Очумелые ручки» бесплатный путь идёт через окно и тест (417), поэтому
++ * флаг временного ремонта здесь не ставится.
+  */
+-export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}) => {
++export const performInstantFreeRepair = (storeItemId) => {
+   const before = useCharacterStore.getState().items?.[storeItemId];
+   if (!before) return { ok: false, reason: 'not-found' };
+   const id = splitOnePieceFromStack(storeItemId);
+@@ -241,18 +243,16 @@ export const performInstantFreeRepair = (storeItemId, { temporary = false } = {}
+   } else {
+     state.repairWeapon(id);
+   }
+-  if (temporary) markTemporaryRepairOnItem(id, true);
+-  return { ok: true, repairedStoreItemId: id, temporary };
++  return { ok: true, repairedStoreItemId: id };
+ };
+ 
+ /** То же для надетой части СБ (всегда одна штука). */
+-export const performInstantFreeRepairForEquippedPiece = (slot, { temporary = false } = {}) => {
++export const performInstantFreeRepairForEquippedPiece = (slot) => {
+   const store = useCharacterStore.getState();
+   const piece = store.equippedPowerArmor?.pieces?.[slot];
+   if (!piece) return { ok: false, reason: 'not-found' };
+   store.repairPowerArmorPieceAt(slot);
+-  if (temporary) markTemporaryRepairOnEquippedPiece(slot, true);
+-  return { ok: true, temporary };
++  return { ok: true };
+ };
+ 
+ /**
+@@ -358,7 +358,9 @@ const countInventoryByCatalogId = (items) => {
+  * Ремонт НАДЕТОЙ части СБ (строка внутри контейнера инвентаря — цели нет
+  * в items). Донор — пачка того же catalogId в инвентаре; успех чинит слот.
+  */
+-export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, ports = {} } = {}) => {
++export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, ports = {}, mode = 'materials' } = {}) => {
++  // Бесплатный режим: без донора и без материалов (сложность полная).
++  if (mode === 'free') donorStoreItemId = null;
+   const state = useCharacterStore.getState();
+   const piece = state.equippedPowerArmor?.pieces?.[slot];
+   if (!piece) return { done: false, stage: 'gate', reasons: [{ code: 'not-repairable' }] };
+@@ -373,7 +375,7 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
+     return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
+   }
+   const complexity = Math.max(0, rarity - (donorUsed ? 1 : 0));
+-  const materialsPlan = donorUsed ? [] : repairMaterialsPlan(rarity);
++  const materialsPlan = (mode === 'free' || donorUsed) ? [] : repairMaterialsPlan(rarity);
+   const store2 = useCharacterStore.getState();
+   const attributeValue = selectAttributeTotal(store2, REPAIR_RULES.testAttribute);
+   const skillValue = selectSkillTotal(store2, REPAIR_RULES.testSkill);
+@@ -388,6 +390,8 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
+     ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
+     spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
+     spendDonor: () => {
++      // «Очумелые ручки» (417): перк покрывает затраты без донора.
++      if (mode === 'free') return { ok: true };
+       const s = useCharacterStore.getState();
+       if (!s.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
+       s.adjustItemQuantity(donorStoreItemId, -1);
+@@ -406,8 +410,9 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
+   }
+   if (result.done) {
+     useCharacterStore.getState().repairPowerArmorPieceAt(slot);
+-    // Честный ремонт перезачитывает временный («Очумелые ручки»).
+-    markTemporaryRepairOnEquippedPiece(slot, false);
++    // Честный ремонт перезачитывает временный; бесплатный ставит флаг.
++    markTemporaryRepairOnEquippedPiece(slot, mode === 'free');
++    result.temporary = mode === 'free';
+   }
+   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
+   result.repairTime = {
+@@ -434,7 +439,20 @@ const collectPairsDeep = (node, visit) => {
+   for (const value of Object.values(node)) collectPairsDeep(value, visit);
+ };
+ 
+-export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}, zeroDifficulty } = {}) => {
++/**
++ * Режимы ремонта (слово владельца 417 — три кнопки в окне):
++ *  'materials' — за счёт материалов (обычный книжный ремонт);
++ *  'donor'     — за счёт донора (ускоренный: сложность −1, материалы из донора);
++ *  'free'      — «Очумелые ручки»: без затрат, но временный (книжный эффект
++ *                перка: снова сломается при следующем осложнении 19–20).
++ * Тест и время одинаковы во всех режимах — бесплатный путь не отменяет
++ * работу, только затраты.
++ */
++export const REPAIR_MODES = ['materials', 'donor', 'free'];
++
++export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}, zeroDifficulty, mode = 'materials' } = {}) => {
++  // Бесплатный режим: без донора и без материалов (сложность полная).
++  if (mode === 'free') donorStoreItemId = null;
+   const preview = repairPreview(storeItemId, { donorStoreItemId });
+   if (!preview.canRepair) {
+     return { done: false, stage: 'gate', reasons: [{ code: preview.reason }] };
+@@ -442,11 +460,12 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+   if (donorStoreItemId != null && !preview.donorUsed) {
+     return { done: false, stage: 'gate', reasons: [{ code: 'bad-donor' }] };
+   }
++  const materialsPlan = mode === 'free' ? [] : preview.materialsPlan;
+ 
+   const { attributeValue, skillValue, isTagged } = preview.hero;
+   const result = runRepair({
+     complexity: preview.complexity,
+-    materialsPlan: preview.materialsPlan,
++    materialsPlan,
+     inventoryCounts: countInventoryByCatalogId(useCharacterStore.getState().items),
+     attributeValue,
+     skillValue,
+@@ -456,6 +475,9 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+     ...(ports.complicationRoll ? { complicationRoll: ports.complicationRoll } : {}),
+     spend: (plan) => useCharacterStore.getState().spendItemStacks({ spend: plan }),
+     spendDonor: () => {
++      // «Очумелые ручки» (417): донора нет и не нужно — перк покрывает
++      // затраты, движку не от чего отказывать.
++      if (mode === 'free') return { ok: true };
+       const state = useCharacterStore.getState();
+       if (!state.items?.[donorStoreItemId]) return { ok: false, reason: 'donor-missing' };
+       state.adjustItemQuantity(donorStoreItemId, -1);
+@@ -465,9 +487,9 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+ 
+   // Потеря дополнительных материалов (осложнение 19–20): сверх потраченных
+   // списывается ещё один такой же комплект (если есть).
+-  if (result.done && result.resolution?.kind === 'lost-materials' && preview.materialsPlan.length > 0) {
++  if (result.done && result.resolution?.kind === 'lost-materials' && materialsPlan.length > 0) {
+     const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
+-    const lossPlan = preview.materialsPlan
++    const lossPlan = materialsPlan
+       .filter((entry) => (freeCounts[entry.itemId] || 0) >= entry.count);
+     if (lossPlan.length > 0) {
+       useCharacterStore.getState().spendItemStacks({ spend: lossPlan });
+@@ -497,8 +519,13 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
+       else state.repairPowerArmorStack(repairTargetId);
+     }
+   }
+-  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки».
+-  if (result.done) markTemporaryRepairOnItem(repairTargetId, false);
++  // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки»;
++  // бесплатный режим «Очумелых ручек» наоборот ставит флаг (книга:
++  // ремонт временный — при осложнении 19–20 предмет снова сломается).
++  if (result.done) {
++    markTemporaryRepairOnItem(repairTargetId, mode === 'free');
++    result.temporary = mode === 'free';
++  }
+   result.repairedStoreItemId = repairTargetId;
+ 
+   const complicationMinutes = (result.complications ?? 0) * REPAIR_RULES.complicationExtraMinutes;
+diff --git a/modules/fallout/screens/InventoryScreen/modals/RepairModal.js b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+index 9333396..cf3a705 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+@@ -1,8 +1,12 @@
+-// Модалка ремонта (патчи 413–414, механика от владельца). Слово владельца
++// Модалка ремонта (патчи 413–417, механика от владельца). Слово владельца
+ // 414: донора предлагать в окне (если есть); отчёт — крафтовый (окно
+ // отчёта крафта берём за основу: те же строки, вопрос про 2 ОД, «только
+ // прочность предмета повышается вместо предмета»). Отчёт рисует общий
+ // CraftReportView (357); строки — словари крафта + repair-секция.
++// Слово владельца 417: с перком «Очумелые ручки» окно выбора всегда —
++// ТРИ кнопки: «Без затрат (некачественно)» (доступна всегда — это перк),
++// «За счёт донора (ускоренный ремонт)» (серая без донора), «За счёт
++// материалов» (серая без материалов). Тест и время — в любом режиме.
+ import React, { useEffect, useMemo, useRef, useState } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+ import styles from '../../../styles/RepairModal.styles';
+@@ -19,6 +23,7 @@ import {
+   buildRepairReport,
+ } from '../../../repair/operations';
+ import { REPAIR_RULES, repairMaterialsPlan } from '../../../repair/rules';
++import { juryRiggingRanksFor } from '../../../repair/operations';
+ import { evaluateRepair } from '../../../../../domain/repairEngine';
+ import { itemRarityFor, donorCandidatesFor, pieceCatalogMaxHp } from '../../../repair/operations';
+ 
+@@ -32,6 +37,10 @@ const RepairModal = ({ target, onClose }) => {
+   const [report, setReport] = useState(null);
+   const [settledTime, setSettledTime] = useState(null);
+ 
++  // 417: подписка на выборы перков — окно выбора видно, пока перк активен.
++  useCharacterStore((state) => state.selectedPerks);
++  const juryActive = juryRiggingRanksFor() > 0;
++
+   const preview = useMemo(() => {
+     if (equippedSlot != null) return repairEquippedPreview(equippedSlot, donorId);
+     if (storeItemId != null) return repairPreview(storeItemId, { donorStoreItemId: donorId });
+@@ -41,20 +50,26 @@ const RepairModal = ({ target, onClose }) => {
+   const executeRef = useRef(() => {});
+   const startedRef = useRef(false);
+   useEffect(() => {
+-    // Слово владельца 414: донора нет — окно выбора не нужно, сразу
+-    // попытка и крафтовый отчёт о ремонте.
+-    if (!startedRef.current && preview && (preview.donors ?? []).length === 0) {
++    // Слово владельца 414 (без перка): донора нет — окно выбора не нужно,
++    // сразу попытка и крафтовый отчёт о ремонте. С перком (417) автостарта
++    // нет: «Без затрат» доступна всегда — пусть игрок выбирает.
++    if (!startedRef.current && preview && !juryActive && (preview.donors ?? []).length === 0) {
+       startedRef.current = true;
+-      executeRef.current();
++      executeRef.current({ mode: 'materials' });
+     }
+   }, [preview]);
+ 
+   if (!preview) return null;
+ 
+-  const execute = () => {
++  const execute = ({ mode = 'materials' } = {}) => {
++    // Донор: выбранный в списке, иначе первый из имеющихся (для кнопки
++    // «За счёт донора»); в остальных режимах донор не тратится.
++    const donorForRun = mode === 'donor'
++      ? (donorId ?? (preview.donors ?? [])[0] ?? null)
++      : (mode === 'materials' ? donorId : null);
+     const result = equippedSlot != null
+-      ? performEquippedPieceRepair(equippedSlot, { donorStoreItemId: donorId })
+-      : performRepair(storeItemId, { donorStoreItemId: donorId });
++      ? performEquippedPieceRepair(equippedSlot, { donorStoreItemId: donorForRun, mode })
++      : performRepair(storeItemId, { donorStoreItemId: donorForRun, mode });
+     if (result.stage === 'gate') { onClose(); return; }
+     setRun(result);
+     const names = localeNames();
+@@ -99,32 +114,61 @@ const RepairModal = ({ target, onClose }) => {
+                   <View style={styles.block}>
+                     <Text style={styles.donorTitle}>{tInventory('repair.donorTitle')}</Text>
+                     <Text style={styles.requirementLine}>{tInventory('repair.donorOffer')}</Text>
+-                    {preview.donors.map((id) => (
++                    {preview.donors.map((id, index) => (
+                       <TouchableOpacity
+                         key={id}
+-                        style={[styles.donorRow, donorId === id && styles.donorRowSelected]}
+-                        onPress={() => setDonorId(donorId === id ? null : id)}
++                        style={[styles.donorRow, (donorId ?? (preview.donors ?? [])[0]) === id && styles.donorRowSelected]}
++                        onPress={() => setDonorId(id)}
+                       >
+                         <Text style={styles.donorText}>
+-                          {donorId === id ? '☑' : '☐'} {tInventory('repair.useDonor')}
++                          {(donorId ?? (preview.donors ?? [])[0]) === id ? '☑' : '☐'} {tInventory('repair.useDonor')}{preview.donors.length > 1 ? ` #${index + 1}` : ''}
+                         </Text>
+                       </TouchableOpacity>
+                     ))}
+                   </View>
+                 )}
+               </ScrollView>
+-              <View style={styles.footer}>
+-                <TouchableOpacity
+-                  style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
+-                  onPress={execute}
+-                  disabled={!preview.evaluation?.ready}
+-                >
+-                  <Text style={styles.mainButtonText}>{tInventory('repair.actions.remake')}</Text>
+-                </TouchableOpacity>
+-                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+-                  <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
+-                </TouchableOpacity>
+-              </View>
++              {juryActive ? (
++                // Слово владельца 417: три кнопки, серые по наличию.
++                <View style={styles.footer}>
++                  <TouchableOpacity
++                    style={styles.mainButton}
++                    onPress={() => execute({ mode: 'free' })}
++                  >
++                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.free')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity
++                    style={[styles.mainButton, (preview.donors ?? []).length === 0 && styles.mainButtonDisabled]}
++                    disabled={(preview.donors ?? []).length === 0}
++                    onPress={() => execute({ mode: 'donor' })}
++                  >
++                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.donor')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity
++                    style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
++                    disabled={!preview.evaluation?.ready}
++                    onPress={() => execute({ mode: 'materials' })}
++                  >
++                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.materials')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity style={styles.closeButton} onPress={onClose}>
++                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
++                  </TouchableOpacity>
++                </View>
++              ) : (
++                <View style={styles.footer}>
++                  <TouchableOpacity
++                    style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
++                    onPress={() => execute({ mode: 'materials' })}
++                    disabled={!preview.evaluation?.ready}
++                  >
++                    <Text style={styles.mainButtonText}>{tInventory('repair.actions.remake')}</Text>
++                  </TouchableOpacity>
++                  <TouchableOpacity style={styles.closeButton} onPress={onClose}>
++                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
++                  </TouchableOpacity>
++                </View>
++              )}
+             </>
+           )}
+ 
+diff --git a/public/version.json b/public/version.json
+index e451d2e..af3da7b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "416",
++  "version": "417",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
