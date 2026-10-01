@@ -49,8 +49,7 @@
     "sectionKey": "survival",
     "labelKey": "settings.qualityTitle",
     "descriptionKey": "settings.qualityDescription",
-    "defaultValue": false,
-    "dependsOn": "weaponDurabilityLossEnabled"
+    "defaultValue": false
   },
   {
     "id": "unarmedAttackVisible",

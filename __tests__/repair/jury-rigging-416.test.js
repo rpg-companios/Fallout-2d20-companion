@@ -272,6 +272,68 @@ describe('Патч 416: флаг временного ремонта снима�
   });
 });
 
+describe('Патч 421: прочность распространяется на броню — чинится тем же окном', () => {
+  const seedArmor = ({ durability = 30, quantity = 1, id, flagged = false } = {}) => {
+    const key = id ?? `seed_armor_${Math.random().toString(36).slice(2, 7)}`;
+    useCharacterStore.setState((prev) => ({
+      items: {
+        ...prev.items,
+        [key]: {
+          id: 'armor_leather_chest_001', weaponId: 'armor_leather_chest_001', itemType: 'armor',
+          durability, durabilityTracked: true, quantity,
+          ...(flagged ? { temporaryRepair: true } : {}),
+        },
+      },
+    }));
+    return key;
+  };
+
+  it('repairTargetFor: броня — цель ремонта с редкостью из каталога', () => {
+    const key = seedArmor({ durability: 30 });
+    const preview = repairPreview(key);
+    expect(preview.canRepair).toBe(true);
+    expect(preview.target.kind).toBe('armor');
+    expect(preview.target.max).toBe(100);
+    expect(preview.rarity).toBe(1); // armor_leather_chest_001 из armor.json
+    expect(preview.complexity).toBe(1);
+  });
+
+  it('книжный ремонт брони: материалы по редкости, прочность 100, флаг временного снят', () => {
+    setCurrentModuleLocale('ru-RU');
+    const key = seedArmor({ durability: 30, flagged: true });
+    useCharacterStore.setState((prev) => ({
+      items: {
+        ...prev.items,
+        seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 6 },
+      },
+      attributes: { ...prev.attributes, INT: { total: 5 } },
+      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
+    }));
+    let i = 0;
+    const result = performRepair(key, { ports: { rollD20: () => [2, 3][i++ % 2] } });
+    expect(result.done).toBe(true);
+    expect(result.spent).toEqual([{ itemId: 'item_common_materials', count: 2 }]); // редкость 1 → 2 Обычных
+    expect(state().items[key].durability).toBe(100);
+    expect(state().items[key].temporaryRepair).toBeUndefined();
+  });
+
+  it('бесплатный режим «Очумелых ручек» для брони: без трат, временно', () => {
+    seedPerk();
+    const key = seedArmor({ durability: 30, quantity: 2 });
+    useCharacterStore.setState((prev) => ({
+      attributes: { ...prev.attributes, INT: { total: 5 } },
+      skills: { ...prev.skills, REPAIR: { base: 0, total: 0 } },
+    }));
+    let i = 0;
+    const result = performRepair(key, { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
+    expect(result.done).toBe(true);
+    expect(result.temporary).toBe(true);
+    const armors = Object.values(state().items).filter((it) => it.weaponId === 'armor_leather_chest_001');
+    expect(armors.find((it) => Number(it.durability) === 100)?.quantity ?? 0).toBe(1);
+    expect(armors.find((it) => Number(it.durability) === 30)?.quantity ?? 0).toBe(1);
+  });
+});
+
 describe('Патч 417: окно выбора — три кнопки, серые по наличию', () => {
   const modal = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
 
@@ -332,7 +394,9 @@ describe('Патч 416: настройка прочности включена �
 
   it('старые сейвы без явного выбора получают включённую (fallback true в мерже стора)', () => {
     const srcStore = readFileSync('src/store/appSettingsStore.js', 'utf8');
-    expect(srcStore).toContain('old.weaponDurabilityLossEnabled ?? true');
+    // 421: три ветки — явный выбор, легаси-переключатель, иначе включена.
+    expect(srcStore).toContain('fallout.weaponDurabilityLossEnabled = true;');
+    expect(srcStore).toContain("Boolean(old.randomWeaponDurabilityEnabled)");
   });
 });
 

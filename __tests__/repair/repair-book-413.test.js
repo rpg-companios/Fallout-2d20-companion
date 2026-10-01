@@ -394,25 +394,40 @@ describe('Патч 413: операции — редкость, моды, дон�
 describe('Проводка (слово владельца 415/417/420): одна кнопка, всегда через окно вариантов', () => {
   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
 
-  it('слово владельца 420: есть отображение прочности → кнопка окна; нет — кнопки нет; мгновенной починки нет', () => {
+  it('слово владельца 420/421: отображается прочность (оружие И броня) → кнопка окна; нет — кнопки нет', () => {
     const code = src();
     expect(code).toContain('RepairModal');
-    // Оружие: кнопка = showWeaponRepair && showWeaponDurability (отображение
-    // прочности: настройка качества ИЛИ износа).
-    expect((code.match(/showWeaponRepair && showWeaponDurability && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
+    // Оружие и броня: кнопка = повреждение И отображение прочности.
+    expect((code.match(/showItemRepair && showItemDurability && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
+    // Показ прочности: оружие И броня.
+    expect(code).toContain("localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor'");
+    expect(code).toContain("(item.itemType === 'weapon' || item.itemType === 'armor')");
     // СБ: прочность отображается всегда → кнопка при повреждении, без гейта настроек.
     expect((code.match(/showPARepair && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
     expect((code.match(/item\.showRepair && \(juryRiggingActive \? \(/g) ?? []).length).toBe(1);
-    // Мгновенной починки больше нет совсем (ни одного вызова).
+    // Мгновенной починки нет совсем.
     expect(code).not.toContain('performInstantFreeRepair');
-    // Переключатель только перк/не перк: без перка кнопка серая без затрат.
+    // Без перка кнопка серая без затрат.
     expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
     expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
-    // Прежний гейт «настройка → перк» исчез.
     expect(code).not.toContain('weaponDurabilityLossEnabled ? (');
-    // Подписи режимов.
     expect(code).toContain("tInventory('repair.actions.remake')");
     expect(code).toContain("tInventory('repair.actions.repair')");
+  });
+
+  it('слово владельца 421: качество и износ — самостоятельные пункты; броня рождается с прочностью', () => {
+    const settings = JSON.parse(readFileSync('modules/fallout/settings.json', 'utf8'));
+    const quality = settings.find((s) => s.id === 'randomWeaponQualityEnabled');
+    const wear = settings.find((s) => s.id === 'weaponDurabilityLossEnabled');
+    // Качество больше НЕ зависит от износа.
+    expect(quality.dependsOn).toBeUndefined();
+    expect(wear.dependsOn).toBeUndefined();
+    // Легаси-миграция стора не принуждает износ к false.
+    const storeSrc = readFileSync('src/store/appSettingsStore.js', 'utf8');
+    expect(storeSrc).not.toContain('fallout.weaponDurabilityLossEnabled = false;');
+    // Броня: добыча рождает каждый экземпляр своей прочности (как оружие).
+    const inv = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+    expect(inv).toContain("&& (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')");
   });
 
   it('законы владельца (420): кнопки ремонта нет без отображения прочности; с отображением — окно; «Без затрат» — только с перком', () => {

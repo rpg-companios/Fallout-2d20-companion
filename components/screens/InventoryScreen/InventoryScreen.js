@@ -620,12 +620,16 @@ const InventoryScreen = () => {
     // Прочность — параметр стека (закон): два 100% идентичных экземпляра
     // (та же прочность/моды/имя) склеиваются в один стек; разная прочность
     // разделяет. addNewItem сам склеит совпавшие (ключ = id + dur + моды + имя).
-    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+    // Слово владельца 421: прочность распространяется и на БРОНЮ —
+    // при «Произвольном качестве» каждый экземпляр рождается своей прочности
+    // (покупка = 100, добыча = бросок), как оружие.
+    if (randomWeaponQualityEnabled
+        && (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')
+        && (localizedItem.itemType === 'armor' || isAmmoWeapon(localizedItem))) {
       for (let index = 0; index < quantity; index += 1) {
         const durability = source === 'buy' ? 100 : rollWeaponDurability();
         addNewItem({
           ...localizedItem,
-          itemType: 'weapon',
           quantity: 1,
           durabilityTracked: true,
           durability,
@@ -1578,13 +1582,18 @@ const InventoryScreen = () => {
     const showPARepair = Boolean(
       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
     );
-    const showWeaponDurability = Boolean(
-      localizedDisplayItem?.itemType === 'weapon'
+    // Слово владельца 421: прочность — и у ОРУЖИЯ, и у БРОНИ (отображение —
+    // при настройке качества или износа; кнопка окна — при повреждении).
+    const showItemDurability = Boolean(
+      (localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor')
       && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
-      && isAmmoWeapon(localizedDisplayItem),
+      && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)),
     );
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
-    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+    const showItemRepair = Boolean(
+      (item.itemType === 'weapon' || item.itemType === 'armor')
+      && item.durabilityTracked && Number(item.durability) < 100,
+    );
     // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
     // при включённой прочности) — окно книжного ремонта не открываем.
     const juryRiggingActive = juryRiggingRanksFor() > 0;
@@ -1694,7 +1703,7 @@ const InventoryScreen = () => {
           {/* Слово владельца 420: есть отображение прочности (качество ИЛИ
               износ) → кнопка окна ремонта с вариантами; нет отображения —
               кнопки нет. Мгновенной починки больше нет. */}
-          {showWeaponRepair && showWeaponDurability && (juryRiggingActive ? (
+          {showItemRepair && showItemDurability && (juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
@@ -1758,7 +1767,7 @@ const InventoryScreen = () => {
           {Number.isFinite(paMaxHp) && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
           )}
-          {showWeaponDurability && (
+          {showItemDurability && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
           )}
           {item.temporaryRepair === true && (

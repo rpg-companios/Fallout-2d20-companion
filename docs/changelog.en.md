@@ -1,5 +1,22 @@
 # Changelog
 ---
+## Independent settings; armor durability (patch 421)
+
+«Weapon durability loss» and «Random weapon quality» are now two
+independent settings: quality is no longer hidden behind wear (toggle
+them separately as you like). The old combined switch in saves splits
+evenly into both settings.
+
+Armor (regular, not power armor) now has durability too: with
+«Random quality» every found armor piece is born with its own
+durability (bought = whole), the card shows «Durability: N/100», and
+damaged armor is repaired by the same repair window: with the «Jury
+Rigging» perk — three buttons; without — donor and materials. Rarity
+and mods of the armor affect the difficulty like a weapon's. Armor
+cannot wear from shots — it is only damaged by being born with poor
+durability.
+
+---
 ## Repair button follows durability display (patch 420)
 
 One simple rule, as you said: if durability is not displayed — there

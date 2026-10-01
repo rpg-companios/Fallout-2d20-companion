@@ -146,6 +146,16 @@ export const repairTargetFor = (item) => {
       max: 100,
     };
   }
+  // Слово владельца 421: прочность распространяется на броню — чинится
+  // так же, как оружие (durability 0–100, редкость из armor.json).
+  if (item.itemType === 'armor' && item.durabilityTracked) {
+    return {
+      kind: 'armor',
+      canonicalId: item.weaponId || item.id,
+      current: Number(item.durability) || 0,
+      max: 100,
+    };
+  }
   if (item.itemType === 'powerArmor' && !item.paFrameContent && !item.paFrame
     && Number.isFinite(Number(item.maxHp))) {
     return {
@@ -476,10 +486,11 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
     repairTargetId = splitOnePieceFromStack(storeItemId);
   }
 
-  // Успех чинит предмет существующими экшнами стора (цена — в движке выше).
+  // Успех чинит предмет существующими экшнами стора (цена — в движке выше);
+  // ремонтWeaponDurability — общий для оружия и брони (durability → 100).
   if (result.done) {
     const state = useCharacterStore.getState();
-    if (preview.target.kind === 'weapon') {
+    if (preview.target.kind === 'weapon' || preview.target.kind === 'armor') {
       state.repairWeapon(repairTargetId);
     } else if (preview.target.kind === 'powerArmor') {
       // Надетая (в контейнере) часть чинится по слоту, пачка/штука — по записи.
