@@ -1,0 +1,103 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index 790c0c9..d45e37d 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -418,6 +418,32 @@ describe('Проводка (слово владельца 415/417): ОДНА к
+     expect(code).toContain("tInventory('repair.actions.repair')");
+   });
+ 
++  it('законы владельца (418): окно вариантов — только при включённой прочности; «Без затрат» — только с перком', () => {
++    const code = src();
++    // Настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» без окна,
++    // у всех трёх целей: окно вариантов не выходит ТОЛЬКО при выключенной
++    // настройке прочности.
++    expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
++    expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
++    // Настройка ВКЛ + перк → окно выбора (кнопка «Починить» ведёт в окно).
++    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
++    // Настройка ВКЛ без перка → окно «Ремонт» (донор/материалы), кнопка серая
++    // без материалов и донора — «Без затрат» в таком окне НЕТ.
++    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
++
++    const modal = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
++    // «Без затрат (некачественно)» живёт ТОЛЬКО в ветке активного перка.
++    const juryStart = modal.indexOf('{juryActive ? (');
++    expect(juryStart).toBeGreaterThan(-1);
++    const juryEnd = modal.indexOf(') : (', juryStart);
++    expect(juryEnd).toBeGreaterThan(juryStart);
++    const juryBranch = modal.slice(juryStart, juryEnd);
++    expect(juryBranch).toContain("tInventory('repair.choice.free')");
++    expect(juryBranch).not.toContain("tInventory('repair.actions.remake')");
++    const rest = modal.slice(0, juryStart) + modal.slice(juryEnd);
++    expect(rest).not.toContain("tInventory('repair.choice.free')");
++  });
++
+   it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
+     const code = src();
+     expect(code).toContain('!repairAffordable && styles.applyButtonDisabled');
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 5507dc4..dfe9ff8 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (417)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (418)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **418** (СЛОВО ВЛАДЕЛЬЦА: «Без затрат (некачественно) только если есть перк. Окна с вариантами ремонта не выходит только если отключена настройка прочности»). ПРОВЕРЕНО ДО ПРАВОК: код 417 УЖЕ соответствует обоим правилам (таблица: настройка ВЫКЛ → мгновенная «Починить» без окна, перк не важен; ВКЛ без перка → окно «Ремонт» — донор/материалы, «Без затрат» НЕТ; ВКЛ с перком → окно трёх кнопок). Поправка была к МОЕМУ ОТЧЁТУ (написал «с перком кнопка всегда открывает окно» без упоминания настройки). Патч 418 = ТОЛЬКО тесты-таблица истинности в защёлке 413-файла (46) + честный changelog «приложение не менялось». 1496/153, tsc 0. Предыдущий снимок — **417** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **417** (СЛОВО ВЛАДЕЛЬЦА на безусловность 416: «Опять ты не спрашиваешь, а думаешь… Кнопка открывает окно с выбором: 3 кнопки "Без затрат (некачественно)", "За счёт донора (ускоренный ремонт)", "За счёт материалов". Если нет материалов, но есть донор — "За счёт материалов" не активна. Если нет донора — "За счёт донора" не активна. Если нет ни донора, ни материалов — соответствующие кнопки не активны»). ПРИМЕНЕНО: с перком кнопка ВСЕГДА открывает окно выбора (мгновенных срабатываний нет); REPAIR_MODES materials|donor|free в performRepair/performEquippedPieceRepair — free: план материалов пуст, донор null, spendDonor-порт возвращает ok (перк покрывает; иначе движок donor-refused), СЛОЖНОСТЬ ПОЛНАЯ, тест и время те же, успех → флаг temporaryRepair + result.temporary; donor: прежний поток (−1 сложность, донор списан, постоянно); materials: как было; автостарт без донора — ТОЛЬКО без перка (слово 414); донор в окне: выбор из списка (по умолчанию первый); отчёт бесплатного = строка craftingModal repair.temporary («Ремонт временный… 19–20»); проводка инвентаря: перк → setRepairTarget (кнопка НЕ серая — free всегда есть), без перка вкл → Ремонт (серая без материалов/донора), без перка выкл → performInstantFreeRepair (без temporary-параметра). АГЕНТСКОЕ (пометить): «ускоренный ремонт» в подписи донора — механика осталась «−1 сложность» (слово 413); если владелец имел в виду СКОРОСТЬ (меньше времени) — скажет, поменяю. Защёлка jury-rigging-416.test.js дополнена законами 417 (22 теста), 413-файл = 45. 1495/153, tsc 0. Предыдущий снимок — **416** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **416** (СЛОВО ВЛАДЕЛЬЦА: «Да делаем очумелые ручки и меняем настройку прочности включенной по-умолчанию»). ПРИМЕНЕНО: перк juryRigging (канон: 1 ранг, без требований; book: бесплатно без компонентов, ВРЕМЕННО, снова сломается при следующем осложнении при использовании, диапазон осложнений 19–20) — juryRiggingRanksFor (countActivePerkSelections, закон 412: погашенные не считаются; prereq {} → всегда активен при выборе); проводка: тернарник кнопки `weaponDurabilityLossEnabled && !juryRiggingActive ?` (×3 цели) — с перком кнопка = performInstantFreeRepair/ForEquippedPiece({temporary: настройка && перк}); флаг temporaryRepair (строго true; паспорт: normalizeItemParameters отбрасывает не-true; splitOnePieceFromStack не наследует; честный performRepair/performEquippedPieceRepair снимает; износ spendAmmoForWeapon НЕ снимает — перк отпускает только осложнение); жёлтая пометка repair.tempNote (2 места: общий подзаголовок карточки + надетая часть). Настройка weaponDurabilityLossEnabled defaultValue true (settings.json + мигр стора `?? true`; ЯВНО сохранённый false не трогается — владельцу сказать: в его сейве включить один раз). Боевая сцена вне приложения (закон 404): «сломается при осложнении» отмечает владелец сам, пометка исчезает когда предмет снова чинят/ломают вручную. АГЕНТСКОЕ (пометить): с перком книжный «Ремонт» с материалами недоступен из карточки (кнопка одна = бесплатная временная; по книге перк даёт ВЫБОР — если владельцу нужен и честный ремонт при перке, верну вторую кнопку/окно по его слову); слитая с целыми временно-починенная штука теряет флаг при слиянии (редкий край). Защёлка __tests__/repair/jury-rigging-416.test.js (15) + 413-файл=закон 415/416. 1488/153, tsc 0. node_modules исчезал дважды за сессию — npm ci по стандарту. Предыдущий снимок — **415** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **415** (СЛОВО ВЛАДЕЛЬЦА: «Бесплатная починка только при отключенных настройках или перке. Кнопка одна для обоих случаев. Ремонт и его затраты даны на 1шт, а не карточку, пачку, стопку или как ты называешь количество >1»). ПРИМЕНЕНО: КНОПКА ОДНА (тернарник weaponDurabilityLossEnabled у всех 3 целей): настройка ВЫКЛ → мгновенная бесплатная «Починить» (en Fix), ВКЛ → книжный «Ремонт» (en Repair, окно 413/414 с донором/материалами/крафт-отчётом, гейт repairAffordable/pieceAffordable — серая без материалов и донора). ЗАКОН 1 ШТ ВЕЗДЕ: splitOnePieceFromStack (operations) — performRepair отделяет штуку для ЛЮБОГО вида (оружие тоже), мгновенная кнопка зовёт repairOnePieceInstant (инвентарь) = split + экшн по отделённой штуке; надетая часть СБ — всегда 1 шт (прямой экшн). Фикс бага 414: у кнопки надетой части disabled={!pieceAffordable} (была чужая переменная). Бесплатная при перке = «Очумелые ручки» — СЛЕДУЮЩИЙ патч (та же кнопка). Защёлка 413 = закон 415 (23 теста). 1473/152, tsc 0. Предыдущий снимок — **414** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 3d57c5e..1ab4503 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,15 @@
+ # Changelog
++---
++## Repair rules locked in (patch 418)
++
++The app itself did not change — both of your rules were already in
++effect after the previous update; now they are locked by checks so
++they cannot be lost: the repair choice window appears only when the
++durability setting is on (off — the instant free «Fix» with no
++window), and the «Without cost (poor quality)» button in the window
++exists only with the «Jury Rigging» perk (without the perk the window
++has the donor and the materials).
++
+ ---
+ ## Repair choice window (patch 417)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a6d0bf4..110dd85 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Правила ремонта закреплены (патч 418)
++
++Само приложение не менялось — ваши два правила уже работали после
++предыдущего обновления, теперь они зафиксированы проверками, чтобы не
++потерялись: окно с вариантами ремонта выходит только при включённой
++настройке прочности (выключена — мгновенная бесплатная «Починить» без
++всякого окна), а кнопка «Без затрат (некачественно)» в окне бывает
++только с перком «Очумелые ручки» (без перка в окне — донор и
++материалы).
++
+ ---
+ ## Окно выбора ремонта (патч 417)
+ 
+diff --git a/public/version.json b/public/version.json
+index af3da7b..e72fb92 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "417",
++  "version": "418",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
