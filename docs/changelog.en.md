@@ -1,5 +1,16 @@
 # Changelog
 ---
+## The window only when the setting is on (patch 419)
+
+You caught a real bug: with the «Jury Rigging» perk and the
+durability setting OFF, the repair window still opened — the perk
+intercepted the press before the setting was checked. The order is
+now reversed: the setting is checked first. Off — always the instant
+free «Fix» with no window, perk or not. On — the window: with the
+perk, three buttons («Without cost (poor quality)» exists only with
+the perk); without the perk — «From a donor» and «From materials».
+
+---
 ## Repair rules locked in (patch 418)
 
 The app itself did not change — both of your rules were already in

@@ -394,42 +394,42 @@ describe('Патч 413: операции — редкость, моды, дон�
 describe('Проводка (слово владельца 415/417): ОДНА кнопка; с перком — окно выбора', () => {
   const src = () => readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
 
-  it('одна кнопка у всех целей: без перка при включённой прочности — «Ремонт» (окно), иначе — «Починить»', () => {
+  it('одна кнопка у всех целей: настройка ВКЛ — окно (перк: выбор из трёх, без: донор/материалы), ВЫКЛ — мгновенная', () => {
     const code = src();
     expect(code).toContain('RepairModal');
-    // Переключатель режима — у всех трёх целей (оружие, пачка СБ, надетая часть).
-    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
+    // Слово владельца 419: СНАЧАЛА настройка, потом перк — окно
+    // (любое) выходит только при включённой настройке прочности.
+    expect((code.match(/weaponDurabilityLossEnabled \? \(\s+juryRiggingActive \? \(/g) ?? []).length).toBe(3);
     // Книжный режим открывает окно (обе формы цели).
-    expect(code).toContain("setRepairTarget({ storeItemId: item.id, name: item.name })");
-    expect(code).toContain("setRepairTarget({ equippedSlot: item.paSlot, name: item.name })");
-    // С перком «Починить» тоже открывает окно (417: выбор из трёх) —
-    // и НЕ мгновенный (вторая ступень тернарника у всех трёх целей).
-    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
-    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
-    expect(code).not.toContain('performInstantFreeRepairForEquippedPiece(item.paSlot, { temporary');
-    // Мгновенный путь остался только для «без перка и настройка выкл».
+    expect((code.match(/setRepairTarget\(\{ storeItemId: item\.id, name: item\.name \}\)/g) ?? []).length).toBe(4);
+    // Надетая часть: обе кнопки окна (с перком «Починить», без — «Ремонт»).
+    expect((code.match(/setRepairTarget\(\{ equippedSlot: item\.paSlot, name: item\.name \}\)/g) ?? []).length).toBe(2);
+    // Мгновенный путь — только в ветке ВЫКЛЮЧЕННОЙ настройки.
     expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
     expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
+    expect(code).not.toContain('performInstantFreeRepair(item.id, { temporary');
     expect(code).not.toContain('onPress={() => repairWeapon(item.id)}');
     expect(code).not.toContain('onPress={() => repairPowerArmorStack(item.id)}');
     expect(code).not.toContain('onPress={() => repairPowerArmorPieceAt(item.paSlot)}');
-    // Подписи режимов различаются.
+    // Подписи режимов различаются; окно без перка серое без материалов/донора.
     expect(code).toContain("tInventory('repair.actions.remake')");
     expect(code).toContain("tInventory('repair.actions.repair')");
+    expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
+    expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
   });
 
-  it('законы владельца (418): окно вариантов — только при включённой прочности; «Без затрат» — только с перком', () => {
+  it('законы владельца (419): окно ЛЮБОЕ — только при включённой прочности; «Без затрат» — только с перком', () => {
     const code = src();
-    // Настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» без окна,
-    // у всех трёх целей: окно вариантов не выходит ТОЛЬКО при выключенной
-    // настройке прочности.
+    // Таблица истинности (порядок проверки: настройка → перк):
+    //   настройка ВЫКЛ (перк есть или нет) → мгновенная «Починить» БЕЗ окна;
+    //   настройка ВКЛ, перка нет  → окно «Ремонт» (донор/материалы);
+    //   настройка ВКЛ, перк есть  → окно выбора (три кнопки).
+    // Окно вариантов не выходит ТОЛЬКО при выключенной настройке прочности
+    // — даже с перком (исправлено в 419: перк больше не перехватывает раньше
+    // настройки).
+    expect((code.match(/weaponDurabilityLossEnabled \? \(\s+juryRiggingActive \? \(/g) ?? []).length).toBe(3);
     expect((code.match(/performInstantFreeRepair\(item\.id\)/g) ?? []).length).toBe(2);
     expect((code.match(/performInstantFreeRepairForEquippedPiece\(item\.paSlot\)/g) ?? []).length).toBe(1);
-    // Настройка ВКЛ + перк → окно выбора (кнопка «Починить» ведёт в окно).
-    expect((code.match(/: juryRiggingActive \? \(/g) ?? []).length).toBe(3);
-    // Настройка ВКЛ без перка → окно «Ремонт» (донор/материалы), кнопка серая
-    // без материалов и донора — «Без затрат» в таком окне НЕТ.
-    expect((code.match(/weaponDurabilityLossEnabled && !juryRiggingActive \?/g) ?? []).length).toBe(3);
 
     const modal = readFileSync('modules/fallout/screens/InventoryScreen/modals/RepairModal.js', 'utf8');
     // «Без затрат (некачественно)» живёт ТОЛЬКО в ветке активного перка.

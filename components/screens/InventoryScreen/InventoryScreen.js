@@ -1489,19 +1489,21 @@ const InventoryScreen = () => {
             </View>
           </View>
           <View style={styles.actionContainer}>
-            {item.showRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
-                disabled={!pieceAffordable}
-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-              </TouchableOpacity>
-            ) : juryRiggingActive ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.applyButton]}
-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-              </TouchableOpacity>
+            {item.showRepair && (weaponDurabilityLossEnabled ? (
+              juryRiggingActive ? (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton]}
+                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                  disabled={!pieceAffordable}
+                  onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                </TouchableOpacity>
+              )
             ) : (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
@@ -1696,19 +1698,21 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {showWeaponRepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                  disabled={!repairAffordable}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-              </TouchableOpacity>
-          ) : juryRiggingActive ? (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-              </TouchableOpacity>
+          {showWeaponRepair && (weaponDurabilityLossEnabled ? (
+              juryRiggingActive ? (
+                  <TouchableOpacity
+                      style={[styles.actionButton, styles.applyButton]}
+                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                  </TouchableOpacity>
+              ) : (
+                  <TouchableOpacity
+                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                      disabled={!repairAffordable}
+                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                  </TouchableOpacity>
+              )
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
@@ -1717,19 +1721,21 @@ const InventoryScreen = () => {
               </TouchableOpacity>
           ))}
 
-          {showPARepair && (weaponDurabilityLossEnabled && !juryRiggingActive ? (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                  disabled={!repairAffordable}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
-              </TouchableOpacity>
-          ) : juryRiggingActive ? (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
-              </TouchableOpacity>
+          {showPARepair && (weaponDurabilityLossEnabled ? (
+              juryRiggingActive ? (
+                  <TouchableOpacity
+                      style={[styles.actionButton, styles.applyButton]}
+                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                  </TouchableOpacity>
+              ) : (
+                  <TouchableOpacity
+                      style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                      disabled={!repairAffordable}
+                      onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                      <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                  </TouchableOpacity>
+              )
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
