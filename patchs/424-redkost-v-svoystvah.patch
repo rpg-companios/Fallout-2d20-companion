@@ -1,0 +1,159 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index 5510219..e8dc0b5 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -477,6 +477,20 @@ describe('Проводка (слово владельца 415/417/420): одна
+     expect(modal).toContain('CraftReportView');
+   });
+ 
++  it('закон 424: редкость в свойствах оружия/брони/СБ (без подстановок)', () => {
++    const code = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
++    expect(code).toContain("tInventory('screen.labels.rarity')");
++    expect(code).toContain('itemRarityFor(item.weaponId || item.id)');
++    expect(code).toContain('itemRarityFor(item.pieceCatalogId)');
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/screen.json', 'utf8'));
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/screen.json', 'utf8'));
++    expect(ru.labels.rarity).toBe('Редкость');
++    expect(en.labels.rarity).toBe('Rarity');
++    // tInventory резолвит (закон 422).
++    setCurrentLocale('ru-RU');
++    expect(tInventory('screen.labels.rarity')).toBe('Редкость');
++  });
++
+   it('закон 423: в отчёте названия материалов, не id (как в крафте)', () => {
+     setCurrentLocale('ru-RU');
+     const report = buildRepairReport({
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 077cbf1..7c1a885 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -17,6 +17,7 @@ import {
+   repairAffordableFor,
+   repairAffordableForPiece,
+   juryRiggingRanksFor,
++  itemRarityFor,
+ } from '../../../modules/fallout/repair/operations';
+ import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+ // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+@@ -1518,6 +1519,12 @@ const InventoryScreen = () => {
+             <Text style={styles.itemSubText}>
+               {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
+             </Text>
++            {(() => {
++              const pieceRarity = itemRarityFor(item.pieceCatalogId);
++              return pieceRarity > 0 ? (
++                <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {pieceRarity}</Text>
++              ) : null;
++            })()}
+             {item.temporaryRepair === true && (
+               <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+                 {tInventory('screen.repair.tempNote')}
+@@ -1594,6 +1601,10 @@ const InventoryScreen = () => {
+       (item.itemType === 'weapon' || item.itemType === 'armor')
+       && item.durabilityTracked && Number(item.durability) < 100,
+     );
++    // Слово владельца 424: редкость в свойствах оружия/брони (и СБ).
++    const cardRarity = itemRarityFor(item.weaponId || item.id);
++    const showCardRarity = cardRarity > 0
++      && (item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'powerArmor');
+     // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
+     // при включённой прочности) — окно книжного ремонта не открываем.
+     const juryRiggingActive = juryRiggingRanksFor() > 0;
+@@ -1770,6 +1781,9 @@ const InventoryScreen = () => {
+           {showItemDurability && (
+             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+           )}
++          {showCardRarity && (
++            <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {cardRarity}</Text>
++          )}
+           {item.temporaryRepair === true && (
+             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+               {tInventory('screen.repair.tempNote')}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index f3cf5df..04cabcd 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (423)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (424)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **424** (СЛОВО ВЛАДЕЛЬЦА: «в отображения свойств оружия/брони хорошо бы добавить редкость. А заодно нужны фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)… Сделай проверку, какими вариантами свойств обладает оружие/броня. Покажи мне список, а потом сделаем фильтр по типу того, как в перках»). СДАНО: (1) патч 424 — «Редкость: N» на карточках (общий подзаголовок: weapon/armor/powerArmor при cardRarity>0, itemRarityFor; надетая часть СБ — по pieceCatalogId; i18n labels.rarity Редкость/Rarity; закон 424 в защёлке). (2) АУДИТ свойств отправлен в чат (полный список вариантов); ФИЛЬТРЫ = СЛЕДУЮЩИЙ ПАТЧ после разбора списка владельцем; образец UI — PerkSelectModal (спойлер «Фильтр» с чекбоксами). АУДИТ-факты (для фильтра): оружие 146 (145 реальных): редкость 0×11/1×22/2×29/3×36/4×25/5×20/6×1(гаусс-миниган)/без ×1(britva); тип урона physical 110/energy 35/radiation 2/special 1/poison 1; патронов 41 вариант (62 без патронов; 1 предмет со СПИСКОМ ammo 'ammo_energy_cell,ammo_fusion_core'; ammo_anything); скорострельность 0×90/1..7; дистанция C×33/M×55/L×10/пусто×46; тип Light 42/Melee 31/Energy 27/Explosive 21/Heavy 12/Unarmed 7/Thrown 4; качеств 22 варианта (у 121 предмета; словарь 32 — 10 без владельцев: bayonet/bombard/crank_x/disarm/night_vision/re-roll_hit_location/recon/shredder/sneak_attack/targetting_computer); эффектов 10 вариантов (у 94; piercing_x со value 1/2); урон 0..21 (0 у инъектора/детонатора/газовой/дымовой). Броня 56 частей: редкость 0×3..5×4; части Head 10/Body 16/Hand 16/Leg 16; СУ физ 1–4/эн 0–5/рад 0 (×55) и 2 (×1). ПА 20 деталей: редкость 2×8/3×4/4×4/5×4; части по 5. Одежда 32 — редкость ЕСТЬ у всех (учесть при фильтре!). i18n качеств/эффектов: data/system/{qualities,damageEffects}.json (ru/en). Ammo названия: i18n ammo/ammo_types.json. Фильтры окон: AddItemModal/BuyItemModal (в AddItemModal уже гейт модов по редкости ≤). 1502/153, tsc 0. Предыдущий снимок — **423** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **423** (СЛОВО ВЛАДЕЛЬЦА: «Потрачено: item_common_materials ×2» — второй дефект того же класса, что 422). ПРИЧИНА: buildRepairReport брал имена из getScrapMaterials() (реестр без локализованных .name → фолбэк на id). ИСПРАВЛЕНО: materialName = screen.json repair.materials[id] (те же слова, что в требованиях окна) → локализованный equipmentCatalog (findCatalogEntry misc→junk, как itemName крафта) → id. Закон 423 в защёлке: строка «Потрачено: Обычные материалы ×2», ни одна строка отчёта не содержит 'item_'. ЛОВУШКА: repairDict() — это craftingModal.json, а repair.materials живёт в screen.json (другой файл!) — правка дважды не сходилась, пока не подключил ruScreen/enScreen. .git сбрасывался снова (529824d) — восстановлен. 1501/153, tsc 0. Предыдущий снимок — **422** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **422** (СЛОВО ВЛАДЕЛЬЦА: «на кнопке ремонта в инвентаре стоит заглушка»). ПРИЧИНА: tInventory резолвит путь от корня {screen:…, modals:…} — все ремонтные ключи 413–421 звались БЕЗ префикса «screen.» → resolvePath по закону «без фолбэков» возвращал САМ ПУТЬ → на кнопках/в окне были служебные пути («repair.actions.remake»). Защёлки читали JSON НАПРЯМУЮ, мимо tInventory — поэтому 8 патчей дефект не ловили. ИСПРАВЛЕНО: 23 вызова → tInventory('screen.repair.…') (инвентарь 8, RepairModal 15); закон 422 в защёлке: tInventory('screen.repair.actions.remake')==='Ремонт' (setCurrentLocale — ГЛОБАЛЬНАЯ локаль, не модульная!) + в коде не осталось голых путей. ЛОВУШКИ (учесть): (1) массовая replace по файлу тестов зацепила литералы НОВЫХ отрицательных ассертов — делать replace точечно, после — прогон; (2) тесты словарей обязаны идти через ТУ ЖЕ функцию, что и UI (tInventory), не через прямой JSON; (3) .git сбрасывался повторно — restore по схеме (fetch→reset --hard FETCH_HEAD). 1500/153, tsc 0. Предыдущий снимок — **421** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **421** (СЛОВО ВЛАДЕЛЬЦА: «поменяем зависимости износа оружия и случайного качества. Это теперь 2 самостоятельных пункта. И прочность ещё распространяется на броню. Её тоже нужно чинить»). ПРИМЕНЕНО: (1) settings.json randomWeaponQualityEnabled БЕЗ dependsOn (качество standalone); легаси-миграция стора развязана: явный weaponDurabilityLossEnabled > легаси randomWeaponDurabilityEnabled (поровну на оба пункта) > дефолт true (416 сохранён); (2) БРОНЯ (itemType 'armor', не одежда/не СБ) в системе прочности: addItem при качестве рождает каждый экземпляр своей прочности (buy=100, loot=rollWeaponDurability, стек по прочности), карточка показывает «Прочность N/100» при (качество ИЛИ износ), repairTargetFor kind 'armor' (rarity из armor.json через collectPairs — уже индексирована), performRepair → repairWeapon (общий экшн durability→100), кнопка окна = showItemRepair && showItemDurability (переименование showWeapon*→showItem*), донор/материалы/Очумелые ручки — как у оружия. Износа от выстрелов у брони НЕТ (нет источника урона в приложении) — сказано владельцу. ЛОВУШКА (учесть): замена в appSettingsStore не прошла с первого раза — анкер не учёл комментарий 416 внутри else; python-хередок с assert при падении МОЖЕТ оставить ЧАСТИЧНО применённое дерево если старых анкеров несколько — ВСЕГДА перепроверять grep'ом фактическое состояние после каждого скрипта. Защёлка 413-файла = 46 (+законы 421), 416-файла = 17 (+3 теста брони). 1499/153, tsc 0. Предыдущий снимок — **420** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 746b03e..24eaf32 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,12 @@
+ # Changelog
++---
++## Rarity in properties (patch 424)
++
++Weapon, armor and power armor cards now show «Редкость: N» (the
++book rarity; items without rarity have no line). The first step
++toward loot/purchase filters: the list of filterable properties is
++sent separately; the filters come after we review it.
++
+ ---
+ ## Material names in the report (patch 423)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9b3f497..58c1dda 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,13 @@
+ # История изменений
+ 
++---
++## Редкость в свойствах (патч 424)
++
++На карточках оружия, брони и силовой брони теперь показывается
++«Редкость: N» (книжная редкость предмета; у безредкостных — строки
++нет). Первый шаг к фильтрам добычи/покупки: список доступных свойств
++для фильтрации отправлен отдельно, фильтры делаем после разбора.
++
+ ---
+ ## Названия материалов в отчёте (патч 423)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/screen.json b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+index 63d0fca..0b03dd0 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/screen.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/screen.json
+@@ -57,7 +57,8 @@
+     "caps": "caps"
+   },
+   "labels": {
+-    "requiresMkII": "Requires Mk II OS"
++    "requiresMkII": "Requires Mk II OS",
++    "rarity": "Rarity"
+   },
+   "powerArmor": {
+     "containerTitle": "Power Armor",
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+index 9dd1091..ec27e24 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/screen.json
+@@ -57,7 +57,8 @@
+     "caps": "крышек"
+   },
+   "labels": {
+-    "requiresMkII": "Требуется ОС Mk II"
++    "requiresMkII": "Требуется ОС Mk II",
++    "rarity": "Редкость"
+   },
+   "powerArmor": {
+     "containerTitle": "Силовая броня",
+diff --git a/public/version.json b/public/version.json
+index ed0119e..502724f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "423",
++  "version": "424",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
