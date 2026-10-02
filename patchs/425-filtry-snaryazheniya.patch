@@ -1,0 +1,971 @@
+diff --git a/__tests__/gear/equipment-filter-425.test.js b/__tests__/gear/equipment-filter-425.test.js
+new file mode 100644
+index 0000000..79facee
+--- /dev/null
++++ b/__tests__/gear/equipment-filter-425.test.js
+@@ -0,0 +1,174 @@
++// ПРИЁМОЧНЫЙ (патч 425): фильтры снаряжения в окнах добычи/покупки.
++// Слово владельца: «по параметрам снаряжения (кроме веса)»; диапазоны
++// «от–до» с серыми подсказками-границами (пропадают при касании);
++// качества — ВСЕ из словаря (вопрос владельца про «не встречаются»
++// решён проверкой модов: 10 из 22 «мёртвых» на оружии дают моды,
++// кроме Бомбарды); «моды это моды — только когда поставят, тогда и
++// будут эффекты»: оружие фильтруется по СВОИМ качествам/эффектам,
++// выбранное, чего на оружии нет, раскрывает секцию МОДОВ.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import {
++  buildEquipmentFilterOptions,
++  emptyEquipmentFilter,
++  isEquipmentFilterEmpty,
++  applyEquipmentFilter,
++  pruneTreeByEquipmentFilter,
++  weaponModsProviding,
++  readDamageTotal,
++} from '../../modules/fallout/logic/equipmentFilter';
++
++const labels = {
++  ammoNames: [],
++  damageTypes: { physical: 'Ф', energy: 'Э', radiation: 'Р', special: 'О', poison: 'Я' },
++  weaponTypes: { Light: 'Л', Melee: 'Б', Energy: 'Эн', Explosive: 'В', Heavy: 'Т', Unarmed: 'Рук', Thrown: 'Мет' },
++  distances: { C: 'Б', M: 'С', L: 'Д' },
++  bodyParts: { Head: 'Г', Body: 'Т', Hand: 'Р', Leg: 'Н' },
++};
++const options = buildEquipmentFilterOptions('ru-RU', labels);
++
++describe('Патч 425: варианты фильтра из каталогов (аудит 424)', () => {
++  it('границы диапазонов — фактические по каталогу', () => {
++    expect(options.rarity).toEqual({ min: 0, max: 6 });
++    expect(options.damage).toEqual({ min: 0, max: 21 });
++    expect(options.fireRate).toEqual({ min: 0, max: 7 });
++  });
++
++  it('качества — ВСЕ 32 из словаря (слово владельца), эффекты — все 10', () => {
++    expect(options.qualities.length).toBe(32);
++    expect(options.qualities.find((q) => q.id === 'quality_night_vision')?.name).toBe('Ночное Видение');
++    expect(options.effects.length).toBe(10);
++  });
++
++  it('патроны — уникальные из каталога оружия (включая «два сразу»)', () => {
++    expect(options.ammoOptions.some((a) => a.id === 'ammo_energy_cell')).toBe(true);
++    // редкий случай списка «energy_cell,fusion_core» — оба варианта в списке.
++    expect(options.ammoOptions.some((a) => a.id === 'ammo_fusion_core')).toBe(true);
++    expect(options.ammoOptions.every((a) => !a.id.includes(','))).toBe(true);
++  });
++
++  it('веса в фильтре НЕТ (слово владельца)', () => {
++    expect(Object.keys(emptyEquipmentFilter())).not.toContain('weight');
++  });
++});
++
++describe('Патч 425: оружие — по СВОИМ качествам/эффектам («моды это моды»)', () => {
++  it('оружие без врождённого Ночного Видения НЕ проходит фильтр', () => {
++    const weapon = { itemType: 'weapon', qualities: [{ qualityId: 'quality_accurate' }] };
++    const filter = { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] };
++    expect(applyEquipmentFilter(weapon, filter)).toBe(false);
++  });
++
++  it('выбранное, чего на оружии нет, дают моды: ночное видение → 3 прицела', () => {
++    const mods = weaponModsProviding(
++      { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] }, 'ru-RU',
++    );
++    expect(mods.map((m) => m.id).sort()).toEqual([
++      'mod_long_night_vision_scope', 'mod_night_vision_scope', 'mod_short_night_vision_scope',
++    ]);
++    expect(mods[0].itemType).toBe('weaponMod');
++    expect(mods[0].name.length).toBeGreaterThan(0);
++  });
++
++  it('компьютер наведения → его мод; Бомбарда не покрыта ничем (пусто)', () => {
++    const tc = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_targetting_computer'] }, 'ru-RU');
++    expect(tc.map((m) => m.id)).toEqual(['mod_targeting_computer']);
++    const bombard = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_bombard'] }, 'ru-RU');
++    expect(bombard).toEqual([]);
++  });
++
++  it('эффекты от модов тоже находятся (Устойчивый дают 13 модов)', () => {
++    const mods = weaponModsProviding({ ...emptyEquipmentFilter(), effects: ['effect_persistent'] }, 'ru-RU');
++    expect(mods.length).toBe(13);
++  });
++});
++
++describe('Патч 425: предикат фильтра по параметрам', () => {
++  it('редкость «от 3»: 0-й не проходит, 3-й проходит; безредкостный не прячется', () => {
++    const filter = { ...emptyEquipmentFilter(), rarity: { from: '3', to: '' } };
++    expect(applyEquipmentFilter({ itemType: 'weapon', rarity: 0 }, filter)).toBe(false);
++    expect(applyEquipmentFilter({ itemType: 'weapon', rarity: 3 }, filter)).toBe(true);
++    expect(applyEquipmentFilter({ itemType: 'weapon' }, filter)).toBe(true); // нет поля — не прячем
++  });
++
++  it('урон «от 2 до 5»; прочее снаряжение фильтром урона не трогается', () => {
++    const filter = { ...emptyEquipmentFilter(), damage: { from: '2', to: '5' } };
++    expect(applyEquipmentFilter({ itemType: 'weapon', damage: 6 }, filter)).toBe(false);
++    expect(applyEquipmentFilter({ itemType: 'weapon', damage: { total: 3 } }, filter)).toBe(true);
++    expect(applyEquipmentFilter({ itemType: 'ammo' }, filter)).toBe(true); // не снаряжение-оружие
++  });
++
++  it('тип урона — «любое из»; качества — «все выбранные»', () => {
++    const dt = { ...emptyEquipmentFilter(), damageTypes: ['energy'] };
++    expect(applyEquipmentFilter({ itemType: 'weapon', damageType: 'physical' }, dt)).toBe(false);
++    expect(applyEquipmentFilter({ itemType: 'weapon', damageType: ['physical', 'energy'] }, dt)).toBe(true);
++    const q = { ...emptyEquipmentFilter(), qualities: ['quality_accurate', 'quality_reliable'] };
++    expect(applyEquipmentFilter({ itemType: 'weapon', qualities: [{ qualityId: 'quality_accurate' }] }, q)).toBe(false);
++    expect(applyEquipmentFilter({
++      itemType: 'weapon',
++      qualities: [{ qualityId: 'quality_accurate' }, { qualityId: 'quality_reliable' }],
++    }, q)).toBe(true);
++  });
++
++  it('броня: СУ диапазонами, части тела — все выбранные; патрон-фильтр броню не прячет', () => {
++    const dr = { ...emptyEquipmentFilter(), energy: { from: '3', to: '' } };
++    expect(applyEquipmentFilter({ itemType: 'armor', energyDamageRating: { total: 2 } }, dr)).toBe(false);
++    expect(applyEquipmentFilter({ itemType: 'armor', energyDamageRating: { total: 4 } }, dr)).toBe(true);
++    const parts = { ...emptyEquipmentFilter(), bodyParts: ['Head', 'Body'] };
++    expect(applyEquipmentFilter({ itemType: 'armor', protectedAreas: ['Body'] }, parts)).toBe(false);
++    expect(applyEquipmentFilter({ itemType: 'armor', protectedAreas: ['Head', 'Body'] }, parts)).toBe(true);
++    const ammo = { ...emptyEquipmentFilter(), ammo: ['ammo_10mm'] };
++    expect(applyEquipmentFilter({ itemType: 'armor', physicalDamageRating: 2 }, ammo)).toBe(true);
++  });
++
++  it('не-снаряжение проходит всегда (патроны, еда и пр.)', () => {
++    const filter = { ...emptyEquipmentFilter(), rarity: { from: '5', to: '' }, qualities: ['quality_blast'] };
++    expect(applyEquipmentFilter({ itemType: 'ammo' }, filter)).toBe(true);
++    expect(applyEquipmentFilter({ itemType: 'chems' }, filter)).toBe(true);
++  });
++
++  it('обрезка дерева прячет пустые ветки', () => {
++    const tree = {
++      'Оружие': { 'Лёгкое': [{ itemType: 'weapon', damage: 1 }], 'Тяжёлое': [{ itemType: 'weapon', damage: 9 }] },
++      'Броня': { 'Всё': [{ itemType: 'armor', physicalDamageRating: 2 }] },
++      'Патроны': { 'Все': [{ itemType: 'ammo' }] },
++    };
++    const pruned = pruneTreeByEquipmentFilter(tree, { ...emptyEquipmentFilter(), damage: { from: '5', to: '' } });
++    expect(pruned['Оружие']['Лёгкое']).toBeUndefined();
++    expect(pruned['Оружие']['Тяжёлое'].length).toBe(1);
++    // СУ-фильтры пусты → броня проходит (укороченного СУ у неё нет — не прячем).
++    expect(pruned['Броня']['Всё'].length).toBe(1); 
++  });
++});
++
++describe('Патч 425: проводка окна и подсказки', () => {
++  const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js', 'utf8');
++
++  it('панель спойлером как в перках, диапазоны с серыми подсказками (исчезают при касании)', () => {
++    const code = panel();
++    expect(code).toContain('spoilerHeader');
++    expect(code).toContain('placeholder={touchedFrom ? \'\' : String(hint?.min ?? \'\')}');
++    expect(code).toContain('placeholder={touchedTo ? \'\' : String(hint?.max ?? \'\')}');
++    expect(code).toContain('placeholderTextColor="#999"');
++    // сброс — через проп родителя
++    expect(code).toContain('onPress={onReset}');
++  });
++
++  it('секция модов появляется от выбранного качества/эффекта; словарь на месте', () => {
++    const code = modal();
++    expect(code).toContain('weaponModsProviding(equipmentFilter, moduleLocale)');
++    expect(code).toContain("tInventory('modals.addItemModal.filter.modsSection')");
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json', 'utf8'));
++    expect(ru.filter.modsSection).toBe('Моды');
++    expect(en.filter.modsSection).toBe('Mods');
++    expect(ru.filter.title).toBe('Фильтр');
++    expect(ru.filter.qualities).toBe('Качества');
++    expect(ru.filter.effects).toBe('Эффекты');
++  });
++
++  it('DB-ветка мержит оружие с каталогом ПОЛНОСТЬЮ (поля фильтра не теряются)', () => {
++    expect(modal()).toContain('...(catalogEntry ?? {})');
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 2070f24..fd12a0f 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -6,6 +6,15 @@ import { tInventory } from '../logic/inventoryI18n';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
+ import { describeItemBasics } from '../../../../domain/itemBasics';
++// 425: фильтры снаряжения (кроме веса) — по образцу перков.
++import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel';
++import {
++  buildEquipmentFilterOptions,
++  emptyEquipmentFilter,
++  isEquipmentFilterEmpty,
++  pruneTreeByEquipmentFilter,
++  weaponModsProviding,
++} from '../../../../modules/fallout/logic/equipmentFilter';
+ 
+ const CATEGORY_ICONS = {
+   weapon: '🔫',
+@@ -46,6 +55,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const [weaponsByType, setWeaponsByType] = useState({});
+   const [pendingItem, setPendingItem] = useState(null);
+   const [pendingQuantity, setPendingQuantity] = useState('1');
++  // 425: фильтр снаряжения + спойлер; null = фильтр пуст.
++  const [equipmentFilter, setEquipmentFilter] = useState(null);
++  const [filterOpen, setFilterOpen] = useState(false);
+ 
+   useEffect(() => {
+     let cancelled = false;
+@@ -82,14 +94,14 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+             const normalizedWeapons = weaponsById
+               .filter(Boolean)
+               .map((weapon) => {
+-                // Merge with catalog to get qualities array and other structured fields
++                // Слияние с каталогом ПОЛНОЕ (425): поля фильтра
++                // (fireRate/range/ammoId/rarity/damage) тоже из каталога.
+                 const catalogEntry = (catalog.weapons || []).find((w) => w.id === weapon.id);
+                 return {
+                   ...weapon,
+-                  ...(catalogEntry ? { qualities: catalogEntry.qualities, damageType: catalogEntry.damageType } : {}),
+-                  weaponType: weapon.weaponType,
++                  ...(catalogEntry ?? {}),
+                   itemType: 'weapon',
+-                  name: weapon.name,
++                  name: weapon.name ?? catalogEntry?.name,
+                 };
+               })
+               .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+@@ -179,6 +191,8 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+       setSearchTerm('');
+       setPendingItem(null);
+       setPendingQuantity('1');
++      setEquipmentFilter(null);
++      setFilterOpen(false);
+     }
+   }, [visible]);
+ 
+@@ -210,6 +224,35 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     return prune(tree);
+   }, [engineLocale, weaponsByType, staticData, maxRarity]);
+ 
++  // 425: фильтр снаряжения — та же обрезка дерева (пустые ветки прячутся).
++  // Слово владельца: выбранное, чего на оружии нет, раскрывает МОДЫ, дающие
++  // его («моды это моды — только когда поставят, тогда и будут эффекты»):
++  // секция «Моды» появляется, когда подобранные качества/эффекты есть в
++  // каком-то моде; если ни одно оружие не подходит — в окне остаются моды.
++  const filteredData = useMemo(() => {
++    if (isEquipmentFilterEmpty(equipmentFilter)) return allData;
++    const pruned = pruneTreeByEquipmentFilter(allData, equipmentFilter);
++    const mods = weaponModsProviding(equipmentFilter, moduleLocale);
++    if (mods.length === 0) return pruned;
++    const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
++    const allLabel = tInventory('modals.addItemModal.categories.all');
++    return {
++      ...pruned,
++      [modsLabel]: { [allLabel]: [...mods].sort((a, b) => String(a.name).localeCompare(String(b.name))) },
++    };
++  }, [allData, equipmentFilter, moduleLocale, engineLocale]);
++
++  const filterOptions = useMemo(() => {
++    const labels = {
++      ammoNames: (getEquipmentCatalog(moduleLocale).ammoTypes ?? []).map((row) => ({ id: row.id, name: row.name })),
++      damageTypes: tInventory('modals.addItemModal.filter.damageTypes'),
++      weaponTypes: tInventory('modals.addItemModal.filter.weaponTypes'),
++      distances: tInventory('modals.addItemModal.filter.distances'),
++      bodyParts: tInventory('modals.addItemModal.filter.bodyPartsDict'),
++    };
++    return buildEquipmentFilterOptions(moduleLocale, labels);
++  }, [moduleLocale, engineLocale]);
++
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+     if (itemType === 'armor') return tInventory('modals.addItemModal.itemTypes.armor');
+@@ -266,15 +309,15 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const currentData = useMemo(() => {
+     if (searchTerm) {
+       const allItems = [];
+-      Object.values(allData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(allData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(allData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(allData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+       const allLabel = tInventory('modals.addItemModal.categories.all');
+       const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
+       categoryKeys.forEach((category) => {
+-        if (allData[category]?.[allLabel]) {
+-          allItems.push(...allData[category][allLabel]);
++        if (filteredData[category]?.[allLabel]) {
++          allItems.push(...filteredData[category][allLabel]);
+         }
+       });
+ 
+@@ -283,7 +326,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+       };
+     }
+ 
+-    let data = allData;
++    let data = filteredData;
+     for (const key of currentPath) {
+       if (!data || typeof data !== 'object') return { categories: [] };
+       data = data[key];
+@@ -293,7 +336,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     if (Array.isArray(data)) return { items: data };
+     if (data && typeof data === 'object') return { categories: Object.keys(data) };
+     return { categories: [] };
+-  }, [engineLocale, allData, currentPath, searchTerm]);
++  }, [engineLocale, filteredData, currentPath, searchTerm]);
+ 
+   const renderItem = ({ item }) => {
+     const isItem = typeof item === 'object' && item?.name;
+@@ -359,6 +402,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+                 onChangeText={setSearchTerm}
+               />
+ 
++              {/* 425: фильтр снаряжения (кроме веса) — как в перках, спойлером. */}
++              <EquipmentFilterPanel
++                options={filterOptions}
++                filter={equipmentFilter ?? emptyEquipmentFilter()}
++                onChange={(next) => setEquipmentFilter(next)}
++                onReset={() => setEquipmentFilter(null)}
++                open={filterOpen}
++                onToggleOpen={() => setFilterOpen((prev) => !prev)}
++              />
++
+               <FlatList
+                 data={currentData.items || currentData.categories}
+                 renderItem={renderItem}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 04cabcd..893c5ee 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (424)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (425)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **425** (СЛОВА ВЛАДЕЛЬЦА: «может вместо галочек и "не ниже", сделать 2мя полями диапазон "от - до". И в качестве подсказок немного серые значения, которые пропадают, как только его касаются»; «Качества показывать все»; проверка владельца «Компьютер наведения — идёт от мода… Ночное Видение, Разведовательный и многие другие тоже от модов. Проверь» — ПОДТВЕРЖДЕНО: 22 врождённых + 18 от модов (9 только от модов), лишь Бомбарда не покрыта; «моды это моды. Только когда их поставят, тогда и будут эффекты. Поскольку моды теперь предметы… при выборе эффектов, которые не на оружие, покажут модули»; УРОК: «я спросил у тебя про задумку и показать качества, которые не встречаются. А ты уже кодить начал» — НЕ НАЧИНАТЬ КОДИТЬ, пока владелец разбирает список/задумку, даже если кажется что всё согласовано). ПРИМЕНЕНО: modules/fallout/logic/equipmentFilter.js (чистые: buildEquipmentFilterOptions — границы из каталога редкость 0–6/урон 0–21/скор 0–7/СУ; качества ВСЕ 32 из словаря, эффекты 10, патроны 41 из оружия (списки ammoId через запятую раскрыты); applyEquipmentFilter — снаряжение only, не-снаряжение проходит всегда, без параметра не прячется, типы/дистанция «любое из», качества/эффекты/части «все», патрон «любое из» по частям ammoId; pruneTreeByEquipmentFilter; weaponModsProviding — моды с ≥1 выбранным качеством/эффектом, имена из i18n weapon_mods, itemType weaponMod → addFlow понимает mod_*) + EquipmentFilterPanel (спойлер как перки, RangeRow «от–до» с placeholder=граница каталога, исчезает при касании (touched state), ChipsRow, DropdownRow, onReset проп) + AddItemModal (полное слияние DB-оружия с каталогом `...(catalogEntry ?? {})` — поля фильтра не теряются; filteredData = prune + секция «Моды» при совпадении; сброс фильтра на visible). Правило «мёртвые» качества: Бомбарда — единственное пустое. Защёлка __tests__/gear/equipment-filter-425.test.js (17). 1522/154, tsc 0. Предыдущий снимок — **424** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **424** (СЛОВО ВЛАДЕЛЬЦА: «в отображения свойств оружия/брони хорошо бы добавить редкость. А заодно нужны фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)… Сделай проверку, какими вариантами свойств обладает оружие/броня. Покажи мне список, а потом сделаем фильтр по типу того, как в перках»). СДАНО: (1) патч 424 — «Редкость: N» на карточках (общий подзаголовок: weapon/armor/powerArmor при cardRarity>0, itemRarityFor; надетая часть СБ — по pieceCatalogId; i18n labels.rarity Редкость/Rarity; закон 424 в защёлке). (2) АУДИТ свойств отправлен в чат (полный список вариантов); ФИЛЬТРЫ = СЛЕДУЮЩИЙ ПАТЧ после разбора списка владельцем; образец UI — PerkSelectModal (спойлер «Фильтр» с чекбоксами). АУДИТ-факты (для фильтра): оружие 146 (145 реальных): редкость 0×11/1×22/2×29/3×36/4×25/5×20/6×1(гаусс-миниган)/без ×1(britva); тип урона physical 110/energy 35/radiation 2/special 1/poison 1; патронов 41 вариант (62 без патронов; 1 предмет со СПИСКОМ ammo 'ammo_energy_cell,ammo_fusion_core'; ammo_anything); скорострельность 0×90/1..7; дистанция C×33/M×55/L×10/пусто×46; тип Light 42/Melee 31/Energy 27/Explosive 21/Heavy 12/Unarmed 7/Thrown 4; качеств 22 варианта (у 121 предмета; словарь 32 — 10 без владельцев: bayonet/bombard/crank_x/disarm/night_vision/re-roll_hit_location/recon/shredder/sneak_attack/targetting_computer); эффектов 10 вариантов (у 94; piercing_x со value 1/2); урон 0..21 (0 у инъектора/детонатора/газовой/дымовой). Броня 56 частей: редкость 0×3..5×4; части Head 10/Body 16/Hand 16/Leg 16; СУ физ 1–4/эн 0–5/рад 0 (×55) и 2 (×1). ПА 20 деталей: редкость 2×8/3×4/4×4/5×4; части по 5. Одежда 32 — редкость ЕСТЬ у всех (учесть при фильтре!). i18n качеств/эффектов: data/system/{qualities,damageEffects}.json (ru/en). Ammo названия: i18n ammo/ammo_types.json. Фильтры окон: AddItemModal/BuyItemModal (в AddItemModal уже гейт модов по редкости ≤). 1502/153, tsc 0. Предыдущий снимок — **423** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **423** (СЛОВО ВЛАДЕЛЬЦА: «Потрачено: item_common_materials ×2» — второй дефект того же класса, что 422). ПРИЧИНА: buildRepairReport брал имена из getScrapMaterials() (реестр без локализованных .name → фолбэк на id). ИСПРАВЛЕНО: materialName = screen.json repair.materials[id] (те же слова, что в требованиях окна) → локализованный equipmentCatalog (findCatalogEntry misc→junk, как itemName крафта) → id. Закон 423 в защёлке: строка «Потрачено: Обычные материалы ×2», ни одна строка отчёта не содержит 'item_'. ЛОВУШКА: repairDict() — это craftingModal.json, а repair.materials живёт в screen.json (другой файл!) — правка дважды не сходилась, пока не подключил ruScreen/enScreen. .git сбрасывался снова (529824d) — восстановлен. 1501/153, tsc 0. Предыдущий снимок — **422** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **422** (СЛОВО ВЛАДЕЛЬЦА: «на кнопке ремонта в инвентаре стоит заглушка»). ПРИЧИНА: tInventory резолвит путь от корня {screen:…, modals:…} — все ремонтные ключи 413–421 звались БЕЗ префикса «screen.» → resolvePath по закону «без фолбэков» возвращал САМ ПУТЬ → на кнопках/в окне были служебные пути («repair.actions.remake»). Защёлки читали JSON НАПРЯМУЮ, мимо tInventory — поэтому 8 патчей дефект не ловили. ИСПРАВЛЕНО: 23 вызова → tInventory('screen.repair.…') (инвентарь 8, RepairModal 15); закон 422 в защёлке: tInventory('screen.repair.actions.remake')==='Ремонт' (setCurrentLocale — ГЛОБАЛЬНАЯ локаль, не модульная!) + в коде не осталось голых путей. ЛОВУШКИ (учесть): (1) массовая replace по файлу тестов зацепила литералы НОВЫХ отрицательных ассертов — делать replace точечно, после — прогон; (2) тесты словарей обязаны идти через ТУ ЖЕ функцию, что и UI (tInventory), не через прямой JSON; (3) .git сбрасывался повторно — restore по схеме (fetch→reset --hard FETCH_HEAD). 1500/153, tsc 0. Предыдущий снимок — **421** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 24eaf32..82ca6c8 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,23 @@
+ # Changelog
++---
++## Filters in loot and purchase windows (patch 425)
++
++The «Add» and «Buy» windows now have a «Filter» spoiler — like the
++perks one. Weight is not filtered; the rest is as you chose:
++- «from–to» ranges with grey hints of the catalog bounds (rarity 0–6,
++  damage 0–21, fire rate 0–7, armor DR) — the hint disappears once the
++  field is touched;
++- qualities — all 32 in the game (including those absent on weapons:
++  mods grant them, except Bombardment), effects — all 10;
++- types (Light/Heavy…), damage type, range, body parts — chips;
++- ammo — a dropdown (41 variants from the catalog).
++
++Per your word «mods are mods — effects appear only when installed»:
++weapons are filtered by their own qualities/effects only; a selection
++no weapon has opens a «Mods» section listing the mods that grant it
++(night scopes, targeting computer, etc.). If nothing fits — only the
++mods remain in the window.
++
+ ---
+ ## Rarity in properties (patch 424)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 58c1dda..259f160 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,24 @@
+ # История изменений
+ 
++---
++## Фильтры в окнах добычи и покупки (патч 425)
++
++В окнах «Добавить» и «Купить» появился спойлер «Фильтр» — как в
++перках. Вес не фильтруется, остальное — по твоему выбору:
++- диапазоны «от–до» с серыми подсказками-границами из каталога
++  (редкость 0–6, урон 0–21, скорострельность 0–7, СУ брони) —
++  подсказка исчезает, когда поле тронуто;
++- качества — все 32 из игры (включая те, что на оружии не встречаются:
++  их дают моды, кроме Бомбарды), эффекты — все 10;
++- типы (Лёгкое/Тяжёлое…), тип урона, дистанция, части тела — плитками;
++- патрон — выпадающим списком (41 вариант из каталога).
++
++По слову «моды это моды — только когда поставят, тогда и будут
++эффекты»: оружие фильтруется только по своим качествам и эффектам;
++а выбранное, чего на оружии нет, раскрывает секцию «Моды» — какие
++моды дают это качество/эффект (ночные прицелы, компьютер наведения
++и т.д.). Не подходит ничего — в окне остаются только моды.
++
+ ---
+ ## Редкость в свойствах (патч 424)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index 107c48e..fbfcb44 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -1,5 +1,55 @@
+ {
+   "categories": {
+     "powerArmor": "Power Armor"
++  },
++  "filter": {
++    "title": "Filter",
++    "reset": "Reset",
++    "from": "from",
++    "to": "to",
++    "selected": "selected",
++    "rarity": "Rarity",
++    "damage": "Damage",
++    "fireRate": "Fire rate",
++    "distance": "Range",
++    "damageType": "Damage type",
++    "weaponType": "Type",
++    "ammo": "Ammo",
++    "qualities": "Qualities",
++    "effects": "Effects",
++    "physical": "Physical DR",
++    "energy": "Energy DR",
++    "radiation": "Radiation DR",
++    "bodyParts": "Body parts",
++    "weaponSection": "Weapons",
++    "armorSection": "Armor & PA",
++    "damageTypes": {
++      "physical": "Physical",
++      "energy": "Energy",
++      "radiation": "Radiation",
++      "special": "Special",
++      "poison": "Poison"
++    },
++    "weaponTypes": {
++      "Light": "Light",
++      "Melee": "Melee",
++      "Energy": "Energy",
++      "Explosive": "Explosive",
++      "Heavy": "Heavy",
++      "Unarmed": "Unarmed",
++      "Thrown": "Thrown"
++    },
++    "distances": {
++      "C": "Close",
++      "M": "Medium",
++      "L": "Long"
++    },
++    "bodyPartsDict": {
++      "Head": "Head",
++      "Body": "Body",
++      "Hand": "Arms",
++      "Leg": "Legs"
++    },
++    "modsSection": "Mods"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 9b5b5bf..844fadf 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -1,5 +1,55 @@
+ {
+   "categories": {
+     "powerArmor": "Силовая броня"
++  },
++  "filter": {
++    "title": "Фильтр",
++    "reset": "Сбросить",
++    "from": "от",
++    "to": "до",
++    "selected": "выбрано",
++    "rarity": "Редкость",
++    "damage": "Урон",
++    "fireRate": "Скорострельность",
++    "distance": "Дистанция",
++    "damageType": "Тип урона",
++    "weaponType": "Тип",
++    "ammo": "Патрон",
++    "qualities": "Качества",
++    "effects": "Эффекты",
++    "physical": "СУ физическая",
++    "energy": "СУ энергетическая",
++    "radiation": "СУ радиационная",
++    "bodyParts": "Части тела",
++    "weaponSection": "Оружие",
++    "armorSection": "Броня и СБ",
++    "damageTypes": {
++      "physical": "Физический",
++      "energy": "Энергетический",
++      "radiation": "Радиационный",
++      "special": "Особый",
++      "poison": "Яд"
++    },
++    "weaponTypes": {
++      "Light": "Лёгкое",
++      "Melee": "Ближний бой",
++      "Energy": "Энергетическое",
++      "Explosive": "Взрывное",
++      "Heavy": "Тяжёлое",
++      "Unarmed": "Рукопашное",
++      "Thrown": "Метательное"
++    },
++    "distances": {
++      "C": "Ближняя",
++      "M": "Средняя",
++      "L": "Дальняя"
++    },
++    "bodyPartsDict": {
++      "Head": "Голова",
++      "Body": "Тело",
++      "Hand": "Руки",
++      "Leg": "Ноги"
++    },
++    "modsSection": "Моды"
+   }
+ }
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+new file mode 100644
+index 0000000..1bb30df
+--- /dev/null
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -0,0 +1,256 @@
++// Фильтры снаряжения для окон добычи/покупки (патч 425, слово владельца:
++// «фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)»;
++// диапазоны «от–до» с серыми подсказками; качества — ВСЕ из словаря, даже
++// те, что не встречаются на предметах). Чистые функции: варианты собираются
++// из каталогов (каталог JSON = истина), предикат — без побочных эффектов.
++import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
++import enQualities from '../i18n/en-EN/data/system/qualities.json';
++import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
++import enEffects from '../i18n/en-EN/data/system/damageEffects.json';
++import weaponsCatalog from '../data/equipment/weapons.json';
++import armorCatalog from '../data/equipment/armor.json';
++import powerArmorCatalog from '../data/equipment/powerArmor.json';
++import clothesCatalog from '../data/equipment/clothes.json';
++import weaponModsCatalog from '../data/equipment/weapon_mods.json';
++import ruModNames from '../i18n/ru-RU/data/equipment/weapon_mods.json';
++import enModNames from '../i18n/en-EN/data/equipment/weapon_mods.json';
++
++export const GEAR_KINDS = ['weapon', 'armor', 'powerArmor', 'clothing'];
++
++const isGear = (item) => GEAR_KINDS.includes(item?.itemType);
++
++/** Универсальное чтение «итога» параметра: {total} | число | строка | список. */
++export const readRatingTotal = (value) => {
++  if (value == null) return 0;
++  if (Array.isArray(value)) return value.reduce((sum, part) => sum + readRatingTotal(part), 0);
++  if (typeof value === 'object') return Number(value.total) || 0;
++  const num = Number(value);
++  return Number.isFinite(num) ? num : 0;
++};
++
++/** Урон оружия: damage — число, строка или список частей. */
++export const readDamageTotal = (item) => readRatingTotal(item?.damage);
++
++const armorPieces = () => {
++  const sink = [];
++  for (const group of Object.values(armorCatalog ?? {})) {
++    for (const tier of Object.values(group?.tiers ?? {})) {
++      for (const piece of tier?.pieces ?? []) sink.push(piece);
++    }
++  }
++  return sink;
++};
++
++const powerArmorPieces = () => {
++  const sink = [];
++  const walk = (node) => {
++    if (!node || typeof node !== 'object') return;
++    if (Array.isArray(node)) { node.forEach(walk); return; }
++    if (typeof node.id === 'string' && Number.isFinite(Number(node.hp))) sink.push(node);
++    Object.values(node).forEach(walk);
++  };
++  walk(powerArmorCatalog);
++  return sink;
++};
++
++const clothingItems = () => {
++  const raw = clothesCatalog?.clothes ?? [];
++  const sink = [];
++  for (const entry of raw) {
++    if (Array.isArray(entry?.items)) sink.push(...entry.items);
++    else if (entry?.id) sink.push(entry);
++  }
++  return sink;
++};
++
++const numBounds = (values) => ({
++  min: Math.min(...values),
++  max: Math.max(...values),
++});
++
++/**
++ * Варианты для панели фильтра. Диапазоны — фактические границы каталога
++ * (аудит 424: редкость 0–6, урон 0–21, скорострельность 0–7, СУ физ 1–4,
++ * эн 0–5, рад 0–2). Качества — ВСЕ из словаря (слово владельца), эффекты —
++ * все из словаря. Патроны — уникальные из каталога оружия.
++ */
++export const buildEquipmentFilterOptions = (locale, labels) => {
++  const qualitiesDict = locale === 'en-EN' ? enQualities : ruQualities;
++  const effectsDict = locale === 'en-EN' ? enEffects : ruEffects;
++  const weapons = (weaponsCatalog ?? []).filter((w) => !w.isBuiltin);
++  const armor = armorPieces();
++  const pa = powerArmorPieces();
++  const clothes = clothingItems();
++
++  const ammoSeen = [];
++  for (const weapon of weapons) {
++    for (const id of String(weapon.ammoId ?? '').split(',').map((part) => part.trim())) {
++      if (id && !ammoSeen.includes(id)) ammoSeen.push(id);
++    }
++  }
++  const ammoNames = new Map((labels.ammoNames ?? []).map((row) => [row.id, row.name]));
++  const ammoOptions = ammoSeen.map((id) => ({ id, name: ammoNames.get(id) ?? id }));
++
++  return {
++    rarity: numBounds(
++      [...weapons, ...armor, ...pa, ...clothes]
++        .map((item) => Number(item.rarity))
++        .filter((num) => Number.isFinite(num)),
++    ),
++    damage: numBounds(weapons.map((w) => readDamageTotal(w))),
++    fireRate: numBounds(weapons.map((w) => Number(w.fireRate)).filter((num) => Number.isFinite(num))),
++    physical: numBounds([...armor, ...pa, ...clothes].map((item) => readRatingTotal(item.physicalDamageRating))),
++    energy: numBounds([...armor, ...pa, ...clothes].map((item) => readRatingTotal(item.energyDamageRating))),
++    radiation: numBounds([...armor, ...pa, ...clothes].map((item) => readRatingTotal(item.radiationDamageRating))),
++    damageTypes: [
++      { id: 'physical', name: labels.damageTypes.physical },
++      { id: 'energy', name: labels.damageTypes.energy },
++      { id: 'radiation', name: labels.damageTypes.radiation },
++      { id: 'special', name: labels.damageTypes.special },
++      { id: 'poison', name: labels.damageTypes.poison },
++    ],
++    weaponTypes: [
++      { id: 'Light', name: labels.weaponTypes.Light },
++      { id: 'Melee', name: labels.weaponTypes.Melee },
++      { id: 'Energy', name: labels.weaponTypes.Energy },
++      { id: 'Explosive', name: labels.weaponTypes.Explosive },
++      { id: 'Heavy', name: labels.weaponTypes.Heavy },
++      { id: 'Unarmed', name: labels.weaponTypes.Unarmed },
++      { id: 'Thrown', name: labels.weaponTypes.Thrown },
++    ],
++    distances: [
++      { id: 'C', name: labels.distances.C },
++      { id: 'M', name: labels.distances.M },
++      { id: 'L', name: labels.distances.L },
++    ],
++    bodyParts: [
++      { id: 'Head', name: labels.bodyParts.Head },
++      { id: 'Body', name: labels.bodyParts.Body },
++      { id: 'Hand', name: labels.bodyParts.Hand },
++      { id: 'Leg', name: labels.bodyParts.Leg },
++    ],
++    ammoOptions,
++    qualities: qualitiesDict.map((row) => ({ id: row.id, name: row.name })),
++    effects: effectsDict.map((row) => ({ id: row.id, name: row.name })),
++  };
++};
++
++export const emptyEquipmentFilter = () => ({
++  rarity: { from: '', to: '' },
++  damage: { from: '', to: '' },
++  fireRate: { from: '', to: '' },
++  distance: [],
++  damageTypes: [],
++  weaponTypes: [],
++  ammo: [],
++  qualities: [],
++  effects: [],
++  physical: { from: '', to: '' },
++  energy: { from: '', to: '' },
++  radiation: { from: '', to: '' },
++  bodyParts: [],
++});
++
++export const isEquipmentFilterEmpty = (filter) => {
++  const empty = emptyEquipmentFilter();
++  return JSON.stringify(filter ?? empty) === JSON.stringify(empty);
++};
++
++const inRange = (value, range) => {
++  if (range == null) return true;
++  const from = parseFloat(range.from);
++  const to = parseFloat(range.to);
++  const num = Number(value);
++  if (!Number.isFinite(num)) return true; // нет параметра — не прячем предмет
++  if (Number.isFinite(from) && num < from) return false;
++  if (Number.isFinite(to) && num > to) return false;
++  return true;
++};
++
++const hasAll = (values, selected) => selected.every((id) => values.includes(id));
++const hasAny = (values, selected) => selected.some((id) => values.includes(id));
++
++const weaponAmmoIds = (item) => String(item?.ammoId ?? '')
++  .split(',')
++  .map((part) => part.trim())
++  .filter(Boolean);
++
++/**
++ * Предикат фильтра. Фильтр применяется ТОЛЬКО к снаряжению
++ * (оружие/броня/СБ/одежда); остальные предметы проходят всегда.
++ * Одно-значные категории (тип урона, тип, дистанция, патрон) — «любое из
++ * выбранных»; многозначные (качества, эффекты, части тела) — «все выбранные».
++ */
++export const applyEquipmentFilter = (item, filter) => {
++  if (!isGear(item)) return true;
++  const f = filter ?? emptyEquipmentFilter();
++
++  if (!inRange(item.rarity, f.rarity)) return false;
++
++  if (item.itemType === 'weapon') {
++    if (!inRange(readDamageTotal(item), f.damage)) return false;
++    if (!inRange(item.fireRate, f.fireRate)) return false;
++    if (f.distance?.length && !f.distance.includes(item.range)) return false;
++    const types = Array.isArray(item.damageType) ? item.damageType : [item.damageType].filter(Boolean);
++    if (f.damageTypes?.length && !hasAny(types, f.damageTypes)) return false;
++    if (f.weaponTypes?.length && !f.weaponTypes.includes(item.weaponType)) return false;
++    if (f.ammo?.length && !hasAny(weaponAmmoIds(item), f.ammo)) return false;
++    if (f.qualities?.length
++      && !hasAll((item.qualities ?? []).map((q) => q?.qualityId ?? q), f.qualities)) return false;
++    if (f.effects?.length
++      && !hasAll((item.effects ?? []).map((e) => e?.effectId ?? e), f.effects)) return false;
++  }
++
++  if (item.itemType !== 'weapon') {
++    if (!inRange(readRatingTotal(item.physicalDamageRating), f.physical)) return false;
++    if (!inRange(readRatingTotal(item.energyDamageRating), f.energy)) return false;
++    if (!inRange(readRatingTotal(item.radiationDamageRating), f.radiation)) return false;
++    if (f.bodyParts?.length && !hasAll(item.protectedAreas ?? [], f.bodyParts)) return false;
++  }
++
++  return true;
++};
++
++/**
++ * Слово владельца 425: «моды это моды. Только когда их поставят, тогда и
++ * будут эффекты» — оружие фильтруется ТОЛЬКО по своим (врождённым)
++ * качествам/эффектам; ни «может получить от мода», ни установленные моды
++ * экземпляров здесь не учитываются. Но «поскольку моды теперь предметы
++ * и они есть в инвентаре, при выборе эффектов, которые не на оружие,
++ * покажут модули»: моды, дающие хоть одно из выбранного, показываются
++ * отдельной секцией окна (addFlow принимает mod_* как weaponMod).
++ */
++export const weaponModsProviding = (filter, locale) => {
++  const wanted = [...(filter?.qualities ?? []), ...(filter?.effects ?? [])];
++  if (wanted.length === 0) return [];
++  const names = new Map((locale === 'en-EN' ? enModNames : ruModNames).map((row) => [row.id, row.name]));
++  return (weaponModsCatalog ?? [])
++    .filter((mod) => (mod.qualityChanges ?? []).some((t) => wanted.includes(t?.id))
++      || (mod.effectChanges ?? []).some((t) => wanted.includes(t?.id)))
++    .map((mod) => ({
++      id: mod.id,
++      name: names.get(mod.id) ?? mod.id,
++      itemType: 'weaponMod',
++      modSlot: mod.slot,
++      rarity: mod.rarity,
++      cost: mod.cost,
++      weight: mod.weight,
++    }));
++};
++
++/**
++ * Обрезка дерева категорий по фильтру (как потолок редкости): пустые ветки
++ * после отсева не показываются. Предметы вне снаряжения проходят всегда.
++ */
++export const pruneTreeByEquipmentFilter = (node, filter) => {
++  if (Array.isArray(node)) return node.filter((item) => applyEquipmentFilter(item, filter));
++  if (!node || typeof node !== 'object') return node;
++  const out = {};
++  for (const [key, value] of Object.entries(node)) {
++    const pruned = pruneTreeByEquipmentFilter(value, filter);
++    const isEmpty = Array.isArray(pruned) ? pruned.length === 0
++      : pruned && typeof pruned === 'object' && Object.keys(pruned).length === 0;
++    if (!isEmpty) out[key] = pruned;
++  }
++  return out;
++};
+diff --git a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
+new file mode 100644
+index 0000000..455aeef
+--- /dev/null
++++ b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
+@@ -0,0 +1,136 @@
++// Панель фильтров снаряжения (патч 425) — по образцу фильтра перков:
++// спойлер «Фильтр» с рядом параметров. Диапазоны «от–до» — два поля с
++// СЕРЫМИ подсказками (границы каталога), подсказка исчезает, как только
++// поле тронули; выпадающие списки (качества/эффекты/патрон) — много-
++// выбор галочками; типы/дистанция/части тела — чипсы. Вес не фильтруется
++// (слово владельца).
++import React, { useState } from 'react';
++import { View, Text, TextInput, TouchableOpacity } from 'react-native';
++import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
++import styles from '../../../styles/EquipmentFilterPanel.styles';
++
++const t = (key) => tInventory(`modals.addItemModal.filter.${key}`);
++
++/** Поле диапазона «от–до»: подсказка-граница серым, исчезает при касании. */
++const RangeRow = ({ label, hint, value, onChange }) => {
++  // Слово владельца 425: подсказка пропадает, как только поле коснулись.
++  const [touchedFrom, setTouchedFrom] = useState(false);
++  const [touchedTo, setTouchedTo] = useState(false);
++  return (
++    <View style={styles.row}>
++      <Text style={styles.rowLabel}>{label}</Text>
++      <Text style={styles.rangeDash}>{t('from')}</Text>
++      <TextInput
++        style={styles.rangeInput}
++        value={value.from}
++        onChangeText={(text) => onChange({ ...value, from: text })}
++        onFocus={() => setTouchedFrom(true)}
++        onBlur={() => setTouchedFrom(false)}
++        keyboardType="number-pad"
++        placeholder={touchedFrom ? '' : String(hint?.min ?? '')}
++        placeholderTextColor="#999"
++      />
++      <Text style={styles.rangeDash}>{t('to')}</Text>
++      <TextInput
++        style={styles.rangeInput}
++        value={value.to}
++        onChangeText={(text) => onChange({ ...value, to: text })}
++        onFocus={() => setTouchedTo(true)}
++        onBlur={() => setTouchedTo(false)}
++        keyboardType="number-pad"
++        placeholder={touchedTo ? '' : String(hint?.max ?? '')}
++        placeholderTextColor="#999"
++      />
++    </View>
++  );
++};
++
++/** Чипсы (одиночный/мультивыбор кликами). */
++const ChipsRow = ({ label, options, selected, onToggle }) => (
++  <View style={styles.row}>
++    <Text style={styles.rowLabel}>{label}</Text>
++    {options.map((option) => {
++      const on = selected.includes(option.id);
++      return (
++        <TouchableOpacity
++          key={option.id}
++          style={[styles.chip, on && styles.chipOn]}
++          onPress={() => onToggle(option.id)}
++        >
++          <Text style={[styles.chipText, on && styles.chipTextOn]}>{option.name}</Text>
++        </TouchableOpacity>
++      );
++    })}
++  </View>
++);
++
++/** Выпадающий список с галочками (мультивыбор). */
++const DropdownRow = ({ label, options, selected, onToggle }) => {
++  const [open, setOpen] = useState(false);
++  return (
++    <View>
++      <TouchableOpacity style={styles.dropdownHeader} onPress={() => setOpen((prev) => !prev)}>
++        <Text style={styles.dropdownArrow}>{open ? '▼' : '►'}</Text>
++        <Text style={styles.dropdownTitle}>{label}</Text>
++        {selected.length > 0 && (
++          <Text style={styles.dropdownCount}>{selected.length} {t('selected')}</Text>
++        )}
++      </TouchableOpacity>
++      {open && options.map((option) => {
++        const on = selected.includes(option.id);
++        return (
++          <TouchableOpacity key={option.id} style={styles.optionRow} onPress={() => onToggle(option.id)}>
++            <Text style={styles.optionText}>{on ? '☑' : '☐'} {option.name}</Text>
++          </TouchableOpacity>
++        );
++      })}
++    </View>
++  );
++};
++
++/**
++ * Панель фильтра. options — buildEquipmentFilterOptions(locale, labels);
++ * filter/onChange — состояние фильтра; open/onToggleOpen — спойлер.
++ */
++const EquipmentFilterPanel = ({ options, filter, onChange, onReset, open, onToggleOpen }) => {
++  if (!options || !filter) return null;
++  const toggleIn = (list, id) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
++  const setRange = (key) => (value) => onChange({ ...filter, [key]: value });
++  const toggleList = (key) => (id) => onChange({ ...filter, [key]: toggleIn(filter[key], id) });
++
++  return (
++    <View style={styles.panel}>
++      <TouchableOpacity style={styles.spoilerHeader} onPress={onToggleOpen}>
++        <Text style={styles.spoilerTitle}>{t('title')}</Text>
++        <Text style={styles.spoilerArrow}>{open ? '▼' : '►'}</Text>
++      </TouchableOpacity>
++      {open && (
++        <View style={styles.body}>
++          <RangeRow label={t('rarity')} hint={options.rarity} value={filter.rarity} onChange={setRange('rarity')} />
++
++          <Text style={styles.sectionTitle}>{t('weaponSection')}</Text>
++          <RangeRow label={t('damage')} hint={options.damage} value={filter.damage} onChange={setRange('damage')} />
++          <RangeRow label={t('fireRate')} hint={options.fireRate} value={filter.fireRate} onChange={setRange('fireRate')} />
++          <ChipsRow label={t('distance')} options={options.distances} selected={filter.distance} onToggle={toggleList('distance')} />
++          <ChipsRow label={t('damageType')} options={options.damageTypes} selected={filter.damageTypes} onToggle={toggleList('damageTypes')} />
++          <ChipsRow label={t('weaponType')} options={options.weaponTypes} selected={filter.weaponTypes} onToggle={toggleList('weaponTypes')} />
++          <DropdownRow label={t('ammo')} options={options.ammoOptions} selected={filter.ammo} onToggle={toggleList('ammo')} />
++          <DropdownRow label={t('qualities')} options={options.qualities} selected={filter.qualities} onToggle={toggleList('qualities')} />
++          <DropdownRow label={t('effects')} options={options.effects} selected={filter.effects} onToggle={toggleList('effects')} />
++
++          <Text style={styles.sectionTitle}>{t('armorSection')}</Text>
++          <RangeRow label={t('physical')} hint={options.physical} value={filter.physical} onChange={setRange('physical')} />
++          <RangeRow label={t('energy')} hint={options.energy} value={filter.energy} onChange={setRange('energy')} />
++          <RangeRow label={t('radiation')} hint={options.radiation} value={filter.radiation} onChange={setRange('radiation')} />
++          <ChipsRow label={t('bodyParts')} options={options.bodyParts} selected={filter.bodyParts} onToggle={toggleList('bodyParts')} />
++
++          <TouchableOpacity style={styles.resetButton} onPress={onReset}>
++            <Text style={styles.resetText}>{t('reset')}</Text>
++          </TouchableOpacity>
++        </View>
++      )}
++    </View>
++  );
++};
++
++export default EquipmentFilterPanel;
+diff --git a/modules/fallout/styles/EquipmentFilterPanel.styles.js b/modules/fallout/styles/EquipmentFilterPanel.styles.js
+new file mode 100644
+index 0000000..27ea3ec
+--- /dev/null
++++ b/modules/fallout/styles/EquipmentFilterPanel.styles.js
+@@ -0,0 +1,28 @@
++// Стили панели фильтров снаряжения (патч 425) — по образцу фильтра перков
++// (PerkSelectModal.styles: спойлер-заголовок, ряды чипсов).
++import { StyleSheet } from 'react-native';
++
++export default StyleSheet.create({
++  panel: { marginBottom: 8 },
++  spoilerHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#eee', borderRadius: 8 },
++  spoilerTitle: { fontSize: 15, fontWeight: 'bold', color: '#333' },
++  spoilerArrow: { fontSize: 14, color: '#555' },
++  body: { paddingHorizontal: 10, paddingTop: 8 },
++  sectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#555', marginTop: 8, marginBottom: 4 },
++  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 },
++  rowLabel: { fontSize: 13, color: '#333', width: 120 },
++  rangeInput: { borderBottomWidth: 1, borderColor: '#bbb', width: 56, textAlign: 'center', paddingVertical: 2, fontSize: 14, color: '#333', marginHorizontal: 4 },
++  rangeDash: { fontSize: 13, color: '#777' },
++  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#999', marginRight: 6, marginBottom: 4 },
++  chipOn: { backgroundColor: '#2f6df6', borderColor: '#2f6df6' },
++  chipText: { fontSize: 12, color: '#333' },
++  chipTextOn: { color: '#fff' },
++  dropdownHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
++  dropdownArrow: { fontSize: 11, color: '#555', marginRight: 6 },
++  dropdownTitle: { fontSize: 13, color: '#333' },
++  dropdownCount: { fontSize: 12, color: '#2f6df6', marginLeft: 6 },
++  optionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, paddingLeft: 18 },
++  optionText: { fontSize: 12, color: '#333', flex: 1 },
++  resetButton: { alignSelf: 'center', marginTop: 8, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
++  resetText: { fontSize: 13, color: '#333' },
++});
+diff --git a/public/version.json b/public/version.json
+index 502724f..e1edc90 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "424",
++  "version": "425",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
