@@ -1,5 +1,13 @@
 # Changelog
 ---
+## Rarity in properties (patch 424)
+
+Weapon, armor and power armor cards now show «Редкость: N» (the
+book rarity; items without rarity have no line). The first step
+toward loot/purchase filters: the list of filterable properties is
+sent separately; the filters come after we review it.
+
+---
 ## Material names in the report (patch 423)
 
 You caught the same class of defect as with the button: the report
