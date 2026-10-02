@@ -1,0 +1,156 @@
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index d07031b..5510219 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -477,6 +477,23 @@ describe('Проводка (слово владельца 415/417/420): одна
+     expect(modal).toContain('CraftReportView');
+   });
+ 
++  it('закон 423: в отчёте названия материалов, не id (как в крафте)', () => {
++    setCurrentLocale('ru-RU');
++    const report = buildRepairReport({
++      done: true,
++      check: { rolls: [2, 3], passed: true, successes: 2, complicationCount: 0, targetNumber: 5 },
++      spent: [
++        { itemId: 'item_common_materials', count: 2 },
++        { itemId: 'item_uncommon_materials', count: 1 },
++      ],
++    }, { attributeName: 'ИНТ', skillName: 'Ремонт' });
++    const spentLine = report.lines.find((line) => line.startsWith('Потрачено'));
++    expect(spentLine).toContain('Обычные материалы ×2');
++    expect(spentLine).toContain('Необычные материалы ×1');
++    // Ни одна строка отчёта не содержит сырых id предметов.
++    for (const line of report.lines) expect(line).not.toContain('item_');
++  });
++
+   it('закон 422: ремонтные ключи резолвятся через tInventory (без «заглушек»-путей на кнопках)', () => {
+     setCurrentLocale('ru-RU'); // tInventory живёт на ГЛОБАЛЬНОЙ локали
+     // Слово владельца: «на кнопке ремонта в инвентаре стоит заглушка» —
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 552008e..f3cf5df 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (422)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (423)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **423** (СЛОВО ВЛАДЕЛЬЦА: «Потрачено: item_common_materials ×2» — второй дефект того же класса, что 422). ПРИЧИНА: buildRepairReport брал имена из getScrapMaterials() (реестр без локализованных .name → фолбэк на id). ИСПРАВЛЕНО: materialName = screen.json repair.materials[id] (те же слова, что в требованиях окна) → локализованный equipmentCatalog (findCatalogEntry misc→junk, как itemName крафта) → id. Закон 423 в защёлке: строка «Потрачено: Обычные материалы ×2», ни одна строка отчёта не содержит 'item_'. ЛОВУШКА: repairDict() — это craftingModal.json, а repair.materials живёт в screen.json (другой файл!) — правка дважды не сходилась, пока не подключил ruScreen/enScreen. .git сбрасывался снова (529824d) — восстановлен. 1501/153, tsc 0. Предыдущий снимок — **422** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **422** (СЛОВО ВЛАДЕЛЬЦА: «на кнопке ремонта в инвентаре стоит заглушка»). ПРИЧИНА: tInventory резолвит путь от корня {screen:…, modals:…} — все ремонтные ключи 413–421 звались БЕЗ префикса «screen.» → resolvePath по закону «без фолбэков» возвращал САМ ПУТЬ → на кнопках/в окне были служебные пути («repair.actions.remake»). Защёлки читали JSON НАПРЯМУЮ, мимо tInventory — поэтому 8 патчей дефект не ловили. ИСПРАВЛЕНО: 23 вызова → tInventory('screen.repair.…') (инвентарь 8, RepairModal 15); закон 422 в защёлке: tInventory('screen.repair.actions.remake')==='Ремонт' (setCurrentLocale — ГЛОБАЛЬНАЯ локаль, не модульная!) + в коде не осталось голых путей. ЛОВУШКИ (учесть): (1) массовая replace по файлу тестов зацепила литералы НОВЫХ отрицательных ассертов — делать replace точечно, после — прогон; (2) тесты словарей обязаны идти через ТУ ЖЕ функцию, что и UI (tInventory), не через прямой JSON; (3) .git сбрасывался повторно — restore по схеме (fetch→reset --hard FETCH_HEAD). 1500/153, tsc 0. Предыдущий снимок — **421** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **421** (СЛОВО ВЛАДЕЛЬЦА: «поменяем зависимости износа оружия и случайного качества. Это теперь 2 самостоятельных пункта. И прочность ещё распространяется на броню. Её тоже нужно чинить»). ПРИМЕНЕНО: (1) settings.json randomWeaponQualityEnabled БЕЗ dependsOn (качество standalone); легаси-миграция стора развязана: явный weaponDurabilityLossEnabled > легаси randomWeaponDurabilityEnabled (поровну на оба пункта) > дефолт true (416 сохранён); (2) БРОНЯ (itemType 'armor', не одежда/не СБ) в системе прочности: addItem при качестве рождает каждый экземпляр своей прочности (buy=100, loot=rollWeaponDurability, стек по прочности), карточка показывает «Прочность N/100» при (качество ИЛИ износ), repairTargetFor kind 'armor' (rarity из armor.json через collectPairs — уже индексирована), performRepair → repairWeapon (общий экшн durability→100), кнопка окна = showItemRepair && showItemDurability (переименование showWeapon*→showItem*), донор/материалы/Очумелые ручки — как у оружия. Износа от выстрелов у брони НЕТ (нет источника урона в приложении) — сказано владельцу. ЛОВУШКА (учесть): замена в appSettingsStore не прошла с первого раза — анкер не учёл комментарий 416 внутри else; python-хередок с assert при падении МОЖЕТ оставить ЧАСТИЧНО применённое дерево если старых анкеров несколько — ВСЕГДА перепроверять grep'ом фактическое состояние после каждого скрипта. Защёлка 413-файла = 46 (+законы 421), 416-файла = 17 (+3 теста брони). 1499/153, tsc 0. Предыдущий снимок — **420** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **420** (СЛОВО ВЛАДЕЛЬЦА: «короче, в ui если прочность не включена, то и кнопки ремонта нет. А вот если есть отображение прочности, то и кнопка окна ремонта с вариантами есть» — после моего вопроса «что чинить при выключенной»). ПРИМЕНЕНО: МГНОВЕННОЙ ПОЧИНКИ БОЛЬШЕ НЕТ (performInstantFreeRepair/ForEquippedPiece удалены из operations и UI); кнопка = отображение прочности: оружие → showWeaponRepair && showWeaponDurability (качество ИЛИ износ), СБ → повреждение (прочность видна всегда); кнопка всегда открывает окно (перк: «Починить» активна всегда — free; без перка: «Ремонт», серая без донора/материалов). Окно не менялось (free только в juryActive). Таблица 420: прочность не видна → кнопки нет; видна без перка → окно (донор/материалы); видна с перком → окно трёх. Защёлка 413-файла = 45 (−1 мгновенный тест), 416-файл = 14. 1495/153, tsc 0. Предыдущий снимок — **419** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5b972c5..746b03e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Material names in the report (patch 423)
++
++You caught the same class of defect as with the button: the report
++line said «Потрачено: item_common_materials ×2» — a service id instead
++of a name. The report now speaks properly: «Потрачено: Обычные
++материалы ×2» (Common materials ×2), with the same words as the
++window's requirement lines. A check is added: no report line may
++contain service identifiers.
++
+ ---
+ ## Repair window without placeholders (patch 422)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a5f591d..9b3f497 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Названия материалов в отчёте (патч 423)
++
++Ты поймал тот же класс дефекта, что и с кнопкой: в строке отчёта было
++«Потрачено: item_common_materials ×2» — служебный идентификатор вместо
++названия. Теперь отчёт пишет по-человечески: «Потрачено: Обычные
++материалы ×2», теми же словами, что и строки требований окна. Проверка
++добавлена: ни одна строка отчёта не должна содержать служебных
++идентификаторов.
++
+ ---
+ ## Окно ремонта без заглушек (патч 422)
+ 
+diff --git a/modules/fallout/repair/operations.js b/modules/fallout/repair/operations.js
+index f52e135..83e1078 100644
+--- a/modules/fallout/repair/operations.js
++++ b/modules/fallout/repair/operations.js
+@@ -23,12 +23,15 @@ import { REPAIR_RULES, repairMaterialsPlan } from './rules';
+ import weaponsCatalog from '../data/equipment/weapons.json';
+ import armorCatalog from '../data/equipment/armor.json';
+ import powerArmorCatalog from '../data/equipment/powerArmor.json';
+-import { getScrapMaterials } from '../../../domain/registry';
+ import { countActivePerkSelections } from '../../../domain/perks';
+ import perksCatalog from '../data/perks/perks.json';
+ import { getCurrentModuleLocale } from '../../../i18n/locale';
++import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
++import { findCatalogEntry } from '../../../domain/resolveItem';
+ import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
+ import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
++import ruScreen from '../i18n/ru-RU/screens/inventory/screen.json';
++import enScreen from '../i18n/en-EN/screens/inventory/screen.json';
+ 
+ // ── Редкость по каноническому id ─────────────────────────────────────────
+ 
+@@ -36,12 +39,18 @@ let rarityIndexCache = null;
+ 
+ const repairDict = () => (getCurrentModuleLocale() === 'en-EN' ? enCraft : ruCraft);
+ 
+-const materialNames = () => {
+-  const names = {};
+-  for (const material of getScrapMaterials() ?? []) {
+-    if (material?.id) names[material.id] = material.name ?? material.id;
+-  }
+-  return names;
++// Слово владельца 423: в отчёте «Потрачено: item_common_materials ×2» —
++// id вместо названия. Имя материала — из словаря ремонта (те же слова,
++// что в строках требований окна), затем из локализованного каталога
++// экипировки (как отчёт крафта, 357), затем сам id.
++const materialName = (itemId) => {
++  const screenDict = getCurrentModuleLocale() === 'en-EN' ? enScreen : ruScreen;
++  const dictName = screenDict.repair?.materials?.[itemId];
++  if (dictName) return dictName;
++  const catalog = getEquipmentCatalog(getCurrentModuleLocale());
++  return findCatalogEntry(catalog, itemId, 'misc')?.name
++    ?? findCatalogEntry(catalog, itemId, 'junk')?.name
++    ?? itemId;
+ };
+ 
+ /**
+@@ -60,7 +69,7 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
+   const check = run?.check ?? null;
+   const target = check?.targetNumber
+     ?? ((Number(attributeName) >= 0 ? '' : '') || '');
+-  const names = materialNames();
++
+   const lines = [];
+   if (check?.targetNumber != null) {
+     lines.push(`${attributeName ?? REPAIR_RULES.testAttribute} + ${skillName ?? REPAIR_RULES.testSkill}`
+@@ -93,7 +102,7 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
+   const spentRows = run?.spent ?? [];
+   if (spentRows.length > 0) {
+     const items = spentRows
+-      .map((row) => `${names[row.itemId] ?? row.itemId} ×${row.count}`)
++      .map((row) => `${materialName(row.itemId)} ×${row.count}`)
+       .join(', ');
+     if (ru.spent) lines.push(ru.spent.replace('{items}', items));
+   }
+diff --git a/public/version.json b/public/version.json
+index 5ed7b3b..ed0119e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "422",
++  "version": "423",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
