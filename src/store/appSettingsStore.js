@@ -120,13 +120,19 @@ const migrateFlatState = (persistedState) => {
     ?? old.randomWeaponDurabilityEnabled
     ?? false;
 
-  if (old.randomWeaponDurabilityEnabled !== undefined) {
-    fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
-    fallout.weaponDurabilityLossEnabled = false;
+  // Слово владельца 421: «износ» и «произвольное качество» — два
+  // самостоятельных пункта, друг от друга не зависят. Старый общий
+  // переключатель (randomWeaponDurabilityEnabled) раскладывается на оба
+  // пункта поровну; явный выбор игрока всегда главнее (416: износ по
+  // умолчанию включён).
+  if (old.weaponDurabilityLossEnabled !== undefined) {
+    fallout.weaponDurabilityLossEnabled = Boolean(old.weaponDurabilityLossEnabled);
+  } else if (old.randomWeaponDurabilityEnabled !== undefined) {
+    fallout.weaponDurabilityLossEnabled = Boolean(old.randomWeaponDurabilityEnabled);
   } else {
-    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
-    fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+    fallout.weaponDurabilityLossEnabled = true;
   }
+  fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
 
   fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
   fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;

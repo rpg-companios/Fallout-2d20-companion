@@ -1,5 +1,132 @@
 # Changelog
 ---
+## Independent settings; armor durability (patch 421)
+
+«Weapon durability loss» and «Random weapon quality» are now two
+independent settings: quality is no longer hidden behind wear (toggle
+them separately as you like). The old combined switch in saves splits
+evenly into both settings.
+
+Armor (regular, not power armor) now has durability too: with
+«Random quality» every found armor piece is born with its own
+durability (bought = whole), the card shows «Durability: N/100», and
+damaged armor is repaired by the same repair window: with the «Jury
+Rigging» perk — three buttons; without — donor and materials. Rarity
+and mods of the armor affect the difficulty like a weapon's. Armor
+cannot wear from shots — it is only damaged by being born with poor
+durability.
+
+---
+## Repair button follows durability display (patch 420)
+
+One simple rule, as you said: if durability is not displayed — there
+is no repair button at all. If durability is visible on the card —
+the button opens the choice window (with the «Jury Rigging» perk —
+three buttons including «Without cost (poor quality)»; without the
+perk — donor and materials). A weapon shows durability when either
+the quality or the wear setting is on; power armor always shows it,
+so a damaged piece always has the button. No more instant repair:
+everything goes through the window, the test and the time.
+
+---
+## The window only when the setting is on (patch 419)
+
+You caught a real bug: with the «Jury Rigging» perk and the
+durability setting OFF, the repair window still opened — the perk
+intercepted the press before the setting was checked. The order is
+now reversed: the setting is checked first. Off — always the instant
+free «Fix» with no window, perk or not. On — the window: with the
+perk, three buttons («Without cost (poor quality)» exists only with
+the perk); without the perk — «From a donor» and «From materials».
+
+---
+## Repair rules locked in (patch 418)
+
+The app itself did not change — both of your rules were already in
+effect after the previous update; now they are locked by checks so
+they cannot be lost: the repair choice window appears only when the
+durability setting is on (off — the instant free «Fix» with no
+window), and the «Without cost (poor quality)» button in the window
+exists only with the «Jury Rigging» perk (without the perk the window
+has the donor and the materials).
+
+---
+## Repair choice window (patch 417)
+
+By your word the unconditional free repair is gone. With the
+«Jury Rigging» perk the button opens a choice window with three
+buttons: «Without cost (poor quality)», «From a donor (quick
+repair)», «From materials». No donor — the donor button is grey; no
+materials — the materials button is grey; neither — both grey, the
+free one remains. No more instant actions: every choice is the test
+and half an hour of work (2 AP halve it); the free option only spends
+nothing, and its result is temporary (a complication 19–20 breaks the
+item again — shown in the report and on the card). Without the perk
+the repair window is as before.
+
+---
+## Jury Rigging (patch 416)
+
+The «Jury Rigging» perk works now. The same single «Fix» button is
+free with this perk too, even with the durability setting on. Per the
+book, such a repair is temporary: the item breaks again at the next
+complication while being used, and the complication range for skill
+checks with the item is 19–20. While the item is temporarily repaired,
+its card shows a yellow note. A proper repair with materials (the
+«Repair» button) removes the note — the item is fixed for good. Firing
+wear does not remove the note: only a complication releases the item.
+
+The «Weapon durability loss» setting is now on by default. If it was
+saved off in your save — turn it on once in the settings; an explicit
+choice is never overridden.
+
+---
+## One repair button (patch 415)
+
+By your word there is one button again. With the durability setting
+off it is the old instant free «Fix». With it on — the book «Repair»:
+a window with the donor, materials and the crafting-style report; no
+materials (and no donor) — the button is grey. Free repair exists only
+when the settings are off (later — also with the «Jury Rigging» perk,
+on the same button). The «repair is per one piece» law now covers
+everything: a weapon stack is also repaired one instance per test,
+like power armor pieces; even the instant free fix separates one piece
+from the stack and repairs only it. The repaired piece merges with the
+whole ones.
+
+---
+## Repair — as you said (patch 414)
+
+By your corrections there are two buttons now. «Fix» is the old
+instant free repair. «Repair» is the book test with materials. The
+repair window offers a donor when a second identical item is in the
+bag; with no donor there is no selection window — pressing the button
+attempts the repair right away and shows the report. The report comes
+from the Crafting window: the same check and dice lines, the same 2 AP
+question and time — only instead of «received: item» it says «the
+item's durability has been restored». When materials are missing (and
+no donor), the «Repair» button is disabled; when the durability
+setting is off, there is no «Repair» button at all. Power armor is
+repaired one piece at a time: one test — one piece, the rest of the
+stack waits for its own tests.
+
+---
+## Repair — by the book (patch 413)
+
+The repair mechanics you provided is implemented in full. The «Repair»
+button now opens a repair window: an INT + Repair test with difficulty
+equal to the item's rarity; +1 difficulty for each installed
+modification. If you have a second identical item in the bag, you can
+mark it as a donor: it is scrapped, provides the materials and lowers
+the difficulty by 1. Materials follow the book rarity table (the
+window shows «have / need» for every line). Time is half an hour; on
+a success you may spend 2 AP to halve it; each complication adds 15
+minutes, and a d20 rolled 19–20 on a complication loses one more set
+of materials. On a failure the materials stay in the bag, but the
+time is gone. Instant free repair is no more — an item's durability
+is now honestly earned.
+
+---
 ## Dormant perks: the game warns and leaves the call to you (patch 412)
 
 By your word, the migrator no longer removes perks taken under the old

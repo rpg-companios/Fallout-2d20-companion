@@ -48,7 +48,8 @@ describe('survival settings: данные раздела «Выживание»'
       expect(setting).toBeTruthy();
       expect(setting.sectionKey).toBe('survival');
     }
-    expect(byId('weaponDurabilityLossEnabled').defaultValue).toBe(false);
+    // Слово владельца 416: включена по умолчанию.
+    expect(byId('weaponDurabilityLossEnabled').defaultValue).toBe(true);
     expect(byId('weaponDurabilityLossPer10Shots').defaultValue).toBe(1);
     expect(byId('randomWeaponQualityEnabled').defaultValue).toBe(false);
   });
