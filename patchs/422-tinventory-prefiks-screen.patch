@@ -1,0 +1,334 @@
+diff --git a/__tests__/repair/jury-rigging-416.test.js b/__tests__/repair/jury-rigging-416.test.js
+index fd6b4a1..7acf16d 100644
+--- a/__tests__/repair/jury-rigging-416.test.js
++++ b/__tests__/repair/jury-rigging-416.test.js
+@@ -339,9 +339,9 @@ describe('Патч 417: окно выбора — три кнопки, серы
+ 
+   it('три кнопки с книжными подписями; бесплатная — всегда активна', () => {
+     const code = modal();
+-    expect(code).toContain("tInventory('repair.choice.free')");
+-    expect(code).toContain("tInventory('repair.choice.donor')");
+-    expect(code).toContain("tInventory('repair.choice.materials')");
++    expect(code).toContain("tInventory('screen.repair.choice.free')");
++    expect(code).toContain("tInventory('screen.repair.choice.donor')");
++    expect(code).toContain("tInventory('screen.repair.choice.materials')");
+     // Кнопки зовут свои режимы.
+     expect(code).toContain("execute({ mode: 'free' })");
+     expect(code).toContain("execute({ mode: 'donor' })");
+@@ -404,7 +404,7 @@ describe('Патч 416: проводка и словари', () => {
+   it('заметка о временном ремонте показывается на карточке (оружие, СБ, надетая часть)', () => {
+     const code = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+     // Два места: общий подзаголовок карточки (оружие И пачка СБ) + надетая часть.
+-    expect((code.match(/tInventory\('repair\.tempNote'\)/g) ?? []).length).toBe(2);
++    expect((code.match(/tInventory\('screen\.repair\.tempNote'\)/g) ?? []).length).toBe(2);
+     expect(code).toContain('temporaryRepair: piece.temporaryRepair === true,');
+   });
+ 
+diff --git a/__tests__/repair/repair-book-413.test.js b/__tests__/repair/repair-book-413.test.js
+index e0dd405..d07031b 100644
+--- a/__tests__/repair/repair-book-413.test.js
++++ b/__tests__/repair/repair-book-413.test.js
+@@ -27,6 +27,8 @@ import {
+ import { readFileSync } from 'node:fs';
+ import { buildRepairReport } from '../../modules/fallout/repair/operations';
+ import { setCurrentModuleLocale } from '../../i18n/locale';
++import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
++import { setCurrentLocale } from '../../i18n/locale';
+ 
+ const state = () => useCharacterStore.getState();
+ 
+@@ -411,8 +413,8 @@ describe('Проводка (слово владельца 415/417/420): одна
+     expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
+     expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
+     expect(code).not.toContain('weaponDurabilityLossEnabled ? (');
+-    expect(code).toContain("tInventory('repair.actions.remake')");
+-    expect(code).toContain("tInventory('repair.actions.repair')");
++    expect(code).toContain("tInventory('screen.repair.actions.remake')");
++    expect(code).toContain("tInventory('screen.repair.actions.repair')");
+   });
+ 
+   it('слово владельца 421: качество и износ — самостоятельные пункты; броня рождается с прочностью', () => {
+@@ -449,10 +451,10 @@ describe('Проводка (слово владельца 415/417/420): одна
+     const juryEnd = modal.indexOf(') : (', juryStart);
+     expect(juryEnd).toBeGreaterThan(juryStart);
+     const juryBranch = modal.slice(juryStart, juryEnd);
+-    expect(juryBranch).toContain("tInventory('repair.choice.free')");
+-    expect(juryBranch).not.toContain("tInventory('repair.actions.remake')");
++    expect(juryBranch).toContain("tInventory('screen.repair.choice.free')");
++    expect(juryBranch).not.toContain("tInventory('screen.repair.actions.remake')");
+     const rest = modal.slice(0, juryStart) + modal.slice(juryEnd);
+-    expect(rest).not.toContain("tInventory('repair.choice.free')");
++    expect(rest).not.toContain("tInventory('screen.repair.choice.free')");
+   });
+ 
+   it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
+@@ -470,11 +472,33 @@ describe('Проводка (слово владельца 415/417/420): одна
+     // донора нет → окно выбора не открывается, сразу попытка и отчёт.
+     expect(modal).toContain("preview.donors ?? []).length === 0");
+     // донор есть → предложение в окне.
+-    expect(modal).toContain("tInventory('repair.donorOffer')");
++    expect(modal).toContain("tInventory('screen.repair.donorOffer')");
+     // отчёт — крафтовый компонент (слово владельца: берём отчёт крафта за основу).
+     expect(modal).toContain('CraftReportView');
+   });
+ 
++  it('закон 422: ремонтные ключи резолвятся через tInventory (без «заглушек»-путей на кнопках)', () => {
++    setCurrentLocale('ru-RU'); // tInventory живёт на ГЛОБАЛЬНОЙ локали
++    // Слово владельца: «на кнопке ремонта в инвентаре стоит заглушка» —
++    // ключи 413–421 звались без префикса screen. и tInventory возвращал
++    // сам путь. Теперь путь полный, а тест ловит любой промах.
++    expect(tInventory('screen.repair.actions.remake')).toBe('Ремонт');
++    expect(tInventory('screen.repair.actions.repair')).toBe('Починить');
++    expect(tInventory('screen.repair.title')).toBe('Ремонт');
++    expect(tInventory('screen.repair.materials.item_common_materials')).toBe('Обычные материалы');
++    expect(tInventory('screen.repair.donorOffer')).toContain('разобрать');
++    expect(tInventory('screen.repair.tempNote')).toContain('19–20');
++    // В коде не осталось «голых» repair.-путей мимо словаря.
++    for (const file of [
++      'components/screens/InventoryScreen/InventoryScreen.js',
++      'modules/fallout/screens/InventoryScreen/modals/RepairModal.js',
++    ]) {
++      const code = readFileSync(file, 'utf8');
++      expect(code).not.toContain("tInventory('repair.");
++      expect(code).not.toContain('tInventory(`repair.');
++    }
++  });
++
+   it('словари ремонта есть в обоих языках (без фолбэков)', () => {
+     const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/screen.json', 'utf8'));
+     const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/screen.json', 'utf8'));
+diff --git a/components/screens/InventoryScreen/InventoryScreen.js b/components/screens/InventoryScreen/InventoryScreen.js
+index 45769f1..077cbf1 100644
+--- a/components/screens/InventoryScreen/InventoryScreen.js
++++ b/components/screens/InventoryScreen/InventoryScreen.js
+@@ -1498,14 +1498,14 @@ const InventoryScreen = () => {
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton]}
+                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
+               </TouchableOpacity>
+             ) : (
+               <TouchableOpacity
+                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                 disabled={!pieceAffordable}
+                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+               </TouchableOpacity>
+             ))}
+             <TouchableOpacity
+@@ -1520,7 +1520,7 @@ const InventoryScreen = () => {
+             </Text>
+             {item.temporaryRepair === true && (
+               <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+-                {tInventory('repair.tempNote')}
++                {tInventory('screen.repair.tempNote')}
+               </Text>
+             )}
+           </View>
+@@ -1707,14 +1707,14 @@ const InventoryScreen = () => {
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+               </TouchableOpacity>
+           ))}
+ 
+@@ -1722,14 +1722,14 @@ const InventoryScreen = () => {
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton]}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
+               </TouchableOpacity>
+           ) : (
+               <TouchableOpacity
+                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                   disabled={!repairAffordable}
+                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
++                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+               </TouchableOpacity>
+           ))}
+ 
+@@ -1772,7 +1772,7 @@ const InventoryScreen = () => {
+           )}
+           {item.temporaryRepair === true && (
+             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+-              {tInventory('repair.tempNote')}
++              {tInventory('screen.repair.tempNote')}
+             </Text>
+           )}
+           {mk2Blocked && (
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 0ddf7b8..552008e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (421)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-09-30 (422)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **422** (СЛОВО ВЛАДЕЛЬЦА: «на кнопке ремонта в инвентаре стоит заглушка»). ПРИЧИНА: tInventory резолвит путь от корня {screen:…, modals:…} — все ремонтные ключи 413–421 звались БЕЗ префикса «screen.» → resolvePath по закону «без фолбэков» возвращал САМ ПУТЬ → на кнопках/в окне были служебные пути («repair.actions.remake»). Защёлки читали JSON НАПРЯМУЮ, мимо tInventory — поэтому 8 патчей дефект не ловили. ИСПРАВЛЕНО: 23 вызова → tInventory('screen.repair.…') (инвентарь 8, RepairModal 15); закон 422 в защёлке: tInventory('screen.repair.actions.remake')==='Ремонт' (setCurrentLocale — ГЛОБАЛЬНАЯ локаль, не модульная!) + в коде не осталось голых путей. ЛОВУШКИ (учесть): (1) массовая replace по файлу тестов зацепила литералы НОВЫХ отрицательных ассертов — делать replace точечно, после — прогон; (2) тесты словарей обязаны идти через ТУ ЖЕ функцию, что и UI (tInventory), не через прямой JSON; (3) .git сбрасывался повторно — restore по схеме (fetch→reset --hard FETCH_HEAD). 1500/153, tsc 0. Предыдущий снимок — **421** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **421** (СЛОВО ВЛАДЕЛЬЦА: «поменяем зависимости износа оружия и случайного качества. Это теперь 2 самостоятельных пункта. И прочность ещё распространяется на броню. Её тоже нужно чинить»). ПРИМЕНЕНО: (1) settings.json randomWeaponQualityEnabled БЕЗ dependsOn (качество standalone); легаси-миграция стора развязана: явный weaponDurabilityLossEnabled > легаси randomWeaponDurabilityEnabled (поровну на оба пункта) > дефолт true (416 сохранён); (2) БРОНЯ (itemType 'armor', не одежда/не СБ) в системе прочности: addItem при качестве рождает каждый экземпляр своей прочности (buy=100, loot=rollWeaponDurability, стек по прочности), карточка показывает «Прочность N/100» при (качество ИЛИ износ), repairTargetFor kind 'armor' (rarity из armor.json через collectPairs — уже индексирована), performRepair → repairWeapon (общий экшн durability→100), кнопка окна = showItemRepair && showItemDurability (переименование showWeapon*→showItem*), донор/материалы/Очумелые ручки — как у оружия. Износа от выстрелов у брони НЕТ (нет источника урона в приложении) — сказано владельцу. ЛОВУШКА (учесть): замена в appSettingsStore не прошла с первого раза — анкер не учёл комментарий 416 внутри else; python-хередок с assert при падении МОЖЕТ оставить ЧАСТИЧНО применённое дерево если старых анкеров несколько — ВСЕГДА перепроверять grep'ом фактическое состояние после каждого скрипта. Защёлка 413-файла = 46 (+законы 421), 416-файла = 17 (+3 теста брони). 1499/153, tsc 0. Предыдущий снимок — **420** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **420** (СЛОВО ВЛАДЕЛЬЦА: «короче, в ui если прочность не включена, то и кнопки ремонта нет. А вот если есть отображение прочности, то и кнопка окна ремонта с вариантами есть» — после моего вопроса «что чинить при выключенной»). ПРИМЕНЕНО: МГНОВЕННОЙ ПОЧИНКИ БОЛЬШЕ НЕТ (performInstantFreeRepair/ForEquippedPiece удалены из operations и UI); кнопка = отображение прочности: оружие → showWeaponRepair && showWeaponDurability (качество ИЛИ износ), СБ → повреждение (прочность видна всегда); кнопка всегда открывает окно (перк: «Починить» активна всегда — free; без перка: «Ремонт», серая без донора/материалов). Окно не менялось (free только в juryActive). Таблица 420: прочность не видна → кнопки нет; видна без перка → окно (донор/материалы); видна с перком → окно трёх. Защёлка 413-файла = 45 (−1 мгновенный тест), 416-файл = 14. 1495/153, tsc 0. Предыдущий снимок — **419** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **419** (СЛОВО ВЛАДЕЛЬЦА: «Кнопка "Без затрат (некачественно)" есть только если есть перк. Кнопка ремонта дающая доступ к окну ремонта, показывается только при включенной настройке ремонта» — на мой ответ 418 «код уже работает» НАСТОЯЩИЙ БАГ: тернарник 417 `вкл && !перк ? окно-ремонта : перк ? окно-выбора : инстант` при настройке ВЫКЛ+перк уходил во ВТОРУЮ ветку → ОКНО ОТКРЫВАЛОСЬ без включённой настройки; моя таблица 418 это скрывала (структурные ассерты, не таблица). ИСПРАВЛЕНО: порядок проверки — СНАЧАЛА настройка, ПОТОМ перк: `weaponDurabilityLossEnabled ? (juryRiggingActive ? окно-выбора («Починить», всегда активна) : окно-ремонта («Ремонт», серая без материалов/донора)) : инстант-«Починить»` ×3 цели. Таблица 419: ВЫКЛ (перк любой) → инстант без окна; ВКЛ без перка → окно донор/материалы («Без затрат» НЕТ); ВКЛ с перком → окно трёх. Урок: структурные ассерты НЕ доказывают поведение — писать таблицу истинности через ветки, а не через счётчики регэкспов. Защёлка 413-файла = 46. 1496/153, tsc 0. Предыдущий снимок — **418** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index dc5a664..5b972c5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,16 @@
+ # Changelog
++---
++## Repair window without placeholders (patch 422)
++
++You caught a defect: the repair button (and the whole repair window)
++showed service names instead of words — «repair.actions.remake»
++instead of «Repair» and so on. The cause: repair dictionary keys were
++called without a prefix, and by the «no fallbacks» rule the key's own
++name leaked onto the screen. All 23 call sites are fixed (card
++buttons, the repair window, the temporary-repair note). The check now
++reads the dictionary the same way the screen does — such a defect can
++no longer slip past the tests.
++
+ ---
+ ## Independent settings; armor durability (patch 421)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9051446..a5f591d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## Окно ремонта без заглушек (патч 422)
++
++Ты поймал дефект: кнопка ремонта (и всё окно ремонта) показывала
++служебные названия вместо слов — «repair.actions.remake» вместо
++«Ремонт» и так далее. Причина: словарные ключи ремонта звались без
++приставки, по правилу «никаких подстановок» на экран выходило само
++название ключа. Поправлены все 23 обращения (кнопки карточек, окно
++ремонта, заметка о временном ремонте). Проверка теперь читает словарь
++тем же способом, что и экран, — такой дефект больше не пройдёт
++мимо тестов.
++
+ ---
+ ## Самостоятельные настройки; прочность брони (патч 421)
+ 
+diff --git a/modules/fallout/screens/InventoryScreen/modals/RepairModal.js b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+index cf3a705..fe5d39d 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
++++ b/modules/fallout/screens/InventoryScreen/modals/RepairModal.js
+@@ -84,13 +84,13 @@ const RepairModal = ({ target, onClose }) => {
+ 
+   const requirementLines = [];
+   if (!run) {
+-    requirementLines.push(tInventory('repair.testLine')
+-      .replace('{attribute}', tInventory('repair.attribute'))
+-      .replace('{skill}', tInventory('repair.skill'))
++    requirementLines.push(tInventory('screen.repair.testLine')
++      .replace('{attribute}', tInventory('screen.repair.attribute'))
++      .replace('{skill}', tInventory('screen.repair.skill'))
+       .replace('{difficulty}', preview.complexity));
+     for (const material of preview.evaluation?.materials ?? []) {
+-      requirementLines.push(tInventory('repair.materialLine')
+-        .replace('{name}', tInventory(`repair.materials.${material.itemId}`))
++      requirementLines.push(tInventory('screen.repair.materialLine')
++        .replace('{name}', tInventory(`screen.repair.materials.${material.itemId}`))
+         .replace('{have}', material.have)
+         .replace('{need}', material.need));
+     }
+@@ -102,7 +102,7 @@ const RepairModal = ({ target, onClose }) => {
+         <View style={styles.window}>
+           {!run && (
+             <>
+-              <Text style={styles.title}>{tInventory('repair.title')}</Text>
++              <Text style={styles.title}>{tInventory('screen.repair.title')}</Text>
+               <Text style={styles.subtitle}>{target?.name ?? ''}</Text>
+               <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+                 <View style={styles.block}>
+@@ -112,8 +112,8 @@ const RepairModal = ({ target, onClose }) => {
+                 </View>
+                 {(preview.donors ?? []).length > 0 && (
+                   <View style={styles.block}>
+-                    <Text style={styles.donorTitle}>{tInventory('repair.donorTitle')}</Text>
+-                    <Text style={styles.requirementLine}>{tInventory('repair.donorOffer')}</Text>
++                    <Text style={styles.donorTitle}>{tInventory('screen.repair.donorTitle')}</Text>
++                    <Text style={styles.requirementLine}>{tInventory('screen.repair.donorOffer')}</Text>
+                     {preview.donors.map((id, index) => (
+                       <TouchableOpacity
+                         key={id}
+@@ -121,7 +121,7 @@ const RepairModal = ({ target, onClose }) => {
+                         onPress={() => setDonorId(id)}
+                       >
+                         <Text style={styles.donorText}>
+-                          {(donorId ?? (preview.donors ?? [])[0]) === id ? '☑' : '☐'} {tInventory('repair.useDonor')}{preview.donors.length > 1 ? ` #${index + 1}` : ''}
++                          {(donorId ?? (preview.donors ?? [])[0]) === id ? '☑' : '☐'} {tInventory('screen.repair.useDonor')}{preview.donors.length > 1 ? ` #${index + 1}` : ''}
+                         </Text>
+                       </TouchableOpacity>
+                     ))}
+@@ -135,24 +135,24 @@ const RepairModal = ({ target, onClose }) => {
+                     style={styles.mainButton}
+                     onPress={() => execute({ mode: 'free' })}
+                   >
+-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.free')}</Text>
++                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.free')}</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity
+                     style={[styles.mainButton, (preview.donors ?? []).length === 0 && styles.mainButtonDisabled]}
+                     disabled={(preview.donors ?? []).length === 0}
+                     onPress={() => execute({ mode: 'donor' })}
+                   >
+-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.donor')}</Text>
++                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.donor')}</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity
+                     style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
+                     disabled={!preview.evaluation?.ready}
+                     onPress={() => execute({ mode: 'materials' })}
+                   >
+-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.materials')}</Text>
++                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.materials')}</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+-                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
++                    <Text style={styles.closeButtonText}>{tInventory('screen.repair.cancel')}</Text>
+                   </TouchableOpacity>
+                 </View>
+               ) : (
+@@ -162,10 +162,10 @@ const RepairModal = ({ target, onClose }) => {
+                     onPress={() => execute({ mode: 'materials' })}
+                     disabled={!preview.evaluation?.ready}
+                   >
+-                    <Text style={styles.mainButtonText}>{tInventory('repair.actions.remake')}</Text>
++                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+                   </TouchableOpacity>
+                   <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+-                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
++                    <Text style={styles.closeButtonText}>{tInventory('screen.repair.cancel')}</Text>
+                   </TouchableOpacity>
+                 </View>
+               )}
+diff --git a/public/version.json b/public/version.json
+index e5d6644..5ed7b3b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "421",
++  "version": "422",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
