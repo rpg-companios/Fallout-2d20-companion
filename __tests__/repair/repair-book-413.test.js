@@ -27,6 +27,8 @@ import {
 import { readFileSync } from 'node:fs';
 import { buildRepairReport } from '../../modules/fallout/repair/operations';
 import { setCurrentModuleLocale } from '../../i18n/locale';
+import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
+import { setCurrentLocale } from '../../i18n/locale';
 
 const state = () => useCharacterStore.getState();
 
@@ -411,8 +413,8 @@ describe('Проводка (слово владельца 415/417/420): одна
     expect((code.match(/!repairAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(2);
     expect((code.match(/!pieceAffordable && styles\.applyButtonDisabled/g) ?? []).length).toBe(1);
     expect(code).not.toContain('weaponDurabilityLossEnabled ? (');
-    expect(code).toContain("tInventory('repair.actions.remake')");
-    expect(code).toContain("tInventory('repair.actions.repair')");
+    expect(code).toContain("tInventory('screen.repair.actions.remake')");
+    expect(code).toContain("tInventory('screen.repair.actions.repair')");
   });
 
   it('слово владельца 421: качество и износ — самостоятельные пункты; броня рождается с прочностью', () => {
@@ -449,10 +451,10 @@ describe('Проводка (слово владельца 415/417/420): одна
     const juryEnd = modal.indexOf(') : (', juryStart);
     expect(juryEnd).toBeGreaterThan(juryStart);
     const juryBranch = modal.slice(juryStart, juryEnd);
-    expect(juryBranch).toContain("tInventory('repair.choice.free')");
-    expect(juryBranch).not.toContain("tInventory('repair.actions.remake')");
+    expect(juryBranch).toContain("tInventory('screen.repair.choice.free')");
+    expect(juryBranch).not.toContain("tInventory('screen.repair.actions.remake')");
     const rest = modal.slice(0, juryStart) + modal.slice(juryEnd);
-    expect(rest).not.toContain("tInventory('repair.choice.free')");
+    expect(rest).not.toContain("tInventory('screen.repair.choice.free')");
   });
 
   it('гейты: при включённой прочности кнопка неактивна без материалов/донора (и у надетой части)', () => {
@@ -470,9 +472,31 @@ describe('Проводка (слово владельца 415/417/420): одна
     // донора нет → окно выбора не открывается, сразу попытка и отчёт.
     expect(modal).toContain("preview.donors ?? []).length === 0");
     // донор есть → предложение в окне.
-    expect(modal).toContain("tInventory('repair.donorOffer')");
+    expect(modal).toContain("tInventory('screen.repair.donorOffer')");
     // отчёт — крафтовый компонент (слово владельца: берём отчёт крафта за основу).
     expect(modal).toContain('CraftReportView');
+  });
+
+  it('закон 422: ремонтные ключи резолвятся через tInventory (без «заглушек»-путей на кнопках)', () => {
+    setCurrentLocale('ru-RU'); // tInventory живёт на ГЛОБАЛЬНОЙ локали
+    // Слово владельца: «на кнопке ремонта в инвентаре стоит заглушка» —
+    // ключи 413–421 звались без префикса screen. и tInventory возвращал
+    // сам путь. Теперь путь полный, а тест ловит любой промах.
+    expect(tInventory('screen.repair.actions.remake')).toBe('Ремонт');
+    expect(tInventory('screen.repair.actions.repair')).toBe('Починить');
+    expect(tInventory('screen.repair.title')).toBe('Ремонт');
+    expect(tInventory('screen.repair.materials.item_common_materials')).toBe('Обычные материалы');
+    expect(tInventory('screen.repair.donorOffer')).toContain('разобрать');
+    expect(tInventory('screen.repair.tempNote')).toContain('19–20');
+    // В коде не осталось «голых» repair.-путей мимо словаря.
+    for (const file of [
+      'components/screens/InventoryScreen/InventoryScreen.js',
+      'modules/fallout/screens/InventoryScreen/modals/RepairModal.js',
+    ]) {
+      const code = readFileSync(file, 'utf8');
+      expect(code).not.toContain("tInventory('repair.");
+      expect(code).not.toContain('tInventory(`repair.');
+    }
   });
 
   it('словари ремонта есть в обоих языках (без фолбэков)', () => {

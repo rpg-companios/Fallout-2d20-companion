@@ -1498,14 +1498,14 @@ const InventoryScreen = () => {
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
                 disabled={!pieceAffordable}
                 onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
               </TouchableOpacity>
             ))}
             <TouchableOpacity
@@ -1520,7 +1520,7 @@ const InventoryScreen = () => {
             </Text>
             {item.temporaryRepair === true && (
               <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
-                {tInventory('repair.tempNote')}
+                {tInventory('screen.repair.tempNote')}
               </Text>
             )}
           </View>
@@ -1707,14 +1707,14 @@ const InventoryScreen = () => {
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
               </TouchableOpacity>
           ))}
 
@@ -1722,14 +1722,14 @@ const InventoryScreen = () => {
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.repair')}</Text>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
           ) : (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
                   disabled={!repairAffordable}
                   onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('repair.actions.remake')}</Text>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
               </TouchableOpacity>
           ))}
 
@@ -1772,7 +1772,7 @@ const InventoryScreen = () => {
           )}
           {item.temporaryRepair === true && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
-              {tInventory('repair.tempNote')}
+              {tInventory('screen.repair.tempNote')}
             </Text>
           )}
           {mk2Blocked && (

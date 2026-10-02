@@ -84,13 +84,13 @@ const RepairModal = ({ target, onClose }) => {
 
   const requirementLines = [];
   if (!run) {
-    requirementLines.push(tInventory('repair.testLine')
-      .replace('{attribute}', tInventory('repair.attribute'))
-      .replace('{skill}', tInventory('repair.skill'))
+    requirementLines.push(tInventory('screen.repair.testLine')
+      .replace('{attribute}', tInventory('screen.repair.attribute'))
+      .replace('{skill}', tInventory('screen.repair.skill'))
       .replace('{difficulty}', preview.complexity));
     for (const material of preview.evaluation?.materials ?? []) {
-      requirementLines.push(tInventory('repair.materialLine')
-        .replace('{name}', tInventory(`repair.materials.${material.itemId}`))
+      requirementLines.push(tInventory('screen.repair.materialLine')
+        .replace('{name}', tInventory(`screen.repair.materials.${material.itemId}`))
         .replace('{have}', material.have)
         .replace('{need}', material.need));
     }
@@ -102,7 +102,7 @@ const RepairModal = ({ target, onClose }) => {
         <View style={styles.window}>
           {!run && (
             <>
-              <Text style={styles.title}>{tInventory('repair.title')}</Text>
+              <Text style={styles.title}>{tInventory('screen.repair.title')}</Text>
               <Text style={styles.subtitle}>{target?.name ?? ''}</Text>
               <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
                 <View style={styles.block}>
@@ -112,8 +112,8 @@ const RepairModal = ({ target, onClose }) => {
                 </View>
                 {(preview.donors ?? []).length > 0 && (
                   <View style={styles.block}>
-                    <Text style={styles.donorTitle}>{tInventory('repair.donorTitle')}</Text>
-                    <Text style={styles.requirementLine}>{tInventory('repair.donorOffer')}</Text>
+                    <Text style={styles.donorTitle}>{tInventory('screen.repair.donorTitle')}</Text>
+                    <Text style={styles.requirementLine}>{tInventory('screen.repair.donorOffer')}</Text>
                     {preview.donors.map((id, index) => (
                       <TouchableOpacity
                         key={id}
@@ -121,7 +121,7 @@ const RepairModal = ({ target, onClose }) => {
                         onPress={() => setDonorId(id)}
                       >
                         <Text style={styles.donorText}>
-                          {(donorId ?? (preview.donors ?? [])[0]) === id ? '☑' : '☐'} {tInventory('repair.useDonor')}{preview.donors.length > 1 ? ` #${index + 1}` : ''}
+                          {(donorId ?? (preview.donors ?? [])[0]) === id ? '☑' : '☐'} {tInventory('screen.repair.useDonor')}{preview.donors.length > 1 ? ` #${index + 1}` : ''}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -135,24 +135,24 @@ const RepairModal = ({ target, onClose }) => {
                     style={styles.mainButton}
                     onPress={() => execute({ mode: 'free' })}
                   >
-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.free')}</Text>
+                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.free')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.mainButton, (preview.donors ?? []).length === 0 && styles.mainButtonDisabled]}
                     disabled={(preview.donors ?? []).length === 0}
                     onPress={() => execute({ mode: 'donor' })}
                   >
-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.donor')}</Text>
+                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.donor')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.mainButton, !preview.evaluation?.ready && styles.mainButtonDisabled]}
                     disabled={!preview.evaluation?.ready}
                     onPress={() => execute({ mode: 'materials' })}
                   >
-                    <Text style={styles.mainButtonText}>{tInventory('repair.choice.materials')}</Text>
+                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.choice.materials')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
+                    <Text style={styles.closeButtonText}>{tInventory('screen.repair.cancel')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -162,10 +162,10 @@ const RepairModal = ({ target, onClose }) => {
                     onPress={() => execute({ mode: 'materials' })}
                     disabled={!preview.evaluation?.ready}
                   >
-                    <Text style={styles.mainButtonText}>{tInventory('repair.actions.remake')}</Text>
+                    <Text style={styles.mainButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                    <Text style={styles.closeButtonText}>{tInventory('repair.cancel')}</Text>
+                    <Text style={styles.closeButtonText}>{tInventory('screen.repair.cancel')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
