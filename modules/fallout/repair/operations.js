@@ -23,12 +23,15 @@ import { REPAIR_RULES, repairMaterialsPlan } from './rules';
 import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
 import powerArmorCatalog from '../data/equipment/powerArmor.json';
-import { getScrapMaterials } from '../../../domain/registry';
 import { countActivePerkSelections } from '../../../domain/perks';
 import perksCatalog from '../data/perks/perks.json';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
+import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+import { findCatalogEntry } from '../../../domain/resolveItem';
 import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
+import ruScreen from '../i18n/ru-RU/screens/inventory/screen.json';
+import enScreen from '../i18n/en-EN/screens/inventory/screen.json';
 
 // ── Редкость по каноническому id ─────────────────────────────────────────
 
@@ -36,12 +39,18 @@ let rarityIndexCache = null;
 
 const repairDict = () => (getCurrentModuleLocale() === 'en-EN' ? enCraft : ruCraft);
 
-const materialNames = () => {
-  const names = {};
-  for (const material of getScrapMaterials() ?? []) {
-    if (material?.id) names[material.id] = material.name ?? material.id;
-  }
-  return names;
+// Слово владельца 423: в отчёте «Потрачено: item_common_materials ×2» —
+// id вместо названия. Имя материала — из словаря ремонта (те же слова,
+// что в строках требований окна), затем из локализованного каталога
+// экипировки (как отчёт крафта, 357), затем сам id.
+const materialName = (itemId) => {
+  const screenDict = getCurrentModuleLocale() === 'en-EN' ? enScreen : ruScreen;
+  const dictName = screenDict.repair?.materials?.[itemId];
+  if (dictName) return dictName;
+  const catalog = getEquipmentCatalog(getCurrentModuleLocale());
+  return findCatalogEntry(catalog, itemId, 'misc')?.name
+    ?? findCatalogEntry(catalog, itemId, 'junk')?.name
+    ?? itemId;
 };
 
 /**
@@ -60,7 +69,7 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
   const check = run?.check ?? null;
   const target = check?.targetNumber
     ?? ((Number(attributeName) >= 0 ? '' : '') || '');
-  const names = materialNames();
+
   const lines = [];
   if (check?.targetNumber != null) {
     lines.push(`${attributeName ?? REPAIR_RULES.testAttribute} + ${skillName ?? REPAIR_RULES.testSkill}`
@@ -93,7 +102,7 @@ export const buildRepairReport = (run, { attributeName, skillName } = {}) => {
   const spentRows = run?.spent ?? [];
   if (spentRows.length > 0) {
     const items = spentRows
-      .map((row) => `${names[row.itemId] ?? row.itemId} ×${row.count}`)
+      .map((row) => `${materialName(row.itemId)} ×${row.count}`)
       .join(', ');
     if (ru.spent) lines.push(ru.spent.replace('{items}', items));
   }
