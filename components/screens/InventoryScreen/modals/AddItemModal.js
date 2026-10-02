@@ -6,6 +6,15 @@ import { tInventory } from '../logic/inventoryI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/AddItemModal.styles';
 import { describeItemBasics } from '../../../../domain/itemBasics';
+// 425: фильтры снаряжения (кроме веса) — по образцу перков.
+import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel';
+import {
+  buildEquipmentFilterOptions,
+  emptyEquipmentFilter,
+  isEquipmentFilterEmpty,
+  pruneTreeByEquipmentFilter,
+  weaponModsProviding,
+} from '../../../../modules/fallout/logic/equipmentFilter';
 
 const CATEGORY_ICONS = {
   weapon: '🔫',
@@ -46,6 +55,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const [weaponsByType, setWeaponsByType] = useState({});
   const [pendingItem, setPendingItem] = useState(null);
   const [pendingQuantity, setPendingQuantity] = useState('1');
+  // 425: фильтр снаряжения + спойлер; null = фильтр пуст.
+  const [equipmentFilter, setEquipmentFilter] = useState(null);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,14 +94,14 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
             const normalizedWeapons = weaponsById
               .filter(Boolean)
               .map((weapon) => {
-                // Merge with catalog to get qualities array and other structured fields
+                // Слияние с каталогом ПОЛНОЕ (425): поля фильтра
+                // (fireRate/range/ammoId/rarity/damage) тоже из каталога.
                 const catalogEntry = (catalog.weapons || []).find((w) => w.id === weapon.id);
                 return {
                   ...weapon,
-                  ...(catalogEntry ? { qualities: catalogEntry.qualities, damageType: catalogEntry.damageType } : {}),
-                  weaponType: weapon.weaponType,
+                  ...(catalogEntry ?? {}),
                   itemType: 'weapon',
-                  name: weapon.name,
+                  name: weapon.name ?? catalogEntry?.name,
                 };
               })
               .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -179,6 +191,8 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       setSearchTerm('');
       setPendingItem(null);
       setPendingQuantity('1');
+      setEquipmentFilter(null);
+      setFilterOpen(false);
     }
   }, [visible]);
 
@@ -209,6 +223,35 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     };
     return prune(tree);
   }, [engineLocale, weaponsByType, staticData, maxRarity]);
+
+  // 425: фильтр снаряжения — та же обрезка дерева (пустые ветки прячутся).
+  // Слово владельца: выбранное, чего на оружии нет, раскрывает МОДЫ, дающие
+  // его («моды это моды — только когда поставят, тогда и будут эффекты»):
+  // секция «Моды» появляется, когда подобранные качества/эффекты есть в
+  // каком-то моде; если ни одно оружие не подходит — в окне остаются моды.
+  const filteredData = useMemo(() => {
+    if (isEquipmentFilterEmpty(equipmentFilter)) return allData;
+    const pruned = pruneTreeByEquipmentFilter(allData, equipmentFilter);
+    const mods = weaponModsProviding(equipmentFilter, moduleLocale);
+    if (mods.length === 0) return pruned;
+    const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
+    const allLabel = tInventory('modals.addItemModal.categories.all');
+    return {
+      ...pruned,
+      [modsLabel]: { [allLabel]: [...mods].sort((a, b) => String(a.name).localeCompare(String(b.name))) },
+    };
+  }, [allData, equipmentFilter, moduleLocale, engineLocale]);
+
+  const filterOptions = useMemo(() => {
+    const labels = {
+      ammoNames: (getEquipmentCatalog(moduleLocale).ammoTypes ?? []).map((row) => ({ id: row.id, name: row.name })),
+      damageTypes: tInventory('modals.addItemModal.filter.damageTypes'),
+      weaponTypes: tInventory('modals.addItemModal.filter.weaponTypes'),
+      distances: tInventory('modals.addItemModal.filter.distances'),
+      bodyParts: tInventory('modals.addItemModal.filter.bodyPartsDict'),
+    };
+    return buildEquipmentFilterOptions(moduleLocale, labels);
+  }, [moduleLocale, engineLocale]);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -266,15 +309,15 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const currentData = useMemo(() => {
     if (searchTerm) {
       const allItems = [];
-      Object.values(allData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(allData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(allData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(allData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       const allLabel = tInventory('modals.addItemModal.categories.all');
       const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
       categoryKeys.forEach((category) => {
-        if (allData[category]?.[allLabel]) {
-          allItems.push(...allData[category][allLabel]);
+        if (filteredData[category]?.[allLabel]) {
+          allItems.push(...filteredData[category][allLabel]);
         }
       });
 
@@ -283,7 +326,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       };
     }
 
-    let data = allData;
+    let data = filteredData;
     for (const key of currentPath) {
       if (!data || typeof data !== 'object') return { categories: [] };
       data = data[key];
@@ -293,7 +336,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (Array.isArray(data)) return { items: data };
     if (data && typeof data === 'object') return { categories: Object.keys(data) };
     return { categories: [] };
-  }, [engineLocale, allData, currentPath, searchTerm]);
+  }, [engineLocale, filteredData, currentPath, searchTerm]);
 
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;
@@ -357,6 +400,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                 placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
                 value={searchTerm}
                 onChangeText={setSearchTerm}
+              />
+
+              {/* 425: фильтр снаряжения (кроме веса) — как в перках, спойлером. */}
+              <EquipmentFilterPanel
+                options={filterOptions}
+                filter={equipmentFilter ?? emptyEquipmentFilter()}
+                onChange={(next) => setEquipmentFilter(next)}
+                onReset={() => setEquipmentFilter(null)}
+                open={filterOpen}
+                onToggleOpen={() => setFilterOpen((prev) => !prev)}
               />
 
               <FlatList

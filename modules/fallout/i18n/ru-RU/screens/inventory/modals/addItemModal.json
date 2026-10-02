@@ -1,5 +1,55 @@
 {
   "categories": {
     "powerArmor": "Силовая броня"
+  },
+  "filter": {
+    "title": "Фильтр",
+    "reset": "Сбросить",
+    "from": "от",
+    "to": "до",
+    "selected": "выбрано",
+    "rarity": "Редкость",
+    "damage": "Урон",
+    "fireRate": "Скорострельность",
+    "distance": "Дистанция",
+    "damageType": "Тип урона",
+    "weaponType": "Тип",
+    "ammo": "Патрон",
+    "qualities": "Качества",
+    "effects": "Эффекты",
+    "physical": "СУ физическая",
+    "energy": "СУ энергетическая",
+    "radiation": "СУ радиационная",
+    "bodyParts": "Части тела",
+    "weaponSection": "Оружие",
+    "armorSection": "Броня и СБ",
+    "damageTypes": {
+      "physical": "Физический",
+      "energy": "Энергетический",
+      "radiation": "Радиационный",
+      "special": "Особый",
+      "poison": "Яд"
+    },
+    "weaponTypes": {
+      "Light": "Лёгкое",
+      "Melee": "Ближний бой",
+      "Energy": "Энергетическое",
+      "Explosive": "Взрывное",
+      "Heavy": "Тяжёлое",
+      "Unarmed": "Рукопашное",
+      "Thrown": "Метательное"
+    },
+    "distances": {
+      "C": "Ближняя",
+      "M": "Средняя",
+      "L": "Дальняя"
+    },
+    "bodyPartsDict": {
+      "Head": "Голова",
+      "Body": "Тело",
+      "Hand": "Руки",
+      "Leg": "Ноги"
+    },
+    "modsSection": "Моды"
   }
 }

@@ -1,5 +1,55 @@
 {
   "categories": {
     "powerArmor": "Power Armor"
+  },
+  "filter": {
+    "title": "Filter",
+    "reset": "Reset",
+    "from": "from",
+    "to": "to",
+    "selected": "selected",
+    "rarity": "Rarity",
+    "damage": "Damage",
+    "fireRate": "Fire rate",
+    "distance": "Range",
+    "damageType": "Damage type",
+    "weaponType": "Type",
+    "ammo": "Ammo",
+    "qualities": "Qualities",
+    "effects": "Effects",
+    "physical": "Physical DR",
+    "energy": "Energy DR",
+    "radiation": "Radiation DR",
+    "bodyParts": "Body parts",
+    "weaponSection": "Weapons",
+    "armorSection": "Armor & PA",
+    "damageTypes": {
+      "physical": "Physical",
+      "energy": "Energy",
+      "radiation": "Radiation",
+      "special": "Special",
+      "poison": "Poison"
+    },
+    "weaponTypes": {
+      "Light": "Light",
+      "Melee": "Melee",
+      "Energy": "Energy",
+      "Explosive": "Explosive",
+      "Heavy": "Heavy",
+      "Unarmed": "Unarmed",
+      "Thrown": "Thrown"
+    },
+    "distances": {
+      "C": "Close",
+      "M": "Medium",
+      "L": "Long"
+    },
+    "bodyPartsDict": {
+      "Head": "Head",
+      "Body": "Body",
+      "Hand": "Arms",
+      "Leg": "Legs"
+    },
+    "modsSection": "Mods"
   }
 }

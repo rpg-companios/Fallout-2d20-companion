@@ -1,5 +1,24 @@
 # Changelog
 ---
+## Filters in loot and purchase windows (patch 425)
+
+The «Add» and «Buy» windows now have a «Filter» spoiler — like the
+perks one. Weight is not filtered; the rest is as you chose:
+- «from–to» ranges with grey hints of the catalog bounds (rarity 0–6,
+  damage 0–21, fire rate 0–7, armor DR) — the hint disappears once the
+  field is touched;
+- qualities — all 32 in the game (including those absent on weapons:
+  mods grant them, except Bombardment), effects — all 10;
+- types (Light/Heavy…), damage type, range, body parts — chips;
+- ammo — a dropdown (41 variants from the catalog).
+
+Per your word «mods are mods — effects appear only when installed»:
+weapons are filtered by their own qualities/effects only; a selection
+no weapon has opens a «Mods» section listing the mods that grant it
+(night scopes, targeting computer, etc.). If nothing fits — only the
+mods remain in the window.
+
+---
 ## Rarity in properties (patch 424)
 
 Weapon, armor and power armor cards now show «Редкость: N» (the
