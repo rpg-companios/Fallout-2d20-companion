@@ -339,9 +339,9 @@ describe('Патч 417: окно выбора — три кнопки, серы�
 
   it('три кнопки с книжными подписями; бесплатная — всегда активна', () => {
     const code = modal();
-    expect(code).toContain("tInventory('repair.choice.free')");
-    expect(code).toContain("tInventory('repair.choice.donor')");
-    expect(code).toContain("tInventory('repair.choice.materials')");
+    expect(code).toContain("tInventory('screen.repair.choice.free')");
+    expect(code).toContain("tInventory('screen.repair.choice.donor')");
+    expect(code).toContain("tInventory('screen.repair.choice.materials')");
     // Кнопки зовут свои режимы.
     expect(code).toContain("execute({ mode: 'free' })");
     expect(code).toContain("execute({ mode: 'donor' })");
@@ -404,7 +404,7 @@ describe('Патч 416: проводка и словари', () => {
   it('заметка о временном ремонте показывается на карточке (оружие, СБ, надетая часть)', () => {
     const code = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
     // Два места: общий подзаголовок карточки (оружие И пачка СБ) + надетая часть.
-    expect((code.match(/tInventory\('repair\.tempNote'\)/g) ?? []).length).toBe(2);
+    expect((code.match(/tInventory\('screen\.repair\.tempNote'\)/g) ?? []).length).toBe(2);
     expect(code).toContain('temporaryRepair: piece.temporaryRepair === true,');
   });
 

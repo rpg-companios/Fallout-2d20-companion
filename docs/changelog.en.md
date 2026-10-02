@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Repair window without placeholders (patch 422)
+
+You caught a defect: the repair button (and the whole repair window)
+showed service names instead of words — «repair.actions.remake»
+instead of «Repair» and so on. The cause: repair dictionary keys were
+called without a prefix, and by the «no fallbacks» rule the key's own
+name leaked onto the screen. All 23 call sites are fixed (card
+buttons, the repair window, the temporary-repair note). The check now
+reads the dictionary the same way the screen does — such a defect can
+no longer slip past the tests.
+
+---
 ## Independent settings; armor durability (patch 421)
 
 «Weapon durability loss» and «Random weapon quality» are now two
