@@ -477,6 +477,23 @@ describe('Проводка (слово владельца 415/417/420): одна
     expect(modal).toContain('CraftReportView');
   });
 
+  it('закон 423: в отчёте названия материалов, не id (как в крафте)', () => {
+    setCurrentLocale('ru-RU');
+    const report = buildRepairReport({
+      done: true,
+      check: { rolls: [2, 3], passed: true, successes: 2, complicationCount: 0, targetNumber: 5 },
+      spent: [
+        { itemId: 'item_common_materials', count: 2 },
+        { itemId: 'item_uncommon_materials', count: 1 },
+      ],
+    }, { attributeName: 'ИНТ', skillName: 'Ремонт' });
+    const spentLine = report.lines.find((line) => line.startsWith('Потрачено'));
+    expect(spentLine).toContain('Обычные материалы ×2');
+    expect(spentLine).toContain('Необычные материалы ×1');
+    // Ни одна строка отчёта не содержит сырых id предметов.
+    for (const line of report.lines) expect(line).not.toContain('item_');
+  });
+
   it('закон 422: ремонтные ключи резолвятся через tInventory (без «заглушек»-путей на кнопках)', () => {
     setCurrentLocale('ru-RU'); // tInventory живёт на ГЛОБАЛЬНОЙ локали
     // Слово владельца: «на кнопке ремонта в инвентаре стоит заглушка» —

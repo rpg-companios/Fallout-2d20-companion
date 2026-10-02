@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Material names in the report (patch 423)
+
+You caught the same class of defect as with the button: the report
+line said «Потрачено: item_common_materials ×2» — a service id instead
+of a name. The report now speaks properly: «Потрачено: Обычные
+материалы ×2» (Common materials ×2), with the same words as the
+window's requirement lines. A check is added: no report line may
+contain service identifiers.
+
+---
 ## Repair window without placeholders (patch 422)
 
 You caught a defect: the repair button (and the whole repair window)
