@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Installer cutoff — at the latest patch (patch 426)
+
+The installer's key patch moved from №391 to №425 (the latest one).
+Installation no longer walks the whole old chain: a clean tree is
+brought to the №425 state from the branch history in one step, and
+only patches after it are checked and applied. Uncommitted changes
+block the fast path — commit or stash before installing. A latch
+keeps the cutoff equal to the branch's latest patch (moved by the
+agent with a patch).
+
+---
 ## Filters in loot and purchase windows (patch 425)
 
 The «Add» and «Buy» windows now have a «Filter» spoiler — like the
