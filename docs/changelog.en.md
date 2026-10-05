@@ -1,5 +1,19 @@
 # Changelog
 ---
+## Filter — a separate window (patch 429)
+
+The owner's word about mobile screens: the item list must not hide
+behind the settings. The "Filter (N)" button in the search row now
+opens a separate window: first it shows only the category checkboxes —
+**Weapons, Armor, Power Armor, Clothing**. Parameters are NOT shown
+up front: check a category and "Rarity" plus that category's
+parameters appear (weapons — damage, fire rate, distance, damage
+type, weapon type, ammo, qualities, effects; armor — resistances and
+body parts). At the bottom, a "Show (N)" button tells how many items
+match the filter. Header and button stay put, the settings scroll.
+The main window is as before: search, filter button, full-height list.
+
+---
 ## Installing the latest version — one step (patch 428)
 
 The installer's cutoff now also fires when the target is the key

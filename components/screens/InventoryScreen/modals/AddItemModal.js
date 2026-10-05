@@ -6,12 +6,14 @@ import { tInventory } from '../logic/inventoryI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/AddItemModal.styles';
 import { describeItemBasics } from '../../../../domain/itemBasics';
-// 425: фильтры снаряжения (кроме веса) — по образцу перков.
-import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel';
+// 429: фильтр снаряжения — отдельное окно (слово владельца: на мобильных
+// экранах список не должен прятаться за панелью).
+import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal';
 import {
   buildEquipmentFilterOptions,
   emptyEquipmentFilter,
   activeEquipmentFilterCount,
+  countFilteredItems,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
   weaponModsProviding,
@@ -263,6 +265,8 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
 
   // 427: счётчик активных условий — рядом с надписью «Фильтр».
   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
+  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
+  const foundCount = countFilteredItems(filteredData);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -424,14 +428,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                 </TouchableOpacity>
               </View>
 
-              <EquipmentFilterPanel
-                options={filterOptions}
-                filter={equipmentFilter ?? emptyEquipmentFilter()}
-                onChange={(next) => setEquipmentFilter(next)}
-                onReset={() => setEquipmentFilter(null)}
-                open={filterOpen}
-              />
-
               <View style={styles.listDivider} />
 
               <FlatList
@@ -443,6 +439,17 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <Text style={styles.closeButtonText}>{tInventory('modals.addItemModal.close')}</Text>
               </TouchableOpacity>
+
+              {/* 429: окно фильтра — настройки не прячут список предметов. */}
+              <EquipmentFilterModal
+                visible={filterOpen}
+                options={filterOptions}
+                filter={equipmentFilter ?? emptyEquipmentFilter()}
+                onChange={(next) => setEquipmentFilter(next)}
+                onReset={() => setEquipmentFilter(null)}
+                onClose={() => setFilterOpen(false)}
+                foundCount={foundCount}
+              />
             </>
           )}
         </SafeAreaView>
