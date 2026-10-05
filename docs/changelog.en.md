@@ -1,5 +1,43 @@
 # Changelog
 ---
+## Installer cutoff — at the latest patch (patch 426)
+
+The installer's key patch moved from №391 to №425 (the latest one).
+Installation no longer walks the whole old chain: a clean tree is
+brought to the №425 state from the branch history in one step, and
+only patches after it are checked and applied. Uncommitted changes
+block the fast path — commit or stash before installing. A latch
+keeps the cutoff equal to the branch's latest patch (moved by the
+agent with a patch).
+
+---
+## Filters in loot and purchase windows (patch 425)
+
+The «Add» and «Buy» windows now have a «Filter» spoiler — like the
+perks one. Weight is not filtered; the rest is as you chose:
+- «from–to» ranges with grey hints of the catalog bounds (rarity 0–6,
+  damage 0–21, fire rate 0–7, armor DR) — the hint disappears once the
+  field is touched;
+- qualities — all 32 in the game (including those absent on weapons:
+  mods grant them, except Bombardment), effects — all 10;
+- types (Light/Heavy…), damage type, range, body parts — chips;
+- ammo — a dropdown (41 variants from the catalog).
+
+Per your word «mods are mods — effects appear only when installed»:
+weapons are filtered by their own qualities/effects only; a selection
+no weapon has opens a «Mods» section listing the mods that grant it
+(night scopes, targeting computer, etc.). If nothing fits — only the
+mods remain in the window.
+
+---
+## Rarity in properties (patch 424)
+
+Weapon, armor and power armor cards now show «Редкость: N» (the
+book rarity; items without rarity have no line). The first step
+toward loot/purchase filters: the list of filterable properties is
+sent separately; the filters come after we review it.
+
+---
 ## Material names in the report (patch 423)
 
 You caught the same class of defect as with the button: the report

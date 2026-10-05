@@ -17,6 +17,7 @@ import {
   repairAffordableFor,
   repairAffordableForPiece,
   juryRiggingRanksFor,
+  itemRarityFor,
 } from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
@@ -1518,6 +1519,12 @@ const InventoryScreen = () => {
             <Text style={styles.itemSubText}>
               {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
             </Text>
+            {(() => {
+              const pieceRarity = itemRarityFor(item.pieceCatalogId);
+              return pieceRarity > 0 ? (
+                <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {pieceRarity}</Text>
+              ) : null;
+            })()}
             {item.temporaryRepair === true && (
               <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
                 {tInventory('screen.repair.tempNote')}
@@ -1594,6 +1601,10 @@ const InventoryScreen = () => {
       (item.itemType === 'weapon' || item.itemType === 'armor')
       && item.durabilityTracked && Number(item.durability) < 100,
     );
+    // Слово владельца 424: редкость в свойствах оружия/брони (и СБ).
+    const cardRarity = itemRarityFor(item.weaponId || item.id);
+    const showCardRarity = cardRarity > 0
+      && (item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'powerArmor');
     // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
     // при включённой прочности) — окно книжного ремонта не открываем.
     const juryRiggingActive = juryRiggingRanksFor() > 0;
@@ -1769,6 +1780,9 @@ const InventoryScreen = () => {
           )}
           {showItemDurability && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+          )}
+          {showCardRarity && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {cardRarity}</Text>
           )}
           {item.temporaryRepair === true && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>

@@ -477,6 +477,20 @@ describe('Проводка (слово владельца 415/417/420): одна
     expect(modal).toContain('CraftReportView');
   });
 
+  it('закон 424: редкость в свойствах оружия/брони/СБ (без подстановок)', () => {
+    const code = readFileSync('components/screens/InventoryScreen/InventoryScreen.js', 'utf8');
+    expect(code).toContain("tInventory('screen.labels.rarity')");
+    expect(code).toContain('itemRarityFor(item.weaponId || item.id)');
+    expect(code).toContain('itemRarityFor(item.pieceCatalogId)');
+    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/screen.json', 'utf8'));
+    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/screen.json', 'utf8'));
+    expect(ru.labels.rarity).toBe('Редкость');
+    expect(en.labels.rarity).toBe('Rarity');
+    // tInventory резолвит (закон 422).
+    setCurrentLocale('ru-RU');
+    expect(tInventory('screen.labels.rarity')).toBe('Редкость');
+  });
+
   it('закон 423: в отчёте названия материалов, не id (как в крафте)', () => {
     setCurrentLocale('ru-RU');
     const report = buildRepairReport({
