@@ -1,0 +1,807 @@
+diff --git a/__tests__/gear/equipment-filter-425.test.js b/__tests__/gear/equipment-filter-425.test.js
+index 6292f34..42e674f 100644
+--- a/__tests__/gear/equipment-filter-425.test.js
++++ b/__tests__/gear/equipment-filter-425.test.js
+@@ -143,15 +143,12 @@ describe('Патч 425: предикат фильтра по параметра
+ 
+ describe('Патч 425: проводка окна и подсказки', () => {
+   const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
+-  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js', 'utf8');
++  // 429: панель переехала в отдельное окно EquipmentFilterModal.
++  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js', 'utf8');
+ 
+-  it('панель спойлером как в перках, диапазоны с серыми подсказками (исчезают при касании)', () => {
++  it('диапазоны с серыми подсказками (исчезают при касании) — в окне фильтра', () => {
+     const code = panel();
+-    // 427: своей шапки у панели больше нет — кнопка «Фильтр» совмещена
+-    // с поиском в окне (см. защёлку 427). Тело панели по-прежнему под
+-    // флагом open.
+     expect(code).not.toContain('spoilerHeader');
+-    expect(code).toContain('open && (');
+     expect(code).toContain('placeholder={touchedFrom ? \'\' : String(hint?.min ?? \'\')}');
+     expect(code).toContain('placeholder={touchedTo ? \'\' : String(hint?.max ?? \'\')}');
+     expect(code).toContain('placeholderTextColor="#999"');
+diff --git a/__tests__/gear/equipment-filter-427.test.js b/__tests__/gear/equipment-filter-427.test.js
+index 285195c..75bd5e0 100644
+--- a/__tests__/gear/equipment-filter-427.test.js
++++ b/__tests__/gear/equipment-filter-427.test.js
+@@ -99,7 +99,8 @@ describe('Патч 427: счётчик активных условий на кн
+ 
+ describe('Патч 427: проводка окна — поиск+фильтр одной строкой, черта, панель закреплена', () => {
+   const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
+-  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js', 'utf8');
++  // 429: панель переехала в отдельное окно EquipmentFilterModal.
++  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js', 'utf8');
+   const modalStyles = () => readFileSync('styles/AddItemModal.styles.js', 'utf8');
+ 
+   it('в окне поиск и кнопка «Фильтр» в одной строке (тулбар), черта перед списком', () => {
+@@ -108,12 +109,12 @@ describe('Патч 427: проводка окна — поиск+фильтр о
+     expect(code).toContain('styles.searchInputInToolbar');
+     expect(code).toContain('styles.filterToggle');
+     expect(code).toContain('styles.listDivider');
+-    // кнопка открывает/закрывает панель (у панели своей шапки больше нет)
++    // кнопка открывает/закрывает окно фильтра (429)
+     expect(code).toContain('setFilterOpen((prev) => !prev)');
+     expect(code).toContain('activeEquipmentFilterCount(equipmentFilter)');
+-    // панель без onToggleOpen — управляется снаружи
+-    expect(code).toContain('open={filterOpen}');
++    expect(code).toContain('visible={filterOpen}');
+     expect(code).not.toContain('onToggleOpen');
++    expect(code).not.toContain('EquipmentFilterPanel');
+   });
+ 
+   it('в стилях окна есть тулбар и черта', () => {
+@@ -134,8 +135,8 @@ describe('Патч 427: проводка окна — поиск+фильтр о
+     expect(code).toContain('kinds.includes');
+   });
+ 
+-  it('стили панели: ряд категорий и ячейки-чекбоксы на месте (по 3 в ряд)', () => {
+-    const stylesCode = readFileSync('modules/fallout/styles/EquipmentFilterPanel.styles.js', 'utf8');
++  it('стили окна: ряд категорий и ячейки-чекбоксы на месте (по 3 в ряд)', () => {
++    const stylesCode = readFileSync('modules/fallout/styles/EquipmentFilterModal.styles.js', 'utf8');
+     expect(stylesCode).toContain('kindsRow');
+     // квадраты по 3 в ряд — ширина ячейки 31% + отступ 2%
+     expect(stylesCode).toContain("width: '31%'");
+diff --git a/__tests__/gear/equipment-filter-modal-429.test.js b/__tests__/gear/equipment-filter-modal-429.test.js
+new file mode 100644
+index 0000000..b52583d
+--- /dev/null
++++ b/__tests__/gear/equipment-filter-modal-429.test.js
+@@ -0,0 +1,87 @@
++// ПРИЁМОЧНЫЙ (патч 429): слово владельца про мобильные экраны —
++// «Отдельное окно, с чекбоксами категорий. И только когда выбран
++// чекбокс — показать параметры категории, а не сразу всё, а потом
++// отсекать параметры по фильтру. Наоборот, сначала параметры не видно,
++// пока не выбрана категория». Фильтр переехал из встроенной панели в
++// отдельное окно: до отметки категорий в окне ТОЛЬКО чекбоксы; отметил —
++// появились «Редкость» и параметры отмеченных категорий. Внизу кнопка
++// «Показать (N)» — сколько предметов найдётся. Шапка и кнопка на месте,
++// содержимое прокручивается (скролл-закон 402).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { setCurrentLocale } from '../../i18n/locale';
++import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
++import { countFilteredItems } from '../../modules/fallout/logic/equipmentFilter';
++
++setCurrentLocale('ru-RU');
++
++const windowCode = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js', 'utf8');
++
++describe('Патч 429: фильтр — отдельным окном', () => {
++  it('фильтр рендерится как Modal поверх окна добавления; список не спрятан', () => {
++    const modal = readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++    expect(modal).toContain("import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal'");
++    expect(modal).toContain('visible={filterOpen}');
++    expect(modal).toContain('foundCount={foundCount}');
++    // встроенной панели больше нет нигде
++    expect(modal).not.toContain('EquipmentFilterPanel');
++    expect(readFileSync('styles/AddItemModal.styles.js', 'utf8')).toContain('listDivider');
++  });
++
++  it('окно по скролл-закону: шапка и кнопка «Показать» на месте, содержимое в ScrollView', () => {
++    const code = windowCode();
++    expect(code).toContain('ScrollView');
++    // шапка до прокручиваемого содержимого, низ — после
++    expect(code.indexOf('styles.header')).toBeGreaterThan(-1);
++    expect(code.indexOf('<ScrollView')).toBeGreaterThan(code.indexOf('styles.header'));
++    expect(code.indexOf('styles.footer')).toBeGreaterThan(code.indexOf('</ScrollView>'));
++    expect(code).toContain('styles.showButton');
++  });
++
++  it('сначала параметры НЕ видно: без категорий — только чекбоксы', () => {
++    const code = windowCode();
++    // блок параметров существует только под условием «есть отмеченные»
++    expect(code).toContain('anyKindChecked && (');
++    // «Редкость» — общий параметр, тоже появляется только после отметки
++    expect(code.indexOf('anyKindChecked && (')).toBeLessThan(code.indexOf("t('rarity')"));
++    // старого правила «нет отметок — показывать все секции» больше нет
++    expect(code).not.toContain('!kindPicked');
++  });
++
++  it('отметка категории раскрывает только её параметры (как в 427, но строго)', () => {
++    const code = windowCode();
++    expect(code).toContain("const showWeapon = kinds.includes('weapon')");
++    expect(code).toContain("const showArmor = kinds.includes('armor') || kinds.includes('powerArmor') || kinds.includes('clothing')");
++    expect(code).toContain('{showWeapon && (');
++    expect(code).toContain('{showArmor && (');
++  });
++
++  it('кнопка «Показать (N)» — с числом найденных предметов', () => {
++    const code = windowCode();
++    expect(code).toContain("t('show')");
++    expect(code).toContain('foundCount ?? 0');
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json', 'utf8'));
++    expect(ru.filter.show).toBe('Показать');
++    expect(en.filter.show).toBe('Show');
++    expect(ru.filter.categories).toBe('Категории');
++    expect(en.filter.categories).toBe('Categories');
++    // тот же резолвер, что весь UI (закон 422)
++    expect(tInventory('modals.addItemModal.filter.show')).toBe('Показать');
++    expect(tInventory('modals.addItemModal.filter.categories')).toBe('Категории');
++  });
++});
++
++describe('Патч 429: счётчик найденных предметов', () => {
++  it('считает предметы (объекты с именем), заголовки групп — нет', () => {
++    const tree = {
++      Оружие: { Лёгкое: [{ name: 'Клинок' }, { name: 'Пистолет' }] },
++      Броня: { Всё: [{ name: 'Кожанка' }] },
++      Пусто: {},
++      Моды: { Всё: [{ name: 'Прицел', itemType: 'weaponMod' }] },
++    };
++    expect(countFilteredItems(tree)).toBe(4);
++    expect(countFilteredItems({ Всё: ['Заголовок', 'Ещё заголовок'] })).toBe(0);
++    expect(countFilteredItems(null)).toBe(0);
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index ae7589e..268a555 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -6,12 +6,14 @@ import { tInventory } from '../logic/inventoryI18n';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
+ import { describeItemBasics } from '../../../../domain/itemBasics';
+-// 425: фильтры снаряжения (кроме веса) — по образцу перков.
+-import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel';
++// 429: фильтр снаряжения — отдельное окно (слово владельца: на мобильных
++// экранах список не должен прятаться за панелью).
++import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal';
+ import {
+   buildEquipmentFilterOptions,
+   emptyEquipmentFilter,
+   activeEquipmentFilterCount,
++  countFilteredItems,
+   isEquipmentFilterEmpty,
+   pruneTreeByEquipmentFilter,
+   weaponModsProviding,
+@@ -263,6 +265,8 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+ 
+   // 427: счётчик активных условий — рядом с надписью «Фильтр».
+   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
++  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
++  const foundCount = countFilteredItems(filteredData);
+ 
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+@@ -424,14 +428,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+                 </TouchableOpacity>
+               </View>
+ 
+-              <EquipmentFilterPanel
+-                options={filterOptions}
+-                filter={equipmentFilter ?? emptyEquipmentFilter()}
+-                onChange={(next) => setEquipmentFilter(next)}
+-                onReset={() => setEquipmentFilter(null)}
+-                open={filterOpen}
+-              />
+-
+               <View style={styles.listDivider} />
+ 
+               <FlatList
+@@ -443,6 +439,17 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                 <Text style={styles.closeButtonText}>{tInventory('modals.addItemModal.close')}</Text>
+               </TouchableOpacity>
++
++              {/* 429: окно фильтра — настройки не прячут список предметов. */}
++              <EquipmentFilterModal
++                visible={filterOpen}
++                options={filterOptions}
++                filter={equipmentFilter ?? emptyEquipmentFilter()}
++                onChange={(next) => setEquipmentFilter(next)}
++                onReset={() => setEquipmentFilter(null)}
++                onClose={() => setFilterOpen(false)}
++                foundCount={foundCount}
++              />
+             </>
+           )}
+         </SafeAreaView>
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index bac44e4..f7ab517 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-05 (428)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-05 (429)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **429** (СЛОВО ВЛАДЕЛЬЦА через ask_user: «Отдельное окно, с чекбоксами категорий. И только когда выбран чекбокс — показать параметры категории, а не сразу всё, а потом отсекать параметры по фильтру. Наоборот, сначала параметры не видно, пока не выбрана категория»; вопрос был «как правильно для мобильных: отдельным окном или фильтр внутри категории»). ПРИМЕНЕНО: (1) НОВОЕ ОКНО EquipmentFilterModal.js + EquipmentFilterModal.styles.js (вместо удалённых EquipmentFilterPanel*: встроенная панель 425–427 удалена); в окне: шапка (filter.title + ✕), ScrollView (скролл-закон 402), ЧЕКБОКСЫ КАТЕГОРИЙ (kindsRow, filter.categories «Категории»), блок параметров СТРОГО под anyKindChecked (нет fallback «показывать всё» — not '!kindPicked'); внутри блока: Редкость (общая — тоже только после отметки, МОЁ РЕШЕНИЕ доложено владельцу) + showWeapon (weaponSection: урон/скорострельность/дистанция/тип урона/тип/патроны/качества/эффекты) + showArmor (armorSection: СУ/части тела); футер showButton «Показать (N)» (filter.show; N = countFilteredItems(filteredData) — счёт предметов с именем; foundCount в AddItemModal). (2) AddItemModal: тулбар 427 (поиск + «Фильтр (N)» условий) и listDivider ОСТАЛИСЬ; EquipmentFilterModal visible={filterOpen} после closeButton. (3) equipmentFilter.js +countFilteredItems. (4) i18n filter: +categories/show. Защёлки: 425 и 427 переведены на модальное окно (paths), 429 __tests__/gear/equipment-filter-modal-429.test.js (6: проводка/скролл-закон/строгость anyKindChecked/категорийность/Показать+словари/счётчик). 1542/157, tsc 0. .git сбрасывался ДВАЖДЫ за ход — схема с tar-бэкапом, НОВЫЕ файлы сохранять в /tmp ДО git clean. Предыдущий снимок — **428** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **428** (СВОЯ НЕДОРАБОТКА 426, доведена до слова владельца «отсечка по последнему патчу»): защёлка «baseline == старший патч» при условии 426 («цель строго > baseline») означала бы, что цель НИКОГДА не больше baseline → отсечка не срабатывает НИКОГДА (после каждого патча baseline догоняет) → каждая установка снова полный проход. ИСПРАВЛЕНО: условие отсечки `! number_le` → `! number_lt` (цель >= ключевого; для самого ключевого — мгновенная установка: sync_to_baseline сразу даёт конечное дерево). Справка usage дополнена. Защёлка baseline-cutoff: +тест условия (number_lt есть, number_le НЕТ). ВЕРИФИКАЦИЯ 428: (1) финал 426 → apply 427 (старый скрипт, полный проход) EXIT=0 1-в-1; (2) финал 427 → apply 428 (старый скрипт) EXIT=0 1-в-1; (3) МГНОВЕННЫЙ путь: клон на финале 427 + подмена скрипта с ЛОКАЛЬНЫМ КОММИТОМ подмены (иначе грязное дерево блокирует отсечку — урок 426-сценария c) → apply 428 → «Отсечка: ключевой патч №428», EXIT=0, 1-в-1; (4) bootstrap 12ad784 → apply 428 EXIT=0 1-в-1. С 429 верификация от финала предыдущего патча идёт БЫСТРЫМ путём (скрипт в клоне уже с >=). Предыдущий снимок — **427** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **427** (СЛОВО ВЛАДЕЛЬЦА: «в модалках поиск и фильтр совместить. Фильтр не скролится, отделить чертой фильтр и поиск от списка предметов… сделать чекбоксы категорий. Броня, Оружие, Силовая броня»). ПРИМЕНЕНО: (1) AddItemModal — тулбар styles.filterToolbar: поиск (styles.searchInputInToolbar, flex) + кнопка styles.filterToggle («Фильтр (N)» — activeEquipmentFilterCount, стрелка ▼/►, словарь filter.title); панель НИЖЕ тулбара (open без onToggleOpen — своей шапки больше нет), затем styles.listDivider (черта 1px) и FlatList; (2) EquipmentFilterPanel — ряд kindsRow чекбоксов ☑/☐ (options.kinds из buildEquipmentFilterOptions, подписи = СУЩЕСТВУЮЩИЙ словарь categories.* рут-i18n: Оружие/Броня/Силовая броня + ДОБАВЛЕННАЯ Одежда — без неё пряталась бы при любой отметке; 31%+2% = по 3 в ряд); адаптивные секции showWeapon/showArmor (нет отметок = все секции как в 425); (3) equipmentFilter.js — emptyEquipmentFilter.kinds=[], applyEquipmentFilter прячет не-отмеченные kind'ы (weaponMod и не-снаряжение проходят всегда), activeEquipmentFilterCount (категории + заполненные диапазоны по 1 + выбранные пункты), GEAR_KINDS-порядок weapon/armor/powerArmor/clothing. Защёлка __tests__/gear/equipment-filter-427.test.js (11); защёлка 425 обновлена (spoilerHeader → not.toContain + open&&). 1534+1 защёлка отсечки ВРЕМЕННО красная до создания патч-файла 427 (baseline==старший патч) — после генерации патча зелёная. Боковая панель фильтра (свернуть/развернуть, окно до 90% ширины) — «просто на обсуждение», НЕ кодил, ответ отправлен. Предыдущий снимок — **426** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **426** (СЛОВО ВЛАДЕЛЬЦА: «для скрипта установки нужна отсечка по последнему патчу»). ПРИМЕНЕНО: patchs/baseline.json 391 → 425 (последний); защёлка __tests__/patches/baseline-cutoff.test.js — отсечка ВСЕГДА == старший патч patchs/ (перенос отсечки будущим патчем обязателен, тест напомнит); старая защёлка 391 (install-baseline-391) ослаблена: номер-формат без фиксации «391». МЕХАНИКА: установщик читает baseline из FETCHED_COMMIT — быстрый путь синхронизирует дерево к состоянию ключевого патча из истории (git archive, патчи до него по одному НЕ ставятся) и применяет только последующие. УРОК (уловлен на 426): первый прогон 426 прошёл полным проходом МОЛЧА — `git add -A -- . ':(exclude)patchs'` исключил и patchs/baseline.json: правка отсечки НЕ вошла ни в коммит, ни в патч-файл. Правила переноса отсечки: baseline.json добавлять в коммит ЯВНО (`git add patchs/baseline.json`), патч-файл генерировать с `':(exclude)patchs/*.patch'` (baseline.json в патч ВХОДИТ). РАЗГАДКА старого наблюдения «в чистых клоне 12ad784 отсечка не срабатывала»: клон на 12ad784 запускает apply-patch.sh ТОЙ ревизии — механизм отсечки в неё ещё НЕ входит, полный проход законен (одноразовая bootstrap-цена; после установки владелец получает новый скрипт). ВЕРИФИКАЦИЯ 426 — два сценария: (1) bootstrap: клон 12ad784 → apply 426 старым скриптом → полный проход EXIT=0, дерево 1-в-1; (2) быстрый путь (гл. приёмка): клон на финале 425 (e6ca843) → apply 426 → «Отсечка: ключевой патч №425», очередь = 1 патч, EXIT=0, дерево 1-в-1, --status показывает отсечку. Быстрый путь в тесте от 12ad784 недостижим по определению — проверять отсечку от финала предыдущего патча. Грязное дерево → полный проход (детект проверен: «в дереве незакоммиченные изменения»). 1524/155, tsc 0. Предыдущий снимок — **425** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 3b0f583..8d087ce 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,18 @@
+ # Changelog
++---
++## Filter — a separate window (patch 429)
++
++The owner's word about mobile screens: the item list must not hide
++behind the settings. The "Filter (N)" button in the search row now
++opens a separate window: first it shows only the category checkboxes —
++**Weapons, Armor, Power Armor, Clothing**. Parameters are NOT shown
++up front: check a category and "Rarity" plus that category's
++parameters appear (weapons — damage, fire rate, distance, damage
++type, weapon type, ammo, qualities, effects; armor — resistances and
++body parts). At the bottom, a "Show (N)" button tells how many items
++match the filter. Header and button stay put, the settings scroll.
++The main window is as before: search, filter button, full-height list.
++
+ ---
+ ## Installing the latest version — one step (patch 428)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 0029ea2..a5b64e7 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Фильтр — отдельным окном (патч 429)
++
++Слово владельца про мобильные экраны: список предметов не должен
++прятаться за настройками. Кнопка «Фильтр (N)» в строке поиска теперь
++открывает отдельное окно: в нём сначала только чекбоксы категорий —
++**Оружие, Броня, Силовая броня, Одежда**. Параметры НЕ показываются
++сразу: отметил категорию — появились «Редкость» и параметры отмеченных
++(у оружия — урон, скорострельность, дистанция, тип урона, тип оружия,
++патроны, качества, эффекты; у брони — сопротивления и части тела).
++Внизу — кнопка «Показать (N)»: сколько предметов найдётся с таким
++фильтром. Шапка и кнопка всегда на виду, настройки прокручиваются.
++Главное окно как было: поиск, кнопка фильтра, список во весь экран.
++
+ ---
+ ## Установка последней версии — один шаг (патч 428)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index fbfcb44..56f1c33 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -50,6 +50,8 @@
+       "Hand": "Arms",
+       "Leg": "Legs"
+     },
+-    "modsSection": "Mods"
++    "modsSection": "Mods",
++    "categories": "Categories",
++    "show": "Show"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 844fadf..270f2ed 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -50,6 +50,8 @@
+       "Hand": "Руки",
+       "Leg": "Ноги"
+     },
+-    "modsSection": "Моды"
++    "modsSection": "Моды",
++    "categories": "Категории",
++    "show": "Показать"
+   }
+ }
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+index 90af029..a9cf51b 100644
+--- a/modules/fallout/logic/equipmentFilter.js
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -266,6 +266,19 @@ export const weaponModsProviding = (filter, locale) => {
+     }));
+ };
+ 
++/**
++ * 429: сколько предметов покажет список при таком дереве (после фильтра
++ * и потолка редкости) — для кнопки «Показать (N)» в окне фильтра.
++ * Считаются только предметы (объекты с именем); заголовки групп — нет.
++ */
++export const countFilteredItems = (node) => {
++  if (Array.isArray(node)) {
++    return node.reduce((sum, item) => sum + (item && typeof item === 'object' && item.name ? 1 : 0), 0);
++  }
++  if (!node || typeof node !== 'object') return 0;
++  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value), 0);
++};
++
+ /**
+  * Обрезка дерева категорий по фильтру (как потолок редкости): пустые ветки
+  * после отсева не показываются. Предметы вне снаряжения проходят всегда.
+diff --git a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js
+new file mode 100644
+index 0000000..1491e79
+--- /dev/null
++++ b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js
+@@ -0,0 +1,188 @@
++// Окно фильтров снаряжения (патч 429 — слово владельца: «Отдельное окно,
++// с чекбоксами категорий. И только когда выбран чекбокс — показать
++// параметры категории, а не сразу всё… Наоборот, сначала параметры не
++// видно, пока не выбрана категория»). До отметки категорий в окне ТОЛЬКО
++// чекбоксы категорий; отметил — появились «Редкость» и параметры
++// отмеченных (оружейные — от «Оружия», сопротивления и части тела — от
++// «Брони»/«Силовой брони»/«Одежды»). Внизу «Показать (N)» — сколько
++// предметов найдётся. Шапка и кнопка на месте, содержимое прокручивается
++// (скролл-закон 402). Приложение мобильное — окно вместо встроенной
++// панели, чтобы не занимать список предметов.
++import React, { useState } from 'react';
++import { Modal, SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity } from 'react-native';
++import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
++import styles from '../../../styles/EquipmentFilterModal.styles';
++
++const t = (key) => tInventory(`modals.addItemModal.filter.${key}`);
++
++/** Поле диапазона «от–до»: подсказка-граница серым, исчезает при касании. */
++const RangeRow = ({ label, hint, value, onChange }) => {
++  // Слово владельца 425: подсказка пропадает, как только поле коснулись.
++  const [touchedFrom, setTouchedFrom] = useState(false);
++  const [touchedTo, setTouchedTo] = useState(false);
++  return (
++    <View style={styles.row}>
++      <Text style={styles.rowLabel}>{label}</Text>
++      <Text style={styles.rangeDash}>{t('from')}</Text>
++      <TextInput
++        style={styles.rangeInput}
++        value={value.from}
++        onChangeText={(text) => onChange({ ...value, from: text })}
++        onFocus={() => setTouchedFrom(true)}
++        onBlur={() => setTouchedFrom(false)}
++        keyboardType="number-pad"
++        placeholder={touchedFrom ? '' : String(hint?.min ?? '')}
++        placeholderTextColor="#999"
++      />
++      <Text style={styles.rangeDash}>{t('to')}</Text>
++      <TextInput
++        style={styles.rangeInput}
++        value={value.to}
++        onChangeText={(text) => onChange({ ...value, to: text })}
++        onFocus={() => setTouchedTo(true)}
++        onBlur={() => setTouchedTo(false)}
++        keyboardType="number-pad"
++        placeholder={touchedTo ? '' : String(hint?.max ?? '')}
++        placeholderTextColor="#999"
++      />
++    </View>
++  );
++};
++
++/** Чипсы (одиночный/мультивыбор кликами). */
++const ChipsRow = ({ label, options, selected, onToggle }) => (
++  <View style={styles.row}>
++    <Text style={styles.rowLabel}>{label}</Text>
++    {options.map((option) => {
++      const on = selected.includes(option.id);
++      return (
++        <TouchableOpacity
++          key={option.id}
++          style={[styles.chip, on && styles.chipOn]}
++          onPress={() => onToggle(option.id)}
++        >
++          <Text style={[styles.chipText, on && styles.chipTextOn]}>{option.name}</Text>
++        </TouchableOpacity>
++      );
++    })}
++  </View>
++);
++
++/** Выпадающий список с галочками (мультивыбор). */
++const DropdownRow = ({ label, options, selected, onToggle }) => {
++  const [open, setOpen] = useState(false);
++  return (
++    <View>
++      <TouchableOpacity style={styles.dropdownHeader} onPress={() => setOpen((prev) => !prev)}>
++        <Text style={styles.dropdownArrow}>{open ? '▼' : '►'}</Text>
++        <Text style={styles.dropdownTitle}>{label}</Text>
++        {selected.length > 0 && (
++          <Text style={styles.dropdownCount}>{selected.length} {t('selected')}</Text>
++        )}
++      </TouchableOpacity>
++      {open && options.map((option) => {
++        const on = selected.includes(option.id);
++        return (
++          <TouchableOpacity key={option.id} style={styles.optionRow} onPress={() => onToggle(option.id)}>
++            <Text style={styles.optionText}>{on ? '☑' : '☐'} {option.name}</Text>
++          </TouchableOpacity>
++        );
++      })}
++    </View>
++  );
++};
++
++/**
++ * Окно фильтра (вместо встроенной панели 425–427). options —
++ * buildEquipmentFilterOptions(locale, labels); filter/onChange —
++ * состояние фильтра; foundCount — сколько предметов найдётся.
++ */
++const EquipmentFilterModal = ({ visible, options, filter, onChange, onReset, onClose, foundCount }) => {
++  if (!options || !filter) return null;
++  const toggleIn = (list, id) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
++  const setRange = (key) => (value) => onChange({ ...filter, [key]: value });
++  const toggleList = (key) => (id) => onChange({ ...filter, [key]: toggleIn(filter[key], id) });
++  const toggleKind = (id) => onChange({ ...filter, kinds: toggleIn(filter.kinds ?? [], id) });
++
++  // Слово владельца 429: параметры не видны, пока не выбрана категория.
++  const kinds = filter.kinds ?? [];
++  const anyKindChecked = kinds.length > 0;
++  const showWeapon = kinds.includes('weapon');
++  const showArmor = kinds.includes('armor') || kinds.includes('powerArmor') || kinds.includes('clothing');
++
++  return (
++    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
++      <View style={styles.overlay}>
++        <SafeAreaView style={styles.sheet}>
++          <View style={styles.header}>
++            <Text style={styles.headerTitle}>{t('title')}</Text>
++            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
++              <Text style={styles.closeIcon}>✕</Text>
++            </TouchableOpacity>
++          </View>
++
++          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
++            <Text style={styles.sectionTitle}>{t('categories')}</Text>
++            <View style={styles.kindsRow}>
++              {(options.kinds ?? []).map((kind) => {
++                const on = kinds.includes(kind.id);
++                return (
++                  <TouchableOpacity
++                    key={kind.id}
++                    style={[styles.kindBox, on && styles.kindBoxOn]}
++                    onPress={() => toggleKind(kind.id)}
++                  >
++                    <Text style={styles.kindCheck}>{on ? '☑' : '☐'}</Text>
++                    <Text style={[styles.kindName, on && styles.kindNameOn]}>{kind.name}</Text>
++                  </TouchableOpacity>
++                );
++              })}
++            </View>
++
++            {anyKindChecked && (
++              <View>
++                <RangeRow label={t('rarity')} hint={options.rarity} value={filter.rarity} onChange={setRange('rarity')} />
++
++                {showWeapon && (
++                  <View>
++                    <Text style={styles.sectionTitle}>{t('weaponSection')}</Text>
++                    <RangeRow label={t('damage')} hint={options.damage} value={filter.damage} onChange={setRange('damage')} />
++                    <RangeRow label={t('fireRate')} hint={options.fireRate} value={filter.fireRate} onChange={setRange('fireRate')} />
++                    <ChipsRow label={t('distance')} options={options.distances} selected={filter.distance} onToggle={toggleList('distance')} />
++                    <ChipsRow label={t('damageType')} options={options.damageTypes} selected={filter.damageTypes} onToggle={toggleList('damageTypes')} />
++                    <ChipsRow label={t('weaponType')} options={options.weaponTypes} selected={filter.weaponTypes} onToggle={toggleList('weaponTypes')} />
++                    <DropdownRow label={t('ammo')} options={options.ammoOptions} selected={filter.ammo} onToggle={toggleList('ammo')} />
++                    <DropdownRow label={t('qualities')} options={options.qualities} selected={filter.qualities} onToggle={toggleList('qualities')} />
++                    <DropdownRow label={t('effects')} options={options.effects} selected={filter.effects} onToggle={toggleList('effects')} />
++                  </View>
++                )}
++
++                {showArmor && (
++                  <View>
++                    <Text style={styles.sectionTitle}>{t('armorSection')}</Text>
++                    <RangeRow label={t('physical')} hint={options.physical} value={filter.physical} onChange={setRange('physical')} />
++                    <RangeRow label={t('energy')} hint={options.energy} value={filter.energy} onChange={setRange('energy')} />
++                    <RangeRow label={t('radiation')} hint={options.radiation} value={filter.radiation} onChange={setRange('radiation')} />
++                    <ChipsRow label={t('bodyParts')} options={options.bodyParts} selected={filter.bodyParts} onToggle={toggleList('bodyParts')} />
++                  </View>
++                )}
++              </View>
++            )}
++
++            <TouchableOpacity style={styles.resetButton} onPress={onReset}>
++              <Text style={styles.resetText}>{t('reset')}</Text>
++            </TouchableOpacity>
++          </ScrollView>
++
++          <View style={styles.footer}>
++            <TouchableOpacity style={styles.showButton} onPress={onClose}>
++              <Text style={styles.showButtonText}>{t('show')} ({foundCount ?? 0})</Text>
++            </TouchableOpacity>
++          </View>
++        </SafeAreaView>
++      </View>
++    </Modal>
++  );
++};
++
++export default EquipmentFilterModal;
+diff --git a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
+deleted file mode 100644
+index 62f395a..0000000
+--- a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
++++ /dev/null
+@@ -1,169 +0,0 @@
+-// Панель фильтров снаряжения (патчи 425–427). Диапазоны «от–до» — два
+-// поля с СЕРЫМИ подсказками (границы каталога), подсказка исчезает, как
+-// только поле тронули; выпадающие списки (качества/эффекты/патрон) —
+-// многовыбор галочками; типы/дистанция/части тела — чипсы. Вес не
+-// фильтруется (слово владельца).
+-// 427 (слово владельца): поиск и фильтр совмещены в одну строку — кнопка
+-// «Фильтр» живёт в окне рядом с поиском, своей шапки-спойлера у панели
+-// больше нет. Наверху панели — чекбоксы категорий (Оружие, Броня,
+-// Силовая броня, Одежда; по 3 в ряд): отмечены — показываются только их
+-// параметры, не «все параметры скопом». Панель не прокручивается вместе
+-// со списком: она закреплена над чертой, отделяющей её от списка.
+-import React, { useState } from 'react';
+-import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+-import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
+-import styles from '../../../styles/EquipmentFilterPanel.styles';
+-
+-const t = (key) => tInventory(`modals.addItemModal.filter.${key}`);
+-
+-/** Поле диапазона «от–до»: подсказка-граница серым, исчезает при касании. */
+-const RangeRow = ({ label, hint, value, onChange }) => {
+-  // Слово владельца 425: подсказка пропадает, как только поле коснулись.
+-  const [touchedFrom, setTouchedFrom] = useState(false);
+-  const [touchedTo, setTouchedTo] = useState(false);
+-  return (
+-    <View style={styles.row}>
+-      <Text style={styles.rowLabel}>{label}</Text>
+-      <Text style={styles.rangeDash}>{t('from')}</Text>
+-      <TextInput
+-        style={styles.rangeInput}
+-        value={value.from}
+-        onChangeText={(text) => onChange({ ...value, from: text })}
+-        onFocus={() => setTouchedFrom(true)}
+-        onBlur={() => setTouchedFrom(false)}
+-        keyboardType="number-pad"
+-        placeholder={touchedFrom ? '' : String(hint?.min ?? '')}
+-        placeholderTextColor="#999"
+-      />
+-      <Text style={styles.rangeDash}>{t('to')}</Text>
+-      <TextInput
+-        style={styles.rangeInput}
+-        value={value.to}
+-        onChangeText={(text) => onChange({ ...value, to: text })}
+-        onFocus={() => setTouchedTo(true)}
+-        onBlur={() => setTouchedTo(false)}
+-        keyboardType="number-pad"
+-        placeholder={touchedTo ? '' : String(hint?.max ?? '')}
+-        placeholderTextColor="#999"
+-      />
+-    </View>
+-  );
+-};
+-
+-/** Чипсы (одиночный/мультивыбор кликами). */
+-const ChipsRow = ({ label, options, selected, onToggle }) => (
+-  <View style={styles.row}>
+-    <Text style={styles.rowLabel}>{label}</Text>
+-    {options.map((option) => {
+-      const on = selected.includes(option.id);
+-      return (
+-        <TouchableOpacity
+-          key={option.id}
+-          style={[styles.chip, on && styles.chipOn]}
+-          onPress={() => onToggle(option.id)}
+-        >
+-          <Text style={[styles.chipText, on && styles.chipTextOn]}>{option.name}</Text>
+-        </TouchableOpacity>
+-      );
+-    })}
+-  </View>
+-);
+-
+-/** Выпадающий список с галочками (мультивыбор). */
+-const DropdownRow = ({ label, options, selected, onToggle }) => {
+-  const [open, setOpen] = useState(false);
+-  return (
+-    <View>
+-      <TouchableOpacity style={styles.dropdownHeader} onPress={() => setOpen((prev) => !prev)}>
+-        <Text style={styles.dropdownArrow}>{open ? '▼' : '►'}</Text>
+-        <Text style={styles.dropdownTitle}>{label}</Text>
+-        {selected.length > 0 && (
+-          <Text style={styles.dropdownCount}>{selected.length} {t('selected')}</Text>
+-        )}
+-      </TouchableOpacity>
+-      {open && options.map((option) => {
+-        const on = selected.includes(option.id);
+-        return (
+-          <TouchableOpacity key={option.id} style={styles.optionRow} onPress={() => onToggle(option.id)}>
+-            <Text style={styles.optionText}>{on ? '☑' : '☐'} {option.name}</Text>
+-          </TouchableOpacity>
+-        );
+-      })}
+-    </View>
+-  );
+-};
+-
+-/**
+- * Панель фильтра. options — buildEquipmentFilterOptions(locale, labels);
+- * filter/onChange — состояние фильтра; open — панель развёрнута кнопкой
+- * «Фильтр» из строки поиска окна (427).
+- */
+-const EquipmentFilterPanel = ({ options, filter, onChange, onReset, open }) => {
+-  if (!options || !filter) return null;
+-  const toggleIn = (list, id) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
+-  const setRange = (key) => (value) => onChange({ ...filter, [key]: value });
+-  const toggleList = (key) => (id) => onChange({ ...filter, [key]: toggleIn(filter[key], id) });
+-  const toggleKind = (id) => onChange({ ...filter, kinds: toggleIn(filter.kinds ?? [], id) });
+-
+-  // 427: отмечены категории — показываем только их параметры.
+-  const kinds = filter.kinds ?? [];
+-  const kindPicked = kinds.length > 0;
+-  const showWeapon = !kindPicked || kinds.includes('weapon');
+-  const showArmor = !kindPicked || kinds.includes('armor') || kinds.includes('powerArmor') || kinds.includes('clothing');
+-
+-  return (
+-    <View style={styles.panel}>
+-      {open && (
+-        <View style={styles.body}>
+-          <View style={styles.kindsRow}>
+-            {(options.kinds ?? []).map((kind) => {
+-              const on = kinds.includes(kind.id);
+-              return (
+-                <TouchableOpacity
+-                  key={kind.id}
+-                  style={[styles.kindBox, on && styles.kindBoxOn]}
+-                  onPress={() => toggleKind(kind.id)}
+-                >
+-                  <Text style={styles.kindCheck}>{on ? '☑' : '☐'}</Text>
+-                  <Text style={[styles.kindName, on && styles.kindNameOn]}>{kind.name}</Text>
+-                </TouchableOpacity>
+-              );
+-            })}
+-          </View>
+-
+-          <RangeRow label={t('rarity')} hint={options.rarity} value={filter.rarity} onChange={setRange('rarity')} />
+-
+-          {showWeapon && (
+-            <View>
+-              <Text style={styles.sectionTitle}>{t('weaponSection')}</Text>
+-              <RangeRow label={t('damage')} hint={options.damage} value={filter.damage} onChange={setRange('damage')} />
+-              <RangeRow label={t('fireRate')} hint={options.fireRate} value={filter.fireRate} onChange={setRange('fireRate')} />
+-              <ChipsRow label={t('distance')} options={options.distances} selected={filter.distance} onToggle={toggleList('distance')} />
+-              <ChipsRow label={t('damageType')} options={options.damageTypes} selected={filter.damageTypes} onToggle={toggleList('damageTypes')} />
+-              <ChipsRow label={t('weaponType')} options={options.weaponTypes} selected={filter.weaponTypes} onToggle={toggleList('weaponTypes')} />
+-              <DropdownRow label={t('ammo')} options={options.ammoOptions} selected={filter.ammo} onToggle={toggleList('ammo')} />
+-              <DropdownRow label={t('qualities')} options={options.qualities} selected={filter.qualities} onToggle={toggleList('qualities')} />
+-              <DropdownRow label={t('effects')} options={options.effects} selected={filter.effects} onToggle={toggleList('effects')} />
+-            </View>
+-          )}
+-
+-          {showArmor && (
+-            <View>
+-              <Text style={styles.sectionTitle}>{t('armorSection')}</Text>
+-              <RangeRow label={t('physical')} hint={options.physical} value={filter.physical} onChange={setRange('physical')} />
+-              <RangeRow label={t('energy')} hint={options.energy} value={filter.energy} onChange={setRange('energy')} />
+-              <RangeRow label={t('radiation')} hint={options.radiation} value={filter.radiation} onChange={setRange('radiation')} />
+-              <ChipsRow label={t('bodyParts')} options={options.bodyParts} selected={filter.bodyParts} onToggle={toggleList('bodyParts')} />
+-            </View>
+-          )}
+-
+-          <TouchableOpacity style={styles.resetButton} onPress={onReset}>
+-            <Text style={styles.resetText}>{t('reset')}</Text>
+-          </TouchableOpacity>
+-        </View>
+-      )}
+-    </View>
+-  );
+-};
+-
+-export default EquipmentFilterPanel;
+diff --git a/modules/fallout/styles/EquipmentFilterModal.styles.js b/modules/fallout/styles/EquipmentFilterModal.styles.js
+new file mode 100644
+index 0000000..a6c71fc
+--- /dev/null
++++ b/modules/fallout/styles/EquipmentFilterModal.styles.js
+@@ -0,0 +1,41 @@
++// Стили окна фильтров снаряжения (патч 429): шапка с крестиком, лист —
++// чекбоксы категорий по 3 в ряд («квадраты по 3 в ряд»), параметры групп,
++// кнопка «Показать (N)» внизу. Шапка, низ и содержимое — по скролл-закону.
++import { StyleSheet } from 'react-native';
++
++export default StyleSheet.create({
++  overlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
++  sheet: { backgroundColor: 'white', borderTopLeftRadius: 14, borderTopRightRadius: 14, height: '85%' },
++  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#ddd' },
++  headerTitle: { fontSize: 17, fontWeight: 'bold', color: '#333' },
++  closeButton: { width: 34, height: 34, borderRadius: 17, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' },
++  closeIcon: { fontSize: 16, color: '#333' },
++  body: { flex: 1 },
++  bodyContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 16 },
++  footer: { paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#ddd' },
++  showButton: { backgroundColor: '#2f6df6', borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
++  showButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
++  kindsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
++  kindBox: { width: '31%', marginRight: '2%', marginBottom: 6, flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 4, borderRadius: 6 },
++  kindBoxOn: { backgroundColor: '#e8f0fe' },
++  kindCheck: { fontSize: 15, marginRight: 4, color: '#333' },
++  kindName: { fontSize: 12, color: '#333', flex: 1 },
++  kindNameOn: { color: '#2f6df6', fontWeight: 'bold' },
++  sectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#555', marginTop: 8, marginBottom: 4 },
++  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 },
++  rowLabel: { fontSize: 13, color: '#333', width: 120 },
++  rangeInput: { borderBottomWidth: 1, borderColor: '#bbb', width: 56, textAlign: 'center', paddingVertical: 2, fontSize: 14, color: '#333', marginHorizontal: 4 },
++  rangeDash: { fontSize: 13, color: '#777' },
++  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#999', marginRight: 6, marginBottom: 4 },
++  chipOn: { backgroundColor: '#2f6df6', borderColor: '#2f6df6' },
++  chipText: { fontSize: 12, color: '#333' },
++  chipTextOn: { color: '#fff' },
++  dropdownHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
++  dropdownArrow: { fontSize: 11, color: '#555', marginRight: 6 },
++  dropdownTitle: { fontSize: 13, color: '#333' },
++  dropdownCount: { fontSize: 12, color: '#2f6df6', marginLeft: 6 },
++  optionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, paddingLeft: 18 },
++  optionText: { fontSize: 12, color: '#333', flex: 1 },
++  resetButton: { alignSelf: 'center', marginTop: 10, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
++  resetText: { fontSize: 13, color: '#333' },
++});
+diff --git a/modules/fallout/styles/EquipmentFilterPanel.styles.js b/modules/fallout/styles/EquipmentFilterPanel.styles.js
+deleted file mode 100644
+index 57a95be..0000000
+--- a/modules/fallout/styles/EquipmentFilterPanel.styles.js
++++ /dev/null
+@@ -1,32 +0,0 @@
+-// Стили панели фильтров снаряжения (патчи 425–427). 427: чекбоксы
+-// категорий по 3 в ряд (слово владельца: «квадраты по 3 в ряд»),
+-// шапка-спойлер убрана — кнопка «Фильтр» живёт в строке поиска окна.
+-import { StyleSheet } from 'react-native';
+-
+-export default StyleSheet.create({
+-  panel: { marginBottom: 8 },
+-  body: { paddingHorizontal: 10, paddingTop: 8 },
+-  kindsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+-  kindBox: { width: '31%', marginRight: '2%', marginBottom: 6, flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, borderRadius: 6 },
+-  kindBoxOn: { backgroundColor: '#e8f0fe' },
+-  kindCheck: { fontSize: 14, marginRight: 4, color: '#333' },
+-  kindName: { fontSize: 12, color: '#333', flex: 1 },
+-  kindNameOn: { color: '#2f6df6', fontWeight: 'bold' },
+-  sectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#555', marginTop: 8, marginBottom: 4 },
+-  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 },
+-  rowLabel: { fontSize: 13, color: '#333', width: 120 },
+-  rangeInput: { borderBottomWidth: 1, borderColor: '#bbb', width: 56, textAlign: 'center', paddingVertical: 2, fontSize: 14, color: '#333', marginHorizontal: 4 },
+-  rangeDash: { fontSize: 13, color: '#777' },
+-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#999', marginRight: 6, marginBottom: 4 },
+-  chipOn: { backgroundColor: '#2f6df6', borderColor: '#2f6df6' },
+-  chipText: { fontSize: 12, color: '#333' },
+-  chipTextOn: { color: '#fff' },
+-  dropdownHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5 },
+-  dropdownArrow: { fontSize: 11, color: '#555', marginRight: 6 },
+-  dropdownTitle: { fontSize: 13, color: '#333' },
+-  dropdownCount: { fontSize: 12, color: '#2f6df6', marginLeft: 6 },
+-  optionRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 3, paddingLeft: 18 },
+-  optionText: { fontSize: 12, color: '#333', flex: 1 },
+-  resetButton: { alignSelf: 'center', marginTop: 8, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
+-  resetText: { fontSize: 13, color: '#333' },
+-});
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 26aea43..6837d9a 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "428"
++  "baseline": "429"
+ }
+diff --git a/public/version.json b/public/version.json
+index 43eaf35..acea24a 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "428",
++  "version": "429",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
