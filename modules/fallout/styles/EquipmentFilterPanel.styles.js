@@ -1,13 +1,17 @@
-// Стили панели фильтров снаряжения (патч 425) — по образцу фильтра перков
-// (PerkSelectModal.styles: спойлер-заголовок, ряды чипсов).
+// Стили панели фильтров снаряжения (патчи 425–427). 427: чекбоксы
+// категорий по 3 в ряд (слово владельца: «квадраты по 3 в ряд»),
+// шапка-спойлер убрана — кнопка «Фильтр» живёт в строке поиска окна.
 import { StyleSheet } from 'react-native';
 
 export default StyleSheet.create({
   panel: { marginBottom: 8 },
-  spoilerHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#eee', borderRadius: 8 },
-  spoilerTitle: { fontSize: 15, fontWeight: 'bold', color: '#333' },
-  spoilerArrow: { fontSize: 14, color: '#555' },
   body: { paddingHorizontal: 10, paddingTop: 8 },
+  kindsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+  kindBox: { width: '31%', marginRight: '2%', marginBottom: 6, flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, borderRadius: 6 },
+  kindBoxOn: { backgroundColor: '#e8f0fe' },
+  kindCheck: { fontSize: 14, marginRight: 4, color: '#333' },
+  kindName: { fontSize: 12, color: '#333', flex: 1 },
+  kindNameOn: { color: '#2f6df6', fontWeight: 'bold' },
   sectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#555', marginTop: 8, marginBottom: 4 },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 },
   rowLabel: { fontSize: 13, color: '#333', width: 120 },

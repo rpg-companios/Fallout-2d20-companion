@@ -1,5 +1,29 @@
 # Changelog
 ---
+## Installing the latest version — one step (patch 428)
+
+The installer's cutoff now also fires when the target is the key
+(latest) patch itself: the tree is brought to its state from the
+branch history in one step, without walking the old chain. Before,
+only installs on top of the latest were instant; installing the
+fresh version itself re-checked every patch in order. The full walk
+remains for a dirty tree (uncommitted edits — commit or stash them)
+and for installing older versions.
+
+---
+## Search and filter — together; category checkboxes (patch 427)
+
+Add-item window (loot and buy): search and the "Filter" button now
+share one row. The filter panel is pinned at the top and no longer
+scrolls with the list — a divider line separates it from the items.
+The filter gains category checkboxes, 3 per row: **Weapons, Armor,
+Power Armor, Clothing** (Clothing added as a fourth — it is in the
+window and would vanish under any check mark otherwise). With
+categories checked, the panel shows only their parameters, and the
+list shows only those kinds. The Filter button shows the number of
+active conditions. Unchecked — everything as before.
+
+---
 ## Installer cutoff — at the latest patch (patch 426)
 
 The installer's key patch moved from №391 to №425 (the latest one).
