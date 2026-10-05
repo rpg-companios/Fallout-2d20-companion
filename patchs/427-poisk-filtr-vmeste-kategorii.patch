@@ -1,0 +1,555 @@
+diff --git a/__tests__/gear/equipment-filter-425.test.js b/__tests__/gear/equipment-filter-425.test.js
+index 79facee..6292f34 100644
+--- a/__tests__/gear/equipment-filter-425.test.js
++++ b/__tests__/gear/equipment-filter-425.test.js
+@@ -147,7 +147,11 @@ describe('Патч 425: проводка окна и подсказки', () =>
+ 
+   it('панель спойлером как в перках, диапазоны с серыми подсказками (исчезают при касании)', () => {
+     const code = panel();
+-    expect(code).toContain('spoilerHeader');
++    // 427: своей шапки у панели больше нет — кнопка «Фильтр» совмещена
++    // с поиском в окне (см. защёлку 427). Тело панели по-прежнему под
++    // флагом open.
++    expect(code).not.toContain('spoilerHeader');
++    expect(code).toContain('open && (');
+     expect(code).toContain('placeholder={touchedFrom ? \'\' : String(hint?.min ?? \'\')}');
+     expect(code).toContain('placeholder={touchedTo ? \'\' : String(hint?.max ?? \'\')}');
+     expect(code).toContain('placeholderTextColor="#999"');
+diff --git a/__tests__/gear/equipment-filter-427.test.js b/__tests__/gear/equipment-filter-427.test.js
+new file mode 100644
+index 0000000..285195c
+--- /dev/null
++++ b/__tests__/gear/equipment-filter-427.test.js
+@@ -0,0 +1,154 @@
++// ПРИЁМОЧНЫЙ (патч 427): улучшение фильтра по слову владельца —
++// «в модалках поиск и фильтр совместить. Фильтр не скролится, отделить
++// чертой фильтр и поиск от списка предметов… сделать чекбоксы категорий.
++// Броня, Оружие, Силовая броня». Поиск и кнопка «Фильтр» — одна строка;
++// панель закреплена над чертой, отделяющей её от списка (сам прокрутку
++// не водит); чекбоксы категорий показывают только свои параметры.
++// Одежду добавил четвёртой: она есть в окне (32 предмета), без своей
++// галочки она пряталась бы при любой отметке.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { setCurrentLocale } from '../../i18n/locale';
++import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
++import {
++  GEAR_KINDS,
++  activeEquipmentFilterCount,
++  applyEquipmentFilter,
++  buildEquipmentFilterOptions,
++  emptyEquipmentFilter,
++  pruneTreeByEquipmentFilter,
++} from '../../modules/fallout/logic/equipmentFilter';
++
++setCurrentLocale('ru-RU');
++
++const gear = (itemType, extra = {}) => ({ itemType, ...extra });
++const weapon = () => gear('weapon', { damage: 3, rarity: 1 });
++const armor = () => gear('armor', { physicalDamageRating: { total: 2 }, rarity: 1 });
++const powerArmor = () => gear('powerArmor', { physicalDamageRating: { total: 5 }, rarity: 3 });
++const clothing = () => gear('clothing', { physicalDamageRating: { total: 0 }, rarity: 0 });
++const ammo = () => ({ itemType: 'ammo', name: 'Патрон' });
++const weaponMod = () => ({ itemType: 'weaponMod', name: 'Мод' });
++
++describe('Патч 427: чекбоксы категорий в фильтре', () => {
++  it('пустой фильтр знает kinds; без отметок работает как раньше', () => {
++    const empty = emptyEquipmentFilter();
++    expect(empty.kinds).toEqual([]);
++    expect(applyEquipmentFilter(weapon(), empty)).toBe(true);
++    expect(applyEquipmentFilter(armor(), empty)).toBe(true);
++    expect(applyEquipmentFilter(ammo(), empty)).toBe(true);
++  });
++
++  it('отмеченная категория прячет остальные виды снаряжения', () => {
++    const filter = { ...emptyEquipmentFilter(), kinds: ['armor'] };
++    expect(applyEquipmentFilter(armor(), filter)).toBe(true);
++    expect(applyEquipmentFilter(weapon(), filter)).toBe(false);
++    expect(applyEquipmentFilter(powerArmor(), filter)).toBe(false);
++    expect(applyEquipmentFilter(clothing(), filter)).toBe(false);
++  });
++
++  it('неснаряжение и моды проходят при любых категориях (моды про «что даёт мод»)', () => {
++    const filter = { ...emptyEquipmentFilter(), kinds: ['weapon'] };
++    expect(applyEquipmentFilter(ammo(), filter)).toBe(true);
++    expect(applyEquipmentFilter(weaponMod(), filter)).toBe(true);
++    expect(applyEquipmentFilter(weapon(), filter)).toBe(true);
++  });
++
++  it('обрезка дерева: чужие ветки исчезают целиком, моды остаются', () => {
++    const tree = {
++      Оружие: { Всё: [weapon()] },
++      Броня: { Всё: [armor()] },
++      Одежда: { Всё: [clothing()] },
++      Моды: { Всё: [weaponMod()] },
++    };
++    const pruned = pruneTreeByEquipmentFilter(tree, { ...emptyEquipmentFilter(), kinds: ['weapon'] });
++    expect(Object.keys(pruned).sort()).toEqual(['Моды', 'Оружие']);
++  });
++
++  it('варианты категорий — ровно виды снаряжения, с подписями из словаря окна', () => {
++    const options = buildEquipmentFilterOptions('ru-RU', {
++      ammoNames: [],
++      damageTypes: { physical: 'Ф', energy: 'Э', radiation: 'Р', special: 'О', poison: 'Я' },
++      weaponTypes: { Light: 'Л', Melee: 'Б', Energy: 'Эн', Explosive: 'В', Heavy: 'Т', Unarmed: 'Рук', Thrown: 'Мет' },
++      distances: { C: 'Б', M: 'С', L: 'Д' },
++      bodyParts: { Head: 'Г', Body: 'Т', Hand: 'Р', Leg: 'Н' },
++      kinds: {
++        weapon: tInventory('modals.addItemModal.categories.weapon'),
++        armor: tInventory('modals.addItemModal.categories.armor'),
++        powerArmor: tInventory('modals.addItemModal.categories.powerArmor'),
++        clothing: tInventory('modals.addItemModal.categories.clothing'),
++      },
++    });
++    expect(options.kinds.map((kind) => kind.id)).toEqual(GEAR_KINDS);
++    expect(options.kinds.map((kind) => kind.name)).toEqual(['Оружие', 'Броня', 'Силовая броня', 'Одежда']);
++  });
++});
++
++describe('Патч 427: счётчик активных условий на кнопке «Фильтр»', () => {
++  it('пустой фильтр — ноль; каждая отметка/диапазон/пункт считается', () => {
++    expect(activeEquipmentFilterCount(null)).toBe(0);
++    expect(activeEquipmentFilterCount(emptyEquipmentFilter())).toBe(0);
++    const filter = {
++      ...emptyEquipmentFilter(),
++      kinds: ['weapon', 'armor'], // +2
++      rarity: { from: '2', to: '' }, // +1
++      damageTypes: ['energy', 'radiation'], // +2
++    };
++    expect(activeEquipmentFilterCount(filter)).toBe(5);
++  });
++});
++
++describe('Патч 427: проводка окна — поиск+фильтр одной строкой, черта, панель закреплена', () => {
++  const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js', 'utf8');
++  const modalStyles = () => readFileSync('styles/AddItemModal.styles.js', 'utf8');
++
++  it('в окне поиск и кнопка «Фильтр» в одной строке (тулбар), черта перед списком', () => {
++    const code = modal();
++    expect(code).toContain('styles.filterToolbar');
++    expect(code).toContain('styles.searchInputInToolbar');
++    expect(code).toContain('styles.filterToggle');
++    expect(code).toContain('styles.listDivider');
++    // кнопка открывает/закрывает панель (у панели своей шапки больше нет)
++    expect(code).toContain('setFilterOpen((prev) => !prev)');
++    expect(code).toContain('activeEquipmentFilterCount(equipmentFilter)');
++    // панель без onToggleOpen — управляется снаружи
++    expect(code).toContain('open={filterOpen}');
++    expect(code).not.toContain('onToggleOpen');
++  });
++
++  it('в стилях окна есть тулбар и черта', () => {
++    const code = modalStyles();
++    expect(code).toContain('filterToolbar');
++    expect(code).toContain('searchInputInToolbar');
++    expect(code).toContain('filterToggle');
++    expect(code).toContain('listDivider');
++  });
++
++  it('панель: чекбоксы категорий, секции показываются по категориям', () => {
++    const code = panel();
++    expect(code).toContain('styles.kindsRow');
++    expect(code).toContain('options.kinds');
++    // адаптивные секции: отмечено — показывается только своё
++    expect(code).toContain('showWeapon');
++    expect(code).toContain('showArmor');
++    expect(code).toContain('kinds.includes');
++  });
++
++  it('стили панели: ряд категорий и ячейки-чекбоксы на месте (по 3 в ряд)', () => {
++    const stylesCode = readFileSync('modules/fallout/styles/EquipmentFilterPanel.styles.js', 'utf8');
++    expect(stylesCode).toContain('kindsRow');
++    // квадраты по 3 в ряд — ширина ячейки 31% + отступ 2%
++    expect(stylesCode).toContain("width: '31%'");
++    expect(stylesCode).toContain("marginRight: '2%'");
++    expect(stylesCode).toContain('kindBox');
++    expect(stylesCode).toContain('kindCheck');
++    expect(stylesCode).toContain('kindName');
++    expect(stylesCode).not.toContain('spoilerHeader');
++  });
++
++  it('кнопка «Фильтр» подписана из словаря (тот же резолвер, что весь UI)', () => {
++    expect(tInventory('modals.addItemModal.filter.title')).toBe('Фильтр');
++    expect(tInventory('modals.addItemModal.categories.powerArmor')).toBe('Силовая броня');
++    expect(tInventory('modals.addItemModal.categories.clothing')).toBe('Одежда');
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index fd12a0f..ae7589e 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -11,6 +11,7 @@ import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryS
+ import {
+   buildEquipmentFilterOptions,
+   emptyEquipmentFilter,
++  activeEquipmentFilterCount,
+   isEquipmentFilterEmpty,
+   pruneTreeByEquipmentFilter,
+   weaponModsProviding,
+@@ -244,6 +245,13 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+ 
+   const filterOptions = useMemo(() => {
+     const labels = {
++      // 427: подписи категорий-чекбоксов — тот же словарь категорий окна.
++      kinds: {
++        weapon: tInventory('modals.addItemModal.categories.weapon'),
++        armor: tInventory('modals.addItemModal.categories.armor'),
++        powerArmor: tInventory('modals.addItemModal.categories.powerArmor'),
++        clothing: tInventory('modals.addItemModal.categories.clothing'),
++      },
+       ammoNames: (getEquipmentCatalog(moduleLocale).ammoTypes ?? []).map((row) => ({ id: row.id, name: row.name })),
+       damageTypes: tInventory('modals.addItemModal.filter.damageTypes'),
+       weaponTypes: tInventory('modals.addItemModal.filter.weaponTypes'),
+@@ -253,6 +261,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     return buildEquipmentFilterOptions(moduleLocale, labels);
+   }, [moduleLocale, engineLocale]);
+ 
++  // 427: счётчик активных условий — рядом с надписью «Фильтр».
++  const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
++
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+     if (itemType === 'armor') return tInventory('modals.addItemModal.itemTypes.armor');
+@@ -395,23 +406,34 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+                 </TouchableOpacity>
+               )}
+ 
+-              <TextInput
+-                style={styles.searchInput}
+-                placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
+-                value={searchTerm}
+-                onChangeText={setSearchTerm}
+-              />
++              {/* 427 (слово владельца): поиск и фильтр совмещены — одна
++                  строка; панель фильтра закреплена (не прокручивается) и
++                  отделена чертой от списка предметов. */}
++              <View style={styles.filterToolbar}>
++                <TextInput
++                  style={[styles.searchInput, styles.searchInputInToolbar]}
++                  placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
++                  value={searchTerm}
++                  onChangeText={setSearchTerm}
++                />
++                <TouchableOpacity style={styles.filterToggle} onPress={() => setFilterOpen((prev) => !prev)}>
++                  <Text style={styles.filterToggleText}>
++                    {tInventory('modals.addItemModal.filter.title')}
++                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} {filterOpen ? '▼' : '►'}
++                  </Text>
++                </TouchableOpacity>
++              </View>
+ 
+-              {/* 425: фильтр снаряжения (кроме веса) — как в перках, спойлером. */}
+               <EquipmentFilterPanel
+                 options={filterOptions}
+                 filter={equipmentFilter ?? emptyEquipmentFilter()}
+                 onChange={(next) => setEquipmentFilter(next)}
+                 onReset={() => setEquipmentFilter(null)}
+                 open={filterOpen}
+-                onToggleOpen={() => setFilterOpen((prev) => !prev)}
+               />
+ 
++              <View style={styles.listDivider} />
++
+               <FlatList
+                 data={currentData.items || currentData.categories}
+                 renderItem={renderItem}
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 7b1953c..230f60a 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-09-30 (426)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-05 (427)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **427** (СЛОВО ВЛАДЕЛЬЦА: «в модалках поиск и фильтр совместить. Фильтр не скролится, отделить чертой фильтр и поиск от списка предметов… сделать чекбоксы категорий. Броня, Оружие, Силовая броня»). ПРИМЕНЕНО: (1) AddItemModal — тулбар styles.filterToolbar: поиск (styles.searchInputInToolbar, flex) + кнопка styles.filterToggle («Фильтр (N)» — activeEquipmentFilterCount, стрелка ▼/►, словарь filter.title); панель НИЖЕ тулбара (open без onToggleOpen — своей шапки больше нет), затем styles.listDivider (черта 1px) и FlatList; (2) EquipmentFilterPanel — ряд kindsRow чекбоксов ☑/☐ (options.kinds из buildEquipmentFilterOptions, подписи = СУЩЕСТВУЮЩИЙ словарь categories.* рут-i18n: Оружие/Броня/Силовая броня + ДОБАВЛЕННАЯ Одежда — без неё пряталась бы при любой отметке; 31%+2% = по 3 в ряд); адаптивные секции showWeapon/showArmor (нет отметок = все секции как в 425); (3) equipmentFilter.js — emptyEquipmentFilter.kinds=[], applyEquipmentFilter прячет не-отмеченные kind'ы (weaponMod и не-снаряжение проходят всегда), activeEquipmentFilterCount (категории + заполненные диапазоны по 1 + выбранные пункты), GEAR_KINDS-порядок weapon/armor/powerArmor/clothing. Защёлка __tests__/gear/equipment-filter-427.test.js (11); защёлка 425 обновлена (spoilerHeader → not.toContain + open&&). 1534+1 защёлка отсечки ВРЕМЕННО красная до создания патч-файла 427 (baseline==старший патч) — после генерации патча зелёная. Боковая панель фильтра (свернуть/развернуть, окно до 90% ширины) — «просто на обсуждение», НЕ кодил, ответ отправлен. Предыдущий снимок — **426** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **426** (СЛОВО ВЛАДЕЛЬЦА: «для скрипта установки нужна отсечка по последнему патчу»). ПРИМЕНЕНО: patchs/baseline.json 391 → 425 (последний); защёлка __tests__/patches/baseline-cutoff.test.js — отсечка ВСЕГДА == старший патч patchs/ (перенос отсечки будущим патчем обязателен, тест напомнит); старая защёлка 391 (install-baseline-391) ослаблена: номер-формат без фиксации «391». МЕХАНИКА: установщик читает baseline из FETCHED_COMMIT — быстрый путь синхронизирует дерево к состоянию ключевого патча из истории (git archive, патчи до него по одному НЕ ставятся) и применяет только последующие. УРОК (уловлен на 426): первый прогон 426 прошёл полным проходом МОЛЧА — `git add -A -- . ':(exclude)patchs'` исключил и patchs/baseline.json: правка отсечки НЕ вошла ни в коммит, ни в патч-файл. Правила переноса отсечки: baseline.json добавлять в коммит ЯВНО (`git add patchs/baseline.json`), патч-файл генерировать с `':(exclude)patchs/*.patch'` (baseline.json в патч ВХОДИТ). РАЗГАДКА старого наблюдения «в чистых клоне 12ad784 отсечка не срабатывала»: клон на 12ad784 запускает apply-patch.sh ТОЙ ревизии — механизм отсечки в неё ещё НЕ входит, полный проход законен (одноразовая bootstrap-цена; после установки владелец получает новый скрипт). ВЕРИФИКАЦИЯ 426 — два сценария: (1) bootstrap: клон 12ad784 → apply 426 старым скриптом → полный проход EXIT=0, дерево 1-в-1; (2) быстрый путь (гл. приёмка): клон на финале 425 (e6ca843) → apply 426 → «Отсечка: ключевой патч №425», очередь = 1 патч, EXIT=0, дерево 1-в-1, --status показывает отсечку. Быстрый путь в тесте от 12ad784 недостижим по определению — проверять отсечку от финала предыдущего патча. Грязное дерево → полный проход (детект проверен: «в дереве незакоммиченные изменения»). 1524/155, tsc 0. Предыдущий снимок — **425** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **425** (СЛОВА ВЛАДЕЛЬЦА: «может вместо галочек и "не ниже", сделать 2мя полями диапазон "от - до". И в качестве подсказок немного серые значения, которые пропадают, как только его касаются»; «Качества показывать все»; проверка владельца «Компьютер наведения — идёт от мода… Ночное Видение, Разведовательный и многие другие тоже от модов. Проверь» — ПОДТВЕРЖДЕНО: 22 врождённых + 18 от модов (9 только от модов), лишь Бомбарда не покрыта; «моды это моды. Только когда их поставят, тогда и будут эффекты. Поскольку моды теперь предметы… при выборе эффектов, которые не на оружие, покажут модули»; УРОК: «я спросил у тебя про задумку и показать качества, которые не встречаются. А ты уже кодить начал» — НЕ НАЧИНАТЬ КОДИТЬ, пока владелец разбирает список/задумку, даже если кажется что всё согласовано). ПРИМЕНЕНО: modules/fallout/logic/equipmentFilter.js (чистые: buildEquipmentFilterOptions — границы из каталога редкость 0–6/урон 0–21/скор 0–7/СУ; качества ВСЕ 32 из словаря, эффекты 10, патроны 41 из оружия (списки ammoId через запятую раскрыты); applyEquipmentFilter — снаряжение only, не-снаряжение проходит всегда, без параметра не прячется, типы/дистанция «любое из», качества/эффекты/части «все», патрон «любое из» по частям ammoId; pruneTreeByEquipmentFilter; weaponModsProviding — моды с ≥1 выбранным качеством/эффектом, имена из i18n weapon_mods, itemType weaponMod → addFlow понимает mod_*) + EquipmentFilterPanel (спойлер как перки, RangeRow «от–до» с placeholder=граница каталога, исчезает при касании (touched state), ChipsRow, DropdownRow, onReset проп) + AddItemModal (полное слияние DB-оружия с каталогом `...(catalogEntry ?? {})` — поля фильтра не теряются; filteredData = prune + секция «Моды» при совпадении; сброс фильтра на visible). Правило «мёртвые» качества: Бомбарда — единственное пустое. Защёлка __tests__/gear/equipment-filter-425.test.js (17). 1522/154, tsc 0. Предыдущий снимок — **424** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **424** (СЛОВО ВЛАДЕЛЬЦА: «в отображения свойств оружия/брони хорошо бы добавить редкость. А заодно нужны фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)… Сделай проверку, какими вариантами свойств обладает оружие/броня. Покажи мне список, а потом сделаем фильтр по типу того, как в перках»). СДАНО: (1) патч 424 — «Редкость: N» на карточках (общий подзаголовок: weapon/armor/powerArmor при cardRarity>0, itemRarityFor; надетая часть СБ — по pieceCatalogId; i18n labels.rarity Редкость/Rarity; закон 424 в защёлке). (2) АУДИТ свойств отправлен в чат (полный список вариантов); ФИЛЬТРЫ = СЛЕДУЮЩИЙ ПАТЧ после разбора списка владельцем; образец UI — PerkSelectModal (спойлер «Фильтр» с чекбоксами). АУДИТ-факты (для фильтра): оружие 146 (145 реальных): редкость 0×11/1×22/2×29/3×36/4×25/5×20/6×1(гаусс-миниган)/без ×1(britva); тип урона physical 110/energy 35/radiation 2/special 1/poison 1; патронов 41 вариант (62 без патронов; 1 предмет со СПИСКОМ ammo 'ammo_energy_cell,ammo_fusion_core'; ammo_anything); скорострельность 0×90/1..7; дистанция C×33/M×55/L×10/пусто×46; тип Light 42/Melee 31/Energy 27/Explosive 21/Heavy 12/Unarmed 7/Thrown 4; качеств 22 варианта (у 121 предмета; словарь 32 — 10 без владельцев: bayonet/bombard/crank_x/disarm/night_vision/re-roll_hit_location/recon/shredder/sneak_attack/targetting_computer); эффектов 10 вариантов (у 94; piercing_x со value 1/2); урон 0..21 (0 у инъектора/детонатора/газовой/дымовой). Броня 56 частей: редкость 0×3..5×4; части Head 10/Body 16/Hand 16/Leg 16; СУ физ 1–4/эн 0–5/рад 0 (×55) и 2 (×1). ПА 20 деталей: редкость 2×8/3×4/4×4/5×4; части по 5. Одежда 32 — редкость ЕСТЬ у всех (учесть при фильтре!). i18n качеств/эффектов: data/system/{qualities,damageEffects}.json (ru/en). Ammo названия: i18n ammo/ammo_types.json. Фильтры окон: AddItemModal/BuyItemModal (в AddItemModal уже гейт модов по редкости ≤). 1502/153, tsc 0. Предыдущий снимок — **423** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 392f046..2f2eb6e 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,17 @@
+ # Changelog
++---
++## Search and filter — together; category checkboxes (patch 427)
++
++Add-item window (loot and buy): search and the "Filter" button now
++share one row. The filter panel is pinned at the top and no longer
++scrolls with the list — a divider line separates it from the items.
++The filter gains category checkboxes, 3 per row: **Weapons, Armor,
++Power Armor, Clothing** (Clothing added as a fourth — it is in the
++window and would vanish under any check mark otherwise). With
++categories checked, the panel shows only their parameters, and the
++list shows only those kinds. The Filter button shows the number of
++active conditions. Unchecked — everything as before.
++
+ ---
+ ## Installer cutoff — at the latest patch (patch 426)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 013a5b9..8cf7b2b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,20 @@
+ # История изменений
+ 
++---
++## Поиск и фильтр — вместе; чекбоксы категорий (патч 427)
++
++Окно добавления предметов (добыча и покупка): поиск и кнопка «Фильтр»
++теперь в одной строке. Панель фильтра закреплена сверху и не
++прокручивается вместе со списком — от списка она отделена чертой.
++В фильтре — чекбоксы категорий по 3 в ряд: **Оружие, Броня,
++Силовая броня, Одежда** (Одежду добавил четвёртой: она есть в окне,
++без своей галочки пряталась бы при любой отметке). Отмечены
++категории — в панели остаются только их параметры (у оружия — урон,
++скорострельность, дистанция, тип урона, тип оружия, патроны,
++качества, эффекты; у брони/СБ/одежды — сопротивления и части тела),
++а в списке — только отмеченные виды. На кнопке «Фильтр» горит число
++активных условий. Без отметок — как раньше: показывается всё.
++
+ ---
+ ## Отсечка установщика — по последнему патчу (патч 426)
+ 
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+index 1bb30df..90af029 100644
+--- a/modules/fallout/logic/equipmentFilter.js
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -92,6 +92,8 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
+   const ammoOptions = ammoSeen.map((id) => ({ id, name: ammoNames.get(id) ?? id }));
+ 
+   return {
++    // 427: чекбоксы категорий (подписи — тот же словарь категорий окна).
++    kinds: GEAR_KINDS.map((id) => ({ id, name: labels.kinds?.[id] ?? id })),
+     rarity: numBounds(
+       [...weapons, ...armor, ...pa, ...clothes]
+         .map((item) => Number(item.rarity))
+@@ -136,6 +138,9 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
+ };
+ 
+ export const emptyEquipmentFilter = () => ({
++  // 427 (слово владельца): чекбоксы категорий — Оружие/Броня/Силовая броня/
++  // Одежда. Пусто = без ограничения (показывается всё, как и раньше).
++  kinds: [],
+   rarity: { from: '', to: '' },
+   damage: { from: '', to: '' },
+   fireRate: { from: '', to: '' },
+@@ -156,6 +161,25 @@ export const isEquipmentFilterEmpty = (filter) => {
+   return JSON.stringify(filter ?? empty) === JSON.stringify(empty);
+ };
+ 
++/**
++ * 427: сколько условий сейчас активно — для счётчика на кнопке «Фильтр».
++ * Считаются отмеченные категории, заполненные диапазоны (один на пару
++ * «от–до») и выбранные пункты списков/чипсов.
++ */
++export const activeEquipmentFilterCount = (filter) => {
++  if (!filter) return 0;
++  let count = 0;
++  count += (filter.kinds ?? []).length;
++  for (const key of ['rarity', 'damage', 'fireRate', 'physical', 'energy', 'radiation']) {
++    const range = filter[key];
++    if (range && (Number.isFinite(parseFloat(range.from)) || Number.isFinite(parseFloat(range.to)))) count += 1;
++  }
++  for (const key of ['distance', 'damageTypes', 'weaponTypes', 'ammo', 'qualities', 'effects', 'bodyParts']) {
++    count += (filter[key] ?? []).length;
++  }
++  return count;
++};
++
+ const inRange = (value, range) => {
+   if (range == null) return true;
+   const from = parseFloat(range.from);
+@@ -185,6 +209,10 @@ export const applyEquipmentFilter = (item, filter) => {
+   if (!isGear(item)) return true;
+   const f = filter ?? emptyEquipmentFilter();
+ 
++  // 427: чекбоксы категорий. Отмечена хоть одна — показываются только эти
++  // виды снаряжения (моды проходят всегда: они про «что даёт мод»).
++  if (f.kinds?.length && !f.kinds.includes(item.itemType)) return false;
++
+   if (!inRange(item.rarity, f.rarity)) return false;
+ 
+   if (item.itemType === 'weapon') {
+diff --git a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
+index 455aeef..62f395a 100644
+--- a/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
++++ b/modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js
+@@ -1,9 +1,14 @@
+-// Панель фильтров снаряжения (патч 425) — по образцу фильтра перков:
+-// спойлер «Фильтр» с рядом параметров. Диапазоны «от–до» — два поля с
+-// СЕРЫМИ подсказками (границы каталога), подсказка исчезает, как только
+-// поле тронули; выпадающие списки (качества/эффекты/патрон) — много-
+-// выбор галочками; типы/дистанция/части тела — чипсы. Вес не фильтруется
+-// (слово владельца).
++// Панель фильтров снаряжения (патчи 425–427). Диапазоны «от–до» — два
++// поля с СЕРЫМИ подсказками (границы каталога), подсказка исчезает, как
++// только поле тронули; выпадающие списки (качества/эффекты/патрон) —
++// многовыбор галочками; типы/дистанция/части тела — чипсы. Вес не
++// фильтруется (слово владельца).
++// 427 (слово владельца): поиск и фильтр совмещены в одну строку — кнопка
++// «Фильтр» живёт в окне рядом с поиском, своей шапки-спойлера у панели
++// больше нет. Наверху панели — чекбоксы категорий (Оружие, Броня,
++// Силовая броня, Одежда; по 3 в ряд): отмечены — показываются только их
++// параметры, не «все параметры скопом». Панель не прокручивается вместе
++// со списком: она закреплена над чертой, отделяющей её от списка.
+ import React, { useState } from 'react';
+ import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+ import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
+@@ -90,39 +95,67 @@ const DropdownRow = ({ label, options, selected, onToggle }) => {
+ 
+ /**
+  * Панель фильтра. options — buildEquipmentFilterOptions(locale, labels);
+- * filter/onChange — состояние фильтра; open/onToggleOpen — спойлер.
++ * filter/onChange — состояние фильтра; open — панель развёрнута кнопкой
++ * «Фильтр» из строки поиска окна (427).
+  */
+-const EquipmentFilterPanel = ({ options, filter, onChange, onReset, open, onToggleOpen }) => {
++const EquipmentFilterPanel = ({ options, filter, onChange, onReset, open }) => {
+   if (!options || !filter) return null;
+   const toggleIn = (list, id) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
+   const setRange = (key) => (value) => onChange({ ...filter, [key]: value });
+   const toggleList = (key) => (id) => onChange({ ...filter, [key]: toggleIn(filter[key], id) });
++  const toggleKind = (id) => onChange({ ...filter, kinds: toggleIn(filter.kinds ?? [], id) });
++
++  // 427: отмечены категории — показываем только их параметры.
++  const kinds = filter.kinds ?? [];
++  const kindPicked = kinds.length > 0;
++  const showWeapon = !kindPicked || kinds.includes('weapon');
++  const showArmor = !kindPicked || kinds.includes('armor') || kinds.includes('powerArmor') || kinds.includes('clothing');
+ 
+   return (
+     <View style={styles.panel}>
+-      <TouchableOpacity style={styles.spoilerHeader} onPress={onToggleOpen}>
+-        <Text style={styles.spoilerTitle}>{t('title')}</Text>
+-        <Text style={styles.spoilerArrow}>{open ? '▼' : '►'}</Text>
+-      </TouchableOpacity>
+       {open && (
+         <View style={styles.body}>
++          <View style={styles.kindsRow}>
++            {(options.kinds ?? []).map((kind) => {
++              const on = kinds.includes(kind.id);
++              return (
++                <TouchableOpacity
++                  key={kind.id}
++                  style={[styles.kindBox, on && styles.kindBoxOn]}
++                  onPress={() => toggleKind(kind.id)}
++                >
++                  <Text style={styles.kindCheck}>{on ? '☑' : '☐'}</Text>
++                  <Text style={[styles.kindName, on && styles.kindNameOn]}>{kind.name}</Text>
++                </TouchableOpacity>
++              );
++            })}
++          </View>
++
+           <RangeRow label={t('rarity')} hint={options.rarity} value={filter.rarity} onChange={setRange('rarity')} />
+ 
+-          <Text style={styles.sectionTitle}>{t('weaponSection')}</Text>
+-          <RangeRow label={t('damage')} hint={options.damage} value={filter.damage} onChange={setRange('damage')} />
+-          <RangeRow label={t('fireRate')} hint={options.fireRate} value={filter.fireRate} onChange={setRange('fireRate')} />
+-          <ChipsRow label={t('distance')} options={options.distances} selected={filter.distance} onToggle={toggleList('distance')} />
+-          <ChipsRow label={t('damageType')} options={options.damageTypes} selected={filter.damageTypes} onToggle={toggleList('damageTypes')} />
+-          <ChipsRow label={t('weaponType')} options={options.weaponTypes} selected={filter.weaponTypes} onToggle={toggleList('weaponTypes')} />
+-          <DropdownRow label={t('ammo')} options={options.ammoOptions} selected={filter.ammo} onToggle={toggleList('ammo')} />
+-          <DropdownRow label={t('qualities')} options={options.qualities} selected={filter.qualities} onToggle={toggleList('qualities')} />
+-          <DropdownRow label={t('effects')} options={options.effects} selected={filter.effects} onToggle={toggleList('effects')} />
++          {showWeapon && (
++            <View>
++              <Text style={styles.sectionTitle}>{t('weaponSection')}</Text>
++              <RangeRow label={t('damage')} hint={options.damage} value={filter.damage} onChange={setRange('damage')} />
++              <RangeRow label={t('fireRate')} hint={options.fireRate} value={filter.fireRate} onChange={setRange('fireRate')} />
++              <ChipsRow label={t('distance')} options={options.distances} selected={filter.distance} onToggle={toggleList('distance')} />
++              <ChipsRow label={t('damageType')} options={options.damageTypes} selected={filter.damageTypes} onToggle={toggleList('damageTypes')} />
++              <ChipsRow label={t('weaponType')} options={options.weaponTypes} selected={filter.weaponTypes} onToggle={toggleList('weaponTypes')} />
++              <DropdownRow label={t('ammo')} options={options.ammoOptions} selected={filter.ammo} onToggle={toggleList('ammo')} />
++              <DropdownRow label={t('qualities')} options={options.qualities} selected={filter.qualities} onToggle={toggleList('qualities')} />
++              <DropdownRow label={t('effects')} options={options.effects} selected={filter.effects} onToggle={toggleList('effects')} />
++            </View>
++          )}
+ 
+-          <Text style={styles.sectionTitle}>{t('armorSection')}</Text>
+-          <RangeRow label={t('physical')} hint={options.physical} value={filter.physical} onChange={setRange('physical')} />
+-          <RangeRow label={t('energy')} hint={options.energy} value={filter.energy} onChange={setRange('energy')} />
+-          <RangeRow label={t('radiation')} hint={options.radiation} value={filter.radiation} onChange={setRange('radiation')} />
+-          <ChipsRow label={t('bodyParts')} options={options.bodyParts} selected={filter.bodyParts} onToggle={toggleList('bodyParts')} />
++          {showArmor && (
++            <View>
++              <Text style={styles.sectionTitle}>{t('armorSection')}</Text>
++              <RangeRow label={t('physical')} hint={options.physical} value={filter.physical} onChange={setRange('physical')} />
++              <RangeRow label={t('energy')} hint={options.energy} value={filter.energy} onChange={setRange('energy')} />
++              <RangeRow label={t('radiation')} hint={options.radiation} value={filter.radiation} onChange={setRange('radiation')} />
++              <ChipsRow label={t('bodyParts')} options={options.bodyParts} selected={filter.bodyParts} onToggle={toggleList('bodyParts')} />
++            </View>
++          )}
+ 
+           <TouchableOpacity style={styles.resetButton} onPress={onReset}>
+             <Text style={styles.resetText}>{t('reset')}</Text>
+diff --git a/modules/fallout/styles/EquipmentFilterPanel.styles.js b/modules/fallout/styles/EquipmentFilterPanel.styles.js
+index 27ea3ec..57a95be 100644
+--- a/modules/fallout/styles/EquipmentFilterPanel.styles.js
++++ b/modules/fallout/styles/EquipmentFilterPanel.styles.js
+@@ -1,13 +1,17 @@
+-// Стили панели фильтров снаряжения (патч 425) — по образцу фильтра перков
+-// (PerkSelectModal.styles: спойлер-заголовок, ряды чипсов).
++// Стили панели фильтров снаряжения (патчи 425–427). 427: чекбоксы
++// категорий по 3 в ряд (слово владельца: «квадраты по 3 в ряд»),
++// шапка-спойлер убрана — кнопка «Фильтр» живёт в строке поиска окна.
+ import { StyleSheet } from 'react-native';
+ 
+ export default StyleSheet.create({
+   panel: { marginBottom: 8 },
+-  spoilerHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#eee', borderRadius: 8 },
+-  spoilerTitle: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+-  spoilerArrow: { fontSize: 14, color: '#555' },
+   body: { paddingHorizontal: 10, paddingTop: 8 },
++  kindsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
++  kindBox: { width: '31%', marginRight: '2%', marginBottom: 6, flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 4, borderRadius: 6 },
++  kindBoxOn: { backgroundColor: '#e8f0fe' },
++  kindCheck: { fontSize: 14, marginRight: 4, color: '#333' },
++  kindName: { fontSize: 12, color: '#333', flex: 1 },
++  kindNameOn: { color: '#2f6df6', fontWeight: 'bold' },
+   sectionTitle: { fontSize: 13, fontWeight: 'bold', color: '#555', marginTop: 8, marginBottom: 4 },
+   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 6 },
+   rowLabel: { fontSize: 13, color: '#333', width: 120 },
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 3644899..ca8fbe2 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "425"
++  "baseline": "427"
+ }
+diff --git a/public/version.json b/public/version.json
+index dbc6bad..a07618d 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "426",
++  "version": "427",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/AddItemModal.styles.js b/styles/AddItemModal.styles.js
+index a3d2df8..8657071 100644
+--- a/styles/AddItemModal.styles.js
++++ b/styles/AddItemModal.styles.js
+@@ -27,6 +27,13 @@ const styles = StyleSheet.create({
+   backButton: { alignSelf: 'flex-start', marginBottom: 8 },
+   backButtonText: { color: '#1A73E8', fontSize: 14 },
+   searchInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12 },
++  // 427: поиск и кнопка «Фильтр» — одна строка над панелью; черта отделяет
++  // их от списка предметов.
++  filterToolbar: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
++  searchInputInToolbar: { flex: 1, marginBottom: 0 },
++  filterToggle: { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
++  filterToggleText: { fontSize: 14, fontWeight: 'bold', color: '#333' },
++  listDivider: { height: 1, backgroundColor: '#bbb', marginVertical: 6 },
+   itemContainer: {
+     paddingVertical: 14,
+     borderBottomWidth: 1,
