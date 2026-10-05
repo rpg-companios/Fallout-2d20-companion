@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Installing the latest version — one step (patch 428)
+
+The installer's cutoff now also fires when the target is the key
+(latest) patch itself: the tree is brought to its state from the
+branch history in one step, without walking the old chain. Before,
+only installs on top of the latest were instant; installing the
+fresh version itself re-checked every patch in order. The full walk
+remains for a dirty tree (uncommitted edits — commit or stash them)
+and for installing older versions.
+
+---
 ## Search and filter — together; category checkboxes (patch 427)
 
 Add-item window (loot and buy): search and the "Filter" button now

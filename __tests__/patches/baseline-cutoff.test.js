@@ -28,4 +28,17 @@ describe('Патч 426: отсечка установщика по послед�
     const raw = readFileSync('patchs/baseline.json', 'utf8');
     expect(Object.keys(JSON.parse(raw))).toEqual(['baseline']);
   });
+
+  it('установщик (428): отсечка срабатывает и при цели == ключевой патч', () => {
+    const script = () => readFileSync('apply-patch.sh', 'utf8');
+    // Защёлка «baseline == старший патч» при старом условии («цель строго
+    // больше») делала бы установку последней версии всегда полным
+    // проходом. Условие 428: цель >= ключевого — дерево разом приводится
+    // к состоянию ключевого патча (свежая версия — один шаг).
+    const code = script();
+    expect(code).toContain('! number_lt "$PATCH_ID" "$BASELINE_NUM"');
+    expect(code).not.toContain('! number_le "$PATCH_ID" "$BASELINE_NUM"');
+    // полный проход остался для грязного дерева и недоступной отсечки
+    expect(code).toContain('Идёт полный проход по цепочке');
+  });
 });
