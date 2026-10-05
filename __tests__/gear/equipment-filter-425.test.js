@@ -147,7 +147,11 @@ describe('Патч 425: проводка окна и подсказки', () => 
 
   it('панель спойлером как в перках, диапазоны с серыми подсказками (исчезают при касании)', () => {
     const code = panel();
-    expect(code).toContain('spoilerHeader');
+    // 427: своей шапки у панели больше нет — кнопка «Фильтр» совмещена
+    // с поиском в окне (см. защёлку 427). Тело панели по-прежнему под
+    // флагом open.
+    expect(code).not.toContain('spoilerHeader');
+    expect(code).toContain('open && (');
     expect(code).toContain('placeholder={touchedFrom ? \'\' : String(hint?.min ?? \'\')}');
     expect(code).toContain('placeholder={touchedTo ? \'\' : String(hint?.max ?? \'\')}');
     expect(code).toContain('placeholderTextColor="#999"');

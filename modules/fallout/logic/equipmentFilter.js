@@ -92,6 +92,8 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
   const ammoOptions = ammoSeen.map((id) => ({ id, name: ammoNames.get(id) ?? id }));
 
   return {
+    // 427: чекбоксы категорий (подписи — тот же словарь категорий окна).
+    kinds: GEAR_KINDS.map((id) => ({ id, name: labels.kinds?.[id] ?? id })),
     rarity: numBounds(
       [...weapons, ...armor, ...pa, ...clothes]
         .map((item) => Number(item.rarity))
@@ -136,6 +138,9 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
 };
 
 export const emptyEquipmentFilter = () => ({
+  // 427 (слово владельца): чекбоксы категорий — Оружие/Броня/Силовая броня/
+  // Одежда. Пусто = без ограничения (показывается всё, как и раньше).
+  kinds: [],
   rarity: { from: '', to: '' },
   damage: { from: '', to: '' },
   fireRate: { from: '', to: '' },
@@ -154,6 +159,25 @@ export const emptyEquipmentFilter = () => ({
 export const isEquipmentFilterEmpty = (filter) => {
   const empty = emptyEquipmentFilter();
   return JSON.stringify(filter ?? empty) === JSON.stringify(empty);
+};
+
+/**
+ * 427: сколько условий сейчас активно — для счётчика на кнопке «Фильтр».
+ * Считаются отмеченные категории, заполненные диапазоны (один на пару
+ * «от–до») и выбранные пункты списков/чипсов.
+ */
+export const activeEquipmentFilterCount = (filter) => {
+  if (!filter) return 0;
+  let count = 0;
+  count += (filter.kinds ?? []).length;
+  for (const key of ['rarity', 'damage', 'fireRate', 'physical', 'energy', 'radiation']) {
+    const range = filter[key];
+    if (range && (Number.isFinite(parseFloat(range.from)) || Number.isFinite(parseFloat(range.to)))) count += 1;
+  }
+  for (const key of ['distance', 'damageTypes', 'weaponTypes', 'ammo', 'qualities', 'effects', 'bodyParts']) {
+    count += (filter[key] ?? []).length;
+  }
+  return count;
 };
 
 const inRange = (value, range) => {
@@ -184,6 +208,10 @@ const weaponAmmoIds = (item) => String(item?.ammoId ?? '')
 export const applyEquipmentFilter = (item, filter) => {
   if (!isGear(item)) return true;
   const f = filter ?? emptyEquipmentFilter();
+
+  // 427: чекбоксы категорий. Отмечена хоть одна — показываются только эти
+  // виды снаряжения (моды проходят всегда: они про «что даёт мод»).
+  if (f.kinds?.length && !f.kinds.includes(item.itemType)) return false;
 
   if (!inRange(item.rarity, f.rarity)) return false;
 

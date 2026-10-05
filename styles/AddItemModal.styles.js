@@ -27,6 +27,13 @@ const styles = StyleSheet.create({
   backButton: { alignSelf: 'flex-start', marginBottom: 8 },
   backButtonText: { color: '#1A73E8', fontSize: 14 },
   searchInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12 },
+  // 427: поиск и кнопка «Фильтр» — одна строка над панелью; черта отделяет
+  // их от списка предметов.
+  filterToolbar: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  searchInputInToolbar: { flex: 1, marginBottom: 0 },
+  filterToggle: { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
+  filterToggleText: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+  listDivider: { height: 1, backgroundColor: '#bbb', marginVertical: 6 },
   itemContainer: {
     paddingVertical: 14,
     borderBottomWidth: 1,

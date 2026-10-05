@@ -11,6 +11,7 @@ import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryS
 import {
   buildEquipmentFilterOptions,
   emptyEquipmentFilter,
+  activeEquipmentFilterCount,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
   weaponModsProviding,
@@ -244,6 +245,13 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
 
   const filterOptions = useMemo(() => {
     const labels = {
+      // 427: подписи категорий-чекбоксов — тот же словарь категорий окна.
+      kinds: {
+        weapon: tInventory('modals.addItemModal.categories.weapon'),
+        armor: tInventory('modals.addItemModal.categories.armor'),
+        powerArmor: tInventory('modals.addItemModal.categories.powerArmor'),
+        clothing: tInventory('modals.addItemModal.categories.clothing'),
+      },
       ammoNames: (getEquipmentCatalog(moduleLocale).ammoTypes ?? []).map((row) => ({ id: row.id, name: row.name })),
       damageTypes: tInventory('modals.addItemModal.filter.damageTypes'),
       weaponTypes: tInventory('modals.addItemModal.filter.weaponTypes'),
@@ -252,6 +260,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     };
     return buildEquipmentFilterOptions(moduleLocale, labels);
   }, [moduleLocale, engineLocale]);
+
+  // 427: счётчик активных условий — рядом с надписью «Фильтр».
+  const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -395,22 +406,33 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                 </TouchableOpacity>
               )}
 
-              <TextInput
-                style={styles.searchInput}
-                placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
-                value={searchTerm}
-                onChangeText={setSearchTerm}
-              />
+              {/* 427 (слово владельца): поиск и фильтр совмещены — одна
+                  строка; панель фильтра закреплена (не прокручивается) и
+                  отделена чертой от списка предметов. */}
+              <View style={styles.filterToolbar}>
+                <TextInput
+                  style={[styles.searchInput, styles.searchInputInToolbar]}
+                  placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
+                  value={searchTerm}
+                  onChangeText={setSearchTerm}
+                />
+                <TouchableOpacity style={styles.filterToggle} onPress={() => setFilterOpen((prev) => !prev)}>
+                  <Text style={styles.filterToggleText}>
+                    {tInventory('modals.addItemModal.filter.title')}
+                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} {filterOpen ? '▼' : '►'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-              {/* 425: фильтр снаряжения (кроме веса) — как в перках, спойлером. */}
               <EquipmentFilterPanel
                 options={filterOptions}
                 filter={equipmentFilter ?? emptyEquipmentFilter()}
                 onChange={(next) => setEquipmentFilter(next)}
                 onReset={() => setEquipmentFilter(null)}
                 open={filterOpen}
-                onToggleOpen={() => setFilterOpen((prev) => !prev)}
               />
+
+              <View style={styles.listDivider} />
 
               <FlatList
                 data={currentData.items || currentData.categories}

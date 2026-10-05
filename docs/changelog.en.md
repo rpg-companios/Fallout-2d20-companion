@@ -1,5 +1,18 @@
 # Changelog
 ---
+## Search and filter — together; category checkboxes (patch 427)
+
+Add-item window (loot and buy): search and the "Filter" button now
+share one row. The filter panel is pinned at the top and no longer
+scrolls with the list — a divider line separates it from the items.
+The filter gains category checkboxes, 3 per row: **Weapons, Armor,
+Power Armor, Clothing** (Clothing added as a fourth — it is in the
+window and would vanish under any check mark otherwise). With
+categories checked, the panel shows only their parameters, and the
+list shows only those kinds. The Filter button shows the number of
+active conditions. Unchecked — everything as before.
+
+---
 ## Installer cutoff — at the latest patch (patch 426)
 
 The installer's key patch moved from №391 to №425 (the latest one).
