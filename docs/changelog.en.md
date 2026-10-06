@@ -1,5 +1,17 @@
 # Changelog
 ---
+## "Show" leads to results (patch 430)
+
+Defect of 429: the filter was applied, but after the "Show" button
+the window returned to the category catalog — filtered items had to
+be dug out of folders by hand. Now with an active filter the window
+immediately shows a flat, alphabetically sorted list of matches with
+a "Found: N" header (each row keeps its type label:
+Weapons/Armor/…). Reset the filter — the usual folder catalog
+returns. Also: the "Mods" section now appears in search too (it used
+to be lost).
+
+---
 ## Filter — a separate window (patch 429)
 
 The owner's word about mobile screens: the item list must not hide
