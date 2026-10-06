@@ -1,0 +1,260 @@
+diff --git a/__tests__/gear/equipment-filter-results-430.test.js b/__tests__/gear/equipment-filter-results-430.test.js
+new file mode 100644
+index 0000000..ccfc32c
+--- /dev/null
++++ b/__tests__/gear/equipment-filter-results-430.test.js
+@@ -0,0 +1,60 @@
++// ПРИЁМОЧНЫЙ (патч 430): слово владельца — «а фильтр то показывает
++// отсортированные материалы? У меня нет. Я выбрал броню, выбрал
++// редкость 5. Нажал показать и снова я на экране каталога». Дефект:
++// фильтр применялся к дереву, но после «Показать» окно возвращалось на
++// экран каталога категорий — отфильтрованные предметы надо было ещё
++// искать вручную. Теперь при активном фильтре окно показывает ПЛОСКИЙ
++// ОТСОРТИРОВАННЫЙ список находок с заголовком «Найдено: N»; каталог —
++// только без фильтра. Заодно: секция «Моды» (425) теперь попадает и в
++// плоский список поиска (раньше терялась).
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { setCurrentLocale } from '../../i18n/locale';
++import { tInventory, formatInventoryText } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
++import { emptyEquipmentFilter, isEquipmentFilterEmpty } from '../../modules/fallout/logic/equipmentFilter';
++
++setCurrentLocale('ru-RU');
++
++const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++
++describe('Патч 430: «Показать» ведёт к результатам, а не к каталогу', () => {
++  it('при активном фильтре — плоский список (общий сборщик с поиском)', () => {
++    const code = modal();
++    expect(code).toContain('const filterActive = !isEquipmentFilterEmpty(equipmentFilter)');
++    expect(code).toContain('if (searchTerm || filterActive) {');
++    // плоский список сортируется по имени («отсортированные материалы»)
++    expect(code).toContain("visible.sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')))");
++  });
++
++  it('заголовок окна при активном фильтре — «Найдено: N», кнопки «Назад» нет', () => {
++    const code = modal();
++    expect(code).toContain("formatInventoryText(tInventory('modals.addItemModal.filter.resultsFound'), { n: foundCount })");
++    // каталог и «Назад» — только без фильтра
++    expect(code).toContain('currentPath.length > 0 && !searchTerm && !filterActive && (');
++  });
++
++  it('секция «Моды» входит в плоский список (поиск и фильтр)', () => {
++    const code = modal();
++    const start = code.indexOf('const flatKeys');
++    expect(start).toBeGreaterThan(-1);
++    const block = code.slice(start, code.indexOf('flatKeys.forEach'));
++    expect(block).toContain("tInventory('modals.addItemModal.filter.modsSection')");
++  });
++
++  it('зависимости useMemo включают фильтр', () => {
++    const code = modal();
++    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]');
++  });
++
++  it('словарь: «Найдено: {n}» тем же резолвером (закон 422)', () => {
++    expect(tInventory('modals.addItemModal.filter.resultsFound')).toBe('Найдено: {n}');
++    expect(formatInventoryText(tInventory('modals.addItemModal.filter.resultsFound'), { n: 7 })).toBe('Найдено: 7');
++    const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json', 'utf8'));
++    expect(en.filter.resultsFound).toBe('Found: {n}');
++  });
++
++  it('пустой фильтр — по-прежнему каталог, ничего не сломано', () => {
++    expect(isEquipmentFilterEmpty(emptyEquipmentFilter())).toBe(true);
++    expect(isEquipmentFilterEmpty({ ...emptyEquipmentFilter(), kinds: ['armor'] })).toBe(false);
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 268a555..36d08cd 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+-import { tInventory } from '../logic/inventoryI18n';
++import { tInventory, formatInventoryText } from '../logic/inventoryI18n';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+ import styles from '../../../../styles/AddItemModal.styles';
+ import { describeItemBasics } from '../../../../domain/itemBasics';
+@@ -265,6 +265,8 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+ 
+   // 427: счётчик активных условий — рядом с надписью «Фильтр».
+   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
++  // 430: фильтр активен — окно показывает результаты, а не каталог.
++  const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+   // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
+   const foundCount = countFilteredItems(filteredData);
+ 
+@@ -322,23 +324,34 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   };
+ 
+   const currentData = useMemo(() => {
+-    if (searchTerm) {
++    // 430 (владелец: «Нажал показать и снова я на экране каталога»):
++    // при активном фильтре — ПЛОСКИЙ отсортированный список находок,
++    // а не каталог категорий. Поиск работает так же (общий сборщик),
++    // и секция «Моды» теперь попадает в оба режима.
++    const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
++    if (searchTerm || filterActive) {
+       const allItems = [];
+       Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+       Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+       Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+       Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+       const allLabel = tInventory('modals.addItemModal.categories.all');
+-      const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
+-      categoryKeys.forEach((category) => {
++      const flatKeys = [
++        // секция модов, подобранных под выбранные качества/эффекты (425)
++        tInventory('modals.addItemModal.filter.modsSection'),
++        ...['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
++      ];
++      flatKeys.forEach((category) => {
+         if (filteredData[category]?.[allLabel]) {
+           allItems.push(...filteredData[category][allLabel]);
+         }
+       });
+ 
+-      return {
+-        items: allItems.filter((item) => item?.name?.toLowerCase().includes(searchTerm.toLowerCase())),
+-      };
++      const needle = searchTerm.toLowerCase();
++      const visible = allItems.filter((item) => !searchTerm || item?.name?.toLowerCase().includes(needle));
++      // результаты — по алфавиту
++      visible.sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')));
++      return { items: visible };
+     }
+ 
+     let data = filteredData;
+@@ -351,7 +364,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     if (Array.isArray(data)) return { items: data };
+     if (data && typeof data === 'object') return { categories: Object.keys(data) };
+     return { categories: [] };
+-  }, [engineLocale, filteredData, currentPath, searchTerm]);
++  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]);
+ 
+   const renderItem = ({ item }) => {
+     const isItem = typeof item === 'object' && item?.name;
+@@ -402,9 +415,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+             </>
+           ) : (
+             <>
+-              <Text style={styles.title}>{currentPath.length > 0 ? currentPath[currentPath.length - 1] : tInventory(rootTitleKey)}</Text>
+-
+-              {currentPath.length > 0 && !searchTerm && (
++              {/* 430: при активном фильтре заголовок — «Найдено: N». */}
++              <Text style={styles.title}>
++                {currentPath.length > 0 && !searchTerm && !filterActive
++                  ? currentPath[currentPath.length - 1]
++                  : (filterActive
++                    ? formatInventoryText(tInventory('modals.addItemModal.filter.resultsFound'), { n: foundCount })
++                    : tInventory(rootTitleKey))}
++              </Text>
++
++              {currentPath.length > 0 && !searchTerm && !filterActive && (
+                 <TouchableOpacity style={styles.backButton} onPress={() => setCurrentPath(currentPath.slice(0, -1))}>
+                   <Text style={styles.backButtonText}>{tInventory('modals.addItemModal.back')}</Text>
+                 </TouchableOpacity>
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index f7ab517..f78a232 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-05 (429)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-05 (430)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **430** (ДЕФЕКТ 429, слово владельца: «а фильтр то показывает отсортированные материалы? У меня нет. Я выбрал броню, выбрал редкость 5. Нажал показать и снова я на экране каталога» — фильтр применялся, но «Показать» возвращало на каталог). ПРИМЕНЕНО: AddItemModal — currentData при filterActive (не пуст) даёт ПЛОСКИЙ ОТСОРТИРОВАННЫЙ список (общий сборщик с поиском: weapon/armor/clothing/robotEquipment по группам + flatKeys = [modsSection, ammo, chems, drinks, food, items, materials, junk] по «Все»; visible.sort по имени); заголовок окна при активном фильтре = formatInventoryText(filter.resultsFound, {n: foundCount}) «Найдено: N»; «Назад» и каталог — только при пустом фильтре (условие currentPath.length>0 && !searchTerm && !filterActive). ПОПУТНО ПОЧИНЕНО: «Моды» не попадали в плоский список поиска 425. i18n filter.resultsFound ru «Найдено: {n}»/en «Found: {n}». Защёлка __tests__/gear/equipment-filter-results-430.test.js (6). 1548/158, tsc 0. ВАЖНО ОБ УСТАНОВКЕ У ВЛАДЕЛЬЦА: у него в папке ЛОКАЛЬНЫЕ правки metro.config.js — установка 429 прошла быстрым путём (дерево приведено к 429: metro.config.js ПЕРЕЗАПИСАН версией из репо!) и владелец предупреждён прислать что там правилось, если веб-сборка сломается. Предыдущий снимок — **429** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **429** (СЛОВО ВЛАДЕЛЬЦА через ask_user: «Отдельное окно, с чекбоксами категорий. И только когда выбран чекбокс — показать параметры категории, а не сразу всё, а потом отсекать параметры по фильтру. Наоборот, сначала параметры не видно, пока не выбрана категория»; вопрос был «как правильно для мобильных: отдельным окном или фильтр внутри категории»). ПРИМЕНЕНО: (1) НОВОЕ ОКНО EquipmentFilterModal.js + EquipmentFilterModal.styles.js (вместо удалённых EquipmentFilterPanel*: встроенная панель 425–427 удалена); в окне: шапка (filter.title + ✕), ScrollView (скролл-закон 402), ЧЕКБОКСЫ КАТЕГОРИЙ (kindsRow, filter.categories «Категории»), блок параметров СТРОГО под anyKindChecked (нет fallback «показывать всё» — not '!kindPicked'); внутри блока: Редкость (общая — тоже только после отметки, МОЁ РЕШЕНИЕ доложено владельцу) + showWeapon (weaponSection: урон/скорострельность/дистанция/тип урона/тип/патроны/качества/эффекты) + showArmor (armorSection: СУ/части тела); футер showButton «Показать (N)» (filter.show; N = countFilteredItems(filteredData) — счёт предметов с именем; foundCount в AddItemModal). (2) AddItemModal: тулбар 427 (поиск + «Фильтр (N)» условий) и listDivider ОСТАЛИСЬ; EquipmentFilterModal visible={filterOpen} после closeButton. (3) equipmentFilter.js +countFilteredItems. (4) i18n filter: +categories/show. Защёлки: 425 и 427 переведены на модальное окно (paths), 429 __tests__/gear/equipment-filter-modal-429.test.js (6: проводка/скролл-закон/строгость anyKindChecked/категорийность/Показать+словари/счётчик). 1542/157, tsc 0. .git сбрасывался ДВАЖДЫ за ход — схема с tar-бэкапом, НОВЫЕ файлы сохранять в /tmp ДО git clean. Предыдущий снимок — **428** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **428** (СВОЯ НЕДОРАБОТКА 426, доведена до слова владельца «отсечка по последнему патчу»): защёлка «baseline == старший патч» при условии 426 («цель строго > baseline») означала бы, что цель НИКОГДА не больше baseline → отсечка не срабатывает НИКОГДА (после каждого патча baseline догоняет) → каждая установка снова полный проход. ИСПРАВЛЕНО: условие отсечки `! number_le` → `! number_lt` (цель >= ключевого; для самого ключевого — мгновенная установка: sync_to_baseline сразу даёт конечное дерево). Справка usage дополнена. Защёлка baseline-cutoff: +тест условия (number_lt есть, number_le НЕТ). ВЕРИФИКАЦИЯ 428: (1) финал 426 → apply 427 (старый скрипт, полный проход) EXIT=0 1-в-1; (2) финал 427 → apply 428 (старый скрипт) EXIT=0 1-в-1; (3) МГНОВЕННЫЙ путь: клон на финале 427 + подмена скрипта с ЛОКАЛЬНЫМ КОММИТОМ подмены (иначе грязное дерево блокирует отсечку — урок 426-сценария c) → apply 428 → «Отсечка: ключевой патч №428», EXIT=0, 1-в-1; (4) bootstrap 12ad784 → apply 428 EXIT=0 1-в-1. С 429 верификация от финала предыдущего патча идёт БЫСТРЫМ путём (скрипт в клоне уже с >=). Предыдущий снимок — **427** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **427** (СЛОВО ВЛАДЕЛЬЦА: «в модалках поиск и фильтр совместить. Фильтр не скролится, отделить чертой фильтр и поиск от списка предметов… сделать чекбоксы категорий. Броня, Оружие, Силовая броня»). ПРИМЕНЕНО: (1) AddItemModal — тулбар styles.filterToolbar: поиск (styles.searchInputInToolbar, flex) + кнопка styles.filterToggle («Фильтр (N)» — activeEquipmentFilterCount, стрелка ▼/►, словарь filter.title); панель НИЖЕ тулбара (open без onToggleOpen — своей шапки больше нет), затем styles.listDivider (черта 1px) и FlatList; (2) EquipmentFilterPanel — ряд kindsRow чекбоксов ☑/☐ (options.kinds из buildEquipmentFilterOptions, подписи = СУЩЕСТВУЮЩИЙ словарь categories.* рут-i18n: Оружие/Броня/Силовая броня + ДОБАВЛЕННАЯ Одежда — без неё пряталась бы при любой отметке; 31%+2% = по 3 в ряд); адаптивные секции showWeapon/showArmor (нет отметок = все секции как в 425); (3) equipmentFilter.js — emptyEquipmentFilter.kinds=[], applyEquipmentFilter прячет не-отмеченные kind'ы (weaponMod и не-снаряжение проходят всегда), activeEquipmentFilterCount (категории + заполненные диапазоны по 1 + выбранные пункты), GEAR_KINDS-порядок weapon/armor/powerArmor/clothing. Защёлка __tests__/gear/equipment-filter-427.test.js (11); защёлка 425 обновлена (spoilerHeader → not.toContain + open&&). 1534+1 защёлка отсечки ВРЕМЕННО красная до создания патч-файла 427 (baseline==старший патч) — после генерации патча зелёная. Боковая панель фильтра (свернуть/развернуть, окно до 90% ширины) — «просто на обсуждение», НЕ кодил, ответ отправлен. Предыдущий снимок — **426** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 8d087ce..cd7f6f6 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,16 @@
+ # Changelog
++---
++## "Show" leads to results (patch 430)
++
++Defect of 429: the filter was applied, but after the "Show" button
++the window returned to the category catalog — filtered items had to
++be dug out of folders by hand. Now with an active filter the window
++immediately shows a flat, alphabetically sorted list of matches with
++a "Found: N" header (each row keeps its type label:
++Weapons/Armor/…). Reset the filter — the usual folder catalog
++returns. Also: the "Mods" section now appears in search too (it used
++to be lost).
++
+ ---
+ ## Filter — a separate window (patch 429)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a5b64e7..bd5c0bd 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## «Показать» ведёт к результатам (патч 430)
++
++Дефект 429: фильтр применялся, но после кнопки «Показать» окно
++возвращалось на экран каталога — отфильтрованные предметы приходилось
++ещё искать по папкам. Теперь при активном фильтре окно сразу
++показывает плоский отсортированный список находок с заголовком
++«Найдено: N» (у каждой строки — подпись типа: Оружие/Броня/…).
++Сбросили фильтр — вернулся обычный каталог с папками. Заодно секция
++«Моды» теперь попадает и в поиск (раньше терялась).
++
+ ---
+ ## Фильтр — отдельным окном (патч 429)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index 56f1c33..e65520a 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -52,6 +52,7 @@
+     },
+     "modsSection": "Mods",
+     "categories": "Categories",
+-    "show": "Show"
++    "show": "Show",
++    "resultsFound": "Found: {n}"
+   }
+ }
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 270f2ed..7ec3ef4 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -52,6 +52,7 @@
+     },
+     "modsSection": "Моды",
+     "categories": "Категории",
+-    "show": "Показать"
++    "show": "Показать",
++    "resultsFound": "Найдено: {n}"
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6837d9a..5f65623 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "429"
++  "baseline": "430"
+ }
+diff --git a/public/version.json b/public/version.json
+index acea24a..82e85bc 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "429",
++  "version": "430",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
