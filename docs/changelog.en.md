@@ -1,5 +1,44 @@
 # Changelog
 ---
+## Installation no longer fears local edits (patch 431)
+
+Real-life case: the project folder rolled back to an old state (the
+platform rebuilt it from git), local edits remained inside — and the
+installer refused to bring the project to the fresh version, demanding
+manual cleanup first. Now the installer itself saves all uncommitted
+edits into an archive folder `.install-backup/<date-time>/` (deletes
+nothing) and brings the project to the target version in one step.
+If the project is rebuilt from git (hosting/platform), the installer
+suggests committing the result — otherwise a rebuild brings the old
+files back.
+
+---
+## "Show" leads to results (patch 430)
+
+Defect of 429: the filter was applied, but after the "Show" button
+the window returned to the category catalog — filtered items had to
+be dug out of folders by hand. Now with an active filter the window
+immediately shows a flat, alphabetically sorted list of matches with
+a "Found: N" header (each row keeps its type label:
+Weapons/Armor/…). Reset the filter — the usual folder catalog
+returns. Also: the "Mods" section now appears in search too (it used
+to be lost).
+
+---
+## Filter — a separate window (patch 429)
+
+The owner's word about mobile screens: the item list must not hide
+behind the settings. The "Filter (N)" button in the search row now
+opens a separate window: first it shows only the category checkboxes —
+**Weapons, Armor, Power Armor, Clothing**. Parameters are NOT shown
+up front: check a category and "Rarity" plus that category's
+parameters appear (weapons — damage, fire rate, distance, damage
+type, weapon type, ammo, qualities, effects; armor — resistances and
+body parts). At the bottom, a "Show (N)" button tells how many items
+match the filter. Header and button stay put, the settings scroll.
+The main window is as before: search, filter button, full-height list.
+
+---
 ## Installing the latest version — one step (patch 428)
 
 The installer's cutoff now also fires when the target is the key

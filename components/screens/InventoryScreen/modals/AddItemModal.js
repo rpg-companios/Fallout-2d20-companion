@@ -2,16 +2,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
-import { tInventory } from '../logic/inventoryI18n';
+import { tInventory, formatInventoryText } from '../logic/inventoryI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import styles from '../../../../styles/AddItemModal.styles';
 import { describeItemBasics } from '../../../../domain/itemBasics';
-// 425: фильтры снаряжения (кроме веса) — по образцу перков.
-import EquipmentFilterPanel from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel';
+// 429: фильтр снаряжения — отдельное окно (слово владельца: на мобильных
+// экранах список не должен прятаться за панелью).
+import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal';
 import {
   buildEquipmentFilterOptions,
   emptyEquipmentFilter,
   activeEquipmentFilterCount,
+  countFilteredItems,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
   weaponModsProviding,
@@ -263,6 +265,10 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
 
   // 427: счётчик активных условий — рядом с надписью «Фильтр».
   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
+  // 430: фильтр активен — окно показывает результаты, а не каталог.
+  const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
+  const foundCount = countFilteredItems(filteredData);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -318,23 +324,34 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   };
 
   const currentData = useMemo(() => {
-    if (searchTerm) {
+    // 430 (владелец: «Нажал показать и снова я на экране каталога»):
+    // при активном фильтре — ПЛОСКИЙ отсортированный список находок,
+    // а не каталог категорий. Поиск работает так же (общий сборщик),
+    // и секция «Моды» теперь попадает в оба режима.
+    const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+    if (searchTerm || filterActive) {
       const allItems = [];
       Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
       const allLabel = tInventory('modals.addItemModal.categories.all');
-      const categoryKeys = ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`));
-      categoryKeys.forEach((category) => {
+      const flatKeys = [
+        // секция модов, подобранных под выбранные качества/эффекты (425)
+        tInventory('modals.addItemModal.filter.modsSection'),
+        ...['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+      ];
+      flatKeys.forEach((category) => {
         if (filteredData[category]?.[allLabel]) {
           allItems.push(...filteredData[category][allLabel]);
         }
       });
 
-      return {
-        items: allItems.filter((item) => item?.name?.toLowerCase().includes(searchTerm.toLowerCase())),
-      };
+      const needle = searchTerm.toLowerCase();
+      const visible = allItems.filter((item) => !searchTerm || item?.name?.toLowerCase().includes(needle));
+      // результаты — по алфавиту
+      visible.sort((a, b) => String(a?.name ?? '').localeCompare(String(b?.name ?? '')));
+      return { items: visible };
     }
 
     let data = filteredData;
@@ -347,7 +364,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (Array.isArray(data)) return { items: data };
     if (data && typeof data === 'object') return { categories: Object.keys(data) };
     return { categories: [] };
-  }, [engineLocale, filteredData, currentPath, searchTerm]);
+  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]);
 
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;
@@ -398,9 +415,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
             </>
           ) : (
             <>
-              <Text style={styles.title}>{currentPath.length > 0 ? currentPath[currentPath.length - 1] : tInventory(rootTitleKey)}</Text>
+              {/* 430: при активном фильтре заголовок — «Найдено: N». */}
+              <Text style={styles.title}>
+                {currentPath.length > 0 && !searchTerm && !filterActive
+                  ? currentPath[currentPath.length - 1]
+                  : (filterActive
+                    ? formatInventoryText(tInventory('modals.addItemModal.filter.resultsFound'), { n: foundCount })
+                    : tInventory(rootTitleKey))}
+              </Text>
 
-              {currentPath.length > 0 && !searchTerm && (
+              {currentPath.length > 0 && !searchTerm && !filterActive && (
                 <TouchableOpacity style={styles.backButton} onPress={() => setCurrentPath(currentPath.slice(0, -1))}>
                   <Text style={styles.backButtonText}>{tInventory('modals.addItemModal.back')}</Text>
                 </TouchableOpacity>
@@ -424,14 +448,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                 </TouchableOpacity>
               </View>
 
-              <EquipmentFilterPanel
-                options={filterOptions}
-                filter={equipmentFilter ?? emptyEquipmentFilter()}
-                onChange={(next) => setEquipmentFilter(next)}
-                onReset={() => setEquipmentFilter(null)}
-                open={filterOpen}
-              />
-
               <View style={styles.listDivider} />
 
               <FlatList
@@ -443,6 +459,17 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <Text style={styles.closeButtonText}>{tInventory('modals.addItemModal.close')}</Text>
               </TouchableOpacity>
+
+              {/* 429: окно фильтра — настройки не прячут список предметов. */}
+              <EquipmentFilterModal
+                visible={filterOpen}
+                options={filterOptions}
+                filter={equipmentFilter ?? emptyEquipmentFilter()}
+                onChange={(next) => setEquipmentFilter(next)}
+                onReset={() => setEquipmentFilter(null)}
+                onClose={() => setFilterOpen(false)}
+                foundCount={foundCount}
+              />
             </>
           )}
         </SafeAreaView>

@@ -99,7 +99,8 @@ describe('Патч 427: счётчик активных условий на кн
 
 describe('Патч 427: проводка окна — поиск+фильтр одной строкой, черта, панель закреплена', () => {
   const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
-  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterPanel.js', 'utf8');
+  // 429: панель переехала в отдельное окно EquipmentFilterModal.
+  const panel = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js', 'utf8');
   const modalStyles = () => readFileSync('styles/AddItemModal.styles.js', 'utf8');
 
   it('в окне поиск и кнопка «Фильтр» в одной строке (тулбар), черта перед списком', () => {
@@ -108,12 +109,12 @@ describe('Патч 427: проводка окна — поиск+фильтр о
     expect(code).toContain('styles.searchInputInToolbar');
     expect(code).toContain('styles.filterToggle');
     expect(code).toContain('styles.listDivider');
-    // кнопка открывает/закрывает панель (у панели своей шапки больше нет)
+    // кнопка открывает/закрывает окно фильтра (429)
     expect(code).toContain('setFilterOpen((prev) => !prev)');
     expect(code).toContain('activeEquipmentFilterCount(equipmentFilter)');
-    // панель без onToggleOpen — управляется снаружи
-    expect(code).toContain('open={filterOpen}');
+    expect(code).toContain('visible={filterOpen}');
     expect(code).not.toContain('onToggleOpen');
+    expect(code).not.toContain('EquipmentFilterPanel');
   });
 
   it('в стилях окна есть тулбар и черта', () => {
@@ -134,8 +135,8 @@ describe('Патч 427: проводка окна — поиск+фильтр о
     expect(code).toContain('kinds.includes');
   });
 
-  it('стили панели: ряд категорий и ячейки-чекбоксы на месте (по 3 в ряд)', () => {
-    const stylesCode = readFileSync('modules/fallout/styles/EquipmentFilterPanel.styles.js', 'utf8');
+  it('стили окна: ряд категорий и ячейки-чекбоксы на месте (по 3 в ряд)', () => {
+    const stylesCode = readFileSync('modules/fallout/styles/EquipmentFilterModal.styles.js', 'utf8');
     expect(stylesCode).toContain('kindsRow');
     // квадраты по 3 в ряд — ширина ячейки 31% + отступ 2%
     expect(stylesCode).toContain("width: '31%'");

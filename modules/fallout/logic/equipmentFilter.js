@@ -267,6 +267,19 @@ export const weaponModsProviding = (filter, locale) => {
 };
 
 /**
+ * 429: сколько предметов покажет список при таком дереве (после фильтра
+ * и потолка редкости) — для кнопки «Показать (N)» в окне фильтра.
+ * Считаются только предметы (объекты с именем); заголовки групп — нет.
+ */
+export const countFilteredItems = (node) => {
+  if (Array.isArray(node)) {
+    return node.reduce((sum, item) => sum + (item && typeof item === 'object' && item.name ? 1 : 0), 0);
+  }
+  if (!node || typeof node !== 'object') return 0;
+  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value), 0);
+};
+
+/**
  * Обрезка дерева категорий по фильтру (как потолок редкости): пустые ветки
  * после отсева не показываются. Предметы вне снаряжения проходят всегда.
  */
