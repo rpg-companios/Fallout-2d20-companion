@@ -29,6 +29,22 @@ describe('Патч 426: отсечка установщика по послед�
     expect(Object.keys(JSON.parse(raw))).toEqual(['baseline']);
   });
 
+  it('установщик (431): грязное дерево — правки в архив, затем отсечка', () => {
+    const script = () => readFileSync('apply-patch.sh', 'utf8');
+    const code = script();
+    // правки сохраняются в папку-архив, установка продолжается отсечкой
+    expect(code).toContain('.install-backup');
+    expect(code).toContain('cp -R "$ROOT_DIR/$part" "$backup_dir/$part"');
+    // старое поведение «отсечка не применяется из-за правок» исчезло
+    expect(code).not.toContain('не применяется: в дереве незакоммиченные изменения');
+    // сам архив не попадает в список правок (иначе архив рос бы сам)
+    expect(code).toContain("grep -vE '^\\?\\? \\.install-backup/'");
+    // подсказка про пересборку из git — только когда архив создавался
+    expect(code).toContain('если проект пересобирается из git');
+    // полный проход остался для случаев без отсечки
+    expect(code).toContain('Идёт полный проход по цепочке');
+  });
+
   it('установщик (428): отсечка срабатывает и при цели == ключевой патч', () => {
     const script = () => readFileSync('apply-patch.sh', 'utf8');
     // Защёлка «baseline == старший патч» при старом условии («цель строго

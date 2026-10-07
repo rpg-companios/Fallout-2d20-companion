@@ -292,26 +292,53 @@ if [[ -n "${BASELINE_NUM:-}" ]]; then
 fi
 
 if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' || true)"
+  # 431: незакоммиченные правки не останавливают установку. Прежде чем
+  # привести дерево к ключевому патчу, установщик сохраняет их в папку-
+  # архив .install-backup/<дата-время>/ (ничего не удаляет). Полный
+  # проход остался для случаев без отсечки (нет ключевого патча/истории).
+  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
+  backup_dir=""
   if [[ -n "$local_dirty" ]]; then
-    echo "Отсечка №$BASELINE_NUM не применяется: в дереве незакоммиченные изменения."
-    echo "Идёт полный проход по цепочке."
+    backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"
+    mkdir -p "$backup_dir"
+    while IFS= read -r line; do
+      entry="${line:3}"
+      if [[ "$entry" == *" -> "* ]]; then
+        for part in "${entry%% -> *}" "${entry##* -> }"; do
+          if [[ -n "$part" && -e "$ROOT_DIR/$part" ]]; then
+            mkdir -p "$backup_dir/$(dirname "$part")"
+            cp -R "$ROOT_DIR/$part" "$backup_dir/$part"
+          fi
+        done
+        continue
+      fi
+      [[ -z "$entry" || ! -e "$ROOT_DIR/$entry" ]] && continue
+      mkdir -p "$backup_dir/$(dirname "$entry")"
+      cp -R "$ROOT_DIR/$entry" "$backup_dir/$entry"
+    done <<<"$local_dirty"
+    echo "В дереве незакоммиченные изменения. Прежде чем привести дерево к №$BASELINE_NUM,"
+    echo "установщик сохранил их в папку относительно проекта:"
+    echo "  .install-backup/$(basename "$backup_dir")"
     echo
-  else
-    BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
-    if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
-      FAST_MODE=1
-      echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
-      echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
-      echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
-      echo "по одному они не применяются и в «Применено» не попадут."
-      echo
-      sync_to_baseline
-    else
-      echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
-      echo "Идёт полный проход по цепочке."
+  fi
+  BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
+  if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
+    FAST_MODE=1
+    echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
+    echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
+    echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
+    echo "по одному они не применяются и в «Применено» не попадут."
+    echo
+    sync_to_baseline
+    if [[ -n "$backup_dir" ]]; then
+      echo "Подсказка: если проект пересобирается из git (хостинг/платформа), закоммитьте"
+      echo "результат установки — иначе пересборка вернёт прежние файлы."
       echo
     fi
+  else
+    echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
+    echo "Идёт полный проход по цепочке."
+    echo
   fi
 fi
 

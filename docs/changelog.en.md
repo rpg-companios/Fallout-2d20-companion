@@ -1,5 +1,18 @@
 # Changelog
 ---
+## Installation no longer fears local edits (patch 431)
+
+Real-life case: the project folder rolled back to an old state (the
+platform rebuilt it from git), local edits remained inside — and the
+installer refused to bring the project to the fresh version, demanding
+manual cleanup first. Now the installer itself saves all uncommitted
+edits into an archive folder `.install-backup/<date-time>/` (deletes
+nothing) and brings the project to the target version in one step.
+If the project is rebuilt from git (hosting/platform), the installer
+suggests committing the result — otherwise a rebuild brings the old
+files back.
+
+---
 ## "Show" leads to results (patch 430)
 
 Defect of 429: the filter was applied, but after the "Show" button
