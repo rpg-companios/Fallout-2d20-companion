@@ -1,0 +1,191 @@
+diff --git a/.gitignore b/.gitignore
+index 34cbeaf..aa9f93b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -40,3 +40,6 @@ yarn-error.*
+ сеттинги/
+ settings/pins.json
+ package-lock — копия.json
++
++# архив локальных правок перед установкой (патч 431)
++.install-backup/
+diff --git a/__tests__/patches/baseline-cutoff.test.js b/__tests__/patches/baseline-cutoff.test.js
+index 114ca66..dfb661f 100644
+--- a/__tests__/patches/baseline-cutoff.test.js
++++ b/__tests__/patches/baseline-cutoff.test.js
+@@ -29,6 +29,22 @@ describe('Патч 426: отсечка установщика по послед
+     expect(Object.keys(JSON.parse(raw))).toEqual(['baseline']);
+   });
+ 
++  it('установщик (431): грязное дерево — правки в архив, затем отсечка', () => {
++    const script = () => readFileSync('apply-patch.sh', 'utf8');
++    const code = script();
++    // правки сохраняются в папку-архив, установка продолжается отсечкой
++    expect(code).toContain('.install-backup');
++    expect(code).toContain('cp -R "$ROOT_DIR/$part" "$backup_dir/$part"');
++    // старое поведение «отсечка не применяется из-за правок» исчезло
++    expect(code).not.toContain('не применяется: в дереве незакоммиченные изменения');
++    // сам архив не попадает в список правок (иначе архив рос бы сам)
++    expect(code).toContain("grep -vE '^\\?\\? \\.install-backup/'");
++    // подсказка про пересборку из git — только когда архив создавался
++    expect(code).toContain('если проект пересобирается из git');
++    // полный проход остался для случаев без отсечки
++    expect(code).toContain('Идёт полный проход по цепочке');
++  });
++
+   it('установщик (428): отсечка срабатывает и при цели == ключевой патч', () => {
+     const script = () => readFileSync('apply-patch.sh', 'utf8');
+     // Защёлка «baseline == старший патч» при старом условии («цель строго
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 1db0f96..fda2676 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -292,26 +292,53 @@ if [[ -n "${BASELINE_NUM:-}" ]]; then
+ fi
+ 
+ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
+-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' || true)"
++  # 431: незакоммиченные правки не останавливают установку. Прежде чем
++  # привести дерево к ключевому патчу, установщик сохраняет их в папку-
++  # архив .install-backup/<дата-время>/ (ничего не удаляет). Полный
++  # проход остался для случаев без отсечки (нет ключевого патча/истории).
++  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
++  backup_dir=""
+   if [[ -n "$local_dirty" ]]; then
+-    echo "Отсечка №$BASELINE_NUM не применяется: в дереве незакоммиченные изменения."
+-    echo "Идёт полный проход по цепочке."
++    backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"
++    mkdir -p "$backup_dir"
++    while IFS= read -r line; do
++      entry="${line:3}"
++      if [[ "$entry" == *" -> "* ]]; then
++        for part in "${entry%% -> *}" "${entry##* -> }"; do
++          if [[ -n "$part" && -e "$ROOT_DIR/$part" ]]; then
++            mkdir -p "$backup_dir/$(dirname "$part")"
++            cp -R "$ROOT_DIR/$part" "$backup_dir/$part"
++          fi
++        done
++        continue
++      fi
++      [[ -z "$entry" || ! -e "$ROOT_DIR/$entry" ]] && continue
++      mkdir -p "$backup_dir/$(dirname "$entry")"
++      cp -R "$ROOT_DIR/$entry" "$backup_dir/$entry"
++    done <<<"$local_dirty"
++    echo "В дереве незакоммиченные изменения. Прежде чем привести дерево к №$BASELINE_NUM,"
++    echo "установщик сохранил их в папку относительно проекта:"
++    echo "  .install-backup/$(basename "$backup_dir")"
+     echo
+-  else
+-    BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
+-    if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
+-      FAST_MODE=1
+-      echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
+-      echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
+-      echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
+-      echo "по одному они не применяются и в «Применено» не попадут."
+-      echo
+-      sync_to_baseline
+-    else
+-      echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
+-      echo "Идёт полный проход по цепочке."
++  fi
++  BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
++  if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
++    FAST_MODE=1
++    echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
++    echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
++    echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
++    echo "по одному они не применяются и в «Применено» не попадут."
++    echo
++    sync_to_baseline
++    if [[ -n "$backup_dir" ]]; then
++      echo "Подсказка: если проект пересобирается из git (хостинг/платформа), закоммитьте"
++      echo "результат установки — иначе пересборка вернёт прежние файлы."
+       echo
+     fi
++  else
++    echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
++    echo "Идёт полный проход по цепочке."
++    echo
+   fi
+ fi
+ 
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index f78a232..e6935d3 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-05 (430)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-07 (431)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **431** (АВАРИЙНАЯ ПОЧИНКА УСТАНОВЩИКА по логу владельца: у него в ~/workspace папка ОТКАТИЛАСЬ к старому состоянию (пересборка платформы из git: «стоит: 6» = контент publish-коммита 529824d ≈ эра патча 274) + локальные правки → «Отсечка не применяется: незакоммиченные изменения» → полный проход → ОСТАНОВКА на 275. Это же объясняет «пропавший файл» EquipmentFilterModal при сборке: установка 429 жила в папке НЕЗАКОММИЧЕННО и была стёрта откатом). ПРИМЕНЕНО: apply-patch.sh — грязное дерево при доступной отсечке БОЛЬШЕ НЕ БЛОКИРУЕТ: все porcelain-записи (кроме apply-patch.sh и .install-backup/) копируются в `.install-backup/<дата-время>/` (cp -R, ничего не удаляется; rename-записи — обе стороны), затем отсечка приводит дерево к цели; после синхронизации при созданном архиве — подсказка «закоммитьте результат, если проект пересобирается из git». Полный проход остался только для «нет ключевого патча/истории». .install-backup/ в .gitignore. ВЛАДЕЛЬЦУ ДАНЫ КОМАНДЫ СПАСЕНИЯ (старый установщик ещё у него): git diff > update-backup.txt; git checkout -- .; git clean -fd; ./apply-patch.sh 430. Защёлка baseline-cutoff: +тест 431 (архив вместо отказа). 1549/158, tsc 0. ВОПРОСЫ К ВЛАДЕЛЬЦУ БЕЗ ОТВЕТА: (1) что в metro.config.js правилось (установка могла перезаписать); (2) два вопроса секции «Моды»; (3) редкость в окне фильтра — сейчас только после отметки категории. Предыдущий снимок — **430** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **430** (ДЕФЕКТ 429, слово владельца: «а фильтр то показывает отсортированные материалы? У меня нет. Я выбрал броню, выбрал редкость 5. Нажал показать и снова я на экране каталога» — фильтр применялся, но «Показать» возвращало на каталог). ПРИМЕНЕНО: AddItemModal — currentData при filterActive (не пуст) даёт ПЛОСКИЙ ОТСОРТИРОВАННЫЙ список (общий сборщик с поиском: weapon/armor/clothing/robotEquipment по группам + flatKeys = [modsSection, ammo, chems, drinks, food, items, materials, junk] по «Все»; visible.sort по имени); заголовок окна при активном фильтре = formatInventoryText(filter.resultsFound, {n: foundCount}) «Найдено: N»; «Назад» и каталог — только при пустом фильтре (условие currentPath.length>0 && !searchTerm && !filterActive). ПОПУТНО ПОЧИНЕНО: «Моды» не попадали в плоский список поиска 425. i18n filter.resultsFound ru «Найдено: {n}»/en «Found: {n}». Защёлка __tests__/gear/equipment-filter-results-430.test.js (6). 1548/158, tsc 0. ВАЖНО ОБ УСТАНОВКЕ У ВЛАДЕЛЬЦА: у него в папке ЛОКАЛЬНЫЕ правки metro.config.js — установка 429 прошла быстрым путём (дерево приведено к 429: metro.config.js ПЕРЕЗАПИСАН версией из репо!) и владелец предупреждён прислать что там правилось, если веб-сборка сломается. Предыдущий снимок — **429** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **429** (СЛОВО ВЛАДЕЛЬЦА через ask_user: «Отдельное окно, с чекбоксами категорий. И только когда выбран чекбокс — показать параметры категории, а не сразу всё, а потом отсекать параметры по фильтру. Наоборот, сначала параметры не видно, пока не выбрана категория»; вопрос был «как правильно для мобильных: отдельным окном или фильтр внутри категории»). ПРИМЕНЕНО: (1) НОВОЕ ОКНО EquipmentFilterModal.js + EquipmentFilterModal.styles.js (вместо удалённых EquipmentFilterPanel*: встроенная панель 425–427 удалена); в окне: шапка (filter.title + ✕), ScrollView (скролл-закон 402), ЧЕКБОКСЫ КАТЕГОРИЙ (kindsRow, filter.categories «Категории»), блок параметров СТРОГО под anyKindChecked (нет fallback «показывать всё» — not '!kindPicked'); внутри блока: Редкость (общая — тоже только после отметки, МОЁ РЕШЕНИЕ доложено владельцу) + showWeapon (weaponSection: урон/скорострельность/дистанция/тип урона/тип/патроны/качества/эффекты) + showArmor (armorSection: СУ/части тела); футер showButton «Показать (N)» (filter.show; N = countFilteredItems(filteredData) — счёт предметов с именем; foundCount в AddItemModal). (2) AddItemModal: тулбар 427 (поиск + «Фильтр (N)» условий) и listDivider ОСТАЛИСЬ; EquipmentFilterModal visible={filterOpen} после closeButton. (3) equipmentFilter.js +countFilteredItems. (4) i18n filter: +categories/show. Защёлки: 425 и 427 переведены на модальное окно (paths), 429 __tests__/gear/equipment-filter-modal-429.test.js (6: проводка/скролл-закон/строгость anyKindChecked/категорийность/Показать+словари/счётчик). 1542/157, tsc 0. .git сбрасывался ДВАЖДЫ за ход — схема с tar-бэкапом, НОВЫЕ файлы сохранять в /tmp ДО git clean. Предыдущий снимок — **428** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **428** (СВОЯ НЕДОРАБОТКА 426, доведена до слова владельца «отсечка по последнему патчу»): защёлка «baseline == старший патч» при условии 426 («цель строго > baseline») означала бы, что цель НИКОГДА не больше baseline → отсечка не срабатывает НИКОГДА (после каждого патча baseline догоняет) → каждая установка снова полный проход. ИСПРАВЛЕНО: условие отсечки `! number_le` → `! number_lt` (цель >= ключевого; для самого ключевого — мгновенная установка: sync_to_baseline сразу даёт конечное дерево). Справка usage дополнена. Защёлка baseline-cutoff: +тест условия (number_lt есть, number_le НЕТ). ВЕРИФИКАЦИЯ 428: (1) финал 426 → apply 427 (старый скрипт, полный проход) EXIT=0 1-в-1; (2) финал 427 → apply 428 (старый скрипт) EXIT=0 1-в-1; (3) МГНОВЕННЫЙ путь: клон на финале 427 + подмена скрипта с ЛОКАЛЬНЫМ КОММИТОМ подмены (иначе грязное дерево блокирует отсечку — урок 426-сценария c) → apply 428 → «Отсечка: ключевой патч №428», EXIT=0, 1-в-1; (4) bootstrap 12ad784 → apply 428 EXIT=0 1-в-1. С 429 верификация от финала предыдущего патча идёт БЫСТРЫМ путём (скрипт в клоне уже с >=). Предыдущий снимок — **427** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index cd7f6f6..77adfa7 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,17 @@
+ # Changelog
++---
++## Installation no longer fears local edits (patch 431)
++
++Real-life case: the project folder rolled back to an old state (the
++platform rebuilt it from git), local edits remained inside — and the
++installer refused to bring the project to the fresh version, demanding
++manual cleanup first. Now the installer itself saves all uncommitted
++edits into an archive folder `.install-backup/<date-time>/` (deletes
++nothing) and brings the project to the target version in one step.
++If the project is rebuilt from git (hosting/platform), the installer
++suggests committing the result — otherwise a rebuild brings the old
++files back.
++
+ ---
+ ## "Show" leads to results (patch 430)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index bd5c0bd..a4f9eb5 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,18 @@
+ # История изменений
+ 
++---
++## Установка больше не боится локальных правок (патч 431)
++
++Случай из жизни: папка проекта откатилась к старому состоянию
++(платформа пересобрала её из git), внутри остались свои правки — и
++установщик отказывался приводить проект к свежей версии, требуя
++сначала разобраться с правками вручную. Теперь установщик сам
++сохраняет все незакоммиченные правки в папку-архив
++`.install-backup/<дата-время>/` (ничего не удаляет) и приводит
++проект к нужной версии одним шагом. Если проект пересобирается из
++git (хостинг/платформа) — установщик подсказывает закоммитить
++результат, иначе пересборка вернёт прежние файлы.
++
+ ---
+ ## «Показать» ведёт к результатам (патч 430)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 5f65623..5a54d03 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "430"
++  "baseline": "431"
+ }
+diff --git a/public/version.json b/public/version.json
+index 82e85bc..9f70574 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "430",
++  "version": "431",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
