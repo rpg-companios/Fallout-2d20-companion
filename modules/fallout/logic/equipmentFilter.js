@@ -287,6 +287,25 @@ export const countFilteredItems = (node, gearOnly = false) => {
 };
 
 /**
+ * 429/432: счётчик кнопки «Показать (N)» по дереву окна (после фильтра
+ * и потолка редкости). labels — локализованные подписи категорий
+ * снаряжения и секции модов, ИЗ ТОГО ЖЕ словаря, которым построены
+ * ключи дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт
+ * всегда ноль). Без активного фильтра считаем всё дерево; при
+ * активном — только эти группы и ТОЛЬКО снаряжение/моды: ровно то,
+ * что попадёт в список результатов.
+ */
+export const countFoundItems = (filteredTree, labels, filterActive) => {
+  if (!filterActive) return countFilteredItems(filteredTree);
+  const part = {};
+  const groupLabels = [...(labels?.gear ?? []), ...(labels?.modsSection ? [labels.modsSection] : [])];
+  for (const label of groupLabels) {
+    if (filteredTree && filteredTree[label] !== undefined) part[label] = filteredTree[label];
+  }
+  return countFilteredItems(part, true);
+};
+
+/**
  * Обрезка дерева категорий по фильтру (как потолок редкости): пустые ветки
  * после отсева не показываются. Предметы вне снаряжения проходят всегда.
  */

@@ -13,7 +13,7 @@ import {
   buildEquipmentFilterOptions,
   emptyEquipmentFilter,
   activeEquipmentFilterCount,
-  countFilteredItems,
+  countFoundItems,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
   weaponModsProviding,
@@ -267,17 +267,17 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
   // 430: фильтр активен — окно показывает результаты, а не каталог.
   const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
-  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
-  // 432: при активном фильтре считаем ТЕ ЖЕ группы, что и показываем
-  // (снаряжение + моды) — расходники в фильтре не участвуют.
-  const foundCount = useMemo(() => {
-    if (!filterActive) return countFilteredItems(filteredData);
-    const countTree = {};
-    [...['weapon', 'armor', 'powerArmor', 'clothing'], tInventory('modals.addItemModal.filter.modsSection')].forEach((key) => {
-      if (filteredData[key] !== undefined) countTree[key] = filteredData[key];
-    });
-    return countFilteredItems(countTree, true);
-  }, [filteredData, filterActive, engineLocale]);
+  // 429/432/433: сколько предметов найдётся — для кнопки «Показать (N)».
+  // Подписи категорий берутся ИЗ ТОГО ЖЕ словаря, которым построены
+  // ключи дерева окна (урок 433: служебные ключи давали всегда 0).
+  const filterLabels = useMemo(() => ({
+    gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+    modsSection: tInventory('modals.addItemModal.filter.modsSection'),
+  }), [engineLocale]);
+  const foundCount = useMemo(
+    () => countFoundItems(filteredData, filterLabels, filterActive),
+    [filteredData, filterLabels, filterActive],
+  );
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');

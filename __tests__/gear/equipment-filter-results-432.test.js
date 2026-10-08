@@ -10,7 +10,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { setCurrentLocale } from '../../i18n/locale';
-import { countFilteredItems } from '../../modules/fallout/logic/equipmentFilter';
+import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
+import { countFilteredItems, countFoundItems } from '../../modules/fallout/logic/equipmentFilter';
 
 setCurrentLocale('ru-RU');
 
@@ -28,11 +29,13 @@ describe('Патч 432: в результатах фильтра — тольк�
     expect(code).toContain("...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk']");
   });
 
-  it('счётчик «Показать (N)» считает те же группы, что и список', () => {
+  it('счётчик «Показать (N)» — countFoundItems по словарным подписям (урок 433)', () => {
     const code = modal();
-    expect(code).toContain('countFilteredItems(countTree, true)');
-    expect(code).toContain('[...[\'weapon\', \'armor\', \'powerArmor\', \'clothing\'], tInventory(\'modals.addItemModal.filter.modsSection\')]');
-    expect(code).toContain('[filteredData, filterActive, engineLocale]');
+    // 433: служебные ключи «weapon» промахивались мимо дерева с подписями
+    // («Оружие») — счётчик показывал всегда 0. Теперь подписи из того же
+    // словаря, что ключи дерева, а счёт — поведенческим тестом ниже.
+    expect(code).toContain('countFoundItems(filteredData, filterLabels, filterActive)');
+    expect(code).toContain("tInventory(`modals.addItemModal.categories.${key}`)");
   });
 
   it('зависимости useMemo включают filterActive', () => {
@@ -55,5 +58,34 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и �
   it('без gearOnly (обычный каталог/поиск) — считаются все предметы', () => {
     expect(countFilteredItems(tree)).toBe(5);
     expect(countFilteredItems(null)).toBe(0);
+  });
+});
+
+// 433: поведенческий тест счётчика «Показать (N)» — на ТЕХ ЖЕ словарных
+// подписях, которыми окно строит дерево. Поймал бы баг «всегда 0».
+describe('Патч 433: счётчик «Показать (N)» считается по словарным подписям дерева', () => {
+  const gearLabel = (key) => tInventory(`modals.addItemModal.categories.${key}`);
+  const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
+  const labels = {
+    gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map(gearLabel),
+    modsSection: modsLabel,
+  };
+
+  it('снаряжение и моды считаются, расходники — нет; ключи — словарные', () => {
+    const tree = {
+      [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Пистолет', itemType: 'weapon' }] },
+      [gearLabel('armor')]: { 'Всё': [{ name: 'Кожанка', itemType: 'armor' }] },
+      [modsLabel]: { 'Всё': [{ name: 'Прицел', itemType: 'weaponMod' }] },
+      [gearLabel('ammo')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Патрон', itemType: 'ammo' }] },
+      [gearLabel('junk')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Банка', itemType: 'junk' }] },
+    };
+    expect(countFoundItems(tree, labels, true)).toBe(3);
+    expect(countFoundItems(tree, labels, false)).toBe(5);
+  });
+
+  it('пустые и отсутствующие группы не ломают счёт', () => {
+    expect(countFoundItems({ [modsLabel]: { 'Всё': [] } }, labels, true)).toBe(0);
+    expect(countFoundItems(null, labels, true)).toBe(0);
+    expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Нож', itemType: 'weapon' }] } }, labels, false)).toBe(1);
   });
 });

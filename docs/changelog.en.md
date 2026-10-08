@@ -1,5 +1,14 @@
 # Changelog
 ---
+## The "Show" count is honest again (patch 433)
+
+Defect of 432: the found-items counter counted groups by service
+keys while the window is grouped by dictionary labels — so it always
+showed 0. Now it counts exactly the groups that reach the results,
+by the same labels; locked in with a behavioral test on the
+dictionary.
+
+---
 ## Filter results contain only what matched (patch 432)
 
 Defect of 430: picking "Weapons, rarity 6" in the filter still listed
