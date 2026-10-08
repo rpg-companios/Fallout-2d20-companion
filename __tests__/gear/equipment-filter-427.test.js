@@ -121,6 +121,10 @@ describe('Патч 427: проводка окна — поиск+фильтр о
     const code = modalStyles();
     expect(code).toContain('filterToolbar');
     expect(code).toContain('searchInputInToolbar');
+    // 436 (владелец: «поиск и фильтр не влезают… фильтр ушёл за границу
+    // модалки»): на вебе поле не сжималось ниже врождённой ширины и
+    // выталкивало кнопку — minWidth: 0 разрешает сжатие
+    expect(code).toContain('minWidth: 0');
     expect(code).toContain('filterToggle');
     expect(code).toContain('listDivider');
   });

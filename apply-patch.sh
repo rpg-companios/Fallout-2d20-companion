@@ -324,7 +324,10 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID
       if [[ "$entry" == *" -> "* ]]; then entry="${entry%% -> *}"; fi
       [[ -n "$entry" ]] && printf '  - %s\n' "$entry"
     done <<<"$local_dirty"
-    echo "Если среди них нет ничего ценного — эту папку можно удалить."
+    echo "Если новая версия не понравится, вернуть всё как было можно одной командой"
+    echo "(из папки проекта):"
+    echo "  cp -R .install-backup/$(basename "$backup_dir")/. ."
+    echo "Если среди сохранённого нет ничего ценного — эту папку можно удалить."
     echo
   fi
   BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"

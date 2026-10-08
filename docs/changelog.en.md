@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Search and filter fit inside the window again (patch 436)
+
+Defect: in the loot and buy windows the search field refused to
+shrink below its intrinsic width, pushing the filter button beyond
+the window border. Now the row uses exactly the space it is given.
+The installer also names the rollback command right away: if the new
+version is not to your liking, one line from the .install-backup
+folder brings everything back.
+
+---
 ## Installer hints follow your workflow (patch 435)
 
 The owner's word: it is easier to accumulate commits and record them

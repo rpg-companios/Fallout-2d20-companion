@@ -55,6 +55,9 @@ describe('Патч 426: отсечка установщика по послед�
     expect(code).toContain('запустите установку ещё раз');
     expect(code).toContain('В папке проекта были ваши правки.');
     expect(code).toContain('эту папку можно удалить');
+    // 436: установщик сам называет команду отката («пурга» -> вернуть как было)
+    expect(code).toContain('cp -R .install-backup/$(basename "$backup_dir")/. .');
+    expect(code).toContain('вернуть всё как было');
     // старые канцеляризмы исчезли
     expect(code).not.toContain('Ничего не нужно');
     expect(code).not.toContain('не применяются и в «Применено» не попадут');

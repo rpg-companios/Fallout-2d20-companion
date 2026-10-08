@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
   // 427: поиск и кнопка «Фильтр» — одна строка над панелью; черта отделяет
   // их от списка предметов.
   filterToolbar: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  searchInputInToolbar: { flex: 1, marginBottom: 0 },
+  searchInputInToolbar: { flex: 1, minWidth: 0, marginBottom: 0 },
   filterToggle: { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
   filterToggleText: { fontSize: 14, fontWeight: 'bold', color: '#333' },
   listDivider: { height: 1, backgroundColor: '#bbb', marginVertical: 6 },
