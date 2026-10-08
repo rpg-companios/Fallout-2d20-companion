@@ -268,7 +268,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   // 430: фильтр активен — окно показывает результаты, а не каталог.
   const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
   // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
-  const foundCount = countFilteredItems(filteredData);
+  // 432: при активном фильтре считаем ТЕ ЖЕ группы, что и показываем
+  // (снаряжение + моды) — расходники в фильтре не участвуют.
+  const foundCount = useMemo(() => {
+    if (!filterActive) return countFilteredItems(filteredData);
+    const countTree = {};
+    [...['weapon', 'armor', 'powerArmor', 'clothing'], tInventory('modals.addItemModal.filter.modsSection')].forEach((key) => {
+      if (filteredData[key] !== undefined) countTree[key] = filteredData[key];
+    });
+    return countFilteredItems(countTree, true);
+  }, [filteredData, filterActive, engineLocale]);
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -326,20 +335,26 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const currentData = useMemo(() => {
     // 430 (владелец: «Нажал показать и снова я на экране каталога»):
     // при активном фильтре — ПЛОСКИЙ отсортированный список находок,
-    // а не каталог категорий. Поиск работает так же (общий сборщик),
-    // и секция «Моды» теперь попадает в оба режима.
-    const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+    // а не каталог категорий. 432 (владелец: «выбрал оружие с редкостью
+    // от 6 до 6, а в списке боеприпасы, химия, хлам»): в результатах
+    // фильтра — только снаряжение, прошедшее условия, и подобранные
+    // моды; расходники и хлам живут в обычном каталоге и в поиске.
     if (searchTerm || filterActive) {
       const allItems = [];
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      const gearGroupKeys = ['weapon', 'armor', 'powerArmor', 'clothing'];
+      // поиск дополнительно собирает снаряжение роботов;
+      // при активном фильтре только эти четыре вида снаряжения
+      const groupKeys = filterActive ? gearGroupKeys : [...gearGroupKeys, 'robotEquipment'];
+      groupKeys.forEach((key) => {
+        const group = filteredData[tInventory(`modals.addItemModal.categories.${key}`)] || {};
+        Object.values(group).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      });
       const allLabel = tInventory('modals.addItemModal.categories.all');
       const flatKeys = [
         // секция модов, подобранных под выбранные качества/эффекты (425)
         tInventory('modals.addItemModal.filter.modsSection'),
-        ...['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+        // расходники/хлам — только в поиске, в фильтре они не участвуют
+        ...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`))),
       ];
       flatKeys.forEach((category) => {
         if (filteredData[category]?.[allLabel]) {
@@ -364,7 +379,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (Array.isArray(data)) return { items: data };
     if (data && typeof data === 'object') return { categories: Object.keys(data) };
     return { categories: [] };
-  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]);
+  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]);
 
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;

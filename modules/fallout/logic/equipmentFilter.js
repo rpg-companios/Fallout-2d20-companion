@@ -267,16 +267,23 @@ export const weaponModsProviding = (filter, locale) => {
 };
 
 /**
- * 429: сколько предметов покажет список при таком дереве (после фильтра
- * и потолка редкости) — для кнопки «Показать (N)» в окне фильтра.
- * Считаются только предметы (объекты с именем); заголовки групп — нет.
+ * 429: сколько предметов покажет список (после фильтра и потолка
+ * редкости) — для кнопки «Показать (N)» в окне фильтра. Считаются
+ * только предметы (объекты с именем); заголовки групп — нет.
+ * 432: gearOnly — считать только снаряжение и моды (расходники/хлам
+ * в результатах фильтра не участвуют и в список не выводятся).
  */
-export const countFilteredItems = (node) => {
+export const countFilteredItems = (node, gearOnly = false) => {
+  const counts = (item) => {
+    if (!item || typeof item !== 'object' || !item.name) return false;
+    if (!gearOnly) return true;
+    return GEAR_KINDS.includes(item.itemType) || item.itemType === 'weaponMod';
+  };
   if (Array.isArray(node)) {
-    return node.reduce((sum, item) => sum + (item && typeof item === 'object' && item.name ? 1 : 0), 0);
+    return node.reduce((sum, item) => sum + (counts(item) ? 1 : 0), 0);
   }
   if (!node || typeof node !== 'object') return 0;
-  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value), 0);
+  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value, gearOnly), 0);
 };
 
 /**

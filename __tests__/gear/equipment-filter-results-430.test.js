@@ -41,9 +41,9 @@ describe('Патч 430: «Показать» ведёт к результата�
     expect(block).toContain("tInventory('modals.addItemModal.filter.modsSection')");
   });
 
-  it('зависимости useMemo включают фильтр', () => {
+  it('зависимости useMemo включают фильтр (432 добавил filterActive)', () => {
     const code = modal();
-    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]');
+    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]');
   });
 
   it('словарь: «Найдено: {n}» тем же резолвером (закон 422)', () => {

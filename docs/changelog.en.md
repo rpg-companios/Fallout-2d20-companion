@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Filter results contain only what matched (patch 432)
+
+Defect of 430: picking "Weapons, rarity 6" in the filter still listed
+ammo, chems and junk in the results — consumables were never cut by
+the filter, since the filter targets gear. Now the results contain
+only gear that matched plus the selected mods; consumables and junk
+stay in the usual catalog and in search. The number on the "Show"
+button is now honest — it counts exactly what will be shown. Also,
+Power Armor was added to the flat lists (filter and search) — it used
+to be missing there.
+
+---
 ## Installation no longer fears local edits (patch 431)
 
 Real-life case: the project folder rolled back to an old state (the
