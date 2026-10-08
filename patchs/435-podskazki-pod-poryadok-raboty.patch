@@ -1,0 +1,139 @@
+diff --git a/__tests__/patches/baseline-cutoff.test.js b/__tests__/patches/baseline-cutoff.test.js
+index 89113df..bd3ea01 100644
+--- a/__tests__/patches/baseline-cutoff.test.js
++++ b/__tests__/patches/baseline-cutoff.test.js
+@@ -40,7 +40,7 @@ describe('Патч 426: отсечка установщика по послед
+     // сам архив не попадает в список правок (иначе архив рос бы сам)
+     expect(code).toContain("grep -vE '^\\?\\? \\.install-backup/'");
+     // подсказка про пересборку из git — только когда архив создавался
+-    expect(code).toContain('если проект пересобирается из git');
++    expect(code).toContain('пересоберёт проект из git');
+     // (434) владелец не программист — итог должен быть понятным:
+     // «Готово: приложение обновлено до №N» + версия приложения + список
+     // правок в архиве со словами «можно удалить»
+@@ -49,7 +49,10 @@ describe('Патч 426: отсечка установщика по послед
+     // ранний выход («очередь пуста») — с той же версией и коммит-подсказкой:
+     // отсечка меняет файлы, без коммита платформа их откатит
+     expect(code).toContain('Готово: приложение уже обновлено до №$PATCH_ID.');
+-    expect(code).toContain('if [[ "$FAST_MODE" -eq 1 ]]; then\n    echo\n    echo "Закрепите результат коммитом');
++    expect(code).toContain('if [[ "$FAST_MODE" -eq 1 ]]; then\n    echo\n    echo "Коммитьте, когда удобно');
++    // (435) порядок работы владельца: пачки коммитов, повторная установка как откат
++    expect(code).toContain('накопить несколько установок и записать одним коммитом');
++    expect(code).toContain('запустите установку ещё раз');
+     expect(code).toContain('В папке проекта были ваши правки.');
+     expect(code).toContain('эту папку можно удалить');
+     // старые канцеляризмы исчезли
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 2913d32..8fa3919 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -334,8 +334,9 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID
+     echo
+     sync_to_baseline
+     if [[ -n "$backup_dir" ]]; then
+-      echo "Подсказка: если проект пересобирается из git (хостинг/платформа), закоммитьте"
+-      echo "результат установки — иначе пересборка вернёт прежние файлы."
++      echo "Подсказка: если платформа пересоберёт проект из git, незакоммиченное вернётся"
++      echo "к прежнему — тогда просто запустите установку ещё раз. Свои правки я сохранил"
++      echo "в архиве выше."
+       echo
+     fi
+   else
+@@ -581,7 +582,9 @@ if [[ ${#QUEUE[@]} -eq 0 ]]; then
+   fi
+   if [[ "$FAST_MODE" -eq 1 ]]; then
+     echo
+-    echo "Закрепите результат коммитом — иначе платформа может вернуть прежние файлы:"
++    echo "Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом."
++    echo "Пока не закоммичено, пересборка платформы может вернуть прежние файлы — тогда просто"
++    echo "запустите установку ещё раз. Команда для коммита:"
+     echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
+   fi
+   echo
+@@ -783,7 +786,9 @@ if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
+   echo "Коммит:   $FETCHED_COMMIT"
+   if [[ ${#APPLIED[@]} -gt 0 || "$FAST_MODE" -eq 1 ]]; then
+     echo
+-    echo "Закрепите результат коммитом — иначе платформа может вернуть прежние файлы:"
++    echo "Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом."
++    echo "Пока не закоммичено, пересборка платформы может вернуть прежние файлы — тогда просто"
++    echo "запустите установку ещё раз. Команда для коммита:"
+     echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
+   fi
+   exit 0
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 92178ae..8703577 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-08 (434)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (435)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **435** (ПОРЯДОК РАБОТЫ ВЛАДЕЛЬЦА словами: «могу не комитить патчи десятками, а потом всё одним комитом запушить» и «зачем постоянный git fetch… если его патч делает?»). ОТВЕТЫ ВЛАДЕЛЬЦУ: (1) коммиты пачкой — ДА, установщику безразличны коммиты (он проверяет содержимое), пересборка платформы откатывается повторной установкой за ~30 сек, правки архивируются в .install-backup; (2) ручной fetch был нужен ОДИН раз (замена устаревшего установщика — замкнутый круг старый-не-умеет-отсечку), теперь каждая установка приносит свежий установщик в папке, обычное обновление = `./apply-patch.sh N`. ПРИМЕНЕНО: apply-patch.sh — подсказки переписаны: архивная («…пересоберёт проект из git… запустите установку ещё раз. Свои правки я сохранил в архиве выше») и обе коммит-подсказки («Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом… запустите установку ещё раз…» + команда). Защёлка 426 обновлена (пересоберёт/накопить). 1557/159, tsc 0. РЕШЕНО ВЛАДЕЛЬЦЕМ: обновляется одной командой ./apply-patch.sh N, коммитит пачками. Предыдущий снимок — **434** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **434** (РЕЧЬ УСТАНОВЩИКА, слово владельца: «что за хня?… столько мусора в выводе, а понимания поставился ли 433 или нет нету. И на кой чёрт мне папка .install-backup… Ты хоть помнишь как я работаю?» — владелец НЕ программист, ему нужен ясный итог). ПРИМЕНЕНО в apply-patch.sh: (1) главный итог ВСЕГДА «Готово: приложение обновлено до №$PATCH_ID» + строка «Версия приложения: N (public/version.json)» (APP_VERSION из public/version.json — доказательство из самого приложения); (2) архив правок — «В папке проекта были ваши правки…» + СПИСОК файлов (entry rename→левая часть) + «эту папку можно удалить»; (3) блок отсечки → одна строка «Привожу папку сразу к состоянию №N — старая цепочка патчей не перебирается»; (4) ранний выход → «Готово: приложение уже обновлено до №N.»; (5) коммит-подсказка теперь и при FAST_MODE (иначе платформа откатывает); (6) защёлка 393 переведена на новые слова (смысл тот же: установщик объясняет отсечку), защёлка 426/434 запрещает канцеляризмы («Ничего не нужно», «не применяются и в «Применено» не попадут»). ВАЖНО: usage-справка (—help) НЕ тронута — там для агента. 1557/159, tsc 0. СЦЕНАРИЙ ВЛАДЕЛЬЦА ПОВТОРИЛСЯ: он ставил 433 — установщик отработал (433 встал), но вывод был непонятен; ему дана команда проверки ls .install-backup/... и решение про удаление. Предыдущий снимок — **433** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **433** (ДЕФЕКТ 432, слово владельца: «теперь кнопка Показать N всегда 0» — счётчик 432 собирал группы по служебным ключам 'weapon'/'armor', а дерево окна сгруппировано СЛОВАРНЫМИ подписями ('Оружие'…) → все группы мимо → всегда 0, кроме секции «Моды» (её ключ и был словарным)). ПРИМЕНЕНО: equipmentFilter.js +countFoundItems(filteredTree, labels, filterActive) — labels.gear (4 словарные подписи) + labels.modsSection → part → countFilteredItems(part, true); без активного фильтра — countFilteredItems(всё дерево). AddItemModal: filterLabels useMemo (gear: tInventory(`…categories.${key}`), modsSection) + foundCount = countFoundItems(filteredData, filterLabels, filterActive); импорт countFoundItems вместо countFilteredItems. УРОК: счётчики/сборщики дерева обязаны иметь ПОВЕДЕНЧЕСКИЙ тест на словарных подписях (source-ассерты ловят только опечатки) — в защёлке 432 добавлен describe 433 с настоящим словарём через tInventory. 1557/159, tsc 0. Предыдущий снимок — **432** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **432** (ДЕФЕКТ 430, слово владельца: «Я выбрал в нём оружие с редкостью от 6 до 6. А мне в списке показаны боеприпасы, химия, хлам и т.д.» — плоский список собирал ВСЕ категории, а не-снаряжение по закону 425 проходит всегда). ПРИМЕНЕНО: AddItemModal currentData — groupKeys = filterActive ? [weapon,armor,powerArmor,clothing] : + robotEquipment; flatKeys расходников только при поиске (filterActive ? [] : [...]); ЗАМЕЧЕН И ПОЧИНЕН пробел: Силовой брони НЕ БЫЛО в плоских списках вовсе; foundCount = useMemo: если !filterActive — countFilteredItems(filteredData), иначе countTree из тех же групп + modsSection → countFilteredItems(countTree, true); deps + filterActive. equipmentFilter.countFilteredItems(node, gearOnly=false): gearOnly считает только GEAR_KINDS + weaponMod. Защёлка __tests__/gear/equipment-filter-results-432.test.js (6), 430-защёлка обновлена (deps-строка). 1555/159, tsc 0. КОНТЕКСТ ВЛАДЕЛЬЦА: его папку регулярно откатывает платформа-хостинг (пересборка из git) — после 431 установщик сам архивирует правки в .install-backup/ и подсказывает коммитить; владельцу дана последовательность спасения (fetch → git show FETCH_HEAD:apply-patch.sh > apply-patch.sh → apply 431 → КОММИТ результата — без коммита платформа снова откатит). Предыдущий снимок — **431** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 9db2639..54686de 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,16 @@
+ # Changelog
++---
++## Installer hints follow your workflow (patch 435)
++
++The owner's word: it is easier to accumulate commits and record them
++in one go than to commit after every install. The installer no
++longer nags: the hint now says honestly — commit whenever you like,
++several installs can be folded into one commit; if the platform
++rebuilds the project before that, just run the installer again (it
++archives your edits in advance). The manual git fetch from the
++instructions is no longer needed: it was required once, to replace
++an outdated installer.
++
+ ---
+ ## The installer speaks human (patch 434)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ee475c8..8eab803 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Подсказки установщика — под ваш порядок работы (патч 435)
++
++Слово владельца: коммиты удобнее копить и записывать одним махом, а
++не после каждой установки. Установщик больше не понукает: подсказка
++теперь честно говорит — коммитьте когда удобно, можно накопить
++несколько установок в один коммит; если платформа пересоберёт проект
++до коммита, просто запустите установку ещё раз (свои правки она
++заранее сохраняет в архив). Ручной git fetch из инструкций больше не
++нужен: он требовался один раз, чтобы заменить устаревший установщик.
++
+ ---
+ ## Установщик говорит по-человечески (патч 434)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index dddac3a..8a84f6a 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "434"
++  "baseline": "435"
+ }
+diff --git a/public/version.json b/public/version.json
+index 102fd58..366b35f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "434",
++  "version": "435",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
