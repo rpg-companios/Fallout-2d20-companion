@@ -1,0 +1,207 @@
+diff --git a/__tests__/gear/equipment-filter-results-432.test.js b/__tests__/gear/equipment-filter-results-432.test.js
+index 7781f21..3598ef0 100644
+--- a/__tests__/gear/equipment-filter-results-432.test.js
++++ b/__tests__/gear/equipment-filter-results-432.test.js
+@@ -10,7 +10,8 @@
+ import { describe, expect, it } from 'vitest';
+ import { readFileSync } from 'node:fs';
+ import { setCurrentLocale } from '../../i18n/locale';
+-import { countFilteredItems } from '../../modules/fallout/logic/equipmentFilter';
++import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
++import { countFilteredItems, countFoundItems } from '../../modules/fallout/logic/equipmentFilter';
+ 
+ setCurrentLocale('ru-RU');
+ 
+@@ -28,11 +29,13 @@ describe('Патч 432: в результатах фильтра — тольк
+     expect(code).toContain("...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk']");
+   });
+ 
+-  it('счётчик «Показать (N)» считает те же группы, что и список', () => {
++  it('счётчик «Показать (N)» — countFoundItems по словарным подписям (урок 433)', () => {
+     const code = modal();
+-    expect(code).toContain('countFilteredItems(countTree, true)');
+-    expect(code).toContain('[...[\'weapon\', \'armor\', \'powerArmor\', \'clothing\'], tInventory(\'modals.addItemModal.filter.modsSection\')]');
+-    expect(code).toContain('[filteredData, filterActive, engineLocale]');
++    // 433: служебные ключи «weapon» промахивались мимо дерева с подписями
++    // («Оружие») — счётчик показывал всегда 0. Теперь подписи из того же
++    // словаря, что ключи дерева, а счёт — поведенческим тестом ниже.
++    expect(code).toContain('countFoundItems(filteredData, filterLabels, filterActive)');
++    expect(code).toContain("tInventory(`modals.addItemModal.categories.${key}`)");
+   });
+ 
+   it('зависимости useMemo включают filterActive', () => {
+@@ -57,3 +60,32 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и 
+     expect(countFilteredItems(null)).toBe(0);
+   });
+ });
++
++// 433: поведенческий тест счётчика «Показать (N)» — на ТЕХ ЖЕ словарных
++// подписях, которыми окно строит дерево. Поймал бы баг «всегда 0».
++describe('Патч 433: счётчик «Показать (N)» считается по словарным подписям дерева', () => {
++  const gearLabel = (key) => tInventory(`modals.addItemModal.categories.${key}`);
++  const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
++  const labels = {
++    gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map(gearLabel),
++    modsSection: modsLabel,
++  };
++
++  it('снаряжение и моды считаются, расходники — нет; ключи — словарные', () => {
++    const tree = {
++      [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Пистолет', itemType: 'weapon' }] },
++      [gearLabel('armor')]: { 'Всё': [{ name: 'Кожанка', itemType: 'armor' }] },
++      [modsLabel]: { 'Всё': [{ name: 'Прицел', itemType: 'weaponMod' }] },
++      [gearLabel('ammo')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Патрон', itemType: 'ammo' }] },
++      [gearLabel('junk')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Банка', itemType: 'junk' }] },
++    };
++    expect(countFoundItems(tree, labels, true)).toBe(3);
++    expect(countFoundItems(tree, labels, false)).toBe(5);
++  });
++
++  it('пустые и отсутствующие группы не ломают счёт', () => {
++    expect(countFoundItems({ [modsLabel]: { 'Всё': [] } }, labels, true)).toBe(0);
++    expect(countFoundItems(null, labels, true)).toBe(0);
++    expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Нож', itemType: 'weapon' }] } }, labels, false)).toBe(1);
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 3414267..0ce621e 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -13,7 +13,7 @@ import {
+   buildEquipmentFilterOptions,
+   emptyEquipmentFilter,
+   activeEquipmentFilterCount,
+-  countFilteredItems,
++  countFoundItems,
+   isEquipmentFilterEmpty,
+   pruneTreeByEquipmentFilter,
+   weaponModsProviding,
+@@ -267,17 +267,17 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
+   // 430: фильтр активен — окно показывает результаты, а не каталог.
+   const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+-  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
+-  // 432: при активном фильтре считаем ТЕ ЖЕ группы, что и показываем
+-  // (снаряжение + моды) — расходники в фильтре не участвуют.
+-  const foundCount = useMemo(() => {
+-    if (!filterActive) return countFilteredItems(filteredData);
+-    const countTree = {};
+-    [...['weapon', 'armor', 'powerArmor', 'clothing'], tInventory('modals.addItemModal.filter.modsSection')].forEach((key) => {
+-      if (filteredData[key] !== undefined) countTree[key] = filteredData[key];
+-    });
+-    return countFilteredItems(countTree, true);
+-  }, [filteredData, filterActive, engineLocale]);
++  // 429/432/433: сколько предметов найдётся — для кнопки «Показать (N)».
++  // Подписи категорий берутся ИЗ ТОГО ЖЕ словаря, которым построены
++  // ключи дерева окна (урок 433: служебные ключи давали всегда 0).
++  const filterLabels = useMemo(() => ({
++    gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
++    modsSection: tInventory('modals.addItemModal.filter.modsSection'),
++  }), [engineLocale]);
++  const foundCount = useMemo(
++    () => countFoundItems(filteredData, filterLabels, filterActive),
++    [filteredData, filterLabels, filterActive],
++  );
+ 
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 9a43a8a..bef77c1 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-08 (432)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (433)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **433** (ДЕФЕКТ 432, слово владельца: «теперь кнопка Показать N всегда 0» — счётчик 432 собирал группы по служебным ключам 'weapon'/'armor', а дерево окна сгруппировано СЛОВАРНЫМИ подписями ('Оружие'…) → все группы мимо → всегда 0, кроме секции «Моды» (её ключ и был словарным)). ПРИМЕНЕНО: equipmentFilter.js +countFoundItems(filteredTree, labels, filterActive) — labels.gear (4 словарные подписи) + labels.modsSection → part → countFilteredItems(part, true); без активного фильтра — countFilteredItems(всё дерево). AddItemModal: filterLabels useMemo (gear: tInventory(`…categories.${key}`), modsSection) + foundCount = countFoundItems(filteredData, filterLabels, filterActive); импорт countFoundItems вместо countFilteredItems. УРОК: счётчики/сборщики дерева обязаны иметь ПОВЕДЕНЧЕСКИЙ тест на словарных подписях (source-ассерты ловят только опечатки) — в защёлке 432 добавлен describe 433 с настоящим словарём через tInventory. 1557/159, tsc 0. Предыдущий снимок — **432** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **432** (ДЕФЕКТ 430, слово владельца: «Я выбрал в нём оружие с редкостью от 6 до 6. А мне в списке показаны боеприпасы, химия, хлам и т.д.» — плоский список собирал ВСЕ категории, а не-снаряжение по закону 425 проходит всегда). ПРИМЕНЕНО: AddItemModal currentData — groupKeys = filterActive ? [weapon,armor,powerArmor,clothing] : + robotEquipment; flatKeys расходников только при поиске (filterActive ? [] : [...]); ЗАМЕЧЕН И ПОЧИНЕН пробел: Силовой брони НЕ БЫЛО в плоских списках вовсе; foundCount = useMemo: если !filterActive — countFilteredItems(filteredData), иначе countTree из тех же групп + modsSection → countFilteredItems(countTree, true); deps + filterActive. equipmentFilter.countFilteredItems(node, gearOnly=false): gearOnly считает только GEAR_KINDS + weaponMod. Защёлка __tests__/gear/equipment-filter-results-432.test.js (6), 430-защёлка обновлена (deps-строка). 1555/159, tsc 0. КОНТЕКСТ ВЛАДЕЛЬЦА: его папку регулярно откатывает платформа-хостинг (пересборка из git) — после 431 установщик сам архивирует правки в .install-backup/ и подсказывает коммитить; владельцу дана последовательность спасения (fetch → git show FETCH_HEAD:apply-patch.sh > apply-patch.sh → apply 431 → КОММИТ результата — без коммита платформа снова откатит). Предыдущий снимок — **431** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **431** (АВАРИЙНАЯ ПОЧИНКА УСТАНОВЩИКА по логу владельца: у него в ~/workspace папка ОТКАТИЛАСЬ к старому состоянию (пересборка платформы из git: «стоит: 6» = контент publish-коммита 529824d ≈ эра патча 274) + локальные правки → «Отсечка не применяется: незакоммиченные изменения» → полный проход → ОСТАНОВКА на 275. Это же объясняет «пропавший файл» EquipmentFilterModal при сборке: установка 429 жила в папке НЕЗАКОММИЧЕННО и была стёрта откатом). ПРИМЕНЕНО: apply-patch.sh — грязное дерево при доступной отсечке БОЛЬШЕ НЕ БЛОКИРУЕТ: все porcelain-записи (кроме apply-patch.sh и .install-backup/) копируются в `.install-backup/<дата-время>/` (cp -R, ничего не удаляется; rename-записи — обе стороны), затем отсечка приводит дерево к цели; после синхронизации при созданном архиве — подсказка «закоммитьте результат, если проект пересобирается из git». Полный проход остался только для «нет ключевого патча/истории». .install-backup/ в .gitignore. ВЛАДЕЛЬЦУ ДАНЫ КОМАНДЫ СПАСЕНИЯ (старый установщик ещё у него): git diff > update-backup.txt; git checkout -- .; git clean -fd; ./apply-patch.sh 430. Защёлка baseline-cutoff: +тест 431 (архив вместо отказа). 1549/158, tsc 0. ВОПРОСЫ К ВЛАДЕЛЬЦУ БЕЗ ОТВЕТА: (1) что в metro.config.js правилось (установка могла перезаписать); (2) два вопроса секции «Моды»; (3) редкость в окне фильтра — сейчас только после отметки категории. Предыдущий снимок — **430** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **430** (ДЕФЕКТ 429, слово владельца: «а фильтр то показывает отсортированные материалы? У меня нет. Я выбрал броню, выбрал редкость 5. Нажал показать и снова я на экране каталога» — фильтр применялся, но «Показать» возвращало на каталог). ПРИМЕНЕНО: AddItemModal — currentData при filterActive (не пуст) даёт ПЛОСКИЙ ОТСОРТИРОВАННЫЙ список (общий сборщик с поиском: weapon/armor/clothing/robotEquipment по группам + flatKeys = [modsSection, ammo, chems, drinks, food, items, materials, junk] по «Все»; visible.sort по имени); заголовок окна при активном фильтре = formatInventoryText(filter.resultsFound, {n: foundCount}) «Найдено: N»; «Назад» и каталог — только при пустом фильтре (условие currentPath.length>0 && !searchTerm && !filterActive). ПОПУТНО ПОЧИНЕНО: «Моды» не попадали в плоский список поиска 425. i18n filter.resultsFound ru «Найдено: {n}»/en «Found: {n}». Защёлка __tests__/gear/equipment-filter-results-430.test.js (6). 1548/158, tsc 0. ВАЖНО ОБ УСТАНОВКЕ У ВЛАДЕЛЬЦА: у него в папке ЛОКАЛЬНЫЕ правки metro.config.js — установка 429 прошла быстрым путём (дерево приведено к 429: metro.config.js ПЕРЕЗАПИСАН версией из репо!) и владелец предупреждён прислать что там правилось, если веб-сборка сломается. Предыдущий снимок — **429** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b7c7f28..c58c25f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,13 @@
+ # Changelog
++---
++## The "Show" count is honest again (patch 433)
++
++Defect of 432: the found-items counter counted groups by service
++keys while the window is grouped by dictionary labels — so it always
++showed 0. Now it counts exactly the groups that reach the results,
++by the same labels; locked in with a behavioral test on the
++dictionary.
++
+ ---
+ ## Filter results contain only what matched (patch 432)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index cdc3a81..cee1d0c 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,13 @@
+ # История изменений
+ 
++---
++## Число на кнопке «Показать» снова честное (патч 433)
++
++Дефект 432: счётчик находок считал группы по служебным ключам, а
++окно сгруппировано по словарным подписям — счётчик всегда показывал
++0. Теперь он считает ровно те группы, что попадут в результаты, по
++тем же подписям; закреплено поведенческим тестом на словаре.
++
+ ---
+ ## В результатах фильтра — только то, что прошло условия (патч 432)
+ 
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+index b520e24..c33a156 100644
+--- a/modules/fallout/logic/equipmentFilter.js
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -286,6 +286,25 @@ export const countFilteredItems = (node, gearOnly = false) => {
+   return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value, gearOnly), 0);
+ };
+ 
++/**
++ * 429/432: счётчик кнопки «Показать (N)» по дереву окна (после фильтра
++ * и потолка редкости). labels — локализованные подписи категорий
++ * снаряжения и секции модов, ИЗ ТОГО ЖЕ словаря, которым построены
++ * ключи дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт
++ * всегда ноль). Без активного фильтра считаем всё дерево; при
++ * активном — только эти группы и ТОЛЬКО снаряжение/моды: ровно то,
++ * что попадёт в список результатов.
++ */
++export const countFoundItems = (filteredTree, labels, filterActive) => {
++  if (!filterActive) return countFilteredItems(filteredTree);
++  const part = {};
++  const groupLabels = [...(labels?.gear ?? []), ...(labels?.modsSection ? [labels.modsSection] : [])];
++  for (const label of groupLabels) {
++    if (filteredTree && filteredTree[label] !== undefined) part[label] = filteredTree[label];
++  }
++  return countFilteredItems(part, true);
++};
++
+ /**
+  * Обрезка дерева категорий по фильтру (как потолок редкости): пустые ветки
+  * после отсева не показываются. Предметы вне снаряжения проходят всегда.
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 79bbe88..d59358d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "432"
++  "baseline": "433"
+ }
+diff --git a/public/version.json b/public/version.json
+index adbc7b7..6667af8 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "432",
++  "version": "433",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
