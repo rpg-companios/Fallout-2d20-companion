@@ -1,8 +1,11 @@
 // Фильтры снаряжения для окон добычи/покупки (патч 425, слово владельца:
 // «фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)»;
-// диапазоны «от–до» с серыми подсказками; качества — ВСЕ из словаря, даже
-// те, что не встречаются на предметах). Чистые функции: варианты собираются
-// из каталогов (каталог JSON = истина), предикат — без побочных эффектов.
+// диапазоны «от–до» с серыми подсказками). 438: качества в фильтре —
+// ТОЛЬКО те, что встречаются на оружии («нельзя отметить, поскольку
+// такого качества на оружие нет»); моды в результатах НИКОГДА («1 мод
+// может подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода
+// смысла нет»). Чистые функции: варианты собираются из каталогов
+// (каталог JSON = истина), предикат — без побочных эффектов.
 import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
 import enQualities from '../i18n/en-EN/data/system/qualities.json';
 import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
@@ -11,9 +14,6 @@ import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
 import powerArmorCatalog from '../data/equipment/powerArmor.json';
 import clothesCatalog from '../data/equipment/clothes.json';
-import weaponModsCatalog from '../data/equipment/weapon_mods.json';
-import ruModNames from '../i18n/ru-RU/data/equipment/weapon_mods.json';
-import enModNames from '../i18n/en-EN/data/equipment/weapon_mods.json';
 
 export const GEAR_KINDS = ['weapon', 'armor', 'powerArmor', 'clothing'];
 
@@ -68,19 +68,30 @@ const numBounds = (values) => ({
   max: Math.max(...values),
 });
 
+const qualitiesDict = (locale) => (locale === 'en-EN' ? enQualities : ruQualities);
+
 /**
  * Варианты для панели фильтра. Диапазоны — фактические границы каталога
  * (аудит 424: редкость 0–6, урон 0–21, скорострельность 0–7, СУ физ 1–4,
- * эн 0–5, рад 0–2). Качества — ВСЕ из словаря (слово владельца), эффекты —
- * все из словаря. Патроны — уникальные из каталога оружия.
+ * эн 0–5, рад 0–2). 438: качества — только встречающиеся на оружии,
+ * по алфавиту; эффекты — все из словаря (все 10 на оружии есть).
+ * Патроны — уникальные из каталога оружия.
  */
 export const buildEquipmentFilterOptions = (locale, labels) => {
-  const qualitiesDict = locale === 'en-EN' ? enQualities : ruQualities;
   const effectsDict = locale === 'en-EN' ? enEffects : ruEffects;
   const weapons = (weaponsCatalog ?? []).filter((w) => !w.isBuiltin);
   const armor = armorPieces();
   const pa = powerArmorPieces();
   const clothes = clothingItems();
+
+  // 438 (слово владельца): отмечать можно только то, что на оружии есть.
+  const weaponQualityIds = [];
+  for (const weapon of weapons) {
+    for (const q of (weapon.qualities ?? [])) {
+      const id = q?.qualityId ?? q;
+      if (id && !weaponQualityIds.includes(id)) weaponQualityIds.push(id);
+    }
+  }
 
   const ammoSeen = [];
   for (const weapon of weapons) {
@@ -132,7 +143,9 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
       { id: 'Leg', name: labels.bodyParts.Leg },
     ],
     ammoOptions,
-    qualities: qualitiesDict.map((row) => ({ id: row.id, name: row.name })),
+    qualities: weaponQualityIds
+      .map((id) => ({ id, name: qualitiesDict(locale).find((row) => row.id === id)?.name ?? id }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     effects: effectsDict.map((row) => ({ id: row.id, name: row.name })),
   };
 };
@@ -240,44 +253,25 @@ export const applyEquipmentFilter = (item, filter) => {
 };
 
 /**
- * Слово владельца 425: «моды это моды. Только когда их поставят, тогда и
- * будут эффекты» — оружие фильтруется ТОЛЬКО по своим (врождённым)
- * качествам/эффектам; ни «может получить от мода», ни установленные моды
- * экземпляров здесь не учитываются. Но «поскольку моды теперь предметы
- * и они есть в инвентаре, при выборе эффектов, которые не на оружие,
- * покажут модули»: моды, дающие хоть одно из выбранного, показываются
- * отдельной секцией окна (addFlow принимает mod_* как weaponMod).
+ * 429/432/438: счётчик кнопки «Показать (N)» по дереву окна (после
+ * фильтра и потолка редкости). labels.gear — локализованные подписи
+ * категорий снаряжения ИЗ ТОГО ЖЕ словаря, которым построены ключи
+ * дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт всегда
+ * ноль). Без активного фильтра считаем всё дерево; при активном —
+ * только эти группы и только снаряжение (модов в результатах больше
+ * нет — слово владельца 438).
  */
-export const weaponModsProviding = (filter, locale) => {
-  const wanted = [...(filter?.qualities ?? []), ...(filter?.effects ?? [])];
-  if (wanted.length === 0) return [];
-  const names = new Map((locale === 'en-EN' ? enModNames : ruModNames).map((row) => [row.id, row.name]));
-  return (weaponModsCatalog ?? [])
-    .filter((mod) => (mod.qualityChanges ?? []).some((t) => wanted.includes(t?.id))
-      || (mod.effectChanges ?? []).some((t) => wanted.includes(t?.id)))
-    .map((mod) => ({
-      id: mod.id,
-      name: names.get(mod.id) ?? mod.id,
-      itemType: 'weaponMod',
-      modSlot: mod.slot,
-      rarity: mod.rarity,
-      cost: mod.cost,
-      weight: mod.weight,
-    }));
-};
-
 /**
  * 429: сколько предметов покажет список (после фильтра и потолка
- * редкости) — для кнопки «Показать (N)» в окне фильтра. Считаются
- * только предметы (объекты с именем); заголовки групп — нет.
- * 432: gearOnly — считать только снаряжение и моды (расходники/хлам
- * в результатах фильтра не участвуют и в список не выводятся).
+ * редкости). Считаются только предметы (объекты с именем); заголовки
+ * групп — нет. gearOnly — только снаряжение (в результатах фильтра,
+ * по слову 438, модов больше нет, расходники не участвуют).
  */
 export const countFilteredItems = (node, gearOnly = false) => {
   const counts = (item) => {
     if (!item || typeof item !== 'object' || !item.name) return false;
     if (!gearOnly) return true;
-    return GEAR_KINDS.includes(item.itemType) || item.itemType === 'weaponMod';
+    return GEAR_KINDS.includes(item.itemType);
   };
   if (Array.isArray(node)) {
     return node.reduce((sum, item) => sum + (counts(item) ? 1 : 0), 0);
@@ -286,20 +280,10 @@ export const countFilteredItems = (node, gearOnly = false) => {
   return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value, gearOnly), 0);
 };
 
-/**
- * 429/432: счётчик кнопки «Показать (N)» по дереву окна (после фильтра
- * и потолка редкости). labels — локализованные подписи категорий
- * снаряжения и секции модов, ИЗ ТОГО ЖЕ словаря, которым построены
- * ключи дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт
- * всегда ноль). Без активного фильтра считаем всё дерево; при
- * активном — только эти группы и ТОЛЬКО снаряжение/моды: ровно то,
- * что попадёт в список результатов.
- */
 export const countFoundItems = (filteredTree, labels, filterActive) => {
   if (!filterActive) return countFilteredItems(filteredTree);
   const part = {};
-  const groupLabels = [...(labels?.gear ?? []), ...(labels?.modsSection ? [labels.modsSection] : [])];
-  for (const label of groupLabels) {
+  for (const label of (labels?.gear ?? [])) {
     if (filteredTree && filteredTree[label] !== undefined) part[label] = filteredTree[label];
   }
   return countFilteredItems(part, true);

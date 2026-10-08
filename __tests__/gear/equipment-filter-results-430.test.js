@@ -33,12 +33,10 @@ describe('Патч 430: «Показать» ведёт к результата�
     expect(code).toContain('currentPath.length > 0 && !searchTerm && !filterActive && (');
   });
 
-  it('секция «Моды» входит в плоский список (поиск и фильтр)', () => {
+  it('438: секции «Моды» в плоском списке больше нет (моды в результатах никогда)', () => {
     const code = modal();
-    const start = code.indexOf('const flatKeys');
-    expect(start).toBeGreaterThan(-1);
-    const block = code.slice(start, code.indexOf('flatKeys.forEach'));
-    expect(block).toContain("tInventory('modals.addItemModal.filter.modsSection')");
+    expect(code).not.toContain('modsSection');
+    expect(code).not.toContain('weaponModsProviding');
   });
 
   it('зависимости useMemo включают фильтр (432 добавил filterActive)', () => {

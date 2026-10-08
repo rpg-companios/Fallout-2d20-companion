@@ -1,5 +1,16 @@
 # Changelog
 ---
+## The owner's word on mods in the filter (patch 438)
+
+Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,
+and if there is no 11th weapon, the mod is pointless". The "Mods"
+section is gone from the window. What a mod gives is already written
+in the mod installation screen — no labels needed in the list. And
+so: the filter's qualities are now only those actually found on
+weapons (22) — Night Vision and other mod-only abilities are not in
+the list, no empty selections.
+
+---
 ## Filter button — square with a funnel (patch 437)
 
 The owner's word: the filter should be a square button with a funnel

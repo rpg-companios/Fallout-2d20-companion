@@ -36,6 +36,8 @@ describe('Патч 432: в результатах фильтра — тольк�
     // словаря, что ключи дерева, а счёт — поведенческим тестом ниже.
     expect(code).toContain('countFoundItems(filteredData, filterLabels, filterActive)');
     expect(code).toContain("tInventory(`modals.addItemModal.categories.${key}`)");
+    // 438: моды в счётчике больше не участвуют
+    expect(code).not.toContain('modsSection');
   });
 
   it('зависимости useMemo включают filterActive', () => {
@@ -51,8 +53,8 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и �
     Моды: { Всё: [{ name: 'Прицел', itemType: 'weaponMod' }] },
   };
 
-  it('gearOnly: снаряжение и моды считаются, расходники — нет', () => {
-    expect(countFilteredItems(tree, true)).toBe(2);
+  it('438: gearOnly — только снаряжение (модов в результатах больше нет), расходники — нет', () => {
+    expect(countFilteredItems(tree, true)).toBe(1);
   });
 
   it('без gearOnly (обычный каталог/поиск) — считаются все предметы', () => {
@@ -65,26 +67,23 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и �
 // подписях, которыми окно строит дерево. Поймал бы баг «всегда 0».
 describe('Патч 433: счётчик «Показать (N)» считается по словарным подписям дерева', () => {
   const gearLabel = (key) => tInventory(`modals.addItemModal.categories.${key}`);
-  const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
   const labels = {
     gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map(gearLabel),
-    modsSection: modsLabel,
   };
 
-  it('снаряжение и моды считаются, расходники — нет; ключи — словарные', () => {
+  it('снаряжение считается, расходники — нет; ключи — словарные (438: без модов)', () => {
     const tree = {
       [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Пистолет', itemType: 'weapon' }] },
       [gearLabel('armor')]: { 'Всё': [{ name: 'Кожанка', itemType: 'armor' }] },
-      [modsLabel]: { 'Всё': [{ name: 'Прицел', itemType: 'weaponMod' }] },
       [gearLabel('ammo')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Патрон', itemType: 'ammo' }] },
       [gearLabel('junk')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Банка', itemType: 'junk' }] },
     };
-    expect(countFoundItems(tree, labels, true)).toBe(3);
-    expect(countFoundItems(tree, labels, false)).toBe(5);
+    expect(countFoundItems(tree, labels, true)).toBe(2);
+    expect(countFoundItems(tree, labels, false)).toBe(4);
   });
 
   it('пустые и отсутствующие группы не ломают счёт', () => {
-    expect(countFoundItems({ [modsLabel]: { 'Всё': [] } }, labels, true)).toBe(0);
+    expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [] } }, labels, true)).toBe(0);
     expect(countFoundItems(null, labels, true)).toBe(0);
     expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Нож', itemType: 'weapon' }] } }, labels, false)).toBe(1);
   });

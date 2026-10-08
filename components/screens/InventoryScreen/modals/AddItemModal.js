@@ -18,7 +18,6 @@ import {
   countFoundItems,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
-  weaponModsProviding,
 } from '../../../../modules/fallout/logic/equipmentFilter';
 
 const CATEGORY_ICONS = {
@@ -229,23 +228,14 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     return prune(tree);
   }, [engineLocale, weaponsByType, staticData, maxRarity]);
 
-  // 425: фильтр снаряжения — та же обрезка дерева (пустые ветки прячутся).
-  // Слово владельца: выбранное, чего на оружии нет, раскрывает МОДЫ, дающие
-  // его («моды это моды — только когда поставят, тогда и будут эффекты»):
-  // секция «Моды» появляется, когда подобранные качества/эффекты есть в
-  // каком-то моде; если ни одно оружие не подходит — в окне остаются моды.
+  // 425: фильтр снаряжения — обрезка дерева (пустые ветки прячутся).
+  // 438 (слово владельца): моды в результатах НИКОГДА — «1 мод может
+  // подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода
+  // смысла нет».
   const filteredData = useMemo(() => {
     if (isEquipmentFilterEmpty(equipmentFilter)) return allData;
-    const pruned = pruneTreeByEquipmentFilter(allData, equipmentFilter);
-    const mods = weaponModsProviding(equipmentFilter, moduleLocale);
-    if (mods.length === 0) return pruned;
-    const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
-    const allLabel = tInventory('modals.addItemModal.categories.all');
-    return {
-      ...pruned,
-      [modsLabel]: { [allLabel]: [...mods].sort((a, b) => String(a.name).localeCompare(String(b.name))) },
-    };
-  }, [allData, equipmentFilter, moduleLocale, engineLocale]);
+    return pruneTreeByEquipmentFilter(allData, equipmentFilter);
+  }, [allData, equipmentFilter]);
 
   const filterOptions = useMemo(() => {
     const labels = {
@@ -274,7 +264,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   // ключи дерева окна (урок 433: служебные ключи давали всегда 0).
   const filterLabels = useMemo(() => ({
     gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
-    modsSection: tInventory('modals.addItemModal.filter.modsSection'),
   }), [engineLocale]);
   const foundCount = useMemo(
     () => countFoundItems(filteredData, filterLabels, filterActive),
@@ -353,8 +342,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       });
       const allLabel = tInventory('modals.addItemModal.categories.all');
       const flatKeys = [
-        // секция модов, подобранных под выбранные качества/эффекты (425)
-        tInventory('modals.addItemModal.filter.modsSection'),
         // расходники/хлам — только в поиске, в фильтре они не участвуют
         ...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`))),
       ];
