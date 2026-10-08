@@ -1,0 +1,258 @@
+diff --git a/__tests__/gear/equipment-filter-results-430.test.js b/__tests__/gear/equipment-filter-results-430.test.js
+index ccfc32c..3707067 100644
+--- a/__tests__/gear/equipment-filter-results-430.test.js
++++ b/__tests__/gear/equipment-filter-results-430.test.js
+@@ -41,9 +41,9 @@ describe('Патч 430: «Показать» ведёт к результата
+     expect(block).toContain("tInventory('modals.addItemModal.filter.modsSection')");
+   });
+ 
+-  it('зависимости useMemo включают фильтр', () => {
++  it('зависимости useMemo включают фильтр (432 добавил filterActive)', () => {
+     const code = modal();
+-    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]');
++    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]');
+   });
+ 
+   it('словарь: «Найдено: {n}» тем же резолвером (закон 422)', () => {
+diff --git a/__tests__/gear/equipment-filter-results-432.test.js b/__tests__/gear/equipment-filter-results-432.test.js
+new file mode 100644
+index 0000000..7781f21
+--- /dev/null
++++ b/__tests__/gear/equipment-filter-results-432.test.js
+@@ -0,0 +1,59 @@
++// ПРИЁМОЧНЫЙ (патч 432): слово владельца — «Я выбрал в нём оружие с
++// редкостью от 6 до 6. А мне в списке показаны боеприпасы, химия, хлам
++// и т.д.» Дефект 430: плоский список результатов собирал ВСЕ категории,
++// а не-снаряжение фильтр пропускает всегда (закон 425) — в результаты
++// попадали расходники. Теперь в результатах фильтра только снаряжение,
++// прошедшее условия, и секция модов; расходники/хлам — в обычном
++// каталоге и в поиске. Счётчик «Показать (N)» считает те же группы
++// (прежде был завышен). Заодно Силовая броня добавлена в плоские
++// списки (фильтр и поиск) — раньше её там не было.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import { setCurrentLocale } from '../../i18n/locale';
++import { countFilteredItems } from '../../modules/fallout/logic/equipmentFilter';
++
++setCurrentLocale('ru-RU');
++
++const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
++
++describe('Патч 432: в результатах фильтра — только снаряжение и моды', () => {
++  it('сборщик списка: при фильтре группы снаряжения, при поиске — плюс роботы', () => {
++    const code = modal();
++    expect(code).toContain("const gearGroupKeys = ['weapon', 'armor', 'powerArmor', 'clothing'];");
++    expect(code).toContain("const groupKeys = filterActive ? gearGroupKeys : [...gearGroupKeys, 'robotEquipment']");
++  });
++
++  it('расходники/хлам — только при поиске, в фильтре не участвуют', () => {
++    const code = modal();
++    expect(code).toContain("...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk']");
++  });
++
++  it('счётчик «Показать (N)» считает те же группы, что и список', () => {
++    const code = modal();
++    expect(code).toContain('countFilteredItems(countTree, true)');
++    expect(code).toContain('[...[\'weapon\', \'armor\', \'powerArmor\', \'clothing\'], tInventory(\'modals.addItemModal.filter.modsSection\')]');
++    expect(code).toContain('[filteredData, filterActive, engineLocale]');
++  });
++
++  it('зависимости useMemo включают filterActive', () => {
++    const code = modal();
++    expect(code).toContain('[engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]');
++  });
++});
++
++describe('Патч 432: счётчик с gearOnly — снаряжение и моды, без расходников', () => {
++  const tree = {
++    Оружие: { Всё: [{ name: 'Гаусс-миниган', itemType: 'weapon' }, { name: 'Патрон', itemType: 'ammo' }] },
++    Хлам: { Всё: [{ name: 'Банка', itemType: 'junk' }, { name: 'Химия', itemType: 'chems' }] },
++    Моды: { Всё: [{ name: 'Прицел', itemType: 'weaponMod' }] },
++  };
++
++  it('gearOnly: снаряжение и моды считаются, расходники — нет', () => {
++    expect(countFilteredItems(tree, true)).toBe(2);
++  });
++
++  it('без gearOnly (обычный каталог/поиск) — считаются все предметы', () => {
++    expect(countFilteredItems(tree)).toBe(5);
++    expect(countFilteredItems(null)).toBe(0);
++  });
++});
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 36d08cd..3414267 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -268,7 +268,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   // 430: фильтр активен — окно показывает результаты, а не каталог.
+   const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+   // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
+-  const foundCount = countFilteredItems(filteredData);
++  // 432: при активном фильтре считаем ТЕ ЖЕ группы, что и показываем
++  // (снаряжение + моды) — расходники в фильтре не участвуют.
++  const foundCount = useMemo(() => {
++    if (!filterActive) return countFilteredItems(filteredData);
++    const countTree = {};
++    [...['weapon', 'armor', 'powerArmor', 'clothing'], tInventory('modals.addItemModal.filter.modsSection')].forEach((key) => {
++      if (filteredData[key] !== undefined) countTree[key] = filteredData[key];
++    });
++    return countFilteredItems(countTree, true);
++  }, [filteredData, filterActive, engineLocale]);
+ 
+   const getTypeLabelAndIcon = (itemType) => {
+     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
+@@ -326,20 +335,26 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   const currentData = useMemo(() => {
+     // 430 (владелец: «Нажал показать и снова я на экране каталога»):
+     // при активном фильтре — ПЛОСКИЙ отсортированный список находок,
+-    // а не каталог категорий. Поиск работает так же (общий сборщик),
+-    // и секция «Моды» теперь попадает в оба режима.
+-    const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
++    // а не каталог категорий. 432 (владелец: «выбрал оружие с редкостью
++    // от 6 до 6, а в списке боеприпасы, химия, хлам»): в результатах
++    // фильтра — только снаряжение, прошедшее условия, и подобранные
++    // моды; расходники и хлам живут в обычном каталоге и в поиске.
+     if (searchTerm || filterActive) {
+       const allItems = [];
+-      Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+-      Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      const gearGroupKeys = ['weapon', 'armor', 'powerArmor', 'clothing'];
++      // поиск дополнительно собирает снаряжение роботов;
++      // при активном фильтре только эти четыре вида снаряжения
++      const groupKeys = filterActive ? gearGroupKeys : [...gearGroupKeys, 'robotEquipment'];
++      groupKeys.forEach((key) => {
++        const group = filteredData[tInventory(`modals.addItemModal.categories.${key}`)] || {};
++        Object.values(group).forEach((items) => Array.isArray(items) && allItems.push(...items));
++      });
+       const allLabel = tInventory('modals.addItemModal.categories.all');
+       const flatKeys = [
+         // секция модов, подобранных под выбранные качества/эффекты (425)
+         tInventory('modals.addItemModal.filter.modsSection'),
+-        ...['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
++        // расходники/хлам — только в поиске, в фильтре они не участвуют
++        ...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`))),
+       ];
+       flatKeys.forEach((category) => {
+         if (filteredData[category]?.[allLabel]) {
+@@ -364,7 +379,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     if (Array.isArray(data)) return { items: data };
+     if (data && typeof data === 'object') return { categories: Object.keys(data) };
+     return { categories: [] };
+-  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]);
++  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]);
+ 
+   const renderItem = ({ item }) => {
+     const isItem = typeof item === 'object' && item?.name;
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index e6935d3..9a43a8a 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-07 (431)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (432)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **432** (ДЕФЕКТ 430, слово владельца: «Я выбрал в нём оружие с редкостью от 6 до 6. А мне в списке показаны боеприпасы, химия, хлам и т.д.» — плоский список собирал ВСЕ категории, а не-снаряжение по закону 425 проходит всегда). ПРИМЕНЕНО: AddItemModal currentData — groupKeys = filterActive ? [weapon,armor,powerArmor,clothing] : + robotEquipment; flatKeys расходников только при поиске (filterActive ? [] : [...]); ЗАМЕЧЕН И ПОЧИНЕН пробел: Силовой брони НЕ БЫЛО в плоских списках вовсе; foundCount = useMemo: если !filterActive — countFilteredItems(filteredData), иначе countTree из тех же групп + modsSection → countFilteredItems(countTree, true); deps + filterActive. equipmentFilter.countFilteredItems(node, gearOnly=false): gearOnly считает только GEAR_KINDS + weaponMod. Защёлка __tests__/gear/equipment-filter-results-432.test.js (6), 430-защёлка обновлена (deps-строка). 1555/159, tsc 0. КОНТЕКСТ ВЛАДЕЛЬЦА: его папку регулярно откатывает платформа-хостинг (пересборка из git) — после 431 установщик сам архивирует правки в .install-backup/ и подсказывает коммитить; владельцу дана последовательность спасения (fetch → git show FETCH_HEAD:apply-patch.sh > apply-patch.sh → apply 431 → КОММИТ результата — без коммита платформа снова откатит). Предыдущий снимок — **431** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **431** (АВАРИЙНАЯ ПОЧИНКА УСТАНОВЩИКА по логу владельца: у него в ~/workspace папка ОТКАТИЛАСЬ к старому состоянию (пересборка платформы из git: «стоит: 6» = контент publish-коммита 529824d ≈ эра патча 274) + локальные правки → «Отсечка не применяется: незакоммиченные изменения» → полный проход → ОСТАНОВКА на 275. Это же объясняет «пропавший файл» EquipmentFilterModal при сборке: установка 429 жила в папке НЕЗАКОММИЧЕННО и была стёрта откатом). ПРИМЕНЕНО: apply-patch.sh — грязное дерево при доступной отсечке БОЛЬШЕ НЕ БЛОКИРУЕТ: все porcelain-записи (кроме apply-patch.sh и .install-backup/) копируются в `.install-backup/<дата-время>/` (cp -R, ничего не удаляется; rename-записи — обе стороны), затем отсечка приводит дерево к цели; после синхронизации при созданном архиве — подсказка «закоммитьте результат, если проект пересобирается из git». Полный проход остался только для «нет ключевого патча/истории». .install-backup/ в .gitignore. ВЛАДЕЛЬЦУ ДАНЫ КОМАНДЫ СПАСЕНИЯ (старый установщик ещё у него): git diff > update-backup.txt; git checkout -- .; git clean -fd; ./apply-patch.sh 430. Защёлка baseline-cutoff: +тест 431 (архив вместо отказа). 1549/158, tsc 0. ВОПРОСЫ К ВЛАДЕЛЬЦУ БЕЗ ОТВЕТА: (1) что в metro.config.js правилось (установка могла перезаписать); (2) два вопроса секции «Моды»; (3) редкость в окне фильтра — сейчас только после отметки категории. Предыдущий снимок — **430** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **430** (ДЕФЕКТ 429, слово владельца: «а фильтр то показывает отсортированные материалы? У меня нет. Я выбрал броню, выбрал редкость 5. Нажал показать и снова я на экране каталога» — фильтр применялся, но «Показать» возвращало на каталог). ПРИМЕНЕНО: AddItemModal — currentData при filterActive (не пуст) даёт ПЛОСКИЙ ОТСОРТИРОВАННЫЙ список (общий сборщик с поиском: weapon/armor/clothing/robotEquipment по группам + flatKeys = [modsSection, ammo, chems, drinks, food, items, materials, junk] по «Все»; visible.sort по имени); заголовок окна при активном фильтре = formatInventoryText(filter.resultsFound, {n: foundCount}) «Найдено: N»; «Назад» и каталог — только при пустом фильтре (условие currentPath.length>0 && !searchTerm && !filterActive). ПОПУТНО ПОЧИНЕНО: «Моды» не попадали в плоский список поиска 425. i18n filter.resultsFound ru «Найдено: {n}»/en «Found: {n}». Защёлка __tests__/gear/equipment-filter-results-430.test.js (6). 1548/158, tsc 0. ВАЖНО ОБ УСТАНОВКЕ У ВЛАДЕЛЬЦА: у него в папке ЛОКАЛЬНЫЕ правки metro.config.js — установка 429 прошла быстрым путём (дерево приведено к 429: metro.config.js ПЕРЕЗАПИСАН версией из репо!) и владелец предупреждён прислать что там правилось, если веб-сборка сломается. Предыдущий снимок — **429** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **429** (СЛОВО ВЛАДЕЛЬЦА через ask_user: «Отдельное окно, с чекбоксами категорий. И только когда выбран чекбокс — показать параметры категории, а не сразу всё, а потом отсекать параметры по фильтру. Наоборот, сначала параметры не видно, пока не выбрана категория»; вопрос был «как правильно для мобильных: отдельным окном или фильтр внутри категории»). ПРИМЕНЕНО: (1) НОВОЕ ОКНО EquipmentFilterModal.js + EquipmentFilterModal.styles.js (вместо удалённых EquipmentFilterPanel*: встроенная панель 425–427 удалена); в окне: шапка (filter.title + ✕), ScrollView (скролл-закон 402), ЧЕКБОКСЫ КАТЕГОРИЙ (kindsRow, filter.categories «Категории»), блок параметров СТРОГО под anyKindChecked (нет fallback «показывать всё» — not '!kindPicked'); внутри блока: Редкость (общая — тоже только после отметки, МОЁ РЕШЕНИЕ доложено владельцу) + showWeapon (weaponSection: урон/скорострельность/дистанция/тип урона/тип/патроны/качества/эффекты) + showArmor (armorSection: СУ/части тела); футер showButton «Показать (N)» (filter.show; N = countFilteredItems(filteredData) — счёт предметов с именем; foundCount в AddItemModal). (2) AddItemModal: тулбар 427 (поиск + «Фильтр (N)» условий) и listDivider ОСТАЛИСЬ; EquipmentFilterModal visible={filterOpen} после closeButton. (3) equipmentFilter.js +countFilteredItems. (4) i18n filter: +categories/show. Защёлки: 425 и 427 переведены на модальное окно (paths), 429 __tests__/gear/equipment-filter-modal-429.test.js (6: проводка/скролл-закон/строгость anyKindChecked/категорийность/Показать+словари/счётчик). 1542/157, tsc 0. .git сбрасывался ДВАЖДЫ за ход — схема с tar-бэкапом, НОВЫЕ файлы сохранять в /tmp ДО git clean. Предыдущий снимок — **428** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 77adfa7..b7c7f28 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,16 @@
+ # Changelog
++---
++## Filter results contain only what matched (patch 432)
++
++Defect of 430: picking "Weapons, rarity 6" in the filter still listed
++ammo, chems and junk in the results — consumables were never cut by
++the filter, since the filter targets gear. Now the results contain
++only gear that matched plus the selected mods; consumables and junk
++stay in the usual catalog and in search. The number on the "Show"
++button is now honest — it counts exactly what will be shown. Also,
++Power Armor was added to the flat lists (filter and search) — it used
++to be missing there.
++
+ ---
+ ## Installation no longer fears local edits (patch 431)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a4f9eb5..cdc3a81 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## В результатах фильтра — только то, что прошло условия (патч 432)
++
++Дефект 430: выбрав в фильтре «Оружие, редкость 6», в списке находок
++видел боеприпасы, химию и хлам — расходники фильтром не отсекались,
++ибо фильтр заточен под снаряжение. Теперь в результатах — только
++снаряжение, прошедшее условия, и подобранные моды; расходники и хлам
++остались в обычном каталоге и в поиске. Число на кнопке «Показать»
++теперь честное — считает то же, что будет показано. Заодно Силовая
++броня добавлена в плоские списки (фильтр и поиск) — раньше её там
++не было.
++
+ ---
+ ## Установка больше не боится локальных правок (патч 431)
+ 
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+index a9cf51b..b520e24 100644
+--- a/modules/fallout/logic/equipmentFilter.js
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -267,16 +267,23 @@ export const weaponModsProviding = (filter, locale) => {
+ };
+ 
+ /**
+- * 429: сколько предметов покажет список при таком дереве (после фильтра
+- * и потолка редкости) — для кнопки «Показать (N)» в окне фильтра.
+- * Считаются только предметы (объекты с именем); заголовки групп — нет.
++ * 429: сколько предметов покажет список (после фильтра и потолка
++ * редкости) — для кнопки «Показать (N)» в окне фильтра. Считаются
++ * только предметы (объекты с именем); заголовки групп — нет.
++ * 432: gearOnly — считать только снаряжение и моды (расходники/хлам
++ * в результатах фильтра не участвуют и в список не выводятся).
+  */
+-export const countFilteredItems = (node) => {
++export const countFilteredItems = (node, gearOnly = false) => {
++  const counts = (item) => {
++    if (!item || typeof item !== 'object' || !item.name) return false;
++    if (!gearOnly) return true;
++    return GEAR_KINDS.includes(item.itemType) || item.itemType === 'weaponMod';
++  };
+   if (Array.isArray(node)) {
+-    return node.reduce((sum, item) => sum + (item && typeof item === 'object' && item.name ? 1 : 0), 0);
++    return node.reduce((sum, item) => sum + (counts(item) ? 1 : 0), 0);
+   }
+   if (!node || typeof node !== 'object') return 0;
+-  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value), 0);
++  return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value, gearOnly), 0);
+ };
+ 
+ /**
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 5a54d03..79bbe88 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "431"
++  "baseline": "432"
+ }
+diff --git a/public/version.json b/public/version.json
+index 9f70574..adbc7b7 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "431",
++  "version": "432",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
