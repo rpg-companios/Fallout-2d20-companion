@@ -1,0 +1,475 @@
+diff --git a/__tests__/gear/equipment-filter-425.test.js b/__tests__/gear/equipment-filter-425.test.js
+index 42e674f..9a80be9 100644
+--- a/__tests__/gear/equipment-filter-425.test.js
++++ b/__tests__/gear/equipment-filter-425.test.js
+@@ -14,7 +14,6 @@ import {
+   isEquipmentFilterEmpty,
+   applyEquipmentFilter,
+   pruneTreeByEquipmentFilter,
+-  weaponModsProviding,
+   readDamageTotal,
+ } from '../../modules/fallout/logic/equipmentFilter';
+ 
+@@ -34,9 +33,10 @@ describe('Патч 425: варианты фильтра из каталогов
+     expect(options.fireRate).toEqual({ min: 0, max: 7 });
+   });
+ 
+-  it('качества — ВСЕ 32 из словаря (слово владельца), эффекты — все 10', () => {
+-    expect(options.qualities.length).toBe(32);
+-    expect(options.qualities.find((q) => q.id === 'quality_night_vision')?.name).toBe('Ночное Видение');
++  it('качества — только встречающиеся на оружии (слово 438), эффекты — все 10', () => {
++    expect(options.qualities.length).toBe(22);
++    // «Ночного Видения» на оружии нет — отмечать нельзя (моды больше не показываются)
++    expect(options.qualities.find((q) => q.id === 'quality_night_vision')).toBeUndefined();
+     expect(options.effects.length).toBe(10);
+   });
+ 
+@@ -52,34 +52,20 @@ describe('Патч 425: варианты фильтра из каталогов
+   });
+ });
+ 
+-describe('Патч 425: оружие — по СВОИМ качествам/эффектам («моды это моды»)', () => {
+-  it('оружие без врождённого Ночного Видения НЕ проходит фильтр', () => {
++describe('Патч 425→438: оружие — по СВОИМ качествам/эффектам; модов в фильтре нет', () => {
++  it('оружие без врождённого качества НЕ проходит фильтр («моды это моды»)', () => {
+     const weapon = { itemType: 'weapon', qualities: [{ qualityId: 'quality_accurate' }] };
+     const filter = { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] };
+     expect(applyEquipmentFilter(weapon, filter)).toBe(false);
+   });
+ 
+-  it('выбранное, чего на оружии нет, дают моды: ночное видение → 3 прицела', () => {
+-    const mods = weaponModsProviding(
+-      { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] }, 'ru-RU',
+-    );
+-    expect(mods.map((m) => m.id).sort()).toEqual([
+-      'mod_long_night_vision_scope', 'mod_night_vision_scope', 'mod_short_night_vision_scope',
+-    ]);
+-    expect(mods[0].itemType).toBe('weaponMod');
+-    expect(mods[0].name.length).toBeGreaterThan(0);
+-  });
+-
+-  it('компьютер наведения → его мод; Бомбарда не покрыта ничем (пусто)', () => {
+-    const tc = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_targetting_computer'] }, 'ru-RU');
+-    expect(tc.map((m) => m.id)).toEqual(['mod_targeting_computer']);
+-    const bombard = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_bombard'] }, 'ru-RU');
+-    expect(bombard).toEqual([]);
+-  });
+-
+-  it('эффекты от модов тоже находятся (Устойчивый дают 13 модов)', () => {
+-    const mods = weaponModsProviding({ ...emptyEquipmentFilter(), effects: ['effect_persistent'] }, 'ru-RU');
+-    expect(mods.length).toBe(13);
++  it('438: моды в результатах НИКОГДА — функции больше нет, секции в окне нет', () => {
++    // «1 мод может подходить 9 из 11 оружий, а если 11-го оружия нет,
++    // то от мода смысла нет» (владелец)
++    expect(readFileSync('modules/fallout/logic/equipmentFilter.js', 'utf8')).not.toContain('weaponModsProviding');
++    expect(readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8')).not.toContain('modsSection');
++    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
++    expect(ru.filter.modsSection).toBeUndefined();
+   });
+ });
+ 
+@@ -156,14 +142,13 @@ describe('Патч 425: проводка окна и подсказки', () =>
+     expect(code).toContain('onPress={onReset}');
+   });
+ 
+-  it('секция модов появляется от выбранного качества/эффекта; словарь на месте', () => {
++  it('словарь фильтра на месте; секции модов больше нет (слово 438)', () => {
+     const code = modal();
+-    expect(code).toContain('weaponModsProviding(equipmentFilter, moduleLocale)');
+-    expect(code).toContain("tInventory('modals.addItemModal.filter.modsSection')");
++    expect(code).not.toContain('weaponModsProviding');
+     const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
+     const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json', 'utf8'));
+-    expect(ru.filter.modsSection).toBe('Моды');
+-    expect(en.filter.modsSection).toBe('Mods');
++    expect(ru.filter.modsSection).toBeUndefined();
++    expect(en.filter.modsSection).toBeUndefined();
+     expect(ru.filter.title).toBe('Фильтр');
+     expect(ru.filter.qualities).toBe('Качества');
+     expect(ru.filter.effects).toBe('Эффекты');
+diff --git a/__tests__/gear/equipment-filter-results-430.test.js b/__tests__/gear/equipment-filter-results-430.test.js
+index 3707067..f6a9d22 100644
+--- a/__tests__/gear/equipment-filter-results-430.test.js
++++ b/__tests__/gear/equipment-filter-results-430.test.js
+@@ -33,12 +33,10 @@ describe('Патч 430: «Показать» ведёт к результата
+     expect(code).toContain('currentPath.length > 0 && !searchTerm && !filterActive && (');
+   });
+ 
+-  it('секция «Моды» входит в плоский список (поиск и фильтр)', () => {
++  it('438: секции «Моды» в плоском списке больше нет (моды в результатах никогда)', () => {
+     const code = modal();
+-    const start = code.indexOf('const flatKeys');
+-    expect(start).toBeGreaterThan(-1);
+-    const block = code.slice(start, code.indexOf('flatKeys.forEach'));
+-    expect(block).toContain("tInventory('modals.addItemModal.filter.modsSection')");
++    expect(code).not.toContain('modsSection');
++    expect(code).not.toContain('weaponModsProviding');
+   });
+ 
+   it('зависимости useMemo включают фильтр (432 добавил filterActive)', () => {
+diff --git a/__tests__/gear/equipment-filter-results-432.test.js b/__tests__/gear/equipment-filter-results-432.test.js
+index 3598ef0..9e0943f 100644
+--- a/__tests__/gear/equipment-filter-results-432.test.js
++++ b/__tests__/gear/equipment-filter-results-432.test.js
+@@ -36,6 +36,8 @@ describe('Патч 432: в результатах фильтра — тольк
+     // словаря, что ключи дерева, а счёт — поведенческим тестом ниже.
+     expect(code).toContain('countFoundItems(filteredData, filterLabels, filterActive)');
+     expect(code).toContain("tInventory(`modals.addItemModal.categories.${key}`)");
++    // 438: моды в счётчике больше не участвуют
++    expect(code).not.toContain('modsSection');
+   });
+ 
+   it('зависимости useMemo включают filterActive', () => {
+@@ -51,8 +53,8 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и 
+     Моды: { Всё: [{ name: 'Прицел', itemType: 'weaponMod' }] },
+   };
+ 
+-  it('gearOnly: снаряжение и моды считаются, расходники — нет', () => {
+-    expect(countFilteredItems(tree, true)).toBe(2);
++  it('438: gearOnly — только снаряжение (модов в результатах больше нет), расходники — нет', () => {
++    expect(countFilteredItems(tree, true)).toBe(1);
+   });
+ 
+   it('без gearOnly (обычный каталог/поиск) — считаются все предметы', () => {
+@@ -65,26 +67,23 @@ describe('Патч 432: счётчик с gearOnly — снаряжение и 
+ // подписях, которыми окно строит дерево. Поймал бы баг «всегда 0».
+ describe('Патч 433: счётчик «Показать (N)» считается по словарным подписям дерева', () => {
+   const gearLabel = (key) => tInventory(`modals.addItemModal.categories.${key}`);
+-  const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
+   const labels = {
+     gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map(gearLabel),
+-    modsSection: modsLabel,
+   };
+ 
+-  it('снаряжение и моды считаются, расходники — нет; ключи — словарные', () => {
++  it('снаряжение считается, расходники — нет; ключи — словарные (438: без модов)', () => {
+     const tree = {
+       [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Пистолет', itemType: 'weapon' }] },
+       [gearLabel('armor')]: { 'Всё': [{ name: 'Кожанка', itemType: 'armor' }] },
+-      [modsLabel]: { 'Всё': [{ name: 'Прицел', itemType: 'weaponMod' }] },
+       [gearLabel('ammo')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Патрон', itemType: 'ammo' }] },
+       [gearLabel('junk')]: { [tInventory('modals.addItemModal.categories.all')]: [{ name: 'Банка', itemType: 'junk' }] },
+     };
+-    expect(countFoundItems(tree, labels, true)).toBe(3);
+-    expect(countFoundItems(tree, labels, false)).toBe(5);
++    expect(countFoundItems(tree, labels, true)).toBe(2);
++    expect(countFoundItems(tree, labels, false)).toBe(4);
+   });
+ 
+   it('пустые и отсутствующие группы не ломают счёт', () => {
+-    expect(countFoundItems({ [modsLabel]: { 'Всё': [] } }, labels, true)).toBe(0);
++    expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [] } }, labels, true)).toBe(0);
+     expect(countFoundItems(null, labels, true)).toBe(0);
+     expect(countFoundItems({ [gearLabel('weapon')]: { 'Лёгкое': [{ name: 'Нож', itemType: 'weapon' }] } }, labels, false)).toBe(1);
+   });
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 553d2b2..87040d3 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -18,7 +18,6 @@ import {
+   countFoundItems,
+   isEquipmentFilterEmpty,
+   pruneTreeByEquipmentFilter,
+-  weaponModsProviding,
+ } from '../../../../modules/fallout/logic/equipmentFilter';
+ 
+ const CATEGORY_ICONS = {
+@@ -229,23 +228,14 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+     return prune(tree);
+   }, [engineLocale, weaponsByType, staticData, maxRarity]);
+ 
+-  // 425: фильтр снаряжения — та же обрезка дерева (пустые ветки прячутся).
+-  // Слово владельца: выбранное, чего на оружии нет, раскрывает МОДЫ, дающие
+-  // его («моды это моды — только когда поставят, тогда и будут эффекты»):
+-  // секция «Моды» появляется, когда подобранные качества/эффекты есть в
+-  // каком-то моде; если ни одно оружие не подходит — в окне остаются моды.
++  // 425: фильтр снаряжения — обрезка дерева (пустые ветки прячутся).
++  // 438 (слово владельца): моды в результатах НИКОГДА — «1 мод может
++  // подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода
++  // смысла нет».
+   const filteredData = useMemo(() => {
+     if (isEquipmentFilterEmpty(equipmentFilter)) return allData;
+-    const pruned = pruneTreeByEquipmentFilter(allData, equipmentFilter);
+-    const mods = weaponModsProviding(equipmentFilter, moduleLocale);
+-    if (mods.length === 0) return pruned;
+-    const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
+-    const allLabel = tInventory('modals.addItemModal.categories.all');
+-    return {
+-      ...pruned,
+-      [modsLabel]: { [allLabel]: [...mods].sort((a, b) => String(a.name).localeCompare(String(b.name))) },
+-    };
+-  }, [allData, equipmentFilter, moduleLocale, engineLocale]);
++    return pruneTreeByEquipmentFilter(allData, equipmentFilter);
++  }, [allData, equipmentFilter]);
+ 
+   const filterOptions = useMemo(() => {
+     const labels = {
+@@ -274,7 +264,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+   // ключи дерева окна (урок 433: служебные ключи давали всегда 0).
+   const filterLabels = useMemo(() => ({
+     gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+-    modsSection: tInventory('modals.addItemModal.filter.modsSection'),
+   }), [engineLocale]);
+   const foundCount = useMemo(
+     () => countFoundItems(filteredData, filterLabels, filterActive),
+@@ -353,8 +342,6 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+       });
+       const allLabel = tInventory('modals.addItemModal.categories.all');
+       const flatKeys = [
+-        // секция модов, подобранных под выбранные качества/эффекты (425)
+-        tInventory('modals.addItemModal.filter.modsSection'),
+         // расходники/хлам — только в поиске, в фильтре они не участвуют
+         ...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`))),
+       ];
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index d9b14b3..eb64964 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-08 (437)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (438)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **438** (СЛОВА ВЛАДЕЛЬЦА ПО МОДАМ — ЗАКРЫТО ОБСУЖДЕНИЕ 425: (1) «моды в результатах — НИКОГДА: 1 мод может подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода смысла нет»; (2) подписывать мод тем, что даёт — НЕТ («что даёт мод, написано в экране установки модов»); (3) «отмечаете Ночное Видение — нельзя отметить, поскольку такого качества на оружие нет» → качества фильтра = только встречающиеся на оружии, 22 (прежнее слово 425 «качества показывать все» переосмыслено владельцем; в его логике: раз модов нет, пустая отметка давала бы «Найдено: 0»)). ПРИМЕНЕНО: equipmentFilter.js — weaponModsProviding УДАЛЕН (+импорты weapon_mods), buildEquipmentFilterOptions: qualities из каталога оружия (weaponQualityIds, имена из словаря, по алфавиту) = 22, эффекты все 10; countFilteredItems gearOnly БЕЗ weaponMod (ловушка: вырезая блок модов, зацепил countFilteredItems — TypeError в 5 тестах, вернул); countFoundItems без labels.modsSection. AddItemModal: секция «Моды» из filteredData удалена (prune как есть), filterLabels без modsSection, flatKeys без modsSection. i18n: filter.modsSection удалён (ru/en). Защёлки: 425 (22 качества, night_vision нет в списке, weaponModsProviding отсутствует, modsSection в словаре нет), 430 (отсутствие), 432/433 (счётчик без модов). 1555/159, tsc 0. Предыдущий снимок — **437** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **437** (СЛОВО владельца: «Воронку иконкой по типу awesome font. В экране крафта смотри иконки категорий, вот такую же иконку надо» — ход ПРЕРЫВАЛСЯ владельцем, успел текстовую воронку '▽│', заменена на настоящую иконку). ПРИМЕНЕНО: AddItemModal — import { MaterialCommunityIcons } from '@expo/vector-icons' (ТОТ ЖЕ набор, что иконки категорий крафта, CraftingModal :12), кнопка styles.filterToggle 40×40 (высота = высоте поиска) справа от поиска, внутри <MaterialCommunityIcons name="filter" style={styles.filterIcon} /> (filterIcon fontSize 20 — стиль как у крафта, не пропсы), бейдж styles.filterBadge (#22c55e, top -5 right -5) с activeFilterCount (нет условий — бейджа нет), filterToggleText УДАЛЁН. Защёлка 427: воронка-иконка + квадрат + бейдж. ПРНЯТО ОТ ВЛАДЕЛЬЦА (учесть навсегда): (1) откат пачки у владельца = откат КОММИТА (пачка из 11 патчей, 11-й сломан → откат всех 11 → ставит до 10-го; для отсечки штатно: apply старой цели идёт полным проходом ~2 мин); (2) смысл .install-backup объяснён через «сохранёнку перед перезаписью» + команда отката в выводе установщика (с 436); (3) песочница агента ≠ папка владельца на реплите — истина только слова владельца из игры. 1557/159, tsc 0. ОТКРЫТО: 2 вопроса секции «Моды»; редкость в окне фильтра (сейчас после отметки категории). Предыдущий снимок — **436** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **436** (СЛОВА ВЛАДЕЛЬЦА: «песочница это не то, что лежит в реплите» (его папка — на реплите, na4u); «могу не поставить какие-то патчи… ставлю сразу всю пачку исправлений патчем, который считаю достойным установки» (ПРЫЖКИ ЧЕРЕЗ ПАТЧИ — штатно для отсечки: ставит последний достойный, промежуточные по одному не применяются); «Всё ещё не понимаю смысла в .install-backup» (объяснено через сохранёнку/откат); «В окнах с добычей и покупкой поиск и фильтр не влезают… Фильтр ушёл за границу модалки» (ДЕФЕКТ); «А может фильтр вообще сделать квадратной кнопкой с иконкой воронки?» (ВОПРОС-ПРЕДЛОЖЕНИЕ — КОДИТЬ ДО «ДЕЛАЙ» НЕЛЬЗЯ, урок 425)). ПРИМЕНЕНО: (1) styles searchInputInToolbar minWidth:0 (на вебе TextInput не сжимался ниже врождённой ширины → кнопка выталкивалась за границу; защёлка 427); (2) apply-patch.sh архивная подсказка дополнена КОМАНДОЙ ОТКАТА `cp -R .install-backup/<ts>/. .` («вернуть всё как было одной командой» — это и есть смысл папки для владельца: откат моей неудачной пачки; защёлка 426). 1557/159, tsc 0. ВОРОНКА: план согласован в чате (квадрат ~40×40, иконка-воронка из примитивов: треугольник border-трюком + ножка, цветной бейдж с числом условий; текст «Фильтр» уходит), ЖДУ «ДЕЛАЙ». Предыдущий снимок — **435** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **435** (ПОРЯДОК РАБОТЫ ВЛАДЕЛЬЦА словами: «могу не комитить патчи десятками, а потом всё одним комитом запушить» и «зачем постоянный git fetch… если его патч делает?»). ОТВЕТЫ ВЛАДЕЛЬЦУ: (1) коммиты пачкой — ДА, установщику безразличны коммиты (он проверяет содержимое), пересборка платформы откатывается повторной установкой за ~30 сек, правки архивируются в .install-backup; (2) ручной fetch был нужен ОДИН раз (замена устаревшего установщика — замкнутый круг старый-не-умеет-отсечку), теперь каждая установка приносит свежий установщик в папке, обычное обновление = `./apply-patch.sh N`. ПРИМЕНЕНО: apply-patch.sh — подсказки переписаны: архивная («…пересоберёт проект из git… запустите установку ещё раз. Свои правки я сохранил в архиве выше») и обе коммит-подсказки («Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом… запустите установку ещё раз…» + команда). Защёлка 426 обновлена (пересоберёт/накопить). 1557/159, tsc 0. РЕШЕНО ВЛАДЕЛЬЦЕМ: обновляется одной командой ./apply-patch.sh N, коммитит пачками. Предыдущий снимок — **434** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d833f36..df5b481 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,15 @@
+ # Changelog
++---
++## The owner's word on mods in the filter (patch 438)
++
++Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,
++and if there is no 11th weapon, the mod is pointless". The "Mods"
++section is gone from the window. What a mod gives is already written
++in the mod installation screen — no labels needed in the list. And
++so: the filter's qualities are now only those actually found on
++weapons (22) — Night Vision and other mod-only abilities are not in
++the list, no empty selections.
++
+ ---
+ ## Filter button — square with a funnel (patch 437)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 4bfe525..c6d0941 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Слова владельца по модам в фильтре (патч 438)
++
++Моды в результатах фильтра — НИКОГДА: «1 мод может подходить 9 из
++11 оружий, а если 11-го оружия нет, то от мода смысла нет». Секция
++«Моды» из окна убрана. Что даёт мод, и так написано в экране
++установки модов — подписи в списке не нужны. И раз так: качества в
++фильтре теперь только те, что реально встречаются на оружии (22) —
++«Ночного Видения» и прочих только-модовых способностей в списке
++нет, пустых отметок не бывает.
++
+ ---
+ ## Кнопка фильтра — квадратная с воронкой (патч 437)
+ 
+diff --git a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+index e65520a..dbb776d 100644
+--- a/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json
+@@ -50,7 +50,6 @@
+       "Hand": "Arms",
+       "Leg": "Legs"
+     },
+-    "modsSection": "Mods",
+     "categories": "Categories",
+     "show": "Show",
+     "resultsFound": "Found: {n}"
+diff --git a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+index 7ec3ef4..b9933b8 100644
+--- a/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
++++ b/modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json
+@@ -50,7 +50,6 @@
+       "Hand": "Руки",
+       "Leg": "Ноги"
+     },
+-    "modsSection": "Моды",
+     "categories": "Категории",
+     "show": "Показать",
+     "resultsFound": "Найдено: {n}"
+diff --git a/modules/fallout/logic/equipmentFilter.js b/modules/fallout/logic/equipmentFilter.js
+index c33a156..afffda1 100644
+--- a/modules/fallout/logic/equipmentFilter.js
++++ b/modules/fallout/logic/equipmentFilter.js
+@@ -1,8 +1,11 @@
+ // Фильтры снаряжения для окон добычи/покупки (патч 425, слово владельца:
+ // «фильтры в окнах добычи/покупки по параметрам снаряжения (кроме веса)»;
+-// диапазоны «от–до» с серыми подсказками; качества — ВСЕ из словаря, даже
+-// те, что не встречаются на предметах). Чистые функции: варианты собираются
+-// из каталогов (каталог JSON = истина), предикат — без побочных эффектов.
++// диапазоны «от–до» с серыми подсказками). 438: качества в фильтре —
++// ТОЛЬКО те, что встречаются на оружии («нельзя отметить, поскольку
++// такого качества на оружие нет»); моды в результатах НИКОГДА («1 мод
++// может подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода
++// смысла нет»). Чистые функции: варианты собираются из каталогов
++// (каталог JSON = истина), предикат — без побочных эффектов.
+ import ruQualities from '../i18n/ru-RU/data/system/qualities.json';
+ import enQualities from '../i18n/en-EN/data/system/qualities.json';
+ import ruEffects from '../i18n/ru-RU/data/system/damageEffects.json';
+@@ -11,9 +14,6 @@ import weaponsCatalog from '../data/equipment/weapons.json';
+ import armorCatalog from '../data/equipment/armor.json';
+ import powerArmorCatalog from '../data/equipment/powerArmor.json';
+ import clothesCatalog from '../data/equipment/clothes.json';
+-import weaponModsCatalog from '../data/equipment/weapon_mods.json';
+-import ruModNames from '../i18n/ru-RU/data/equipment/weapon_mods.json';
+-import enModNames from '../i18n/en-EN/data/equipment/weapon_mods.json';
+ 
+ export const GEAR_KINDS = ['weapon', 'armor', 'powerArmor', 'clothing'];
+ 
+@@ -68,20 +68,31 @@ const numBounds = (values) => ({
+   max: Math.max(...values),
+ });
+ 
++const qualitiesDict = (locale) => (locale === 'en-EN' ? enQualities : ruQualities);
++
+ /**
+  * Варианты для панели фильтра. Диапазоны — фактические границы каталога
+  * (аудит 424: редкость 0–6, урон 0–21, скорострельность 0–7, СУ физ 1–4,
+- * эн 0–5, рад 0–2). Качества — ВСЕ из словаря (слово владельца), эффекты —
+- * все из словаря. Патроны — уникальные из каталога оружия.
++ * эн 0–5, рад 0–2). 438: качества — только встречающиеся на оружии,
++ * по алфавиту; эффекты — все из словаря (все 10 на оружии есть).
++ * Патроны — уникальные из каталога оружия.
+  */
+ export const buildEquipmentFilterOptions = (locale, labels) => {
+-  const qualitiesDict = locale === 'en-EN' ? enQualities : ruQualities;
+   const effectsDict = locale === 'en-EN' ? enEffects : ruEffects;
+   const weapons = (weaponsCatalog ?? []).filter((w) => !w.isBuiltin);
+   const armor = armorPieces();
+   const pa = powerArmorPieces();
+   const clothes = clothingItems();
+ 
++  // 438 (слово владельца): отмечать можно только то, что на оружии есть.
++  const weaponQualityIds = [];
++  for (const weapon of weapons) {
++    for (const q of (weapon.qualities ?? [])) {
++      const id = q?.qualityId ?? q;
++      if (id && !weaponQualityIds.includes(id)) weaponQualityIds.push(id);
++    }
++  }
++
+   const ammoSeen = [];
+   for (const weapon of weapons) {
+     for (const id of String(weapon.ammoId ?? '').split(',').map((part) => part.trim())) {
+@@ -132,7 +143,9 @@ export const buildEquipmentFilterOptions = (locale, labels) => {
+       { id: 'Leg', name: labels.bodyParts.Leg },
+     ],
+     ammoOptions,
+-    qualities: qualitiesDict.map((row) => ({ id: row.id, name: row.name })),
++    qualities: weaponQualityIds
++      .map((id) => ({ id, name: qualitiesDict(locale).find((row) => row.id === id)?.name ?? id }))
++      .sort((a, b) => a.name.localeCompare(b.name)),
+     effects: effectsDict.map((row) => ({ id: row.id, name: row.name })),
+   };
+ };
+@@ -240,44 +253,25 @@ export const applyEquipmentFilter = (item, filter) => {
+ };
+ 
+ /**
+- * Слово владельца 425: «моды это моды. Только когда их поставят, тогда и
+- * будут эффекты» — оружие фильтруется ТОЛЬКО по своим (врождённым)
+- * качествам/эффектам; ни «может получить от мода», ни установленные моды
+- * экземпляров здесь не учитываются. Но «поскольку моды теперь предметы
+- * и они есть в инвентаре, при выборе эффектов, которые не на оружие,
+- * покажут модули»: моды, дающие хоть одно из выбранного, показываются
+- * отдельной секцией окна (addFlow принимает mod_* как weaponMod).
++ * 429/432/438: счётчик кнопки «Показать (N)» по дереву окна (после
++ * фильтра и потолка редкости). labels.gear — локализованные подписи
++ * категорий снаряжения ИЗ ТОГО ЖЕ словаря, которым построены ключи
++ * дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт всегда
++ * ноль). Без активного фильтра считаем всё дерево; при активном —
++ * только эти группы и только снаряжение (модов в результатах больше
++ * нет — слово владельца 438).
+  */
+-export const weaponModsProviding = (filter, locale) => {
+-  const wanted = [...(filter?.qualities ?? []), ...(filter?.effects ?? [])];
+-  if (wanted.length === 0) return [];
+-  const names = new Map((locale === 'en-EN' ? enModNames : ruModNames).map((row) => [row.id, row.name]));
+-  return (weaponModsCatalog ?? [])
+-    .filter((mod) => (mod.qualityChanges ?? []).some((t) => wanted.includes(t?.id))
+-      || (mod.effectChanges ?? []).some((t) => wanted.includes(t?.id)))
+-    .map((mod) => ({
+-      id: mod.id,
+-      name: names.get(mod.id) ?? mod.id,
+-      itemType: 'weaponMod',
+-      modSlot: mod.slot,
+-      rarity: mod.rarity,
+-      cost: mod.cost,
+-      weight: mod.weight,
+-    }));
+-};
+-
+ /**
+  * 429: сколько предметов покажет список (после фильтра и потолка
+- * редкости) — для кнопки «Показать (N)» в окне фильтра. Считаются
+- * только предметы (объекты с именем); заголовки групп — нет.
+- * 432: gearOnly — считать только снаряжение и моды (расходники/хлам
+- * в результатах фильтра не участвуют и в список не выводятся).
++ * редкости). Считаются только предметы (объекты с именем); заголовки
++ * групп — нет. gearOnly — только снаряжение (в результатах фильтра,
++ * по слову 438, модов больше нет, расходники не участвуют).
+  */
+ export const countFilteredItems = (node, gearOnly = false) => {
+   const counts = (item) => {
+     if (!item || typeof item !== 'object' || !item.name) return false;
+     if (!gearOnly) return true;
+-    return GEAR_KINDS.includes(item.itemType) || item.itemType === 'weaponMod';
++    return GEAR_KINDS.includes(item.itemType);
+   };
+   if (Array.isArray(node)) {
+     return node.reduce((sum, item) => sum + (counts(item) ? 1 : 0), 0);
+@@ -286,20 +280,10 @@ export const countFilteredItems = (node, gearOnly = false) => {
+   return Object.values(node).reduce((sum, value) => sum + countFilteredItems(value, gearOnly), 0);
+ };
+ 
+-/**
+- * 429/432: счётчик кнопки «Показать (N)» по дереву окна (после фильтра
+- * и потолка редкости). labels — локализованные подписи категорий
+- * снаряжения и секции модов, ИЗ ТОГО ЖЕ словаря, которым построены
+- * ключи дерева (урок 433: служебные ключи «weapon» мимо дерева — счёт
+- * всегда ноль). Без активного фильтра считаем всё дерево; при
+- * активном — только эти группы и ТОЛЬКО снаряжение/моды: ровно то,
+- * что попадёт в список результатов.
+- */
+ export const countFoundItems = (filteredTree, labels, filterActive) => {
+   if (!filterActive) return countFilteredItems(filteredTree);
+   const part = {};
+-  const groupLabels = [...(labels?.gear ?? []), ...(labels?.modsSection ? [labels.modsSection] : [])];
+-  for (const label of groupLabels) {
++  for (const label of (labels?.gear ?? [])) {
+     if (filteredTree && filteredTree[label] !== undefined) part[label] = filteredTree[label];
+   }
+   return countFilteredItems(part, true);
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index ebcfff1..9a225da 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "437"
++  "baseline": "438"
+ }
+diff --git a/public/version.json b/public/version.json
+index 4ac9465..3d8c854 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "437",
++  "version": "438",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
