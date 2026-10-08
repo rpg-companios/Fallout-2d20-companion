@@ -316,18 +316,21 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID
       mkdir -p "$backup_dir/$(dirname "$entry")"
       cp -R "$ROOT_DIR/$entry" "$backup_dir/$entry"
     done <<<"$local_dirty"
-    echo "В дереве незакоммиченные изменения. Прежде чем привести дерево к №$BASELINE_NUM,"
-    echo "установщик сохранил их в папку относительно проекта:"
-    echo "  .install-backup/$(basename "$backup_dir")"
+    echo "В папке проекта были ваши правки. На всякий случай я сохранил их"
+    echo "в папку: .install-backup/$(basename "$backup_dir") (ничего не удалял)."
+    echo "Там сейчас:"
+    while IFS= read -r line; do
+      entry="${line:3}"
+      if [[ "$entry" == *" -> "* ]]; then entry="${entry%% -> *}"; fi
+      [[ -n "$entry" ]] && printf '  - %s\n' "$entry"
+    done <<<"$local_dirty"
+    echo "Если среди них нет ничего ценного — эту папку можно удалить."
     echo
   fi
   BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
   if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
     FAST_MODE=1
-    echo "Отсечка: ключевой патч №$BASELINE_NUM ($BASELINE_NAME)."
-    echo "Дерево приводится к его состоянию; проверяются только патчи после №$BASELINE_NUM."
-    echo "Содержимое №$BASELINE_NUM и всех патчей до него УЖЕ в дереве —"
-    echo "по одному они не применяются и в «Применено» не попадут."
+    echo "Привожу папку сразу к состоянию №$BASELINE_NUM — старая цепочка патчей не перебирается."
     echo
     sync_to_baseline
     if [[ -n "$backup_dir" ]]; then
@@ -571,8 +574,7 @@ for name in "${STATE_SCOPE[@]}"; do
 done
 
 if [[ ${#QUEUE[@]} -eq 0 ]]; then
-  echo "По содержимому дерева всё до №$PATCH_ID стоит."
-  echo "Ничего не нужно."
+  echo "Готово: приложение уже обновлено до №$PATCH_ID."
   echo
   json_check || exit 1
   exit 0
@@ -746,31 +748,34 @@ if [[ ${#DEFERRED[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
+  APP_VERSION="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT_DIR/public/version.json" 2>/dev/null | head -1)"
   echo
+  echo "Готово: приложение обновлено до №$PATCH_ID."
+  if [[ -n "${APP_VERSION:-}" ]]; then
+    echo "Версия приложения: $APP_VERSION (public/version.json)."
+  fi
   if [[ ${#APPLIED[@]} -eq 0 ]]; then
-    echo "По содержимому дерева всё до №$PATCH_ID стоит. Ничего не нужно."
+    echo "Содержимое папки точно соответствует №$PATCH_ID."
   else
-    echo "Готово. Применено патчей: ${#APPLIED[@]}"
+    echo "Применено патчей: ${#APPLIED[@]}"
     printf '  %s\n' "${APPLIED[@]}"
   fi
   if [[ ${#DEFERRED[@]} -gt 0 ]]; then
     echo
-    echo "Отложено (дерево ушло мимо, подтверждено): ${#DEFERRED[@]}"
+    echo "Отложено (подтверждено поздними патчами): ${#DEFERRED[@]}"
     printf '  %s\n' "${DEFERRED[@]}"
   fi
   if [[ "$FAST_MODE" -eq 1 ]]; then
-    echo
-    echo "Отсечка №$BASELINE_NUM: патчи до неё включительно уже в дереве —"
-    echo "приведены отсечкой, по одному не проверялись и не применялись."
+    echo "Патчи до №$BASELINE_NUM по одному не перебирались — их содержимое уже в папке."
   fi
   echo
   json_check || exit 1
   echo "Источник: $REMOTE/$ARENA_BRANCH"
   echo "Коммит:   $FETCHED_COMMIT"
-  if [[ ${#APPLIED[@]} -gt 0 ]]; then
+  if [[ ${#APPLIED[@]} -gt 0 || "$FAST_MODE" -eq 1 ]]; then
     echo
-    echo "Закрепите результат коммитом — это точка отката перед следующей установкой:"
-    echo "  git add -A && git commit -m \"Патчи применены: цель №$PATCH_ID\""
+    echo "Закрепите результат коммитом — иначе платформа может вернуть прежние файлы:"
+    echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
   fi
   exit 0
 fi

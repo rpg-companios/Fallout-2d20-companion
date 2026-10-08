@@ -1,5 +1,16 @@
 # Changelog
 ---
+## The installer speaks human (patch 434)
+
+The owner's word: "so much noise in the output, and no understanding
+of whether the patch is installed". The result is now clear from one
+line: "Done: the app is updated to №N" — with the app's own version
+shown next to it as proof. The backup message became understandable:
+what is inside (as a list) and that the folder can be deleted if
+nothing valuable is there. The bureaucratic talk about "trees" and
+"queues" is gone.
+
+---
 ## The "Show" count is honest again (patch 433)
 
 Defect of 432: the found-items counter counted groups by service
