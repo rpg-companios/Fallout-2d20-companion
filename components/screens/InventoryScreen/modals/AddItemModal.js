@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
+// 437 (слово владельца): иконка фильтра — как иконки категорий в крафте.
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory, formatInventoryText } from '../logic/inventoryI18n';
@@ -456,10 +458,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                   onChangeText={setSearchTerm}
                 />
                 <TouchableOpacity style={styles.filterToggle} onPress={() => setFilterOpen((prev) => !prev)}>
-                  <Text style={styles.filterToggleText}>
-                    {tInventory('modals.addItemModal.filter.title')}
-                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} {filterOpen ? '▼' : '►'}
-                  </Text>
+                  {/* 437 (слово владельца): квадратная кнопка справа от
+                      поиска, высота = высоте поиска; внутри иконка-воронка
+                      из того же набора, что иконки категорий крафта, в
+                      уголке — цветной кружок с числом активных условий. */}
+                  <MaterialCommunityIcons name="filter" style={styles.filterIcon} />
+                  {activeFilterCount > 0 && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </View>
 

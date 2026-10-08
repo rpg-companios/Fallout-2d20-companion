@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Filter button — square with a funnel (patch 437)
+
+The owner's word: the filter should be a square button with a funnel
+icon, like the category icons in the crafting screen. To the right
+of the search field there is now a square button: inside, a funnel
+icon from the same icon set as the crafting screen; in the corner, a
+colored badge with the number of active conditions (no badge when
+there are none). The search field takes all the remaining width.
+
+---
 ## Search and filter fit inside the window again (patch 436)
 
 Defect: in the loot and buy windows the search field refused to
