@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Installer hints follow your workflow (patch 435)
+
+The owner's word: it is easier to accumulate commits and record them
+in one go than to commit after every install. The installer no
+longer nags: the hint now says honestly — commit whenever you like,
+several installs can be folded into one commit; if the platform
+rebuilds the project before that, just run the installer again (it
+archives your edits in advance). The manual git fetch from the
+instructions is no longer needed: it was required once, to replace
+an outdated installer.
+
+---
 ## The installer speaks human (patch 434)
 
 The owner's word: "so much noise in the output, and no understanding
