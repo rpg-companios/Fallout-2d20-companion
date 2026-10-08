@@ -1,0 +1,161 @@
+diff --git a/__tests__/gear/equipment-filter-427.test.js b/__tests__/gear/equipment-filter-427.test.js
+index 42bddcd..281a44e 100644
+--- a/__tests__/gear/equipment-filter-427.test.js
++++ b/__tests__/gear/equipment-filter-427.test.js
+@@ -108,6 +108,12 @@ describe('Патч 427: проводка окна — поиск+фильтр о
+     expect(code).toContain('styles.filterToolbar');
+     expect(code).toContain('styles.searchInputInToolbar');
+     expect(code).toContain('styles.filterToggle');
++    // 437 (слово владельца): иконка-воронка — из того же набора, что
++    // иконки категорий крафта (MaterialCommunityIcons), имя «filter»
++    expect(code).toContain("import { MaterialCommunityIcons } from '@expo/vector-icons';");
++    expect(code).toContain('<MaterialCommunityIcons name="filter" style={styles.filterIcon} />');
++    expect(code).toContain('activeFilterCount > 0');
++    expect(code).toContain('styles.filterBadge');
+     expect(code).toContain('styles.listDivider');
+     // кнопка открывает/закрывает окно фильтра (429)
+     expect(code).toContain('setFilterOpen((prev) => !prev)');
+@@ -127,6 +133,13 @@ describe('Патч 427: проводка окна — поиск+фильтр о
+     expect(code).toContain('minWidth: 0');
+     expect(code).toContain('filterToggle');
+     expect(code).toContain('listDivider');
++    // 437 (слово владельца): квадратная кнопка с воронкой и кружком-счётчиком
++    expect(code).toContain('width: 40, height: 40');
++    expect(code).toContain('filterIcon: { fontSize: 20, color:');
++    expect(code).toContain("backgroundColor: '#22c55e'");
++    expect(code).toContain('filterBadge');
++    // текстовая кнопка ушла — вместо неё воронка из символов
++    expect(code).not.toContain('filterToggleText');
+   });
+ 
+   it('панель: чекбоксы категорий, секции показываются по категориям', () => {
+diff --git a/components/screens/InventoryScreen/modals/AddItemModal.js b/components/screens/InventoryScreen/modals/AddItemModal.js
+index 0ce621e..553d2b2 100644
+--- a/components/screens/InventoryScreen/modals/AddItemModal.js
++++ b/components/screens/InventoryScreen/modals/AddItemModal.js
+@@ -1,5 +1,7 @@
+ import React, { useState, useMemo, useEffect } from 'react';
+ import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
++// 437 (слово владельца): иконка фильтра — как иконки категорий в крафте.
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+ import { tInventory, formatInventoryText } from '../logic/inventoryI18n';
+@@ -456,10 +458,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
+                   onChangeText={setSearchTerm}
+                 />
+                 <TouchableOpacity style={styles.filterToggle} onPress={() => setFilterOpen((prev) => !prev)}>
+-                  <Text style={styles.filterToggleText}>
+-                    {tInventory('modals.addItemModal.filter.title')}
+-                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} {filterOpen ? '▼' : '►'}
+-                  </Text>
++                  {/* 437 (слово владельца): квадратная кнопка справа от
++                      поиска, высота = высоте поиска; внутри иконка-воронка
++                      из того же набора, что иконки категорий крафта, в
++                      уголке — цветной кружок с числом активных условий. */}
++                  <MaterialCommunityIcons name="filter" style={styles.filterIcon} />
++                  {activeFilterCount > 0 && (
++                    <View style={styles.filterBadge}>
++                      <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
++                    </View>
++                  )}
+                 </TouchableOpacity>
+               </View>
+ 
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index db50de6..d9b14b3 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-08 (436)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (437)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **437** (СЛОВО владельца: «Воронку иконкой по типу awesome font. В экране крафта смотри иконки категорий, вот такую же иконку надо» — ход ПРЕРЫВАЛСЯ владельцем, успел текстовую воронку '▽│', заменена на настоящую иконку). ПРИМЕНЕНО: AddItemModal — import { MaterialCommunityIcons } from '@expo/vector-icons' (ТОТ ЖЕ набор, что иконки категорий крафта, CraftingModal :12), кнопка styles.filterToggle 40×40 (высота = высоте поиска) справа от поиска, внутри <MaterialCommunityIcons name="filter" style={styles.filterIcon} /> (filterIcon fontSize 20 — стиль как у крафта, не пропсы), бейдж styles.filterBadge (#22c55e, top -5 right -5) с activeFilterCount (нет условий — бейджа нет), filterToggleText УДАЛЁН. Защёлка 427: воронка-иконка + квадрат + бейдж. ПРНЯТО ОТ ВЛАДЕЛЬЦА (учесть навсегда): (1) откат пачки у владельца = откат КОММИТА (пачка из 11 патчей, 11-й сломан → откат всех 11 → ставит до 10-го; для отсечки штатно: apply старой цели идёт полным проходом ~2 мин); (2) смысл .install-backup объяснён через «сохранёнку перед перезаписью» + команда отката в выводе установщика (с 436); (3) песочница агента ≠ папка владельца на реплите — истина только слова владельца из игры. 1557/159, tsc 0. ОТКРЫТО: 2 вопроса секции «Моды»; редкость в окне фильтра (сейчас после отметки категории). Предыдущий снимок — **436** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **436** (СЛОВА ВЛАДЕЛЬЦА: «песочница это не то, что лежит в реплите» (его папка — на реплите, na4u); «могу не поставить какие-то патчи… ставлю сразу всю пачку исправлений патчем, который считаю достойным установки» (ПРЫЖКИ ЧЕРЕЗ ПАТЧИ — штатно для отсечки: ставит последний достойный, промежуточные по одному не применяются); «Всё ещё не понимаю смысла в .install-backup» (объяснено через сохранёнку/откат); «В окнах с добычей и покупкой поиск и фильтр не влезают… Фильтр ушёл за границу модалки» (ДЕФЕКТ); «А может фильтр вообще сделать квадратной кнопкой с иконкой воронки?» (ВОПРОС-ПРЕДЛОЖЕНИЕ — КОДИТЬ ДО «ДЕЛАЙ» НЕЛЬЗЯ, урок 425)). ПРИМЕНЕНО: (1) styles searchInputInToolbar minWidth:0 (на вебе TextInput не сжимался ниже врождённой ширины → кнопка выталкивалась за границу; защёлка 427); (2) apply-patch.sh архивная подсказка дополнена КОМАНДОЙ ОТКАТА `cp -R .install-backup/<ts>/. .` («вернуть всё как было одной командой» — это и есть смысл папки для владельца: откат моей неудачной пачки; защёлка 426). 1557/159, tsc 0. ВОРОНКА: план согласован в чате (квадрат ~40×40, иконка-воронка из примитивов: треугольник border-трюком + ножка, цветной бейдж с числом условий; текст «Фильтр» уходит), ЖДУ «ДЕЛАЙ». Предыдущий снимок — **435** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **435** (ПОРЯДОК РАБОТЫ ВЛАДЕЛЬЦА словами: «могу не комитить патчи десятками, а потом всё одним комитом запушить» и «зачем постоянный git fetch… если его патч делает?»). ОТВЕТЫ ВЛАДЕЛЬЦУ: (1) коммиты пачкой — ДА, установщику безразличны коммиты (он проверяет содержимое), пересборка платформы откатывается повторной установкой за ~30 сек, правки архивируются в .install-backup; (2) ручной fetch был нужен ОДИН раз (замена устаревшего установщика — замкнутый круг старый-не-умеет-отсечку), теперь каждая установка приносит свежий установщик в папке, обычное обновление = `./apply-patch.sh N`. ПРИМЕНЕНО: apply-patch.sh — подсказки переписаны: архивная («…пересоберёт проект из git… запустите установку ещё раз. Свои правки я сохранил в архиве выше») и обе коммит-подсказки («Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом… запустите установку ещё раз…» + команда). Защёлка 426 обновлена (пересоберёт/накопить). 1557/159, tsc 0. РЕШЕНО ВЛАДЕЛЬЦЕМ: обновляется одной командой ./apply-patch.sh N, коммитит пачками. Предыдущий снимок — **434** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **434** (РЕЧЬ УСТАНОВЩИКА, слово владельца: «что за хня?… столько мусора в выводе, а понимания поставился ли 433 или нет нету. И на кой чёрт мне папка .install-backup… Ты хоть помнишь как я работаю?» — владелец НЕ программист, ему нужен ясный итог). ПРИМЕНЕНО в apply-patch.sh: (1) главный итог ВСЕГДА «Готово: приложение обновлено до №$PATCH_ID» + строка «Версия приложения: N (public/version.json)» (APP_VERSION из public/version.json — доказательство из самого приложения); (2) архив правок — «В папке проекта были ваши правки…» + СПИСОК файлов (entry rename→левая часть) + «эту папку можно удалить»; (3) блок отсечки → одна строка «Привожу папку сразу к состоянию №N — старая цепочка патчей не перебирается»; (4) ранний выход → «Готово: приложение уже обновлено до №N.»; (5) коммит-подсказка теперь и при FAST_MODE (иначе платформа откатывает); (6) защёлка 393 переведена на новые слова (смысл тот же: установщик объясняет отсечку), защёлка 426/434 запрещает канцеляризмы («Ничего не нужно», «не применяются и в «Применено» не попадут»). ВАЖНО: usage-справка (—help) НЕ тронута — там для агента. 1557/159, tsc 0. СЦЕНАРИЙ ВЛАДЕЛЬЦА ПОВТОРИЛСЯ: он ставил 433 — установщик отработал (433 встал), но вывод был непонятен; ему дана команда проверки ls .install-backup/... и решение про удаление. Предыдущий снимок — **433** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index fd6f306..d833f36 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Filter button — square with a funnel (patch 437)
++
++The owner's word: the filter should be a square button with a funnel
++icon, like the category icons in the crafting screen. To the right
++of the search field there is now a square button: inside, a funnel
++icon from the same icon set as the crafting screen; in the corner, a
++colored badge with the number of active conditions (no badge when
++there are none). The search field takes all the remaining width.
++
+ ---
+ ## Search and filter fit inside the window again (patch 436)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index d3d8b93..4bfe525 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Кнопка фильтра — квадратная с воронкой (патч 437)
++
++Слово владельца: фильтр — квадратной кнопкой с иконкой-воронкой,
++как иконки категорий в экране крафта. Справа от строки поиска теперь
++квадратная кнопка: внутри иконка-воронка из того же набора, что и
++иконки крафта; в уголке — цветной кружок с числом активных условий
++(условий нет — кружка нет). Поиск при этом занимает всю оставшуюся
++ширину.
++
+ ---
+ ## Поиск и фильтр снова в границах окна (патч 436)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index e2b3e4c..ebcfff1 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "436"
++  "baseline": "437"
+ }
+diff --git a/public/version.json b/public/version.json
+index 20cf1d2..4ac9465 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "436",
++  "version": "437",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/AddItemModal.styles.js b/styles/AddItemModal.styles.js
+index 40e415e..e97282a 100644
+--- a/styles/AddItemModal.styles.js
++++ b/styles/AddItemModal.styles.js
+@@ -27,12 +27,15 @@ const styles = StyleSheet.create({
+   backButton: { alignSelf: 'flex-start', marginBottom: 8 },
+   backButtonText: { color: '#1A73E8', fontSize: 14 },
+   searchInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12 },
+-  // 427: поиск и кнопка «Фильтр» — одна строка над панелью; черта отделяет
+-  // их от списка предметов.
++  // 427: поиск и кнопка-воронка — одна строка над окном; черта отделяет
++  // их от списка предметов. 437: кнопка квадратная (по высоте поиска),
++  // иконка-воронка как в крафте + кружок-счётчик активных условий.
+   filterToolbar: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+   searchInputInToolbar: { flex: 1, minWidth: 0, marginBottom: 0 },
+-  filterToggle: { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
+-  filterToggleText: { fontSize: 14, fontWeight: 'bold', color: '#333' },
++  filterToggle: { width: 40, height: 40, marginLeft: 8, borderRadius: 8, borderWidth: 1, borderColor: '#bbb', backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' },
++  filterIcon: { fontSize: 20, color: '#333' },
++  filterBadge: { position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: '#22c55e', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1, borderColor: '#fff' },
++  filterBadgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
+   listDivider: { height: 1, backgroundColor: '#bbb', marginVertical: 6 },
+   itemContainer: {
+     paddingVertical: 14,
