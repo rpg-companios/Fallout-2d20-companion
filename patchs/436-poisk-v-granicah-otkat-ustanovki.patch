@@ -1,0 +1,131 @@
+diff --git a/__tests__/gear/equipment-filter-427.test.js b/__tests__/gear/equipment-filter-427.test.js
+index 75bd5e0..42bddcd 100644
+--- a/__tests__/gear/equipment-filter-427.test.js
++++ b/__tests__/gear/equipment-filter-427.test.js
+@@ -121,6 +121,10 @@ describe('Патч 427: проводка окна — поиск+фильтр о
+     const code = modalStyles();
+     expect(code).toContain('filterToolbar');
+     expect(code).toContain('searchInputInToolbar');
++    // 436 (владелец: «поиск и фильтр не влезают… фильтр ушёл за границу
++    // модалки»): на вебе поле не сжималось ниже врождённой ширины и
++    // выталкивало кнопку — minWidth: 0 разрешает сжатие
++    expect(code).toContain('minWidth: 0');
+     expect(code).toContain('filterToggle');
+     expect(code).toContain('listDivider');
+   });
+diff --git a/__tests__/patches/baseline-cutoff.test.js b/__tests__/patches/baseline-cutoff.test.js
+index bd3ea01..144d7e0 100644
+--- a/__tests__/patches/baseline-cutoff.test.js
++++ b/__tests__/patches/baseline-cutoff.test.js
+@@ -55,6 +55,9 @@ describe('Патч 426: отсечка установщика по послед
+     expect(code).toContain('запустите установку ещё раз');
+     expect(code).toContain('В папке проекта были ваши правки.');
+     expect(code).toContain('эту папку можно удалить');
++    // 436: установщик сам называет команду отката («пурга» -> вернуть как было)
++    expect(code).toContain('cp -R .install-backup/$(basename "$backup_dir")/. .');
++    expect(code).toContain('вернуть всё как было');
+     // старые канцеляризмы исчезли
+     expect(code).not.toContain('Ничего не нужно');
+     expect(code).not.toContain('не применяются и в «Применено» не попадут');
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 8fa3919..585f8bd 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -324,7 +324,10 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID
+       if [[ "$entry" == *" -> "* ]]; then entry="${entry%% -> *}"; fi
+       [[ -n "$entry" ]] && printf '  - %s\n' "$entry"
+     done <<<"$local_dirty"
+-    echo "Если среди них нет ничего ценного — эту папку можно удалить."
++    echo "Если новая версия не понравится, вернуть всё как было можно одной командой"
++    echo "(из папки проекта):"
++    echo "  cp -R .install-backup/$(basename "$backup_dir")/. ."
++    echo "Если среди сохранённого нет ничего ценного — эту папку можно удалить."
+     echo
+   fi
+   BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 8703577..db50de6 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -7,7 +7,8 @@
+ > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
+ > `docs/agents/README.md` и `docs/agents/data-flows.md`.
+ 
+-Снимок: **2026-10-08 (435)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++Снимок: **2026-10-08 (436)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
++· последний сданный патч: **436** (СЛОВА ВЛАДЕЛЬЦА: «песочница это не то, что лежит в реплите» (его папка — на реплите, na4u); «могу не поставить какие-то патчи… ставлю сразу всю пачку исправлений патчем, который считаю достойным установки» (ПРЫЖКИ ЧЕРЕЗ ПАТЧИ — штатно для отсечки: ставит последний достойный, промежуточные по одному не применяются); «Всё ещё не понимаю смысла в .install-backup» (объяснено через сохранёнку/откат); «В окнах с добычей и покупкой поиск и фильтр не влезают… Фильтр ушёл за границу модалки» (ДЕФЕКТ); «А может фильтр вообще сделать квадратной кнопкой с иконкой воронки?» (ВОПРОС-ПРЕДЛОЖЕНИЕ — КОДИТЬ ДО «ДЕЛАЙ» НЕЛЬЗЯ, урок 425)). ПРИМЕНЕНО: (1) styles searchInputInToolbar minWidth:0 (на вебе TextInput не сжимался ниже врождённой ширины → кнопка выталкивалась за границу; защёлка 427); (2) apply-patch.sh архивная подсказка дополнена КОМАНДОЙ ОТКАТА `cp -R .install-backup/<ts>/. .` («вернуть всё как было одной командой» — это и есть смысл папки для владельца: откат моей неудачной пачки; защёлка 426). 1557/159, tsc 0. ВОРОНКА: план согласован в чате (квадрат ~40×40, иконка-воронка из примитивов: треугольник border-трюком + ножка, цветной бейдж с числом условий; текст «Фильтр» уходит), ЖДУ «ДЕЛАЙ». Предыдущий снимок — **435** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **435** (ПОРЯДОК РАБОТЫ ВЛАДЕЛЬЦА словами: «могу не комитить патчи десятками, а потом всё одним комитом запушить» и «зачем постоянный git fetch… если его патч делает?»). ОТВЕТЫ ВЛАДЕЛЬЦУ: (1) коммиты пачкой — ДА, установщику безразличны коммиты (он проверяет содержимое), пересборка платформы откатывается повторной установкой за ~30 сек, правки архивируются в .install-backup; (2) ручной fetch был нужен ОДИН раз (замена устаревшего установщика — замкнутый круг старый-не-умеет-отсечку), теперь каждая установка приносит свежий установщик в папке, обычное обновление = `./apply-patch.sh N`. ПРИМЕНЕНО: apply-patch.sh — подсказки переписаны: архивная («…пересоберёт проект из git… запустите установку ещё раз. Свои правки я сохранил в архиве выше») и обе коммит-подсказки («Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом… запустите установку ещё раз…» + команда). Защёлка 426 обновлена (пересоберёт/накопить). 1557/159, tsc 0. РЕШЕНО ВЛАДЕЛЬЦЕМ: обновляется одной командой ./apply-patch.sh N, коммитит пачками. Предыдущий снимок — **434** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **434** (РЕЧЬ УСТАНОВЩИКА, слово владельца: «что за хня?… столько мусора в выводе, а понимания поставился ли 433 или нет нету. И на кой чёрт мне папка .install-backup… Ты хоть помнишь как я работаю?» — владелец НЕ программист, ему нужен ясный итог). ПРИМЕНЕНО в apply-patch.sh: (1) главный итог ВСЕГДА «Готово: приложение обновлено до №$PATCH_ID» + строка «Версия приложения: N (public/version.json)» (APP_VERSION из public/version.json — доказательство из самого приложения); (2) архив правок — «В папке проекта были ваши правки…» + СПИСОК файлов (entry rename→левая часть) + «эту папку можно удалить»; (3) блок отсечки → одна строка «Привожу папку сразу к состоянию №N — старая цепочка патчей не перебирается»; (4) ранний выход → «Готово: приложение уже обновлено до №N.»; (5) коммит-подсказка теперь и при FAST_MODE (иначе платформа откатывает); (6) защёлка 393 переведена на новые слова (смысл тот же: установщик объясняет отсечку), защёлка 426/434 запрещает канцеляризмы («Ничего не нужно», «не применяются и в «Применено» не попадут»). ВАЖНО: usage-справка (—help) НЕ тронута — там для агента. 1557/159, tsc 0. СЦЕНАРИЙ ВЛАДЕЛЬЦА ПОВТОРИЛСЯ: он ставил 433 — установщик отработал (433 встал), но вывод был непонятен; ему дана команда проверки ls .install-backup/... и решение про удаление. Предыдущий снимок — **433** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+ · последний сданный патч: **433** (ДЕФЕКТ 432, слово владельца: «теперь кнопка Показать N всегда 0» — счётчик 432 собирал группы по служебным ключам 'weapon'/'armor', а дерево окна сгруппировано СЛОВАРНЫМИ подписями ('Оружие'…) → все группы мимо → всегда 0, кроме секции «Моды» (её ключ и был словарным)). ПРИМЕНЕНО: equipmentFilter.js +countFoundItems(filteredTree, labels, filterActive) — labels.gear (4 словарные подписи) + labels.modsSection → part → countFilteredItems(part, true); без активного фильтра — countFilteredItems(всё дерево). AddItemModal: filterLabels useMemo (gear: tInventory(`…categories.${key}`), modsSection) + foundCount = countFoundItems(filteredData, filterLabels, filterActive); импорт countFoundItems вместо countFilteredItems. УРОК: счётчики/сборщики дерева обязаны иметь ПОВЕДЕНЧЕСКИЙ тест на словарных подписях (source-ассерты ловят только опечатки) — в защёлке 432 добавлен describe 433 с настоящим словарём через tInventory. 1557/159, tsc 0. Предыдущий снимок — **432** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 54686de..fd6f306 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Search and filter fit inside the window again (patch 436)
++
++Defect: in the loot and buy windows the search field refused to
++shrink below its intrinsic width, pushing the filter button beyond
++the window border. Now the row uses exactly the space it is given.
++The installer also names the rollback command right away: if the new
++version is not to your liking, one line from the .install-backup
++folder brings everything back.
++
+ ---
+ ## Installer hints follow your workflow (patch 435)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8eab803..d3d8b93 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Поиск и фильтр снова в границах окна (патч 436)
++
++Дефект: в окнах добычи и покупки строка поиска не сжималась ниже
++«врождённой» ширины и выталкивала кнопку фильтра за границу окна.
++Теперь строка занимает ровно отведённое место. Установщик, кроме
++того, теперь сразу называет команду отката: если новая версия не
++понравилась, всё возвращается как было одной строкой из архивной
++папки .install-backup.
++
+ ---
+ ## Подсказки установщика — под ваш порядок работы (патч 435)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 8a84f6a..e2b3e4c 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "435"
++  "baseline": "436"
+ }
+diff --git a/public/version.json b/public/version.json
+index 366b35f..20cf1d2 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "435",
++  "version": "436",
+   "release": 2,
+   "notes": {
+     "ru-RU": [
+diff --git a/styles/AddItemModal.styles.js b/styles/AddItemModal.styles.js
+index 8657071..40e415e 100644
+--- a/styles/AddItemModal.styles.js
++++ b/styles/AddItemModal.styles.js
+@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
+   // 427: поиск и кнопка «Фильтр» — одна строка над панелью; черта отделяет
+   // их от списка предметов.
+   filterToolbar: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+-  searchInputInToolbar: { flex: 1, marginBottom: 0 },
++  searchInputInToolbar: { flex: 1, minWidth: 0, marginBottom: 0 },
+   filterToggle: { marginLeft: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, backgroundColor: '#eee', borderWidth: 1, borderColor: '#bbb' },
+   filterToggleText: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+   listDivider: { height: 1, backgroundColor: '#bbb', marginVertical: 6 },
