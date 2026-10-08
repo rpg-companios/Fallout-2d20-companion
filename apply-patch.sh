@@ -574,7 +574,16 @@ for name in "${STATE_SCOPE[@]}"; do
 done
 
 if [[ ${#QUEUE[@]} -eq 0 ]]; then
+  APP_VERSION="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT_DIR/public/version.json" 2>/dev/null | head -1)"
   echo "Готово: приложение уже обновлено до №$PATCH_ID."
+  if [[ -n "${APP_VERSION:-}" ]]; then
+    echo "Версия приложения: $APP_VERSION (public/version.json)."
+  fi
+  if [[ "$FAST_MODE" -eq 1 ]]; then
+    echo
+    echo "Закрепите результат коммитом — иначе платформа может вернуть прежние файлы:"
+    echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
+  fi
   echo
   json_check || exit 1
   exit 0
