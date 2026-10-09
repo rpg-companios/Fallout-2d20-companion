@@ -14,7 +14,6 @@ import {
   isEquipmentFilterEmpty,
   applyEquipmentFilter,
   pruneTreeByEquipmentFilter,
-  weaponModsProviding,
   readDamageTotal,
 } from '../../modules/fallout/logic/equipmentFilter';
 
@@ -34,9 +33,10 @@ describe('Патч 425: варианты фильтра из каталогов 
     expect(options.fireRate).toEqual({ min: 0, max: 7 });
   });
 
-  it('качества — ВСЕ 32 из словаря (слово владельца), эффекты — все 10', () => {
-    expect(options.qualities.length).toBe(32);
-    expect(options.qualities.find((q) => q.id === 'quality_night_vision')?.name).toBe('Ночное Видение');
+  it('качества — только встречающиеся на оружии (слово 438), эффекты — все 10', () => {
+    expect(options.qualities.length).toBe(22);
+    // «Ночного Видения» на оружии нет — отмечать нельзя (моды больше не показываются)
+    expect(options.qualities.find((q) => q.id === 'quality_night_vision')).toBeUndefined();
     expect(options.effects.length).toBe(10);
   });
 
@@ -52,34 +52,20 @@ describe('Патч 425: варианты фильтра из каталогов 
   });
 });
 
-describe('Патч 425: оружие — по СВОИМ качествам/эффектам («моды это моды»)', () => {
-  it('оружие без врождённого Ночного Видения НЕ проходит фильтр', () => {
+describe('Патч 425→438: оружие — по СВОИМ качествам/эффектам; модов в фильтре нет', () => {
+  it('оружие без врождённого качества НЕ проходит фильтр («моды это моды»)', () => {
     const weapon = { itemType: 'weapon', qualities: [{ qualityId: 'quality_accurate' }] };
     const filter = { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] };
     expect(applyEquipmentFilter(weapon, filter)).toBe(false);
   });
 
-  it('выбранное, чего на оружии нет, дают моды: ночное видение → 3 прицела', () => {
-    const mods = weaponModsProviding(
-      { ...emptyEquipmentFilter(), qualities: ['quality_night_vision'] }, 'ru-RU',
-    );
-    expect(mods.map((m) => m.id).sort()).toEqual([
-      'mod_long_night_vision_scope', 'mod_night_vision_scope', 'mod_short_night_vision_scope',
-    ]);
-    expect(mods[0].itemType).toBe('weaponMod');
-    expect(mods[0].name.length).toBeGreaterThan(0);
-  });
-
-  it('компьютер наведения → его мод; Бомбарда не покрыта ничем (пусто)', () => {
-    const tc = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_targetting_computer'] }, 'ru-RU');
-    expect(tc.map((m) => m.id)).toEqual(['mod_targeting_computer']);
-    const bombard = weaponModsProviding({ ...emptyEquipmentFilter(), qualities: ['quality_bombard'] }, 'ru-RU');
-    expect(bombard).toEqual([]);
-  });
-
-  it('эффекты от модов тоже находятся (Устойчивый дают 13 модов)', () => {
-    const mods = weaponModsProviding({ ...emptyEquipmentFilter(), effects: ['effect_persistent'] }, 'ru-RU');
-    expect(mods.length).toBe(13);
+  it('438: моды в результатах НИКОГДА — функции больше нет, секции в окне нет', () => {
+    // «1 мод может подходить 9 из 11 оружий, а если 11-го оружия нет,
+    // то от мода смысла нет» (владелец)
+    expect(readFileSync('modules/fallout/logic/equipmentFilter.js', 'utf8')).not.toContain('weaponModsProviding');
+    expect(readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8')).not.toContain('modsSection');
+    const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
+    expect(ru.filter.modsSection).toBeUndefined();
   });
 });
 
@@ -156,14 +142,13 @@ describe('Патч 425: проводка окна и подсказки', () => 
     expect(code).toContain('onPress={onReset}');
   });
 
-  it('секция модов появляется от выбранного качества/эффекта; словарь на месте', () => {
+  it('словарь фильтра на месте; секции модов больше нет (слово 438)', () => {
     const code = modal();
-    expect(code).toContain('weaponModsProviding(equipmentFilter, moduleLocale)');
-    expect(code).toContain("tInventory('modals.addItemModal.filter.modsSection')");
+    expect(code).not.toContain('weaponModsProviding');
     const ru = JSON.parse(readFileSync('modules/fallout/i18n/ru-RU/screens/inventory/modals/addItemModal.json', 'utf8'));
     const en = JSON.parse(readFileSync('modules/fallout/i18n/en-EN/screens/inventory/modals/addItemModal.json', 'utf8'));
-    expect(ru.filter.modsSection).toBe('Моды');
-    expect(en.filter.modsSection).toBe('Mods');
+    expect(ru.filter.modsSection).toBeUndefined();
+    expect(en.filter.modsSection).toBeUndefined();
     expect(ru.filter.title).toBe('Фильтр');
     expect(ru.filter.qualities).toBe('Качества');
     expect(ru.filter.effects).toBe('Эффекты');

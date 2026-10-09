@@ -1,5 +1,80 @@
 # Changelog
 ---
+## The owner's word on mods in the filter (patch 438)
+
+Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,
+and if there is no 11th weapon, the mod is pointless". The "Mods"
+section is gone from the window. What a mod gives is already written
+in the mod installation screen — no labels needed in the list. And
+so: the filter's qualities are now only those actually found on
+weapons (22) — Night Vision and other mod-only abilities are not in
+the list, no empty selections.
+
+---
+## Filter button — square with a funnel (patch 437)
+
+The owner's word: the filter should be a square button with a funnel
+icon, like the category icons in the crafting screen. To the right
+of the search field there is now a square button: inside, a funnel
+icon from the same icon set as the crafting screen; in the corner, a
+colored badge with the number of active conditions (no badge when
+there are none). The search field takes all the remaining width.
+
+---
+## Search and filter fit inside the window again (patch 436)
+
+Defect: in the loot and buy windows the search field refused to
+shrink below its intrinsic width, pushing the filter button beyond
+the window border. Now the row uses exactly the space it is given.
+The installer also names the rollback command right away: if the new
+version is not to your liking, one line from the .install-backup
+folder brings everything back.
+
+---
+## Installer hints follow your workflow (patch 435)
+
+The owner's word: it is easier to accumulate commits and record them
+in one go than to commit after every install. The installer no
+longer nags: the hint now says honestly — commit whenever you like,
+several installs can be folded into one commit; if the platform
+rebuilds the project before that, just run the installer again (it
+archives your edits in advance). The manual git fetch from the
+instructions is no longer needed: it was required once, to replace
+an outdated installer.
+
+---
+## The installer speaks human (patch 434)
+
+The owner's word: "so much noise in the output, and no understanding
+of whether the patch is installed". The result is now clear from one
+line: "Done: the app is updated to №N" — with the app's own version
+shown next to it as proof. The backup message became understandable:
+what is inside (as a list) and that the folder can be deleted if
+nothing valuable is there. The bureaucratic talk about "trees" and
+"queues" is gone.
+
+---
+## The "Show" count is honest again (patch 433)
+
+Defect of 432: the found-items counter counted groups by service
+keys while the window is grouped by dictionary labels — so it always
+showed 0. Now it counts exactly the groups that reach the results,
+by the same labels; locked in with a behavioral test on the
+dictionary.
+
+---
+## Filter results contain only what matched (patch 432)
+
+Defect of 430: picking "Weapons, rarity 6" in the filter still listed
+ammo, chems and junk in the results — consumables were never cut by
+the filter, since the filter targets gear. Now the results contain
+only gear that matched plus the selected mods; consumables and junk
+stay in the usual catalog and in search. The number on the "Show"
+button is now honest — it counts exactly what will be shown. Also,
+Power Armor was added to the flat lists (filter and search) — it used
+to be missing there.
+
+---
 ## Installation no longer fears local edits (patch 431)
 
 Real-life case: the project folder rolled back to an old state (the

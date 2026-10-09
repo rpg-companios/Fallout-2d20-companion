@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, FlatList, SafeAreaView, TextInput, StyleSheet } from 'react-native';
+// 437 (слово владельца): иконка фильтра — как иконки категорий в крафте.
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory, formatInventoryText } from '../logic/inventoryI18n';
@@ -13,10 +15,9 @@ import {
   buildEquipmentFilterOptions,
   emptyEquipmentFilter,
   activeEquipmentFilterCount,
-  countFilteredItems,
+  countFoundItems,
   isEquipmentFilterEmpty,
   pruneTreeByEquipmentFilter,
-  weaponModsProviding,
 } from '../../../../modules/fallout/logic/equipmentFilter';
 
 const CATEGORY_ICONS = {
@@ -227,23 +228,14 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     return prune(tree);
   }, [engineLocale, weaponsByType, staticData, maxRarity]);
 
-  // 425: фильтр снаряжения — та же обрезка дерева (пустые ветки прячутся).
-  // Слово владельца: выбранное, чего на оружии нет, раскрывает МОДЫ, дающие
-  // его («моды это моды — только когда поставят, тогда и будут эффекты»):
-  // секция «Моды» появляется, когда подобранные качества/эффекты есть в
-  // каком-то моде; если ни одно оружие не подходит — в окне остаются моды.
+  // 425: фильтр снаряжения — обрезка дерева (пустые ветки прячутся).
+  // 438 (слово владельца): моды в результатах НИКОГДА — «1 мод может
+  // подходить 9 из 11 оружий, а если 11-го оружия нет, то от мода
+  // смысла нет».
   const filteredData = useMemo(() => {
     if (isEquipmentFilterEmpty(equipmentFilter)) return allData;
-    const pruned = pruneTreeByEquipmentFilter(allData, equipmentFilter);
-    const mods = weaponModsProviding(equipmentFilter, moduleLocale);
-    if (mods.length === 0) return pruned;
-    const modsLabel = tInventory('modals.addItemModal.filter.modsSection');
-    const allLabel = tInventory('modals.addItemModal.categories.all');
-    return {
-      ...pruned,
-      [modsLabel]: { [allLabel]: [...mods].sort((a, b) => String(a.name).localeCompare(String(b.name))) },
-    };
-  }, [allData, equipmentFilter, moduleLocale, engineLocale]);
+    return pruneTreeByEquipmentFilter(allData, equipmentFilter);
+  }, [allData, equipmentFilter]);
 
   const filterOptions = useMemo(() => {
     const labels = {
@@ -267,8 +259,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const activeFilterCount = activeEquipmentFilterCount(equipmentFilter);
   // 430: фильтр активен — окно показывает результаты, а не каталог.
   const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
-  // 429: сколько предметов найдётся — для кнопки «Показать (N)» в окне.
-  const foundCount = countFilteredItems(filteredData);
+  // 429/432/433: сколько предметов найдётся — для кнопки «Показать (N)».
+  // Подписи категорий берутся ИЗ ТОГО ЖЕ словаря, которым построены
+  // ключи дерева окна (урок 433: служебные ключи давали всегда 0).
+  const filterLabels = useMemo(() => ({
+    gear: ['weapon', 'armor', 'powerArmor', 'clothing'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+  }), [engineLocale]);
+  const foundCount = useMemo(
+    () => countFoundItems(filteredData, filterLabels, filterActive),
+    [filteredData, filterLabels, filterActive],
+  );
 
   const getTypeLabelAndIcon = (itemType) => {
     if (itemType === 'weapon') return tInventory('modals.addItemModal.itemTypes.weapon');
@@ -326,20 +326,24 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
   const currentData = useMemo(() => {
     // 430 (владелец: «Нажал показать и снова я на экране каталога»):
     // при активном фильтре — ПЛОСКИЙ отсортированный список находок,
-    // а не каталог категорий. Поиск работает так же (общий сборщик),
-    // и секция «Моды» теперь попадает в оба режима.
-    const filterActive = !isEquipmentFilterEmpty(equipmentFilter);
+    // а не каталог категорий. 432 (владелец: «выбрал оружие с редкостью
+    // от 6 до 6, а в списке боеприпасы, химия, хлам»): в результатах
+    // фильтра — только снаряжение, прошедшее условия, и подобранные
+    // моды; расходники и хлам живут в обычном каталоге и в поиске.
     if (searchTerm || filterActive) {
       const allItems = [];
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.weapon')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.armor')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.clothing')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
-      Object.values(filteredData[tInventory('modals.addItemModal.categories.robotEquipment')] || {}).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      const gearGroupKeys = ['weapon', 'armor', 'powerArmor', 'clothing'];
+      // поиск дополнительно собирает снаряжение роботов;
+      // при активном фильтре только эти четыре вида снаряжения
+      const groupKeys = filterActive ? gearGroupKeys : [...gearGroupKeys, 'robotEquipment'];
+      groupKeys.forEach((key) => {
+        const group = filteredData[tInventory(`modals.addItemModal.categories.${key}`)] || {};
+        Object.values(group).forEach((items) => Array.isArray(items) && allItems.push(...items));
+      });
       const allLabel = tInventory('modals.addItemModal.categories.all');
       const flatKeys = [
-        // секция модов, подобранных под выбранные качества/эффекты (425)
-        tInventory('modals.addItemModal.filter.modsSection'),
-        ...['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`)),
+        // расходники/хлам — только в поиске, в фильтре они не участвуют
+        ...(filterActive ? [] : ['ammo', 'chems', 'drinks', 'food', 'items', 'materials', 'junk'].map((key) => tInventory(`modals.addItemModal.categories.${key}`))),
       ];
       flatKeys.forEach((category) => {
         if (filteredData[category]?.[allLabel]) {
@@ -364,7 +368,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     if (Array.isArray(data)) return { items: data };
     if (data && typeof data === 'object') return { categories: Object.keys(data) };
     return { categories: [] };
-  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter]);
+  }, [engineLocale, filteredData, currentPath, searchTerm, equipmentFilter, filterActive]);
 
   const renderItem = ({ item }) => {
     const isItem = typeof item === 'object' && item?.name;
@@ -441,10 +445,16 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
                   onChangeText={setSearchTerm}
                 />
                 <TouchableOpacity style={styles.filterToggle} onPress={() => setFilterOpen((prev) => !prev)}>
-                  <Text style={styles.filterToggleText}>
-                    {tInventory('modals.addItemModal.filter.title')}
-                    {activeFilterCount > 0 ? ` (${activeFilterCount})` : ''} {filterOpen ? '▼' : '►'}
-                  </Text>
+                  {/* 437 (слово владельца): квадратная кнопка справа от
+                      поиска, высота = высоте поиска; внутри иконка-воронка
+                      из того же набора, что иконки категорий крафта, в
+                      уголке — цветной кружок с числом активных условий. */}
+                  <MaterialCommunityIcons name="filter" style={styles.filterIcon} />
+                  {activeFilterCount > 0 && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               </View>
 

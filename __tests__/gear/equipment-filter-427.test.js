@@ -108,6 +108,12 @@ describe('Патч 427: проводка окна — поиск+фильтр о
     expect(code).toContain('styles.filterToolbar');
     expect(code).toContain('styles.searchInputInToolbar');
     expect(code).toContain('styles.filterToggle');
+    // 437 (слово владельца): иконка-воронка — из того же набора, что
+    // иконки категорий крафта (MaterialCommunityIcons), имя «filter»
+    expect(code).toContain("import { MaterialCommunityIcons } from '@expo/vector-icons';");
+    expect(code).toContain('<MaterialCommunityIcons name="filter" style={styles.filterIcon} />');
+    expect(code).toContain('activeFilterCount > 0');
+    expect(code).toContain('styles.filterBadge');
     expect(code).toContain('styles.listDivider');
     // кнопка открывает/закрывает окно фильтра (429)
     expect(code).toContain('setFilterOpen((prev) => !prev)');
@@ -121,8 +127,19 @@ describe('Патч 427: проводка окна — поиск+фильтр о
     const code = modalStyles();
     expect(code).toContain('filterToolbar');
     expect(code).toContain('searchInputInToolbar');
+    // 436 (владелец: «поиск и фильтр не влезают… фильтр ушёл за границу
+    // модалки»): на вебе поле не сжималось ниже врождённой ширины и
+    // выталкивало кнопку — minWidth: 0 разрешает сжатие
+    expect(code).toContain('minWidth: 0');
     expect(code).toContain('filterToggle');
     expect(code).toContain('listDivider');
+    // 437 (слово владельца): квадратная кнопка с воронкой и кружком-счётчиком
+    expect(code).toContain('width: 40, height: 40');
+    expect(code).toContain('filterIcon: { fontSize: 20, color:');
+    expect(code).toContain("backgroundColor: '#22c55e'");
+    expect(code).toContain('filterBadge');
+    // текстовая кнопка ушла — вместо неё воронка из символов
+    expect(code).not.toContain('filterToggleText');
   });
 
   it('панель: чекбоксы категорий, секции показываются по категориям', () => {
