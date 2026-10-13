@@ -1,5 +1,17 @@
 # Changelog
 ---
+## Release 3 — «What's new» notes (patch 440)
+
+The owner's word: "Now we make the release description. What changed
+from the previous version." version.json: release raised to 3 (the
+«What's new» window shows the notes once), notes rewritten for
+patches 402–439 in the player's language: perks by the books and old
+save migration, book repair (weapons and armor), durability and its
+settings, rarity on cards, gear filters (funnel, categories, «Show
+(N)»), the «Sleep\Wait» button with «Wait», app updates, window
+scrolling. Full text — public/version.json (ru/en).
+
+---
 ## The "Sleep\Wait" button and the "Wait" option (patch 439)
 
 The owner's word: the sleep button is now called **"Sleep\Wait"**.
