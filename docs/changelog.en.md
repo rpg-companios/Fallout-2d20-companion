@@ -1,5 +1,30 @@
 # Changelog
 ---
+## Release 3 — «What's new» notes (patch 440)
+
+The owner's word: "Now we make the release description. What changed
+from the previous version." version.json: release raised to 3 (the
+«What's new» window shows the notes once), notes rewritten for
+patches 402–439 in the player's language: perks by the books and old
+save migration, book repair (weapons and armor), durability and its
+settings, rarity on cards, gear filters (funnel, categories, «Show
+(N)»), the «Sleep\Wait» button with «Wait», app updates, window
+scrolling. Full text — public/version.json (ru/en).
+
+---
+## The "Sleep\Wait" button and the "Wait" option (patch 439)
+
+The owner's word: the sleep button is now called **"Sleep\Wait"**.
+The sleep modal gained a **"Wait"** option: time passes almost like
+sleep (effect timers move), but **all three** survival parameters are
+spent — Hunger, Thirst and Sleep — and nothing is replenished: no
+sleep ladder, no fatigue relief, no bonus, no bed rest. Fatigue eats
+current HP as in normal time flow. The forecast shows the drains and
+HP loss up front; if HP would drop **below zero**, the alert
+**"Character died"** is shown. Sleep place (bed/wasteland) and the
+disease check apply to sleeping only.
+
+---
 ## The owner's word on mods in the filter (patch 438)
 
 Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,

@@ -15,7 +15,7 @@
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { debugLog } from '../../../src/debug/falloutDebug';
-import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest } from './survival';
+import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest, wait } from './survival';
 // 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
 // лестниц), естественная стойкость (сон в пустоши без болезни).
 const survivalPerkOptions = (item = null) => {
@@ -132,6 +132,40 @@ export const sleepSurvival = ({ place, hours }) => {
     diseaseRiskResult,
     effectsExpired: expired,
   };
+};
+
+/**
+ * Ожидание (патч 439, слово владельца: кнопка «Сон\Ждать», пункт
+ * «Ожидание» в модалке). Работает почти как сон: часы идут, мост контуров
+ * двигает таймеры эффектов. Отличия: тратятся ВСЕ три параметра (лестница
+ * сна не заморожена), ничего не восполняется (лестницы сна, снятие
+ * усталости сна, бонус, отдых в постели — всё мимо), и усталость ест
+ * текущие ОЗ как в обычном часовом тике. Если текущие ОЗ станут меньше 0 —
+ * died:true (модалка показывает алерт «Персонаж умер»; стор держит ОЗ
+ * не ниже 0, смерть определяем по счёту до применения).
+ */
+export const waitSurvival = ({ hours }) => {
+  if (!survivalEnabled()) return { ok: false, reason: 'disabled' };
+  const survival = currentSurvival();
+  if (!survival) return { ok: false, reason: 'notCapable' };
+
+  const store = useCharacterStore.getState();
+  const { ladderAccRates } = survivalPerkOptions();
+  const result = wait(survival, { hours, ladderAccRates: ladderAccRates || undefined });
+  store.setStateExtension('survival', result.state);
+
+  const hpBefore = store.currentHealth;
+  if (result.hpLoss > 0) store.applySurvivalHpLoss(result.hpLoss);
+  const died = result.hpLoss > 0 && hpBefore - result.hpLoss < 0;
+
+  let expired = [];
+  if (typeof store.advanceEffectsByGameHours === 'function') {
+    ({ expired } = store.advanceEffectsByGameHours(hours));
+  }
+
+  debugLog('survival.wait.apply', { hours, hpLoss: result.hpLoss, died, expiredEffects: expired.length });
+
+  return { ok: true, result, hpLoss: result.hpLoss, died, expired };
 };
 
 /**
