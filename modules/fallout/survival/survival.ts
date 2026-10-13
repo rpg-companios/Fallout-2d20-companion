@@ -501,6 +501,40 @@ export function forecastSleep(state: SurvivalState, opts: RestOptions): RestResu
     return rest(state, opts);
 }
 
+export interface WaitOptions {
+    hours: number;
+    ladderAccRates?: Partial<Record<SurvivalLadder, number>>;
+}
+
+export interface WaitResult {
+    state: SurvivalState;
+    events: SurvivalEvent[];
+    // Сколько текущих ОЗ съела усталость за часы ожидания (⌊N/2⌋ за час).
+    hpLoss: number;
+}
+
+// Ожидание (патч 439, слово владельца): время идёт как при сне, но тратятся
+// ВСЕ три параметра — Голод, Жажда и Сон (лестница сна НЕ заморожена) — и
+// ничего не восполняется: ни лестница сна, ни снятие усталости сна, ни
+// бонус «прекрасно отдохнувший», ни отдых в постели. Усталость за ожидание
+// ест текущие ОЗ (⌊N/2⌋ за час — тот же часовой тик, патч 232).
+export function wait(state: SurvivalState, { hours, ladderAccRates }: WaitOptions): WaitResult {
+    if (!Number.isInteger(hours) || hours < 1 || hours > SURVIVAL_RULES.maxSleepHours) {
+        throw new Error(`wait: некорректные часы ожидания: ${hours}`);
+    }
+    const result = advanceHours(state, hours, { ladderAccRates });
+    return {
+        state: result.state,
+        events: result.events,
+        hpLoss: fatigueHpLossFromEvents(result.events),
+    };
+}
+
+// Прогноз ожидания для модали (чистый прогон, состояние не фиксируется).
+export function forecastWait(state: SurvivalState, opts: WaitOptions): WaitResult {
+    return wait(state, opts);
+}
+
 // Канонический порядок источников Усталости в разбивке панели «Эффекты»
 // (патч 217): лестницы (еда, вода, сон), затем болезнь.
 export const FATIGUE_SOURCE_ORDER: FatigueSource[] = ['food', 'water', 'sleep', 'disease'];

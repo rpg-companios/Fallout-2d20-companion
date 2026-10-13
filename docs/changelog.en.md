@@ -1,5 +1,18 @@
 # Changelog
 ---
+## The "Sleep\Wait" button and the "Wait" option (patch 439)
+
+The owner's word: the sleep button is now called **"Sleep\Wait"**.
+The sleep modal gained a **"Wait"** option: time passes almost like
+sleep (effect timers move), but **all three** survival parameters are
+spent — Hunger, Thirst and Sleep — and nothing is replenished: no
+sleep ladder, no fatigue relief, no bonus, no bed rest. Fatigue eats
+current HP as in normal time flow. The forecast shows the drains and
+HP loss up front; if HP would drop **below zero**, the alert
+**"Character died"** is shown. Sleep place (bed/wasteland) and the
+disease check apply to sleeping only.
+
+---
 ## The owner's word on mods in the filter (patch 438)
 
 Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,
