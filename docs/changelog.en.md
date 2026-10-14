@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Technical memory of session 425–440 (patch 441)
+
+The owner's word: write down how the release-3 mechanisms work — not
+"made a filter" but how it works, where the data comes from and why
+exactly this way. docs/agents/data-flows.md gained sections: gear
+filters (§10), the installer — cutoff/backup/human output (§11),
+«Sleep\Wait» (§12), session laws and traps (§13). The technical
+document serves future maintenance of the app.
+
+---
 ## Release 3 — «What's new» notes (patch 440)
 
 The owner's word: "Now we make the release description. What changed
