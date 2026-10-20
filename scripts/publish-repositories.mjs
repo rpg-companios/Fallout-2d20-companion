@@ -95,6 +95,30 @@ const hasCommand = (command) => {
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+/**
+ * Проверить право на запись до того, как собран 20-мегабайтный .trpg.
+ * `git push --dry-run` у GitHub проверяет и доступ: без прав вернётся 403.
+ */
+const assertPushAccess = (directory, repository, branch) => {
+  try {
+    execFileSync('git', ['push', '--dry-run', 'origin', `HEAD:${branch}`], {
+      cwd: directory,
+      stdio: 'pipe',
+    });
+    return;
+  } catch (error) {
+    const stderr = String(error.stderr ?? '');
+    if (/403|Permission to .* denied|Authentication failed/i.test(stderr)) {
+      fail(
+        `нет прав на запись в ${repository.repository}. `
+        + 'Выдайте подключению Arena доступ к этому репозиторию (Arena → GitHub → '
+        + 'выбор репозиториев) и повторите публикацию.',
+      );
+    }
+    fail(`не удалось проверить доступ к ${repository.repository}: ${stderr.trim().split('\n')[0]}`);
+  }
+};
+
 /** Свежий clone целевого репозитория в .publish/<name>. */
 const ensureWorktree = (repository, workdir) => {
   fs.mkdirSync(workdir, { recursive: true });
@@ -158,6 +182,10 @@ const publishEngine = (args, config) => {
   const directory = ensureWorktree(repository, workdir);
   const files = planEngineFiles(ROOT);
 
+  if (args.push || args.release) {
+    assertPushAccess(directory, repository, repository.branch);
+  }
+
   clearWorktree(directory);
   for (const relative of files) {
     copyFile(path.join(ROOT, relative), path.join(directory, relative));
@@ -203,6 +231,10 @@ const publishSetting = (args, config) => {
   const directory = ensureWorktree(repository, workdir);
   const wallets = planSettingWallets(ROOT, repository.wallets);
   const tools = planSettingToolFiles(ROOT);
+
+  if (args.push || args.release) {
+    assertPushAccess(directory, repository, repository.branch);
+  }
 
   // Предыдущий release.json нужен, если сейчас выпускаем не релиз:
   // клиенты должны продолжать видеть последний выпущенный пакет.
