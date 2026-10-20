@@ -184,6 +184,12 @@ export default function GameSettingsModal({ visible, onClose }) {
     }
   };
 
+  const installedIds = new Set(installed.map((entry) => entry.id));
+  // Релиз для сеттинга, которого ещё нет на устройстве: приложение не несёт
+  // сеттинг внутри, поэтому первый релиз — это предложение установки.
+  const pendingInstalls = Object.values(updatePlans)
+    .filter((plan) => plan && !installedIds.has(plan.settingId));
+
   const handleInstallUpdate = async (entry) => {
     if (installingId) return;
     try {
@@ -268,22 +274,42 @@ export default function GameSettingsModal({ visible, onClose }) {
               );
             })}
 
-            {installed.length > 0 ? (
-              <View style={styles.updateRow}>
-                <ActionButton
-                  label={updateStatus === 'checking'
-                    ? tHomeScreen('gameSetting.updateChecking')
-                    : tHomeScreen('gameSetting.updateCheck')}
-                  onPress={handleCheckUpdates}
-                  disabled={updateStatus === 'checking' || Boolean(installingId)}
-                />
-                {updateError ? (
-                  <Text style={styles.updateError} numberOfLines={2}>
-                    {tHomeScreen('gameSetting.updateError')}
+            {pendingInstalls.map((plan) => (
+              <View key={plan.settingId} style={styles.installedRow}>
+                <View style={styles.installedInfo}>
+                  <Text style={styles.settingName} numberOfLines={2}>
+                    {plan.release?.name ?? plan.settingId}
                   </Text>
-                ) : null}
+                  <Text style={styles.updateStatus}>
+                    {withParams(tHomeScreen('gameSetting.updateAvailableShort'), {
+                      version: plan.toVersion,
+                    })}
+                  </Text>
+                </View>
+                <ActionButton
+                  label={installingId === plan.settingId
+                    ? tHomeScreen('gameSetting.updateInstalling')
+                    : tHomeScreen('gameSetting.updateNow')}
+                  onPress={() => handleInstallUpdate({ id: plan.settingId })}
+                  disabled={Boolean(installingId)}
+                />
               </View>
-            ) : null}
+            ))}
+
+            <View style={styles.updateRow}>
+              <ActionButton
+                label={updateStatus === 'checking'
+                  ? tHomeScreen('gameSetting.updateChecking')
+                  : tHomeScreen('gameSetting.updateCheck')}
+                onPress={handleCheckUpdates}
+                disabled={updateStatus === 'checking' || Boolean(installingId)}
+              />
+              {updateError ? (
+                <Text style={styles.updateError} numberOfLines={2}>
+                  {tHomeScreen('gameSetting.updateError')}
+                </Text>
+              ) : null}
+            </View>
 
             <View style={styles.plusBlock}>
               <Text style={styles.plusMark}>+</Text>
