@@ -22,7 +22,11 @@ const COMMON_IGNORED_DIRS = new Set([
 
 // Только в этом (совмещённом) репозитории: патчи владельца, сборки, локальные
 // кошельки. В движок и сеттинг они не едут.
-const COMBINED_ONLY = ['patchs', 'artifacts', 'сеттинги', 'output.txt'];
+const COMBINED_ONLY = [
+  'patchs', 'artifacts', 'сеттинги', 'output.txt',
+  // Рабочие файлы этого чекаута и агентских инструментов — не часть движка.
+  '.agents', '.kiro', '.replit', 'replit.md', 'apply-patch.sh',
+];
 
 // Только для движка: всё, что относится к сеттингу, уезжает в другой репозиторий.
 const ENGINE_ONLY_EXCLUDES = ['modules'];
