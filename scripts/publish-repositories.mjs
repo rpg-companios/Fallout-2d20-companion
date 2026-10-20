@@ -102,12 +102,17 @@ const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 // токен берём из окружения и передаём git'у заголовком на один вызов: в
 // .git/config он не попадает. Тот же токен нужен REST API для релиза.
 // ---------------------------------------------------------------------------
-const TOKEN = (
-  process.env.PUBLISH_GITHUB_TOKEN
-  || process.env.GH_TOKEN
-  || process.env.GITHUB_TOKEN
-  || ''
-).trim();
+// PUBLISH_NO_TOKEN=1 — игнорировать переменные окружения и положиться на
+// настроенные в системе git-креды (в Replit бывает рабочий credential helper
+// при постороннем GITHUB_TOKEN в окружении).
+const TOKEN = process.env.PUBLISH_NO_TOKEN === '1'
+  ? ''
+  : (
+    process.env.PUBLISH_GITHUB_TOKEN
+    || process.env.GH_TOKEN
+    || process.env.GITHUB_TOKEN
+    || ''
+  ).trim();
 
 const AUTH_HEADER = TOKEN
   ? `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`
