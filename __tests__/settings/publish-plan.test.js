@@ -9,6 +9,7 @@ import {
   buildReleaseIndex,
   listRepositoryFiles,
   planEngineFiles,
+  planSettingLegalFiles,
   planSettingWallets,
   releaseAssetUrls,
   releaseTag,
@@ -37,6 +38,7 @@ describe('что уезжает в репозиторий движка', () => {
       'artifacts/fallout.trpg': '',
       'settings/pins.json': '{}',
       'node_modules/pkg/index.js': '',
+      'positronium-boot.zip': 'PK',
     });
     const files = planEngineFiles(root);
     expect(files).toContain('App.js');
@@ -46,6 +48,8 @@ describe('что уезжает в репозиторий движка', () => {
     expect(files.some((file) => file.startsWith('artifacts/'))).toBe(false);
     expect(files).not.toContain('settings/pins.json');
     expect(files.some((file) => file.startsWith('node_modules/'))).toBe(false);
+    // Сборки и архивы уезжают релизами, а не в git.
+    expect(files.some((file) => file.endsWith('.zip'))).toBe(false);
   });
 
   it('в этом репозитории движок и правда отделён от модулей', () => {
@@ -130,7 +134,11 @@ describe('release.json', () => {
     });
   });
 
-  it('README репозитория сеттингов объясняет папки и сборку', () => {
+  it('инструменты сеттинга уезжают с лицензией движка', () => {
+    expect(planSettingLegalFiles(ROOT)).toEqual(['LICENSE', 'NOTICE']);
+  });
+
+  it('README репозитория сеттингов объясняет папки, сборку и лицензию', () => {
     const readme = renderSettingReadme({
       repository: 'rpg-companios/positronium-game-settings',
       wallets: { fallout: { path: 'modules/fallout' } },
@@ -139,6 +147,7 @@ describe('release.json', () => {
     expect(readme).toContain('fallout/');
     expect(readme).toContain('tools/pack-setting.py');
     expect(readme).toContain('POSITRONIUM_ENGINE');
+    expect(readme).toContain('AGPL-3.0');
   });
 });
 

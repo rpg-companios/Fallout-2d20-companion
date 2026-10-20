@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildReleaseIndex,
   planEngineFiles,
+  planSettingLegalFiles,
   planSettingToolFiles,
   planSettingWallets,
   RELEASE_INDEX_FILE,
@@ -239,6 +240,10 @@ const publishSetting = (args, config) => {
   for (const tool of tools) {
     copyFile(path.join(ROOT, tool.from), path.join(directory, tool.to));
   }
+  const legalFiles = planSettingLegalFiles(ROOT);
+  for (const name of legalFiles) {
+    copyFile(path.join(ROOT, name), path.join(directory, name));
+  }
   fs.writeFileSync(path.join(directory, TOOLS_DIR, 'README.md'), renderToolsReadme());
   fs.writeFileSync(path.join(directory, 'README.md'), renderSettingReadme({
     repository: repository.repository,
@@ -271,6 +276,7 @@ const publishSetting = (args, config) => {
     target: 'setting',
     repository: repository.repository,
     wallets: wallets.map((wallet) => ({ id: wallet.id, files: wallet.files.length })),
+    legal: legalFiles,
     changed: status ? status.split('\n').length : 0,
     release: args.release
       ? packages.map((entry) => ({

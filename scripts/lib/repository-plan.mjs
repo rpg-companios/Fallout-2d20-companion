@@ -31,10 +31,15 @@ const SETTING_ID_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 
 export const normalizePosix = (value) => value.split(path.sep).join('/');
 
+// Готовые сборки и архивы — артефакты, а не исходники: в git целевых
+// репозиториев они не едут (только через релизы).
+const ARCHIVE_RE = /\.(?:zip|trpg|apk|aab|ipa|tgz|tar|gz)$/i;
+
 const isIgnoredFile = (relativePath) => (
   relativePath === 'settings/pins.json'
   || relativePath === 'package-lock — копия.json'
   || relativePath.startsWith('.install-backup/')
+  || ARCHIVE_RE.test(relativePath)
 );
 
 const toRelative = (root, target) => normalizePosix(path.relative(root, target));
@@ -118,6 +123,16 @@ export const planSettingToolFiles = (root) => SETTING_TOOL_SOURCES
   .filter(({ from }) => fs.existsSync(path.join(root, from)))
   .map((tool) => ({ ...tool }));
 
+/**
+ * Юридические файлы, которые остаются в корне репозитория сеттингов:
+ * инструменты сборки — производные движка (AGPL-3.0), поэтому лицензия и
+ * NOTICE обязаны ехать вместе с ними.
+ */
+export const SETTING_LEGAL_FILES = ['LICENSE', 'NOTICE'];
+
+export const planSettingLegalFiles = (root) => SETTING_LEGAL_FILES
+  .filter((name) => fs.existsSync(path.join(root, name)));
+
 /** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v2). */
 export const releaseTag = (settingId, version) => `${settingId}-v${version}`;
 
@@ -192,6 +207,13 @@ export const renderSettingReadme = ({ repository, wallets, engineRepository }) =
     '',
     'Без `POSITRONIUM_ENGINE` (или `--engine <path>`) упаковщик остановится с',
     'понятной ошибкой, а не соберёт пакет без runtime-бандла.',
+    '',
+    '## Лицензия',
+    '',
+    '`LICENSE` и `NOTICE` относятся к инструментам сборки (`tools/`) — они',
+    'производные движка и распространяются под AGPL-3.0. Содержимое папок',
+    'сеттингов наполняет сообщество: администраторы следят только за тем,',
+    'чтобы в пакетах не было вредоносного кода, а не за лицензиями вкладов.',
     '',
     '## Релиз',
     '',
