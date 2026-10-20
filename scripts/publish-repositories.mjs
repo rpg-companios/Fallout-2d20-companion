@@ -51,6 +51,7 @@ const parseArguments = (argv) => {
     push: false,
     release: false,
     message: null,
+    keep: false,
     config: DEFAULT_REPOSITORIES_FILE,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -63,6 +64,7 @@ const parseArguments = (argv) => {
       case '--patch': args.patch = true; break;
       case '--push': args.push = true; break;
       case '--release': args.release = true; break;
+      case '--keep': args.keep = true; break;
       default:
         fail(`unknown argument: ${argument}`);
     }
@@ -185,10 +187,11 @@ const publishEngine = (args, config) => {
     git(directory, 'push', 'origin', `HEAD:${repository.branch}`);
     console.log('[publish] engine: pushed');
     report.pushed = true;
-  } else {
+  } else if (!args.keep) {
     git(directory, 'reset', '--hard', 'HEAD');
     git(directory, 'clean', '-fdx');
   }
+  if (args.keep) console.log(`[publish] engine tree kept: ${directory}`);
   return report;
 };
 
@@ -325,10 +328,11 @@ const publishSetting = (args, config) => {
       console.log(`[publish] release: ${tag} → ${repository.repository}`);
     }
     report.released = true;
-  } else if (!args.push) {
+  } else if (!args.push && !args.keep) {
     git(directory, 'reset', '--hard', 'HEAD');
     git(directory, 'clean', '-fdx');
   }
+  if (args.keep) console.log(`[publish] setting tree kept: ${directory}`);
   return report;
 };
 

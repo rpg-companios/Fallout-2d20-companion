@@ -80,11 +80,9 @@ const useSettingUpdateStore = create(
 
         const installed = useSettingPackStore.getState().installed;
         const byId = new Map(installed.map((entry) => [entry.id, entry]));
-        const applicable = sources.filter((source) => byId.has(source.id));
-        if (applicable.length === 0) {
-          set({ status: 'idle', lastCheckedAt: now, error: null });
-          return [];
-        }
+        // Приложение не несёт сеттинг внутри: пока пакет не установлен,
+        // релиз — это предложение поставить сеттинг впервые (версия 0).
+        const applicable = sources;
 
         set({ status: 'checking', error: null });
         const found = {};
@@ -97,7 +95,7 @@ const useSettingUpdateStore = create(
               settingId: source.id,
               source,
               index,
-              installedVersion: byId.get(source.id)?.version ?? null,
+              installedVersion: byId.get(source.id)?.version ?? 0,
               coreVersion: ENGINE_VERSION,
             });
             if (plan.status === 'update-available') {
@@ -106,7 +104,9 @@ const useSettingUpdateStore = create(
               // «Позже» ничего не значит. Новая версия снимает отказ.
               const sameAsDismissed = dismissedVersion != null
                 && String(dismissedVersion) === String(plan.toVersion);
-              if (!sameAsDismissed) found[source.id] = plan;
+              if (!sameAsDismissed) {
+                found[source.id] = { ...plan, installed: byId.has(source.id) };
+              }
             }
           } catch (error) {
             errors.push({ settingId: source.id, message: error?.message ?? String(error) });
@@ -134,7 +134,9 @@ const useSettingUpdateStore = create(
           await verifySettingRelease(downloaded.bytes, plan.release);
 
           const packStore = useSettingPackStore.getState();
-          const wasActive = packStore.activeId === settingId;
+          // Активного сеттинга нет — приложение работает без правил, поэтому
+          // первый же установленный пакет становится активным.
+          const wasActive = packStore.activeId === settingId || packStore.activeId == null;
           await packStore.installLocalPackage({
             name: plan.release.asset,
             bytes: downloaded.bytes,

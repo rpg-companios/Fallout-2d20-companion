@@ -241,6 +241,11 @@ def pack(source: Path, output: Path | None, engine: str | None = None) -> Path:
     manifest = load_manifest(source)
     setting_id = manifest['id']
     engine_root = resolve_engine_root(engine)
+    if not (engine_root / 'src' / 'engine').is_dir():
+        fail(
+            'engine checkout not found: pass --engine <path> or set POSITRONIUM_ENGINE '
+            f'(checked {engine_root})'
+        )
 
     # Кошелёк из чужого репозитория (репозиторий сеттинга) пока импортирует
     # файлы движка относительными путями. Чтобы собрать пакет без переноса

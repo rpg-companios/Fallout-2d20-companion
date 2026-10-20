@@ -28,7 +28,7 @@
 | --- | --- | --- |
 | `main` @ `6b6cde1` (`/tmp/base-wt`) | 160 passed / 1 failed | — |
 | этот checkout после диффа | 35 failed / 140 passed | 79 failed / 1651 passed |
-| этот checkout после правок 2026-10-20 | 33 failed / 142 passed | 77 failed / 1653 passed |
+| этот checkout после правок 2026-10-20 | 33 failed / 143 passed | 77 failed / 1660 passed |
 
 Причина, по которой набор с `main` не совпадает буквально: дифф удаляет
 `src/store/powerArmorSlice.js` и переносит Fallout-механику в пакет, поэтому

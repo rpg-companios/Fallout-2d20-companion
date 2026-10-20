@@ -115,11 +115,15 @@ describe('стор обновлений сеттинга', () => {
     expect(mocks.fetchSettingReleaseIndex).toHaveBeenCalledTimes(1);
   });
 
-  it('сеттинг без установленного пакета не проверяется', async () => {
+  it('без установленного пакета релиз предлагает первую установку с версии 0', async () => {
+    // Приложение не несёт сеттинг внутри: пока пакета нет, релиз — это
+    // предложение поставить Fallout впервые, а не «обновление с 1».
     mocks.packState.installed = [];
+    mocks.fetchSettingReleaseIndex.mockResolvedValue(indexWith(release));
     const plans = await useSettingUpdateStore.getState().checkForUpdates({ force: true });
-    expect(plans).toEqual([]);
-    expect(mocks.fetchSettingReleaseIndex).not.toHaveBeenCalled();
+    expect(plans).toHaveLength(1);
+    expect(plans[0].fromVersion).toBe(0);
+    expect(plans[0].installed).toBe(false);
   });
 
   it('сбой сети не роняет стор: статус error и текст ошибки', async () => {
@@ -153,7 +157,11 @@ describe('стор обновлений сеттинга', () => {
 
     const result = await useSettingUpdateStore.getState().installUpdate('fallout');
 
-    expect(mocks.verifySettingRelease).toHaveBeenCalledWith(bytes, release);
+    expect(mocks.verifySettingRelease).toHaveBeenCalledWith(bytes, expect.objectContaining({
+      id: 'fallout',
+      version: 2,
+      asset: 'fallout.trpg',
+    }));
     expect(mocks.installLocalPackage).toHaveBeenCalledWith({ name: 'fallout.trpg', bytes });
     expect(mocks.selectSetting).toHaveBeenCalledWith('fallout');
     expect(result).toEqual({ version: 2 });

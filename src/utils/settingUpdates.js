@@ -13,7 +13,6 @@ import releaseSourcesConfig from '../../settings/release-sources.json';
 import { showAlert } from '../../components/alerts/alertService';
 import { debugLog } from '../engine/debug/runtimeTrace';
 import useSettingUpdateStore from '../store/settingUpdateStore';
-import useSettingPackStore from '../store/settingPackStore';
 
 let startedForSession = false;
 
@@ -41,9 +40,6 @@ export const runSettingUpdateCheck = async ({
   fetchImpl = fetch,
 } = {}) => {
   const updateStore = useSettingUpdateStore.getState();
-  const installed = useSettingPackStore.getState().installed;
-  if (installed.length === 0) return [];
-
   let plans = [];
   try {
     plans = await updateStore.checkForUpdates({ force, fetchImpl });
@@ -57,8 +53,11 @@ export const runSettingUpdateCheck = async ({
     const source = sourceFor(plan.settingId);
     if (!source) continue;
 
+    // Первую установку подтверждаем всегда: приложение не несёт сеттинг
+    // внутри, и качать десятки мегабайт без спроса нельзя. autoInstall
+    // относится к обновлениям уже установленного сеттинга.
     let approved = true;
-    if (prompt && !source.autoInstall) {
+    if (prompt && (!source.autoInstall || !plan.installed)) {
       approved = await showAlert('settingUpdateAvailable', {
         name: plan.settingId,
         from: plan.fromVersion ?? '—',
