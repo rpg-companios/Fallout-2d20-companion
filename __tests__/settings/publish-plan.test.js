@@ -151,6 +151,32 @@ describe('release.json', () => {
   });
 });
 
+describe('shell-обёртки', () => {
+  const read = (name) => fs.readFileSync(path.join(ROOT, 'scripts', name), 'utf8');
+
+  it('движок публикуется обёрткой с --target engine и --push', () => {
+    const script = read('publish-engine.sh');
+    expect(script).toContain('--target engine');
+    expect(script).toContain('--push');
+    expect(script).toContain('--dry-run');
+  });
+
+  it('сеттинг публикуется обёрткой с --target setting, --push и --release', () => {
+    const script = read('publish-setting.sh');
+    expect(script).toContain('--target setting');
+    expect(script).toContain('--push');
+    expect(script).toContain('--release');
+    expect(script).toContain('--no-release');
+  });
+
+  it('обёртки исполняемые', () => {
+    for (const name of ['publish-engine.sh', 'publish-setting.sh']) {
+      const mode = fs.statSync(path.join(ROOT, 'scripts', name)).mode;
+      expect(mode & 0o111).toBeTruthy();
+    }
+  });
+});
+
 describe('конфигурация в репозитории', () => {
   it('settings/repositories.json: два адреса и кошелёк fallout', () => {
     const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'settings/repositories.json'), 'utf8'));

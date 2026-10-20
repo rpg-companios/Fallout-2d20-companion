@@ -253,6 +253,18 @@ fallout/
 **Правки делаются здесь.** Целевые репозитории не редактируются руками: `scripts/publish-repositories.mjs` собирает их деревья из текущего checkout и публикует.
 
 ```sh
+./scripts/publish-engine.sh     # движок: собрать и запушить
+./scripts/publish-setting.sh    # сеттинг: дерево + .trpg + release.json + релиз
+```
+
+Обе обёртки — тонкие: `--dry-run` показывает изменения, `--patch` сохраняет
+патч, `--message` задаёт сообщение коммита, у сеттинга ещё `--no-release`.
+Токен — `GH_TOKEN` (или `GITHUB_TOKEN`); подробности и разбор ошибок —
+`docs/publishing.md`.
+
+Ручной запуск без обёрток тоже возможен:
+
+```sh
 node scripts/publish-repositories.mjs                      # план: что изменится
 node scripts/publish-repositories.mjs --target engine --patch
 node scripts/publish-repositories.mjs --target setting --push --release

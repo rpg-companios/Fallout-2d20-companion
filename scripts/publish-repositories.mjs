@@ -75,7 +75,7 @@ const parseArguments = (argv) => {
   return args;
 };
 
-const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+const git = (cwd, ...args) => execFileSync('git', [...authArgs(), ...args], { cwd, encoding: 'utf8' }).trim();
 
 // Подпись коммита в целевых репозиториях: у клона может не быть настроенного
 // git identity, а публикация не должна требовать ручной настройки.
@@ -95,13 +95,153 @@ const hasCommand = (command) => {
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+// ---------------------------------------------------------------------------
+// Авторизация.
+//
+// В Replit и CI git обычно не имеет настроенного credential helper, поэтому
+// токен берём из окружения и передаём git'у заголовком на один вызов: в
+// .git/config он не попадает. Тот же токен нужен REST API для релиза.
+// ---------------------------------------------------------------------------
+const TOKEN = (
+  process.env.PUBLISH_GITHUB_TOKEN
+  || process.env.GH_TOKEN
+  || process.env.GITHUB_TOKEN
+  || ''
+).trim();
+
+const AUTH_HEADER = TOKEN
+  ? `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`
+  : null;
+
+const authArgs = () => (AUTH_HEADER ? ['-c', `http.https://github.com/.extraheader=${AUTH_HEADER}`] : []);
+
+// Переопределение для тестов: локальный сервер вместо GitHub API.
+const API_BASE = process.env.PUBLISH_API_BASE || 'https://api.github.com';
+const UPLOAD_BASE = process.env.PUBLISH_UPLOAD_BASE || 'https://uploads.github.com';
+
+const apiHeaders = () => ({
+  ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+  'User-Agent': 'positronium-publish',
+});
+
+/** Запрос к GitHub API с разбором JSON и внятной ошибкой. */
+const apiRequest = async (url, options = {}) => {
+  const response = await fetch(url, { ...options, headers: { ...apiHeaders(), ...(options.headers ?? {}) } });
+  const text = await response.text();
+  let body = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
+  }
+  return { ok: response.ok, status: response.status, body };
+};
+
+const describeApiError = (result) => (
+  (result.body && (result.body.message || result.body.documentation_url))
+  || `HTTP ${result.status}`
+);
+
+/** Найти или создать релиз; существующий — переиспользуем. */
+const ensureRelease = async ({ repository, tag, title, notes, branch }) => {
+  const created = await apiRequest(`${API_BASE}/repos/${repository}/releases`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag_name: tag, name: title, body: notes, target_commitish: branch }),
+  });
+  if (created.ok) return created.body;
+
+  const existing = await apiRequest(`${API_BASE}/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`);
+  if (existing.ok) return existing.body;
+
+  fail(`не удалось создать релиз ${tag} в ${repository}: ${describeApiError(created)}`);
+  return null;
+};
+
+/** Положить ассет в релиз; одноимённый старый — удалить (--clobber). */
+const uploadReleaseAsset = async ({ repository, releaseId, file, name }) => {
+  const assets = await apiRequest(`${API_BASE}/repos/${repository}/releases/${releaseId}/assets?per_page=100`);
+  if (assets.ok && Array.isArray(assets.body)) {
+    for (const asset of assets.body) {
+      if (asset.name !== name) continue;
+      const removed = await apiRequest(`${API_BASE}/repos/${repository}/releases/assets/${asset.id}`, {
+        method: 'DELETE',
+      });
+      if (!removed.ok) {
+        fail(`не удалось заменить ассет ${name} в ${repository}: ${describeApiError(removed)}`);
+      }
+    }
+  }
+
+  const bytes = fs.readFileSync(file);
+  const uploaded = await apiRequest(`${UPLOAD_BASE}/repos/${repository}/releases/${releaseId}/assets?name=${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(bytes.length) },
+    body: bytes,
+  });
+  if (!uploaded.ok) fail(`не удалось загрузить ${name} в ${repository}: ${describeApiError(uploaded)}`);
+  return uploaded.body;
+};
+
+/** Релиз через gh, если токена нет, но gh авторизован. */
+const publishReleaseWithGh = ({ repository, tag, title, notes, file, id }) => {
+  const exists = (() => {
+    try {
+      execFileSync('gh', ['release', 'view', tag, '--repo', repository], { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  if (exists) {
+    execFileSync('gh', ['release', 'upload', tag, file, '--repo', repository, '--clobber'], { stdio: 'inherit' });
+    return;
+  }
+  execFileSync('gh', [
+    'release', 'create', tag, file,
+    '--repo', repository,
+    '--title', title,
+    '--notes', notes,
+  ], { stdio: 'inherit' });
+};
+
+const publishRelease = async ({ repository, branch, entry }) => {
+  const tag = `${entry.id}-v${entry.manifest.version}`;
+  const title = `${entry.manifest.name ?? entry.id} ${entry.manifest.version}`;
+  const notes = `Пакет сеттинга ${entry.id} версии ${entry.manifest.version}.`;
+
+  if (TOKEN) {
+    const release = await ensureRelease({
+      repository: repository.repository, tag, title, notes, branch,
+    });
+    await uploadReleaseAsset({
+      repository: repository.repository,
+      releaseId: release.id,
+      file: entry.file,
+      name: entry.asset,
+    });
+  } else if (hasCommand('gh')) {
+    publishReleaseWithGh({
+      repository: repository.repository, tag, title, notes, file: entry.file,
+    });
+  } else {
+    fail(
+      'для релиза нужен токен GitHub: задайте GH_TOKEN (или GITHUB_TOKEN) '
+      + 'либо авторизуйте gh CLI',
+    );
+  }
+  console.log(`[publish] release: ${tag} → ${repository.repository}`);
+};
+
 /**
  * Проверить право на запись до того, как собран 20-мегабайтный .trpg.
  * `git push --dry-run` у GitHub проверяет и доступ: без прав вернётся 403.
  */
 const assertPushAccess = (directory, repository, branch) => {
   try {
-    execFileSync('git', ['push', '--dry-run', 'origin', `HEAD:${branch}`], {
+    execFileSync('git', [...authArgs(), 'push', '--dry-run', 'origin', `HEAD:${branch}`], {
       cwd: directory,
       stdio: 'pipe',
     });
@@ -130,6 +270,7 @@ const ensureWorktree = (repository, workdir) => {
     return directory;
   }
   execFileSync('git', [
+    ...authArgs(),
     'clone', '--depth', '1', '--branch', repository.branch, repository.url, directory,
   ], { stdio: 'inherit' });
   return directory;
@@ -224,7 +365,7 @@ const publishEngine = (args, config) => {
   return report;
 };
 
-const publishSetting = (args, config) => {
+const publishSetting = async (args, config) => {
   const repository = config.setting;
   if (!repository?.repository) fail('settings/repositories.json has no setting repository');
   const workdir = path.resolve(ROOT, args.workdir);
@@ -341,29 +482,8 @@ const publishSetting = (args, config) => {
   }
 
   if (args.release) {
-    if (!hasCommand('gh')) fail('gh CLI is required to create a GitHub release');
     for (const entry of packages) {
-      const tag = `${entry.id}-v${entry.manifest.version}`;
-      const title = `${entry.manifest.name ?? entry.id} ${entry.manifest.version}`;
-      const exists = (() => {
-        try {
-          execFileSync('gh', ['release', 'view', tag, '--repo', repository.repository], { stdio: 'ignore' });
-          return true;
-        } catch {
-          return false;
-        }
-      })();
-      if (exists) {
-        execFileSync('gh', ['release', 'upload', tag, entry.file, '--repo', repository.repository, '--clobber'], { stdio: 'inherit' });
-      } else {
-        execFileSync('gh', [
-          'release', 'create', tag, entry.file,
-          '--repo', repository.repository,
-          '--title', title,
-          '--notes', `Пакет сеттинга ${entry.id} версии ${entry.manifest.version}.`,
-        ], { stdio: 'inherit' });
-      }
-      console.log(`[publish] release: ${tag} → ${repository.repository}`);
+      await publishRelease({ repository, branch: repository.branch, entry });
     }
     report.released = true;
   } else if (!args.push && !args.keep) {
@@ -374,14 +494,18 @@ const publishSetting = (args, config) => {
   return report;
 };
 
-const main = () => {
+const main = async () => {
   const args = parseArguments(process.argv.slice(2));
   if (!fs.existsSync(args.config)) fail(`missing ${args.config}`);
   const config = readJson(args.config);
+  console.log(`[publish] auth: ${TOKEN ? 'токен GitHub из окружения' : 'без токена (git credential helper / gh)'}`);
   const reports = [];
   if (args.target === 'all' || args.target === 'engine') reports.push(publishEngine(args, config));
-  if (args.target === 'all' || args.target === 'setting') reports.push(publishSetting(args, config));
+  if (args.target === 'all' || args.target === 'setting') reports.push(await publishSetting(args, config));
   console.log(JSON.stringify({ ok: true, reports }, null, 2));
 };
 
-main();
+main().catch((error) => {
+  console.error(`[publish] ${error?.message ?? error}`);
+  process.exit(1);
+});
