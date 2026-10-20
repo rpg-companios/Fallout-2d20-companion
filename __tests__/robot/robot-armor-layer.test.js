@@ -9,14 +9,14 @@ import { describe, it, expect } from 'vitest';
 
 import {
   initRobotSlots,
-} from '../../domain/robotEquip';
+} from '../../modules/fallout/logic/robotEquip';
 import {
   normalizeSlot,
   serializeSlot,
   deserializeSlot,
   withArmorLayer,
-} from '../../domain/robotSlots';
-import { getRobotSlotDamageResistance } from '../../domain/robotDamageResistance';
+} from '../../modules/fallout/logic/robotSlots';
+import { getRobotSlotDamageResistance } from '../../modules/fallout/logic/robotDamageResistance';
 import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
 import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
 import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';

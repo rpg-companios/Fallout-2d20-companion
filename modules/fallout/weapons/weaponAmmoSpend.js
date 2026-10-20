@@ -38,8 +38,8 @@
  * потолок; без value или при нуле получается 1.
  */
 
-import { getRobotLimbCatalog } from '../../../domain/registry';
-import { toModIds } from '../../../domain/robotSlots';
+import { getFalloutRobotLimbCatalog as getRobotLimbCatalog } from '../logic/robotCatalog.js';
+import { toModIds } from '../logic/robotSlots.js';
 
 const toNumber = (value) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;

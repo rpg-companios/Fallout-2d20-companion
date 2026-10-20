@@ -6,8 +6,8 @@
 Этот документ — инвентаризация, а не проектирование: механики не
 закладываются до ответов на вопросы §5.
 
-Источник данных: `data/perks/perks.json` (94 перка), описания —
-`i18n/ru-RU/data/perks/perks.json`.
+Источник данных Fallout: `modules/fallout/data/perks/perks.json`; локализованные описания —
+`modules/fallout/i18n/ru-RU/data/perks/perks.json`.
 
 ## 1. Что приложение считает сегодня (карта «влияет»)
 
@@ -33,10 +33,7 @@
 
 ## 2. Существующая архитектура перков
 
-`data/perks/perks.json` → поле `effect` — флаг-ид эффекта. Реестр
-механик: `domain/perks/index.js` (`perkEffects`), модули-эффекты с
-`apply(ctx) → bonuses`. Агрегация: `calculatePerkEffects` →
-`perkBonuses` в сторе → влито в `calculateDerivedStats` как слой эффектов.
+`modules/fallout/data/perks/perks.json` → поле `effect` — флаг-ид эффекта. Fallout-реестр механик: `modules/fallout/perks/effects/index.js` (`perkEffects`), модули-эффекты с `apply(ctx) → bonuses`. Engine-owned `domain/perks.js` агрегирует эффекты только через optional `services.perks` capability; результат идёт в `perkBonuses` и далее в setting-provided `calculateDerivedStats`.
 
 Реализовано 3 из 94: `intenseTraining`, `educated` (каркасно), `snakeater`.
 Остальное — флаги-лейблы: UI показывает текст без механики (как
@@ -50,9 +47,9 @@ JSON**. Форма JSON-контракта — отдельное обсужде
 
 | Перк | id | Рангов | Механика | Куда садится |
 |---|---|---|---|---|
-| Интенсивные Тренировки | `intenseTraining` | 10 | +1 к любому S.P.E.C.I.A.L. за ранг | **реализован** (`domain/perks/intenseTraining.js`) |
+| Интенсивные Тренировки | `intenseTraining` | 10 | +1 к любому S.P.E.C.I.A.L. за ранг | **реализован** (`modules/fallout/perks/effects/intenseTraining.js`) |
 | Тренированный | `educated` | 10 | +2 очка навыков (1+1 или 2) | **реализован каркасно** (`educated.js` → `skillPoints`); выбор навыков — отдельный вопрос UI |
-| Пожиратель Змей | `snakeater` | 1 | +2 СУ яду | **реализован** (`domain/perks/snakeater.js`) |
+| Пожиратель Змей | `snakeater` | 1 | +2 СУ яду | **реализован** (`modules/fallout/perks/effects/snakeater.js`) |
 | Дающий Жизнь | `lifeGiver` | 5 | +ВЫН к макс. ОЗ за ранг | садится в `maxHealth` (calculateDerivedStats) |
 | Крепкий Хребет | `strongBack` | 3 | +25 фнт. переносимого веса за ранг | садится в `carryWeight` |
 | Прочность | `toughness` | 2 | +1 физ СУ во всех местах | `damageResistance.physical` (как постоянный эффект) |

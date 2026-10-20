@@ -16,7 +16,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
 import { selectLegacyAttributes, selectLegacySkills } from '../../src/store/selectors';
-import { createInitialAttributes, ALL_SKILLS } from '../../domain/characterCreation';
+import { createInitialAttributes, ALL_SKILLS } from '../../modules/fallout/logic/characterCreation.js';
 
 afterEach(async () => {
   useCharacterStore.getState().resetCharacterStore();

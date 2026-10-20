@@ -90,13 +90,13 @@ describe('orchestratorsSlice: расходник и мост времени (п�
   it('applyConsumableFull: журнал доз растёт для химии (пул за 24 ч)', () => {
     const store = useCharacterStore.getState();
     store.applyConsumableFull({ id: 'chem_psycho', itemType: 'chem' });
-    expect(useCharacterStore.getState().chemDosesLog.length).toBe(1);
+    expect(useCharacterStore.getState().stateExtensions.chemDosesLog.length).toBe(1);
     // Зависимость возможна: уровень > 0 и негативный эффект (бросок кубиков
     // случаен — проверяем только форму результата).
     const doses = useCharacterStore.getState().applyConsumableFull({
       id: 'chem_psycho', itemType: 'chem', addictionLevel: 1, negativeEffect: 'addiction',
     });
-    expect(useCharacterStore.getState().chemDosesLog.length).toBe(2);
+    expect(useCharacterStore.getState().stateExtensions.chemDosesLog.length).toBe(2);
     expect(doses.addictionResult).not.toBeNull();
     expect(doses.addictionResult).toHaveProperty('addicted');
   });
@@ -131,7 +131,7 @@ describe('characterStore: resetKitAndRewards (патч 241)', () => {
     store.setSkillsSaved(true);
     store.setSceneCounter(4);
     store.setConditions(['diseased']);
-    store.setChemDosesLog([{ chemId: 'x', takenAt: Date.now() }]);
+    store.setStateExtension('chemDosesLog', [{ chemId: 'x', takenAt: Date.now() }]);
     store.setCurrentHealth(9);
     store.addRadiation(2);
 
@@ -149,7 +149,7 @@ describe('characterStore: resetKitAndRewards (патч 241)', () => {
     expect(s.radiation).toBe(2);
     expect(s.sceneCounter).toBe(4);
     expect(s.conditions).toEqual(['diseased']);
-    expect(s.chemDosesLog.length).toBe(1);
+    expect(s.stateExtensions.chemDosesLog.length).toBe(1);
     expect(s.selectedSkills).toEqual(['Ближний бой']); // keepSkills: tagged живы
     expect(s.skillsSaved).toBe(true);
 

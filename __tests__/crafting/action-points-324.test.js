@@ -6,7 +6,7 @@
 //     прибавка попадает в «успехи сверх сложности» (владелец 324);
 //   • автоуспех (сложность 0, броска не было) и провал ОД не приносят;
 //   • трата «2 ОД: время крафта вдвое» требует пула; меньше 2 — отказ,
-//     время полное. Пул живёт в движке (domain/actionPoints), UI позже;
+//     время полное. Пул живёт в setting package (modules/fallout/logic/actionPoints), UI позже;
 //     пул ГРУППОВОЙ — к будущему экрану мастера подключится как есть.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -17,7 +17,7 @@ import {
   earnActionPoints,
   spendActionPoints,
   resetActionPoints,
-} from '../../domain/actionPoints';
+} from '../../modules/fallout/logic/actionPoints.js';
 import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
 
 const state = () => useCharacterStore.getState();

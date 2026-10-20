@@ -5,9 +5,9 @@
 // показывает её в отчёте и не дублирует при установке счётчика.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
-import { resolveConsumableVitalChanges } from '../../domain/effects';
+import { resolveConsumableVitalChanges } from '../../modules/fallout/consumables/vitalChanges.js';
 import { selectPerkBonuses } from '../../domain/perks';
-import { ghoulishHpPerUnitsByRank } from '../../domain/perks/ghoulish';
+import { ghoulishHpPerUnitsByRank } from '../../modules/fallout/perks/effects/ghoulish';
 import catalog from '../../modules/fallout/data/perks/perks.json';
 import ruCatalog from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
 import enCatalog from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
@@ -92,7 +92,7 @@ describe('Патч 408: расходники — радиация действу
 
   it('ранг 1: +8 радиации → счётчик +8, лечение +2 ОЗ', () => {
     const r = resolveConsumableVitalChanges(irradiated(8), {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 4 },
+      currentHealth: 5, maxHealth: 20, radiation: 0, radiationHealing: { hpPerUnits: 4 },
     });
     expect(r.radiationAfter).toBe(8);
     expect(r.radiationAmount).toBe(8);
@@ -101,11 +101,11 @@ describe('Патч 408: расходники — радиация действу
 
   it('ранг 2: +8 радиации → лечение floor(8/3) = 2; ранг 3: +7 → 3 ОЗ', () => {
     const rank2 = resolveConsumableVitalChanges(irradiated(8), {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 3 },
+      currentHealth: 5, maxHealth: 20, radiation: 0, radiationHealing: { hpPerUnits: 3 },
     });
     expect(rank2.healAmount).toBe(2);
     const rank3 = resolveConsumableVitalChanges(irradiated(7), {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 2 },
+      currentHealth: 5, maxHealth: 20, radiation: 0, radiationHealing: { hpPerUnits: 2 },
     });
     expect(rank3.healAmount).toBe(3);
     expect(rank3.radiationAfter).toBe(7);
@@ -117,7 +117,7 @@ describe('Патч 408: расходники — радиация действу
       radiationModifier: { op: '-', value: 5 },
     };
     const r = resolveConsumableVitalChanges(radaway, {
-      currentHealth: 5, maxHealth: 20, radiation: 6, ghoulish: { hpPerUnits: 2 },
+      currentHealth: 5, maxHealth: 20, radiation: 6, radiationHealing: { hpPerUnits: 2 },
     });
     expect(r.radiationAmount).toBe(-5);
     expect(r.healAmount).toBe(0);
@@ -131,7 +131,7 @@ describe('Патч 408: расходники — радиация действу
     };
     const r = resolveConsumableVitalChanges(item, {
       currentHealth: 10, maxHealth: 14, radiation: 0,
-      ghoulish: { hpPerUnits: 4 }, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
+      radiationHealing: { hpPerUnits: 4 }, preservedFoodBonus: { hpBonus: 2, radiationReduction: 1 },
     });
     // Радиация после гурманской скидки: 8 → 7 (полученные единицы).
     // Лечение: 3 предмета + 2 гурмана + floor(7/4) = 1 гулеподобного = 6,
@@ -163,7 +163,7 @@ describe('Патч 408: ручной счётчик — по той же нор�
   it('конвейер: setRadiation со skip-флагом не дублирует норму из отчёта', () => {
     takeGhoulish(1);
     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
-    state().setRadiation(8, { skipGhoulishHeal: true });
+    state().setRadiation(8, { skipSettingRadiationGainHealing: true });
     expect(state().radiation).toBe(8);
     expect(state().currentHealth).toBe(5); // лечение уже учёл резолвер
   });

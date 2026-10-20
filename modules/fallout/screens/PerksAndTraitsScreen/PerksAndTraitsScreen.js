@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import useCharacterStore from '../../../../src/store/characterStore';
 import { selectLegacyAttributes } from '../../../../src/store/selectors';
 import { showRawAlert } from '../../../../components/alerts/alertService';
-import { getTraitI18nById } from '../../../../domain/traits';
+import { getTraitI18nById } from '../../logic/traits.js';
 import {
   annotatePerks,
   applyPerkSelection,
@@ -14,7 +14,7 @@ import {
   removeSelectedPerkAt,
   withAssignedPerkRanks,
 } from '../../../../domain/perks';
-import { isRobotCharacter } from '../../../../domain/origins';
+import { isRobotCharacter } from '../../logic/originTypes.js';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import perksData from '../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';

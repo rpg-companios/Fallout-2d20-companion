@@ -13,13 +13,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { attacksFromSlot, collectAttacks, serializeSlot } from '../../domain/robotSlots';
-import { getRobotLimbCatalog } from '../../domain/registry';
+import { attacksFromSlot, collectAttacks, serializeSlot } from '../../modules/fallout/logic/robotSlots';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 import { catalogGetWeaponMods, catalogGetModsForWeaponSlot, catalogGetWeaponById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 
 const ROOT = join(__dirname, '../..');
-const catalog = getRobotLimbCatalog();
+const catalog = getFalloutRobotLimbCatalog();
 
 const robotWeapons = () => JSON.parse(
   readFileSync(join(ROOT, 'modules/fallout/data/equipment/robot/weapons.json'), 'utf8'),

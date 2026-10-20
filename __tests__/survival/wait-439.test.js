@@ -11,9 +11,10 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import useCharacterStore from '../../src/store/characterStore';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 
 setCurrentLocale('ru-RU');
+setCurrentModuleLocale('ru-RU');
 import {
   addFatigue,
   createSurvivalState,

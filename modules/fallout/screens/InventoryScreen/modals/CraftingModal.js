@@ -13,7 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from '../../../styles/CraftingModal.styles';
 // 329 (слово владельца): фон окна категорий — фоновое изображение окон
 // сеттинга (как на экранах Снаряжения/Персонажа, opacity 0.3).
-const BG_IMAGE = require('../../../../../assets/bg.png');
+const BG_IMAGE = require('../../../assets/bg.png');
 import {
   buildCraftTiles,
   buildCategoryModel,
@@ -23,7 +23,7 @@ import {
   craftFormat,
 } from '../../../crafting/windowModel';
 import { settleCraftTime } from '../../../crafting/operations';
-import { getActionPoints } from '../../../../../domain/actionPoints';
+import { getActionPoints } from '../../../logic/actionPoints.js';
 // 364 (слово владельца: в приложении ЕДИНЫЙ механизм всплывающих окон —
 // components/alerts/alertService + AlertHost, работает и на вебе, и на
 // нативе; системный Alert на Web — тихая заглушка).

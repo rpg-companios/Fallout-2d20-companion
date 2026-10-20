@@ -1,0 +1,19 @@
+{
+  "id": "example_setting",
+  "name": "Example Setting",
+  "version": "1.0.0",
+  "requiresCore": ">=1.0",
+  "defaultLocale": "en-EN",
+  "locales": [
+    "ru-RU",
+    "en-EN"
+  ],
+  "packFormat": 1,
+  "files": [
+    "manifest.json",
+    "README.md",
+    "data/mechanics.json",
+    "i18n/en-EN.json",
+    "i18n/ru-RU.json"
+  ]
+}

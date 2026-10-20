@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "settingId": "fallout",
+  "kind": "weaponMods",
+  "items": [
+    {
+      "id": "usr_weapon_mod_example_receiver",
+      "names": {
+        "ru-RU": "Тестовый усиленный ресивер",
+        "en-EN": "Test Reinforced Receiver"
+      },
+      "modType": "weapon",
+      "slot": "Receiver",
+      "complexity": 1,
+      "perk1": "",
+      "perk2": "",
+      "skill": "REPAIR",
+      "rarity": "Common",
+      "materials": "Common x 1",
+      "cost": 10,
+      "weight": 0.5,
+      "applies_to_ids": [
+        "weapon_assault_rifle"
+      ],
+      "damageModifier": {
+        "op": "+",
+        "value": 1
+      },
+      "rangeModifier": {
+        "op": "+",
+        "value": 1
+      },
+      "weightModifier": {
+        "op": "*",
+        "value": 1.5
+      },
+      "costModifier": {
+        "op": "/",
+        "value": 2
+      },
+      "damageTypeOverride": {
+        "op": "add",
+        "value": "energy"
+      },
+      "qualityChanges": [
+        {
+          "op": "gain",
+          "qualityId": "quality_accurate"
+        }
+      ],
+      "effectChanges": [
+        {
+          "op": "gain",
+          "effectId": "effect_vicious"
+        }
+      ]
+    }
+  ]
+}

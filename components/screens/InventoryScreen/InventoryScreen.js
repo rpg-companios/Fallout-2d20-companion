@@ -1,75 +1,48 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, Image, ImageBackground, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, Image, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectCarryWeight } from '../../../src/store/selectors';
 import { selectItemsByEquipped } from '../../../src/store/selectors';
 import { useShallow } from 'zustand/react/shallow';
-import CapsModal from './modals/CapsModal';
 import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
-import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
 // 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
 // «Починить» больше не чинят мгновенно и бесплатно).
-import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
-import {
-  repairAffordableFor,
-  repairAffordableForPiece,
-  juryRiggingRanksFor,
-  itemRarityFor,
-} from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
-import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
-import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
-import {
-  isFusionCoreItem,
-  fusionCoreStackKey,
-  isPowerArmorFrame,
-  powerArmorPieceStackKey,
-  powerArmorFrameStackKey,
-  rollNewFusionCoreCharges,
-  hasFrame,
-  FUSION_CORE_ID,
-} from '../../../domain/powerArmor';
-import { getPowerArmorData } from '../../../domain/registry';
+import { getSettingService } from '../../../domain/registry';
 import { formatInventoryText, tInventory } from './logic/inventoryI18n';
-import { slotsForLimbType, isArmAttachment, canReplaceArmWeapon } from '../../../domain/robotSlots';
-import { rerollConsumableRadiationRoll } from '../../../domain/effects';
-import { buildConsumableResultReport } from './logic/consumableResultReport';
-import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../../domain/foundItemBonus';
-import { getPerkDisplay } from '../../../modules/fallout/screens/PerksAndTraitsScreen/perksDisplay';
-import { debugLog } from '../../../src/debug/falloutDebug';
-import { useLocale, useModuleLocale } from '../../../i18n/locale';
+import { pickRandomItem } from '../../../domain/randomItem';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { generateStackKey, getItemId } from '../../../domain/itemIdentity';
-import { resolveItem, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
-import { isRobotCharacter } from '../../../domain/origins';
+import { getItemId } from '../../../domain/itemIdentity';
+import { resolveItem, inferItemType, getItemPrice, getItemWeight } from '../../../domain/resolveItem';
 import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules';
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
-import { getBuiltinWeaponsFromSlots, findFreeWeaponHand } from '../../../domain/robotEquip';
-import { canEquipArmor, canEquipClothing, canEquipWeapon, canEquipPowerArmor, isPowerArmorItem as isPowerArmorDomain } from '../../../domain/equipEquip';
+import { canEquipArmor, canEquipClothing, canEquipWeapon } from '../../../domain/equipEquip';
 import styles from '../../../styles/InventoryScreen.styles';
-import useAppSettingsStore, { selectRandomWeaponQualityEnabled, selectWeaponDurabilityLossEnabled, selectRobotArmPartsStrictReplace } from '../../../src/store/appSettingsStore';
-import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../../../domain/weaponDurability';
-import { salvageItem } from '../../../modules/fallout/salvage/operations';
-import { salvageButtonForItem } from '../../../modules/fallout/salvage/subline';
-import { buildSalvageReport } from './logic/salvageResultReport';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
 
-const PARAM_FIELDS = [
-  'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
-];
+const NO_DURABILITY_SETTINGS = Object.freeze({
+  randomQualityEnabled: false,
+  durabilityLossEnabled: false,
+});
+const selectNoDurabilitySettings = () => NO_DURABILITY_SETTINGS;
+const selectNoCharacterEquipmentSettings = () => false;
+const NO_SETTING_ACTION = () => undefined;
 
-// Каталог механики силовой брони по id (макс. прочность частей, зоны защиты).
-const PA_CATALOG_BY_ID = Object.fromEntries(
-  Object.values(getPowerArmorData()).flatMap((set) => set.pieces).map((p) => [p.id, p]),
-);
-
-const flattenItemParams = (item) => {
+const flattenItemParams = (item, settingParameterFields = []) => {
   if (!item) return item;
   const flat = { ...item };
-  PARAM_FIELDS.forEach((field) => {
+  [
+    'damage',
+    'fireRate',
+    ...(Array.isArray(settingParameterFields)
+      ? settingParameterFields.filter((field) => typeof field === 'string')
+      : []),
+  ].forEach((field) => {
     if (flat[field] && typeof flat[field] === 'object') {
       flat[field] = flat[field].total ?? flat[field].base;
     }
@@ -77,14 +50,16 @@ const flattenItemParams = (item) => {
   return flat;
 };
 
-const CurrencySection = ({ amount, onAdd, onSubtract, onCraft }) => (
+const CurrencySection = ({ amount, onAdd, onSubtract, onCraft, currencyIcon, showCraft }) => (
   <View style={styles.currencyRow}>
     <View style={styles.currencyContainer}>
-      <Image
-        source={require('../../../modules/fallout/assets/backgrounds/caps.png')}
-        style={styles.currencyIcon}
-        resizeMode="contain"
-      />
+      {currencyIcon ? (
+        <Image
+          source={currencyIcon}
+          style={styles.currencyIcon}
+          resizeMode="contain"
+        />
+      ) : null}
       <TouchableOpacity style={styles.currencyButton} onPress={onSubtract}>
         <Text style={styles.currencyButtonText}>{tInventory('screen.currency.subtract')}</Text>
       </TouchableOpacity>
@@ -93,63 +68,97 @@ const CurrencySection = ({ amount, onAdd, onSubtract, onCraft }) => (
         <Text style={styles.currencyButtonText}>{tInventory('screen.currency.add')}</Text>
       </TouchableOpacity>
     </View>
-    <TouchableOpacity style={styles.craftButton} onPress={onCraft}>
-      <MaterialCommunityIcons name="wrench" size={14} color="#fff" />
-      <Text style={styles.craftButtonText}>{tInventory('screen.craft.label')}</Text>
-    </TouchableOpacity>
+    {showCraft ? (
+      <TouchableOpacity style={styles.craftButton} onPress={onCraft}>
+        <MaterialCommunityIcons name="wrench" size={14} color="#fff" />
+        <Text style={styles.craftButtonText}>{tInventory('screen.craft.label')}</Text>
+      </TouchableOpacity>
+    ) : null}
   </View>
 );
 
 const InventoryScreen = () => {
+  const inventoryRuntime = getSettingService('inventory') ?? {};
+  const flattenStoreItemParams = (item) => flattenItemParams(item, inventoryRuntime.itemParameterFields);
+  const consumablesCapability = getSettingService('consumables') ?? {};
+  const equipmentEligibilityRuntime = getSettingService('equipmentEligibility') ?? {};
+  const inventoryFeatures = inventoryRuntime.features ?? {};
+  const inventoryFeatureList = Object.values(inventoryFeatures);
+  const getInventoryFeature = (predicate) => inventoryFeatureList.find(predicate) ?? null;
+  const craftingFeature = inventoryFeatures.crafting ?? null;
+  const repairFeature = inventoryFeatures.repair ?? null;
+  const durabilityFeature = inventoryFeatures.durability ?? null;
+  const structuredEquipmentFeature = getInventoryFeature((feature) => (
+    typeof feature?.getInventoryRows === 'function'
+    && typeof feature?.isInventoryRow === 'function'
+    && typeof feature?.renderInventoryRow === 'function'
+    && typeof feature?.getInventoryState === 'function'
+  ));
+  const characterEquipmentFeature = getInventoryFeature((feature) => (
+    typeof feature?.getWeaponsForDisplay === 'function'
+    && typeof feature?.handleWeaponEquip === 'function'
+  ));
+  const itemBreakdownFeature = inventoryFeatures.itemBreakdown ?? null;
+  const itemRarityFeature = inventoryFeatures.itemRarity ?? null;
+  const perkDisplayFeature = inventoryFeatures.perkDisplay ?? null;
+  const lootBonusesFeature = inventoryFeatures.lootBonuses ?? null;
+  const weaponPresentationFeature = inventoryFeatures.weaponPresentation ?? null;
+  const consumablesFeature = inventoryFeatures.consumables ?? null;
+  const CraftingModal = craftingFeature?.Modal;
+  const RepairModal = repairFeature?.Modal;
+  const currencyRuntime = inventoryRuntime.currency ?? {};
+  const CurrencyModal = currencyRuntime.Modal;
+  const currencyIcon = currencyRuntime.icon;
+  const getItemTypeId = (role) => inventoryRuntime.itemTypeIds?.[role] ?? null;
+  const getItemCapabilities = (item) => inventoryRuntime.classifyItem?.(item) ?? {};
+  const isItemKind = (item, role) => {
+    const capabilities = getItemCapabilities(item);
+    if (Object.hasOwn(capabilities, role)) return Boolean(capabilities[role]);
+    const typeId = getItemTypeId(role);
+    return typeId !== null && item?.itemType === typeId;
+  };
+
   // Деньги — стор напрямую (Шаг 8а, патч 241; поле в сторе с Шага 2).
   const currency = useCharacterStore((s) => s.currency);
   const earnCurrency = useCharacterStore((s) => s.earnCurrency);
   const spendCurrency = useCharacterStore((s) => s.spendCurrency);
   // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
   const applyConsumableFull = useCharacterStore((s) => s.applyConsumableFull);
-  // Шаг 8а (патч 239): превью радиации — стор-экшен.
-  const previewConsumableRadiation = useCharacterStore((s) => s.previewConsumableRadiation);
   // Шаг 8а (часть 3): комплект и модификации предметов — стор напрямую.
   const equipment = useCharacterStore((s) => s.equipment);
   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
+  const getSettingAction = useCharacterStore((s) => s.getSettingAction);
+  const getFeatureAction = (feature, actionKey) => {
+    const actionId = feature?.actionIds?.[actionKey];
+    return feature?.id && typeof actionId === 'string'
+      ? getSettingAction(feature.id, actionId)
+      : NO_SETTING_ACTION;
+  };
   // Read-хелпер альбома модификаций: с патча 237 альбом только читается
   // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
-  // 404: «Заряжай и стреляй» — тяжёлое оружие на карточках инвентаря
-  // показывает скорострельность с перковой прибавкой (единая точка с
-  // экраном снаряжения — domain/perks/loadAndFire).
-  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
   const getModifiedItem = (item) => {
     const base = storeModifiedItems[getItemId(item)] || item;
-    return base?.weaponType === 'Heavy'
-      ? applyLoadAndFireToWeapon(base, loadAndFireBonus)
-      : base;
+    return weaponPresentationFeature?.getDisplayItem?.(base, storePerkBonuses) ?? base;
   };
   // Шаг 7: origin/trait — стор напрямую.
-  // Шаг 8а: слоты робота и производный вес — стор напрямую.
-  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
-  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  // Optional equipment state and derived weight are exposed by capabilities.
+  const characterEquipmentState = useCharacterStore((s) => characterEquipmentFeature?.getState?.(s) ?? null);
+  const characterEquipmentSlots = characterEquipmentFeature?.getEquipmentSlots?.(characterEquipmentState) ?? null;
+  const setCharacterEquipmentSlots = getFeatureAction(characterEquipmentFeature, 'setSlots');
   const carryWeight = useCharacterStore(selectCarryWeight);
   const trait = useCharacterStore((s) => s.trait);
   const origin = useCharacterStore((s) => s.origin);
 
   const storeItems = useCharacterStore((state) => state.items);
-  // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
-  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter(). Имена
-  // локальные сохранены — точки вызова не менялись.
+  // Generic worn-armor data is shared state; setting-owned gear is accessed
+  // through the active inventory capabilities below.
   const equippedArmor = useCharacterStore((s) => s.equippedArmor);
   const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
-  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
-  const equipPowerArmorPackage = useCharacterStore((s) => s.equipPowerArmorPackage);
-  const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
-  const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
-  const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
+  const structuredEquipmentState = useCharacterStore((s) => structuredEquipmentFeature?.getInventoryState?.(s) ?? null);
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
   // минуя фасад useCharacter().
   const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
-  // ОС Mk II (Секьюритрон): нерабочие ракетница/гранатомёт активируются
-  // драйвером из инвентаря; флаг живёт в robot-срезе стора (персистится).
-  const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedWeapons = useMemo(() => selectItemsByEquipped({ items: storeItems }, true), [storeItems]);
   const equipItem = useCharacterStore((state) => state.equipItem);
@@ -157,39 +166,24 @@ const InventoryScreen = () => {
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
-  // 413/414: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name);
-  // «Починить» — прежнее мгновенное действие (3 экшна ниже).
   const [repairTarget, setRepairTarget] = useState(null);
-  const repairWeapon = useCharacterStore((state) => state.repairWeapon);
-  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
-  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
-  // 416 «Очумелые ручки»: подписка на выборы перков — чтобы кнопка
-  // мгновенно переключилась на бесплатный режим.
-  useCharacterStore((state) => state.selectedPerks);
-  // Слово владельца 414: «кнопки ремонта нет, если настройка прочности
-  // не активна» — используем существующий селектор weaponDurabilityLossEnabled.
-  const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
-  const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
-  const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
-
+  // The optional repair feature declares which character data affects its row actions.
+  useCharacterStore((state) => repairFeature?.selectInventoryDependency?.(state) ?? null);
+  // Optional setting feature: if absent, the engine does not subscribe to or
+  // display durability fields. The setting supplies its own preferences selector.
+  const durabilitySettings = useAppSettingsStore(useShallow(
+    durabilityFeature?.selectSettings ?? selectNoDurabilitySettings,
+  ));
+  const characterEquipmentSettings = useAppSettingsStore(useShallow(
+    characterEquipmentFeature?.selectSettings ?? selectNoCharacterEquipmentSettings,
+  ));
+  const strictEquipmentPartReplacement = Boolean(characterEquipmentSettings);
   const findUnequippedStoreItemByStackKey = useCallback((stackKey) => {
     if (!stackKey) return undefined;
-    // Прямое совпадение (сторовый stackKey: "weapon_10mm_pistol")
     const direct = inventoryItems.find((item) => (item.stackKey || item.id) === stackKey);
     if (direct) return direct;
-    // UI-формат stackKey ("weapon:weapon_10mm_pistol:mods:none") — нормализуем:
-    // извлекаем weaponId/каталожный id и ищем по нему в неэкипированных.
-    const match = String(stackKey).match(/^[^:]+:(.+?):mods:/);
-    const catalogId = match ? match[1] : null;
-    if (!catalogId) return undefined;
-    // Точное совпадение по сторовому стек-ключу — учитывает имя варианта:
-    // бритва (weapon_switchblade_as_опасная_бритва) не спутается с ножом.
-    const byStackKey = inventoryItems.find((item) => item.stackKey === catalogId && !item.equipped);
-    if (byStackKey) return byStackKey;
-    return inventoryItems.find((item) =>
-      (item.weaponId || item.id) === catalogId && !item.equipped,
-    );
-  }, [inventoryItems]);
+    return inventoryRuntime.findUnequippedByDisplayStackKey?.(inventoryItems, stackKey);
+  }, [inventoryItems, inventoryRuntime]);
 
   const adjustStoreItemQuantity = useCallback((itemId, delta) => {
     // 344: количество меняет СТОР (adjustItemQuantity) — удаление при нуле
@@ -204,8 +198,8 @@ const InventoryScreen = () => {
     if ((storeItem.quantity || 1) > 1) {
       adjustStoreItemQuantity(storeItem.id, -1);
       addNewItem({
-        ...flattenItemParams(displayWeapon),
-        itemType: 'weapon',
+        ...flattenStoreItemParams(displayWeapon),
+        itemType: getItemTypeId('weapon'),
         stackKey: sourceStackKey,
         equipped: true,
         quantity: 1,
@@ -217,34 +211,37 @@ const InventoryScreen = () => {
     return true;
   }, [findUnequippedStoreItemByStackKey, adjustStoreItemQuantity, addNewItem, equipItem]);
 
-  // isRobot читается из origin.characterType (domain/origins.js). Объявлен ДО
-  // equippedWeaponsForDisplay, который его использует (иначе TDZ при рендере).
-  const isRobot = isRobotCharacter({ origin, trait });
+  // Optional equipment row projections come from the active capability.
+  // Declared before equippedWeaponsForDisplay because that memo consumes it.
+  const isCompatibleCharacter = characterEquipmentFeature?.isApplicableCharacter?.({ origin, trait }) ?? false;
   // Персонаж для правил fitProfile (характерType + origin). Профиль берётся из
   // characterType (или origin.fitProfile — полный override).
   const fitCharacter = { origin, trait };
 
   const equippedWeaponsForDisplay = useMemo(() => {
     const fromStore = storeEquippedWeapons.map(flattenItemParams);
-    // Роботы: оружие (встроенное и в ладонях) живёт в слотах стора — единый
-    // источник. Люди: встроенные кулаки — в контекстном списке (как было).
-    const robotExtras = isRobot
-      ? getBuiltinWeaponsFromSlots(equippedRobotSlots || {})
-      : (equippedWeapons || []).filter(
-          (w) => w?.isBuiltin || w?.isManipulator || w?.sourceSlot,
-        );
+    const settingWeaponRows = characterEquipmentFeature?.getWeaponsForDisplay?.({
+      isCompatibleCharacter,
+      slots: characterEquipmentSlots || {},
+      equippedWeapons: equippedWeapons || [],
+    }) ?? (equippedWeapons || []);
     const storeKeys = new Set(fromStore.map((w) => w.uniqueId || w.id || w.stackKey));
-    const extras = robotExtras.filter((w) => !storeKeys.has(w.uniqueId || w.id || w.stackKey));
+    const extras = settingWeaponRows.filter((w) => !storeKeys.has(w.uniqueId || w.id || w.stackKey));
     return [...fromStore, ...extras];
-  }, [storeEquippedWeapons, equippedWeapons, isRobot, equippedRobotSlots]);
+  }, [storeEquippedWeapons, equippedWeapons, isCompatibleCharacter, characterEquipmentSlots, characterEquipmentFeature]);
 
   // Показ через общий AlertHost — одинаково на вебе и на нативе.
   // Раньше здесь была локальная копия развилки Platform.OS с window.alert,
   // из-за которой на вебе терялись все кнопки кроме первой.
   const showAlert = (title, message = '', buttons) => showRawAlert({ title, message, buttons });
-  
-  const [isCapsModalVisible, setIsCapsModalVisible] = useState(false);
-  const [capsOperationType, setCapsOperationType] = useState('add');
+  const showEquipmentEligibilityAlert = (kind, reason) => {
+    const alert = equipmentEligibilityRuntime.getAlert?.(kind, reason);
+    if (alert) showAlert(alert.title, alert.message);
+    else showAlert('', tInventory('screen.alerts.cannotEquipItem'));
+  };
+
+  const [isCurrencyModalVisible, setIsCurrencyModalVisible] = useState(false);
+  const [currencyOperationType, setCurrencyOperationType] = useState('add');
   const [isSellModalVisible, setIsSellModalVisible] = useState(false);
   const [selectedItemForSale, setSelectedItemForSale] = useState(null);
   const [isAddItemModalVisible, setAddItemModalVisible] = useState(false);
@@ -252,157 +249,56 @@ const InventoryScreen = () => {
   const [itemSelectionMode, setItemSelectionMode] = useState('loot');
   const [isBuyItemModalVisible, setIsBuyItemModalVisible] = useState(false);
   const [selectedItemForBuy, setSelectedItemForBuy] = useState(null);
-  // Контейнер «Силовая броня» (ПРАВИЛО владельца): надетый пакет — одна строка
-  // в общем списке; «Содержание» раскрывает аккордеоном части и Ядерный блок.
-  const [paContentsOpen, setPaContentsOpen] = useState(false);
-  // Снятые пакеты: каждый — тоже контейнер (ПРАВИЛО владельца), аккордеоны
-  // независимы по id стор-записи: { [storeItemId]: true }.
+  // Optional structured rows may expose an expandable inventory container.
+  const [structuredContentsExpanded, setStructuredContentsExpanded] = useState(false);
 
   useLocale();
   const moduleLocale = useModuleLocale();
-  const equipmentCatalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
-
+  const catalogRevision = useModuleCatalogRevision();
+  const equipmentCatalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale, catalogRevision]);
+  // Read setting data after activation rather than snapshotting package data at
+  // module import time; the same engine screen can serve a different package.
   const getItemName = (item) => item?.name || item?.id || '';
-  const getItemCatalogId = (item) => item?.id || item?.weaponId || item?.itemId || item?.armorId || item?.clothingId || item?.code || '';
-  const getItemType = (item) => {
-    if (item?.itemType) return item.itemType;
-    if (item?.effectType || item?.durationInScenes || item?.duration || item?.positiveEffect) return 'chem';
-    if (item?.type === 'ammo') return 'ammo';
-    if (item?.weaponId || item?.damage !== undefined) return 'weapon';
-    if (item?.clothingType) return 'clothing';
-    if (item?.protectedAreas) return 'armor';
-    return 'misc';
-  };
-  const isWeaponItem = (item) => getItemType(item) === 'weapon';
-  const getModsSignature = (item) => {
-    const applied = item?.appliedMods || {};
-    const modIds = Object.values(applied).filter(Boolean).sort();
-    return modIds.length ? modIds.join('|') : 'none';
-  };
+  const getItemCatalogId = (item) => inventoryRuntime.getItemCatalogId?.(item) ?? item?.catalogId ?? item?.id ?? '';
+  const getItemType = (item) => inferItemType(item);
+  const isWeaponItem = (item) => isItemKind(item, 'weapon');
   const getStackKey = (item) => {
-    // Ядерный Блок: блоки с разным зарядом лежат отдельными стопками (§2 плана).
-    // Ветка ПЕРВАЯ: блок — разновидность ammo, но его подпись строится по зарядам.
-    if (isFusionCoreItem(item)) return fusionCoreStackKey(item.charges);
-    if (item?.itemType === 'powerArmor') {
-      // Каталожный id у стор-предмета живёт в weaponId, у свежего из каталога — в id.
-      const catalogId = item.weaponId || item.id;
-      if (isPowerArmorFrame(item)) {
-        // Пакет: подпись считает домен по составу установленных частей и заряду блока.
-        return powerArmorFrameStackKey({ ...item, id: catalogId });
-      }
-      return powerArmorPieceStackKey({ catalogId, appliedMods: item.appliedMods || {}, hpCurrent: item.hpCurrent });
-    }
+    const settingStackKey = structuredEquipmentFeature?.getStackKey?.(item);
+    if (settingStackKey != null) return settingStackKey;
     const itemType = getItemType(item);
-    if (itemType === 'weapon') {
-      // Середина ключа — СТОРОВЫЙ стек-ключ (id + прочие параметры + имя),
-      // чтобы точное совпадение в findUnequippedStoreItemByStackKey не путало
-      // бритву с ножом (у них одинаковый истинный id).
-      const storeKey = item?.stackKey || generateStackKey(
-        item?.weaponId || item?.id || getItemName(item),
-        item?.appliedMods,
-        item?.baseName,
-        item?.durabilityTracked ? item?.durability : undefined,
-        item?.uniqQualities,
-      );
-      return `weapon:${storeKey}:mods:${getModsSignature(item)}`;
+    if (isWeaponItem(item)) {
+      return inventoryRuntime.getDisplayStackKey?.(item)
+        ?? `${itemType}:${getItemCatalogId(item)}`;
     }
     return `${itemType}:${getItemCatalogId(item)}`;
   };
   const createWeaponInstanceId = () => `weapon-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const createArmorInstanceId = () => `armor-instance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const getArmorInstanceKey = (item, slot, type) =>
-    item?.equipInstanceId || `${type || item?.itemType || 'armor'}:${item?.stackKey || getStackKey(item)}:${slot}`;
-  const getItemTypeIcon = (itemType) => {
-    if (itemType === 'weapon') return '🔫';
-    if (itemType === 'armor') return '🛡️';
-    if (itemType === 'clothing' || itemType === 'outfit') return '👕';
-    if (itemType === 'chem' || itemType === 'chems' || itemType === 'robotConsumable') return '💊';
-    if (itemType === 'drinks') return '🥤';
-    if (itemType === 'food') return '🍖';
-    if (itemType === 'magazine') return '📖';
-    if (itemType === 'ammo') return '🔹';
-    if (itemType === 'powerArmor') return '⚡';
-    if (itemType === 'misc') return '🔧';
-    return '📦';
-  };
+    item?.equipInstanceId || `${type || item?.itemType || getItemTypeId('armor')}:${item?.stackKey || getStackKey(item)}:${slot}`;
+  const getItemTypeIcon = (itemType) => inventoryRuntime.getItemTypeIcon?.(itemType) ?? '📦';
 
-  const equippedRobotBodyPart = useMemo(() => {
-    return inventoryItems.find(
-      (item) => String(item?.id || '').startsWith('robot_body_') || item?.itemType === 'robotPart',
-    ) || null;
-  }, [inventoryItems]);
-
-  // Per docs/schema/02-traits.md T-1: bodyPlan lives on origin.
-  // Legacy trait.modifiers.robotBodyPlan was dropped from data.
-  const robotBodyPlan = origin?.bodyPlan
-    || equippedRobotBodyPart?.robotBodyPlan
-    || null;
-
-  const robotBodyUpgrade = useMemo(() => {
-    if (!robotBodyPlan) return null;
-    const parts = Array.isArray(equipmentCatalog?.robotPartsUpgrade) ? equipmentCatalog.robotPartsUpgrade : [];
-    return parts.find((part) => part?.robotBodyPlan === robotBodyPlan) || null;
-  }, [equipmentCatalog, robotBodyPlan]);
-  const isRobotLimbItem = (item) => {
-    const itype = item?.itemType;
-    if (itype === 'robotArm' || itype === 'robotHead' || itype === 'robotBody' || itype === 'robotLeg') return true;
-    // Конечность из единого каталога: признак — категория, а не старая пометка
-    // itemType (её носят записи комплектов и старые сейвы).
-    return item?.itemCategory === 'limb' || item?.itemCategory === 'weaponAsLimb';
-  };
-
-  const robotWeaponIds = useMemo(
-    () => new Set((equipmentCatalog?.robotWeapons || []).map((entry) => entry.id)),
-    [equipmentCatalog],
-  );
-  const robotArmsById = useMemo(
-    () => new Map((equipmentCatalog?.robotArms || []).map((entry) => [entry.id, entry])),
-    [equipmentCatalog],
-  );
-  const isRobotOnlyItem = (item) => Boolean(item?.id && robotWeaponIds.has(item.id));
-  const resolveRobotArmFromWeapon = (item) => {
-    if (!item?.id) return null;
-    return robotArmsById.get(item.id) || null;
-  };
-  const isRobotLimbWeapon = (item) => Boolean(resolveRobotArmFromWeapon(item));
-
-  // Проверяем наличие руки с canHoldWeapons в слотах робота (Requirement 7.2)
-  const robotHasHoldingArm = useMemo(() => {
-    if (!isRobot) return true;
-    const slots = equippedRobotSlots || {};
-    return Object.values(slots).some((slotData) => slotData?.limb?.canHoldWeapons === true);
-  }, [isRobot, equippedRobotSlots]);
-  // Силовая броня определяется ТОЛЬКО по виду из данных (domain/protectionKind.js).
-  // ПРАВИЛО (от владельца, 2026-07-31): эвристик по названию здесь больше нет.
-  const isPowerArmorItem = (item) => getProtectionKind(item) === PROTECTION_KINDS.POWER_ARMOR;
-  const toWeight = (value) => parseFloat(String(value ?? 0).replace(',', '.')) || 0;
+  const isHiddenCharacterEquipmentItem = (item) => characterEquipmentFeature?.hideInventoryItem?.(item) ?? false;
+  const isStructuredEquipmentItem = (item) => structuredEquipmentFeature?.handlesItem?.(item) ?? false;
 
   // Обогащение инстанса каталожными данными — единая точка (domain/resolveItem):
   // вес/цена/эффект/имя берутся из каталога по id. Локальной копии логики больше нет.
   const resolveLocalizedItem = (item) => resolveItem(item, equipmentCatalog);
 
 
-  const handleOpenCapsModal = (type) => {
-    setCapsOperationType(type);
-    setIsCapsModalVisible(true);
+  const handleOpenCurrencyModal = (type) => {
+    setCurrencyOperationType(type);
+    setIsCurrencyModalVisible(true);
   };
 
-  // Кнопка крафта снова неактивна (патч 266, решение владельца): окно 265
-  // строилось на «верстаках», а деление будет по типу изготавливаемого (еда и
-  // напитки, оружие, взрывчатка, броня, силовая броня, препараты, роботы).
-  // До перестройки (следующий крупный патч) крафт не открываем; модалка и
-  // модель на месте — 267 подключит их к новым вкладкам. Механика движка
-  // (251/262/263) от этого не менялась.
-  // Патч 319: кнопка «Крафт» открывает окно крафта (318). До сих пор здесь
-  // жила заглушка-алерт с самого первого коммита — окно крафта с кнопки
-  // было недостижимо (хвост незавершённого шага 265→267).
+  // The active crafting capability owns the optional crafting dialog.
   const handleCraftPress = () => setCraftModalVisible(true);
 
   const showFoundItemBonusAlerts = (events) => {
     (events || []).forEach((event) => {
       if (!event?.amount || event.extraRandom) return;
       showAlert(formatInventoryText(tInventory('screen.alerts.foundItemBonus'), {
-        perkName: getPerkDisplay({ id: event.perkId }).name,
+        perkName: perkDisplayFeature?.getForId?.({ id: event.perkId })?.name ?? event.perkId,
         amount: event.amount,
         itemType: Object.hasOwn(event, 'itemName')
           ? event.itemName
@@ -412,7 +308,8 @@ const InventoryScreen = () => {
   };
 
   const extraRandomCatalogFor = (itemType) => {
-    if (itemType === 'chem' || itemType === 'chems') return equipmentCatalog.chems;
+    const settingCatalog = inventoryRuntime.getRandomLootCatalog?.(equipmentCatalog, itemType);
+    if (Array.isArray(settingCatalog)) return settingCatalog;
     throw new Error(`[InventoryScreen] Нет каталога случайных предметов для типа ${itemType}`);
   };
 
@@ -435,10 +332,13 @@ const InventoryScreen = () => {
     showFoundItemBonusAlerts(events);
   };
 
-  const handleSaveCaps = (amount) => {
-    if (capsOperationType === 'add') {
-      const bonusEvents = rollFoundItemBonuses(storePerkBonuses, 'caps');
-      earnCurrency(amount + sumFoundItemBonus(bonusEvents));
+  const handleSaveCurrency = (amount) => {
+    if (currencyOperationType === 'add') {
+      const bonusTargetId = currencyRuntime.lootBonusTargetId;
+      const bonusEvents = bonusTargetId
+        ? (lootBonusesFeature?.roll?.(storePerkBonuses, bonusTargetId) ?? [])
+        : [];
+      earnCurrency(amount + (lootBonusesFeature?.sum?.(bonusEvents) ?? 0));
       showFoundItemBonusAlerts(bonusEvents);
       return;
     }
@@ -446,66 +346,17 @@ const InventoryScreen = () => {
   };
 
   const handleApplyConsumable = (item) => {
-    const consumableItem = { ...item };
-    const itemName = getItemName(consumableItem);
-
-    debugLog('consumable.screen.start', {
-      itemName,
+    consumablesFeature?.useFromInventory?.({
       item,
-      consumableItem,
-      positiveEffect: consumableItem?.positiveEffect,
-      positiveEffectType: typeof consumableItem?.positiveEffect,
-    });
-
-    const applyToSelf = async () => {
-      if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
-        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
-        return;
-      }
-
-      const finish = (radiationRequestedAmount) => {
-        const result = applyConsumableFull(consumableItem, { radiationRequestedAmount });
-        const report = buildConsumableResultReport({ itemName, ...result });
-        showAlert(report.title, report.message);
-        handleRemoveItem(consumableItem, 1);
-      };
-
-      const preview = previewConsumableRadiation(consumableItem);
-      if (!preview.canOfferReroll) {
-        finish(preview.requestedAmount);
-        return;
-      }
-
-      // Выбор из каталога: 'reroll' — перебросить, 'keep'/закрытие — оставить.
-      // На вебе раньше был window.confirm, и «Отмена» там значила «оставить»
-      // только по совпадению; теперь обе платформы дают явные кнопки.
-      const choice = await showCatalogAlert('leadBellyReroll', {
-        radiationAmount: preview.receivedRadiationDamage,
-      });
-      if (choice === 'reroll') {
-        const rerolled = rerollConsumableRadiationRoll(consumableItem, preview.rolls);
-        finish(rerolled.requestedAmount);
-      } else {
-        finish(preview.requestedAmount);
-      }
-    };
-
-    const applyToOther = () => {
-      if (!canConsumeOnOther(consumableItem, fitCharacter)) {
-        showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
-        return;
-      }
-      const report = buildConsumableResultReport({ itemName });
-      showAlert(report.title, report.message);
-      handleRemoveItem(consumableItem, 1);
-    };
-
-    // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
-    // в window.confirm (две кнопки), где «Отмена» на самом деле означала
-    // «применить на другого» — отменить действие было нельзя.
-    showCatalogAlert('applyConsumable', { itemName }).then(async (choice) => {
-      if (choice === 'self') await applyToSelf();
-      else if (choice === 'other') applyToOther();
+      character: fitCharacter,
+      getState: useCharacterStore.getState,
+      applyConsumable: applyConsumableFull,
+      removeItem: handleRemoveItem,
+      getItemName,
+      showAlert,
+      showChoice: showCatalogAlert,
+      consumablesCapability,
+      inventoryFeature: consumablesFeature,
     });
   };
   
@@ -524,26 +375,21 @@ const InventoryScreen = () => {
     setIsSellModalVisible(true);
   };
 
-  /**
-   * Применить «Драйвер ОС Mk II» к Секьюритрону: потребляет предмет и
-   * активирует нерабочие оружия (ракетница/гранатомёт) в списке атак.
-   */
-  const handleApplyMk2Driver = (item) => {
+  const handleCharacterEquipmentAction = (item, action) => {
     const stackKey = item.stackKey || getStackKey(item);
     const storeItem = findUnequippedStoreItemByStackKey(stackKey);
     if (!storeItem) return;
-    const result = useCharacterStore.getState().applyMk2Driver(storeItem.id);
-    if (!result?.ok) {
-      showAlert(
-        tInventory('screen.alerts.mk2ApplyFailedTitle'),
-        tInventory(`screen.alerts.mk2Reason.${result?.reason || 'noDriver'}`),
-      );
-      return;
-    }
-    showAlert(
-      tInventory('screen.alerts.mk2AppliedTitle'),
-      tInventory('screen.alerts.mk2AppliedMessage'),
-    );
+    const result = characterEquipmentFeature?.runInventoryAction?.(action, {
+      item,
+      storeItemId: storeItem.id,
+      dispatch: (featureId, actionId, ...args) => {
+        const getAction = useCharacterStore.getState()?.getSettingAction;
+        return typeof getAction === 'function'
+          ? getAction(featureId, actionId)(...args)
+          : undefined;
+      },
+    });
+    if (result?.alert) showAlert(result.alert.title, result.alert.message);
   };
 
   const handleConfirmSale = (quantity, finalPrice) => {
@@ -561,29 +407,28 @@ const InventoryScreen = () => {
 
   const handleAddItem = (item, quantity = 1, source = 'loot') => {
     const localizedItem = resolveLocalizedItem(item);
-    const bonusEvents = source === 'loot' && !isFusionCoreItem(localizedItem)
-      ? rollFoundItemBonuses(storePerkBonuses, getItemType(localizedItem), localizedItem)
+    const bonusEvents = source === 'loot'
+      ? (lootBonusesFeature?.roll?.(storePerkBonuses, getItemType(localizedItem), localizedItem) ?? [])
       : [];
-    quantity += sumFoundItemBonus(bonusEvents);
+    quantity += (lootBonusesFeature?.sum?.(bonusEvents) ?? 0);
 
-    // Ядерный Блок (§3.2): заряды нового блока — бросок d20. Каждый блок — свой
-    // бросок (покупка 5 шт = 5 независимых бросков), стекаются только одинаковые.
-    if (isFusionCoreItem(localizedItem)) {
-      for (let i = 0; i < quantity; i += 1) {
-        const fcBonus = Number(storePerkBonuses?.fusionCoreChargeBonus) || 0;
-        const charges = rollNewFusionCoreCharges(localizedItem.maxCharges, fcBonus);
-        const stackKey = fusionCoreStackKey(charges);
+    const itemAcquisitions = structuredEquipmentFeature?.initializeAcquisition?.(localizedItem, {
+      quantity,
+      perkBonuses: storePerkBonuses,
+    });
+    if (Array.isArray(itemAcquisitions)) {
+      for (const preparedItem of itemAcquisitions) {
+        const stackKey = preparedItem.stackKey || getStackKey(preparedItem);
+        const itemQuantity = Number(preparedItem.quantity) || 1;
         const existingItem = findUnequippedStoreItemByStackKey(stackKey);
         if (existingItem) {
-          adjustStoreItemQuantity(existingItem.id, 1);
+          adjustStoreItemQuantity(existingItem.id, itemQuantity);
         } else {
           addNewItem({
-            ...localizedItem,
-            itemType: 'ammo',
-            quantity: 1,
-            charges,
+            ...preparedItem,
+            quantity: itemQuantity,
             stackKey,
-            uniqueId: stackKey,
+            uniqueId: preparedItem.uniqueId || stackKey,
           });
         }
       }
@@ -591,53 +436,18 @@ const InventoryScreen = () => {
       return;
     }
 
-    // Силовая броня (§4): часть приходит со своей прочностью (hpCurrent = max),
-    // каркас — пустым пакетом (без частей и блока). Подпись стопки — доменная.
-    if (localizedItem.itemType === 'powerArmor') {
-      const prepared = isPowerArmorFrame(localizedItem)
-        ? {
-          ...localizedItem,
-          appliedMods: localizedItem.appliedMods || {},
-          installedPieces: { head: null, body: null, hands: null, legs: null },
-          installedCore: null,
-        }
-        : {
-          ...localizedItem,
-          appliedMods: localizedItem.appliedMods || {},
-          hpCurrent: localizedItem.hpCurrent ?? PA_CATALOG_BY_ID[localizedItem.id]?.hp,
-        };
-      const stackKey = getStackKey(prepared);
-      const existingItem = findUnequippedStoreItemByStackKey(stackKey);
-      if (existingItem) {
-        adjustStoreItemQuantity(existingItem.id, quantity);
-        finishLootBonuses(bonusEvents);
-        return;
-      }
-      addNewItem({ ...prepared, itemType: 'powerArmor', quantity, stackKey, uniqueId: stackKey });
-      finishLootBonuses(bonusEvents);
-      return;
-    }
-
-    // Прочность — параметр стека (закон): два 100% идентичных экземпляра
-    // (та же прочность/моды/имя) склеиваются в один стек; разная прочность
-    // разделяет. addNewItem сам склеит совпавшие (ключ = id + dur + моды + имя).
-    // Слово владельца 421: прочность распространяется и на БРОНЮ —
-    // при «Произвольном качестве» каждый экземпляр рождается своей прочности
-    // (покупка = 100, добыча = бросок), как оружие.
-    if (randomWeaponQualityEnabled
-        && (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')
-        && (localizedItem.itemType === 'armor' || isAmmoWeapon(localizedItem))) {
-      for (let index = 0; index < quantity; index += 1) {
-        const durability = source === 'buy' ? 100 : rollWeaponDurability();
-        addNewItem({
-          ...localizedItem,
-          quantity: 1,
-          durabilityTracked: true,
-          durability,
-          durabilityAmmoRemainder: 0,
-          durabilityWearRemainder: 0,
-        });
-      }
+    // Optional durability extension: a setting may initialize individual item
+    // instances, while settings without this capability keep normal stacking.
+    const initializedDurabilityItems = durabilityFeature?.initializeAcquisition?.(
+      localizedItem,
+      {
+        quantity,
+        source,
+        randomQualityEnabled: durabilitySettings.randomQualityEnabled,
+      },
+    );
+    if (Array.isArray(initializedDurabilityItems)) {
+      initializedDurabilityItems.forEach((item) => addNewItem(item));
       finishLootBonuses(bonusEvents);
       return;
     }
@@ -678,8 +488,8 @@ const InventoryScreen = () => {
     const result = spendCurrency(finalCost);
     if (!result.ok) {
       showAlert(
-        tInventory('modals.buyItemModal.notEnoughCapsTitle'),
-        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total: finalCost, caps: currency }),
+        tInventory('modals.buyItemModal.notEnoughCurrencyTitle'),
+        formatInventoryText(tInventory('modals.buyItemModal.notEnoughCurrencyMessage'), { total: finalCost, balance: currency }),
       );
       return;
     }
@@ -741,249 +551,31 @@ const InventoryScreen = () => {
 
   const handleEquipWeapon = (weaponToEquip) => {
     const displayWeapon = weaponToEquip;
-    const weaponQualities = String(displayWeapon?.qualities || '').toLowerCase();
-    const isTwoHandedWeapon = ['двуруч', 'two-handed', 'two handed'].some((token) => weaponQualities.includes(token));
+    const equipmentEquipResult = characterEquipmentFeature?.handleWeaponEquip?.(displayWeapon, {
+      capability: characterEquipmentFeature,
+      origin,
+      trait,
+      equipmentState: characterEquipmentState,
+      inventoryItems,
+      equipmentCatalog,
+      strictPartReplacement: strictEquipmentPartReplacement,
+      getStackKey,
+      findUnequippedStoreItemByStackKey,
+      getItemTypeId,
+      createWeaponInstanceId,
+      setEquipmentSlots: setCharacterEquipmentSlots,
+      setEquippedWeapons,
+      adjustStoreItemQuantity,
+      addNewItem,
+      flattenStoreItemParams: flattenStoreItemParams,
+      showAlert,
+    });
+    if (equipmentEquipResult?.handled) return;
 
-    // IRON RULES: проверка через domain/equipEquip.js
     const weaponCheck = canEquipWeapon(displayWeapon, { origin, trait });
     if (!weaponCheck.allowed) {
-      if (weaponCheck.reason === 'equip.error.robotOnlyWeapon') {
-        showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
-      } else if (weaponCheck.reason === 'equip.error.robotCannotUseStandardWeapon') {
-        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
-      } else {
-        showAlert(tInventory('screen.alerts.robotOnlyWeaponTitle'), tInventory('screen.alerts.robotOnlyWeaponMessage'));
-      }
-      return;
-    }
-
-    if (isRobot && isRobotOnlyItem(displayWeapon) && Array.isArray(robotBodyUpgrade?.allowedRobotWeaponIds)) {
-      const allowedWeaponIds = robotBodyUpgrade.allowedRobotWeaponIds;
-      if (displayWeapon?.id && !allowedWeaponIds.includes(displayWeapon.id)) {
-        showAlert(
-          tInventory('screen.alerts.robotBodyWeaponMismatchTitle'),
-          tInventory('screen.alerts.robotBodyWeaponMismatchMessage')
-        );
-        return;
-      }
-    }
-    if (isRobot && isRobotLimbWeapon(displayWeapon)) {
-      const armDef = resolveRobotArmFromWeapon(displayWeapon);
-      if (!armDef) return;
-      const slots = equippedRobotSlots || {};
-      const slotKeys = Object.keys(slots);
-
-      // Навес (arm attachment) — оружие, крепящееся К руке: без руки его
-      // получить нельзя, занимает ладонь и меняется на аналогичный навес
-      // (строгий режим — настройка «прикрепляемые части рук»).
-      if (isArmAttachment(displayWeapon)) {
-        const armEntries = slotKeys
-          .map((key) => [key, slots[key]])
-          .filter(([, slotData]) => slotData?.limb?.canHoldWeapons === true);
-        if (armEntries.length === 0) {
-          showAlert(
-            tInventory('screen.alerts.robotArmRequiredTitle'),
-            tInventory('screen.alerts.robotArmRequiredMessage')
-          );
-          return;
-        }
-        // Свободная ладонь → первая установка; занятая → замена по правилу.
-        let target = armEntries.find(([, slotData]) => slotData?.heldWeapon == null);
-        let replaced = null;
-        if (!target) {
-          for (const entry of armEntries) {
-            const check = canReplaceArmWeapon(entry[1].heldWeapon, displayWeapon, {
-              strict: robotArmPartsStrict,
-            });
-            if (check.allowed) { target = entry; replaced = entry[1].heldWeapon; break; }
-          }
-          if (!target) {
-            showAlert(
-              tInventory('screen.alerts.armPartStrictTitle'),
-              tInventory('screen.alerts.armPartStrictMessage')
-            );
-            return;
-          }
-        }
-        const [targetKey] = target;
-        const sourceStackKey = weaponToEquip.stackKey || getStackKey(displayWeapon);
-        const totalOwned = findUnequippedStoreItemByStackKey(sourceStackKey)?.quantity || 0;
-        if (totalOwned <= 0) {
-          showAlert(tInventory('screen.alerts.noItemsTitle'), tInventory('screen.alerts.noItemsMessage'));
-          return;
-        }
-        const weaponEntry = {
-          ...displayWeapon,
-          itemType: 'weapon',
-          stackKey: sourceStackKey,
-          uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
-          sourceSlot: targetKey,
-        };
-        const updatedSlots = {
-          ...slots,
-          [targetKey]: { ...slots[targetKey], heldWeapon: weaponEntry },
-        };
-        setEquippedRobotSlots(updatedSlots);
-        // Снятый предмет возвращается в инвентарь (как при снятии из ладони).
-        if (replaced) {
-          const replacedStackKey = replaced.stackKey || getStackKey(replaced);
-          const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
-          if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
-          else {
-            addNewItem({
-              ...flattenItemParams(replaced),
-              itemType: 'weapon',
-              stackKey: replacedStackKey,
-              equipped: false,
-              quantity: 1,
-            });
-          }
-        }
-        const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
-        if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
-        return;
-      }
-
-      // Слоты под конечность даёт план тела по типу конечности — раньше их
-      // список лежал внутри самой конечности (compatibleSlots).
-      const compatibleSlots = slotsForLimbType(robotBodyPlan, armDef.limbType ?? 'arm');
-      const finalTargets = compatibleSlots.filter((key) => slotKeys.includes(key) && !slots[key]?.limb);
-      if (finalTargets.length === 0) {
-        showAlert(tInventory('screen.alerts.manipulatorRequiredTitle'), tInventory('screen.alerts.robotNoHandlingLimbMessage'));
-        return;
-      }
-
-      const sourceStackKey = weaponToEquip.stackKey || getStackKey(displayWeapon);
-      const totalOwned = findUnequippedStoreItemByStackKey(sourceStackKey)?.quantity || 0;
-      if (totalOwned <= 0) {
-        showAlert(tInventory('screen.alerts.noItemsTitle'), tInventory('screen.alerts.noItemsMessage'));
-        return;
-      }
-
-      const updatedSlots = { ...slots };
-      const weaponLimb = {
-        ...armDef,
-        itemType: 'robotArm',
-        builtinWeaponId: armDef.builtinWeaponId || displayWeapon.id,
-      };
-      finalTargets.forEach((key) => {
-        if (!updatedSlots[key]) return;
-        updatedSlots[key] = { ...updatedSlots[key], limb: weaponLimb, heldWeapon: null };
-      });
-
-      setEquippedRobotSlots(updatedSlots);
-      setEquippedWeapons(getBuiltinWeaponsFromSlots(updatedSlots));
-
-      const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
-      if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
-      return;
-    }
-    if (!isRobotOnlyItem(displayWeapon) && isRobot) {
-      // Robot equip flow: check for arm slot with canHoldWeapons (Requirement 7.2, 7.6)
-      const slots = equippedRobotSlots || {};
-      // ПРАВИЛО (владелец): оружие встаёт в ПЕРВУЮ СВОБОДНУЮ руку — источником
-      // занятости считаются руки с оружием в ладони (heldWeapon) и уже занятые
-      // sourceSlot'ы. Встроенное оружие руки ладонь не занимает.
-      const occupiedSourceSlots = Object.values(slots)
-        .filter((slotData) => slotData?.heldWeapon?.sourceSlot)
-        .map((slotData) => slotData.heldWeapon.sourceSlot);
-      const armWithHoldCapability = findFreeWeaponHand(slots, occupiedSourceSlots);
-
-      if (!armWithHoldCapability) {
-        // No arm that can hold weapons — show warning, no equip button (Requirement 7.2 / design §9)
-        showAlert(
-          tInventory('screen.alerts.manipulatorRequiredTitle'),
-          tInventory('screen.alerts.robotNoHandlingLimbMessage')
-        );
-        return;
-      }
-
-      // Validate weight / two-handed against the arm (Requirement 7.6)
-      const [armSlotKey, armSlotData] = armWithHoldCapability;
-      const armLimb = armSlotData.limb;
-
-      // Ладонь занята — это замена, а не первая установка: строгий режим
-      // требует «аналогичное на аналогичное» (навес меняется навесом, оружие —
-      // оружием). Снятый предмет возвращается в инвентарь, а не пропадает.
-      let replacedPalmItem = null;
-      if (armSlotData?.heldWeapon) {
-        const replaceCheck = canReplaceArmWeapon(armSlotData.heldWeapon, displayWeapon, {
-          strict: robotArmPartsStrict,
-        });
-        if (!replaceCheck.allowed) {
-          showAlert(
-            tInventory('screen.alerts.armPartStrictTitle'),
-            tInventory('screen.alerts.armPartStrictMessage')
-          );
-          return;
-        }
-        replacedPalmItem = armSlotData.heldWeapon;
-      }
-
-      const candidateWeight = toWeight(displayWeapon.weight);
-      const excludeTwoHanded = Boolean(armLimb?.excludeTwoHanded);
-      if (excludeTwoHanded && isTwoHandedWeapon) {
-        showAlert(
-          tInventory('screen.alerts.manipulatorWeightTitle'),
-          tInventory('screen.alerts.robotCannotUseTwoHandedMessage')
-        );
-        return;
-      }
-      const maxWeightRaw = armLimb?.maxHandelWeaponWeight;
-      if (maxWeightRaw !== null && maxWeightRaw !== undefined && maxWeightRaw !== '' && maxWeightRaw !== 'unlimited') {
-        const maxHeldWeight = toWeight(maxWeightRaw);
-        if (candidateWeight > maxHeldWeight) {
-          showAlert(
-            tInventory('screen.alerts.manipulatorWeightTitle'),
-            formatInventoryText(
-              tInventory('screen.alerts.manipulatorWeightMessage'),
-              { maxHeldWeight },
-            ),
-          );
-          return;
-        }
-      }
-
-      // Add weapon directly to equippedWeapons with sourceSlot (Requirement 7.2 / design §9)
-      const sourceStackKey = weaponToEquip.stackKey || getStackKey(displayWeapon);
-      const totalOwned = findUnequippedStoreItemByStackKey(sourceStackKey)?.quantity || 0;
-      if (totalOwned <= 0) {
-        showAlert(tInventory('screen.alerts.noItemsTitle'), tInventory('screen.alerts.noItemsMessage'));
-        return;
-      }
-
-      const weaponEntry = {
-        ...displayWeapon,
-        itemType: 'weapon',
-        stackKey: sourceStackKey,
-        uniqueId: displayWeapon.uniqueId || createWeaponInstanceId(),
-        sourceSlot: armSlotKey,
-      };
-
-      // Оружие в ладони — часть слота руки (как и встроенное): единый источник
-      // в сторе, без дублей в контексте. Предмет уходит из стека инвентаря.
-      const updatedSlots = {
-        ...slots,
-        [armSlotKey]: { ...slots[armSlotKey], heldWeapon: weaponEntry },
-      };
-      setEquippedRobotSlots(updatedSlots);
-      // Заменённый предмет ладони возвращается в инвентарь (как при снятии).
-      if (replacedPalmItem) {
-        const replacedStackKey = replacedPalmItem.stackKey || getStackKey(replacedPalmItem);
-        const stackMate = findUnequippedStoreItemByStackKey(replacedStackKey);
-        if (stackMate) adjustStoreItemQuantity(stackMate.id, 1);
-        else {
-          addNewItem({
-            ...flattenItemParams(replacedPalmItem),
-            itemType: 'weapon',
-            stackKey: replacedStackKey,
-            equipped: false,
-            quantity: 1,
-          });
-        }
-      }
-      const storeItem = findUnequippedStoreItemByStackKey(sourceStackKey);
-      if (storeItem) adjustStoreItemQuantity(storeItem.id, -1);
+      const alert = equipmentEligibilityRuntime.getAlert?.('weapon', weaponCheck.reason);
+      if (alert) showAlert(alert.title, alert.message);
       return;
     }
 
@@ -998,38 +590,19 @@ const InventoryScreen = () => {
   };
 
   const handleUnequipWeapon = (weapon, slot) => {
-    // Locked items (robot built-ins from kits) cannot be unequipped from the
-    // inventory UI. They are released only by swapping the limb that holds
-    // them. The corresponding 'unequip' button is hidden at the render site.
-    if (weapon?.isBuiltin || weapon?.isManipulator || weapon?.locked) {
-      return;
-    }
+    if (weapon?.locked) return;
 
-    if (weapon?.sourceSlot) {
-      // Оружие в ладони — очищаем слот руки, предмет возвращается в инвентарь.
-      const slots = equippedRobotSlots || {};
-      if (slots[weapon.sourceSlot]?.heldWeapon) {
-        const updatedSlots = {
-          ...slots,
-          [weapon.sourceSlot]: { ...slots[weapon.sourceSlot], heldWeapon: null },
-        };
-        setEquippedRobotSlots(updatedSlots);
-      }
-      const stackKey = weapon.stackKey || getStackKey(weapon);
-      const stackMate = findUnequippedStoreItemByStackKey(stackKey);
-      if (stackMate) {
-        adjustStoreItemQuantity(stackMate.id, 1);
-      } else {
-        addNewItem({
-          ...flattenItemParams(weapon),
-          itemType: 'weapon',
-          stackKey,
-          equipped: false,
-          quantity: 1,
-        });
-      }
-      return;
-    }
+    const settingResult = characterEquipmentFeature?.handleWeaponUnequip?.(weapon, {
+      equipmentState: characterEquipmentState,
+      setEquipmentSlots: setCharacterEquipmentSlots,
+      getStackKey,
+      findUnequippedStoreItemByStackKey,
+      adjustStoreItemQuantity,
+      addNewItem,
+      flattenStoreItemParams,
+      getItemTypeId,
+    });
+    if (settingResult?.handled) return;
 
     const storeItem = useCharacterStore.getState().items[weapon.id];
     if (storeItem?.equipped) {
@@ -1051,8 +624,8 @@ const InventoryScreen = () => {
         adjustStoreItemQuantity(stackMate.id, 1);
       } else {
         addNewItem({
-          ...flattenItemParams(newEquipped[slot]),
-          itemType: 'weapon',
+          ...flattenStoreItemParams(newEquipped[slot]),
+          itemType: getItemTypeId('weapon'),
           stackKey,
           equipped: false,
           quantity: 1,
@@ -1070,33 +643,26 @@ const InventoryScreen = () => {
     // предмет не надевается. Каталог = источник истины.
     const itemToEquip = resolveLocalizedItem(itemToEquipRaw) || itemToEquipRaw;
     const currentEquipped = equippedArmor;
-    // IRON RULES: проверка через domain/equipEquip.js (см. docs/robot-rules.md)
-    // Роботы: только robotOnly броня + декоративные шляпы, NO power armor
-    // Мутанты: только mutantOnly броня, NO power armor
-    if (isPowerArmorItem(itemToEquip) || isPowerArmorDomain(itemToEquip)) {
-      const paCheck = canEquipPowerArmor(itemToEquip, { origin, trait });
-      if (!paCheck.allowed) {
-        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
-        return;
-      }
+    const equipmentCheck = structuredEquipmentFeature?.getEquipEligibility?.(
+      itemToEquip,
+      { origin, trait },
+    );
+    if (equipmentCheck?.handled && !equipmentCheck.allowed) {
+      if (equipmentCheck.alert) showAlert(equipmentCheck.alert.title, equipmentCheck.alert.message);
+      return;
     }
     // Проверка брони/одежды через доменные функции
-    if (itemToEquip.itemType === 'armor' || itemToEquip.protectedAreas) {
+    if (isItemKind(itemToEquip, 'armor')) {
       const armorCheck = canEquipArmor(itemToEquip, { origin, trait });
       if (!armorCheck.allowed) {
-        // Для роботов показываем специфичный алерт, для остальных — generic
-        if (isRobot) {
-          showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
-        } else {
-          showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory(`screen.alerts.${armorCheck.reason?.split('.').pop() || 'cannotEquipItem'}`) || tInventory('screen.alerts.cannotEquipItem'));
-        }
+        showEquipmentEligibilityAlert('armor', armorCheck.reason);
         return;
       }
     }
-    if (itemToEquip.itemType === 'clothing' || itemToEquip.clothingType) {
+    if (isItemKind(itemToEquip, 'clothing')) {
       const clothingCheck = canEquipClothing(itemToEquip, { origin, trait });
       if (!clothingCheck.allowed) {
-        showAlert(tInventory('screen.alerts.robotArmorOnlyTitle'), tInventory('screen.alerts.robotArmorOnlyMessage'));
+        showEquipmentEligibilityAlert('clothing', clothingCheck.reason);
         return;
       }
     }
@@ -1107,16 +673,13 @@ const InventoryScreen = () => {
     // Предмет неизвестного вида (null) не экипируется вовсе — фоллбэков нет.
     const targetSlotType = resolveTargetLayer(itemToEquip);
     if (!targetSlotType) {
-      showAlert(
-        tInventory('screen.alerts.robotArmorOnlyTitle'),
-        tInventory('screen.alerts.cannotEquipItem'),
-      );
+      showAlert('', tInventory('screen.alerts.cannotEquipItem'));
       return;
     }
     const equippedInstances = collectEquippedArmorInstances(currentEquipped);
     const ownedCount = findUnequippedStoreItemByStackKey(itemToEquip.stackKey || getStackKey(itemToEquip))?.quantity || 0;
     const equippedCount = Array.from(equippedInstances.values()).filter((entry) => {
-      if (itemToEquip.itemType === 'armor' || itemToEquip.itemType === 'clothing' || itemToEquip.itemType === 'outfit') {
+      if (isItemKind(itemToEquip, 'armor') || isItemKind(itemToEquip, 'clothing')) {
         return entry.stackKey === (itemToEquip.stackKey || getStackKey(itemToEquip));
       }
       return false;
@@ -1131,15 +694,7 @@ const InventoryScreen = () => {
       // ПРАВИЛО (владелец): молчаливых падений нет. Пустой список слотов —
       // дефект данных предмета (нет protectedAreas): сообщаем, а не no-op.
       if (!slotsToOccupy || slotsToOccupy.length === 0) {
-        debugLog('equip.armor:emptySlots', {
-          id: itemToEquip?.id || itemToEquip?.armorId || itemToEquip?.weaponId,
-          stackKey: itemToEquip?.stackKey,
-          protectedAreas: itemToEquip?.protectedAreas,
-        });
-        showAlert(
-          tInventory('screen.alerts.robotArmorOnlyTitle'),
-          tInventory('screen.alerts.cannotEquipItem'),
-        );
+        showAlert('', tInventory('screen.alerts.cannotEquipItem'));
         return;
       }
       const instancesToUnequip = new Set();
@@ -1248,7 +803,8 @@ const InventoryScreen = () => {
               const equippedItem = newEquipped[slot]?.[type];
               if (!equippedItem) return;
               const sameInstance = equippedItem.equipInstanceId && itemToUnequip.equipInstanceId && equippedItem.equipInstanceId === itemToUnequip.equipInstanceId;
-              const sameNameAndType = getItemName(equippedItem) === getItemName(itemToUnequip) && (itemToUnequip.itemType === type || itemToUnequip.itemType === 'outfit');
+              const sameNameAndType = getItemName(equippedItem) === getItemName(itemToUnequip)
+                && isItemKind(itemToUnequip, type);
               if (sameInstance || sameNameAndType) {
                 newEquipped[slot][type] = null;
               }
@@ -1260,74 +816,12 @@ const InventoryScreen = () => {
     });
   };
   
-  // Силовая броня: надетый пакет — КОНТЕЙНЕР одной строкой в общем списке (ПРАВИЛО
-  // владельца, §6): «Снять» уносит пакет целиком, «Содержание» раскрывает под ним
-  // аккордеон: надетые части (счётчик прочности в дизайне патронов, починка — здесь)
-  // и статус Ядерного блока. Строки строятся строго из equippedPowerArmor, имя —
-  // из локализованного каталога по catalogId; экипировка уменьшила стек стор-записей —
-  // строки идут ПОСЛЕ подсчёта остатков стеков, двойного вычитания нет.
-  const paContainerRows = useMemo(() => {
-    if (!hasFrame(equippedPowerArmor)) return [];
-    const paCatalogEntry = (catalogId) =>
-      (equipmentCatalog?.powerArmorList || []).find((p) => p.id === catalogId)
-      || PA_CATALOG_BY_ID[catalogId] || {};
-    const core = equippedPowerArmor.frame.core;
-    const coreMax = (equipmentCatalog?.ammoTypes || []).find((a) => a.id === FUSION_CORE_ID)?.maxCharges;
-    const coreText = core ? `${core.charges}/${coreMax}` : '—';
-    const frameEntry = paCatalogEntry(equippedPowerArmor.frame.catalogId);
-    const installed = Object.entries(equippedPowerArmor.pieces || {}).filter(([, piece]) => Boolean(piece));
-    const containerRow = {
-      uniqueId: 'pa-container',
-      paContainer: true,
-      itemType: 'powerArmor',
-      // ПРАВИЛО (владелец): родитель контейнера — СИСТЕМНЫЙ заголовок «Силовая броня»,
-      // а не каркас; каркас — элемент контейнера, строка внутри «Содержания» (ниже).
-      name: tInventory('screen.powerArmor.containerTitle'),
-      summary: formatInventoryText(tInventory('screen.powerArmor.summary'), {
-        parts: installed.length,
-        core: coreText,
-      }),
-    };
-    if (!paContentsOpen) return [containerRow];
-    const rows = [containerRow];
-    // Каркас — элемент контейнера, как части и блок: своя строка без кнопок
-    // (отдельно каркас не снимается — только пакетом через «Снять» родителя).
-    rows.push({
-      uniqueId: 'pa-content-frame',
-      paFrameContent: true,
-      itemType: 'powerArmor',
-      name: frameEntry.name || equippedPowerArmor.frame.catalogId,
-    });
-    installed.forEach(([slot, piece]) => {
-      const pieceEntry = paCatalogEntry(piece.catalogId);
-      const maxHp = PA_CATALOG_BY_ID[piece.catalogId]?.hp;
-      rows.push({
-        uniqueId: `pa-content-${slot}`,
-        paPieceContent: true,
-        pieceCatalogId: piece.catalogId,
-        paSlot: slot,
-        itemType: 'powerArmor',
-        name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
-          name: pieceEntry.name || piece.catalogId,
-          slot: tInventory(`screen.powerArmor.slots.${slot}`),
-        }),
-        hpCurrent: piece.hpCurrent,
-        maxHp,
-        temporaryRepair: piece.temporaryRepair === true,
-        // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
-        showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
-      });
-    });
-    if (core) {
-      rows.push({
-        uniqueId: 'pa-content-core',
-        paCoreContent: true,
-        itemType: 'powerArmor',
-        name: formatInventoryText(tInventory('screen.powerArmor.coreRow'), { value: coreText }),
-      });
-    }
-    return rows;
-  }, [equippedPowerArmor, equipmentCatalog, paContentsOpen]);
+  // Setting-specific container rows are supplied only by the active inventory capability.
+  const structuredEquipmentRows = useMemo(() => structuredEquipmentFeature?.getInventoryRows?.({
+    equipmentState: structuredEquipmentState,
+    equipmentCatalog,
+    expanded: structuredContentsExpanded,
+  }) ?? [], [structuredEquipmentState, equipmentCatalog, structuredContentsExpanded, structuredEquipmentFeature]);
 
   const displayItems = useMemo(() => {
     const equippedItemsList = [];
@@ -1381,11 +875,11 @@ const InventoryScreen = () => {
 
     const inventoryItemsList = inventoryItems
         .map(item => {
-            const flatItem = flattenItemParams(item);
+            const flatItem = flattenStoreItemParams(item);
             const itemName = getItemName(flatItem);
             
-            // Скрываем предметы-конечности из инвентаря для роботов (Requirement 7.1)
-            if (isRobot && isRobotLimbItem(flatItem)) {
+            // Optional character-equipment items may be hidden from the base list.
+            if (isCompatibleCharacter && isHiddenCharacterEquipmentItem(flatItem)) {
               return null;
             }
 
@@ -1420,13 +914,10 @@ const InventoryScreen = () => {
         })
         .filter(Boolean);
 
-    const merged = [...equippedItemsList, ...paContainerRows, ...inventoryItemsList];
-    // ПРАВИЛО (владелец): контейнер «Силовая броня» существует только НА персонаже
-    // (надет каркас с ядерным блоком). Наличие каркаса в инвентаре контейнера не
-    // создаёт: стор-запись каркаса (хоть свежая, хоть снятый пакет с частями и
-    // блоком внутри) — обычная строка предмета: её можно продать/надеть.
+    const merged = [...equippedItemsList, ...structuredEquipmentRows, ...inventoryItemsList];
+    // The active capability contributes any setting-owned structured rows.
     return merged;
-  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, isRobot, paContainerRows]);
+  }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, getStackKey, isCompatibleCharacter, structuredEquipmentRows, structuredEquipmentFeature]);
 
   const renderTableHeader = () => {
     return (
@@ -1437,134 +928,33 @@ const InventoryScreen = () => {
     );
   };
 
-  // Разбор из строки инвентаря (264): один предмет из стека, настоящие кости,
-  // результат — в алерте. Кнопку показываем только там, где есть что вынуть
-  // при текущем «Мусорщике» (263): недоступное в подстроке спрятано за счётчиком.
-  const handleSalvagePress = (rowItem) => {
-    const report = buildSalvageReport(salvageItem(rowItem.id));
-    showAlert(report.title, report.message);
+  // Optional item-breakdown feature handles its own action/result presentation.
+  const handleItemBreakdownPress = (rowItem) => {
+    const result = itemBreakdownFeature?.execute?.(rowItem.id);
+    const report = itemBreakdownFeature?.buildReport?.(result);
+    if (report) showAlert(report.title, report.message);
   };
 
   const renderItem = ({ item }) => {
-    // ── Контейнер «Силовая броня» и его содержимое (аккордеон — ПРАВИЛО владельца):
-    // свои строки, общий пайплайн имён/модов обходят (имена уже собраны из каталога).
-    if (item.paContainer) {
-      return (
-        <View style={styles.tableRow}>
-          <View style={styles.mainRowContent}>
-            <View style={styles.itemNameContainer}>
-              <Text style={[styles.itemNameText, styles.equippedItemText]}>{item.name}</Text>
-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
-            </View>
-          </View>
-          <View style={styles.actionContainer}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.unequipButton]}
-              onPress={() => unequipPowerArmorPackage()}>
-              <Text style={styles.actionButtonText}>{tInventory('screen.actions.unequip')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.applyButton]}
-              onPress={() => setPaContentsOpen((open) => !open)}>
-              <Text style={styles.actionButtonText}>{tInventory(paContentsOpen ? 'screen.actions.collapse' : 'screen.actions.contents')}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.itemSubRow}>
-            <Text style={styles.itemSubText}>{item.summary}</Text>
-          </View>
-        </View>
-      );
+    if (structuredEquipmentFeature?.isInventoryRow?.(item)) {
+      const rowActions = structuredEquipmentFeature.getInventoryRowActions?.(item, {
+        getAction: (actionKey) => getFeatureAction(structuredEquipmentFeature, actionKey),
+        setExpanded: setStructuredContentsExpanded,
+        openRepair: setRepairTarget,
+      }) ?? {};
+      return structuredEquipmentFeature.renderInventoryRow?.({
+        item,
+        styles,
+        getItemTypeIcon,
+        repairFeature,
+        itemRarityFeature,
+        expanded: structuredContentsExpanded,
+        onRepairPiece: setRepairTarget,
+        ...rowActions,
+      }) ?? null;
     }
 
-    if (item.paPieceContent) {
-      const pieceAffordable = item?.pieceCatalogId
-        ? repairAffordableForPiece(item.pieceCatalogId)
-        : true;
-      const juryRiggingActive = juryRiggingRanksFor() > 0;
-      // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
-      // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
-      // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
-      return (
-        <View style={styles.tableRow}>
-          <View style={styles.mainRowContent}>
-            <View style={styles.itemNameContainer}>
-              <Text style={styles.itemNameText}>{item.name}</Text>
-            </View>
-          </View>
-          <View style={styles.actionContainer}>
-            {/* Слово владельца 420: прочность части СБ отображается всегда →
-                кнопка окна ремонта есть всегда при повреждении (перк: активна —
-                есть «Без затрат»; без перка — серая без донора/материалов). */}
-            {item.showRepair && (juryRiggingActive ? (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.applyButton]}
-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
-                disabled={!pieceAffordable}
-                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
-                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[styles.actionButton, styles.unequipButton]}
-              onPress={() => unequipPowerArmorPieceAt(item.paSlot)}>
-              <Text style={styles.actionButtonText}>{tInventory('screen.actions.unequip')}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.itemSubRow}>
-            <Text style={styles.itemSubText}>
-              {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
-            </Text>
-            {(() => {
-              const pieceRarity = itemRarityFor(item.pieceCatalogId);
-              return pieceRarity > 0 ? (
-                <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {pieceRarity}</Text>
-              ) : null;
-            })()}
-            {item.temporaryRepair === true && (
-              <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
-                {tInventory('screen.repair.tempNote')}
-              </Text>
-            )}
-          </View>
-        </View>
-      );
-    }
-
-    if (item.paFrameContent) {
-      // Каркас — элемент контейнера (ПРАВИЛО владельца): строка без кнопок,
-      // снимается только вместе с пакетом через «Снять» родителя.
-      return (
-        <View style={styles.tableRow}>
-          <View style={styles.mainRowContent}>
-            <View style={styles.itemNameContainer}>
-              <Text style={styles.itemNameText}>{item.name}</Text>
-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    if (item.paCoreContent) {
-      // Ядерный блок — статусная строка без кнопок (замена блоков автоматическая, §5.4).
-      return (
-        <View style={styles.tableRow}>
-          <View style={styles.mainRowContent}>
-            <View style={styles.itemNameContainer}>
-              <Text style={styles.itemNameText}>{item.name}</Text>
-              <Text style={styles.itemTypeIcon}>{getItemTypeIcon('powerArmor')}</Text>
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    // Убеждаемся, что у предмета есть itemType
+    // Ensure an item type is available before shared catalog rendering.
     const itemWithType = {
       ...item,
       itemType: getItemType(item)
@@ -1577,125 +967,105 @@ const InventoryScreen = () => {
     const localizedDisplayItem = resolveLocalizedItem(displayItem);
     const itemName = getItemName(localizedDisplayItem) || tInventory('screen.labels.unknownItem');
     const itemIcon = getItemTypeIcon(item.itemType);
-    // Ядерный Блок: заряд стопки показываем суффиксом в имени — «Ядерный блок (7/20)».
-    const coreChargeSuffix = isFusionCoreItem(item) && item.charges != null
-      ? ` (${item.charges}/${item.maxCharges})`
-      : '';
-    // Часть силовой брони: строка прочности + «Починить» при hp < max (бесплатно — правило владельца).
-    const isPAItem = item.itemType === 'powerArmor';
-    const paMaxHp = isPAItem && !isPowerArmorFrame(item)
-      ? PA_CATALOG_BY_ID[item.weaponId || item.id]?.hp
-      : null;
-    const showPARepair = Boolean(
-      isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
+    const structuredItemPresentation = structuredEquipmentFeature?.getInventoryItemPresentation?.(item) ?? {};
+    const itemNameSuffix = structuredItemPresentation.nameSuffix ?? '';
+    const structuredDurability = structuredItemPresentation.durability ?? null;
+    const showStructuredRepair = Boolean(
+      repairFeature
+      && !item.isEquipped
+      && structuredItemPresentation.needsRepair,
     );
-    // Слово владельца 421: прочность — и у ОРУЖИЯ, и у БРОНИ (отображение —
-    // при настройке качества или износа; кнопка окна — при повреждении).
-    const showItemDurability = Boolean(
-      (localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor')
-      && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
-      && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)),
-    );
-    const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
+    const durabilityPresentation = durabilityFeature?.getPresentation?.(
+      localizedDisplayItem,
+      durabilitySettings,
+    ) ?? null;
+    const showItemDurability = Boolean(durabilityPresentation);
+    const weaponDurabilityValue = durabilityPresentation?.current;
     const showItemRepair = Boolean(
-      (item.itemType === 'weapon' || item.itemType === 'armor')
-      && item.durabilityTracked && Number(item.durability) < 100,
+      repairFeature
+      && durabilityPresentation?.needsRepair,
     );
-    // Слово владельца 424: редкость в свойствах оружия/брони (и СБ).
-    const cardRarity = itemRarityFor(item.weaponId || item.id);
+    // Optional rarity information is projected by the active setting feature.
+    const rarityCatalogId = inventoryRuntime.getCatalogItemId?.(item)
+      ?? getItemCatalogId(item);
+    const cardRarity = itemRarityFeature?.getForItem?.(rarityCatalogId) ?? 0;
     const showCardRarity = cardRarity > 0
-      && (item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'powerArmor');
-    // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
-    // при включённой прочности) — окно книжного ремонта не открываем.
-    const juryRiggingActive = juryRiggingRanksFor() > 0;
-    // Слово владельца 414: «если материалов нет, кнопка ремонта не
-    // активна» (донор тоже делает кнопку активной).
-    const repairAffordable = repairAffordableFor(item.id);
-    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
-    const isConsumable =
-      item.itemType === 'chem' || item.itemType === 'chems'
-      || item.itemType === 'drinks' || item.itemType === 'food'
-      || item.itemType === 'robotConsumable'
-      || item.healAmount != null;
-
-    // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
-    // помечается, пока драйвер не применён (флаг mk2Installed).
-    const mk2Blocked = Boolean(item.requiresMkII) && !mk2Installed;
-    // «Драйвер ОС Mk II»: применим только к Секьюритрону и только один раз.
-    const isMk2Driver = Boolean(
-      !item.isEquipped
-      && !mk2Installed
-      && origin?.id === 'securitron'
-      && (item.weaponId === 'robot_item_mk2_driver' || item.id === 'robot_item_mk2_driver'),
+      && (isItemKind(item, 'weapon') || isItemKind(item, 'armor') || isStructuredEquipmentItem(item));
+    const repairAction = (showItemRepair || showStructuredRepair)
+      ? repairFeature?.getInventoryAction?.(item, { available: true }) ?? null
+      : null;
+    const isEquippable = Boolean(getItemCapabilities(item).equippable || isStructuredEquipmentItem(item));
+    const isConsumable = Boolean(
+      consumablesCapability.isConsumableItem?.(item)
+      ?? (item.healAmount != null),
     );
 
-    // Скрыть кнопку "Снять" для встроенного/манипуляторного оружия (Requirement 7.5)
-    const isBuiltinOrManipulator = Boolean(item?.isBuiltin || item?.isManipulator);
-    // IRON RULES: роботы не могут носить силовую броню — скрываем кнопку экипировки
-    const isRobotPowerArmorBlocked = isRobot
-      && !item.isEquipped
-      && (item.itemType === 'powerArmor' || isPowerArmorDomain(item) || isPowerArmorItem(item));
-    // Для роботов: скрыть кнопку "Экипировать" для ЛЮБОГО оружия из инвентаря если нет руки с canHoldWeapons
-    // (робо-оружие как конечности экипируется как limb, а не как heldWeapon — для них кнопка остаётся)
-    // Стандартное оружие теперь разрешено если есть манипулятор (allow_standard_with_arm)
-    const hideEquipButtonNoArm = isRobot
-      && item.itemType === 'weapon'
-      && !item.isEquipped
-      && !robotHasHoldingArm
-      && !isRobotLimbWeapon(item);
-    const hideEquipButton = hideEquipButtonNoArm || isRobotPowerArmorBlocked;
-    // Скрыть кнопку действия для экипированного встроенного/манипуляторного оружия,
-    // а также для locked-предметов (комплекты роботов — снять можно только сменой конечности).
+    const settingInventoryRowState = characterEquipmentFeature?.getInventoryRowState?.(item, {
+      origin,
+      equipmentState: characterEquipmentState,
+    }) ?? {};
+
+    // The active equipment capability may mark setting-owned weapon rows as action-locked.
+    const isSettingWeaponActionLocked = characterEquipmentFeature?.isWeaponActionLocked?.(item) ?? false;
+    const equipmentFeatureRestriction = characterEquipmentFeature?.getEquipButtonRestriction?.({
+      item,
+      isCompatibleCharacter,
+      isWeapon: isItemKind(item, 'weapon'),
+      isEquipped: Boolean(item.isEquipped),
+      equipmentState: characterEquipmentState,
+      equipmentCatalog,
+    }) ?? null;
+    const structuredFeatureRestriction = structuredEquipmentFeature?.getEquipButtonRestriction?.(item, {
+      isCompatibleCharacter,
+      isEquipped: Boolean(item.isEquipped),
+      origin,
+      trait,
+    }) ?? null;
+    const equipButtonRestriction = equipmentFeatureRestriction ?? structuredFeatureRestriction;
+    const hideEquipButton = equipButtonRestriction?.hidden === true;
     const hideActionButton = item.isEquipped && (
-      (item.itemType === 'weapon' && isBuiltinOrManipulator)
+      (isItemKind(item, 'weapon') && isSettingWeaponActionLocked)
       || item.locked
     );
 
     const handleActionPress = () => {
         if (item.isEquipped) {
-            // Надетый пакет СБ — контейнер со своими кнопками (см. ветки renderItem выше),
-            // сюда через generic-строку не доходит.
-            if (item.itemType === 'weapon') {
+            // Specialized equipment containers render their own optional rows.
+            if (isItemKind(item, 'weapon')) {
                 handleUnequipWeapon(item, item.slot);
             } else {
                 handleUnequipArmor(item);
             }
         } else {
-            if (item.itemType === 'weapon') {
+            if (isItemKind(item, 'weapon')) {
                 handleEquipWeapon(item);
-            } else if (item.itemType === 'powerArmor') {
-                // Силовая броня — свой слой: каркас надевается пакетом, часть — в слот
-                // надетого пакета. Через equippedArmor/слоты брони не проходит (план §5).
-                if (isPowerArmorFrame(item)) {
-                    equipPowerArmorPackage(item);
-                } else {
-                    equipPowerArmorPiece(item);
-                }
             } else {
-                handleEquipArmor(item);
+                const handledByStructuredEquipment = structuredEquipmentFeature?.equipInventoryItem?.(item, {
+                    getAction: (actionKey) => getFeatureAction(structuredEquipmentFeature, actionKey),
+                    origin,
+                    trait,
+                }) ?? false;
+                if (!handledByStructuredEquipment) handleEquipArmor(item);
             }
         }
     };
     
     const price = getItemPrice(localizedDisplayItem);
     const weight = getItemWeight(localizedDisplayItem);
-    const weaponAmmoIds = String(localizedDisplayItem?.ammoId ?? '')
-      .split(',').map((id) => id.trim()).filter((id) => id && id !== 'ammo_anything');
-    const weaponAmmoNames = weaponAmmoIds
-      .map((ammoId) => (equipmentCatalog?.ammoTypes || []).find((ammo) => ammo.id === ammoId)?.name)
-      .filter(Boolean);
-    // Кнопка разбора (267): у хлама — есть всегда; работает, когда соблюдены
-    // условия (общий расчёт salvagePreview), иначе затемнена и молчит.
-    // Подстрока состава — только при печатном составе и если предмет не надет.
-    const salvage = !item.paContainer
-      ? salvageButtonForItem(item, useCharacterStore.getState())
-      : null;
+    const weaponAmmoNames = weaponPresentationFeature?.getAmmoNames?.(
+      localizedDisplayItem,
+      equipmentCatalog,
+    ) ?? [];
+    const itemBreakdownPresentation = itemBreakdownFeature?.getInventoryPresentation?.(
+      item,
+      useCharacterStore.getState(),
+    ) ?? null;
 
     return (
       <View style={styles.tableRow}>
         <View style={styles.mainRowContent}>
           <View style={styles.itemNameContainer}>
-            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}{coreChargeSuffix}</Text>
+            <Text style={[styles.itemNameText, item.isEquipped && styles.equippedItemText]}>{itemName}{itemNameSuffix}</Text>
             <Text style={styles.itemTypeIcon}>{itemIcon}</Text>
           </View>
         </View>
@@ -1707,49 +1077,29 @@ const InventoryScreen = () => {
                   <Text style={styles.actionButtonText}>{item.isEquipped ? tInventory('screen.actions.unequip') : tInventory('screen.actions.equip')}</Text>
               </TouchableOpacity>
           )}
-          {hideEquipButton && (
-              <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
+          {hideEquipButton && equipButtonRestriction?.message ? (
+              <Text style={styles.itemSubText}>{equipButtonRestriction.message}</Text>
+          ) : null}
+
+          {repairAction && (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAction.enabled && styles.applyButtonDisabled]}
+                  disabled={!repairAction.enabled}
+                  onPress={() => setRepairTarget(repairAction.target)}>
+                  <Text style={styles.actionButtonText}>{repairAction.label}</Text>
+              </TouchableOpacity>
           )}
 
-          {/* Слово владельца 420: есть отображение прочности (качество ИЛИ
-              износ) → кнопка окна ремонта с вариантами; нет отображения —
-              кнопки нет. Мгновенной починки больше нет. */}
-          {showItemRepair && showItemDurability && (juryRiggingActive ? (
+          {itemBreakdownPresentation?.button && (
               <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
-              </TouchableOpacity>
-          ) : (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                  disabled={!repairAffordable}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
-              </TouchableOpacity>
-          ))}
-
-          {showPARepair && (juryRiggingActive ? (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
-              </TouchableOpacity>
-          ) : (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
-                  disabled={!repairAffordable}
-                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
-              </TouchableOpacity>
-          ))}
-
-          {salvage && (
-              <TouchableOpacity
-                  style={[styles.actionButton, styles.applyButton, !salvage.enabled && styles.applyButtonDisabled]}
-                  disabled={!salvage.enabled}
-                  onPress={() => handleSalvagePress(item)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.salvage.action')}</Text>
+                  style={[
+                    styles.actionButton,
+                    styles.applyButton,
+                    !itemBreakdownPresentation.button.enabled && styles.applyButtonDisabled,
+                  ]}
+                  disabled={!itemBreakdownPresentation.button.enabled}
+                  onPress={() => handleItemBreakdownPress(item)}>
+                  <Text style={styles.actionButtonText}>{itemBreakdownPresentation.button.label}</Text>
               </TouchableOpacity>
           )}
           {isConsumable && !item.isEquipped
@@ -1761,13 +1111,14 @@ const InventoryScreen = () => {
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
               </TouchableOpacity>
           )}
-          {isMk2Driver && (
+          {(settingInventoryRowState.actions ?? []).map((action, index) => (
               <TouchableOpacity
+                  key={action.id ?? index}
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => handleApplyMk2Driver(item)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.apply')}</Text>
+                  onPress={() => handleCharacterEquipmentAction(item, action)}>
+                  <Text style={styles.actionButtonText}>{action.label}</Text>
               </TouchableOpacity>
-          )}
+          ))}
           {!item.isEquipped && (
               <TouchableOpacity style={[styles.actionButton, styles.sellButton]} onPress={() => handleSellItem(item)}>
                   <Text style={styles.actionButtonText}>{tInventory('screen.actions.sell')}</Text>
@@ -1775,22 +1126,26 @@ const InventoryScreen = () => {
           )}
         </View>
         <View style={styles.itemSubRow}>
-          {Number.isFinite(paMaxHp) && (
-            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
+          {structuredDurability && (
+            <Text style={styles.itemSubText}>
+              {tInventory('screen.labels.durability')}: {structuredDurability.current}/{structuredDurability.maximum}
+            </Text>
           )}
           {showItemDurability && (
-            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/{durabilityPresentation.maximum}</Text>
           )}
           {showCardRarity && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {cardRarity}</Text>
           )}
-          {item.temporaryRepair === true && (
+          {durabilityPresentation?.statusNote ? (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
-              {tInventory('screen.repair.tempNote')}
+              {durabilityPresentation.statusNote}
             </Text>
-          )}
-          {mk2Blocked && (
-            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>
+          ) : null}
+          {settingInventoryRowState.statusLabel && (
+            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+              {settingInventoryRowState.statusLabel}
+            </Text>
           )}
           <Text style={styles.itemSubText}>{tInventory('screen.labels.quantity')}: {item.isEquipped ? 1 : item.quantity} {tInventory('screen.labels.pieces')}</Text>
           <Text style={styles.itemSubText}>{tInventory('screen.labels.price')}: {item.isEquipped ? price : (price * item.quantity)}</Text>
@@ -1798,15 +1153,9 @@ const InventoryScreen = () => {
           {weaponAmmoNames.length > 0 && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.ammo')}: {weaponAmmoNames.join(', ')}</Text>
           )}
-          {salvage?.hasComposition && !item.isEquipped && (
-            <Text style={styles.itemSubText}>
-              {tInventory('screen.salvage.label')}: {salvage.parts.length
-                ? salvage.parts.map((p) => (p.count != null ? `${p.name} ×${p.count}` : p.name)).join(', ')
-                : salvage.gate === 'rank'
-                  ? formatInventoryText(tInventory('screen.salvage.requiresRank'), { rank: salvage.requiredRank })
-                  : tInventory('screen.salvage.unavailable')}
-            </Text>
-          )}
+          {itemBreakdownPresentation?.subline ? (
+            <Text style={styles.itemSubText}>{itemBreakdownPresentation.subline}</Text>
+          ) : null}
         </View>
       </View>
     );
@@ -1840,8 +1189,8 @@ const InventoryScreen = () => {
     let total = 0;
     
     total += inventoryItems.reduce((acc, item) => {
-      const flatItem = flattenItemParams(item);
-      const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
+      const flatItem = flattenStoreItemParams(item);
+      const itemWithType = { ...flatItem, itemType: flatItem.itemType || getItemTypeId('weapon') };
       const modifiedItem = getModifiedItem(itemWithType);
       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
       const weight = getItemWeight(displayItem);
@@ -1852,7 +1201,7 @@ const InventoryScreen = () => {
       if (weapon) {
         const weaponWithType = {
           ...weapon,
-          itemType: weapon.itemType || 'weapon'
+          itemType: weapon.itemType || getItemTypeId('weapon')
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
@@ -1876,8 +1225,8 @@ const InventoryScreen = () => {
     let total = 0;
 
     total += inventoryItems.reduce((acc, item) => {
-      const flatItem = flattenItemParams(item);
-      const itemWithType = { ...flatItem, itemType: flatItem.itemType || 'weapon' };
+      const flatItem = flattenStoreItemParams(item);
+      const itemWithType = { ...flatItem, itemType: flatItem.itemType || getItemTypeId('weapon') };
       const modifiedItem = getModifiedItem(itemWithType);
       const displayItem = resolveLocalizedItem(modifiedItem || flatItem);
       const price = getItemPrice(displayItem);
@@ -1888,7 +1237,7 @@ const InventoryScreen = () => {
       if (weapon) {
         const weaponWithType = {
           ...weapon,
-          itemType: weapon.itemType || 'weapon'
+          itemType: weapon.itemType || getItemTypeId('weapon')
         };
         const modifiedWeapon = getModifiedItem(weaponWithType);
         const displayWeapon = resolveLocalizedItem(modifiedWeapon || weapon);
@@ -1909,18 +1258,16 @@ const InventoryScreen = () => {
   }, [inventoryItems, equippedWeaponsForDisplay, equippedArmor, getModifiedItem, equipmentCatalog]);
 
   return (
-    <ImageBackground
-      source={require('../../../assets/bg.png')}
-      style={styles.background}
-      imageStyle={{ opacity: 0.3 }}
-    >
+    <View style={styles.background}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <CurrencySection 
             amount={currency}
-            onAdd={() => handleOpenCapsModal('add')}
-            onSubtract={() => handleOpenCapsModal('subtract')}
+            onAdd={() => handleOpenCurrencyModal('add')}
+            onSubtract={() => handleOpenCurrencyModal('subtract')}
             onCraft={handleCraftPress}
+            currencyIcon={currencyIcon}
+            showCraft={Boolean(craftingFeature)}
           />
           <View style={styles.tableContainer}>
             {renderTableHeader()}
@@ -1939,13 +1286,15 @@ const InventoryScreen = () => {
             <Text style={styles.summaryText}>{tInventory('screen.labels.totalPrice')}: {totalPrice}</Text>
           </View>
         </View>
-        <CapsModal
-          visible={isCapsModalVisible}
-          onClose={() => setIsCapsModalVisible(false)}
-          onSave={handleSaveCaps}
-          operationType={capsOperationType}
-          caps={currency}
-        />
+        {CurrencyModal ? (
+          <CurrencyModal
+            visible={isCurrencyModalVisible}
+            onClose={() => setIsCurrencyModalVisible(false)}
+            onSave={handleSaveCurrency}
+            operationType={currencyOperationType}
+            balance={currency}
+          />
+        ) : null}
         <SellItemModal
             visible={isSellModalVisible}
             onClose={() => setIsSellModalVisible(false)}
@@ -1960,11 +1309,13 @@ const InventoryScreen = () => {
           maxRarity={itemSelectionMode === 'buy' ? (equipment?.purchaseMaxRarity ?? null) : null}
           rootTitleKey={itemSelectionMode === 'buy' ? 'modals.addItemModal.buyTitle' : 'modals.addItemModal.title'}
         />
-        <CraftingModal
-          visible={isCraftModalVisible}
-          onClose={() => setCraftModalVisible(false)}
-        />
-        {repairTarget != null && (
+        {CraftingModal ? (
+          <CraftingModal
+            visible={isCraftModalVisible}
+            onClose={() => setCraftModalVisible(false)}
+          />
+        ) : null}
+        {RepairModal && repairTarget != null && (
           <RepairModal
             target={repairTarget}
             onClose={() => setRepairTarget(null)}
@@ -1977,12 +1328,12 @@ const InventoryScreen = () => {
             setSelectedItemForBuy(null);
           }}
           item={selectedItemForBuy}
-          caps={currency}
+          balance={currency}
           onConfirmBuy={handleConfirmBuy}
         />
 
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 };
 

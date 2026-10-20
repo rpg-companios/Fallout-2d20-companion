@@ -2,7 +2,7 @@
 // ФОРМУЛЫ ПРОИЗВОДНЫХ ПАРАМЕТРОВ сеттинга Fallout (МК-3, патч 316).
 //
 // Сюда переехали БЕЗ изменения правил:
-//   • примитивы — из domain/characterCreation.js:
+//   • примитивы — из modules/fallout/logic/characterCreation.js:
 //     calculateInitiative, calculateDefense, calculateMeleeBonusValue,
 //     calculateMeleeBonus, calculateMaxHealth, calculateCarryWeight,
 //     calculateRobotCarryWeight;
@@ -18,18 +18,18 @@
 //   • модуль (экраны) — прямой импорт из этого файла;
 //   • движок (store и пр.) — ТОЛЬКО через дверь: domain/registry.js → getDerivedStatsLogic().
 
+import { calculateAttributeTotal } from '../../../src/store/resolvers.js';
 import {
   getAttributeValue,
-  calculateAttributeTotal,
   getEquipmentCarryWeightModifier,
-  applyFrameAttributeModifiers,
-} from '../../../src/store/resolvers.js';
+} from './characterCreation.js';
+import { applyFrameAttributeModifiers } from './powerArmor.js';
 
 import {
   getTimedMaxHpBonus,
   getTimedDamageResistanceBonus,
   getTimedDefenseBonus,
-} from '../../../domain/effects.js';
+} from './timedEffectModifiers.js';
 
 import { effectsDictToLegacyArray } from '../../../src/store/effectsSync.js';
 

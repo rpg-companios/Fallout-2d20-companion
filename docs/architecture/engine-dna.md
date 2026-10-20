@@ -33,7 +33,7 @@ Positronium — это не только приложение для Fallout 2d2
 - Fallout-данные и несколько экранов уже находятся в `modules/fallout/`;
 - некоторые «универсальные» файлы всё ещё напрямую импортируют Fallout;
 - адаптер активного сеттинга пока не завершён;
-- package loader для `.trpg` пока не является рабочей runtime-дверью.
+- runtime loader уже подключает установленный `.trpg` и выполняет его runtime entry; оставшаяся задача — убрать Fallout-зависимости из engine bundle и закрепить полный host/setting API.
 
 **Цель не состоит в одномоментном переписывании.**
 
@@ -505,16 +505,19 @@ function migrateCharacterState(input: unknown): CurrentCharacterSave {
 
 ### Фаза 1. Сделать активный setting adapter
 
-Создать TS-интерфейс и Fallout-реализацию поверх текущих источников.
+**Первый шаг выполнен:** добавлены общий manifest-контракт, локальная проверка/установка полного `.trpg` и граница `src/engine/**` → setting modules. Добавлен `runtime.apiVersion`/`runtime.entry` и явный loader CommonJS factory; он пока не вызван приложением.
 
-На этом этапе не нужен `.trpg` loader. Нужна одна дверь:
+Следующий шаг — единый `ActiveSettingRuntime`, который загружает из выбранного `.trpg` целостный setting-модуль: каталог, данные, экраны и уникальные механики. Общие механизмы предоставляет engine host API; не создавать отдельные runtime-пакеты для данных и UI.
 
 ```text
-getActiveSetting().catalog
-getActiveSetting().rules
+getActiveSetting().manifest
+getActiveSetting().data
 getActiveSetting().screens
-getActiveSetting().extensions
+getActiveSetting().mechanics
+getActiveSetting().engineApiVersion
 ```
+
+При отсутствии установленного пакета активного setting runtime нет. `.trpg` loader нужен сейчас для ручного staging-теста Web/PWA и APK; текущие статические импорты Fallout будут заменяться по мере подключения этого runtime.
 
 ### Фаза 2. Один Catalog API
 

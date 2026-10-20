@@ -1,205 +1,93 @@
-// domain/resolveItem.js
-//
-// Единая точка обогащения предметов из каталога (JSON = источник истины).
-//
-// Контракт (см. docs и db/schema.js: «Справочники живут в JSON»):
-//   - в сторе/сейве предмет хранится как ССЫЛКА — { id, itemType, quantity,
-//     equipped, locked, appliedMods, stackKey, equipInstanceId, charges, hpCurrent };
-//   - вес/цена/эффект/имя НЕ хранятся — их достаёт отсюда resolveItem() по id.
-//
-// Все экраны и счётчики веса/цены должны идти через эти функции, чтобы не было
-// разнобоя (поле `value` у хлама, «забыли обогатить» и т.п.).
-//
-// Модуль чистый: каталог передаётся аргументом (getEquipmentCatalog(locale)),
-// никаких RN-зависимостей.
+// Generic item catalog lookup and enrichment adapter.
+// Catalog structure, item-type interpretation, instance payloads, and derived
+// modifier rules are supplied by the active setting's inventory capability.
 
-import { applyArmorMods } from './modsEquip.js';
-import { enrichWeaponItem } from './enrichItem.js';
-import { getUniqQualityName } from './registry.js';
+import { getSettingService } from './registry.js';
 
-// itemType, когда у предмета нет явного itemType (для запасных/старых записей).
+const getInventoryService = () => getSettingService('inventory');
+
+/** Interpret a legacy item type through the active setting, or use a neutral type. */
 export const inferItemType = (item) => {
   if (!item) return 'misc';
-  if (item.itemType) return item.itemType;
-  if (item.effectType || item.durationInScenes || item.duration || item.positiveEffect) return 'chem';
-  if (item.type === 'ammo') return 'ammo';
-  if (item.weaponId || item.damage !== undefined) return 'weapon';
-  if (item.clothingType) return 'clothing';
-  if (item.protectedAreas) return 'armor';
-  return 'misc';
+  if (typeof item.itemType === 'string' && item.itemType) return item.itemType;
+  const infer = getInventoryService()?.inferItemTypeFromItem;
+  const settingItemType = typeof infer === 'function' ? infer(item) : null;
+  return typeof settingItemType === 'string' && settingItemType ? settingItemType : 'misc';
 };
 
-// miscellaneous может быть как массивом, так и { miscellaneous: [{items:[]}] }.
-const flattenMisc = (misc) =>
-  Array.isArray(misc)
-    ? misc
-    : (misc?.miscellaneous || []).flatMap((group) => group?.items || []);
-
-/**
- * Найти каталожную запись предмета по id и типу.
- * Объединяет прежние findInCatalog (skillRewards) и lookup-ветки
- * resolveLocalizedItem (InventoryScreen) / resolveItemById (kitResolver).
- *
- * @param {object} catalog  — getEquipmentCatalog(locale)
- * @param {string} id       — канонический id предмета
- * @param {string} itemType — тип (если неизвестен — fallback в misc)
- * @returns {object|null}
- */
+/** Lookup is wholly setting-owned: the engine does not know catalog categories. */
 export const findCatalogEntry = (catalog, id, itemType) => {
   if (!id || !catalog) return null;
-  const search = (arr) => (arr || []).find((e) => e && e.id === id) || null;
-  switch (itemType) {
-    case 'weapon':
-      return search(catalog.weapons);
-    case 'ammo':
-      return search(catalog.ammoTypes);
-    case 'armor':
-      return catalog.armorIndex?.byId?.get(id) || null;
-    case 'armorMod':
-      // Моды брони (341): стандартные и уникальные — плоские списки каталога.
-      return search(catalog.armorMods) || search(catalog.uniqArmorMods);
-    case 'weaponMod':
-      // Моды оружия (348): крафт даёт мод-предмет; пул включает и робо-моды (290).
-      return search(catalog.weaponMods) || null;
-    case 'clothing':
-    case 'outfit': {
-      const all = (catalog.clothes?.clothes || []).flatMap((g) => g.items || []);
-      return search(all);
-    }
-    case 'chem':
-    case 'chems':
-      return search(catalog.chems);
-    case 'drinks':
-      return search(catalog.drinks);
-    case 'food':
-      return search(catalog.food);
-    case 'magazine':
-      return search(catalog.magazines);
-    case 'junk':
-      return search(catalog.junk);
-    case 'powerArmor':
-      // Силовая броня: каркас, части, ядерный блок — плоский список.
-      return search(catalog.powerArmorList);
-    case 'robotArm':
-      return search(catalog.robotArms);
-    case 'robotBody':
-      return search(catalog.robotBody);
-    case 'robotLeg':
-    case 'robotLegs':
-      return search(catalog.robotLegs);
-    case 'robotHead':
-      return search(catalog.robotHeads);
-    case 'robotPart':
-      // Универсальный поиск по любым робочастям.
-      return search(catalog.robotArms)
-        || search(catalog.robotBody)
-        || search(catalog.robotLegs)
-        || search(catalog.robotHeads)
-        || search(catalog.robotPlating)
-        || search(catalog.robotFrames);
-    case 'robotConsumable':
-      // Робо-расходники (ремкомплект и будущие): владелец задаёт их в
-      // general_goods.json с itemType "robotConsumable" → каталог generalGoods.
-      // Ищем по всем возможным контейнерам, чтобы новый расходник не потерял
-      // обогащения (имя/вес/цену/эффект), где бы он ни лежал.
-      return search(catalog.generalGoods)
-        || search(catalog.robotItems)
-        || search(catalog.robotModules);
-    case 'misc':
-    default: {
-      const misc = flattenMisc(catalog.miscellaneous);
-      return search(misc)
-        || search(catalog.generalGoods)
-        || search(catalog.materials)
-        || search(catalog.junk)
-        || search(catalog.oddities)
-        || search(catalog.robotModules)
-        || search(catalog.robotItems);
-    }
-  }
+  const find = getInventoryService()?.findCatalogEntry;
+  return typeof find === 'function' ? (find(catalog, id, itemType) || null) : null;
 };
 
-// Поля СОСТОЯНИЯ экземпляра — берутся из инстанса (стора/сейва), НЕ из каталога.
-// Всё остальное (вес, цена, эффект, статы, имя, зоны защиты, rarity…) — из каталога,
-// чтобы правки данных JSON применялись сразу и не перекрывались устаревшим инстансом.
-// Производные поля (моды оружия/брони) считаются после обогащения из каталога:
-// в состоянии хранится только выбор модов, а не скопированные характеристики.
-const INSTANCE_FIELDS = [
-  'id', 'weaponId', 'code', 'Name',          // идентификаторы / ключ экземпляра
-  'itemType',                                 // тип хранится на инстансе
-  'quantity', 'equipped', 'locked',           // состояние инвентаря
-  'installedOn',                              // 343: мод установлен на предмет
-  'appliedMods', 'stackKey',                  // моды и подпись стопки
-  'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
-  'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
-  'equipInstanceId', 'uniqueId',              // идентификаторы экипировки
-  'charges', 'hpCurrent',                     // заряд Ядерного Блока / прочность части СБ
-  'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', // мета отображения / роботов
-];
+const CORE_INSTANCE_FIELDS = Object.freeze([
+  'id',
+  'catalogId',
+  'itemType',
+  'quantity',
+  'equipped',
+  'locked',
+  'stackKey',
+  'equipInstanceId',
+  'uniqueId',
+]);
+
+const getInstanceFields = () => {
+  const settingFields = getInventoryService()?.itemInstanceFields;
+  return [
+    ...new Set([
+      ...CORE_INSTANCE_FIELDS,
+      ...(Array.isArray(settingFields) ? settingFields.filter((field) => typeof field === 'string') : []),
+    ]),
+  ];
+};
 
 /**
- * Обогащение оружия — через ЕДИНЫЙ конвейер (domain/enrichItem.js):
- * база из каталога + моды (все структурированные поля) + качества,
- * имя по правилам владельца (моды → качества → база; ложа меняет имя
- * только при stockNames.with). Все пути (карточка, комплекты, экраны)
- * используют одну реализацию.
+ * Compatibility adapter for screens that request the active setting's
+ * weapon-specific enrichment explicitly. The engine does not interpret it.
  */
-export const resolveWeaponWithAppliedMods = (weapon, catalog) =>
-  enrichWeaponItem(weapon, catalog, { qualityNameById: getUniqQualityName });
-
-const EFFECTIVE_ITEM_RESOLVERS = {
-  weapon: (item, catalog) => resolveWeaponWithAppliedMods(item, catalog),
-  armor: (item, catalog) => applyArmorMods(item, catalog).item,
-  clothing: (item, catalog) => applyArmorMods(item, catalog, {
-    standardKey: 'appliedClothingModId',
-    uniqueKey: 'unusedUniqueArmorModId',
-  }).item,
-  outfit: (item, catalog) => applyArmorMods(item, catalog, {
-    standardKey: 'appliedClothingModId',
-    uniqueKey: 'unusedUniqueArmorModId',
-  }).item,
+export const resolveWeaponWithAppliedMods = (weapon, catalog) => {
+  const enrich = getInventoryService()?.features?.itemModifiers?.enrichWeapon;
+  return typeof enrich === 'function' ? (enrich(weapon, catalog) ?? weapon) : weapon;
 };
 
+/** Apply any setting-owned derived item behavior, if the active setting provides it. */
 export const resolveEffectiveItem = (item, catalog) => {
-  const itemType = item?.itemType || inferItemType(item);
-  const resolver = EFFECTIVE_ITEM_RESOLVERS[itemType];
-  return resolver ? resolver(item, catalog) : item;
+  const resolve = getInventoryService()?.resolveModifiedItem;
+  if (typeof resolve !== 'function') return item;
+  const resolved = resolve(item, catalog);
+  return resolved === null || resolved === undefined ? item : resolved;
 };
 
 /**
- * Обогатить инстанс предмета каталожными данными по id.
- *
- * Каталог = источник истины: каталожные данные (вес/цена/эффект/статы/имя) — из
- * каталога (base); из инстанса — только состояние экземпляра (INSTANCE_FIELDS).
- * Поэтому правки JSON применяются к уже созданным персонажам сразу. Если записи в
- * каталоге нет (модифицированное оружие с id-суффиксом, синтетические id) —
- * инстанс возвращается как есть.
- *
- * @param {object} instance — запись из стора/сейва (минимум: { id, itemType? })
- * @param {object} catalog  — getEquipmentCatalog(locale)
- * @returns {object}
+ * Enrich one stored item instance with its catalog record. The setting owns the
+ * mapping from its instance key to catalog ID and the instance-only payload
+ * fields that must survive this projection.
  */
 export const resolveItem = (instance, catalog) => {
   if (!instance || !instance.id) return instance;
+  const inventoryService = getInventoryService();
   const itemType = instance.itemType || inferItemType(instance);
-  // Store rows use `id` as the inventory instance key. The catalog id lives in
-  // `weaponId` for weapons and most normalized items, so enrichment must look up
-  // the catalog by that canonical id instead of the instance key.
-  const catalogId = instance.weaponId || instance.id;
+  const getCatalogItemId = inventoryService?.getCatalogItemId;
+  const catalogId = (typeof getCatalogItemId === 'function' ? getCatalogItemId(instance) : null)
+    || instance.catalogId
+    || instance.id;
   const base = findCatalogEntry(catalog, catalogId, itemType);
   if (!base) return instance;
+
   const instanceState = {};
-  INSTANCE_FIELDS.forEach((f) => { if (instance[f] !== undefined) instanceState[f] = instance[f]; });
+  getInstanceFields().forEach((field) => {
+    if (instance[field] !== undefined) instanceState[field] = instance[field];
+  });
   return resolveEffectiveItem({ ...base, ...instanceState, name: base.name }, catalog);
 };
 
-/**
- * Цена предмета. каталог использует cost, общие товары — value; price — запасной.
- * Единое место, чтобы не было «хлам показывает 0».
- */
+/** Generic catalog price projection, with support for common legacy aliases. */
 export const getItemPrice = (item) =>
   parseFloat(item?.cost ?? item?.price ?? item?.value) || 0;
 
-/** Вес предмета (перенос запятой → точка, как было в InventoryScreen). */
+/** Generic catalog weight projection. */
 export const getItemWeight = (item) =>
   parseFloat(String(item?.weight ?? 0).replace(',', '.')) || 0;

@@ -9,12 +9,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import useCharacterStore from '../../src/store/characterStore';
+import { selectItemsByEquipped } from '../../src/store/selectors';
 import {
-  resolveStoreItemIdFromItems,
-  storeItemToWeaponDisplay,
-  weaponModPatchToStore,
-  selectItemsByEquipped,
-} from '../../src/store/selectors';
+  resolveFalloutStoreItemIdFromItems as resolveStoreItemIdFromItems,
+  storeItemToFalloutWeaponDisplay as storeItemToWeaponDisplay,
+  falloutWeaponModPatchToStore as weaponModPatchToStore,
+} from '../../modules/fallout/logic/storeSelectors.js';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 import { classifyModWritePlan, modIdList } from '../../src/engine/items/weaponMods';
 import { diffModInstallPlan } from '../../domain/modsEquip';

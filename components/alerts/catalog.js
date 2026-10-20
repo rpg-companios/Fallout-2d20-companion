@@ -141,22 +141,6 @@ export const ALERTS = {
       { key: 'cancel', labelKey: 'screen.actions.cancel', value: null, style: 'cancel' },
     ],
   },
-  robotCannotSelfUse: {
-    scope: 'inventory',
-    kind: 'info',
-    titleKey: 'screen.alerts.robotCannotSelfUseTitle',
-    messageKey: 'screen.alerts.robotCannotSelfUseMessage',
-  },
-  leadBellyReroll: {
-    scope: 'inventory',
-    kind: 'choice',
-    titleKey: 'screen.alerts.leadBellyRerollTitle',
-    messageKey: 'screen.alerts.leadBellyRerollMessage',
-    buttons: [
-      { key: 'reroll', labelKey: 'screen.alerts.leadBellyRerollConfirm', value: 'reroll' },
-      { key: 'keep', labelKey: 'screen.alerts.leadBellyRerollKeep', value: 'keep', style: 'cancel' },
-    ],
-  },
   replaceEquipment: {
     scope: 'inventory',
     kind: 'confirm',
@@ -221,5 +205,29 @@ export const ALERTS = {
     titleKey: 'gameSetting.delete',
     messageTemplate: '{name}',
     destructive: true,
+  },
+
+  // Обновление сеттинга по сети (2026-10-20): сеттинг сам смотрит в свой
+  // репозиторий и при запуске проверяет релиз. Для сеттингов без autoInstall
+  // это подтверждение, для остальных — отчёт об установке.
+  settingUpdateAvailable: {
+    scope: 'home',
+    kind: 'confirm',
+    titleKey: 'gameSetting.updateTitle',
+    messageKey: 'gameSetting.updateAvailable',
+    confirmKey: 'gameSetting.updateNow',
+    cancelKey: 'gameSetting.updateLater',
+  },
+  settingUpdated: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'gameSetting.updateTitle',
+    messageKey: 'gameSetting.updateInstalled',
+  },
+  settingUpdateFailed: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'gameSetting.updateTitle',
+    messageKey: 'gameSetting.updateFailed',
   },
 };

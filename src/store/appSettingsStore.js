@@ -10,7 +10,6 @@ import {
 import {
   getActiveModuleId,
   getModuleLocales,
-  getRegisteredModuleIds,
   resolveModuleLocale,
 } from '../../domain/moduleLocale';
 import {
@@ -25,7 +24,6 @@ import {
 // Ручной выбор языка контента также раздельный по сеттингам и не смешивается
 // с языком интерфейса движка.
 const ENGINE_KEY = 'engine';
-const MODULE_ID = getActiveModuleId();
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, Math.floor(Number(value) || min)));
 
@@ -45,23 +43,47 @@ const applySettingValue = (setting, value) => {
 const isEngineSetting = (settingId) =>
   ENGINE_SETTINGS.some((setting) => setting.id === settingId);
 
-const buildDefaults = () => {
-  const defaults = { [ENGINE_KEY]: {}, [MODULE_ID]: {} };
+const ENGINE_SETTING_IDS = new Set(ENGINE_SETTINGS.map((setting) => setting.id));
+const LEGACY_VALUES_KEY = '$legacySettings';
+const getSettingLegacyKeys = (setting) => (
+  Array.isArray(setting?.legacyKeys) && setting.legacyKeys.length > 0
+    ? [...new Set(setting.legacyKeys.filter((key) => typeof key === 'string'))]
+    : [setting?.id].filter(Boolean)
+);
+
+const findLegacySettingValue = (setting, sources = []) => {
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of getSettingLegacyKeys(setting)) {
+      if (source[key] !== undefined && source[key] !== null) {
+        return { found: true, key, value: source[key] };
+      }
+    }
+  }
+  return { found: false, key: null, value: undefined };
+};
+
+const buildDefaults = (moduleId = getActiveModuleId()) => {
+  const defaults = { [ENGINE_KEY]: {} };
   ENGINE_SETTINGS.forEach((setting) => {
     defaults[ENGINE_KEY][setting.id] = setting.defaultValue;
   });
-  getModuleSettings(MODULE_ID).forEach((setting) => {
-    defaults[MODULE_ID][setting.id] = setting.defaultValue;
-  });
+  if (moduleId) {
+    defaults[moduleId] = {};
+    getModuleSettings(moduleId).forEach((setting) => {
+      defaults[moduleId][setting.id] = setting.defaultValue;
+    });
+  }
   return defaults;
 };
 
 const syncRuntimeLocales = (values, moduleLocales = {}) => {
   const engineLocale = setCurrentLocale(values?.[ENGINE_KEY]?.language);
+  const moduleId = getActiveModuleId();
   const moduleLocale = resolveModuleLocale({
-    moduleId: MODULE_ID,
+    moduleId,
     engineLocale,
-    manualLocale: moduleLocales[MODULE_ID] ?? null,
+    manualLocale: moduleId ? moduleLocales[moduleId] ?? null : null,
   });
   setCurrentModuleLocale(moduleLocale);
 };
@@ -74,80 +96,140 @@ syncRuntimeLocales(initial);
 
 const migrateNestedState = (persistedState) => {
   const defaults = buildDefaults();
-  const previousValues = persistedState.values || {};
+  const previousValues = persistedState?.values && typeof persistedState.values === 'object'
+    ? persistedState.values
+    : {};
   const previousEngine = previousValues[ENGINE_KEY] || {};
-  const previousModule = previousValues[MODULE_ID] || {};
+  const values = Object.fromEntries(
+    Object.entries(previousValues).map(([scope, scopedValues]) => [
+      scope,
+      scopedValues && typeof scopedValues === 'object' ? { ...scopedValues } : scopedValues,
+    ]),
+  );
   const engine = { ...defaults[ENGINE_KEY], ...previousEngine };
-  const fallout = { ...defaults[MODULE_ID], ...previousModule };
+  ENGINE_SETTINGS.forEach((setting) => {
+    engine[setting.id] = applySettingValue(
+      setting,
+      previousEngine[setting.id] ?? setting.defaultValue,
+    );
+  });
+  values[ENGINE_KEY] = engine;
+  const activeModuleId = getActiveModuleId();
+  const previousModuleValues = activeModuleId && values[activeModuleId]
+    ? values[activeModuleId]
+    : {};
+  const previousLegacyValues = values[LEGACY_VALUES_KEY]
+    && typeof values[LEGACY_VALUES_KEY] === 'object'
+    ? values[LEGACY_VALUES_KEY]
+    : {};
+  for (const [key, value] of Object.entries(previousEngine)) {
+    if (!ENGINE_SETTING_IDS.has(key)) {
+      if (previousLegacyValues[key] === undefined) previousLegacyValues[key] = value;
+      delete engine[key];
+    }
+  }
+  const consumedLegacyKeys = new Set();
+  const migratedEngineKeys = new Set();
 
-  const previousLanguage = previousEngine.language ?? previousModule.language;
+  const previousLanguage = previousEngine.language
+    ?? Object.entries(previousValues).find(([scope, value]) => (
+      scope !== ENGINE_KEY
+      && scope !== LEGACY_VALUES_KEY
+      && value?.language
+    ))?.[1]?.language;
   engine.language = SUPPORTED_LOCALES.includes(previousLanguage)
     ? previousLanguage
     : defaults[ENGINE_KEY].language;
 
-  const previousDisplayMode = previousModule.weaponCardsDisplayMode
-    ?? previousEngine.weaponCardsDisplayMode;
-  fallout.weaponCardsDisplayMode = ['cards', 'spoilers'].includes(previousDisplayMode)
-    ? previousDisplayMode
-    : 'cards';
-
-  // Эти настройки сменили владельца: язык относится к движку, а доступные
-  // способы показа оружия объявляет Fallout.
-  delete engine.weaponCardsDisplayMode;
-  delete fallout.language;
-
-  const moduleLocales = {};
-  for (const moduleId of getRegisteredModuleIds()) {
-    const previousManualLocale = persistedState.moduleLocales?.[moduleId];
-    if (getModuleLocales(moduleId).includes(previousManualLocale)) {
-      moduleLocales[moduleId] = previousManualLocale;
+  for (const [scope, scopedValues] of Object.entries(values)) {
+    if (scope !== ENGINE_KEY && scopedValues && typeof scopedValues === 'object') {
+      delete scopedValues.language;
     }
+  }
+
+  if (activeModuleId) {
+    const moduleValues = {
+      ...(defaults[activeModuleId] || {}),
+      ...previousModuleValues,
+    };
+    const activeSettings = getModuleSettings(activeModuleId);
+    for (const setting of activeSettings) {
+      const legacy = findLegacySettingValue(setting, [previousLegacyValues, previousEngine]);
+      const currentValue = previousModuleValues[setting.id];
+      moduleValues[setting.id] = applySettingValue(
+        setting,
+        currentValue ?? legacy.value ?? setting.defaultValue,
+      );
+      for (const key of getSettingLegacyKeys(setting)) {
+        if (Object.prototype.hasOwnProperty.call(previousLegacyValues, key)) {
+          consumedLegacyKeys.add(key);
+        }
+        if (Object.prototype.hasOwnProperty.call(previousEngine, key) && !ENGINE_SETTING_IDS.has(key)) {
+          migratedEngineKeys.add(key);
+        }
+      }
+    }
+    consumedLegacyKeys.forEach((key) => delete previousLegacyValues[key]);
+    migratedEngineKeys.forEach((key) => delete engine[key]);
+    values[activeModuleId] = moduleValues;
+  }
+
+  if (Object.keys(previousLegacyValues).length > 0) {
+    values[LEGACY_VALUES_KEY] = previousLegacyValues;
+  } else {
+    delete values[LEGACY_VALUES_KEY];
+  }
+
+  const moduleLocales = Object.fromEntries(
+    Object.entries(persistedState?.moduleLocales || {})
+      .filter(([, locale]) => typeof locale === 'string'),
+  );
+  if (activeModuleId && !getModuleLocales(activeModuleId).includes(moduleLocales[activeModuleId])) {
+    delete moduleLocales[activeModuleId];
   }
 
   return {
     ...persistedState,
-    values: { [ENGINE_KEY]: engine, [MODULE_ID]: fallout },
+    values,
     moduleLocales,
   };
 };
 
 const migrateFlatState = (persistedState) => {
   const defaults = buildDefaults();
-  const fallout = { ...defaults[MODULE_ID] };
+  const old = persistedState && typeof persistedState === 'object' ? persistedState : {};
   const engine = { ...defaults[ENGINE_KEY] };
-  const old = persistedState || {};
-  const qualityEnabled = old.randomWeaponQualityEnabled
-    ?? old.randomWeaponDurabilityEnabled
-    ?? false;
+  ENGINE_SETTINGS.forEach((setting) => {
+    engine[setting.id] = applySettingValue(
+      setting,
+      old[setting.id] ?? setting.defaultValue,
+    );
+  });
 
-  // Слово владельца 421: «износ» и «произвольное качество» — два
-  // самостоятельных пункта, друг от друга не зависят. Старый общий
-  // переключатель (randomWeaponDurabilityEnabled) раскладывается на оба
-  // пункта поровну; явный выбор игрока всегда главнее (416: износ по
-  // умолчанию включён).
-  if (old.weaponDurabilityLossEnabled !== undefined) {
-    fallout.weaponDurabilityLossEnabled = Boolean(old.weaponDurabilityLossEnabled);
-  } else if (old.randomWeaponDurabilityEnabled !== undefined) {
-    fallout.weaponDurabilityLossEnabled = Boolean(old.randomWeaponDurabilityEnabled);
-  } else {
-    fallout.weaponDurabilityLossEnabled = true;
-  }
-  fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+  const moduleId = getActiveModuleId();
+  const moduleSettings = moduleId ? getModuleSettings(moduleId) : [];
+  const moduleValues = {};
+  const consumedLegacyKeys = new Set();
+  moduleSettings.forEach((setting) => {
+    const legacy = findLegacySettingValue(setting, [old]);
+    moduleValues[setting.id] = applySettingValue(
+      setting,
+      legacy.value ?? setting.defaultValue,
+    );
+    if (legacy.found) consumedLegacyKeys.add(legacy.key);
+  });
 
-  fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
-  fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;
-  fallout.weaponCardsDisplayMode = ['cards', 'spoilers'].includes(old.weaponCardsDisplayMode)
-    ? old.weaponCardsDisplayMode
-    : 'cards';
-  engine.characterFoldersEnabled = old.characterFoldersEnabled ?? false;
-  engine.characterDeleteActionPlacement = ['menu', 'card'].includes(old.characterDeleteActionPlacement)
-    ? old.characterDeleteActionPlacement
-    : 'menu';
-  engine.language = SUPPORTED_LOCALES.includes(old.language)
-    ? old.language
-    : defaults[ENGINE_KEY].language;
+  const legacyValues = Object.fromEntries(
+    Object.entries(old).filter(([key]) => (
+      !ENGINE_SETTING_IDS.has(key)
+      && !consumedLegacyKeys.has(key)
+    )),
+  );
+  const values = { [ENGINE_KEY]: engine };
+  if (moduleId) values[moduleId] = moduleValues;
+  if (Object.keys(legacyValues).length > 0) values[LEGACY_VALUES_KEY] = legacyValues;
 
-  return { values: { [ENGINE_KEY]: engine, [MODULE_ID]: fallout }, moduleLocales: {} };
+  return { values, moduleLocales: {} };
 };
 
 const useAppSettingsStore = create(
@@ -159,18 +241,74 @@ const useAppSettingsStore = create(
 
       finishSettingsHydration: () => set({ settingsHydrated: true }),
 
+      activateActiveModuleSettings: (moduleId = getActiveModuleId()) => {
+        if (!moduleId) {
+          syncRuntimeLocales(get().values, get().moduleLocales);
+          return;
+        }
+        const state = get();
+        const settings = getModuleSettings(moduleId);
+        const existingValues = state.values[moduleId] || {};
+        const engineValues = { ...(state.values[ENGINE_KEY] || {}) };
+        const legacyValues = { ...(state.values[LEGACY_VALUES_KEY] || {}) };
+        const moduleValues = { ...existingValues };
+        const consumedLegacyKeys = new Set();
+        const migratedEngineKeys = new Set();
+
+        settings.forEach((setting) => {
+          const legacy = findLegacySettingValue(setting, [legacyValues, engineValues]);
+          moduleValues[setting.id] = applySettingValue(
+            setting,
+            existingValues[setting.id] ?? legacy.value ?? setting.defaultValue,
+          );
+          for (const key of getSettingLegacyKeys(setting)) {
+            if (Object.prototype.hasOwnProperty.call(legacyValues, key)) {
+              consumedLegacyKeys.add(key);
+            }
+            if (Object.prototype.hasOwnProperty.call(engineValues, key) && !ENGINE_SETTING_IDS.has(key)) {
+              migratedEngineKeys.add(key);
+            }
+          }
+        });
+        consumedLegacyKeys.forEach((key) => delete legacyValues[key]);
+        migratedEngineKeys.forEach((key) => delete engineValues[key]);
+
+        const nextValues = {
+          ...state.values,
+          [ENGINE_KEY]: engineValues,
+          [moduleId]: moduleValues,
+        };
+        if (Object.keys(legacyValues).length > 0) {
+          nextValues[LEGACY_VALUES_KEY] = legacyValues;
+        } else {
+          delete nextValues[LEGACY_VALUES_KEY];
+        }
+        const moduleLocales = { ...state.moduleLocales };
+        if (!getModuleLocales(moduleId).includes(moduleLocales[moduleId])) {
+          delete moduleLocales[moduleId];
+        }
+        set({ values: nextValues, moduleLocales });
+        syncRuntimeLocales(get().values, get().moduleLocales);
+      },
+
       getValue: (settingId) => {
         const setting = getSettingById(settingId);
-        if (!setting) throw new Error(`[appSettingsStore] Неизвестная настройка "${settingId}"`);
-        const scope = isEngineSetting(settingId) ? ENGINE_KEY : MODULE_ID;
+        const moduleId = getActiveModuleId();
+        if (!setting) {
+          if (!moduleId && !isEngineSetting(settingId)) return null;
+          throw new Error(`[appSettingsStore] Неизвестная настройка "${settingId}"`);
+        }
+        const scope = isEngineSetting(settingId) ? ENGINE_KEY : moduleId;
         const current = get().values[scope]?.[settingId];
         return current !== undefined ? current : getSettingDefault(settingId);
       },
 
       setValue: (settingId, value) => {
         const setting = getSettingById(settingId);
+        const moduleId = getActiveModuleId();
         if (!setting) throw new Error(`[appSettingsStore] Неизвестная настройка "${settingId}"`);
-        const scope = isEngineSetting(settingId) ? ENGINE_KEY : MODULE_ID;
+        const scope = isEngineSetting(settingId) ? ENGINE_KEY : moduleId;
+        if (!scope) throw new Error(`[appSettingsStore] Нет активного сеттинга для настройки "${settingId}"`);
         const normalized = applySettingValue(setting, value);
         set((state) => ({
           values: {
@@ -185,10 +323,10 @@ const useAppSettingsStore = create(
 
       getSettingValue: (settingId) => get().getValue(settingId),
 
-      getModuleLocale: (moduleId = MODULE_ID) => resolveModuleLocale({
+      getModuleLocale: (moduleId = getActiveModuleId()) => resolveModuleLocale({
         moduleId,
         engineLocale: get().getValue('language'),
-        manualLocale: get().moduleLocales[moduleId] ?? null,
+        manualLocale: moduleId ? get().moduleLocales[moduleId] ?? null : null,
       }),
 
       setModuleLocale: (moduleId, locale) => {
@@ -204,11 +342,6 @@ const useAppSettingsStore = create(
       setCharacterFoldersEnabled: (value) => get().setValue('characterFoldersEnabled', value),
       setCharacterDeleteActionPlacement: (value) => get().setValue('characterDeleteActionPlacement', value),
       setLanguage: (value) => get().setValue('language', value),
-      setWeaponCardsDisplayMode: (value) => get().setValue('weaponCardsDisplayMode', value),
-      setWeaponDurabilityLossEnabled: (value) => get().setValue('weaponDurabilityLossEnabled', value),
-      setWeaponDurabilityLossPer10Shots: (value) => get().setValue('weaponDurabilityLossPer10Shots', value),
-      setRandomWeaponQualityEnabled: (value) => get().setValue('randomWeaponQualityEnabled', value),
-      setUnarmedAttackVisible: (value) => get().setValue('unarmedAttackVisible', value),
     }),
     {
       name: 'settings',
@@ -219,7 +352,7 @@ const useAppSettingsStore = create(
           ? migrateNestedState(persistedState)
           : migrateFlatState(persistedState)
       ),
-      version: 2,
+      version: 3,
       onRehydrateStorage: () => (state) => {
         if (state) {
           syncRuntimeLocales(state.values, state.moduleLocales);
@@ -238,11 +371,4 @@ export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScr
 export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
 export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');
-export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');
-export const selectWeaponDurabilityLossEnabled = (state) => state.getSettingValue('weaponDurabilityLossEnabled');
-export const selectWeaponDurabilityLossPer10Shots = (state) => state.getSettingValue('weaponDurabilityLossPer10Shots');
-export const selectRandomWeaponQualityEnabled = (state) => state.getSettingValue('randomWeaponQualityEnabled');
-export const selectUnarmedAttackVisible = (state) => state.getSettingValue('unarmedAttackVisible');
-export const selectRobotArmPartsStrictReplace = (state) => state.getSettingValue('robotArmPartsStrictReplace');
-export const selectSurvivalModeEnabled = (state) => state.getSettingValue('survivalModeEnabled');
-export const selectSurvivalTimeCourseMinutes = (state) => state.getSettingValue('survivalTimeCourseMinutes');
+export const selectSettingValue = (settingId) => (state) => state.getSettingValue(settingId);

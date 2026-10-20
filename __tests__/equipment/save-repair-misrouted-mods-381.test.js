@@ -12,7 +12,7 @@
 //   • повторный прогон ничего не меняет (идемпотентность).
 import { describe, expect, it } from 'vitest';
 
-import { repairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
+import { repairMisroutedWeaponMods } from '../../modules/fallout/migrations/weaponModCanonical.js';
 import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
 
 const weaponModIds = new Set(catalogData.map((m) => m.id));

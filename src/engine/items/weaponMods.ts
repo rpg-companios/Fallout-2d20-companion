@@ -1,11 +1,11 @@
 /**
  * Движковый контракт модов предмета (универсальный, сеттинга не знает).
  *
- * Решение владельца (2026-09-22): модификация предметов — свойство многих
- * игр, поэтому форма правды и классификация места записи живут в движке;
- * сеттинг (Fallout) подставляет только каталог модов и хранилища.
+ * Modifier identifiers and list/map conversion are shared engine operations.
+ * Active settings provide their catalog IDs, target discovery, record fields,
+ * and any additional target semantics through optional capabilities.
  *
- * Единая форма правды: ЭКЗЕМПЛЯР оружия несёт СПИСОК id модов.
+ * Единая форма правды: модифицируемый экземпляр несёт СПИСОК id модификаторов.
  *   — в хранилищах и сейвах список id (`modIds`);
  *   — карта «слот → id» (`appliedMods`) — выводимый вид для экрана,
  *     мод сам знает свой слот; пустая карта означает «модов нет».
@@ -62,70 +62,23 @@ export function modIdMap<M extends { slot?: string | null; id?: string }>(
   return out;
 }
 
-/** Роль экземпляра оружия внутри слота робота (форма слота — дело сеттинга). */
-export type RobotWeaponRole = 'held' | 'installed' | 'ownAttack';
-
-/**
- * Стабильный ключ-носитель для закона 343/344 на робо-оружии: оружие в слоте
- * робота — НЕ предмет сумки (комплект кладёт его внутрь конечности), поэтому
- * мод-экземпляр привязывается к паре «слот + id оружия». Ключ одинаков в
- * каждой сессии — снятие мода и замена конечности находят его снова (359).
- */
-export function robotWeaponHostKey(slotKey: string, weaponId: string | null): string {
-  return `robotSlot:${slotKey}:${weaponId ?? 'unknown'}`;
-}
-
-/** План записи выбора модов: куда и какой экземпляр меняется. */
+/** Common persistence destinations shared by item-modifier screens. */
 export type WeaponModWritePlan =
   | { kind: 'storeItem'; itemId: string }
-  | { kind: 'equippedWeapon'; uniqueId: string }
-  | { kind: 'robotSlot'; slotKey: string; role: RobotWeaponRole; weaponId: string | null };
+  | { kind: 'equippedWeapon'; uniqueId: string };
 
-/** Карточка оружия на экране: поля, по которым строится план. */
+/** Neutral identifiers for a stored or equipped item instance. */
 export type WeaponCardRef = {
-  /** Слот робота, показавший карточку (если карточка из слотов робота). */
-  sourceSlot?: string | null;
-  /** Роль внутри слота: ладонь / установленное / собственная атака. */
-  attackRole?: RobotWeaponRole | null;
-  /** Наследие старых карточек: встроенное (установленное или собственное). */
-  isBuiltin?: boolean | null;
-  /** Предмет инвентаря (id записи хранилища), если карточка из инвентаря. */
   storeItemId?: string | null;
-  /** Ключ экземпляра в списке надетого оружия человека. */
   uniqueId?: string | null;
-  /** id оружия (база из каталога). */
-  id?: string | null;
-  weaponId?: string | null;
-};
-
-/** Контекст, которого нет на карточке: чем занят слот робота. */
-export type ModWriteContext = {
-  /** В слоте робота есть оружие в ладони (ветка ладони законна). */
-  slotHasHeldWeapon?: boolean;
 };
 
 /**
- * План записи выбора модов. Роль внутри слота берётся из `attackRole`;
- * у старых карточек без роли она выводится: встроенное — установленное,
- * иначе (если слот занят ладонью) — ладонь. Инвентарь и надетое оружие
- * человека различаются по наличию id записи хранилища.
+ * Classify only engine-owned item locations. A setting that has additional
+ * target types extends this operation in its own package and passes opaque
+ * target IDs to the engine's generic modifier actions.
  */
-export function classifyModWritePlan(
-  ref: WeaponCardRef,
-  context: ModWriteContext = {},
-): WeaponModWritePlan | null {
-  const weaponId = ref.weaponId ?? ref.id ?? null;
-
-  if (ref.sourceSlot) {
-    let role = ref.attackRole ?? null;
-    if (!role) {
-      role = ref.isBuiltin ? 'installed' : (context.slotHasHeldWeapon ? 'held' : null);
-    }
-    if (role) {
-      return { kind: 'robotSlot', slotKey: ref.sourceSlot, role, weaponId };
-    }
-  }
-
+export function classifyModWritePlan(ref: WeaponCardRef): WeaponModWritePlan | null {
   if (ref.storeItemId) {
     return { kind: 'storeItem', itemId: ref.storeItemId };
   }

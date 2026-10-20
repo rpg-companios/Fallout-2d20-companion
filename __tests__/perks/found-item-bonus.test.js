@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemBonus';
+import { rollFoundItemBonuses, sumFoundItemBonus } from '../../modules/fallout/loot/foundItemBonus';
 import { calculatePerkEffects } from '../../domain/perks';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 

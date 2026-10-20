@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
-import { findTraitById, getTraitI18nById } from '../../../../../../domain/traits';
+import { findTraitById, getTraitI18nById } from '../../../../logic/traits.js';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { tCharacterScreen, getSkillDisplayName } from '../../logic/characterScreenI18n';
-import { ALL_SKILL_KEYS } from '../../../../../../domain/characterCreation';
+import { ALL_SKILL_KEYS } from '../../../../logic/characterCreation.js';
 
 export const GenericTraitModal = ({ visible, onSelect, onClose, origin, originIdForConfig, skills }) => {
   const actualOriginId = origin?.id || originIdForConfig;

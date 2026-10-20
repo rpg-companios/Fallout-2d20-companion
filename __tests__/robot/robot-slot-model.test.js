@@ -1,6 +1,6 @@
 // __tests__/robot/robot-slot-model.test.js
 //
-// Этап 2: чистые функции новой модели слота (domain/robotSlots.js).
+// Этап 2: чистые функции новой модели слота (modules/fallout/logic/robotSlots.js).
 // Тесты изолированы от рабочего кода: функции пока никуда не подключены,
 // каталог берётся из реестра по умолчанию.
 
@@ -25,12 +25,12 @@ import {
   setInstalledWeaponMods,
   resolveHit,
   validateHitTable,
-} from '../../domain/robotSlots';
-import { getRobotLimbCatalog } from '../../domain/registry';
+} from '../../modules/fallout/logic/robotSlots';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 import modsCatalog from '../../modules/fallout/data/equipment/weapon_mods.json';
 import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
 
-const catalog = getRobotLimbCatalog();
+const catalog = getFalloutRobotLimbCatalog();
 const limbById = (id) => catalog.limbs.find((l) => l.id === id);
 const weaponLimbById = (id) => catalog.weaponAsLimb.find((l) => l.id === id);
 const weaponById = (id) => catalog.weapons.find((w) => w.id === id);

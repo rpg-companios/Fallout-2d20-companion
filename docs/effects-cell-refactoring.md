@@ -170,12 +170,12 @@ const safeNewHP = currentHP >= healingCap ? currentHP : newHP;
 ### 3.5 Локализация
 
 ```json
-// i18n/ru-RU/screens/weaponsAndArmor/screen.json
+// modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json
 {
   "radiation": "Радиация"
 }
 
-// i18n/en-EN/screens/weaponsAndArmor/screen.json
+// modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json
 {
   "radiation": "Radiation"
 }
@@ -194,7 +194,7 @@ const safeNewHP = currentHP >= healingCap ? currentHP : newHP;
 |  `modules/fallout/screens/WeaponsAndArmorScreen/` | Создать `RadiationCounter.js` — счётчик (+/−) по образцу `HealthCounter` |
 | `styles/WeaponsAndArmorScreen.styles.js` | Добавить стили для `EffectsPanel` и `RadiationCounter` |
 | `domain/effects.js` | Расширить агрегатор — собирать эффекты из всех источников |
-| `domain/characterCreation.js` | Добавить `getEffectiveMaxHP(character)` — вычитает уровень радиации из базового maxHP |
+| `modules/fallout/logic/characterCreation.js` | Добавить `getEffectiveMaxHP(character)` — вычитает уровень радиации из базового maxHP |
 | `db/` | Добавить поле `radiation INTEGER DEFAULT 0` в схему SQLite; WebAdapter-миграция |
 | `store/characterStore.js` (или Zustand-слайс) | Добавить `radiation`, `setRadiation(n)`, `incrementRadiation()`, `decrementRadiation()` |
 
@@ -221,7 +221,7 @@ function getAllActiveEffects(character) { ... }
 // }
 ```
 
-### 4.3 Расчёт знаменателя ОЗ (`domain/characterCreation.js`)
+### 4.3 Расчёт знаменателя ОЗ (`modules/fallout/logic/characterCreation.js`)
 
 Приложение не вводит «эффективный максимум» — знаменатель отображается как есть, даже если уходит в 0 или ниже. Решение о состоянии персонажа остаётся за столом.
 

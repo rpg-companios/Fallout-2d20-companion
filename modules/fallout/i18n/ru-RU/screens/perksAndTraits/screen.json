@@ -1,11 +1,49 @@
 {
-  "errors": {
-    "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
+  "labels": {
+    "name": "Название",
+    "rank": "Ранг",
+    "rankValue": "Ранг {rank}",
+    "ranksProgress": "Ранги {current} из {max}",
+    "description": "Описание",
+    "traitsSection": "Черты",
+    "perksSection": "Перки"
   },
-  "perkSelected": {
-    "intensiveTrainingSuccess": "Перк \"{perkName}\" выбран! Вы получили +{bonus} очко атрибута. Перейдите на вкладку \"Персонаж\", чтобы распределить его."
+  "buttons": {
+    "addPerk": "+ Добавить перк",
+    "changePerk": "Изменить",
+    "removePerk": "Убрать"
+  },
+  "alerts": {
+    "warningTitle": "Предупреждение",
+    "errorTitle": "Ошибка",
+    "perkSelectedTitle": "Перк выбран",
+    "duplicatePerksFixedTitle": "Дубли перков убраны",
+    "duplicatePerksFixedMessage": "Лишние копии перков сняты — освободившиеся выборы можно потратить заново.",
+    "perkMissingIdTitle": "В сохранении найден неизвестный перк",
+    "perkMissingIdMessage": "Эти перки не найдены в каталоге и сняты: {perks}.",
+    "dormantPerksTitle": "Перки, которые пока не работают",
+    "dormantPerksMessage": "По правилам книги сейчас не действуют: {perks}. Они снова заработают, когда выполнятся условия, — или замените их кнопкой «Заменить» в списке перков."
+  },
+  "warnings": {
+    "perkLimitReached": "На текущем уровне больше перков взять нельзя",
+    "perkAlreadyAtMaxRank": "Этот перк уже взят на максимальном ранге"
   },
   "modal": {
+    "title": "Выберите перк",
+    "replaceTitle": "Заменить перк",
+    "searchPlaceholder": "Поиск",
+    "filterSpoiler": "Поиск и фильтр",
+    "requiresLevel": "Требуется уровень: {required} (текущий: {current})",
+    "requiresAttribute": "Требуется {code}: {required} (текущий: {current})",
+    "alreadyAtMaxRank": "Уже взят на максимальном ранге ({current}/{max})",
+    "excludedByPerk": "Нельзя взять вместе с уже выбранным перком",
+    "buttons": {
+      "choose": "Выбрать",
+      "cancelChoice": "Отменить выбор",
+      "confirm": "Подтвердить",
+      "cancel": "Отмена",
+      "remove": "Убрать перк"
+    },
     "attributeFilters": {
       "STR": "СИЛ",
       "END": "ВЫН",
@@ -16,13 +54,11 @@
       "LCK": "УДЧ"
     }
   },
-  "alerts": {
-    "duplicatePerksFixedTitle": "Дубли перков убраны",
-    "duplicatePerksFixedMessage": "Лишние копии перков сняты — освободившиеся выборы можно потратить заново.",
-    "perkMissingIdTitle": "В сохранении найден неизвестный перк",
-    "perkMissingIdMessage": "Эти перки не найдены в каталоге и сняты: {perks}.",
-    "dormantPerksTitle": "Перки, которые пока не работают",
-    "dormantPerksMessage": "По правилам книги сейчас не действуют: {perks}. Они снова заработают, когда выполнятся условия, — или замените их кнопкой «Заменить» в списке перков."
+  "errors": {
+    "intensiveTrainingRequirements": "Перк \"Интенсивные тренировки\" можно взять только на уровне 2+ или после завершения создания персонажа (распределения атрибутов)"
+  },
+  "perkSelected": {
+    "intensiveTrainingSuccess": "Перк \"{perkName}\" выбран! Вы получили +{bonus} очко атрибута. Перейдите на вкладку \"Персонаж\", чтобы распределить его."
   },
   "dormant": {
     "prefix": "Не работает",

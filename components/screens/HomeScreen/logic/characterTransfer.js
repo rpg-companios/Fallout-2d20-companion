@@ -10,7 +10,7 @@
  */
 
 import { Platform } from 'react-native';
-import { debugLog } from '../../../../src/debug/falloutDebug';
+import { debugLog } from '../../../../src/engine/debug/runtimeTrace.js';
 import {
   EXPORT_FORMAT_VERSION,
   EXPORT_FILE_EXTENSION,
@@ -19,6 +19,7 @@ import {
   createCharacterExportPayload,
   parseCharacterImportPayload,
 } from '../../../../domain/characterTransfer';
+import { getCharacterFilePickerDescription } from '../../../../src/utils/characterFileLabels.js';
 
 const traceCharacterTransfer = (level, ...details) => debugLog(`characterTransfer.${level}`, {
   details: details.map((detail) => (detail instanceof Error
@@ -335,7 +336,7 @@ export const pickCharacterFileWeb = async () => {
           const blob = await fsAccess.fileOpen({
             mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
             extensions: [EXPORT_FILE_EXTENSION, '.json', '*'].filter(Boolean),
-            description: 'Файл персонажа Fallout 2d20 (.rpgc или .json)',
+            description: getCharacterFilePickerDescription({ withExtensions: true }),
             multiple: false,
           });
           traceCharacterTransfer('info', '✅ browser-fs-access получил файл');

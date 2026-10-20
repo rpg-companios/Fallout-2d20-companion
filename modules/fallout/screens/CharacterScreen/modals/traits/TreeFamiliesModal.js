@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { renderTextWithIcons } from '../../../WeaponsAndArmorScreen/textUtils';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, ScrollView } from 'react-native';
-import { getTraitI18nById, findTraitById } from '../../../../../../domain/traits';
+import { getTraitI18nById, findTraitById } from '../../../../logic/traits.js';
 import { tCharacterScreen } from '../../logic/characterScreenI18n';
 
 export const traitConfig = { originId: 'TreeFamilies', modalType: 'choice' };

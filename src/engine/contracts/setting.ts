@@ -18,7 +18,7 @@ import type { Requirement } from './requirements';
 
 /** Полное объявление сеттинга для движка. */
 export interface SettingExtension {
-  /** Префикс сеттинга: 'fallout', 'test'. Все id внутри — с ним. */
+  /** Setting namespace prefix, e.g. `setting` or `test`; all IDs use it. */
   id: string;
   /** Поля состояния персонажа (контракт патча 207, без изменений). */
   fieldKey?: string;

@@ -1,4 +1,5 @@
 import useCharacterStore from '../../../../../src/store/characterStore';
+import { useSettingAction } from '../../../../../src/store/useSettingAction.js';
 import React, { useMemo } from 'react';
 import {
   Modal,
@@ -9,9 +10,10 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { applyLimbReplacement } from '../../../../../domain/robotEquip';
-import { limbOptionsForSlot } from '../../../../../domain/robotSlots';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { applyLimbReplacement } from '../../../logic/robotEquip.js';
+import { selectFalloutRobotState } from '../../../store/robotSelectors.js';
+import { limbOptionsForSlot } from '../../../logic/robotSlots.js';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
@@ -116,17 +118,18 @@ const LimbCard = ({ limb, isSelected, onPress }) => (
  */
 const LimbUpgradeModal = ({ visible, slotKey, currentLimb, bodyPlan, onClose }) => {
   // Шаг 8а: слоты робота и комплект — слайсы стора напрямую.
-  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
-  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const equippedRobotSlots = useCharacterStore((s) => selectFalloutRobotState(s).slots ?? null);
+  const setEquippedRobotSlots = useSettingAction('robotEquipment', 'setEquippedRobotSlots');
   const equipment = useCharacterStore((s) => s.equipment);
   const setEquipment = useCharacterStore((s) => s.setEquipment);
   // Надетое оружие — Шаг 3 миграции: список пишется напрямую в стор.
   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   useLocale();
   const moduleLocale = useModuleLocale();
+  const catalogRevision = useModuleCatalogRevision();
   const equipmentCatalog = useMemo(
     () => getEquipmentCatalog(moduleLocale),
-    [moduleLocale],
+    [moduleLocale, catalogRevision],
   );
 
   // Build filtered limb list

@@ -31,7 +31,7 @@ const usePackStore = create(
       clearPack: () => set({ pack: null }),
     }),
     {
-      name: 'fallout2d20:pack',
+      name: 'setting:pack',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({ pack: state.pack }),
     },

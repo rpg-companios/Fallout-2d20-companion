@@ -8,8 +8,8 @@
 //
 // КОНТРАКТЫ (не менялись):
 //   - формат сейва: buildSnapshot → mergeSnapshotWithStoreData →
-//     serializeState → slimSaveData; исторические ключи сохранены
-//     (caps/effects/modifiedItems-пары/schemaVersion);
+//     serializeState → slimSaveData; common and setting-owned legacy keys are
+//     preserved by the save capability (effects/modifiedItems/schemaVersion);
 //   - старые сейвы читаются (миграции migrations.js + гидрация расширений);
 //   - автосейв: debounce 500 мс, только для уже сохранённого персонажа
 //     (isSaved + currentCharacterId), облако — фоном;
@@ -20,13 +20,8 @@
 // как и раньше.
 
 import * as db from '../../db';
-import { debugLog } from '../debug/falloutDebug';
+import { debugLog } from '../engine/debug/runtimeTrace.js';
 import { showRawAlert } from '../../components/alerts/alertService';
-import ruPerksAndTraitsScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
-import enPerksAndTraitsScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
-// 411: имена перков для уведомления мигратора — по языку интерфейса.
-import ruPerksI18n from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
-import enPerksI18n from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
 import useCharacterStore from '../store/characterStore';
 import {
   denormalizeCharacterState,
@@ -38,45 +33,35 @@ import { CURRENT_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from '../store/saveSche
 import { slimSaveData, restoreSaveData } from '../../domain/saveSlimming';
 import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
 import { getItemId } from '../../domain/itemIdentity';
-import { canonizeLoadedCharacterItems } from '../../domain/kitItemCanonical';
-import { findEnrichedOrigin, getBuiltinBaseWeapon } from '../../domain/origins';
+import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
+import { findEnrichedOrigin } from '../../domain/origins';
 import {
   createInitialAttributes,
-  ALL_SKILLS,
+  getAllSkills,
   getLuckPoints,
-  getAttributeValue,
   getAttributeLimits,
 } from '../../domain/characterCreation';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getCurrentLocale, getCurrentModuleLocale } from '../../i18n/locale';
 import { migrateSkillsToCanonical } from '../../domain/skillCanonical';
-import { migrateWeaponModIdsToCanonical, repairMisroutedWeaponMods as migrateRepairMisroutedWeaponMods } from '../../domain/weaponModCanonical';
 // 399: сверка «записи модов ↔ слоты оружия» по недостатку (анти-двоение).
 import { syncWeaponModInstances } from '../../domain/weaponModInstances';
-import { resolveBodyPlan } from '../../domain/bodyplan';
-import { resolveKitItems } from '../../domain/kitResolver';
 import { inspectSelectedPerkRecords } from '../../domain/perks';
-import { getPerks } from '../../domain/registry';
+import { getPerks, getPerksI18n, getSettingScreenI18n, getSettingService } from '../../domain/registry';
 import {
   createStateExtensionFields,
   hydrateStateExtensionFields,
 } from '../store/stateExtensions';
 import { selectLegacyAttributes, selectLegacySkills } from '../store/selectors';
-import { CHEM_DOSE_WINDOW_MS } from '../store/orchestratorsSlice';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
 const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-const PERK_ALERTS_DICT = {
-  'ru-RU': ruPerksAndTraitsScreen.alerts || {},
-  'en-EN': enPerksAndTraitsScreen.alerts || {},
-};
-// 411: отсутствие ключа больше не роняет загрузку — вернётся сам ключ.
-const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()]?.[key] ?? key;
-const PERK_NAMES_DICT = { 'ru-RU': ruPerksI18n, 'en-EN': enPerksI18n };
+// 411: missing package-owned alert/name keys never block save loading.
+const tPerkAlert = (key) => getSettingScreenI18n('perksAndTraits', getCurrentLocale())?.alerts?.[key] ?? key;
 const perkDisplayName = (id) => {
-  const list = PERK_NAMES_DICT[getCurrentLocale()] || [];
+  const list = getPerksI18n(getCurrentLocale());
   return list.find((perk) => perk?.id === id)?.name || id;
 };
 // Диалоги идут через общий AlertHost — одна React-модалка на вебе и на нативе.
@@ -104,7 +89,9 @@ const clampAttributesToRules = (rawAttributes, trait) => {
     const value = Number(attribute.value);
     if (!Number.isFinite(value)) return attribute;
 
-    const { max } = getAttributeLimits(trait, attribute.name);
+    const limits = getAttributeLimits(trait, attribute.name);
+    if (!limits || !Number.isFinite(Number(limits.max))) return attribute;
+    const { max } = limits;
     if (value <= max) return attribute;
 
     debugLog('character.attribute.clampedOnLoad', {
@@ -168,30 +155,36 @@ const deserializeState = (data) => {
   // текущей версии. Миграции покрывают будущие изменения формата — вместо
   // «плодящихся fallback» в loadCharacter.
   let migrated = migrateCharacterState(data);
-  // Канонизация id модов оружия (патч 375): mod_NNN → канон-id, слияние
-  // фантомных дублей. Без подъёма версии схемы — как migrateSkillsToCanonical;
-  // идемпотентно, канон-id проходят насквозь.
-  migrated = migrateWeaponModIdsToCanonical(migrated);
+  // Optional setting-owned catalog-id repairs run before catalog restoration.
+  const normalizeBeforeCatalogRestore = getSettingService('saveMigrations')?.normalizeBeforeCatalogRestore;
+  if (typeof normalizeBeforeCatalogRestore === 'function') {
+    migrated = normalizeBeforeCatalogRestore(migrated);
+  }
   // «Худые» сейвы (schemaVersion 19+) хранят только состояние экземпляра;
   // восстанавливаем каталожные данные (имя/цену/вес/статы/моды) здесь, чтобы
   // старые «жирные» и новые «худые» сейвы давали одинаковый рендер.
   // Каталог строим один раз на загрузку, а не на каждый предмет.
   const catalog = catalogForCurrentLocale();
-  // Ремонт сейвов после бага 380 (патч 381): appliedMods, записанные на
-  // не-оружие, снимаются; мод-предметы с осиротевшими флагами возвращаются
-  // в сумку. Идемпотентно, робо-привязки не тронуты.
-  if (catalog?.weaponMods?.length) {
-    const weaponModIds = new Set(catalog.weaponMods.map((m) => m.id));
-    // 400: универсальный закон — сверка ведёт ВСЕ семьи модов: оружейные,
-    // броняные и уникальные броняные (оружейные уже включают робо-моды).
-    const allModIds = new Set(weaponModIds);
-    (catalog.armorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
-    (catalog.uniqArmorMods || []).forEach((m) => m?.id && allModIds.add(m.id));
-    // Сначала сверка «записи ↔ слоты» (создать недостающие/вернуть лишние
-    // в пачку), затем ремонт 381 (мусор оружейных модов на не-оружии).
-    // Оба — по недостатку и идемпотентно: повторная загрузка ничего не меняет.
-    syncWeaponModInstances(migrated, allModIds);
-    migrateRepairMisroutedWeaponMods(migrated, weaponModIds);
+  const repairSettingWeaponMods = getSettingService('saveMigrations')?.repairMisroutedWeaponMods;
+  const modifierStorage = getSettingService('inventory')?.features?.modifierStorage;
+  const getModifierIdSets = modifierStorage?.getCatalogModifierIdSets;
+  const modifierIdSets = catalog && typeof getModifierIdSets === 'function'
+    ? getModifierIdSets(catalog)
+    : null;
+  const allModifierIds = modifierIdSets?.allModifierIds;
+  const weaponModifierIds = modifierIdSets?.weaponModifierIds;
+  if (allModifierIds instanceof Set && weaponModifierIds instanceof Set && weaponModifierIds.size > 0) {
+    // Shared reconciliation processes opaque target IDs; setting-owned
+    // discovery, record fields, and orphan policy arrive through the capability.
+    syncWeaponModInstances(migrated, allModifierIds, {
+      getModifierId: modifierStorage.getModifierId,
+      getAdditionalHostRoles: modifierStorage.getAdditionalHostRoles,
+      createModifierInstance: modifierStorage.createModifierInstance,
+      shouldPreserveUnmatched: modifierStorage.shouldPreserveUnmatched,
+    });
+    if (typeof repairSettingWeaponMods === 'function') {
+      repairSettingWeaponMods(migrated, weaponModifierIds);
+    }
   }
   const restored = catalog
     ? restoreSaveData(migrated, { resolve: (item) => resolveItemInCatalog(item, catalog) })
@@ -205,8 +198,8 @@ const deserializeState = (data) => {
   // пересохранится уже без картотеки, а предметы не потеряют вид.
   // Записи без пары (предмет продан/потерян) оседают в стор-альбоме
   // как раньше (read-only поддержка инвентаря). Мост стоит ДО
-  // канонизации id (canonizeLoadedCharacterItems), чтобы переехавшие
-  // предметы прошли починку битых id на общих основаниях.
+  // setting-owned нормализации id, чтобы переехавшие предметы прошли
+  // починку каталожных ссылок на общих основаниях.
   const albumPairs = Array.isArray(restored.modifiedItems) ? restored.modifiedItems : [];
   if (albumPairs.length > 0) {
     const albumById = new Map(albumPairs.map(([albumItemId, albumItem]) => [albumItemId, albumItem]));
@@ -268,21 +261,18 @@ const mergeSnapshotWithStoreData = (snapshot) => {
 
 /**
  * Снимок персонажа для сейва — целиком из состояния стора (Шаг 8б).
- * Исторические ключи формата: caps (ресурс), effects («эффекты трейтов»,
- * стор-поле traitEffects), activeTimedEffects (денормализация словаря
- * timed-эффектов), modifiedItems (Map), equippedRobotSlots (null для
- * «не робот»). Производные (maxLuckPoints, carryWeight, meleeBonus,
- * initiative, defense) в сейв НЕ идут — вычисляются при загрузке
- * (docs/architecture/counters-storage.md, правило 1).
+ * Общие исторические ключи формата включают effects, activeTimedEffects и
+ * modifiedItems. Setting-owned save fields добавляются optional characterSave
+ * capability с сохранением их прежних имён. Производные
+ * (maxLuckPoints, carryWeight, meleeBonus, initiative, defense) в сейв НЕ идут —
+ * вычисляются при загрузке (docs/architecture/counters-storage.md, правило 1).
  */
 export const buildSnapshot = () => {
   const state = useCharacterStore.getState();
-  const slots = state.robot?.slots ?? null;
-  const hasRobotState = Boolean(
-    (slots && Object.keys(slots).length > 0)
-    || (state.robot?.modules?.length > 0)
-    || state.robot?.mk2Installed,
-  );
+  const getSettingSnapshotFields = getSettingService('characterSave')?.getSnapshotFields;
+  const settingSnapshotFields = typeof getSettingSnapshotFields === 'function'
+    ? getSettingSnapshotFields(state)
+    : {};
   return {
     characterName: state.characterName,
     level: state.level,
@@ -300,22 +290,8 @@ export const buildSnapshot = () => {
     activeTimedEffects: denormalizeEffects(state.effects || {}),
     sceneCounter: state.sceneCounter,
     equippedWeapons: state.equippedWeapons,
-    // Робо-поля не описывают органического персонажа и не засоряют его файл.
-    // При загрузке отсутствие полей означает стандартное пустое robot-состояние.
-    ...(hasRobotState ? {
-      equippedRobotSlots: slots,
-      equippedRobotModules: state.robot?.modules ?? [],
-      mk2Installed: state.robot?.mk2Installed ?? false,
-    } : {}),
-    equippedArmor: state.equippedArmor,
-    equippedPowerArmor: state.equippedPowerArmor,
-    powerArmorRuntime: state.powerArmorRuntime,
-    // Рантайм-имя ресурса — currency (стор), поле сейва остаётся caps:
-    // персистентный формат не меняем (совместимость со старыми сохранениями
-    // и migrations.js).
-    caps: state.currency,
+    ...settingSnapshotFields,
     currentHealth: state.currentHealth,
-    radiation: state.radiation,
     // Формат-v2 (247): картотека модификаций в снапшот не входит —
     // моды живут на предметах (id+моды); содержимое старых сейвов
     // переносится на предметы при загрузке (мост в deserializeState).
@@ -325,10 +301,7 @@ export const buildSnapshot = () => {
     skillsSaved: state.skillsSaved,
     selectedPerks: state.selectedPerks,
     conditions: state.conditions,
-    chemDosesLog: state.chemDosesLog,
     sceneRiskStates: state.sceneRiskStates,
-    lastDiseaseResistAt: state.lastDiseaseResistAt,
-    ...state.stateExtensions,
   };
 };
 
@@ -404,10 +377,13 @@ export const loadCharacter = async (id) => {
   try {
     const row = await db.loadCharacterById(id);
     if (!row) return false;
-    // Мост канонизации (по образцу патча 225): битые id предметов китов
-    // (фальшивая вода food_purified_water) переименовываются в канонические.
-    // См. domain/kitItemCanonical.js; версия схемы сейва не меняется.
-    const data = canonizeLoadedCharacterItems(deserializeState(row.data));
+    // Optional setting migration canonicalizes legacy item IDs after generic
+    // catalog restoration; it does not change the schema version.
+    const decodedData = deserializeState(row.data);
+    const canonizeSettingLoadedItems = getSettingService('saveMigrations')?.canonizeLoadedItems;
+    const data = typeof canonizeSettingLoadedItems === 'function'
+      ? canonizeSettingLoadedItems(decodedData)
+      : decodedData;
     // Автосейв загружаемые данные не перезаписывает: блокируем флагом.
     useCharacterStore.setState({ isSaved: false });
 
@@ -421,7 +397,7 @@ export const loadCharacter = async (id) => {
       level: data.level ?? 1,
     });
     st.setBaseAttributes(loadedAttributes);
-    st.setBaseSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map((sk) => ({ ...sk, value: 0 })));
+    st.setBaseSkills(migrateSkillsToCanonical(data.skills) || getAllSkills().map((sk) => ({ ...sk, value: 0 })));
     st.setSelectedSkills(data.selectedSkills || []);
     st.setExtraTaggedSkills(data.extraTaggedSkills || []);
     st.setForcedSelectedSkills(data.forcedSelectedSkills || []);
@@ -439,51 +415,41 @@ export const loadCharacter = async (id) => {
       origin: resolveOrigin(data.origin),
       trait: data.trait || null,
     }));
-    // Migrate old [null, null] format to dynamic array
+    // Migrate old [null, null] format to a dynamic array. Setting-owned
+    // weapon cleanup/injection and state hydration are prepared by an optional
+    // package capability; without one, the engine keeps only the generic list.
     const rawWeapons = data.equippedWeapons || [];
-    let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((w) => w !== null) : [];
-    // 360 (репорт владельца: «Смешанный конденсатор не снимается»): в старых
-    // сейвах робо-оружие оседало копией-призраком в equippedWeapons (карточка
-    // с устаревшими appliedMods). Правда о модах робо-оружия — только слоты
-    // (robot.slots), призрак при загрузке вычищается: иначе он всплывает
-    // устаревшим набором модов, который «не снимается».
-    const ghostCount = migratedWeapons.filter((w) => w?.sourceSlot).length;
-    if (ghostCount > 0) {
-      migratedWeapons = migratedWeapons.filter((w) => !w?.sourceSlot);
-      debugLog('character.load.robotGhostPurged', { count: ghostCount });
-    }
-    // Ensure the archetype's built-in unarmed weapon is present on load
-    // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
+    const migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((weapon) => weapon !== null) : [];
     const loadedOrigin = resolveOrigin(data.origin);
-    const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
-    if (builtin && !migratedWeapons.some((w) => w?.id === builtin.id)) {
-      migratedWeapons = [builtin, ...migratedWeapons];
+    const prepareSettingCharacterLoad = getSettingService('characterLoad')?.prepare;
+    const preparedSettingLoad = typeof prepareSettingCharacterLoad === 'function'
+      ? prepareSettingCharacterLoad({
+        data,
+        origin: loadedOrigin,
+        trait: loadedTrait,
+        equippedWeapons: migratedWeapons,
+      })
+      : null;
+    const preparedStateExtensions = preparedSettingLoad?.stateExtensions;
+    if (preparedStateExtensions && typeof preparedStateExtensions === 'object' && !Array.isArray(preparedStateExtensions)) {
+      const currentExtensions = useCharacterStore.getState().stateExtensions;
+      useCharacterStore.getState().setStateExtensions({
+        ...currentExtensions,
+        ...preparedStateExtensions,
+      });
     }
-    useCharacterStore.getState().setEquippedWeapons(migratedWeapons);
-    // Seed the store's robot body plan first so derived carry-weight resolves
-    // correctly, then load slots/modules (экшены слайса robot).
-    useCharacterStore.getState().loadRobotState({
-      bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
-      slots: data.equippedRobotSlots ?? {},
-      modules: data.equippedRobotModules ?? [],
-      mk2Installed: data.mk2Installed ?? false,
-    });
-    // Встроенное оружие конечностей (манипуляторы, ладонные орудия) НЕ хранится
-    // в equippedWeapons: экраны читают его из слотов стора — единый источник.
-    // Слой брони/СБ из сейва — одним стор-действием; недоодетый диалог выбора
-    // блока при загрузке всегда сбрасывается.
-    useCharacterStore.getState().loadPowerArmorState({
-      equippedArmor: data.equippedArmor,
-      equippedPowerArmor: data.equippedPowerArmor,
-      powerArmorRuntime: data.powerArmorRuntime,
-    });
-    // Абсолютная установка из сейва: инкрементальные earnCurrency/spendCurrency
-    // для этого не годятся. Поле сейва — data.caps: формат не переименовываем.
-    useCharacterStore.getState().setCurrency(data.caps ?? 0);
+    const equippedWeapons = Array.isArray(preparedSettingLoad?.equippedWeapons)
+      ? preparedSettingLoad.equippedWeapons
+      : migratedWeapons;
+    useCharacterStore.getState().setEquippedWeapons(equippedWeapons);
+    // Shared armor slots are engine-owned; setting payloads were normalized by
+    // the package and merged through the generic state-extension map above.
+    useCharacterStore.getState().setEquippedArmor(data.equippedArmor || createEmptyEquippedArmor());
+    // Absolute restore uses a store action rather than incremental currency ops.
+    // The active setting's load capability maps its legacy save field to currency.
+    useCharacterStore.getState().setCurrency(preparedSettingLoad?.currency ?? data.currency ?? 0);
     useCharacterStore.setState({
       currentHealth: data.currentHealth ?? 0,
-      radiation: Math.max(0, data.radiation ?? 0),
-      lastDiseaseResistAt: data.lastDiseaseResistAt ?? null,
       modifiedItems: Object.fromEntries(
         data.modifiedItems instanceof Map
           ? data.modifiedItems.entries()
@@ -498,13 +464,8 @@ export const loadCharacter = async (id) => {
       attributesSaved: data.attributesSaved ?? false,
       skillsSaved: data.skillsSaved ?? false,
       conditions: data.conditions || [],
-      chemDosesLog: (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS),
-      // Журнал «одноразовые награды за tagged-навыки выданы» (патч 244:
-      // паспорт сейва вскрыл рассинхрон — ключ писался мерджем со стором,
-      // но загрузкой не читался; после сейв→загрузка игра забывала о
-      // выданных наградах и могла вручить их заново). Старые сейвы без
-      // ключа дают [] — поведение прежнее.
-      rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
+      // Optional setting-owned reward journal; absent capability means empty.
+      rewardedSkills: preparedSettingLoad?.rewardedSkills ?? [],
     });
     st.setSelectedPerks(data.selectedPerks || []);
     if (data.pendingPerkDuplicateNotice) {
@@ -551,27 +512,16 @@ export const loadCharacter = async (id) => {
       );
     }
 
-    // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
-    // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
-    // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
-    // в data.caps — оставляем как есть (комплект NIGHTKIN крышек не даёт).
-    if (data.nightkinKitPending && data.equipment?.id === 'nightkin') {
-      try {
-        const catalog = getEquipmentCatalog();
-        const kit = catalog?.equipmentKits?.nightkin;
-        if (!kit?.name || !Array.isArray(kit.items)) {
-          throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
-        }
-        const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
-        (resolved.items || []).forEach((item) => {
-          useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
-        });
-        st.setEquipment({ id: 'nightkin', name: kit.name, items: resolved.items || [] });
-        // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
-        data.nightkinKitPending = false;
-      } catch (e) {
-        debugLog('character.load.nightkinKitGrantFailed', { message: e?.message });
-      }
+    // Optional package-owned save finalization runs only after the generic
+    // save and store state are restored. It receives narrow store actions and
+    // cannot make the engine depend on a setting's historical IDs or catalog.
+    const finishSettingSaveLoad = getSettingService('saveMigrations')?.afterCharacterLoad;
+    if (typeof finishSettingSaveLoad === 'function') {
+      await finishSettingSaveLoad({
+        data,
+        addNewItem: (item) => useCharacterStore.getState().addNewItem(item),
+        setEquipment: (equipment) => st.setEquipment(equipment),
+      });
     }
 
     const saved = !row.renamePending;

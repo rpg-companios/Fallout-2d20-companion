@@ -7,13 +7,13 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { applyLoadAndFireToWeapon, loadAndFireBonusByRank, MIN_FIRE_RATE_FOR_BONUS } from '../../domain/perks/loadAndFire';
+import { applyLoadAndFireToWeapon, loadAndFireBonusByRank, MIN_FIRE_RATE_FOR_BONUS } from '../../modules/fallout/perks/loadAndFire';
 import {
   GLARE_OPTICS_IDS,
   IN_SHINING_ARMOR_OPTICS_ENERGY_DR,
   isGlareOpticsCatalogId,
   wearingGlareOpticsInEquippedArmor,
-} from '../../domain/perks/inShiningArmor';
+} from '../../modules/fallout/perks/effects/inShiningArmor';
 import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
 import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
 import clothesData from '../../modules/fallout/data/equipment/clothes.json';

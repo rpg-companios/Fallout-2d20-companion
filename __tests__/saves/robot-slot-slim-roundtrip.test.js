@@ -15,9 +15,9 @@ import {
   deserializeSlot,
   slotAcceptsArmor,
   totalDR,
-} from '../../domain/robotSlots';
+} from '../../modules/fallout/logic/robotSlots';
 import { slimSaveData, slimRobotSlots, restoreSaveData } from '../../domain/saveSlimming';
-import { migrateRobotPlatingIds } from '../../src/store/migrations';
+import { migrateRobotPlatingIds } from '../../modules/fallout/migrations/robotEquipment.js';
 import { resolveItem, findCatalogEntry } from '../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import fixtures from '../fixtures/robot-slots-from-saves.json';

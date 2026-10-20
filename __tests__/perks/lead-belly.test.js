@@ -1,11 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import moduleDrinks from '../../modules/fallout/data/consumables/drinks.json';
 import moduleFood from '../../modules/fallout/data/consumables/food.json';
-import {
-  rerollConsumableRadiationRoll,
-  resolveConsumableRadiationRoll,
-  resolveConsumableVitalChanges,
-} from '../../domain/effects';
+import { resolveConsumableRadiationRoll, rerollConsumableRadiationRoll } from '../../modules/fallout/consumables/radiation.js';
+import { resolveConsumableVitalChanges } from '../../modules/fallout/consumables/vitalChanges.js';
 import { calculatePerkEffects } from '../../domain/perks';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 

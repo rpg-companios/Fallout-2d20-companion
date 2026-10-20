@@ -9,7 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { tApp } from '../../i18n/appI18n';
-import { useLocale } from '../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../i18n/locale';
 import {
   fetchLatestVersion,
   readAckedVersion,
@@ -23,6 +23,7 @@ const storage = () => (typeof window !== 'undefined' ? window.localStorage : nul
 export default function UpdateNoticeModal() {
   const [notice, setNotice] = useState(null);
   const locale = useLocale();
+  useModuleLocale();
 
   useEffect(() => {
     // Веб-платформа: localStorage и /version.json существуют только там.

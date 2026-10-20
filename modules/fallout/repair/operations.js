@@ -1,24 +1,25 @@
 // modules/fallout/repair/operations.js
 //
 // Сеттинг-адаптер ремонта (патч 413): соединяет книжный движок
-// (domain/repairEngine) с каталогами и стором. Движок не знает, что такое
+// (repair/engine) с каталогами и стором. Движок не знает, что такое
 // предметы и редкость; здесь решается:
 //   - редкость предмета по каноническому id (оружие / части брони / части СБ);
 //   - +1 сложности за каждую установленную модификацию (записи installedOn);
 //   - донор — второй предмет того же канонического id (не надет, не мод,
 //     не заперт комплектом): материалы берутся из него, сложность −1 (мин 0);
-//   - успех чинит предмет существующими экшнами стора (repairWeapon /
-//     repairPowerArmorStack / repairPowerArmorPieceAt) — меняется только
-//     ЦЕНА ремонта, охват прежний;
+//   - успех обновляет durability через общий updateItem или вызывает setting-owned
+//     power-armor repair actions — меняется только ЦЕНА ремонта, охват прежний;
 //   - время: 30 минут (успех + 2 ОД → 15; осложнение +15 каждое; провал —
 //     время зря, материалы остаются — закон верстака, 323).
 
 import useCharacterStore from '../../../src/store/characterStore';
 import { selectAttributeTotal, selectSkillTotal } from '../../../src/store/selectors';
-import { evaluateRepair, runRepair } from '../../../domain/repairEngine';
+import { getFalloutPowerArmorState, FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY } from '../store/powerArmorState.js';
+import { evaluateRepair, runRepair } from './engine.js';
+import { repairWeaponDurability } from '../logic/weaponDurability.js';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { applyActivityMinutes } from '../survival/operations';
-import { getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
+import { getActionPoints, spendActionPoints } from '../logic/actionPoints.js';
 import { REPAIR_RULES, repairMaterialsPlan } from './rules';
 import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
@@ -232,12 +233,20 @@ export const markTemporaryRepairOnItem = (storeItemId, value) => {
 /** Паспорт 416: тот же флаг на НАДЕТОЙ части СБ (живёт вне items). */
 export const markTemporaryRepairOnEquippedPiece = (slot, value) => {
   useCharacterStore.setState((prev) => {
-    const piece = prev.equippedPowerArmor?.pieces?.[slot];
+    const powerArmorState = getFalloutPowerArmorState(prev);
+    const equippedPowerArmor = powerArmorState?.equippedPowerArmor;
+    const piece = equippedPowerArmor?.pieces?.[slot];
     if (!piece) return prev;
     return {
-      equippedPowerArmor: {
-        ...prev.equippedPowerArmor,
-        pieces: { ...prev.equippedPowerArmor.pieces, [slot]: { ...piece, temporaryRepair: value ? true : undefined } },
+      stateExtensions: {
+        ...(prev.stateExtensions || {}),
+        [FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY]: {
+          ...powerArmorState,
+          equippedPowerArmor: {
+            ...equippedPowerArmor,
+            pieces: { ...equippedPowerArmor.pieces, [slot]: { ...piece, temporaryRepair: value ? true : undefined } },
+          },
+        },
       },
     };
   });
@@ -350,7 +359,7 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
   // Бесплатный режим: без донора и без материалов (сложность полная).
   if (mode === 'free') donorStoreItemId = null;
   const state = useCharacterStore.getState();
-  const piece = state.equippedPowerArmor?.pieces?.[slot];
+  const piece = getFalloutPowerArmorState(state)?.equippedPowerArmor?.pieces?.[slot];
   if (!piece) return { done: false, stage: 'gate', reasons: [{ code: 'not-repairable' }] };
   const maxHp = pieceCatalogMaxHp(piece.catalogId);
   if (!Number.isFinite(maxHp) || piece.hpCurrent >= maxHp) {
@@ -397,7 +406,7 @@ export const performEquippedPieceRepair = (slot, { donorStoreItemId = null, port
     }
   }
   if (result.done) {
-    useCharacterStore.getState().repairPowerArmorPieceAt(slot);
+    useCharacterStore.getState().getSettingAction('powerArmor', 'repairPowerArmorPieceAt')(slot);
     // Честный ремонт перезачитывает временный; бесплатный ставит флаг.
     markTemporaryRepairOnEquippedPiece(slot, mode === 'free');
     result.temporary = mode === 'free';
@@ -500,12 +509,12 @@ export const performRepair = (storeItemId, { donorStoreItemId = null, ports = {}
   if (result.done) {
     const state = useCharacterStore.getState();
     if (preview.target.kind === 'weapon' || preview.target.kind === 'armor') {
-      state.repairWeapon(repairTargetId);
+      state.updateItem(repairTargetId, repairWeaponDurability());
     } else if (preview.target.kind === 'powerArmor') {
       // Надетая (в контейнере) часть чинится по слоту, пачка/штука — по записи.
       const item = state.items?.[repairTargetId];
-      if (item?.paSlot) state.repairPowerArmorPieceAt(item.paSlot);
-      else state.repairPowerArmorStack(repairTargetId);
+      if (item?.paSlot) state.getSettingAction('powerArmor', 'repairPowerArmorPieceAt')(item.paSlot);
+      else state.getSettingAction('powerArmor', 'repairPowerArmorStack')(repairTargetId);
     }
   }
   // Честный (книжный) ремонт перезачитывает временный «Очумелые ручки»;

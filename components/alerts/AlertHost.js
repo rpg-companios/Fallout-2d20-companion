@@ -11,23 +11,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { registerAlertHost } from './alertService';
 import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
-import { useLocale } from '../../i18n/locale';
+import { useLocale, useModuleLocale } from '../../i18n/locale';
 import { tApp } from '../../i18n/appI18n';
 import { tInventory } from '../screens/InventoryScreen/logic/inventoryI18n';
-import { tCharacterScreen } from '../../modules/fallout/screens/CharacterScreen/logic/characterScreenI18n';
-import tHomeScreenDict from '../../i18n/ru-RU/screens/home/screen.json';
-import tHomeScreenDictEn from '../../i18n/en-EN/screens/home/screen.json';
-import { getCurrentLocale } from '../../i18n/locale';
+import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
+import { getSettingService } from '../../domain/registry';
 
-const HOME_DICTS = { 'ru-RU': tHomeScreenDict, 'en-EN': tHomeScreenDictEn };
-
-const readPath = (dict, path) => {
-  let current = dict;
-  for (const part of String(path).split('.')) {
-    current = current?.[part];
-    if (current === undefined) return undefined;
-  }
-  return current;
+const tCharacterScreen = (path) => {
+  const translate = getSettingService('tCharacterScreen');
+  return typeof translate === 'function' ? translate(path) : path;
 };
 
 /**
@@ -36,9 +28,7 @@ const readPath = (dict, path) => {
  */
 const translate = (scope, path) => {
   if (path === undefined || path === null) return '';
-  if (scope === 'home') {
-    return readPath(HOME_DICTS[getCurrentLocale()], path) ?? path;
-  }
+  if (scope === 'home') return tHomeScreen(path);
   if (scope === 'inventory') return tInventory(path);
   if (scope === 'character') return tCharacterScreen(path);
   if (scope === 'app') return tApp(path);
@@ -54,6 +44,7 @@ const substitute = (text, params) => {
 
 const AlertHost = () => {
   useLocale();
+  useModuleLocale();
   const [request, setRequest] = useState(null);
   const resolverRef = useRef(null);
 

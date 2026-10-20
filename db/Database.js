@@ -17,10 +17,16 @@ import {
   catalogGetPerks, catalogGetItems, catalogGetItemByName, catalogRowCount,
 } from './catalogSource';
 
+// Адаптер web-платформы импортируется статически: только так сборщик тестов
+// (vite/vitest) проходит его импорты сам. `require` внутри ESM исполняется
+// Node/Metro нативно и мимо сборщика — в Node это ломалось на путях без
+// расширения ('../schema'). Нативную ветку по-прежнему грузит Metro.
+import * as webAdapter from './adapters/WebAdapter';
+
 let adapter;
 
 if (Platform.OS === 'web') {
-  adapter = require('./adapters/WebAdapter');
+  adapter = webAdapter;
 } else {
   adapter = require('./adapters/SQLiteAdapter');
 }

@@ -14,7 +14,7 @@ import useCharacterStore from '../../src/store/characterStore';
 import {
   evaluateRepair,
   runRepair,
-} from '../../domain/repairEngine';
+} from '../../modules/fallout/repair/engine.js';
 import { repairMaterialsPlan } from '../../modules/fallout/repair/rules';
 import {
   repairPreview,
@@ -488,11 +488,13 @@ describe('Проводка (слово владельца 415/417/420): одна
     expect(en.labels.rarity).toBe('Rarity');
     // tInventory резолвит (закон 422).
     setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
     expect(tInventory('screen.labels.rarity')).toBe('Редкость');
   });
 
   it('закон 423: в отчёте названия материалов, не id (как в крафте)', () => {
     setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU');
     const report = buildRepairReport({
       done: true,
       check: { rolls: [2, 3], passed: true, successes: 2, complicationCount: 0, targetNumber: 5 },
@@ -509,7 +511,8 @@ describe('Проводка (слово владельца 415/417/420): одна
   });
 
   it('закон 422: ремонтные ключи резолвятся через tInventory (без «заглушек»-путей на кнопках)', () => {
-    setCurrentLocale('ru-RU'); // tInventory живёт на ГЛОБАЛЬНОЙ локали
+    setCurrentLocale('ru-RU');
+    setCurrentModuleLocale('ru-RU'); // Inventory strings belong to the active setting locale
     // Слово владельца: «на кнопке ремонта в инвентаре стоит заглушка» —
     // ключи 413–421 звались без префикса screen. и tInventory возвращал
     // сам путь. Теперь путь полный, а тест ловит любой промах.

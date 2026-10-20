@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import globalStyles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
-import { buildRobotSlotStats } from '../../../../domain/robotSlotLogic';
+import { buildRobotSlotStats } from '../../robotSlotLogic.js';
+import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 
 // ---------------------------------------------------------------------------
 // RobotSlot
@@ -33,6 +34,7 @@ const RobotSlot = ({
     onUpgradeArmor,
     onOpenArmorPicker,
     onWeaponPress,
+    t: tWeaponsAndArmorScreen,
     hasRadImmunity,
     bodyPlan,
   });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   getItemPrice, getCartTotal, getRemaining, isWithinRarity,
   canAfford, addToCart, changeQuantity, finishPurchase,
-} from '../../domain/startingPurchase';
+} from '../../modules/fallout/logic/startingPurchase.js';
 
 const pistol = { id: 'weapon_pistol', name: 'Пистолет', cost: 50, rarity: 1 };
 const armor = { id: 'armor_leather', name: 'Кожаная броня', cost: 30, rarity: 2 };

@@ -87,7 +87,7 @@
 ✅ T-2: `ncrInfantryWeaponIds` обобщён в универсальное поле `weaponDamageBonus`
    (см. `docs/schema/06-modifiers.md` § 1.7). Движок суммирует бонусы из всех
    активных источников (parent trait + sub-traits NCR/Survivor + будущие перки/chem)
-   через `getWeaponDamageBonusFromSources` из `domain/traits.js`.
+   через `getWeaponDamageBonusFromSources` из `modules/fallout/logic/traits.js`.
 ✅ T-3: все skill-ключи в данных и коде — canonical UPPER_SNAKE_CASE. Защита от
    регрессии: `domain/contract.skills.test.js`.
 

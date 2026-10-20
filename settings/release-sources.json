@@ -1,0 +1,12 @@
+{
+  "defaults": {
+    "checkIntervalHours": 6
+  },
+  "settings": {
+    "fallout": {
+      "repository": "rpg-companios/positronium-game-settings",
+      "branch": "main",
+      "autoInstall": true
+    }
+  }
+}

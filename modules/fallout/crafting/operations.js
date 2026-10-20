@@ -11,14 +11,16 @@
 // действиями того же стора; React-контекста модуль не знает.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import { debugLog } from '../../../src/debug/falloutDebug';
-import { getCraftingCategoryRules, getCraftingRecipeById, getScrapMaterials } from '../../../domain/registry';
+import { debugLog } from '../debug.js';
+import { getCraftingCategoryRules, getCraftingRecipeById } from '../../../domain/registry';
+import { getScrapMaterials, getScrapJunkItems } from '../salvage/catalog.js';
 import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
+import { assertFalloutOutputQuantity, resolveFalloutOutputQuantity } from './outputQuantity.js';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { countActivePerkSelections } from '../../../domain/perks';
 import perksCatalog from '../data/perks/perks.json';
-import { getItemId } from '../../../domain/itemIdentity';
-import { rollByType, rollCombatDiceEffects } from '../../../domain/diceRollsLogic';
+import { getItemId } from '../logic/itemIdentity.js';
+import { rollByType, rollCombatDiceEffects } from '../logic/diceRollsLogic.js';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
 import { CRAFT_RULES } from './rules';
 // 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
@@ -27,11 +29,10 @@ import {
   JUNK_RIG_JUNK_COST,
   JUNK_RIG_MINUTES,
   juryRigMaxRarityByRank,
-} from '../../../domain/perks/juryRiggedAmmo';
-import { getScrapJunkItems } from '../../../domain/registry';
+} from '../perks/effects/juryRiggedAmmo.js';
 import { applyActivityMinutes } from '../survival/operations';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
-import { earnActionPoints, getActionPoints, spendActionPoints } from '../../../domain/actionPoints';
+import { earnActionPoints, getActionPoints, spendActionPoints } from '../logic/actionPoints.js';
 
 // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой
 // addNewItem определяет «какой это предмет»). Надетое и запертое комплектом не
@@ -272,7 +273,13 @@ export const craftingPreview = (recipeId) => {
   const { skillRank, perkRanks, inventoryCounts, engineRecipe } = heroView(recipe);
   return {
     recipe,
-    evaluation: evaluateCraft({ recipe: engineRecipe, skillRank, perkRanks, inventoryCounts }),
+    evaluation: evaluateCraft({
+      recipe: engineRecipe,
+      skillRank,
+      perkRanks,
+      inventoryCounts,
+      validateOutputQuantity: assertFalloutOutputQuantity,
+    }),
     // Цена проверки — свойство рецепта (реформа 269): право провала сжигать
     // материалы записано в самой строке (failBurnsMaterials), карт верстаков нет.
     rulesView: {
@@ -363,7 +370,11 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
     // 323: множитель выключен — надбавка за осложнения аддитивная (ниже).
     complicationDurationMultiplier: 1,
     ...(ports.rollD20 ? { rollD20: ports.rollD20 } : {}),
-    rollCD: ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
+    validateOutputQuantity: assertFalloutOutputQuantity,
+    resolveOutputQuantity: (quantity) => resolveFalloutOutputQuantity(
+      quantity,
+      ports.rollCD ?? ((diceCount) => rollByType('rollCD', diceCount)),
+    ),
     spend: (plan) => {
       const freeCounts = countInventoryByCatalogId(useCharacterStore.getState().items);
       // 404: виртуальный «любой хлам» раскладывается на реальные предметы.
@@ -428,7 +439,7 @@ export const craftRecipe = (recipeId, ports = {}, { deferTime = false, zeroDiffi
   // ОД (патч 324, слово владельца): успешная проверка пополняет ГРУППОВОЙ пул —
   // +1 ОД за каждый успех сверх сложности (крит-кубик даёт 2 успеха — его
   // прибавка уже внутри successes, d20Checks). Автоуспех (сложность 0,
-  // броска не было) и провал ОД не приносят. Пул живёт в domain/actionPoints
+  // броска не было) и провал ОД не приносят. Пул живёт в Fallout logic/actionPoints
   // (кап 6), UI-хранилище будет позже.
   if (result.done === true && result.check) {
     const gained = Math.max(0, (result.check.successes ?? 0) - (result.check.difficulty ?? 0));

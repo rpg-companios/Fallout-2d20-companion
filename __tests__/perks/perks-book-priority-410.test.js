@@ -14,7 +14,7 @@ import perksMapping from '../../docs/reference-data/perks_mapping.json';
 import catalog from '../../modules/fallout/data/perks/perks.json';
 import recipesIndex from '../../modules/fallout/data/recipes/index.json';
 import { readFileSync } from 'node:fs';
-import { perkEffects } from '../../domain/perks/index';
+import { perkEffects } from '../../modules/fallout/perks/effects/index.js';
 import { resolve } from 'node:path';
 
 const app2my = new Map(

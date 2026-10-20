@@ -9,11 +9,11 @@
 //
 // Движок владеет общими UI-настройками. Механики и доступные варианты
 // конкретной игры описывает modules/<id>/settings.json. Например, движок умеет
-// отрисовать режим tabs, но Fallout не объявляет этот вариант и потому не даёт
-// его выбрать.
+// render any declared control mode, but a setting exposes only the modes
+// it supports in its own settings manifest.
 
-import moduleSettings from '../modules/fallout/settings.json';
 import { DEFAULT_LOCALE, SUPPORTED_LOCALES } from '../i18n/locale';
+import { getActiveSettingRuntime } from '../src/engine/settings/activeSettingRuntime';
 import { getActiveModuleId } from './moduleLocale';
 
 export const SETTING_CONTROL_SURFACES = Object.freeze({
@@ -102,6 +102,13 @@ const validateSettings = (settings, moduleId) => {
     if (setting.type === 'select' && !Array.isArray(setting.options)) {
       throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" (select) без options`);
     }
+    if (setting.legacyKeys !== undefined && (
+      !Array.isArray(setting.legacyKeys)
+      || setting.legacyKeys.some((key) => typeof key !== 'string' || key.length === 0)
+      || new Set(setting.legacyKeys).size !== setting.legacyKeys.length
+    )) {
+      throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" — неверный legacyKeys`);
+    }
     if (setting.dependsOn && !settings.some((candidate) => candidate.id === setting.dependsOn)) {
       throw new Error(`[settingsCatalog] ${moduleId}: "${setting.id}" dependsOn неизвестной "${setting.dependsOn}"`);
     }
@@ -111,10 +118,12 @@ const validateSettings = (settings, moduleId) => {
 
 /** Настройки сеттинга (после валидации). */
 export const getModuleSettings = (moduleId = getActiveModuleId()) => {
+  if (!moduleId) return [];
   if (moduleId !== getActiveModuleId()) {
     throw new Error(`[settingsCatalog] модуль "${moduleId}" не зарегистрирован`);
   }
-  return validateSettings(moduleSettings, moduleId);
+  const settings = getActiveSettingRuntime()?.settings;
+  return validateSettings(settings ?? [], moduleId);
 };
 
 /** Все настройки: движковые + настройки активного сеттинга. */

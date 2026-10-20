@@ -14,14 +14,16 @@
 import { describe, expect, it } from 'vitest';
 
 import useCharacterStore from '../../src/store/characterStore';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponModById } from '../../db/Database.web';
-import { getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
+import { getBuiltinWeaponsFromSlots } from '../../modules/fallout/logic/robotEquip';
 import { classifyModWritePlan } from '../../src/engine/items/weaponMods';
-import { setInstalledWeaponMods, serializeSlot } from '../../domain/robotSlots';
+import { setInstalledWeaponMods, serializeSlot } from '../../modules/fallout/logic/robotSlots';
 import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
 
 const state = () => useCharacterStore.getState();
+const robot = () => selectFalloutRobotState(state());
 const LASER = 'weapon_laser_gun';
 const EXCITER = 'mod_photon_exciter';      // «Возбудитель фотонов» — из сейва
 const BOOSTED = 'mod_boosted_capacitor';   // «Усиленный конденсатор» — замена
@@ -55,9 +57,9 @@ const held = () => slotsFor({
 
 const load = (slots) => {
   state().resetCharacterStore();
-  state().loadRobotState({ bodyPlan: 'assaultron', slots, modules: [] });
+  state().getSettingAction('robotEquipment', 'loadRobotState')({ bodyPlan: 'assaultron', slots, modules: [] });
 };
-const laserCard = () => getBuiltinWeaponsFromSlots(state().robot?.slots || {})
+const laserCard = () => getBuiltinWeaponsFromSlots(robot()?.slots || {})
   .find((c) => c.weaponId === LASER);
 // Запись тем же планом, что экран (handleApplyModification):
 // installed → setInstalledWeaponMods; held → правка слота ладони.
@@ -69,7 +71,7 @@ const writeByPlan = (appliedMods) => {
   }, { slotHasHeldWeapon: false });
   expect(plan?.kind).toBe('robotSlot');
   if (plan.role === 'held') {
-    const slots = state().robot.slots;
+    const slots = robot().slots;
     const slot = slots[plan.slotKey];
     const next = {
       ...slots,
@@ -82,18 +84,18 @@ const writeByPlan = (appliedMods) => {
         },
       },
     };
-    state().setEquippedRobotSlots(next);
+    state().getSettingAction('robotEquipment', 'setEquippedRobotSlots')(next);
     return;
   }
   expect(plan.role).toBe('installed');
-  const next = setInstalledWeaponMods(state().robot.slots, plan.slotKey, plan.weaponId, appliedMods);
+  const next = setInstalledWeaponMods(robot().slots, plan.slotKey, plan.weaponId, appliedMods);
   expect(next).not.toBeNull();
-  state().setEquippedRobotSlots(next);
+  state().getSettingAction('robotEquipment', 'setEquippedRobotSlots')(next);
 };
 const saveAndLoad = () => {
   const slim_ = {};
-  for (const [k, v] of Object.entries(state().robot.slots)) slim_[k] = serializeSlot(v);
-  state().loadRobotState({ bodyPlan: 'assaultron', slots: slim_, modules: [] });
+  for (const [k, v] of Object.entries(robot().slots)) slim_[k] = serializeSlot(v);
+  state().getSettingAction('robotEquipment', 'loadRobotState')({ bodyPlan: 'assaultron', slots: slim_, modules: [] });
 };
 
 describe('патч 386: лазерный пистолет в руке — старые сейвы (три формы)', () => {

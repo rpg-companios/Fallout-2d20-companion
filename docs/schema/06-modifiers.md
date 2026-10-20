@@ -274,8 +274,9 @@
 - **Источники:** trait, perk, consumable effect.
 - **Поведение:** запись матчит оружие по `weaponIds[]`, `weaponId` или `skillKey`
   (UPPER_SNAKE_CASE). При совпадении прибавляет `bonus`. Несколько записей
-  суммируются. Движок суммирует из всех источников через
-  `getWeaponDamageBonusFromSources` (по тестам в `domain/weaponDamageBonus.test.js`).
+  суммируются. Fallout собирает бонусы активных источников через
+  `getWeaponDamageBonusFromSources` в `modules/fallout/logic/traits.js`; общий
+  движок параметрических модификаторов работает с target ID и не знает этот ключ.
 - **Пример:**
   ```jsonc
   "weaponDamageBonus": [
@@ -283,10 +284,7 @@
     { "skillKey": "BIG_GUNS", "bonus": -1 }
   ]
   ```
-- **Статус:** 🟡 функция `getWeaponDamageBonus` / `getWeaponDamageBonusFromSources` —
-  ожидается тестами, **но реализации в `domain/traits.js` нет**, тесты падают.
-  В данных используется только `ncrInfantryWeaponIds` (legacy). **TODO:**
-  реализовать функции + мигрировать `ncrInfantryWeaponIds` → `weaponDamageBonus`.
+- **Статус:** реализация матчирования есть в `modules/fallout/logic/traits.js`, а Fallout trait data содержит `weaponDamageBonus`. Этот matcher сейчас setting-owned; при унификации модификаторов его связь с целевым параметром следует выражать через engine modifier contract. Тесты в текущем проходе не запускались.
 
 #### `ncrInfantryWeaponIds` 🗑
 - **Тип:** `string[]`.

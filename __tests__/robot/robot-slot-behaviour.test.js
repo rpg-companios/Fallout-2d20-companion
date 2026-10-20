@@ -15,12 +15,12 @@ import {
   applyLimbReplacement,
   canReplaceLimb,
   getSlotForDirection,
-} from '../../domain/robotEquip';
+} from '../../modules/fallout/logic/robotEquip';
 import {
   getRobotSlotDamageResistance,
   getActiveRobotLayers,
-} from '../../domain/robotDamageResistance';
-import { buildRobotSlotStats } from '../../domain/robotSlotLogic';
+} from '../../modules/fallout/logic/robotDamageResistance';
+import { buildRobotSlotStats } from '../../modules/fallout/robotSlotLogic';
 import screenI18n from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
 import platingCatalogJson from '../../modules/fallout/data/equipment/robot/armor_plating.json';
 import framesCatalogJson from '../../modules/fallout/data/equipment/robot/frames.json';
@@ -29,9 +29,9 @@ import {
   resolveHit,
   slotForDirection,
   limbOptionsForSlot,
-} from '../../domain/robotSlots';
-import { getRobotSlotKeys } from '../../domain/robotEquip';
-import { getRobotLimbCatalog } from '../../domain/registry';
+} from '../../modules/fallout/logic/robotSlots';
+import { getRobotSlotKeys } from '../../modules/fallout/logic/robotEquip';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 
 import limbsCatalog from '../../modules/fallout/data/equipment/robot/limbs.json';
 import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
@@ -170,7 +170,7 @@ describe('регрессии', () => {
   });
 
   it('каталог конечностей доступен из реестра', () => {
-    const catalog = getRobotLimbCatalog();
+    const catalog = getFalloutRobotLimbCatalog();
     expect(catalog.limbs.length).toBeGreaterThan(0);
     expect(catalog.weaponAsLimb.length).toBeGreaterThan(0);
     expect(catalog.armorLayers.length).toBeGreaterThan(0);

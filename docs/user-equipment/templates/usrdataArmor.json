@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "settingId": "fallout",
+  "kind": "armor",
+  "items": [
+    {
+      "id": "usr_armor_example_raider_variant",
+      "names": {
+        "ru-RU": "Тестовый усиленный рейдерский нагрудник",
+        "en-EN": "Test Reinforced Raider Chest Armor"
+      },
+      "trueItemId": "armor_raider_chest_001",
+      "modifiers": {
+        "physicalDamageRatingModifier": {
+          "op": "+",
+          "value": 1
+        },
+        "qualityChanges": [
+          {
+            "op": "gain",
+            "qualityId": "quality_reliable"
+          }
+        ],
+        "effectChanges": [
+          {
+            "op": "gain",
+            "effectId": "effect_vicious"
+          }
+        ]
+      }
+    },
+    {
+      "id": "usr_armor_example_standalone",
+      "names": {
+        "ru-RU": "Тестовая самодельная броня",
+        "en-EN": "Test Homemade Armor"
+      },
+      "armorCategoryKey": "raiderArmor",
+      "protectedAreas": [
+        "Body"
+      ],
+      "physicalDamageRating": 1,
+      "energyDamageRating": 1,
+      "radiationDamageRating": 0,
+      "weight": 2.5,
+      "cost": 12,
+      "rarity": 0
+    }
+  ]
+}

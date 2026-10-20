@@ -9,11 +9,12 @@
 // содержимое прокручивается (скролл-закон 402).
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
 import { countFilteredItems } from '../../modules/fallout/logic/equipmentFilter';
 
 setCurrentLocale('ru-RU');
+setCurrentModuleLocale('ru-RU');
 
 const windowCode = () => readFileSync('modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal.js', 'utf8');
 

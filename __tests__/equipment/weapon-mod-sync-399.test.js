@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import { syncWeaponModInstances, robotWeaponHostKeyOf } from '../../domain/weaponModInstances';
 import { robotWeaponHostKey } from '../../src/engine/items/weaponMods';
 import { generateStackKey } from '../../domain/itemIdentity';
-import { WEAPON_MOD_ID_MAP } from '../../domain/weaponModCanonical';
+import { WEAPON_MOD_ID_MAP } from '../../modules/fallout/migrations/weaponModCanonical.js';
 import catalog from '../../modules/fallout/data/equipment/weapon_mods.json';
 
 const weaponModIds = new Set(catalog.map((m) => m.id));

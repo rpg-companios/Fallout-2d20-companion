@@ -9,9 +9,9 @@
 // правилам 261, в подстроке он не нуждается. Цвета редкостей — отдельный
 // слой UI, здесь их нет намеренно.
 
-import { getCanonicalItemId } from '../../../domain/itemIdentity';
+import { getCanonicalItemId } from '../logic/itemIdentity.js';
 import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
-import { getSalvageComposition } from '../../../domain/registry';
+import { getSalvageComposition } from './catalog.js';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
 import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling, scrapperRankForRarity } from './operations';

@@ -1,5 +1,11 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## Активное разделение Fallout package / engine (2026-10-20)
+
+Работа идёт в ветке `arena/e015864a-fallout-2d20-companion`; это отдельная задача по физическому разделению, не новый номер игрового патча. Gameplay/save format сохраняются. `domain/craftingEngine.js` больше не интерпретирует `{base, cd}` и не знает Fallout `rollCD`; setting-owned валидатор/резолвер количества находятся в `modules/fallout/crafting/outputQuantity.js`, а ролл подаётся через callback. Стандартные dN и общая механика 2d20 Combat Dice находятся в engine `domain/diceRollsLogic.js`, чтобы совместимые 2d20 settings не дублировали её; Fallout formula syntax остаётся в package adapter. Runtime host/build audit: около 228 package→engine edges / 92 исходных файлов / 89 specifiers / 43 разрешённых engine-файла (source scan approximate); 41 runtime `engine:` import сейчас в `src/engine/settings/settingRuntimeHost.js`. Builder запускается и проверяет, что каждый external `engine:` import присутствует в host map; последняя настройочная сборка — 2,863,817 bytes. `domain/registry.js` закреплён как generic host API. `domain/diceRollsLogic.js` предоставляет стандартные dN/RNG, 2d20 Combat Dice face/effect rolls и общие `rollByType`/`evaluateRollConfig`; `domain/d20Checks.js` отдельно разрешает проверки 2d20. `modules/fallout/logic/diceRollsLogic.js` оставлен как package adapter для Fallout-specific formula syntax/legacy helpers. Другим игровым системам нужны отдельные resolver APIs, но совместимые 2d20 пакеты переиспользуют engine dice API. Тесты не запускались (запрет остаётся).
+
+Оставлено без изменений: `domain/userEquipment.js`, `src/store/userEquipmentStore.js` и equipment data paths — до разделения пользовательского снаряжения не трогать. `caps` остаётся историческим on-disk полем; currency↔caps mapping принадлежит Fallout save capability. Cloud-sync engine names теперь generic (`setting_cloud_sync_enabled`, `window.SETTING_GOOGLE_DRIVE_CLIENT_ID`, neutral multipart boundaries); прежний `fallout_cloud_sync_enabled` мигрируется через Fallout package capability. Неиспользуемый `packStore` key стал `setting:pack`; `fallout2d20:user-equipment:v1` остаётся вне изменений. Drive-папка использует active `settingId`. `app.json` сохраняет slug/package/scheme Play-приложения, public legal text остаётся Fallout-branded — нужно решение владельца о product/store identity. По слову владельца APK будет собираться из отдельного engine/app repository, а TRPG/setting — из своего; фактическую APK/AAB проверку проведём после split, когда артефакт доступен (в текущей среде нет Java/Android SDK и Android project). Физический перенос блокируется только адресами целевых репозиториев, которые надо запросить до первой repo-level операции и не угадывать. Общая оценка до завершения — около 4–6 крупных этапов.
+
 > Этот файл — текущее положение дел: что сдано, что применено у владельца,
 > какой состав приложения, что ждёт решения. Новая сессия отвечает на
 > вопрос «что происходит?» отсюда, а не обходом дерева.
@@ -7,7 +13,7 @@
 > Полная история — `docs/changelog.ru.md` (сверху новые); как устроено —
 > `docs/agents/README.md` и `docs/agents/data-flows.md`.
 
-Снимок: **2026-10-08 (441)** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
+Последний исторический игровой снимок: **2026-10-08 (441)** · ветка владельческого патч-потока: `arena/01a0c8e2-fallout-2d20-companion`
 · последний сданный патч: **441** (СЛОВО ВЛАДЕЛЬЦА: «запиши в техническую память проекта, что мы делали… как работает фильтр, откуда данные, почему так… чтобы в будущем не переспрашивать… и чтобы не было придумок в стиле "о, я сейчас сделаю отдельную механику, дублирующую имеющуюся"»). ПРИМЕНЕНО: docs/agents/data-flows.md +4 раздела (НОВЫХ ФАЙЛОВ НЕ ЗАВОДИТЬ — закон 365): §10 Фильтры снаряжения (данные из каталогов/словарей, почему отдельное окно и чекбоксы категорий, почему моды НИКОГДА и качества 22, плоский список «Найдено: N», урок 433 о счётчике по словарным подписям, воронка MaterialCommunityIcons, minWidth 0); §11 Установщик (отсечка baseline=последний, грязное дерево → .install-backup, патч-файл от финала предыдущего патча с exclude только *.patch, урок baseline.json, три сценария клон-верификации, язык вывода по-человечески); §12 Сон\Ждать (wait = advanceHours без sleepMode, died по счёту до применения, через СУЩЕСТВУЮЩИЙ тик — без дублей); §13 ЗАКОНЫ И ЛОВУШКИ сеанса 425–440 (слово=ТЗ и не кодить до «делай»; имена только из словарей/каталогов — урок MacGyver; без фолбэков/хардкода; НЕ ЗАВОДИТЬ дублирующие механики; поведенческие тесты на словарях; релизы объявляет владелец; коммит+патч-файл+клон-верификация на каждую правку). Новый диалог: читать state.md (этот файл) ЗАТЕМ data-flows.md §10–13. 1570/161, tsc 0. Предыдущий снимок — **440** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
 · последний сданный патч: **440** (СЛОВО ВЛАДЕЛЬЦА: «Теперь делаем описание релиза. ЧТо изменилось от прошлой версии» — это и есть слово на РЕЛИЗ 3, покрывает патчи 402–439). ПРИМЕНЕНО: version.json — release: 3, version: 440, notes ru/en по 10 строк (перки по книгам+миграция, ремонт по книге, прочность/настройки, редкость, фильтры-воронка, «Показать (N)»+качества 22, «Сон\Ждать»+«Ожидание»+«Персонаж умер», обновление приложения, скролл окон). Защёлки: release-3-notes-440.test.js (4: release=3, язык игрока без патч/агент/отсечк, темы, не дублирует релиз 2), release-2-notes-401 ослаблена (release >= 2, контент релиза 2 не закреплён). ЛОВУШКА: жаргон-фильтр /мост/i ловил «саМОСТоятельных» — заменён на «мост контур». ПОПРАВКА (вопрос владельца «MacGyver — это что?»): в en-заметках вольный перевод «Очумелых Ручек» заменён на канон en-каталога — «Jury Rigging» (id juryRigging). ОБЪЯВЛЕНИЕ РЕЛИЗА — ЗА ВЛАДЕЛЬЦЕМ: он деплоит на реплит (na4u ручная сборка), окно «Что нового» покажется один раз (release 3 > acked 2). 1569/161, tsc 0. Предыдущий снимок — **439** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
 · последний сданный патч: **439** (СЛОВО ВЛАДЕЛЬЦА: «Правим механизм работы кнопки "Сон", она теперь называется "Сон\Ждать". В модалке сна добаляется пункт "Ожидание". Он работает почти, как сон. Только тратятся все 3 параметра выжмвания: Голод, Жажда, Сон. И не восполняются при "Ожидании". Если при режиме ожидание текущие ОЗ станут меньше 0, то показать алерт "Персонаж умер"»). ПРИМЕНЕНО: (1) survival.ts — wait()/forecastWait(): advanceHours БЕЗ sleepMode (все три лестницы тикают), hpLoss = fatigueHpLossFromEvents (⌊N/2⌋/час), часы 1..maxSleepHours целые; НЕТ sleepResult/fatigueSleepCleared/hpBonus/bedRest (rest не трогается); (2) operations.js — waitSurvival({hours}): гейты как у сна, died = currentHealth − hpLoss < 0 (store.applySurvivalHpLoss держит ОЗ ≥ 0, смерть по счёту ДО применения), мост эффектов есть, болезни/бонусов нет; (3) hooks.js — waitSurvival в useSurvivalActions; (4) SleepModal.tsx — режим mode 'sleep'|'wait' (сброс на 'sleep' при visible), переключатель Сон/Ожидание, место+заметка пустоши только во сне, прогноз buildWaitForecastLines (Голод/Жажда/Сон −N, Потеря ОЗ −N, «Персонаж умрёт» при hpBefore−hpLoss<0), confirm «Ждать», отчёт «Ожидание: N ч», при died — алерт «Персонаж умер» (title, message=строки отчёта); (5) i18n weaponsAndArmor screen.json ru/en: actions.sleep «Сон\Ждать»/«Sleep\Wait», survival.mode, survival.wait (13 ключей). Защёлка __tests__/survival/wait-439.test.js (11, включая поведенческие: сон 5→2 за 24 ч, died-флаг, гейты). ЛОВУШКА: в тестах словарей setCurrentLocale('ru-RU') обязателен (дефолт EN — закон 422). 1566/160, tsc 0. НЕ СПРОШЕНО/НЕ ДЕЛАНО: последствия смерти персонажа (владелец сказал только «алерт»; судьбы персонажей — согласовывать). ОТКРЫТО: редкость в окне фильтра (сейчас после отметки категории). Предыдущий снимок — **438** · ветка агента: `arena/01a0c8e2-fallout-2d20-companion`
@@ -98,18 +104,18 @@ uniq_* (uniq_armor_mods.json); «mod_std_boiled_leather» — старый
 оружие — моды ушли вместе (344, единая точка adjustItemQuantity —
 уже стояла); кит = «пульт с батарейками» (заводские моды — обычные
 записи, без особых пометок); при загрузке СВЕРКА ПО НЕДОСТАТКУ
-(syncWeaponModInstances, domain/weaponModInstances.js — роли = слоты
-оружия в items + робо-слоты robotSlot:...): добавляется ровно
-недостающее → повторная загрузка НИКОГДА не двоит (главное требование
-владельца); трекаются ТОЛЬКО оружейные моды каталога, броня (mod_std_)
-и робо-моды (robot_weapon_mod_*) не тронуты. Экран передаёт слот в
+(syncWeaponModInstances, domain/weaponModInstances.js) получает opaque
+`targetId`-роли через `inventory.features.modifierStorage`; Fallout-пакет
+объявляет источники ролей, поля экземпляра и политику сиротских связок.
+Добавляется ровно недостающее → повторная загрузка НИКОГДА не двоит
+(главное требование владельца); сверка остаётся по недостатку. Экран передаёт слот в
 installArmorMod. ВАРИАНТ «ключ записи в слоте» ОТКЛОНЁН владельцем
 (личные номера не нужны — штуки взаимозаменяемы). Заслоны: 399-тесты
 (пример «3 оружия», ×5 идемпотентность, старый сейв, кит, дубль,
 сирота, продажа со стором) · предыдущий: **398** (СИЛЬНЫЙ баг от владельца: «загрузил
 старый сейв — в инвентаре мод mod_043, а имена теперь все другие;
 никакого парсера в миграторе сейвов не было»). Мост 375
-(migrateWeaponModIdsToCanonical, зовётся в deserializeState) переводил
+(modules/fallout/migrations/weaponModCanonical.js, вызывается через `saveMigrations` capability в deserializeState) переводил
 только appliedMods/modIds, но НЕ каталог-id самого мод-предмета — у
 предмета-носителя это поле weaponId; старые моды из сумки оставались
 mod_NNN вне каталога = голый id вместо имени. 398: weaponId проходит
@@ -349,9 +355,9 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
 
 ## Последняя серия (311–317, моды оружия → каскад МК-3)
 
-- 311 — одна правда модов + один путь записи (контракт движка,
-  `src/engine/items/weaponMods.ts`); моды собственной атаки конечности
-  переживают сохранение.
+- 311 — одна форма id модов + generic список/карта и item-location actions
+  (`src/engine/items/weaponMods.ts`); target planning for robot equipment is
+  Fallout-owned in `modules/fallout/logic/robotWeaponMods.js`.
 - 312 — связь робо-оружия с людской базой — в данных.
 - 313 — стартовая карта агента (`docs/agents/`).
 - 314 — робо-версии = полные варианты людского (`trueItemId`), боевых
@@ -381,7 +387,7 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
   аддитивно (×2 отменено), вопрос «2 ОД → время вдвое?» после успеха;
   настройки раздела «Крафт» — потеря материалов при провале двумя группами
   (consumables/gear). Ступени 259 и множитель отменены словом владельца.
-- 324 — общий пул ОД (domain/actionPoints.js, кап 6, в движке без UI):
+- 324 — общий пул ОД (modules/fallout/logic/actionPoints.js, кап 6, package-owned):
   успешные проверки дают +1 ОД за успех сверх сложности (криты = 2 успеха);
   «2 ОД → время вдвое» тратит из пула. Групповой — мастер-экран подключится
   как есть.
@@ -611,10 +617,10 @@ mod_fusion_mag («Термоядерный магазин») → ammo_fusion_cel
   setInstalledWeaponMods, переживает сейв), но закон 343/344 на робо-ветках
   НЕ исполнялся — мод-предмет оставался в сумке («не экипируется»).
   Исправление: экран в ветке robotSlot исполняет дифф 343/344 с
-  синтетическим носителем robotWeaponHostKey(слот, id оружия)
-  (src/engine/items/weaponMods.ts); новое действие стора
-  installRobotWeaponMod (паспорт обновлён); replaceLimb/unequipHeldWeapon
-  слайса возвращают моды уходящего оружия в сумку. Карта потоков —
+  setting-owned синтетическим target ID `robotWeaponHostKey(слот, id)`
+  (`modules/fallout/logic/robotWeaponMods.js`); `modifierStorage` capability
+  описывает reconciliation targets, а robot slice возвращает моды уходящего
+  оружия в сумку. Карта потоков —
   data-flows.md. Тест robot-weapon-mod-flag-359 (5).
 - 360 — РЕПЛЕЙ ЭКСПОРТА ВЛАДЕЛЬЦА (штурмомрон, «Смешанный Снайперский
   ствол Лазерный пистолет», жалоба: «Смешанный не снимается, замена на

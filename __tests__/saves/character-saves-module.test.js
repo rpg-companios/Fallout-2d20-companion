@@ -87,14 +87,16 @@ const seedStore = () => {
     // содержимое картотеки НА ПРЕДМЕТ.
     modifiedItems: { weapon_x_01_22: { id: 'weapon_x_01_22', name: 'Винтовка мод.', damage: 9 } },
     equipment: { id: 'kit_minuteman', name: 'Застрельщик', items: [{ id: 'weapon_x_01_22', name: 'Винтовка' }] },
-    chemDosesLog: [{ chemId: 'psycho', takenAt: Date.now() - 1000 }], // свежая доза (окно CLEAN_DOSE)
-    lastDiseaseResistAt: 999,
     conditions: { disease1: { id: 'disease1', ranks: 1 } },
     selectedPerks: [],
     // Журнал «награды за tagged-навыки выданы» (патч 244: восстанавливается).
     rewardedSkills: ['small_guns', 'repair'],
-    // Расширение сеттинга (survival) — слайс stateExtensions стора.
-    stateExtensions: { survival: { day: 2 } },
+    // Fallout-owned fields share the opaque extension map and retain their flat save keys.
+    stateExtensions: {
+      survival: { day: 2 },
+      chemDosesLog: [{ chemId: 'psycho', takenAt: Date.now() - 1000 }],
+      lastDiseaseResistAt: 999,
+    },
   });
 };
 
@@ -180,8 +182,8 @@ describe('патч 242: модуль сохранений (Шаг 8б)', () => {
     // Сейв-ключ effects вернулся в стор-поле traitEffects.
     expect(state().traitEffects).toEqual([{ id: 'trait_glow', name: 'Светящийся' }]);
     // Журнал доз/условия вернулись.
-    expect(state().chemDosesLog).toHaveLength(1);
-    expect(state().chemDosesLog[0].chemId).toBe('psycho');
+    expect(state().stateExtensions.chemDosesLog).toHaveLength(1);
+    expect(state().stateExtensions.chemDosesLog[0].chemId).toBe('psycho');
     // Журнал выданных наград не потерялся (патч 244) — повторного вручения не будет.
     expect(state().rewardedSkills).toEqual(['small_guns', 'repair']);
   });

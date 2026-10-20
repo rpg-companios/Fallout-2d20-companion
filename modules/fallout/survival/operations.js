@@ -14,7 +14,7 @@
 
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
-import { debugLog } from '../../../src/debug/falloutDebug';
+import { debugLog } from '../debug.js';
 import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest, wait } from './survival';
 // 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
 // лестниц), естественная стойкость (сон в пустоши без болезни).

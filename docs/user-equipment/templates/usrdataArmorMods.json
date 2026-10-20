@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "settingId": "fallout",
+  "kind": "armorMods",
+  "items": [
+    {
+      "id": "usr_armor_mod_example_reinforcement",
+      "names": {
+        "ru-RU": "Тестовая усиливающая пластина",
+        "en-EN": "Test Reinforcement Plate"
+      },
+      "modType": "armor",
+      "modCategory": "standardMods",
+      "protectedAreas": [
+        "Body"
+      ],
+      "complexity": 1,
+      "requiredPerk": "",
+      "requiredSkill": "REPAIR",
+      "costModifier": {
+        "op": "+",
+        "value": 2
+      },
+      "weightModifier": {
+        "op": "*",
+        "value": 1.5
+      },
+      "statModifiers": {
+        "physicalDamageRating": {
+          "op": "+",
+          "value": 1
+        },
+        "energyDamageRating": {
+          "op": "*",
+          "value": 2
+        },
+        "radiationDamageRating": {
+          "op": "+",
+          "value": 0
+        }
+      },
+      "specialEffects": [
+        {
+          "id": "effect_explosive_resistance_2",
+          "value": 2
+        }
+      ]
+    }
+  ]
+}

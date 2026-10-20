@@ -1,16 +1,13 @@
-import falloutManifest from '../modules/fallout/manifest.json';
+import { getActiveSettingRuntime } from '../src/engine/settings/activeSettingRuntime';
 
-const MODULE_MANIFESTS = Object.freeze({
-  fallout: falloutManifest,
-});
+/** The active package manifest is the only source of setting locale metadata. */
+export const getActiveModuleId = () => getActiveSettingRuntime()?.manifest?.id ?? null;
 
-const ACTIVE_MODULE_ID = falloutManifest.id;
-
-/** Идентификатор сеттинга, подключённого реестром данных. */
-export const getActiveModuleId = () => ACTIVE_MODULE_ID;
-
-/** Идентификаторы всех зарегистрированных сеттингов. */
-export const getRegisteredModuleIds = () => Object.keys(MODULE_MANIFESTS);
+/** A running app has at most one active setting package. */
+export const getRegisteredModuleIds = () => {
+  const id = getActiveModuleId();
+  return id ? [id] : [];
+};
 
 const validateManifest = (manifest, moduleId) => {
   if (!manifest || manifest.id !== moduleId) {
@@ -31,23 +28,22 @@ const validateManifest = (manifest, moduleId) => {
   return manifest;
 };
 
-export const getModuleManifest = (moduleId = ACTIVE_MODULE_ID) => {
-  const manifest = MODULE_MANIFESTS[moduleId];
-  if (!manifest) {
-    throw new Error(`[moduleLocale] Модуль "${moduleId}" не зарегистрирован`);
+export const getModuleManifest = (moduleId = getActiveModuleId()) => {
+  const manifest = getActiveSettingRuntime()?.manifest;
+  if (!moduleId || !manifest || manifest.id !== moduleId) {
+    throw new Error(`[moduleLocale] Модуль "${moduleId ?? ''}" не активирован`);
   }
   return validateManifest(manifest, moduleId);
 };
 
-export const getModuleLocales = (moduleId = ACTIVE_MODULE_ID) =>
-  [...getModuleManifest(moduleId).locales];
+export const getModuleLocales = (moduleId = getActiveModuleId()) => {
+  if (!moduleId) return [];
+  return [...getModuleManifest(moduleId).locales];
+};
 
 /**
- * Язык сеттинга:
- * 1. единственный язык сеттинга;
- * 2. ручной выбор пользователя для этого сеттинга (если он был сделан);
- * 3. язык движка при точном совпадении;
- * 4. обязательный defaultLocale из manifest.
+ * Resolve the setting's language. With no installed/active package, follow the
+ * engine locale; no bundled setting is used as a hidden fallback.
  */
 export const resolveLocaleFromManifest = ({
   manifest,
@@ -68,17 +64,20 @@ export const resolveLocaleFromManifest = ({
 };
 
 export const resolveModuleLocale = ({
-  moduleId = ACTIVE_MODULE_ID,
+  moduleId = getActiveModuleId(),
   engineLocale,
   manualLocale = null,
-}) => resolveLocaleFromManifest({
-  manifest: getModuleManifest(moduleId),
-  moduleId,
-  engineLocale,
-  manualLocale,
-});
+} = {}) => {
+  if (!moduleId) return engineLocale || 'ru-RU';
+  return resolveLocaleFromManifest({
+    manifest: getModuleManifest(moduleId),
+    moduleId,
+    engineLocale,
+    manualLocale,
+  });
+};
 
-/** Второй переключатель нужен только при нескольких языках без совпадения с движком. */
+/** The second selector is only needed if the engine locale is unsupported. */
 export const shouldOfferLocaleChoiceForManifest = ({
   manifest,
   moduleId = manifest?.id,
@@ -88,9 +87,14 @@ export const shouldOfferLocaleChoiceForManifest = ({
   return locales.length > 1 && !locales.includes(engineLocale);
 };
 
-export const shouldOfferModuleLocaleChoice = ({ moduleId = ACTIVE_MODULE_ID, engineLocale }) =>
-  shouldOfferLocaleChoiceForManifest({
+export const shouldOfferModuleLocaleChoice = ({
+  moduleId = getActiveModuleId(),
+  engineLocale,
+} = {}) => {
+  if (!moduleId) return false;
+  return shouldOfferLocaleChoiceForManifest({
     manifest: getModuleManifest(moduleId),
     moduleId,
     engineLocale,
   });
+};

@@ -2,30 +2,34 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { showRawAlert } from '../../../../components/alerts/alertService';
-import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../../../domain/diseaseConditions';
+import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../diseases/diseaseConditions.js';
 import useCharacterStore from '../../../../src/store/characterStore';
+import { useSettingAction } from '../../../../src/store/useSettingAction.js';
 import { useShallow } from 'zustand/react/shallow';
 import {
   selectItemsByEquipped,
-  getEquippedArmor,
-  storeItemToWeaponDisplay,
-  weaponModPatchToStore,
-  resolveStoreItemIdFromItems,
   selectActiveTimedEffects,
   selectLegacyAttributes,
   selectLegacySkills,
 } from '../../../../src/store/selectors';
+import {
+  getFalloutEquippedArmor as getEquippedArmor,
+  storeItemToFalloutWeaponDisplay as storeItemToWeaponDisplay,
+  falloutWeaponModPatchToStore as weaponModPatchToStore,
+  resolveFalloutStoreItemIdFromItems as resolveStoreItemIdFromItems,
+} from '../../logic/storeSelectors.js';
 // МК-3 (патч 316): формулы производных — часть сеттинга, прямой импорт из логики модуля.
 import { calculateInitiative, calculateDefense, calculateMeleeBonus, calculateMeleeBonusValue, calculateMaxHealth } from '../../logic/derivedStats';
-import { getAttributeValue } from '../../../../domain/characterCreation';
-import { findTraitById, getWeaponDamageBonusFromSources } from '../../../../domain/traits';
-import { isRobotCharacter } from '../../../../domain/origins';
-import { resolveBodyPlan } from '../../../../domain/bodyplan';
-import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../../../domain/robotSlots';
+import { getAttributeValue } from '../../logic/characterCreation.js';
+import { findTraitById, getWeaponDamageBonusFromSources } from '../../logic/traits.js';
+import { isRobotCharacter } from '../../logic/originTypes.js';
+import { resolveBodyPlan } from '../../logic/bodyplan.js';
+import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../logic/robotSlots.js';
 // Единый путь записи модов (311): классификация места хранения — движок.
-import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../../../src/engine/items/weaponMods';
+import { modIdList } from '../../../../src/engine/items/weaponMods';
+import { classifyFalloutModWritePlan, robotWeaponHostKey } from '../../logic/robotWeaponMods.js';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
-import { applyLoadAndFireToWeapon } from '../../../../domain/perks/loadAndFire';
+import { applyLoadAndFireToWeapon } from '../../perks/loadAndFire.js';
 import { diffModInstallPlan } from '../../../../domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
@@ -33,33 +37,38 @@ import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
-import { getConditionCatalog } from '../../../../domain/registry';
+import { getFalloutDiseaseCatalog } from '../../diseases/catalog.js';
 import { resolveItem, resolveWeaponWithAppliedMods } from '../../../../domain/resolveItem';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../../domain/protectionKind';
 import {
   getDefenseModifierEffectLabel,
   getEffectTimeText,
+} from '../../logic/effectLabels.js';
+import {
   getTimedMaxHpBonus,
   getTimedDamageResistanceBonus,
   getTimedDefenseBonus,
-} from '../../../../domain/effects';
-import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../../../domain/weaponDisplay';
-import { applyUnarmedVisibility } from '../../../../domain/meleeSlot';
-import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../../../domain/immunities';
+} from '../../logic/timedEffectModifiers.js';
+import { resolveWeaponQualities, resolveWeaponDamageType, resolveWeaponEffects, sortWeaponsForDisplay } from '../../logic/weaponDisplay.js';
+import { applyUnarmedVisibility } from '../../logic/meleeSlot.js';
+import { hasPoisonImmunity, hasRadiationImmunity, getTraitImmunities, getOriginImmunities } from '../../logic/immunities.js';
+import { FALLOUT_RESOURCE_IDS, getFalloutRadiation } from '../../logic/radiationResource.js';
 import { tWeaponsAndArmorScreen } from './weaponsAndArmorScreenI18n';
 import { ladderColorKey, survivalEffectRows } from '../../survival/survival';
 import { useSurvivalState } from '../../survival/hooks';
 import SurvivalConsumeModal from './modals/SurvivalConsumeModal';
 import SleepModal from './modals/SleepModal';
 import { dedupeWeaponCards } from './dedupeWeaponCards';
-import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../../domain/robotEquip';
-import { getBodyPlan } from '../../../../domain/bodyplan';
+import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../logic/robotEquip.js';
+import { selectFalloutRobotState } from '../../store/robotSelectors.js';
+import { selectFalloutPowerArmorState } from '../../store/powerArmorState.js';
+import { getBodyPlan } from '../../logic/bodyplan.js';
 import {
   hasFrame,
   suppressesLayerAt,
   applyFrameAttributeModifiers,
   FUSION_CORE_ID,
-} from '../../../../domain/powerArmor';
+} from '../../logic/powerArmor.js';
 import dataPowerArmor from '../../data/equipment/powerArmor.json';
 
 // Силовая броня: каталог механики по id (рейтинги/прочность частей, модификаторы каркаса).
@@ -75,9 +84,10 @@ import ArmorModificationModal from './modal/ArmorModificationModal';
 import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
-import { debugLog } from '../../../../src/debug/falloutDebug';
-import useAppSettingsStore, { selectWeaponDurabilityLossEnabled, selectWeaponDurabilityLossPer10Shots, selectRandomWeaponQualityEnabled, selectWeaponCardsDisplayMode, selectUnarmedAttackVisible } from '../../../../src/store/appSettingsStore';
-import { isAmmoWeapon } from '../../../../domain/weaponDurability';
+import { debugLog } from '../../debug.js';
+import useAppSettingsStore from '../../../../src/store/appSettingsStore';
+import { isAmmoWeapon } from '../../logic/weaponDurability.js';
+import { applyAmmoSpendDurability } from '../../inventoryFeatures/durability.js';
 
 
 const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
@@ -122,13 +132,16 @@ const HealthCounter = ({ max, isEnabled, radiation = 0 }) => {
 };
 
 const RadiationCounter = ({ isEnabled }) => {
-  const radiation = useCharacterStore((state) => state.radiation);
-  const setRadiation = useCharacterStore((state) => state.setRadiation);
+  const radiation = useCharacterStore((state) => getFalloutRadiation(state));
+  const applySettingResourceMutation = useCharacterStore((state) => state.applySettingResourceMutation);
   const canDecrease = isEnabled && radiation > 0;
 
   const handleAdjust = (amount) => {
     if (!isEnabled) return;
-    setRadiation(prev => Math.max(0, prev + amount));
+    applySettingResourceMutation(
+      FALLOUT_RESOURCE_IDS.radiation,
+      (previous) => Math.max(0, previous + amount),
+    );
   };
 
   const text = isEnabled ? `${radiation}` : '0';
@@ -239,8 +252,8 @@ const WeaponAmmoSpendDialog = ({ ask, available, onClose, onConfirm }) => {
 const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapon, untrackedWeapon }) => {
   const storeItems = useCharacterStore((state) => state.items);
   const spendAmmoForWeapon = useCharacterStore((state) => state.spendAmmoForWeapon);
-  const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
-  const baseLossPer10Shots = useAppSettingsStore(selectWeaponDurabilityLossPer10Shots);
+  const durabilityLossEnabled = useAppSettingsStore((state) => state.getSettingValue('weaponDurabilityLossEnabled'));
+  const baseLossPer10Shots = useAppSettingsStore((state) => state.getSettingValue('weaponDurabilityLossPer10Shots'));
   // Открытый запрос расхода: { plan }
   const [ask, setAsk] = useState(null);
 
@@ -265,9 +278,11 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapo
       weaponInstanceId,
       ammoIds,
       ammoAmount: amount,
-      durabilityEnabled: durabilityLossEnabled,
-      baseLossPer10Shots,
-      untrackedWeapon,
+      allowUntrackedWeapon: untrackedWeapon,
+      itemUsePolicy: ({ item, amount: spent }) => applyAmmoSpendDurability(item, spent, {
+        durabilityLossEnabled,
+        baseLossPer10Shots,
+      }),
     });
   };
 
@@ -309,10 +324,10 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
   const moduleLocale = useModuleLocale();
   // Шаг 8а (патч 240): «Сопротивляться» болезни — стор-экшен.
   const resistDisease = useCharacterStore((state) => state.resistDisease);
-  // lastDiseaseResistAt — Шаг 6 миграции: состояние в сторе, экран читает напрямую.
-  const lastDiseaseResistAt = useCharacterStore((state) => state.lastDiseaseResistAt);
+  // The disease-resistance timestamp is setting-owned state in the extension map.
+  const lastDiseaseResistAt = useCharacterStore((state) => state.stateExtensions?.lastDiseaseResistAt ?? null);
   const diseasesById = useMemo(() => new Map(
-    getConditionCatalog('disease', moduleLocale).map((disease) => [disease.id, disease]),
+    getFalloutDiseaseCatalog(moduleLocale).map((disease) => [disease.id, disease]),
   ), [moduleLocale]);
 
   const hasImmunities = immunities.length > 0;
@@ -517,12 +532,12 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
         (Array.isArray(trait?.ids) && trait.ids.includes(id))
       )
     );
-    const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
-    const durabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
+    const randomWeaponQualityEnabled = useAppSettingsStore((state) => state.getSettingValue('randomWeaponQualityEnabled'));
+    const durabilityLossEnabled = useAppSettingsStore((state) => state.getSettingValue('weaponDurabilityLossEnabled'));
     // Нерабочее встроенное оружие (requiresMkII): карточка disabled до установки
     // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
     // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
-    const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
+    const mk2Installed = useCharacterStore((state) => selectFalloutRobotState(state).mk2Installed === true);
     if (!weapon) {
       return (
         <View style={localStyles.weaponCardContainer}>
@@ -745,12 +760,12 @@ const WeaponsAndArmorScreen = () => {
   const storeAttributes = useCharacterStore((s) => s.attributes);
   const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
-  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
-  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const equippedRobotSlots = useCharacterStore((s) => selectFalloutRobotState(s).slots ?? null);
+  const setEquippedRobotSlots = useSettingAction('robotEquipment', 'setEquippedRobotSlots');
   // Шаг 7: level/attributesSaved/trait/origin — стор напрямую.
   const level = useCharacterStore((s) => s.level);
-  // Шаг 8а: радиация — стор-каунтер.
-  const radiation = useCharacterStore((s) => s.radiation);
+  // Setting-owned resource lives in the registered extension field.
+  const radiation = useCharacterStore((state) => getFalloutRadiation(state));
   const attributesSaved = useCharacterStore((s) => s.attributesSaved);
   const trait = useCharacterStore((s) => s.trait);
   const origin = useCharacterStore((s) => s.origin);
@@ -764,12 +779,12 @@ const WeaponsAndArmorScreen = () => {
   const inventoryItems = useMemo(() => selectItemsByEquipped({ items: storeItems }, false), [storeItems]);
   const storeEquippedArmor = useMemo(() => getEquippedArmor({ items: storeItems }), [storeItems]);
   // Броня и силовая броня — Шаг 4 миграции: состояние и действия слоя
-  // напрямую из стора (powerArmorSlice), минуя фасад useCharacter().
+  // через общую state selector и Fallout-owned setting-action capability.
   // equippedArmorState — слайс надетой брони (в merged equippedArmor ниже).
   const equippedArmorState = useCharacterStore((s) => s.equippedArmor);
   const setEquippedArmor = useCharacterStore((s) => s.setEquippedArmor);
-  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
-  const adjustPowerArmorDurability = useCharacterStore((s) => s.adjustPowerArmorDurability);
+  const equippedPowerArmor = useCharacterStore((s) => selectFalloutPowerArmorState(s).equippedPowerArmor);
+  const adjustPowerArmorDurability = useSettingAction('powerArmor', 'adjustPowerArmorDurability');
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора
   // (метаданные кулаков/манипуляторов дополняют items с equipped: true).
   const equippedWeaponsMeta = useCharacterStore((s) => s.equippedWeapons);
@@ -877,11 +892,10 @@ const WeaponsAndArmorScreen = () => {
   // ── Настройки отображения оружия (переключатели — на этом экране) ───────
   // Объявляются ДО visibleEquippedWeapons, т.к. он использует
   // unarmedAttackVisible (иначе TDZ: Cannot access before initialization).
-  const weaponCardsDisplayMode = useAppSettingsStore(selectWeaponCardsDisplayMode);
-  const setWeaponCardsDisplayMode = useAppSettingsStore((state) => state.setWeaponCardsDisplayMode);
+  const weaponCardsDisplayMode = useAppSettingsStore((state) => state.getSettingValue('weaponCardsDisplayMode'));
+  const setSettingValue = useAppSettingsStore((state) => state.setValue);
   // Показ/скрытие виртуальной рукопашной атаки (кулаки/манипулятор).
-  const unarmedAttackVisible = useAppSettingsStore(selectUnarmedAttackVisible);
-  const setUnarmedAttackVisible = useAppSettingsStore((state) => state.setUnarmedAttackVisible);
+  const unarmedAttackVisible = useAppSettingsStore((state) => state.getSettingValue('unarmedAttackVisible'));
 
   // Виртуальная рукопашная атака (кулаки/манипулятор) всегда есть в первом
   // слоте, но игрок может СКРЫТЬ её карточку — тогда слот занимает оружие.
@@ -957,7 +971,7 @@ const WeaponsAndArmorScreen = () => {
   const uninstallArmorMod = useCharacterStore((state) => state.uninstallArmorMod);
   const installWeaponModFlag = useCharacterStore((state) => state.installArmorMod);
   const uninstallWeaponModFlag = useCharacterStore((state) => state.uninstallArmorMod);
-  const installRobotWeaponMod = useCharacterStore((state) => state.installRobotWeaponMod);
+  const installRobotWeaponMod = useSettingAction('robotEquipment', 'installRobotWeaponMod');
 
   const handleApplyModification = useCallback((modifiedWeapon) => {
     // 363→367 (слово владельца): после «Применить» окно закрывается КАК
@@ -968,10 +982,8 @@ const WeaponsAndArmorScreen = () => {
     const itemId = resolveStoreItemId(selectedWeaponForModification);
     debugLog('weapon.mod.apply.screen.start', { itemId, selectedWeaponForModification, modifiedWeapon });
 
-    // Единый путь записи модов (311): место хранения классифицирует движок
-    // (classifyModWritePlan), экран только исполняет план. Роли слота робота:
-    // ладонь / установленное в конечность / собственная атака конечности.
-    const modPlan = classifyModWritePlan(
+    // Fallout extends the shared item-location plan with its robot-slot targets.
+    const modPlan = classifyFalloutModWritePlan(
       {
         sourceSlot: selectedWeaponForModification?.sourceSlot,
         attackRole: selectedWeaponForModification?.attackRole,
@@ -1338,7 +1350,7 @@ const WeaponsAndArmorScreen = () => {
 
   return (
     <ImageBackground
-      source={require('../../../../assets/bg.png')}
+      source={require('../../assets/bg.png')}
       style={localStyles.background}
       imageStyle={{ opacity: 0.3 }}
     >
@@ -1489,7 +1501,7 @@ const WeaponsAndArmorScreen = () => {
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.unarmed')}
-                  onPress={() => setUnarmedAttackVisible(!unarmedAttackVisible)}
+                  onPress={() => setSettingValue('unarmedAttackVisible', !unarmedAttackVisible)}
                   style={[
                     localStyles.weaponDisplayToggleBtn,
                     unarmedAttackVisible && localStyles.weaponDisplayToggleBtnActive,
@@ -1506,7 +1518,7 @@ const WeaponsAndArmorScreen = () => {
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.spoilers')}
-                  onPress={() => setWeaponCardsDisplayMode('spoilers')}
+                  onPress={() => setSettingValue('weaponCardsDisplayMode', 'spoilers')}
                   style={[
                     localStyles.weaponDisplayToggleBtn,
                     weaponCardsDisplayMode === 'spoilers' && localStyles.weaponDisplayToggleBtnActive,
@@ -1521,7 +1533,7 @@ const WeaponsAndArmorScreen = () => {
                 <TouchableOpacity
                   accessibilityRole="button"
                   accessibilityLabel={tWeaponsAndArmorScreen('displayToggle.cards')}
-                  onPress={() => setWeaponCardsDisplayMode('cards')}
+                  onPress={() => setSettingValue('weaponCardsDisplayMode', 'cards')}
                   style={[
                     localStyles.weaponDisplayToggleBtn,
                     weaponCardsDisplayMode === 'cards' && localStyles.weaponDisplayToggleBtnActive,

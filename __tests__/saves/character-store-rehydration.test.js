@@ -28,7 +28,6 @@ describe('characterStore: PWA rehydration', () => {
         effects: {},
         selectedPerks: [],
         rewardedSkills: [],
-        robot: current.robot,
         stateExtensions: {
           survival: {
             enabled: true,

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
-import { useLocale } from '../../../../i18n/locale';
-// 406: КОЛЛЕКЦИОНЕР КРЫШЕК — покупки на 10% дешевле (предзаполнение цены).
+import { useModuleLocale } from '../../../../i18n/locale';
+import { getSettingService } from '../../../../domain/registry.js';
 import useCharacterStore from '../../../../src/store/characterStore';
 
-const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
-  useLocale();
+const BuyItemModal = ({ visible, onClose, item, balance, onConfirmBuy }) => {
+  useModuleLocale();
   const [quantity, setQuantity] = useState('1');
   const [pricePerItem, setPricePerItem] = useState('0');
 
@@ -15,10 +15,10 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
     if (!item) return;
     setQuantity('1');
     const baseCost = Number(item.cost ?? item.price ?? 0);
-    // 406: с «Коллекционером крышек» цена при открытии уже со скидкой 10%
-    // (торговая формулировка книги «можете уменьшить цену на 10%»).
-    const discount = Number(useCharacterStore.getState().perkBonuses?.capCollectorDiscountPercent) || 0;
-    const price = discount > 0 ? Math.round(baseCost * (1 - Math.min(100, discount) / 100)) : baseCost;
+    const getPurchaseUnitPrice = getSettingService('inventory')?.getPurchaseUnitPrice;
+    const price = typeof getPurchaseUnitPrice === 'function'
+      ? getPurchaseUnitPrice(item, baseCost, useCharacterStore.getState())
+      : baseCost;
     setPricePerItem(String(price));
   }, [item]);
 
@@ -40,17 +40,17 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
     }
 
     const total = qty * unitPrice;
-    if (caps <= 0) {
+    if (balance <= 0) {
       showRawAlert({
-        title: tInventory('modals.buyItemModal.noCapsTitle'),
-        message: tInventory('modals.buyItemModal.noCapsMessage'),
+        title: tInventory('modals.buyItemModal.noCurrencyTitle'),
+        message: tInventory('modals.buyItemModal.noCurrencyMessage'),
       });
       return;
     }
-    if (total > caps) {
+    if (total > balance) {
       showRawAlert({
-        title: tInventory('modals.buyItemModal.notEnoughCapsTitle'),
-        message: formatInventoryText(tInventory('modals.buyItemModal.notEnoughCapsMessage'), { total, caps }),
+        title: tInventory('modals.buyItemModal.notEnoughCurrencyTitle'),
+        message: formatInventoryText(tInventory('modals.buyItemModal.notEnoughCurrencyMessage'), { total, balance }),
       });
       return;
     }
@@ -69,7 +69,7 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.title}>{formatInventoryText(tInventory('modals.buyItemModal.title'), { itemName: item.name })}</Text>
-          <Text style={styles.balance}>{formatInventoryText(tInventory('modals.buyItemModal.balance'), { caps })}</Text>
+          <Text style={styles.balance}>{formatInventoryText(tInventory('modals.buyItemModal.balance'), { balance })}</Text>
 
           <View style={styles.controlContainer}>
             <Text style={styles.label}>{tInventory('modals.buyItemModal.quantityLabel')}</Text>

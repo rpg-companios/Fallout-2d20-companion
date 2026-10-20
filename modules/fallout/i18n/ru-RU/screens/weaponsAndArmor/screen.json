@@ -1,11 +1,24 @@
 {
   "stats": {
+    "initiative": "Инициатива",
+    "effects": "Эффекты",
+    "health": "Здоровье",
     "meleeBonus": "Бонус Б.Боя",
     "radiation": "Радиация",
     "poisonResistance": "Сопр. Яду",
     "defense": "Защита"
   },
   "effectsPanel": {
+    "title": "Эффекты",
+    "empty": "Нет активных эффектов",
+    "immunityPrefix": "Иммунитет к:",
+    "resist": "Сопротивляться",
+    "resistTitle": "Сопротивление болезни",
+    "resistRolls": "Броски: {r1}, {r2} (цель ≤ {t}).",
+    "resistCured": "Успехов {s}/{r} — болезнь «{name}» побеждена.",
+    "resistFailed": "Успехов {s}/{r} — болезнь «{name}» остаётся.",
+    "resistRankIncreased": "Выпало 20 — сложность болезни выросла до {r}.",
+    "resistCooldown": "Сопротивляться можно раз в сутки.",
     "immunityTypes": {
       "radiation": "Радиация",
       "poison": "Яд",
@@ -13,6 +26,13 @@
     }
   },
   "armor": {
+    "fields": {
+      "clothingModification": "Улучшить одежду",
+      "armorModification": "Улучшить броню",
+      "physical": "Физ.Су",
+      "energy": "Энрг.Су",
+      "radiation": "Рад.Су"
+    },
     "slots": {
       "head": {
         "title": "Голова",
@@ -59,16 +79,40 @@
         "subtitle": "15-17"
       }
     },
-    "fields": {
-      "physical": "Физ.Су",
-      "energy": "Энрг.Су",
-      "radiation": "Рад.Су"
-    },
     "groups": {
       "robotArmor": "Броня роботов"
     }
   },
   "weapon": {
+    "emptySlot": "Пустой слот",
+    "notEquipped": "Оружие не надето",
+    "unequip": "Снять",
+    "rangeDefault": "Близкая",
+    "fields": {
+      "success": "ЗНАЧЕНИЕ УСПЕХА",
+      "damageType": "ТИП УРОНА",
+      "damage": "УРОН",
+      "effect": "ЭФФЕКТ",
+      "fireRate": "СКОРОСТЬ СТРЕЛЬБЫ",
+      "range": "ДИСТАНЦИЯ",
+      "qualities": "КАЧЕСТВА",
+      "ammo": "ПАТРОНЫ",
+      "modification": "Модификация",
+      "durability": "ПРОЧНОСТЬ"
+    },
+    "ammoSpend": {
+      "title": "Списание зарядов",
+      "available": "Доступно зарядов",
+      "source": {
+        "crank": "Заводная рукоятка",
+        "capacitor": "Конденсатор",
+        "ammoPerAttack": "Расход мода за атаку"
+      },
+      "upTo": "потратить до",
+      "unconditional": "Безусловно",
+      "cancel": "Отмена",
+      "confirm": "Списать"
+    },
     "rangeNames": {
       "Close": "Близкая",
       "Medium": "Средняя",
@@ -99,6 +143,69 @@
       "other": "Другое"
     },
     "requiresMkII": "Требуется ОС Mk II"
+  },
+  "common": {
+    "empty": "—",
+    "none": "00",
+    "close": "Закрыть"
+  },
+  "kitResolver": {
+    "unknownItem": "Неизвестный предмет",
+    "basicMaterial": "Базовые материалы",
+    "currency": "Крышки",
+    "currencyNcr": "Доллары НКР"
+  },
+  "modals": {
+    "requirements": "Требования",
+    "armorModification": "Улучшить броню",
+    "clothingModification": "Улучшить одежду",
+    "availableModifications": "Доступные модификации",
+    "standard": "Модификации",
+    "unique": "Материал брони",
+    "removeStandard": "Снять стандартный мод",
+    "noStandard": "Без стандартного мода",
+    "removeUnique": "Снять уникальный мод",
+    "noUnique": "Без уникального мода",
+    "removeWeaponMod": "Снять мод",
+    "noWeaponMod": "Без мода",
+    "preview": "Предварительный просмотр",
+    "effects": "Эффекты",
+    "weight": "Вес",
+    "cost": "Цена",
+    "cancel": "Отмена",
+    "apply": "Применить",
+    "improvements": "Улучшения",
+    "clothingReinforced": "Усиленные швы",
+    "clothingInsulated": "Утеплённая подкладка",
+    "weaponModification": "Модификации оружия",
+    "unknownWeapon": "Неизвестное оружие",
+    "weaponDamage": "Урон",
+    "weaponFireRate": "Скорость",
+    "weaponRange": "Дистанция",
+    "weaponWeight": "Вес",
+    "weaponCost": "Цена",
+    "availableModificationsLabel": "Доступные модификации:",
+    "previewLabel": "Предварительный просмотр:",
+    "previewEffects": "Эффекты",
+    "previewQualities": "Качества",
+    "errorTitle": "Ошибка",
+    "errorSelectMod": "Выберите хотя бы одну модификацию",
+    "modsNotInInventory": "Нет в сумке (создаются в окне «Крафт»)",
+    "create": "Создать",
+    "createDone": "Создано. Времени прошло:",
+    "createFailTitle": "Не удалось создать",
+    "createFailMissingPerk": "Требуется перк из строки требований",
+    "createFailMaterials": "Не хватает материалов",
+    "createFailCheck": "Проверка навыка не пройдена",
+    "createAskZeroTitle": "Сложность снята навыком",
+    "createAskZeroText": "Бросить кубики? Правила Успехов/Провалов действуют.",
+    "createAskZeroRoll": "Бросить кубики",
+    "createAskZeroAuto": "Автоуспех"
+  },
+  "displayToggle": {
+    "spoilers": "Список (спойлеры)",
+    "cards": "Карточки оружия",
+    "unarmed": "Рукопашная атака"
   },
   "robotSlot": {
     "noLimb": "Нет конечности",
@@ -148,10 +255,6 @@
   "powerArmor": {
     "durability": "Прочность (ОЗ)",
     "core": "Ядерный блок: {value}"
-  },
-  "kitResolver": {
-    "currency": "Крышки",
-    "currencyNcr": "Доллары НКР"
   },
   "robotLimbs": {
     "robot_head_protectron": "Голова Протектрона",

@@ -5,11 +5,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
+import { scaleDuration } from '../../modules/fallout/consumables/effectApplication.js';
 import {
-  resolveConsumableVitalChanges,
-  scaleDuration,
   getInstantHealAmount,
-} from '../../domain/effects';
+  resolveConsumableVitalChanges,
+} from '../../modules/fallout/consumables/vitalChanges.js';
 import { selectPerkBonuses } from '../../domain/perks';
 import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
 import { createSurvivalState, advanceHours, consumeDrink, SURVIVAL_LADDER_MAX, SURVIVAL_RULES } from '../../modules/fallout/survival/survival';
@@ -102,7 +102,7 @@ describe('Патч 406: конвейер употребления', () => {
     const stimpak = byId(chems, 'chem_stimpak');
     expect(getInstantHealAmount(stimpak)).toBe(5);
     const withPerk = resolveConsumableVitalChanges(stimpak, {
-      currentHealth: 5, maxHealth: 20, radiation: 0, stimpakHpBonus: 3,
+      currentHealth: 5, maxHealth: 20, radiation: 0, eligibleItemHealBonus: 3,
     });
     expect(withPerk.healAmount).toBe(8);
     const without = resolveConsumableVitalChanges(stimpak, {
@@ -114,7 +114,7 @@ describe('Патч 406: конвейер употребления', () => {
   it('Рад-а-вей: −4 базово, −5 с одним перком, −6 с двумя (клампится дном)', () => {
     const radaway = byId(chemsData, 'chem_radaway');
     const run = (bonus, current = 3) => resolveConsumableVitalChanges(radaway, {
-      currentHealth: 10, maxHealth: 20, radiation: current, antiradRadiationBonus: bonus,
+      currentHealth: 10, maxHealth: 20, radiation: current, radiationRemovalBonus: bonus,
     });
     expect(run(0).radiationAmount).toBe(-3); // есть только 3 радиации
     expect(run(1, 10).radiationAmount).toBe(-5);
@@ -128,7 +128,7 @@ describe('Патч 406: конвейер употребления', () => {
     };
     // +2 радиации: счётчик растёт, лечение floor(2/4) = 0 ОЗ.
     const ghoul = resolveConsumableVitalChanges(irradiated, {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: true,
+      currentHealth: 5, maxHealth: 20, radiation: 0, radiationHealing: true,
     });
     expect(ghoul.healAmount).toBe(0);
     expect(ghoul.radiationAmount).toBe(2);
@@ -142,7 +142,7 @@ describe('Патч 406: конвейер употребления', () => {
     };
     const both = resolveConsumableVitalChanges(canned, {
       currentHealth: 5, maxHealth: 20, radiation: 0,
-      ghoulish: true, oldWorldGourmet: { hpBonus: 2, radiationReduction: 1 },
+      radiationHealing: true, preservedFoodBonus: { hpBonus: 2, radiationReduction: 1 },
     });
     expect(both.radiationAmount).toBe(1);
     expect(both.healAmount).toBe(2); // только +2 от гурмана

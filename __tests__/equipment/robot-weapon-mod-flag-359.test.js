@@ -8,8 +8,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import useCharacterStore from '../../src/store/characterStore';
-import { initRobotSlots } from '../../domain/robotEquip';
-import { collectAttacks, setInstalledWeaponMods } from '../../domain/robotSlots';
+import { initRobotSlots } from '../../modules/fallout/logic/robotEquip';
+import { collectAttacks, setInstalledWeaponMods } from '../../modules/fallout/logic/robotSlots';
 import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
 import { diffModInstallPlan } from '../../domain/modsEquip';
 import robotCatalog from '../../modules/fallout/data/equipment/robot/limbs.json';
@@ -36,7 +36,7 @@ const applyOnScreen = ({ slots, card, modified: modifiedWeapon }) => {
   const hostKey = robotWeaponHostKey(plan.slotKey, plan.weaponId);
   const diff = diffModInstallPlan(modIdList(card), modIdList(modifiedWeapon));
   diff.uninstall.forEach((id) => state().uninstallArmorMod({ modId: id, hostKey }));
-  diff.install.forEach((id) => state().installRobotWeaponMod({ modId: id, hostKey }));
+  diff.install.forEach((id) => state().getSettingAction('robotEquipment', 'installRobotWeaponMod')({ modId: id, hostKey }));
   const next = setInstalledWeaponMods(slots, plan.slotKey, plan.weaponId, modifiedWeapon.appliedMods);
   expect(next).toBeTruthy();
   return { slots: next, hostKey };
@@ -116,10 +116,10 @@ describe('ПРИЁМОЧНЫЙ (патч 359): мод робо-оружия — 
     useCharacterStore.setState({ robot: { bodyPlan: 'assaultron', slots: { ...slots, rightArm: palm }, modules: [], mk2Installed: false } });
 
     const hostKey = robotWeaponHostKey('rightArm', 'weapon_laser_gun');
-    expect(state().installRobotWeaponMod({ modId: 'mod_beta_wave_tuner', hostKey })).toBeTruthy();
+    expect(state().getSettingAction('robotEquipment', 'installRobotWeaponMod')({ modId: 'mod_beta_wave_tuner', hostKey })).toBeTruthy();
     expect(state().items[modKey].equipped).toBe(true);
 
-    state().unequipHeldWeapon('rightArm');
+    state().getSettingAction('robotEquipment', 'unequipHeldWeapon')('rightArm');
     expect(state().items[modKey].equipped).toBe(false);
     expect(state().items[modKey].installedOn).toBeUndefined();
   });

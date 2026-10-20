@@ -4,8 +4,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: 'transparent' },
   background: { flex: 1, width: '100%', height: '100%' },
   container: { flex: 1, padding: 16 },
-  // Строка основной валюты — имена нейтральные: как валюту назвать и чем
-  // показать (иконка, подписи) решает модуль сеттинга (в Fallout это «крышки»).
+  // The active setting supplies the currency name, icon, and button labels.
   currencyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

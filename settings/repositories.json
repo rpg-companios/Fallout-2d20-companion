@@ -1,0 +1,19 @@
+{
+  "engine": {
+    "repository": "rpg-companios/ttrpg-engine",
+    "url": "https://github.com/rpg-companios/ttrpg-engine.git",
+    "branch": "main"
+  },
+  "setting": {
+    "repository": "rpg-companios/positronium-game-settings",
+    "url": "https://github.com/rpg-companios/positronium-game-settings.git",
+    "branch": "main",
+    "wallets": {
+      "fallout": {
+        "path": "modules/fallout",
+        "asset": "fallout.trpg",
+        "runtimeApiVersion": 1
+      }
+    }
+  }
+}

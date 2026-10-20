@@ -18,7 +18,7 @@ import armorFile from '../../modules/fallout/data/equipment/robot/armor.json';
 import platingFile from '../../modules/fallout/data/equipment/robot/armor_plating.json';
 import framesFile from '../../modules/fallout/data/equipment/robot/frames.json';
 import bodyplans from '../../modules/fallout/data/bodyplans/bodyplans.json';
-import { getRobotSlotKeys } from '../../domain/robotEquip';
+import { getRobotSlotKeys } from '../../modules/fallout/logic/robotEquip';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 

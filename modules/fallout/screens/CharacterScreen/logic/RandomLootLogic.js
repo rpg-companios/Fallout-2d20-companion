@@ -1,4 +1,4 @@
-import { evaluateFormula, evaluateFormulaMulti, rollDie } from '../../../../../domain/diceRollsLogic';
+import { evaluateFormula, evaluateFormulaMulti, rollDie } from '../../../logic/diceRollsLogic.js';
 import trinkets from '../../../data/loot/trinkets.json';
 import food from '../../../data/loot/food.json';
 import brewery from '../../../data/loot/brewery.json';

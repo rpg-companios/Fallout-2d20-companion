@@ -1,19 +1,37 @@
-import { debugLog } from '../../src/debug/falloutDebug';
+import { debugLog } from '../../src/engine/debug/runtimeTrace.js';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import appConfig from '../../app.json';
+import {
+  AuthRequest,
+  ResponseType,
+  makeRedirectUri,
+  exchangeCodeAsync,
+} from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
 import { getActiveModuleId } from '../../domain/moduleLocale';
+import { getSettingService } from '../../domain/registry.js';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
 import { validateAvatarDataUrl } from '../../domain/characterAvatar';
+import useUserEquipmentStore from '../../src/store/userEquipmentStore';
+import {
+  USER_EQUIPMENT_FILE_NAMES,
+  USER_EQUIPMENT_KINDS,
+  getUserEquipmentKindFromFileName,
+  makeUserEquipmentDocument,
+  validateUserEquipmentDocument,
+} from '../../domain/userEquipment.js';
 import * as avatarCache from '../../db/avatarCache';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
 // у этого приложения. Она предназначена именно для конфигураций и cloud-saves.
-// Внутри неё — подпапка на каждый сеттинг (модуль): fallout/, heroes/, dnd/ …
+// Внутри неё — подпапка с id активного setting-пакета.
 const APP_DATA_FOLDER = 'appDataFolder';
-const SYNC_KEY = 'fallout_cloud_sync_enabled';
+const SYNC_KEY = 'setting_cloud_sync_enabled';
+const getLegacySyncPreferenceKey = () => getSettingService('cloudSync')?.legacyPreferenceKey ?? null;
 // appDataFolder requires the dedicated non-sensitive scope. The former
 // drive.metadata.readonly scope is sensitive and is unnecessary here because
 // every sync file lives inside the app-specific data space.
@@ -47,16 +65,31 @@ const clearCachedAccessToken = (token = null) => {
 };
 
 const getClientId = () => {
-  if (typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID) {
-    return process.env.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID;
+  // Expo statically inlines direct process.env references; dynamic env-key
+  // lookup is not reliable in Metro bundles.
+  const sharedClientId = typeof process !== 'undefined'
+    ? process.env.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID
+    : null;
+  if (Platform.OS === 'ios') {
+    return (typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID : null)
+      || sharedClientId;
   }
-  if (typeof window !== 'undefined' && window?.FALLOUT_GOOGLE_DRIVE_CLIENT_ID) {
-    return window.FALLOUT_GOOGLE_DRIVE_CLIENT_ID;
+  if (Platform.OS === 'android') {
+    return (typeof process !== 'undefined' ? process.env.EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID : null)
+      || sharedClientId;
   }
-  return null;
+  return sharedClientId
+    || (typeof window !== 'undefined' ? window?.SETTING_GOOGLE_DRIVE_CLIENT_ID : null);
 };
 
 const ensureWeb = () => Platform.OS === 'web' && typeof window !== 'undefined';
+const isCloudSyncSupported = () => ensureWeb() || Platform.OS === 'ios' || Platform.OS === 'android';
+const GOOGLE_OAUTH_DISCOVERY = {
+  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenEndpoint: 'https://oauth2.googleapis.com/token',
+  revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+};
+WebBrowser.maybeCompleteAuthSession();
 
 const loadGoogleIdentityScript = async () => {
   if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
@@ -81,55 +114,104 @@ const loadGoogleIdentityScript = async () => {
   });
 };
 
+const cacheAccessToken = (accessToken, expiresIn) => {
+  cachedAccessToken = accessToken;
+  cachedAccessTokenExpiresAt = Date.now() + (Number(expiresIn) || 3600) * 1000;
+};
+
+const requestNativeAccessToken = async (clientId) => {
+  const applicationId = Platform.OS === 'ios'
+    ? appConfig.expo.ios.bundleIdentifier
+    : appConfig.expo.android.package;
+  const redirectUri = makeRedirectUri({ native: `${applicationId}:/oauthredirect` });
+  const request = new AuthRequest({
+    clientId,
+    redirectUri,
+    responseType: ResponseType.Code,
+    scopes: [TOKEN_SCOPE],
+    usePKCE: true,
+  });
+  const result = await request.promptAsync(GOOGLE_OAUTH_DISCOVERY);
+  if (result.type !== 'success') {
+    throw new Error(result.type === 'cancel' || result.type === 'dismiss'
+      ? 'Google sign-in was cancelled.'
+      : `Google sign-in failed (${result.type}).`);
+  }
+  if (result.params?.error) throw new Error(result.params.error_description || result.params.error);
+  if (result.params?.state !== request.state) throw new Error('Google auth state validation failed.');
+  if (!result.params?.code) throw new Error('Google did not return an authorization code.');
+
+  const tokenResponse = await exchangeCodeAsync({
+    clientId,
+    code: result.params.code,
+    redirectUri: request.redirectUri,
+    scopes: [TOKEN_SCOPE],
+    extraParams: { code_verifier: request.codeVerifier || '' },
+  }, GOOGLE_OAUTH_DISCOVERY);
+  if (!tokenResponse?.accessToken) throw new Error('Google did not return an access token.');
+  cacheAccessToken(tokenResponse.accessToken, tokenResponse.expiresIn);
+  debugLog('sync.token:native:ok', { expiresIn: tokenResponse.expiresIn });
+  return tokenResponse.accessToken;
+};
+
+const requestWebAccessToken = (clientId, forceRefresh) => new Promise((resolve, reject) => {
+  const state = createOAuthState();
+  const tokenClient = window.google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: TOKEN_SCOPE,
+    // Empty prompt lets Google reuse the existing grant without reopening
+    // consent on every full sync.
+    prompt: '',
+    state,
+    callback: (resp) => {
+      if (resp?.state && resp.state !== state) {
+        reject(new Error('Google auth state validation failed.'));
+        return;
+      }
+      if (resp?.access_token) {
+        debugLog('sync.token:ok', { expiresIn: resp.expires_in });
+        cacheAccessToken(resp.access_token, resp.expires_in);
+        resolve(resp.access_token);
+      } else {
+        debugLog('sync.token:failed', { error: resp?.error || 'unknown' });
+        reject(new Error(resp?.error || 'Google auth failed.'));
+      }
+    },
+    error_callback: (err) => {
+      debugLog('sync.token:error', { type: err?.type, message: err?.message, forceRefresh });
+      reject(new Error(`Google auth failed: ${err?.type || err?.message || 'unknown'}`));
+    },
+  });
+  tokenClient.requestAccessToken();
+});
+
 const requestAccessToken = async ({ forceRefresh = false } = {}) => {
   const clientId = getClientId();
   if (!clientId) {
-    throw new Error('Google Drive client id is not configured. Set EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID.');
+    const hint = Platform.OS === 'ios'
+      ? 'EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID'
+      : Platform.OS === 'android'
+        ? 'EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID'
+        : 'EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID';
+    throw new Error(`Google Drive OAuth client id is not configured. Set ${hint}.`);
   }
   if (!forceRefresh && cachedAccessToken && Date.now() < cachedAccessTokenExpiresAt - TOKEN_EXPIRY_SAFETY_WINDOW_MS) {
     return cachedAccessToken;
   }
   if (pendingToken) return pendingToken;
+  if (Platform.OS === 'web' && !ensureWeb()) throw new Error('Browser window is unavailable for Google sign-in.');
 
-  debugLog('sync.token:request', { forceRefresh, origin: window.location?.origin });
-  pendingToken = new Promise((resolve, reject) => {
-    const state = createOAuthState();
-    const tokenClient = window.google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: TOKEN_SCOPE,
-      // Empty prompt lets Google reuse the existing grant. The previous
-      // `consent` value forced the warning and account selection on every sync.
-      prompt: '',
-      state,
-      callback: (resp) => {
-        if (resp?.state && resp.state !== state) {
-          reject(new Error('Google auth state validation failed.'));
-          return;
-        }
-        if (resp?.access_token) {
-          debugLog('sync.token:ok', { expiresIn: resp.expires_in });
-          cachedAccessToken = resp.access_token;
-          cachedAccessTokenExpiresAt = Date.now() + (Number(resp.expires_in) || 3600) * 1000;
-          resolve(resp.access_token);
-        } else {
-          debugLog('sync.token:failed', { error: resp?.error || 'unknown' });
-          reject(new Error(resp?.error || 'Google auth failed.'));
-        }
-      },
-      // Раньше причина терялась: GIS передаёт сюда объект с полем type
-      // ('popup_closed', 'popup_failed_to_open', ...) — именно он объясняет,
-      // почему окно авторизации закрылось без токена.
-      error_callback: (err) => {
-        debugLog('sync.token:error', { type: err?.type, message: err?.message });
-        reject(new Error(`Google auth failed: ${err?.type || err?.message || 'unknown'}`));
-      },
-    });
-
-    tokenClient.requestAccessToken();
-  }).finally(() => {
+  debugLog('sync.token:request', {
+    forceRefresh,
+    platform: Platform.OS,
+    origin: ensureWeb() ? window.location?.origin : null,
+  });
+  const request = Platform.OS === 'web'
+    ? requestWebAccessToken(clientId, forceRefresh)
+    : requestNativeAccessToken(clientId);
+  pendingToken = request.finally(() => {
     pendingToken = null;
   });
-
   return pendingToken;
 };
 
@@ -155,8 +237,8 @@ const driveFetch = async (token, url, options = {}) => {
 };
 
 // В appDataFolder создаём/находим подпапку текущего сеттинга (модуля).
-// Каждый сеттинг читает только свою подпапку: сейв fallout не попадёт в
-// другой сеттинг и наоборот. Имя подпапки — id модуля (getActiveModuleId).
+// Каждый setting-пакет читает только свою подпапку; имя — его id
+// (getActiveModuleId), поэтому данные не смешиваются между настройками игры.
 const getModuleFolderId = async (token) => {
   const moduleId = getActiveModuleId();
   const q = encodeURIComponent(
@@ -202,7 +284,7 @@ const downloadRemoteCharacter = async (token, fileId) => {
 
 const uploadCharacterFile = async ({ token, folderId, fileId, filename, payload }) => {
   const metadata = fileId ? null : { name: filename, parents: [folderId], mimeType: 'application/json' };
-  const delimiter = '-------fallout2d20sync';
+  const delimiter = '-------setting-cloud-sync';
   const multipartBody = [
     `--${delimiter}`,
     'Content-Type: application/json; charset=UTF-8',
@@ -225,6 +307,73 @@ const uploadCharacterFile = async ({ token, folderId, fileId, filename, payload 
     headers: { 'Content-Type': `multipart/related; boundary=${delimiter}` },
     body: multipartBody,
   });
+};
+
+const ensureUserEquipmentHydrated = async () => {
+  const persistence = useUserEquipmentStore.persist;
+  if (persistence && !persistence.hasHydrated()) await persistence.rehydrate();
+};
+
+// User equipment files live directly beside saves in the existing setting
+// folder. No extra Drive folder is created.
+const syncUserEquipmentInSession = async (token, folderId) => {
+  await ensureUserEquipmentHydrated();
+  const settingId = getActiveModuleId();
+  const store = useUserEquipmentStore.getState();
+  const remoteFiles = await listRemoteCharacterFiles(token, folderId);
+  const remoteByKind = new Map();
+  for (const file of remoteFiles) {
+    const kind = getUserEquipmentKindFromFileName(file.name);
+    if (!kind) continue;
+    const previous = remoteByKind.get(kind);
+    if (!previous || new Date(file.modifiedTime || 0) > new Date(previous.modifiedTime || 0)) {
+      remoteByKind.set(kind, file);
+    }
+  }
+
+  const remoteData = {};
+  const invalidKinds = new Set();
+  for (const [kind, remote] of remoteByKind) {
+    try {
+      const raw = await downloadRemoteCharacter(token, remote.id);
+      const validated = validateUserEquipmentDocument(raw, {
+        expectedSettingId: settingId,
+        expectedKind: kind,
+        fileName: remote.name,
+      });
+      if (!validated.ok) {
+        invalidKinds.add(kind);
+        debugLog('sync.userEquipment:invalidRemote', { kind, errors: validated.errors.map((entry) => entry.code) });
+        continue;
+      }
+      remoteData[kind] = validated.items;
+    } catch (error) {
+      invalidKinds.add(kind);
+      debugLog('sync.userEquipment:downloadFailed', { kind, message: error?.message });
+    }
+  }
+
+  const mergedData = store.mergeRemoteData({ settingId, remoteData }).data;
+  let uploadedKinds = 0;
+  for (const kind of USER_EQUIPMENT_KINDS) {
+    if (invalidKinds.has(kind)) continue;
+    const remote = remoteByKind.get(kind);
+    const items = mergedData[kind] || [];
+    if (items.length === 0 && !remote) continue;
+    const payload = JSON.stringify(makeUserEquipmentDocument({ settingId, kind, items }));
+    await uploadCharacterFile({
+      token,
+      folderId,
+      fileId: remote?.id,
+      filename: USER_EQUIPMENT_FILE_NAMES[kind],
+      payload,
+    });
+    uploadedKinds += 1;
+  }
+
+  const recordCount = USER_EQUIPMENT_KINDS.reduce((sum, kind) => sum + (mergedData[kind]?.length || 0), 0);
+  debugLog('sync.userEquipment:done', { records: recordCount, uploadedKinds });
+  return { records: recordCount, uploadedKinds, downloadedKinds: remoteData ? Object.keys(remoteData).length : 0 };
 };
 
 // Имя файла в Google Drive: <id>__<имя>.json. Часть с именем персонажа
@@ -285,7 +434,7 @@ const listAvatarFiles = async (token, avatarsFolderId) => {
 // локальный кэш; multipart как у сейвов, но MIME image/jpeg).
 const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl }) => {
   const metadata = fileId ? null : { name: avatarFileName(characterId), parents: [folderId], mimeType: 'image/jpeg' };
-  const delimiter = '-------fallout2d20avatar';
+  const delimiter = '-------setting-avatar-sync';
   const multipartBody = [
     `--${delimiter}`,
     'Content-Type: application/json; charset=UTF-8',
@@ -339,11 +488,30 @@ const syncAvatarsInSession = async (token, moduleFolderId) => {
   });
 };
 
-export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';
+export const isCloudSyncConfigured = async () => {
+  const legacyKey = getLegacySyncPreferenceKey();
+  const currentValue = await AsyncStorage.getItem(SYNC_KEY);
+  if (currentValue !== null) {
+    if (legacyKey && legacyKey !== SYNC_KEY) await AsyncStorage.removeItem(legacyKey);
+    return currentValue === '1';
+  }
+  if (!legacyKey || legacyKey === SYNC_KEY) return false;
+
+  const legacyValue = await AsyncStorage.getItem(legacyKey);
+  if (legacyValue === '1') {
+    await AsyncStorage.setItem(SYNC_KEY, '1');
+    await AsyncStorage.removeItem(legacyKey);
+    return true;
+  }
+  if (legacyValue !== null) await AsyncStorage.removeItem(legacyKey);
+  return false;
+};
 
 export const setCloudSyncConfigured = async (enabled) => {
+  const legacyKey = getLegacySyncPreferenceKey();
   if (enabled) await AsyncStorage.setItem(SYNC_KEY, '1');
   else await AsyncStorage.removeItem(SYNC_KEY);
+  if (legacyKey && legacyKey !== SYNC_KEY) await AsyncStorage.removeItem(legacyKey);
 };
 
 export const openCloudFolderInDrive = async () => {
@@ -351,11 +519,26 @@ export const openCloudFolderInDrive = async () => {
   window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener');
 };
 
+export const syncUserEquipmentWithCloud = async () => {
+  if (!isCloudSyncSupported()) throw new Error('Google Drive sync is not supported on this platform.');
+  if (ensureWeb()) await loadGoogleIdentityScript();
+  const token = await requestAccessToken();
+  const folderId = await getModuleFolderId(token);
+  const stats = await syncUserEquipmentInSession(token, folderId);
+  await setCloudSyncConfigured(true);
+  return { ...stats, synced: true };
+};
+
+export const syncUserEquipmentToCloudIfEnabled = async () => {
+  if (!(await isCloudSyncConfigured())) return { synced: false, reason: 'not-configured' };
+  return syncUserEquipmentWithCloud();
+};
+
 // onProgress({ stage, current, total }) — необязательный колбэк для UI.
 // stage: 'auth' | 'folder' | 'list' | 'download' | 'upload' | 'done'.
 // Вызовы обёрнуты так, чтобы падение обработчика UI не роняло синхронизацию.
 export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }) => {
-  if (!ensureWeb()) throw new Error('Cloud sync supports only web platform.');
+  if (!isCloudSyncSupported()) throw new Error('Google Drive sync is not supported on this platform.');
 
   const report = (stage, current = 0, total = 0) => {
     debugLog('sync.progress', { stage, current, total });
@@ -364,12 +547,16 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
 
   debugLog('sync.all:start', {});
   report('auth');
-  await loadGoogleIdentityScript();
+  if (ensureWeb()) await loadGoogleIdentityScript();
   const token = await requestAccessToken();
   report('folder');
   const folderId = await getModuleFolderId(token);
+  // Restore custom catalogs before importing any character save that may refer
+  // to user-defined equipment IDs.
+  const userEquipmentStats = await syncUserEquipmentInSession(token, folderId);
   report('list');
-  const remoteFiles = await listRemoteCharacterFiles(token, folderId);
+  const remoteFiles = (await listRemoteCharacterFiles(token, folderId))
+    .filter((file) => !getUserEquipmentKindFromFileName(file.name));
   const localList = await db.getCharactersList();
   debugLog('sync.all:local', { count: localList.length });
   const remoteById = new Map();
@@ -454,8 +641,8 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   }
 
   report('done');
-  debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
-  return { uploaded: uploads.length, downloaded: downloadedCount };
+  debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount, userEquipmentStats });
+  return { uploaded: uploads.length, downloaded: downloadedCount, userEquipment: userEquipmentStats };
 };
 
 // Удаление персонажа в облаке. Вызывается ТОЛЬКО после явного подтверждения
@@ -465,7 +652,7 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
 // Возвращает { removed, reason }: removed=true, если файл реально удалён.
 // Наружу не бросает — удаление в облаке не должно отменять локальное.
 export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
-  if (!ensureWeb()) return { removed: false, reason: 'not-web' };
+  if (!isCloudSyncSupported()) return { removed: false, reason: 'unsupported-platform' };
 
   try {
     const configured = await isCloudSyncConfigured();
@@ -475,7 +662,7 @@ export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
     }
 
     debugLog('sync.delete:start', { characterId });
-    await loadGoogleIdentityScript();
+    if (ensureWeb()) await loadGoogleIdentityScript();
     const token = await requestAccessToken();
     const folderId = await getModuleFolderId(token);
     const remoteFiles = await listRemoteCharacterFiles(token, folderId);
@@ -515,7 +702,11 @@ export const deleteCharacterFromCloudIfEnabled = async (characterId) => {
 // полностью «незаметной»: никогда не бросать наружу — иначе получим
 // unhandled promise rejection. Проверка флага тоже внутри try.
 export const syncCharacterToCloudIfEnabled = async (characterId) => {
-  if (!ensureWeb()) return;
+  if (!isCloudSyncSupported()) return;
+  // Never open an auth browser from a background autosave on native. A full
+  // manual sync or an explicit user-data import performs interactive sign-in.
+  if (Platform.OS !== 'web'
+    && (!cachedAccessToken || Date.now() >= cachedAccessTokenExpiresAt - TOKEN_EXPIRY_SAFETY_WINDOW_MS)) return;
 
   try {
     const configured = await isCloudSyncConfigured();
@@ -525,7 +716,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
     }
     debugLog('sync.auto:start', { characterId });
 
-    await loadGoogleIdentityScript();
+    if (ensureWeb()) await loadGoogleIdentityScript();
     const token = await requestAccessToken();
     const folderId = await getModuleFolderId(token);
     const remoteFiles = await listRemoteCharacterFiles(token, folderId);

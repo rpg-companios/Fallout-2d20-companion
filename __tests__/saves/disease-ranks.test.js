@@ -22,7 +22,7 @@ import {
   increaseDiseaseRank,
   reduceDiseaseRanks,
   resistDiseaseRoll,
-} from '../../domain/diseaseConditions';
+} from '../../modules/fallout/diseases/diseaseConditions.js';
 import {
   addDiseaseFatigue,
   addFatigue,
@@ -278,8 +278,8 @@ describe('болезни: миграция v24 → v25 (ранги из ката
 
 describe('болезни: i18n новых строк (ru/en)', () => {
   it('ключи сопротивления есть в обоих словарях экрана', async () => {
-    const ruWaA = (await import('../../i18n/ru-RU/screens/weaponsAndArmor/screen.json')).default;
-    const enWaA = (await import('../../i18n/en-EN/screens/weaponsAndArmor/screen.json')).default;
+    const ruWaA = (await import('../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json')).default;
+    const enWaA = (await import('../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json')).default;
     for (const dict of [ruWaA, enWaA]) {
       expect(dict.effectsPanel.resist).toBeTruthy();
       expect(dict.effectsPanel.resistTitle).toBeTruthy();
@@ -292,8 +292,8 @@ describe('болезни: i18n новых строк (ru/en)', () => {
   });
 
   it('ключи лечения антибиотиками есть в обоих словарях инвентаря', async () => {
-    const ruInv = (await import('../../i18n/ru-RU/screens/inventory/screen.json')).default;
-    const enInv = (await import('../../i18n/en-EN/screens/inventory/screen.json')).default;
+    const ruInv = (await import('../../modules/fallout/i18n/ru-RU/screens/inventory/screen.json')).default;
+    const enInv = (await import('../../modules/fallout/i18n/en-EN/screens/inventory/screen.json')).default;
     for (const dict of [ruInv, enInv]) {
       expect(dict.alerts.antibioticDailyLimit).toBeTruthy();
       expect(dict.alerts.antibioticReduced).toContain('{units}');

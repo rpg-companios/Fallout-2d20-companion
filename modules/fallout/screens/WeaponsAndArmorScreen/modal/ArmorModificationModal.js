@@ -1,8 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { applyArmorMods, filterModsByInventory, formatModBonuses, getAvailableArmorMods } from '../../../../../domain/modsEquip';
+import {
+  applyFalloutArmorMods as applyArmorMods,
+  filterFalloutModsByInventory as filterModsByInventory,
+  formatFalloutArmorModBonuses as formatModBonuses,
+  getAvailableFalloutArmorMods as getAvailableArmorMods,
+} from '../../../logic/armorMods.js';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
@@ -57,7 +62,8 @@ const ModRow = ({ mod, selected, onPress }) => {
 const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', onApply }) => {
   useLocale();
   const moduleLocale = useModuleLocale();
-  const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+  const catalogRevision = useModuleCatalogRevision();
+  const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale, catalogRevision]);
   const [selectedStd, setSelectedStd] = useState(null);
   const [selectedUniq, setSelectedUniq] = useState(null);
   const [expandedCategories, setExpandedCategories] = useState({ standard: false, unique: false });
@@ -94,7 +100,7 @@ const ArmorModificationModal = ({ visible, onClose, targetItem, mode = 'armor', 
     if (isClothingMode || !localizedTargetItem) return { standardMods: [], uniqueMods: [] };
 
     // ПРАВИЛО (от владельца): уникальные моды — строго по типу брони.
-    // См. domain/modsEquip.js — если категория брони неизвестна, уникальных
+    // Fallout catalog rules fail closed when armor category data is missing:
     // модов нет вообще (а не «все моды всем»).
     const available = getAvailableArmorMods(localizedTargetItem, catalog);
     return {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isEquippableKitItem, resolveKitItemEquipState } from '../../domain/kitEquip';
+import { isEquippableKitItem, resolveKitItemEquipState } from '../../modules/fallout/logic/kitEquip.js';
 
 const chem = { itemType: 'chem', itemId: 'chem_stimpak' };
 const food = { itemType: 'food', itemId: 'food_snack' };

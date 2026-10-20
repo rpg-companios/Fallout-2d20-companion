@@ -30,7 +30,8 @@
  */
 
 import { ALERTS } from './catalog';
-import { debugLog } from '../../src/debug/falloutDebug';
+import { getSettingService } from '../../domain/registry.js';
+import { debugLog } from '../../src/engine/debug/runtimeTrace.js';
 
 let hostHandler = null;
 // Очередь запросов, пришедших до монтирования хоста (например, ранняя ошибка
@@ -59,7 +60,9 @@ export const registerAlertHost = (handler) => {
  *                          для kind:'choice'  → value выбранной кнопки | null
  */
 export const showAlert = (alertId, params = {}) => {
-  const entry = ALERTS[alertId];
+  const entry = ALERTS[alertId]
+    ?? getSettingService('alerts')?.entries?.[alertId]
+    ?? null;
   if (!entry) {
     // Промах ключа — дефект данных. Не роняем приложение; след оставляем
     // в трассе (включается из консоли, см. docs/debug-tracing.md) — плоские

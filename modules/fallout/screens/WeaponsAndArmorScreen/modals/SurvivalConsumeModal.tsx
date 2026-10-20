@@ -18,7 +18,7 @@ import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectItemsByEquipped } from '../../../../../src/store/selectors';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
 import { resolveItem } from '../../../../../domain/resolveItem';
 import {
   drinkGain,
@@ -28,8 +28,9 @@ import {
 } from '../../../survival/survival';
 import { useSurvivalState } from '../../../survival/hooks';
 import { canConsumeOnSelf } from '../../../../../domain/itemfitRules';
-import { rerollConsumableRadiationRoll } from '../../../../../domain/effects';
-import { buildConsumableResultReport } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
+import { getSettingService } from '../../../../../domain/registry';
+import { rerollConsumableRadiationRoll } from '../../../consumables/radiation.js';
+import { buildConsumableResultReport } from '../../../consumables/resultReport.js';
 import { showAlert as showCatalogAlert, showRawAlert } from '../../../../../components/alerts/alertService';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { survivalModalStyles as styles } from './survivalModalStyles';
@@ -54,16 +55,15 @@ const t = (path: string): string => tWeaponsAndArmorScreen(path);
 const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalProps) => {
     useLocale();
     const moduleLocale = useModuleLocale();
+    const catalogRevision = useModuleCatalogRevision();
     // Шаг 8а (патч 240): полный конвейер расходника — стор-экшен.
     const applyConsumableFull = useCharacterStore((state) => state.applyConsumableFull);
-    // Шаг 8а (патч 239): превью радиации — стор-экшен.
-    const previewConsumableRadiation = useCharacterStore((state) => state.previewConsumableRadiation);
     // Шаг 7: origin/trait — стор напрямую.
     const origin = useCharacterStore((state) => state.origin);
     const trait = useCharacterStore((state) => state.trait);
     const survival = useSurvivalState();
     const storeItems = useCharacterStore((state) => state.items);
-    const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale]);
+    const catalog = useMemo(() => getEquipmentCatalog(moduleLocale), [moduleLocale, catalogRevision]);
 
     const targetType = kind === 'eat' ? 'food' : 'drinks';
     const isEat = kind === 'eat';
@@ -150,7 +150,15 @@ const SurvivalConsumeModal = ({ visible, kind, onClose }: SurvivalConsumeModalPr
             return;
         }
 
-        const preview = previewConsumableRadiation(catalogItem);
+        const preview = getSettingService('consumables')?.previewRadiation?.({
+            item: catalogItem,
+            state: useCharacterStore.getState(),
+        }) ?? {
+            requestedAmount: null,
+            receivedRadiationDamage: 0,
+            rolls: null,
+            canOfferReroll: false,
+        };
         if (!preview.canOfferReroll) {
             finish(preview.requestedAmount);
             return;

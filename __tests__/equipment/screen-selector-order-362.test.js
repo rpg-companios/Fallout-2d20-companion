@@ -21,7 +21,7 @@ describe('ПРИЁМОЧНЫЙ (патч 362): порядок объявлени
     const callback = lineOf(src, 'const handleApplyModification = useCallback');
     expect(callback).toBeTruthy();
     for (const sel of [
-      'const installRobotWeaponMod = useCharacterStore',
+      "const installRobotWeaponMod = useSettingAction('robotEquipment'",
       'const uninstallWeaponModFlag = useCharacterStore',
       'const installWeaponModFlag = useCharacterStore',
     ]) {

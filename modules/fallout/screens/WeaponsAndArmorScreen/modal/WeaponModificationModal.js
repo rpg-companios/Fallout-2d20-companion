@@ -7,17 +7,16 @@ import {
   ScrollView
 } from 'react-native';
 import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
-import { shiftRange } from '../../../../../domain/range';
-import { applyQualityGain } from '../../../../../domain/weaponQualityConflicts';
+import { applyFalloutWeaponMods as applyWeaponMods } from '../../../logic/weaponModifiers.js';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
-import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../../../domain/weaponDisplay';
+import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../logic/weaponDisplay.js';
 import styles from '../../../styles/WeaponModificationModal.styles';
-import { debugLog } from '../../../../../src/debug/falloutDebug';
+import { debugLog } from '../../../debug.js';
 import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { buildModCraftHint, buildCraftReport } from '../../../crafting/windowModel';
 import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
-import { getActionPoints } from '../../../../../domain/actionPoints';
+import { getActionPoints } from '../../../logic/actionPoints.js';
 // 357: отчёт о крафте — тот же компонент, что в окне крафта (кубики, исход,
 // сгоревшие материалы, время, вопрос про 2 ОД).
 import CraftReportView from '../../../crafting/CraftReportView';
@@ -48,6 +47,8 @@ function normalizeModRow(row) {
     // («что делает мод?» отвечают данные: урон/скорострельность/эффекты/…).
     ammoOverride: row.ammoOverride,
     ammoPerShotDelta: row.ammoPerShotDelta,
+    weightModifier: row.weightModifier,
+    costModifier: row.costModifier,
     effectDescription: weaponModRowDescription(row),
     damageModifier: row.damageModifier,
     fireRateModifier: row.fireRateModifier,
@@ -150,119 +151,23 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
   }
   const name = prefixesRu.length ? `${prefixesRu.join(' ')} ${baseName}` : baseName;
 
+  // The same pure resolver powers the preview and the saved weapon card, so
+  // linked variants and +, -, *, / operations cannot diverge between screens.
+  const preview = applyWeaponMods(baseWeapon, selectedMods);
   const damageBase = toNumber(baseWeapon.damage);
   const fireRateBase = toNumber(baseWeapon.fireRate);
   const weightBase = toNumber(baseWeapon.weight);
   const costBase = toNumber(baseWeapon.cost);
-
-  let damage = damageBase;
-  let fire_rate = fireRateBase;
-  let weight = weightBase;
-  let cost = costBase;
-  let rangeShift = 0;
-  // Нормализуем базовый damageType в массив
-  let damage_type = baseWeapon.damageType;
-  if (typeof damage_type === "string") {
-    try {
-      damage_type = JSON.parse(damage_type);
-    } catch {
-      damage_type = [damage_type];
-    }
-  }
-  if (!Array.isArray(damage_type)) {
-    damage_type = damage_type ? [damage_type] : ["physical"];
-  } else {
-    damage_type = [...damage_type];
-  }
-
-  // Качества (quality_*) и Эффекты (effect_*) — две разные сущности.
-  const qualities = new Map(); // qualityId -> entry
-  const effects = new Map();   // effectId -> entry
-  const loadBase = (field, map, idKey) => {
-    let arr = baseWeapon[field];
-    if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { return; } }
-    if (!Array.isArray(arr)) return;
-    arr.forEach((e) => {
-      const id = (typeof e === 'object' && e ? e[idKey] : e);
-      if (id && id !== '–') map.set(id, e && e.value != null ? { [idKey]: id, value: e.value } : { [idKey]: id });
-    });
-  };
-  loadBase('qualities', qualities, 'qualityId');
-  loadBase('effects', effects, 'effectId');
-
-  // Базовый тип патронов; мод может его переопределить через ammoOverride.
-  let ammoId = baseWeapon.ammoId;
-
-  // Применяем структурированные модификаторы из JSON
-  for (const mod of selectedMods) {
-    if (mod.damageModifier) {
-      if (mod.damageModifier.op === '+') damage += Number(mod.damageModifier.value);
-      if (mod.damageModifier.op === '-') damage -= Number(mod.damageModifier.value);
-      if (mod.damageModifier.op === 'set') damage = Number(mod.damageModifier.value);
-    }
-
-    if (mod.fireRateModifier) {
-      if (mod.fireRateModifier.op === '+') fire_rate += Number(mod.fireRateModifier.value);
-      if (mod.fireRateModifier.op === '-') fire_rate -= Number(mod.fireRateModifier.value);
-      if (mod.fireRateModifier.op === 'set') fire_rate = Number(mod.fireRateModifier.value);
-    }
-
-    if (mod.rangeModifier) {
-      if (mod.rangeModifier.op === '+') rangeShift += Number(mod.rangeModifier.value);
-      if (mod.rangeModifier.op === '-') rangeShift -= Number(mod.rangeModifier.value);
-    }
-
-    if (mod.effectChanges && Array.isArray(mod.effectChanges)) {
-      for (const c of mod.effectChanges) {
-        if (c.op === 'gain') effects.set(c.id, c.value != null ? { effectId: c.id, value: c.value } : { effectId: c.id });
-        if (c.op === 'lose') effects.delete(c.id);
-      }
-    }
-
-    if (mod.qualityChanges && Array.isArray(mod.qualityChanges)) {
-      for (const c of mod.qualityChanges) {
-        if (c.op === 'gain') applyQualityGain(qualities, { qualityId: c.id, value: c.value });
-        if (c.op === 'lose') qualities.delete(c.id);
-      }
-    }
-
-    // Обработка damageTypeOverride (изменение типа урона)
-    if (mod.damageTypeOverride) {
-      const { op, value } = mod.damageTypeOverride;
-      if (op === 'set') {
-        // Замена: полностью перезаписываем массив
-        damage_type = Array.isArray(value) ? [...value] : [value];
-      } else if (op === 'add') {
-        // Добавление: добавляем тип, если его нет
-        const typesToAdd = Array.isArray(value) ? value : [value];
-        for (const t of typesToAdd) {
-          if (!damage_type.includes(t)) {
-            damage_type.push(t);
-          }
-        }
-      }
-    }
-
-    // Тип патронов переопределяется модом (канонический ammoId из данных).
-    if (mod.ammoOverride) {
-      ammoId = mod.ammoOverride;
-    }
-
-    // Вес/цена модов
-    weight += toNumber(mod.weight);
-    cost += toNumber(mod.cost);
-  }
-
-  // Range is an ordinal scale; mods shift it by net steps (rangeShift), clamped
-  // to Close..Extreme. Canonical logic lives in domain/range.js.
+  const damage = preview.damage;
+  const fire_rate = preview.fireRate;
+  const weight = preview.weight;
+  const cost = preview.cost;
+  const damage_type = preview.damageType;
+  const ammoId = preview.ammoId;
   const rangeNames = tWeaponsAndArmorScreen('weapon.rangeNames') || {};
-  const { name: range_name_key } = shiftRange(
-    baseWeapon.range ?? baseWeapon.range_index ?? baseWeapon.range_name ?? 'Close',
-    rangeShift,
-  );
-  const range_name = rangeNames[range_name_key] || range_name_key;
-  const effectsValue = effects.size ? JSON.stringify([...effects.values()]) : '–';
-  const qualitiesValue = qualities.size ? JSON.stringify([...qualities.values()]) : '–';
+  const range_name = rangeNames[preview.range_name] || preview.range_name;
+  const effectsValue = preview.effects.length ? JSON.stringify(preview.effects) : '–';
+  const qualitiesValue = preview.qualities.length ? JSON.stringify(preview.qualities) : '–';
 
   debugLog('weapon.mod.compute', {
     weaponId: baseWeapon?.id ?? baseWeapon?.weaponId,
@@ -276,7 +181,7 @@ function applyDbModEffectsToWeapon(baseWeapon, selectedBySlot) {
     resultWeight: weight,
     baseCost: costBase,
     resultCost: cost,
-    rangeShift,
+    rangeIndex: preview.range_index,
     resultRange: range_name,
     baseDamageType: baseWeapon.damageType,
     resultDamageType: damage_type,

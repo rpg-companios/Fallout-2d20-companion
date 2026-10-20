@@ -2,8 +2,8 @@ import React from 'react';
 import { Text, Image } from 'react-native';
 
 const iconMap = {
-  '{CD}': require('../../../../assets/CD.png'),
-  '{/CD}': require('../../../../assets/CD.png'),
+  '{CD}': require('../../assets/CD.png'),
+  '{/CD}': require('../../assets/CD.png'),
 };
 
 const iconRegex = new RegExp(`(${Object.keys(iconMap).join('|')})`, 'g');
@@ -93,12 +93,10 @@ export const renderTextWithIcons = (text, style) => {
   );
 };
 
-// Глобальное подключение: один вызов при старте приложения (см. index.js) — и
-// ЛЮБОЙ <Text> в любом экране/модалке автоматически превращает токены {/CD} (и {CD})
-// в картинку кубика (assets/CD.png). Inline-разметка **/* обрабатывается только
-// там, где используется renderTextWithIcons — глобальный патч остаётся узким.
+// Активируется вместе с Fallout и снимает патч при деактивации сеттинга.
+// Любой <Text> преобразует tokens {/CD} и {CD} в setting-owned dice icon.
 export const setupRichText = () => {
-  if (Text.__richTextPatched) return;
+  if (Text.__richTextPatched) return () => {};
 
   const tokenRe = new RegExp(`(${Object.keys(iconMap).map((k) => k.replace(/[{}]/g, (m) => `\\${m}`)).join('|')})`, 'g');
   const testRe = new RegExp(tokenRe.source); // без флага g — безопасный .test()
@@ -121,9 +119,9 @@ export const setupRichText = () => {
   };
 
   const originalRender = Text.render;
-  if (typeof originalRender !== 'function') return;
+  if (typeof originalRender !== 'function') return () => {};
 
-  Text.render = function patchedTextRender(props, ref) {
+  const patchedTextRender = function patchedTextRender(props, ref) {
     const children = props && props.children;
     if (typeof children === 'string' && testRe.test(children)) {
       return originalRender.call(this, { ...props, children: toNodes(children, props && props.style) }, ref);
@@ -131,5 +129,12 @@ export const setupRichText = () => {
     return originalRender.call(this, props, ref);
   };
 
+  Text.render = patchedTextRender;
   Text.__richTextPatched = true;
+
+  return () => {
+    if (Text.render !== patchedTextRender) return;
+    Text.render = originalRender;
+    delete Text.__richTextPatched;
+  };
 };

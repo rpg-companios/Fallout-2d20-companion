@@ -7,11 +7,11 @@
 // LCK — с самых первых коммитов проекта (проверено git log -S: канона в
 // истории не существовало). Патч 289 выровнял все точки, где порядок задаётся,
 // и добавил этот тест: любая новая точка обязана совпадать с каноном.
-// Источник истины — CANONICAL_ATTRIBUTE_KEYS в domain/characterCreation.js.
+// Источник истины — CANONICAL_ATTRIBUTE_KEYS в Fallout character-creation capability.
 
 import { describe, it, expect } from 'vitest';
-import { CANONICAL_ATTRIBUTE_KEYS, createInitialAttributes } from '../../domain/characterCreation';
-import { PERK_ATTRIBUTE_FILTER_CODES } from '../../domain/perks';
+import { CANONICAL_ATTRIBUTE_KEYS, createInitialAttributes } from '../../modules/fallout/logic/characterCreation.js';
+import { PERK_ATTRIBUTE_FILTER_CODES } from '../../modules/fallout/perks/attributeFilters.js';
 import { selectLegacyAttributes } from '../../src/store/selectors';
 
 const SPECIAL_CANON = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];

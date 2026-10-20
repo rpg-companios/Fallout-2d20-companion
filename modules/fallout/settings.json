@@ -6,7 +6,10 @@
     "sectionKey": "survival",
     "labelKey": "settings.survivalSystemTitle",
     "descriptionKey": "settings.survivalSystemDescription",
-    "defaultValue": false
+    "defaultValue": false,
+    "legacyKeys": [
+      "survivalModeEnabled"
+    ]
   },
   {
     "id": "survivalTimeCourseMinutes",
@@ -19,7 +22,10 @@
     "min": 1,
     "max": 1440,
     "freeInput": true,
-    "dependsOn": "survivalModeEnabled"
+    "dependsOn": "survivalModeEnabled",
+    "legacyKeys": [
+      "survivalTimeCourseMinutes"
+    ]
   },
   {
     "id": "weaponDurabilityLossEnabled",
@@ -28,7 +34,11 @@
     "sectionKey": "survival",
     "labelKey": "settings.durabilityTitle",
     "descriptionKey": "settings.durabilityDescription",
-    "defaultValue": true
+    "defaultValue": true,
+    "legacyKeys": [
+      "weaponDurabilityLossEnabled",
+      "randomWeaponDurabilityEnabled"
+    ]
   },
   {
     "id": "weaponDurabilityLossPer10Shots",
@@ -40,7 +50,10 @@
     "defaultValue": 1,
     "min": 1,
     "max": 100,
-    "dependsOn": "weaponDurabilityLossEnabled"
+    "dependsOn": "weaponDurabilityLossEnabled",
+    "legacyKeys": [
+      "weaponDurabilityLossPer10Shots"
+    ]
   },
   {
     "id": "randomWeaponQualityEnabled",
@@ -49,7 +62,11 @@
     "sectionKey": "survival",
     "labelKey": "settings.qualityTitle",
     "descriptionKey": "settings.qualityDescription",
-    "defaultValue": false
+    "defaultValue": false,
+    "legacyKeys": [
+      "randomWeaponQualityEnabled",
+      "randomWeaponDurabilityEnabled"
+    ]
   },
   {
     "id": "unarmedAttackVisible",
@@ -58,7 +75,10 @@
     "sectionKey": "combat",
     "labelKey": "settings.unarmedTitle",
     "descriptionKey": "settings.unarmedDescription",
-    "defaultValue": true
+    "defaultValue": true,
+    "legacyKeys": [
+      "unarmedAttackVisible"
+    ]
   },
   {
     "id": "weaponCardsDisplayMode",
@@ -77,6 +97,9 @@
         "value": "spoilers",
         "labelKey": "settings.cards.spoilers"
       }
+    ],
+    "legacyKeys": [
+      "weaponCardsDisplayMode"
     ]
   },
   {
@@ -86,7 +109,10 @@
     "sectionKey": "robots",
     "labelKey": "settings.robotArmsStrictTitle",
     "descriptionKey": "settings.robotArmsStrictDescription",
-    "defaultValue": true
+    "defaultValue": true,
+    "legacyKeys": [
+      "robotArmPartsStrictReplace"
+    ]
   },
   {
     "id": "craftFailLossConsumables",
@@ -95,7 +121,10 @@
     "sectionKey": "crafting",
     "labelKey": "settings.craftLossConsumablesTitle",
     "descriptionKey": "settings.craftLossConsumablesDescription",
-    "defaultValue": true
+    "defaultValue": true,
+    "legacyKeys": [
+      "craftFailLossConsumables"
+    ]
   },
   {
     "id": "craftFailLossGear",
@@ -104,7 +133,10 @@
     "sectionKey": "crafting",
     "labelKey": "settings.craftLossGearTitle",
     "descriptionKey": "settings.craftLossGearDescription",
-    "defaultValue": true
+    "defaultValue": true,
+    "legacyKeys": [
+      "craftFailLossGear"
+    ]
   },
   {
     "id": "modsRequireInventoryItem",
@@ -113,6 +145,9 @@
     "sectionKey": "crafting",
     "labelKey": "settings.modsRequireInventoryTitle",
     "descriptionKey": "settings.modsRequireInventoryDescription",
-    "defaultValue": false
+    "defaultValue": false,
+    "legacyKeys": [
+      "modsRequireInventoryItem"
+    ]
   }
 ]

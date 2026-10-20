@@ -2,18 +2,17 @@
 //
 // Универсальный движок механики «крафт» (патч 251).
 //
-// Что он знает: ТОЛЬКО форму рецепта — { requires: { skill, complexity, perks[] },
-// materials: [{ itemId, count }], outputQuantity: number | {base,cd};
-// id рецепта = id предмета результата. Сгорание при провале — настройка
+// Что он знает: форму требований и материалов, а также общую последовательность
+// проверки → списания → выдачи. Форму outputQuantity и её разрешение объявляет
+// пакет через validator/resolver callbacks. Сгорание при провале — настройка
 // модуля (CRAFT_RULES), не поле данных (270).
 // Идентификаторы предметов, перков, верстаков для него непрозрачны: движок не
-// заглядывает в каталоги, не читает стор и не знает, что такое Fallout.
+// заглядывает в каталоги, не читает стор и не знает терминов конкретного сеттинга.
 //
 // Что он делает: гейтит рецепт по рангам особенностей, считает доступность
 // материалов, вычисляет сложность проверки по печатному правилу книги
 // «сложность = Complexity − ранг навыка, 0 = автоуспех» (Core Rulebook, с. 210),
-// бросает проверку движковым d20-резолвером, считает количество результата
-// ({base, cd} — боевые кубики через порт rollCD) и проводит сам обмен:
+// бросает проверку движковым d20-резолвером и проводит сам обмен:
 // «списать материалы — выдать предмет» — через порты вызывающего.
 //
 // Чего он НЕ делает: не решает, ГДЕ лежат рецепты и ЧТО такое предметы, — это
@@ -35,7 +34,20 @@
 
 import { resolveD20Check } from './d20Checks';
 
-const assertRecipeShape = (recipe) => {
+const assertIntegerOutputQuantity = (quantity) => {
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new Error(
+      '[craftingEngine] recipe.outputQuantity must be an integer >= 1; structured quantities require a setting validator',
+    );
+  }
+};
+
+const resolveIntegerOutputQuantity = (quantity) => {
+  assertIntegerOutputQuantity(quantity);
+  return quantity;
+};
+
+const assertRecipeShape = (recipe, validateOutputQuantity = assertIntegerOutputQuantity) => {
   if (!recipe || typeof recipe !== 'object') {
     throw new Error('[craftingEngine] recipe is required');
   }
@@ -55,13 +67,15 @@ const assertRecipeShape = (recipe) => {
       throw new Error('[craftingEngine] recipe.materials entries must be { itemId, count > 0 }');
     }
   }
-  // Результат рецепта — это предмет с его id (реформа 2026-09-17): отдельного
-  // «output.itemId» в данных нет, количество — outputQuantity (целое или {base,cd}).
+  // Результат рецепта — предмет с его id; форма количества — контракт настройки.
   if (typeof recipe.id !== 'string' || !recipe.id) {
     throw new Error('[craftingEngine] recipe.id (он же id предмета результата) is required');
   }
   if (recipe.outputQuantity !== undefined) {
-    assertQuantityShape(recipe.outputQuantity); // форма проверяется без броска
+    if (typeof validateOutputQuantity !== 'function') {
+      throw new Error('[craftingEngine] validateOutputQuantity port is required for recipe output data');
+    }
+    validateOutputQuantity(recipe.outputQuantity);
   }
   if (recipe.failBurnsMaterials !== undefined) {
     throw new Error('[craftingEngine] failBurnsMaterials is a module rule (270), not recipe data');
@@ -76,46 +90,6 @@ export const craftDifficulty = ({ complexity, skillRank = 0 }) =>
   Math.max(0, complexity - Math.max(0, Number(skillRank) || 0));
 
 /**
- * Количество результата: число или { base, cd } — база плюс боевые кубики.
- * Кубики кидает порт rollCD (движок не знает, чьи это кубики и зачем).
- */
-// Форма количества результата: целое ≥1 или {base ≥1, cd ≥0}. Отдельно от
-// резолвера: сверка данных не имеет права бросать кубики (269).
-const assertQuantityShape = (quantity) => {
-  if (Number.isInteger(quantity)) {
-    if (quantity < 1) throw new Error('[craftingEngine] recipe.outputQuantity must be >= 1');
-    return;
-  }
-  if (!quantity || typeof quantity !== 'object' || Array.isArray(quantity)) {
-    throw new Error('[craftingEngine] recipe.outputQuantity must be an integer or { base, cd }');
-  }
-  const base = Number(quantity.base);
-  const cd = Number(quantity.cd ?? 0);
-  if (!Number.isInteger(base) || base < 1) {
-    throw new Error('[craftingEngine] outputQuantity.base must be an integer >= 1');
-  }
-  if (!Number.isInteger(cd) || cd < 0) {
-    throw new Error('[craftingEngine] outputQuantity.cd must be an integer >= 0');
-  }
-};
-
-export const resolveOutputQuantity = (quantity, rollCD) => {
-  assertQuantityShape(quantity);
-  if (Number.isInteger(quantity)) return quantity;
-  const base = Number(quantity.base);
-  const cd = Number(quantity.cd ?? 0);
-  if (cd === 0) return base;
-  if (typeof rollCD !== 'function') {
-    throw new Error('[craftingEngine] rollCD port is required for CD quantities');
-  }
-  const rolled = Number(rollCD(cd));
-  if (!Number.isInteger(rolled) || rolled < 0) {
-    throw new Error('[craftingEngine] rollCD must return a non-negative integer');
-  }
-  return base + rolled;
-};
-
-/**
  * Сверка рецепта с героем и сумкой — БЕЗ изменений состояния. Экран может
  * звать это хоть каждый рендер: «можно ли», «чего не хватает», «какая цена».
  * blocked[] — причины отказа с деталями (что и сколько нужно/есть).
@@ -125,8 +99,9 @@ export const evaluateCraft = ({
   skillRank = 0,
   perkRanks = {},
   inventoryCounts = {},
+  validateOutputQuantity = assertIntegerOutputQuantity,
 }) => {
-  assertRecipeShape(recipe);
+  assertRecipeShape(recipe, validateOutputQuantity);
   const blocked = [];
 
   for (const perk of recipe.requires.perks ?? []) {
@@ -182,7 +157,8 @@ export const runCraft = ({
   // провал на двух осложнениях). Выбор спрашивает UI; движок только исполняет.
   zeroDifficulty = 'auto',
   rollD20,
-  rollCD,
+  validateOutputQuantity = assertIntegerOutputQuantity,
+  resolveOutputQuantity = resolveIntegerOutputQuantity,
   spend,
   grant,
 }) => {
@@ -190,14 +166,23 @@ export const runCraft = ({
     throw new Error('[craftingEngine] ports { spend, grant } are required');
   }
 
-  const evaluation = evaluateCraft({ recipe, skillRank, perkRanks, inventoryCounts });
+  const evaluation = evaluateCraft({
+    recipe,
+    skillRank,
+    perkRanks,
+    inventoryCounts,
+    validateOutputQuantity,
+  });
   if (!evaluation.ready) {
     return { done: false, stage: 'gate', reasons: evaluation.blocked, spent: [], granted: null, check: null, auto: false };
   }
 
   // Количество считаем ДО списания: кривая форма output.quantity — дефект данных,
   // он не должен застирать сумку на полуслове.
-  const quantity = resolveOutputQuantity(recipe.outputQuantity ?? 1, rollCD);
+  const quantity = resolveOutputQuantity(recipe.outputQuantity ?? 1);
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    throw new Error('[craftingEngine] resolveOutputQuantity must return an integer >= 1');
+  }
 
   let check = null;
   if (!evaluation.auto || zeroDifficulty === 'roll') {

@@ -61,8 +61,8 @@ describe('МК-3 шаг 2: каскад производных в хранили
   it('робо-слоты изменились действием → derivedStats пересчитались сами', () => {
     const store = useCharacterStore.getState();
     const before = store.derivedStats;
-    store.initRobot('protectron');
-    store.setEquippedRobotSlots({ body: { limb: { id: 'body1', carryWeight: 42 } } });
+    store.getSettingAction('robotEquipment', 'initRobot')('protectron');
+    store.getSettingAction('robotEquipment', 'setEquippedRobotSlots')({ body: { limb: { id: 'body1', carryWeight: 42 } } });
     const after = useCharacterStore.getState().derivedStats;
     expect(after).not.toBe(before); // каскад сработал от смены robot.slots
   });

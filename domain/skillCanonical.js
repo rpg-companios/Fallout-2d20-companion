@@ -1,43 +1,31 @@
-// domain/skillCanonical.js
-// Мост канонизации навыков при загрузке сейвов (переехал из CharacterContext,
-// Шаг 5 подготовка: loadCharacter будет переписываться — мосту нужен
-// тестируемый домен-дом).
-//
-// Зачем: legacy-сейвы хранят skills с РУССКИМИ отображаемыми именами в поле
-// `name` (например «Ремонт»). После канонического рефакторинга идентичность
-// навыка — ключ UPPER_SNAKE_CASE (REPAIR). Это НЕ про i18n: интерфейс и раньше
-// рисовал названия из каталога переводов, но в сейве имя было
-// персистентным идентификатором. Мост запускается только на загрузке;
-// новые сейвы уже пишут ключи, для них операция — no-op.
+// Canonicalize legacy skill display names when loading saved characters.
+// The active setting owns the localized names; the engine only translates them
+// to its stable skill keys.
+import { getAllSkillKeys } from './characterCreation';
+import { getActiveSettingRuntime } from '../src/engine/settings/activeSettingRuntime';
+import { getSettingScreenI18n } from './registry';
 
-import ruCharacterScreen from '../i18n/ru-RU/screens/character/screen.json';
-import ruSettingCharacterScreen from '../modules/fallout/i18n/ru-RU/screens/character/screen.json';
-import { ALL_SKILL_KEYS } from './characterCreation';
-import { deepMerge } from '../i18n/mergeDicts';
-
-// ВАЖНО: каталог навыков живёт в СЛОЕ СЕТТИНГА (modules/fallout/i18n), а не в
-// движковом screen.json. Мост обязан читать СКЛЕННЫЙ словарь (движок + сеттинг,
-// как tCharacterScreen): раньше тут читался только движковый, где skillsCatalog
-// отсутствует — карта была пуста, мост тихо не работал (поймано фикстурой
-// грязного сейва, __tests__/saves/dirty-save-v18.test.js).
-const RU_SKILL_NAME_TO_KEY = Object.entries(
-  deepMerge(ruCharacterScreen, ruSettingCharacterScreen)?.skillsCatalog || {},
-).reduce(
-  (acc, [key, ruName]) => { acc[ruName] = key; return acc; },
-  {},
-);
+const getSkillNameToKey = () => {
+  const runtime = getActiveSettingRuntime();
+  const locales = runtime?.manifest?.locales ?? Object.keys(runtime?.setting?.names ?? {});
+  return Object.fromEntries(locales.flatMap((locale) => {
+    const skillNames = getSettingScreenI18n('character', locale)?.skillsCatalog ?? {};
+    return Object.entries(skillNames).map(([key, name]) => [name, key]);
+  }));
+};
 
 /**
- * Канонизировать имена навыков в загружаемом сейве.
- * @param {*} rawSkills — массив [{name, value}] из сейва или не-массив.
- * @returns {Array|null} — канонизированный массив; null для не-массива.
+ * Canonicalize names in a loaded legacy save.
+ * @param {*} rawSkills — array [{name, value}] from a save, or a non-array.
+ * @returns {Array|null} — canonicalized array; null for non-arrays.
  */
 export const migrateSkillsToCanonical = (rawSkills) => {
   if (!Array.isArray(rawSkills)) return null;
-  return rawSkills.map((s) => {
-    if (!s || typeof s.name !== 'string') return s;
-    if (ALL_SKILL_KEYS.includes(s.name)) return s;             // already canonical
-    const canonical = RU_SKILL_NAME_TO_KEY[s.name];            // legacy Russian
-    return canonical ? { ...s, name: canonical } : s;
+  const skillNameToKey = getSkillNameToKey();
+  return rawSkills.map((skill) => {
+    if (!skill || typeof skill.name !== 'string') return skill;
+    if (getAllSkillKeys().includes(skill.name)) return skill;
+    const canonical = skillNameToKey[skill.name];
+    return canonical ? { ...skill, name: canonical } : skill;
   });
 };

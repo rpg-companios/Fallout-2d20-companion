@@ -10,18 +10,20 @@
 import { describe, expect, it } from 'vitest';
 
 import useCharacterStore from '../../src/store/characterStore';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import {
   getSlotsForWeapon,
   getModsForWeaponSlot,
   getWeaponModById,
 } from '../../db/Database.web';
-import { getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
+import { getBuiltinWeaponsFromSlots } from '../../modules/fallout/logic/robotEquip';
 import { classifyModWritePlan } from '../../src/engine/items/weaponMods';
-import { setOwnWeaponMods, serializeSlot } from '../../domain/robotSlots';
+import { setOwnWeaponMods, serializeSlot } from '../../modules/fallout/logic/robotSlots';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 
 const state = () => useCharacterStore.getState();
+const robot = () => selectFalloutRobotState(state());
 const catalog = getEquipmentCatalog('ru-RU');
 const catalogRef = { weapons: catalog.weapons, weaponMods: catalog.weaponMods };
 const HEAD_LASER = 'robot_weapon_assaultron_head_laser';
@@ -44,9 +46,9 @@ const oldSaveSlots = () => ({
 
 const loadOldSave = () => {
   state().resetCharacterStore();
-  state().loadRobotState({ bodyPlan: 'assaultron', slots: oldSaveSlots(), modules: [] });
+  state().getSettingAction('robotEquipment', 'loadRobotState')({ bodyPlan: 'assaultron', slots: oldSaveSlots(), modules: [] });
 };
-const headCard = () => getBuiltinWeaponsFromSlots(state().robot?.slots || {})
+const headCard = () => getBuiltinWeaponsFromSlots(robot()?.slots || {})
   .find((c) => c.weaponId === HEAD_LASER);
 const planOf = (card) => classifyModWritePlan({
   sourceSlot: card.sourceSlot, attackRole: card.attackRole, isBuiltin: card.isBuiltin,
@@ -54,8 +56,8 @@ const planOf = (card) => classifyModWritePlan({
 }, { slotHasHeldWeapon: false });
 const applyOwnMods = (appliedMods) => {
   const plan = planOf(headCard());
-  const next = setOwnWeaponMods(state().robot.slots, plan.slotKey, appliedMods);
-  state().setEquippedRobotSlots(next);
+  const next = setOwnWeaponMods(robot().slots, plan.slotKey, appliedMods);
+  state().getSettingAction('robotEquipment', 'setEquippedRobotSlots')(next);
 };
 
 describe('патч 385: моды собственной атаки (Головной лазер) из старого сейва', () => {
@@ -97,14 +99,14 @@ describe('патч 385: моды собственной атаки (Головн
     loadOldSave();
     applyOwnMods({});
     let slim = {};
-    for (const [k, v] of Object.entries(state().robot.slots)) slim[k] = serializeSlot(v);
-    state().loadRobotState({ bodyPlan: 'assaultron', slots: slim, modules: [] });
+    for (const [k, v] of Object.entries(robot().slots)) slim[k] = serializeSlot(v);
+    state().getSettingAction('robotEquipment', 'loadRobotState')({ bodyPlan: 'assaultron', slots: slim, modules: [] });
     expect(headCard().appliedMods.Capacitor).toBeUndefined();
 
     applyOwnMods({ Capacitor: MK5 });
     slim = {};
-    for (const [k, v] of Object.entries(state().robot.slots)) slim[k] = serializeSlot(v);
-    state().loadRobotState({ bodyPlan: 'assaultron', slots: slim, modules: [] });
+    for (const [k, v] of Object.entries(robot().slots)) slim[k] = serializeSlot(v);
+    state().getSettingAction('robotEquipment', 'loadRobotState')({ bodyPlan: 'assaultron', slots: slim, modules: [] });
     expect(headCard().appliedMods.Capacitor).toBe(MK5);
   });
 });

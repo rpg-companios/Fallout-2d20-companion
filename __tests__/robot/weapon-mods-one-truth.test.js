@@ -21,11 +21,11 @@ import {
   deserializeSlot,
   setOwnWeaponMods,
   setInstalledWeaponMods,
-} from '../../domain/robotSlots';
-import { getRobotLimbCatalog } from '../../domain/registry';
+} from '../../modules/fallout/logic/robotSlots';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 
 const ROOT = join(__dirname, '../..');
-const catalog = getRobotLimbCatalog();
+const catalog = getFalloutRobotLimbCatalog();
 const MK3 = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_iii';
 
 // Голова Штурмотрона с Головным лазером (слот робота в живой форме стора).

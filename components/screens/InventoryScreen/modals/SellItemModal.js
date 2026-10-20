@@ -3,10 +3,10 @@ import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvo
 import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
 import { defaultSellPricePerItem } from '../logic/sellPrice';
-import { useLocale } from '../../../../i18n/locale';
+import { useModuleLocale } from '../../../../i18n/locale';
 
 const SellItemModal = ({ visible, onClose, item, onConfirmSale }) => {
-  useLocale();
+  useModuleLocale();
   const [quantity, setQuantity] = useState('1');
   const [pricePerItem, setPricePerItem] = useState('0');
 

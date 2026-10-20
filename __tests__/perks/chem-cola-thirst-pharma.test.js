@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { checkAddiction, resolveConsumableVitalChanges } from '../../domain/effects';
-import { pickRandomItem, rollFoundItemBonuses, sumFoundItemBonus } from '../../domain/foundItemBonus';
+import { resolveConsumableVitalChanges } from '../../modules/fallout/consumables/vitalChanges.js';
+import { checkAddiction } from '../../modules/fallout/consumables/addiction.js';
+import { pickRandomItem } from '../../domain/randomItem';
+import { rollFoundItemBonuses, sumFoundItemBonus } from '../../modules/fallout/loot/foundItemBonus';
 import { calculatePerkEffects } from '../../domain/perks';
-import { COLA_NUT_DRINK_IDS } from '../../domain/perks/colaNut';
-import { DIRTY_WATER_ID } from '../../domain/perks/thirstQuencher';
+import { COLA_NUT_DRINK_IDS } from '../../modules/fallout/perks/effects/colaNut';
+import { DIRTY_WATER_ID } from '../../modules/fallout/perks/effects/thirstQuencher';
 import perksData from '../../modules/fallout/data/perks/perks.json';
 import drinks from '../../modules/fallout/data/consumables/drinks.json';
 

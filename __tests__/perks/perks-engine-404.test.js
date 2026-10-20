@@ -9,12 +9,12 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { resolveConsumableVitalChanges } from '../../domain/effects';
+import { resolveConsumableVitalChanges } from '../../modules/fallout/consumables/vitalChanges.js';
 import { calculateDerivedStats } from '../../modules/fallout/logic/derivedStats.js';
 import { selectPerkBonuses } from '../../domain/perks.js';
-import { oldWorldGourmetPerk } from '../../domain/perks/oldWorldGourmet';
-import { inShiningArmorPerk, isMetalArmorCatalogId } from '../../domain/perks/inShiningArmor';
-import { loadAndFirePerk, applyLoadAndFireToWeapon, loadAndFireBonusByRank } from '../../domain/perks/loadAndFire';
+import { oldWorldGourmetPerk } from '../../modules/fallout/perks/effects/oldWorldGourmet';
+import { inShiningArmorPerk, isMetalArmorCatalogId } from '../../modules/fallout/perks/effects/inShiningArmor';
+import { loadAndFirePerk, applyLoadAndFireToWeapon, loadAndFireBonusByRank } from '../../modules/fallout/perks/loadAndFire';
 import catalog from '../../modules/fallout/data/perks/perks.json';
 import foodData from '../../modules/fallout/data/consumables/food.json';
 import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
@@ -49,7 +49,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
     };
     const withPerk = resolveConsumableVitalChanges(canned, {
       currentHealth: 10, maxHealth: 12, radiation: 0,
-      oldWorldGourmet: GOURMET,
+      preservedFoodBonus: GOURMET,
     });
     expect(withPerk.healAmount).toBe(2);
     expect(withPerk.healthAfter).toBe(12);
@@ -68,7 +68,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
     const result = resolveConsumableVitalChanges(sugarBombs, {
       currentHealth: 5, maxHealth: 12, radiation: 0,
       radiationRequestedAmount: 3, // как будто АГНИ-бросок дал 3 радиации
-      oldWorldGourmet: GOURMET,
+      preservedFoodBonus: GOURMET,
     });
     expect(result.healAmount).toBe(6); // 4 + 2
     expect(result.radiationAmount).toBe(2); // 3 → 2
@@ -80,13 +80,13 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
       radiationModifier: { op: '+', value: 1 },
     };
     expect(resolveConsumableVitalChanges(light, {
-      currentHealth: 5, maxHealth: 12, radiation: 1, oldWorldGourmet: GOURMET,
+      currentHealth: 5, maxHealth: 12, radiation: 1, preservedFoodBonus: GOURMET,
     }).radiationAmount).toBe(0); // 1 радиация → 0 (прирост обнулился)
 
     // Чистая еда без радиации: перк не создаёт радиацию из ничего.
     const clean = { id: 'test_clean', itemType: 'food', preserved: true, radiationModifier: null };
     expect(resolveConsumableVitalChanges(clean, {
-      currentHealth: 5, maxHealth: 12, radiation: 0, oldWorldGourmet: GOURMET,
+      currentHealth: 5, maxHealth: 12, radiation: 0, preservedFoodBonus: GOURMET,
     }).radiationAmount).toBe(null);
 
     // Предмет, СНИМАЮЩИЙ радиацию (op '−'): перк не должен ослаблять очистку.
@@ -95,7 +95,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
       radiationModifier: { op: '-', value: 3 },
     };
     expect(resolveConsumableVitalChanges(cleansing, {
-      currentHealth: 5, maxHealth: 12, radiation: 5, oldWorldGourmet: GOURMET,
+      currentHealth: 5, maxHealth: 12, radiation: 5, preservedFoodBonus: GOURMET,
     }).radiationAmount).toBe(-3); // снято 3 радиации, перк не помешал
   });
 
@@ -103,7 +103,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
     const grilled = byId(foodList, 'food_grilled_bloatfly');
     expect(grilled.preserved).toBe(false);
     const food = resolveConsumableVitalChanges(grilled, {
-      currentHealth: 5, maxHealth: 20, radiation: 0, oldWorldGourmet: GOURMET,
+      currentHealth: 5, maxHealth: 20, radiation: 0, preservedFoodBonus: GOURMET,
     });
     // Жареная стрекоза лечит 6; перк НЕ добавил свои +2 (она не preserved).
     expect(food.healAmount).toBe(6);
@@ -113,7 +113,7 @@ describe('Патч 404: Гурман старого мира (preserved-еда)'
       positiveEffect: null, radiationModifier: { op: '+', value: 2 },
     };
     const drinkResult = resolveConsumableVitalChanges(drink, {
-      currentHealth: 5, maxHealth: 12, radiation: 0, oldWorldGourmet: GOURMET,
+      currentHealth: 5, maxHealth: 12, radiation: 0, preservedFoodBonus: GOURMET,
     });
     expect(drinkResult.healAmount).toBe(0);
     expect(drinkResult.radiationAmount).toBe(2); // −2 у напитков не работает
@@ -176,9 +176,10 @@ describe('Патч 404: Заряжай и стреляй (скорострель
 
   it('проводка UI: обе точки показа оружия зовут единый хелпер', () => {
     const inv = readFileSync(resolve(__dirname, '../../components/screens/InventoryScreen/InventoryScreen.js'), 'utf8');
-    expect(inv).toContain("from '../../../domain/perks/loadAndFire'");
+    expect(inv).not.toMatch(/from\s+['"][^'"]*loadAndFire['"]/);
+    expect(inv).toContain('weaponPresentationFeature?.getDisplayItem');
     const waa = readFileSync(resolve(__dirname, '../../modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js'), 'utf8');
-    expect(waa).toContain("from '../../../../domain/perks/loadAndFire'");
+    expect(waa).toContain("from '../../perks/loadAndFire.js'");
   });
 });
 

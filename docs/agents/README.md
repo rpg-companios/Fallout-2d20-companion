@@ -77,14 +77,14 @@ Web — ПУСТАЯ ФУНКЦИЯ: молчит; прямые вызовы в 
 
 **Моды — закон 343/344 (+359).** Установка: мод-предмет получает
 `equipped: true` + `installedOn` (курсив в сумке = установлен), снятие/
-замена возвращает, продали носитель — ушли оба. Броня — `installArmorMod`
-(hostKey = ключ предмета). Робо-оружие (359): носитель — не предмет,
-ключ синтетический `robotWeaponHostKey(слот, id)`; стор-действие
-`installRobotWeaponMod`; уход оружия из слота возвращает моды. Запись
-выбора — ветки `classifyModWritePlan` (storeItem/equippedWeapon/robotSlot)
-в `WeaponsAndArmorScreen.handleApplyModification`. Гейт — настройка
-`modsRequireInventoryItem` (ВЫКЛ); список не фильтруется; кнопка
-«Создать» — 352–355 (#22c55e, требования блоком).
+замена возвращает, продали носитель — ушли оба. Общие хосты проходят через
+engine item-modifier actions; Fallout-owned armor/robot fields и синтетический
+`robotWeaponHostKey(слот, id)` объявлены в
+`modules/fallout/logic/robotWeaponMods.js` и `modifierStorage` capability.
+`classifyModWritePlan` знает только shared item locations; Fallout screen
+расширяет его своим planner для robotSlot. Уход оружия из слота возвращает
+моды через package action. Гейт — настройка `modsRequireInventoryItem`
+(ВЫКЛ); список не фильтруется; кнопка «Создать» — 352–355.
 
 **Робо-слоты и сейвы (360).** Правда о робо-оружии — слоты стора
 (`robot.slots`); `loadRobotState` разворачивает худые слоты в полную

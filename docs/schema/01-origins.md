@@ -108,10 +108,10 @@ isRobot, isMutant, canWearStandardArmor, canWearRobotArmor, canWearMutantArmor`.
 Это упрощение убирает нужду в `trait.isRobot` (флаг удалён из всех 4 робо-трейтов в реализации v1).
 
 ## Где это читается в коде (для будущей миграции)
-- `domain/bodyplan.js` — resolveBodyPlan (origin.robotBodyPlan / origin.bodyPlan / id-map)
+- `modules/fallout/logic/bodyplan.js` — resolveBodyPlan (setting-owned body-plan interpretation from package data)
 - `domain/robotEquip.js` — isRobotCharacter = origin.isRobot
 - `domain/immunities.js` — ROBOT_IMMUNITIES + trait.immunities
-- `domain/characterCreation.js` — стартовые атрибуты/лимиты
+- `modules/fallout/logic/characterCreation.js` — Fallout-стартовые атрибуты/лимиты
 - `components/.../originsData.js` — image + equipmentKits enrich
 - `components/CharacterContext.js` — resolveOrigin
 

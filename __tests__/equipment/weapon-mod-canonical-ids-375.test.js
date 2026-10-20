@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import {
   WEAPON_MOD_ID_MAP,
   migrateWeaponModIdsToCanonical,
-} from '../../domain/weaponModCanonical';
+} from '../../modules/fallout/migrations/weaponModCanonical.js';
 import catalogData from '../../modules/fallout/data/equipment/weapon_mods.json';
 import slotData from '../../modules/fallout/data/equipment/weapon_mod_slots.json';
 import recipeData from '../../modules/fallout/data/recipes/weapons.json';

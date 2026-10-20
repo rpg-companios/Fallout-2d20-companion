@@ -56,32 +56,22 @@
 обогащения) — движковые и здоровые; **правила** (все формулы из строчек с F)
 — Fallout, застрявшие в движке с ручным приводом.
 
-## 3. Ручной привод: 24 вызова пересчёта
+## 3. Generic automatic cascade
 
-`recalculateDerivedStats()` / `triggerDependentCalculations()` (делегирует в
-первый) расставлены руками по действиям стора:
+`src/store/characterStore.js` wraps Zustand writes and recalculates derived values
+when shared inputs change (`attributes`, `effects`, `perkBonuses`, `trait`,
+`level`, `origin`, `stateExtensions`, and the generic equipment context). It does
+not enumerate robot slots or power-armor fields. Setting-owned feature actions
+write only their registered extension payloads; the same generic cascade sees
+`stateExtensions` change.
 
-| Действие | Файл |
-|---|---|
-| `updateAttribute`, `addAttributeModifier`, `removeAttributeModifier`, `setBaseAttributes` | characterStore |
-| `updateSkill`, `addSkillModifier`, `removeSkillModifier`, `setBaseSkills` | characterStore |
-| `setSelectedPerks`, `updateItem`, `spendItemStacks`, `equipItem`, `unequipItem`, `addNewItem` (×2 ветки) | characterStore |
-| `addEffect`, `updateEffect`, `expireEffect`, `pruneExpiredEffects`, `advanceScene` | characterStore |
-| `recalculateAll`, `setSelectedPerks`… (итого 22 точки в characterStore) | characterStore |
-| `setRobotSlots`, `setRobotModules` | robotSlice |
-| `syncTimedEffectsToStore` | effectsSync |
+## 4. Setting-owned interpretation
 
-Каждое новое действие — кандиддат забыть вызов. Обратная сторона: вызов
-«на всякий случай» после каждого чиха — лишние пересчёты всей кучи.
-
-## 4. Полуавтоматическая подписка (патч 243)
-
-Подписка стора пересчитывает производные при изменении
-`trait / level / origin / equippedArmor / robot.slots / equippedPowerArmor`
-и **не смотрит атрибуты, навыки, эффекты и перки** — их закрывают ручные
-вызовы §3. Подписка пушит контекст в `_characterContext` (зеркало для
-пересчёта) — ещё одно хранимое промежуточное состояние, которого в целевой
-картине нет.
+The active package supplies derived-stat rules through the runtime capability.
+The engine passes the common character snapshot and opaque extension payloads;
+only the package interprets its own fields and formulas. Adding a new setting
+action does not require adding a Fallout-specific action or state key to the
+engine store.
 
 ## 5. Третьи копии в экранах
 

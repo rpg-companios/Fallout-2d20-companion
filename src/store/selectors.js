@@ -1,26 +1,28 @@
 // src/store/selectors.js
 // Pure selector functions for reading data from the normalized character store
 
-import { debugLog } from '../debug/falloutDebug';
+import { debugLog } from '../engine/debug/runtimeTrace.js';
 import { effectsDictToLegacyArray } from './effectsSync.js';
-import { resolveWeaponRangeFields } from '../../domain/range.js';
-import { createEmptyEquippedArmor } from '../../domain/equippedArmor.js';
-import { ALL_SKILLS, CANONICAL_ATTRIBUTE_KEYS, getCanonicalAttributeKey } from '../../domain/characterCreation.js';
+import { getCharacterCreationLogic, getDerivedStatsLogic, getSettingService } from '../../domain/registry.js';
 
-// МК-3 (патч 316): формула грузоподъёмности уехала в сеттинг — чтение через дверь.
-import { getDerivedStatsLogic } from '../../domain/registry.js';
-
-const { calculateCarryWeight } = getDerivedStatsLogic();
+// Setting-derived formulas are resolved at call time. No active setting means
+// there is no carry-weight formula, not an implicit setting implementation.
+const calculateCarryWeight = (...args) => (
+  getDerivedStatsLogic()?.calculateCarryWeight?.(...args) ?? 0
+);
 
 // ── Шаг 5 миграции: стор-словари (Parameter-формат) — единственный источник
 // атрибутов/навыков. Экранам и снапшоту сейва нужен legacy-массив — выводится
 // ЭТИМИ селекторами (одна реализация на провайдер и экраны).
 
-const PARAM_FIELDS = [
-  'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
-];
-
-// Пустая карта слотов экипировки живёт в domain/equippedArmor.js (единый источник).
+const getParameterFieldNames = () => {
+  const settingFields = getSettingService('inventory')?.itemParameterFields;
+  return [
+    'damage',
+    'fireRate',
+    ...(Array.isArray(settingFields) ? settingFields.filter((field) => typeof field === 'string') : []),
+  ];
+};
 
 /**
  * Flatten normalized parameter objects to display values
@@ -28,138 +30,12 @@ const PARAM_FIELDS = [
 export const flattenItemParams = (item) => {
   if (!item) return item;
   const flat = { ...item };
-  PARAM_FIELDS.forEach((field) => {
+  getParameterFieldNames().forEach((field) => {
     if (flat[field] && typeof flat[field] === 'object') {
       flat[field] = flat[field].total ?? flat[field].base;
     }
   });
   return flat;
-};
-
-const getSlotsForProtectedAreas = (item) => {
-  if (Array.isArray(item?.equippedSlots) && item.equippedSlots.length > 0) {
-    return item.equippedSlots;
-  }
-
-  const areas = Array.isArray(item?.protectedAreas) ? item.protectedAreas : [];
-  const slots = [];
-  if (areas.includes('Head')) slots.push('head');
-  if (areas.includes('Body')) slots.push('body');
-  if (areas.includes('Hand')) slots.push('leftArm', 'rightArm');
-  if (areas.includes('Leg')) slots.push('leftLeg', 'rightLeg');
-  return slots;
-};
-
-/**
- * Build equippedArmor slot map from normalized store items
- */
-export const getEquippedArmor = (state) => {
-  const result = createEmptyEquippedArmor();
-  const equippedItems = selectItemsByEquipped(state, true);
-  const armorItemTypes = new Set(['armor', 'clothing', 'outfit']);
-
-  const instances = new Map();
-  equippedItems
-    .filter((item) => armorItemTypes.has(item.itemType))
-    .forEach((item) => {
-      const flat = flattenItemParams(item);
-      const instanceKey = flat.equipInstanceId || flat.stackKey || flat.id;
-      if (!instances.has(instanceKey)) {
-        instances.set(instanceKey, {
-          item: flat,
-          slots: getSlotsForProtectedAreas(flat),
-        });
-      }
-    });
-
-  instances.forEach(({ item, slots }) => {
-    slots.forEach((slotKey) => {
-      if (!result[slotKey]) return;
-      if (item.itemType === 'outfit') {
-        result[slotKey].clothing = item;
-        result[slotKey].armor = null;
-      } else if (item.itemType === 'clothing') {
-        result[slotKey].clothing = item;
-      } else {
-        result[slotKey].armor = item;
-      }
-    });
-  });
-
-  return result;
-};
-
-/**
- * Build store patch from weapon modification modal result
- */
-export const weaponModPatchToStore = (modifiedWeapon) => {
-  return {
-    appliedMods: modifiedWeapon?.appliedMods || {},
-  };
-};
-
-/**
- * Найти ключ предмета-оружия в сторе по отображаемой (локализованной) карточке.
- * Патч 380: раньше ключ искали по uniqueId/id, а локализованная карточка несёт
- * ключ в instanceId; фолбэк «первый надетый предмет» (сравнение
- * undefined === undefined) отдавал чужой предмет (броню) — мод писался не в
- * оружие и карточка молча не менялась. Теперь: instanceId → uniqueId → id,
- * фолбэк — по совпадению только ОПРЕДЕЛЁННЫХ полей (weaponId и т.д.).
- * Чистая функция (items аргументом) — движок; экран только вызывает.
- *
- * @param {object} items  — словарь предметов стора (state.items)
- * @param {object} weapon — карточка оружия (storeItemToWeaponDisplay/локализованная)
- * @returns {string|undefined} ключ предмета в сторе
- */
-export const resolveStoreItemIdFromItems = (items, weapon) => {
-  if (!weapon || !items) return undefined;
-  if (weapon.instanceId && items[weapon.instanceId]) return weapon.instanceId;
-  if (weapon.uniqueId && items[weapon.uniqueId]) return weapon.uniqueId;
-  if (weapon.id && items[weapon.id]) return weapon.id;
-  return Object.values(items).find(
-    (item) => item.equipped && (
-      (weapon.uniqueId != null && item.uniqueId === weapon.uniqueId)
-      || (weapon.instanceId != null && item.instanceId === weapon.instanceId)
-      || (weapon.weaponId != null && item.weaponId === weapon.weaponId)
-      || (weapon.id != null && item.id === weapon.id)
-    ),
-  )?.id;
-};
-
-/**
- * Convert a normalized store weapon item to legacy display shape
- */
-export const storeItemToWeaponDisplay = (item) => {
-  const flat = flattenItemParams(item);
-  // Resolve the ordinal range scale (catalog letter 'C'/'M'/'L'/'E' → canonical
-  // name/index) so display + mod-step math share one representation. See domain/range.js.
-  const { range_index, range_name } = resolveWeaponRangeFields(flat);
-
-  // Десериализуем damage_type если это JSON-строка
-  let damageType = flat.damageType;
-  if (typeof damageType === 'string') {
-    try {
-      damageType = JSON.parse(damageType);
-    } catch {
-      damageType = [damageType];
-    }
-  }
-  if (!Array.isArray(damageType)) {
-    damageType = damageType ? [damageType] : ['physical'];
-  }
-
-  return {
-    ...flat,
-    instanceId: flat.instanceId || flat.id,
-    id: flat.weaponId || flat.id,
-    fireRate: flat.fireRate,
-    damageType,
-    damageEffects: flat.damageEffects,
-    rangeIndex: range_index,
-    rangeName: range_name,
-    weaponType: flat.weaponType,
-    ammoId: flat.ammoId,
-  };
 };
 
 /**
@@ -182,7 +58,7 @@ export const selectItemsByEquipped = (state, equipped) => {
 /**
  * Filter items by itemType
  * @param {object} state - Character store state
- * @param {string} itemType - e.g. 'weapon', 'armor', 'chem'
+ * @param {string} itemType - a setting-declared item type
  */
 export const selectItemsByType = (state, itemType) => {
   return Object.values(state.items || {}).filter(
@@ -217,46 +93,65 @@ export const selectActiveTimedEffects = (state) => {
 
 
 /**
- * Словарь атрибутов (Parameter-формат) → legacy-массив [{name, value}].
- * Порядок — канон SPECIAL (слово владельца 2026-09-21): STR, PER, END, CHA,
- * INT, AGI, LCK. Старые сейвы хранят исторический порядок STR, END, PER, AGI,
- * INT, CHA, LCK — селектор выравнивает показ, а пересохранение пишет уже
- * канонический порядок (сейвы самоисцеляются).
- * @param {{attributes?: Record<string, {id: string, base: number}>}} state
- * @returns {Array<{name: string, value: number}>}
+ * Convert the normalized attribute map to the legacy display/save shape.
+ * If the active setting declares an order, use it; otherwise preserve the
+ * engine's stored order without imposing any game's attribute identities.
  */
-const SPECIAL_ORDER_INDEX = new Map(CANONICAL_ATTRIBUTE_KEYS.map((key, index) => [key, index]));
-const specialOrderRank = (name) =>
-    SPECIAL_ORDER_INDEX.get(getCanonicalAttributeKey(name) ?? name) ?? CANONICAL_ATTRIBUTE_KEYS.length;
+export const selectLegacyAttributes = ({ attributes = {} } = {}) => {
+  const legacy = Object.values(attributes)
+    .map((attr) => ({ name: attr.id, value: attr.base }));
+  const rules = getCharacterCreationLogic();
+  const canonicalKeys = rules?.CANONICAL_ATTRIBUTE_KEYS ?? [];
+  if (!canonicalKeys.length) return legacy;
 
-export const selectLegacyAttributes = ({ attributes = {} } = {}) =>
-    Object.values(attributes)
-        .map((attr) => ({ name: attr.id, value: attr.base }))
-        .sort((a, b) => specialOrderRank(a.name) - specialOrderRank(b.name));
+  const canonicalize = rules.getCanonicalAttributeKey ?? ((key) => key);
+  const order = new Map(canonicalKeys.map((key, index) => [key, index]));
+  return legacy.sort((left, right) => {
+    const leftRank = order.get(canonicalize(left.name) ?? left.name);
+    const rightRank = order.get(canonicalize(right.name) ?? right.name);
+    if (leftRank === rightRank) return 0;
+    if (leftRank == null) return 1;
+    if (rightRank == null) return -1;
+    return leftRank - rightRank;
+  });
+};
 
 /**
- * Словарь навыков (Parameter-формат) → legacy-массив: каталожные записи
- * ALL_SKILLS (порядок и метаданные) + value из base словаря.
- * @param {{skills?: Record<string, {base: number}>}} state
- * @returns {Array<object>}
+ * Convert normalized skills to the legacy save/display shape. The active
+ * setting may supply an ordered catalogue and metadata; the engine otherwise
+ * exposes only keys that are actually present in state.
  */
-export const selectLegacySkills = ({ skills = {} } = {}) =>
-  ALL_SKILLS.map((skill) => {
-    const stored = skills[skill.name];
-    return stored ? { ...skill, value: stored.base } : { ...skill, value: 0 };
-  });
+export const selectLegacySkills = ({ skills = {} } = {}) => {
+  const catalog = getCharacterCreationLogic()?.ALL_SKILLS ?? [];
+  if (catalog.length) {
+    return catalog.map((skill) => {
+      const stored = skills[skill.name];
+      return stored ? { ...skill, value: stored.base } : { ...skill, value: 0 };
+    });
+  }
+  return Object.entries(skills).map(([key, skill]) => ({
+    name: skill?.id ?? key,
+    value: skill?.base ?? 0,
+  }));
+};
 
 // ── Шаг 8а миграции: производные живут в derivedStats стора (пересчёт —
 // recalculateDerivedStats). Экранам нужен плоский номер — форма поля
-// { base, modifiers, total } (или число в старых записях). Фолбэк — та же
-// формула, которой derived-мост контекста подстраховывался до миграции.
+// { base, modifiers, total } (или число в старых записях). Без активного
+// setting capability селектор возвращает нейтральный ноль.
 export const selectCarryWeight = (state) => {
   const raw = state.derivedStats?.carryWeight;
   if (typeof raw === 'number') return raw;
   if (raw && typeof raw.total === 'number') return raw.total;
+  const settingContext = getSettingService('perks')?.getCharacterContext?.({
+    origin: state.origin,
+    trait: state.trait,
+    stateExtensions: state.stateExtensions,
+    equipmentState: { equippedArmor: state.equippedArmor },
+  }) ?? {};
   return calculateCarryWeight(
     selectLegacyAttributes(state),
     state.trait,
-    { equippedArmor: state.equippedArmor, equippedRobotSlots: state.robot?.slots ?? null },
+    { equippedArmor: state.equippedArmor, ...settingContext },
   );
 };

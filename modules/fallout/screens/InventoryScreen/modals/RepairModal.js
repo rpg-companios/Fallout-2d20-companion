@@ -24,8 +24,9 @@ import {
 } from '../../../repair/operations';
 import { REPAIR_RULES, repairMaterialsPlan } from '../../../repair/rules';
 import { juryRiggingRanksFor } from '../../../repair/operations';
-import { evaluateRepair } from '../../../../../domain/repairEngine';
+import { evaluateRepair } from '../../../repair/engine.js';
 import { itemRarityFor, donorCandidatesFor, pieceCatalogMaxHp } from '../../../repair/operations';
+import { getFalloutPowerArmorState } from '../../../store/powerArmorState.js';
 
 const RepairModal = ({ target, onClose }) => {
   // target: { storeItemId, name } | { equippedSlot, name } — две формы строки.
@@ -196,7 +197,7 @@ const localeNames = () => (getCurrentModuleLocale() === 'en-EN'
 // Сводка по надетой части СБ (цели нет в items — см. performEquippedPieceRepair).
 const repairEquippedPreview = (slot, donorId) => {
   const store = useCharacterStore.getState();
-  const piece = store.equippedPowerArmor?.pieces?.[slot];
+  const piece = getFalloutPowerArmorState(store)?.equippedPowerArmor?.pieces?.[slot];
   if (!piece) return null;
   const maxHp = pieceCatalogMaxHp(piece.catalogId);
   if (!Number.isFinite(maxHp)) return null;

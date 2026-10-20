@@ -15,17 +15,18 @@ import {
 import { saveCharacter } from "../../../../src/saves/characterSaves";
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
 import useCharacterStore from "../../../../src/store/characterStore";
+import { useSettingAction } from "../../../../src/store/useSettingAction.js";
 import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
 import { loadEnrichedOrigins } from "../../../../domain/origins";
-import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../../../domain/traits";
+import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../logic/traits.js";
 import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
-import { resolveKitItemEquipState } from "../../../../domain/kitEquip";
+import { resolveKitItemEquipState } from "../../logic/kitEquip.js";
 import StartingPurchaseModal from "./modals/StartingPurchaseModal";
-import { rollCombatDiceEffects } from "../../../../domain/diceRollsLogic";
+import { rollCombatDiceEffects } from "../../logic/diceRollsLogic.js";
 import { getTraitModalComponent, getTraitConfig } from "./modals/traits/index";
 import {
   createInitialAttributes,
@@ -45,29 +46,30 @@ import {
   normalizeAttributeMap,
   getTraitAttributeBonus,
   isCharacterLocked as isCharacterLockedFn,
-} from "../../../../domain/characterCreation";
+} from "../../logic/characterCreation.js";
 // Силовая броня (§5.6 плана): пока надет каркас, его attributeModifier подменяет
 // базу атрибутов НА ОТОБРАЖЕНИИ (натуральные значения в сторе/снапшоте не трогаются).
-import { applyFrameAttributeModifiers, hasFrame } from "../../../../domain/powerArmor";
+import { applyFrameAttributeModifiers, hasFrame } from '../../logic/powerArmor.js';
+import { selectFalloutPowerArmorState } from '../../store/powerArmorState.js';
 // МК-3 (патч 316): формула макс. ОЗ и каталог каркаса СБ — часть сеттинга, из логики модуля.
 import { calculateMaxHealth, PA_FRAME_CATALOG } from "../../logic/derivedStats";
 import {
   getSkillDisplayName,
   tCharacterScreen,
 } from "./logic/characterScreenI18n";
-import { useLocale, useModuleLocale } from "../../../../i18n/locale";
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from "../../../../i18n/locale";
 import { AttributesSection } from "./AttributesSection";
 import styles from '../../styles/CharacterScreen.styles';
-import { getTimedAttributeModifiers } from "../../../../domain/effects";
+import { getTimedAttributeModifiers } from "../../logic/timedEffectModifiers.js";
 import { createEmptyEquippedArmor } from "../../../../domain/equippedArmor";
-import { resolveSkillRewards } from "../../../../domain/skillRewards";
-import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../../src/debug/falloutDebug";
+import { resolveSkillRewards } from "../../skillRewards";
+import { debugLog, FALLOUT_DEBUG_MARKER } from "../../debug.js";
 import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
 const ImageSection = ({ origin }) => {
-  const defaultImage = require("../../../../assets/bg1.png");
+  const defaultImage = require("../../assets/bg1.png");
   return (
     <View style={styles.imageSection}>
       <ImageBackground
@@ -275,8 +277,8 @@ export default function CharacterScreen() {
   const setEquipment = useCharacterStore((s) => s.setEquipment);
   const setTraitEffects = useCharacterStore((s) => s.setTraitEffects);
   // Шаг 8а: слоты/модули робота — слайс robot стора напрямую.
-  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
-  const setEquippedRobotModules = useCharacterStore((s) => s.setEquippedRobotModules);
+  const setEquippedRobotSlots = useSettingAction('robotEquipment', 'setEquippedRobotSlots');
+  const setEquippedRobotModules = useSettingAction('robotEquipment', 'setEquippedRobotModules');
 
   // Шаг 7: профиль персонажа (origin/trait/level/имя, флаги сохранения,
   // удача, очки перков) — стор; фасад useCharacter() поля не отдаёт.
@@ -302,6 +304,7 @@ export default function CharacterScreen() {
 
   const debugLocale = useLocale();
   const moduleLocale = useModuleLocale();
+  const catalogRevision = useModuleCatalogRevision();
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
@@ -309,7 +312,7 @@ export default function CharacterScreen() {
   const setEquippedWeapons = useCharacterStore((s) => s.setEquippedWeapons);
   // Пакет СБ — Шаг 4 миграции: напрямую из стора (модификаторы каркаса
   // в атрибутах, applyFrameAttributeModifiers).
-  const equippedPowerArmor = useCharacterStore((s) => s.equippedPowerArmor);
+  const equippedPowerArmor = useCharacterStore((s) => selectFalloutPowerArmorState(s).equippedPowerArmor);
   const storeEffects = useCharacterStore((state) => state.effects);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
   const activeTimedEffects = useMemo(() => selectActiveTimedEffects({ effects: storeEffects }), [storeEffects]);
@@ -399,7 +402,7 @@ export default function CharacterScreen() {
       throw new Error(`[CharacterScreen] Для комплекта "${equipment.id}" нет перевода`);
     }
     return localizedName;
-  }, [equipment, moduleLocale]);
+  }, [equipment, moduleLocale, catalogRevision]);
 
   const [isOriginModalVisible, setIsOriginModalVisible] = useState(false);
   const [selectedOrigin, setSelectedOrigin] = useState(null);
@@ -1126,7 +1129,7 @@ export default function CharacterScreen() {
 
   return (
     <ImageBackground
-      source={require("../../../../assets/bg.png")}
+      source={require("../../assets/bg.png")}
       style={styles.background}
       imageStyle={{ opacity: 0.3 }}
     >

@@ -9,10 +9,10 @@ import { readFileSync } from 'node:fs';
 
 import {
   craftDifficulty,
-  resolveOutputQuantity,
   evaluateCraft,
   runCraft,
 } from '../../domain/craftingEngine';
+import { resolveFalloutOutputQuantity as resolveOutputQuantity } from '../../modules/fallout/crafting/outputQuantity.js';
 
 const recipe = (over = {}) => ({
   id: 'x_out',
@@ -98,8 +98,8 @@ describe('движок крафта: гейты', () => {
   });
 });
 
-describe('движок крафта: количество результата', () => {
-  it('число — как есть; {base, cd} — база плюс боевые кубики порта', () => {
+describe('Fallout crafting output quantity', () => {
+  it('a number is direct; {base, cd} adds the result of the Combat Dice port', () => {
     expect(resolveOutputQuantity(3)).toBe(3);
     expect(resolveOutputQuantity({ base: 10, cd: 5 }, () => 15)).toBe(25);
     expect(resolveOutputQuantity({ base: 4 }, () => { throw new Error('не нужен'); })).toBe(4);

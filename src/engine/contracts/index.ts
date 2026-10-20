@@ -1,6 +1,6 @@
-// Бочка контрактов выводимости (МК-1, патчи 281–283).
-// Единственный типизированный вход движка для сеттингов. Ничего не исполняется —
-// только типы и чистые функции; реестр живёт в src/engine/derivations/registry.ts.
+// Barrel for generic engine contracts: derivations, setting declarations, and
+// package-manifest validation. It contains no setting-specific game rules; the
+// derivation registry lives in src/engine/derivations/registry.ts.
 
 export type {
   CounterDefinition,
@@ -56,3 +56,13 @@ export {
 export type {
   SettingExtension,
 } from './setting';
+export {
+  isSafeSettingPackagePath,
+  validateSettingManifest,
+  validateSettingPackageManifest,
+} from './settingManifest';
+export type {
+  SettingManifest,
+  SettingPackageManifest,
+  SettingRuntimeManifest,
+} from './settingManifest';

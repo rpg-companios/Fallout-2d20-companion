@@ -7,7 +7,7 @@ import {
   computeJunkYields,
   computeNonJunkYield,
   runSalvage,
-} from '../../domain/salvageEngine';
+} from '../../modules/fallout/salvage/engine.js';
 
 const noDice = () => ({ units: 0, effects: 0 });
 

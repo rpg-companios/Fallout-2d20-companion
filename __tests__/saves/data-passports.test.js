@@ -13,8 +13,9 @@
 //   2) паспорт СЕЙВА (src/saves/saveSnapshot.ts) против реальной записи:
 //      saveCharacter (db замокан) → распарсенная строка data сверяется
 //      с CHARACTER_SAVE_KEYS: паспорт ⊆ сейв, сейв \ паспорт = только
-//      расширения сеттингов. Исторические инварианты формата — caps (не
-//      currency), effects (= traitEffects стора), legacy-массивы
+//      расширения сеттингов, включая package-owned legacy save fields.
+//      Исторические инварианты формата — caps (не currency), effects
+//      (= traitEffects стора), legacy-массивы
 //      { name, value }, origin = { id }, и maxLuckPoints НЕ пишется
 //      (Правило 1 counters-storage.md). Формат-v2 (патч 247): ключ
 //      modifiedItems (картотека модов) в запись НЕ идёт вовсе — даже
@@ -68,6 +69,7 @@ import {
   CHARACTER_RUNTIME_KEYS,
 } from '../../src/store/characterState';
 import { CHARACTER_SAVE_KEYS } from '../../src/saves/saveSnapshot';
+import { getSettingService } from '../../domain/registry';
 
 const PERSIST_KEY = 'character-store';
 const state = () => useCharacterStore.getState();
@@ -165,8 +167,13 @@ describe('патч 244: паспорт сейва против реальной 
     expect(notInSave).toEqual([]); // паспорт не оторвался от формата
 
     const settingFields = Object.keys(state().stateExtensions);
+    const settingSaveFields = Object.keys(
+      getSettingService('characterSave')?.getSnapshotFields?.(state()) ?? {},
+    );
     const outsidePassport = savedKeys.filter(
-      (key) => !CHARACTER_SAVE_KEYS.includes(key) && !settingFields.includes(key),
+      (key) => !CHARACTER_SAVE_KEYS.includes(key)
+        && !settingFields.includes(key)
+        && !settingSaveFields.includes(key),
     );
     expect(outsidePassport).toEqual([]); // в сейве нет неизвестных движку ключей
   });

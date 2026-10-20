@@ -55,7 +55,7 @@ describe('ПРИЁМОЧНЫЙ (патч 361): экспорт = сейв', () =>
       origin: { id: 'assaultron', characterType: 'robot', bodyPlan: 'assaultron' },
       characterName: 'экспортный',
     });
-    state().loadRobotState({
+    state().getSettingAction('robotEquipment', 'loadRobotState')({
       bodyPlan: 'assaultron',
       slots: {
         leftArm: {
@@ -87,7 +87,7 @@ describe('ПРИЁМОЧНЫЙ (патч 361): экспорт = сейв', () =>
     useCharacterStore.setState({
       origin: { id: 'assaultron', characterType: 'robot', bodyPlan: 'assaultron' },
     });
-    state().loadRobotState({
+    state().getSettingAction('robotEquipment', 'loadRobotState')({
       bodyPlan: 'assaultron',
       slots: { leftArm: { limb: { id: 'robot_arm_assaultron' }, armorLayers: { frame: null, plating: null, armor: null }, heldWeapon: null } },
       modules: [], mk2Installed: false,

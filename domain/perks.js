@@ -1,9 +1,13 @@
 // domain/perks.js
 // Utilities to evaluate perk requirements and aggregate perk effects.
 
-import { getCanonicalAttributeKey } from './characterCreation';
-import { getPerkEffect } from './perks/index';
-import { isRobotCharacter } from './origins';
+import { getSettingService } from './registry.js';
+
+const getPerkService = () => getSettingService('perks');
+const normalizeAttributeCode = (value) => {
+    const supplied = getPerkService()?.getAttributeCode?.(value);
+    return supplied || (typeof value === 'string' ? value.trim().toUpperCase() : null);
+};
 
 const isObject = (value) => value && typeof value === 'object' && !Array.isArray(value);
 
@@ -27,12 +31,12 @@ const toSelectedPerkRank = (selected) => {
 };
 
 /**
- * Build a quick lookup map for current attribute values by canonical SPECIAL code.
+ * Build a lookup map using attribute codes supplied by the active setting.
  */
 export function buildAttributeValueMap(attributes) {
     if (isObject(attributes)) {
         return Object.entries(attributes).reduce((acc, [key, attr]) => {
-            const canonical = getCanonicalAttributeKey(attr?.id || key) || key;
+            const canonical = normalizeAttributeCode(attr?.id || attr?.name || key) || key;
             acc[canonical] = attr?.total ?? attr?.value ?? attr?.base ?? 0;
             return acc;
         }, {});
@@ -40,22 +44,27 @@ export function buildAttributeValueMap(attributes) {
 
     const map = {};
     for (const attr of attributes || []) {
-        const key = getCanonicalAttributeKey(attr.name);
+        const key = normalizeAttributeCode(attr?.id || attr?.name);
         if (key) map[key] = attr.value;
     }
     return map;
 }
 
-const getPrerequisites = (perk) => perk?.requirements || perk?.prerequisites || {};
-const getLevelRequirement = (req) => req.char_lvl ?? req.level;
-const getAttributeRequirements = (req) => req.attributes || req.special || {};
-
-// Порядок фильтров = канон SPECIAL (слово владельца 2026-09-21): STR, PER,
-// END, CHA, INT, AGI, LCK. Единый источник порядка — CANONICAL_ATTRIBUTE_KEYS.
-export const PERK_ATTRIBUTE_FILTER_CODES = ['STR', 'PER', 'END', 'CHA', 'INT', 'AGI', 'LCK'];
+const getPrerequisites = (perk) => {
+    const supplied = getPerkService()?.getRequirements?.(perk);
+    return isObject(supplied) ? supplied : (isObject(perk?.requirements) ? perk.requirements : {});
+};
+const getLevelRequirement = (perk, requirements) => (
+    getPerkService()?.getLevelRequirement?.(perk) ?? requirements.level
+);
+const getAttributeRequirements = (perk) => {
+    const supplied = getPerkService()?.getAttributeRequirements?.(perk);
+    if (isObject(supplied)) return supplied;
+    return getPrerequisites(perk).attributes || {};
+};
 
 export function getPerkAttributeRequirementCodes(perk) {
-    const spec = getAttributeRequirements(getPrerequisites(perk));
+    const spec = getAttributeRequirements(perk);
     if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return [];
     return Object.keys(spec);
 }
@@ -84,7 +93,7 @@ export function getPerkSelectionCount(selectedPerks = [], perkId, { ignoreIndex 
 
 export function getRequiredLevelForRank(perk, rank) {
     const req = getPrerequisites(perk);
-    const baseLevel = getLevelRequirement(req);
+    const baseLevel = getLevelRequirement(perk, req);
     const increase = Number(req.levelIncreasePerRank) || 0;
     const base = typeof baseLevel === 'number' ? baseLevel : 1;
     return base + (Math.max(1, Number(rank) || 1) - 1) * increase;
@@ -175,23 +184,24 @@ export function trimSelectedPerksToMaxRanks(selectedPerks = [], perkCatalog = []
  *   - id нет в каталоге → «unknown» (оставить нельзя вовсе — снимает
  *     мигратор);
  *   - ранг выше книжного maxRanks → «rank-limit»;
- *   - требования книги на СВОЙ ранг не выполнены → «level» / «attributes»
- *     (с payload need/have) / «robot»;
+ *   - требования каталога на свой ранг не выполнены → «level» / «attributes»
+ *     (с payload need/have); setting-specific ограничения возвращают свой reason;
  *   - взаимоисключение: уже держится АКТИВНЫЙ перк-конфликт → «excluded»
  *     (остаётся взятый первым; otherId — с кем конфликт).
  * Активный выбор получает ранг = номер среди активных выборов того же
  * перка. Недоступные выборы ОСТАЮТСЯ в списке (слот занят, перк не
  * действует) — снова заработают, когда выполнятся условия, либо их
  * заменит игрок. Идемпотентно.
- * context: { attributes ({STR:8}|{STR:{total}}), level, isRobot }.
+ * context contains attributes/level plus any optional context from the active setting.
  */
 export function evaluateSelectedPerkPicks(selectedPerks = [], perkCatalog = [], context = {}) {
     const catalogById = new Map((perkCatalog || []).filter((perk) => perk?.id).map((perk) => [perk.id, perk]));
     const attributeMap = {};
     for (const [code, value] of Object.entries(context.attributes || {})) {
-      attributeMap[String(code).toUpperCase()] = typeof value === 'number'
+      const normalizedCode = normalizeAttributeCode(value?.id || value?.name || code) || String(code).toUpperCase();
+      attributeMap[normalizedCode] = typeof value === 'number'
         ? value
-        : (Number(value?.total) || 0);
+        : (Number(value?.total ?? value?.value ?? value?.base) || 0);
     }
     const level = Number(context.level) || 1;
 
@@ -226,20 +236,26 @@ export function evaluateSelectedPerkPicks(selectedPerks = [], perkCatalog = [], 
             picks.push({ ...base, active: false, reason: 'rank-limit' });
             return;
         }
-        const req = getPrerequisites(perk) || {};
-        if (req.notForRobots && context.isRobot) {
-            picks.push({ ...base, active: false, reason: 'robot' });
+        const settingContext = getPerkService()?.getCharacterContext?.(context) ?? {};
+        const ineligibilityReason = getPerkService()?.getSelectionIneligibility?.(perk, {
+          ...context,
+          ...settingContext,
+        });
+        if (ineligibilityReason) {
+            picks.push({ ...base, active: false, reason: ineligibilityReason });
             return;
         }
+        const req = getPrerequisites(perk) || {};
         const requiredLevel = getRequiredLevelForRank(perk, rank);
         if (typeof requiredLevel === 'number' && level < requiredLevel) {
             picks.push({ ...base, active: false, reason: 'level', need: requiredLevel, have: level });
             return;
         }
         let attributeMiss = null;
-        for (const [code, need] of Object.entries(getAttributeRequirements(req))) {
-            const have = attributeMap[String(code).toUpperCase()] || 0;
-            if (have < Number(need)) { attributeMiss = { code: String(code).toUpperCase(), need: Number(need), have }; break; }
+        for (const [code, need] of Object.entries(getAttributeRequirements(perk))) {
+            const normalizedCode = normalizeAttributeCode(code) || String(code).toUpperCase();
+            const have = attributeMap[normalizedCode] || 0;
+            if (have < Number(need)) { attributeMiss = { code: normalizedCode, need: Number(need), have }; break; }
         }
         if (attributeMiss) {
             picks.push({ ...base, active: false, reason: 'attributes', ...attributeMiss });
@@ -269,12 +285,12 @@ export function evaluateSelectedPerkPicks(selectedPerks = [], perkCatalog = [], 
     };
 }
 
-/** Контекст книги из состояния стора (атрибуты-объекты, уровень, робот). */
+/** Build perk evaluation context through the active setting's optional rules. */
 export function perkContextFromState(state = {}) {
     return {
         attributes: state.attributes || {},
         level: state.level,
-        isRobot: state.isRobot === true || isRobotCharacter({ origin: state.origin, trait: state.trait }) === true,
+        ...(getPerkService()?.getCharacterContext?.(state) ?? {}),
     };
 }
 
@@ -361,7 +377,7 @@ export function collapseSelectedPerks(selectedPerks = []) {
 
 /**
  * Returns true if the character meets a specific perk's requirements.
- * Considers level, SPECIAL minimums, already-taken ranks, and exclusive perks.
+ * Considers level, attribute minimums, already-taken ranks, and exclusive perks.
  */
 export function meetsPerkRequirements(perk, attributes, level, selectedPerks = [], options = {}) {
     if (!perk) return false;
@@ -405,10 +421,11 @@ export function getPerkUnmetReasons(perk, attributes, level, selectedPerks = [],
         }
     }
 
-    const attrReq = getAttributeRequirements(req);
+    const attrReq = getAttributeRequirements(perk);
     const valueByName = buildAttributeValueMap(attributes);
     for (const [code, minVal] of Object.entries(attrReq)) {
-        const currentVal = valueByName[code] ?? 0;
+        const normalizedCode = normalizeAttributeCode(code) || String(code).toUpperCase();
+        const currentVal = valueByName[normalizedCode] ?? 0;
         if (currentVal < minVal) {
             reasons.attributes[code] = { required: minVal, current: currentVal };
         }
@@ -474,7 +491,7 @@ export function calculatePerkEffects(perks = [], selectedPerks = [], state = {})
         if (!id) continue;
         const perk = byId.get(id) || (isObject(selected) ? selected : null);
         const effectId = perk?.effect || perk?.effectId || id;
-        const effect = getPerkEffect(effectId);
+        const effect = getPerkService()?.getEffect?.(effectId) ?? null;
         if (!effect?.apply) continue;
 
         const rank = toSelectedPerkRank(selected);

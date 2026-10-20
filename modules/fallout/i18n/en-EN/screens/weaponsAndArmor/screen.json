@@ -1,11 +1,24 @@
 {
   "stats": {
+    "initiative": "Initiative",
+    "effects": "Effects",
+    "health": "Health",
     "meleeBonus": "Melee Bonus",
     "radiation": "Radiation",
     "poisonResistance": "Poison Res.",
     "defense": "Defense"
   },
   "effectsPanel": {
+    "title": "Effects",
+    "empty": "No active effects",
+    "immunityPrefix": "Immunity to:",
+    "resist": "Resist",
+    "resistTitle": "Resist disease",
+    "resistRolls": "Rolls: {r1}, {r2} (target ≤ {t}).",
+    "resistCured": "{s}/{r} successes — the disease \"{name}\" is cured.",
+    "resistFailed": "{s}/{r} successes — the disease \"{name}\" remains.",
+    "resistRankIncreased": "A 20 was rolled — the disease difficulty increased to {r}.",
+    "resistCooldown": "You can resist once per day.",
     "immunityTypes": {
       "radiation": "Radiation",
       "poison": "Poison",
@@ -13,6 +26,13 @@
     }
   },
   "armor": {
+    "fields": {
+      "clothingModification": "Upgrade clothing",
+      "armorModification": "Upgrade armor",
+      "physical": "Phys. DR",
+      "energy": "Energy DR",
+      "radiation": "Rad. DR"
+    },
     "slots": {
       "head": {
         "title": "Head",
@@ -59,16 +79,40 @@
         "subtitle": "15-17"
       }
     },
-    "fields": {
-      "physical": "Phys. DR",
-      "energy": "Energy DR",
-      "radiation": "Rad. DR"
-    },
     "groups": {
       "robotArmor": "Robot Armor"
     }
   },
   "weapon": {
+    "emptySlot": "Empty Slot",
+    "notEquipped": "No weapon equipped",
+    "unequip": "Unequip",
+    "rangeDefault": "Close",
+    "fields": {
+      "success": "SUCCESS VALUE",
+      "damageType": "DAMAGE TYPE",
+      "damage": "DAMAGE",
+      "effect": "EFFECT",
+      "fireRate": "RATE OF FIRE",
+      "range": "RANGE",
+      "qualities": "QUALITIES",
+      "ammo": "AMMO",
+      "modification": "Modification",
+      "durability": "DURABILITY"
+    },
+    "ammoSpend": {
+      "title": "Ammo spend",
+      "available": "Charges available",
+      "source": {
+        "crank": "Crank",
+        "capacitor": "Capacitor",
+        "ammoPerAttack": "Mod spend per attack"
+      },
+      "upTo": "spend up to",
+      "unconditional": "Unconditional",
+      "cancel": "Cancel",
+      "confirm": "Spend"
+    },
     "rangeNames": {
       "Close": "Close",
       "Medium": "Medium",
@@ -99,6 +143,69 @@
       "other": "Other"
     },
     "requiresMkII": "Requires Mk II OS"
+  },
+  "common": {
+    "empty": "—",
+    "none": "00",
+    "close": "Close"
+  },
+  "kitResolver": {
+    "unknownItem": "Unknown item",
+    "basicMaterial": "Basic Materials",
+    "currency": "Caps",
+    "currencyNcr": "NCR Dollars"
+  },
+  "modals": {
+    "requirements": "Requirements",
+    "armorModification": "Upgrade armor",
+    "clothingModification": "Upgrade clothing",
+    "availableModifications": "Available modifications",
+    "standard": "Modifications",
+    "unique": "Armor material",
+    "removeStandard": "Remove standard mod",
+    "noStandard": "No standard mod",
+    "removeUnique": "Remove unique mod",
+    "noUnique": "No unique mod",
+    "removeWeaponMod": "Remove mod",
+    "noWeaponMod": "No mod",
+    "preview": "Preview",
+    "effects": "Effects",
+    "weight": "Weight",
+    "cost": "Cost",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "improvements": "Improvements",
+    "clothingReinforced": "Reinforced seams",
+    "clothingInsulated": "Insulated lining",
+    "weaponModification": "Weapon Modifications",
+    "unknownWeapon": "Unknown weapon",
+    "weaponDamage": "Damage",
+    "weaponFireRate": "Rate",
+    "weaponRange": "Range",
+    "weaponWeight": "Weight",
+    "weaponCost": "Cost",
+    "availableModificationsLabel": "Available modifications:",
+    "previewLabel": "Preview:",
+    "previewEffects": "Effects",
+    "previewQualities": "Qualities",
+    "errorTitle": "Error",
+    "errorSelectMod": "Please select at least one modification",
+    "modsNotInInventory": "None in the bag (craft them in the Crafting window)",
+    "create": "Create",
+    "createDone": "Created. Time spent:",
+    "createFailTitle": "Cannot create",
+    "createFailMissingPerk": "A perk from the requirements line is required",
+    "createFailMaterials": "Not enough materials",
+    "createFailCheck": "Skill check failed",
+    "createAskZeroTitle": "Difficulty cleared by skill",
+    "createAskZeroText": "Roll the dice? Success/Failure rules apply.",
+    "createAskZeroRoll": "Roll dice",
+    "createAskZeroAuto": "Auto-success"
+  },
+  "displayToggle": {
+    "spoilers": "List (spoilers)",
+    "cards": "Weapon cards",
+    "unarmed": "Unarmed attack"
   },
   "robotSlot": {
     "noLimb": "No Limb",
@@ -148,10 +255,6 @@
   "powerArmor": {
     "durability": "Durability (HP)",
     "core": "Fusion Core: {value}"
-  },
-  "kitResolver": {
-    "currency": "Caps",
-    "currencyNcr": "NCR Dollars"
   },
   "robotLimbs": {
     "robot_head_protectron": "Protectron Head",

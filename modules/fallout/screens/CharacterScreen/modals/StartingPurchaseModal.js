@@ -4,7 +4,7 @@ import AddItemModal from '../../../../../components/screens/InventoryScreen/moda
 import {
   getItemPrice, getCartTotal, getRemaining,
   addToCart, changeQuantity, finishPurchase,
-} from '../../../../../domain/startingPurchase';
+} from '../../../logic/startingPurchase.js';
 import styles from '../../../styles/StartingPurchaseModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 

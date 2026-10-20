@@ -32,12 +32,14 @@ vi.mock('../../db/Database', () => ({
 
 import saveExport from '../fixtures/assaultron-ghost-export.json';
 import useCharacterStore from '../../src/store/characterStore';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
 import { loadCharacter } from '../../src/saves/characterSaves';
-import { collectAttacks, serializeSlot, setInstalledWeaponMods } from '../../domain/robotSlots';
+import { collectAttacks, serializeSlot, setInstalledWeaponMods } from '../../modules/fallout/logic/robotSlots';
 import { classifyModWritePlan, modIdList, robotWeaponHostKey } from '../../src/engine/items/weaponMods';
 import { diffModInstallPlan } from '../../domain/modsEquip';
 
 const state = () => useCharacterStore.getState();
+const robot = () => selectFalloutRobotState(state());
 const CHAR_ID = 'char_1790055767985_l9qvxxsas';
 
 const loadExport = async () => {
@@ -57,7 +59,7 @@ const loadExport = async () => {
 // Экранная проводка (robotSlot-ветка handleApplyModification, 359).
 const applyOnScreen = (modifiedWeapon) => {
   const s = state();
-  const card = collectAttacks(s.robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
+  const card = collectAttacks(selectFalloutRobotState(s).slots).find((a) => a.weaponId === 'weapon_laser_gun');
   const plan = classifyModWritePlan({
     sourceSlot: card.sourceSlot,
     attackRole: card.attackRole,
@@ -70,10 +72,10 @@ const applyOnScreen = (modifiedWeapon) => {
   const hostKey = robotWeaponHostKey(plan.slotKey, plan.weaponId);
   const diff = diffModInstallPlan(modIdList(card), modIdList(modifiedWeapon));
   diff.uninstall.forEach((id) => s.uninstallArmorMod({ modId: id, hostKey }));
-  diff.install.forEach((id) => s.installRobotWeaponMod({ modId: id, hostKey }));
-  const next = setInstalledWeaponMods(s.robot.slots, plan.slotKey, plan.weaponId, modifiedWeapon.appliedMods);
+  diff.install.forEach((id) => s.getSettingAction('robotEquipment', 'installRobotWeaponMod')({ modId: id, hostKey }));
+  const next = setInstalledWeaponMods(selectFalloutRobotState(s).slots, plan.slotKey, plan.weaponId, modifiedWeapon.appliedMods);
   expect(next).toBeTruthy(); // 360: запись на развёрнутых слотах НЕ молчит
-  state().setEquippedRobotSlots(next);
+  state().getSettingAction('robotEquipment', 'setEquippedRobotSlots')(next);
 };
 
 beforeEach(async () => {
@@ -93,7 +95,7 @@ describe('ПРИЁМОЧНЫЙ (патч 360): реплей экспорта в�
   });
 
   it('карточка из слотов: только «Снайперский ствол», без «Смешанного»', () => {
-    const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
+    const card = collectAttacks(robot().slots).find((a) => a.weaponId === 'weapon_laser_gun');
     expect(card.appliedMods).toEqual({ Barrel: 'mod_sniper_barrel' }); // конденсатора НЕТ
   });
 
@@ -107,7 +109,7 @@ describe('ПРИЁМОЧНЫЙ (патч 360): реплей экспорта в�
     expect(state().items[tunerKey].equipped).toBe(true);
     expect(state().items[tunerKey].installedOn).toBe(robotWeaponHostKey('leftArm', 'weapon_laser_gun'));
 
-    const card = collectAttacks(state().robot.slots).find((a) => a.weaponId === 'weapon_laser_gun');
+    const card = collectAttacks(robot().slots).find((a) => a.weaponId === 'weapon_laser_gun');
     expect(card.appliedMods).toEqual({ Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' });
   });
 
@@ -115,7 +117,7 @@ describe('ПРИЁМОЧНЫЙ (патч 360): реплей экспорта в�
     applyOnScreen({ appliedMods: { Capacitor: 'mod_beta_wave_tuner', Barrel: 'mod_sniper_barrel' }, modIds: ['mod_beta_wave_tuner', 'mod_sniper_barrel'] });
     applyOnScreen({ appliedMods: { Capacitor: 'mod_beta_wave_tuner' }, modIds: ['mod_beta_wave_tuner'] });
 
-    const saved = Object.fromEntries(Object.entries(state().robot.slots).map(([k, v]) => [k, serializeSlot(v)]));
+    const saved = Object.fromEntries(Object.entries(robot().slots).map(([k, v]) => [k, serializeSlot(v)]));
     const restored = saved.leftArm.installedWeapons.find((w) => w.id === 'weapon_laser_gun');
     expect(restored.modIds).toEqual(['mod_beta_wave_tuner']);
   });

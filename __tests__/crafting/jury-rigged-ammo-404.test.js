@@ -9,7 +9,7 @@ import { craftRecipe, craftingPreview, craftMinutesForRecipe, juryRigFor } from 
 import { buildCategoryModel, buildCraftReport } from '../../modules/fallout/crafting/windowModel';
 import { getCraftingRecipeById } from '../../domain/registry';
 import { selectPerkBonuses } from '../../domain/perks';
-import { juryRiggedAmmoPerk, juryRigMaxRarityByRank, JUNK_RIG_ANY_ID } from '../../domain/perks/juryRiggedAmmo';
+import { juryRiggedAmmoPerk, juryRigMaxRarityByRank, JUNK_RIG_ANY_ID } from '../../modules/fallout/perks/effects/juryRiggedAmmo';
 import { CRAFT_RULES } from '../../modules/fallout/crafting/rules';
 import perksCatalog from '../../modules/fallout/data/perks/perks.json';
 import { setCurrentModuleLocale } from '../../i18n/locale';

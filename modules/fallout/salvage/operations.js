@@ -10,15 +10,15 @@
 // действиями того же стора; React-контекста модуль не знает.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import { debugLog } from '../../../src/debug/falloutDebug';
-import { getSalvageComposition, getScrapMaterials } from '../../../domain/registry';
-import { runSalvage } from '../../../domain/salvageEngine';
+import { debugLog } from '../debug.js';
+import { getSalvageComposition, getScrapMaterials } from './catalog.js';
+import { runSalvage } from './engine.js';
 import { isSkillTagged } from '../../../domain/d20Checks';
 import { countActivePerkSelections } from '../../../domain/perks';
 import perksCatalog from '../data/perks/perks.json';
-import { getCanonicalItemId } from '../../../domain/itemIdentity';
+import { getCanonicalItemId } from '../logic/itemIdentity.js';
 import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
-import { rollCombatDiceEffects, facesToCombatUnits } from '../../../domain/diceRollsLogic';
+import { rollCombatDiceEffects, facesToCombatUnits } from '../logic/diceRollsLogic.js';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
 import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
@@ -41,8 +41,8 @@ const entryOf = (stack) => {
 
 const dicePort = (ports) => ports.rollDice
   ?? ((count) => {
-    const { faces } = rollCombatDiceEffects(count);
-    return { units: facesToCombatUnits(faces), effects: faces.filter((f) => f === 5 || f === 6).length };
+    const { faces, effectCount } = rollCombatDiceEffects(count);
+    return { units: facesToCombatUnits(faces), effects: effectCount };
   });
 
 // Материал — конечная часть (аксиома владельца 2026-09-17, п.5): материалы не
@@ -212,7 +212,7 @@ export const salvagePreview = (instanceId) => {
 
 /**
  * Разобрать один предмет из стека. Возврат — контракт движка (см.
- * domain/salvageEngine.js): { done:true, spent, granted, check, time } либо
+ * modules/fallout/salvage/engine.js): { done:true, spent, granted, check, time } либо
  * отказ с причиной (гейты и провал проверки ничего не меняют в балансе).
  * Порты кубиков/выбора переопределяемы (тесты; экраны зовут без портов).
  */

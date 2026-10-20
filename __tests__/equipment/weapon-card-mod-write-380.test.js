@@ -12,10 +12,10 @@ import { describe, expect, it } from 'vitest';
 
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import {
-  resolveStoreItemIdFromItems,
-  storeItemToWeaponDisplay,
-  weaponModPatchToStore,
-} from '../../src/store/selectors';
+  resolveFalloutStoreItemIdFromItems as resolveStoreItemIdFromItems,
+  storeItemToFalloutWeaponDisplay as storeItemToWeaponDisplay,
+  falloutWeaponModPatchToStore as weaponModPatchToStore,
+} from '../../modules/fallout/logic/storeSelectors.js';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
 
 const catalog = getEquipmentCatalog('ru-RU');

@@ -1,7 +1,9 @@
 // СЕТТИНГ «Fallout 2d20» — ДВЕРЬ МОДУЛЯ (патч 292).
 //
-// Единственный файл модуля, который читается СНАРУЖИ (движок, экраны, тесты).
-// Экспорт один: SETTING. Внутри модуля свои файлы модуль читает свободно.
+// Публичная дверь ПОЛНЫХ данных модуля (движок, экраны, тесты).
+// Метаданные без загрузки каталога доступны через соседний manifest.js;
+// сырые JSON и внутренние файлы снаружи не импортируются.
+// Экспорт полного входа — SETTING. Внутри модуль читает свои файлы свободно.
 //
 // ── КОНТРАКТ СЕТТИНГА (единый для всех сеттингов; для ИИ-агентов) ──────────
 //
@@ -10,13 +12,15 @@
 //    кода.
 // 2. ДАННЫЕ МОЛЧАТ. В данных — id и числа. Всё, что видит игрок, — имена
 //    из i18n/<locale>/. Текстов интерфейса в данных нет.
-// 3. ОДНА ДВЕРЬ. Снаружи modules/<сеттинг>/ читается ТОЛЬКО этот index.js.
-//    Прямые импорты data/** и i18n/** снаружи запрещены — держит тест
-//    границы __tests__/settings/settings-boundary.test.js (известный долг —
-//    в его allowlist и в docs/architecture/domain-map.md).
-// 4. ОДНА ТОЧКА ЧТЕНИЯ. Движок и экраны получают данные сеттинга через
-//    domain/registry.js (геттеры). Реестр и каталог отображения
-//    (i18n/equipmentCatalog.js) импортируют только двери сеттингов.
+// 3. ПУБЛИЧНЫЕ ДВЕРИ. Полные данные снаружи читаются через этот index.js;
+//    лёгкие метаданные — через manifest.js. Прямые импорты manifest.json,
+//    data/** и i18n/** из потребителей запрещены — держит тест границы
+//    __tests__/settings/settings-boundary.test.js (известный долг — в allowlist
+//    и docs/architecture/domain-map.md).
+// 4. ОДНА ТОЧКА ЧТЕНИЯ ДАННЫХ. Движок и экраны получают данные сеттинга через
+//    active runtime capabilities. Локализованный каталог и данные механик
+//    объявляются через SETTING.catalogs/ runtime services, а общий adapter
+//    i18n/equipmentCatalog.js не строит Fallout-структуру.
 // 5. НОВЫЕ ДАННЫЕ = json-файл + импорт здесь + место в SETTING (+ геттер
 //    в реестре, если появилась новая ГРУППА). Форма полей — конвенция
 //    живого потребителя (пример: domain/enrichItem.js applyWeaponMods
@@ -35,21 +39,25 @@
 //
 // ── СХЕМА SETTING ──────────────────────────────────────────────────────────
 //
-//   SETTING.meta          — id сеттинга, поддерживаемые локали
+//   SETTING.meta          — валидированный manifest (id/name/version/locales)
+//   SETTING.userData      — схемы локально/облачно загружаемых данных и порядок
+//                           восстановления (user equipment до character saves)
 //   SETTING.data          — значения: equipment (включая robot), consumables,
 //                           junk, recipes, equipmentKits, origins, traits,
 //                           perks, bodyplans, rules
-//   SETTING.names[locale] — имена данных: system, equipment (включая robot),
-//                           consumables, junk (items/materials/tableLabels)
+//   SETTING.names[locale] — имена данных плюс setting-owned UI-словари:
+//                           app, system, equipment, consumables, junk, screens
 //
 // Порядок разделов ниже повторяет структуру SETTING — сверху вниз.
 
+import { SETTING_MANIFEST } from './manifest.js';
 import bodyplans from './data/bodyplans/bodyplans.json';
 import origins from './data/origins/origins.json';
 import fitProfiles from './data/origins/fitProfiles.json';
 import traits from './data/traits/traits.json';
 import perks from './data/perks/perks.json';
 import diseaseExposure from './data/rules/diseaseExposure.json';
+import diseases from './data/conditions/diseases.json';
 
 // — снаряжение —
 import categories from './data/equipment/categories.json';
@@ -156,6 +164,16 @@ import ruConsumablesDrinks from './i18n/ru-RU/data/consumables/drinks.json';
 import ruConsumablesChems from './i18n/ru-RU/data/consumables/chems.json';
 import ruConsumablesMagazines from './i18n/ru-RU/data/consumables/magazines.json';
 import ruPerksNames from './i18n/ru-RU/data/perks/perks.json';
+import ruDiseases from './i18n/ru-RU/data/conditions/diseases.json';
+import ruAppI18n from './i18n/ru-RU/App.json';
+import enAppI18n from './i18n/en-EN/App.json';
+import ruCharacterScreenI18n from './i18n/ru-RU/screens/character/screen.json';
+import ruPerksScreenI18n from './i18n/ru-RU/screens/perksAndTraits/screen.json';
+import ruInventoryScreenI18n from './i18n/ru-RU/screens/inventory/screen.json';
+import ruInventoryAddItemI18n from './i18n/ru-RU/screens/inventory/modals/addItemModal.json';
+import ruInventoryCapsI18n from './i18n/ru-RU/screens/inventory/modals/capsModal.json';
+import ruInventoryBuyItemI18n from './i18n/ru-RU/screens/inventory/modals/buyItemModal.json';
+import ruInventorySellItemI18n from './i18n/ru-RU/screens/inventory/modals/sellItemModal.json';
 import ruJunkItems from './i18n/ru-RU/data/junk/junk.json';
 import ruJunkMaterials from './i18n/ru-RU/data/junk/material.json';
 import ruJunkTableLabels from './i18n/ru-RU/data/junk/tables.json';
@@ -197,18 +215,65 @@ import enConsumablesDrinks from './i18n/en-EN/data/consumables/drinks.json';
 import enConsumablesChems from './i18n/en-EN/data/consumables/chems.json';
 import enConsumablesMagazines from './i18n/en-EN/data/consumables/magazines.json';
 import enPerksNames from './i18n/en-EN/data/perks/perks.json';
+import enDiseases from './i18n/en-EN/data/conditions/diseases.json';
+import enCharacterScreenI18n from './i18n/en-EN/screens/character/screen.json';
+import enPerksScreenI18n from './i18n/en-EN/screens/perksAndTraits/screen.json';
+import enInventoryScreenI18n from './i18n/en-EN/screens/inventory/screen.json';
+import enInventoryAddItemI18n from './i18n/en-EN/screens/inventory/modals/addItemModal.json';
+import enInventoryCapsI18n from './i18n/en-EN/screens/inventory/modals/capsModal.json';
+import enInventoryBuyItemI18n from './i18n/en-EN/screens/inventory/modals/buyItemModal.json';
+import enInventorySellItemI18n from './i18n/en-EN/screens/inventory/modals/sellItemModal.json';
 import enJunkItems from './i18n/en-EN/data/junk/junk.json';
 import enJunkMaterials from './i18n/en-EN/data/junk/material.json';
 import enJunkTableLabels from './i18n/en-EN/data/junk/tables.json';
 
-// Логика сеттинга (МК-3, патч 316): namespace* как `import *` — все формулы доступны
-// по SETTING.logic.derivedStats.
+// Setting-owned mechanics are exposed as capabilities on SETTING.logic;
+// the engine resolves them from the active package through domain/registry.js.
 import * as derivedStatsLogic from './logic/derivedStats.js';
+import * as characterCreationLogic from './logic/characterCreation.js';
+import { SURVIVAL_RULES } from './survival/survival';
+import {
+  getEquipmentCatalog as getFalloutEquipmentCatalog,
+  getEquipmentData as getFalloutEquipmentData,
+} from './catalog/equipmentCatalog.js';
+import { FALLOUT_CATALOG_DATABASE_ROWS } from './catalog/databaseRows.js';
+
+// Full-data consumers use this module doorway; metadata-only consumers import
+// the lightweight manifest doorway and avoid loading setting rule code.
+const settingManifest = SETTING_MANIFEST;
 
 export const SETTING = Object.freeze({
-  meta: {
-    id: 'fallout',
-    locales: ['ru-RU', 'en-EN'],
+  meta: settingManifest,
+  catalogs: Object.freeze({
+    equipment: Object.freeze({
+      getLocalized: getFalloutEquipmentCatalog,
+      getMechanics: getFalloutEquipmentData,
+      databaseRows: FALLOUT_CATALOG_DATABASE_ROWS,
+    }),
+  }),
+
+  // Runtime user equipment is kept outside immutable setting data. This
+  // descriptor is the setting registry contract for local loading and cloud
+  // restore; Drive uses the same hidden setting folder as character saves.
+  userData: {
+    equipment: {
+      schemaVersion: 1,
+      kinds: ['weapons', 'armor', 'weaponMods', 'armorMods'],
+      fileNames: {
+        weapons: 'usrdataWeapon.json',
+        armor: 'usrdataArmor.json',
+        weaponMods: 'usrdataWeaponMods.json',
+        armorMods: 'usrdataArmorMods.json',
+      },
+      localStore: 'src/store/userEquipmentStore.js',
+      reader: 'domain/userEquipment.js',
+      drive: {
+        space: 'appDataFolder',
+        parent: 'setting-folder',
+        sameFolderAs: 'character-saves',
+      },
+      restoreOrder: 'before-character-saves',
+    },
   },
 
   data: {
@@ -218,6 +283,7 @@ export const SETTING = Object.freeze({
     traits,
     perks,
     rules: { diseaseExposure },
+    conditions: { diseases },
 
     equipment: {
       categories,
@@ -290,14 +356,17 @@ export const SETTING = Object.freeze({
     },
   },
 
-  // Логика сеттинга (МК-3, патч 316): формулы производных параметров.
-  // Движок читает ТОЛЬКО через дверь — domain/registry.js → getDerivedStatsLogic().
+  // Character creation and derived formulas are setting-owned capabilities.
+  // The engine reads these only through domain/registry.js; nothing is defaulted.
   logic: {
+    characterCreation: characterCreationLogic,
     derivedStats: derivedStatsLogic,
+    survivalRules: SURVIVAL_RULES,
   },
 
   names: {
     'ru-RU': {
+      app: ruAppI18n,
       system: {
         origins: ruSystemOrigins,
         traits: ruSystemTraits,
@@ -349,8 +418,23 @@ export const SETTING = Object.freeze({
         tableLabels: ruJunkTableLabels,
       },
       perks: ruPerksNames,
+      conditions: { diseases: ruDiseases },
+      screens: {
+        character: ruCharacterScreenI18n,
+        perksAndTraits: ruPerksScreenI18n,
+        inventory: {
+          screen: ruInventoryScreenI18n,
+          modals: {
+            addItemModal: ruInventoryAddItemI18n,
+            capsModal: ruInventoryCapsI18n,
+            buyItemModal: ruInventoryBuyItemI18n,
+            sellItemModal: ruInventorySellItemI18n,
+          },
+        },
+      },
     },
     'en-EN': {
+      app: enAppI18n,
       system: {
         origins: enSystemOrigins,
         traits: enSystemTraits,
@@ -402,6 +486,20 @@ export const SETTING = Object.freeze({
         tableLabels: enJunkTableLabels,
       },
       perks: enPerksNames,
+      conditions: { diseases: enDiseases },
+      screens: {
+        character: enCharacterScreenI18n,
+        perksAndTraits: enPerksScreenI18n,
+        inventory: {
+          screen: enInventoryScreenI18n,
+          modals: {
+            addItemModal: enInventoryAddItemI18n,
+            capsModal: enInventoryCapsI18n,
+            buyItemModal: enInventoryBuyItemI18n,
+            sellItemModal: enInventorySellItemI18n,
+          },
+        },
+      },
     },
   },
 });

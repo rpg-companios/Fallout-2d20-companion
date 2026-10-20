@@ -14,8 +14,8 @@ import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
 import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
 import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
 import generalWeapons from '../../modules/fallout/data/equipment/weapons.json';
-import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
-import { serializeSlot, collectAttacks } from '../../domain/robotSlots';
+import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../modules/fallout/logic/robotEquip';
+import { serializeSlot, collectAttacks } from '../../modules/fallout/logic/robotSlots';
 
 const robotCatalog = { limbs, weaponAsLimb, weapons: robotWeapons };
 const byId = (list, id) => list.find((entry) => entry.id === id);

@@ -1,18 +1,33 @@
 import * as SQLite from 'expo-sqlite';
 import { CREATE_TABLES, SCHEMA_VERSION } from '../schema';
+import { getActiveSettingRuntime } from '../../src/engine/settings/activeSettingRuntime.js';
 
-let _db = null;
+const DEFAULT_DATABASE_NAME = 'positronium.db';
+const getLegacyCatalogTables = () => {
+  const tables = getActiveSettingRuntime()?.services?.storage?.legacyCatalogTables;
+  return Array.isArray(tables) ? tables : [];
+};
+const _databases = new Map();
+
+const getDatabaseName = () => {
+  const declaredName = getActiveSettingRuntime()?.services?.storage?.sqliteDatabaseName;
+  return typeof declaredName === 'string' && declaredName.length > 0
+    ? declaredName
+    : DEFAULT_DATABASE_NAME;
+};
 
 async function getDb() {
-  if (_db) return _db;
-  _db = await SQLite.openDatabaseAsync('fallout_rpg.db');
-  return _db;
+  const databaseName = getDatabaseName();
+  if (!_databases.has(databaseName)) {
+    const opening = SQLite.openDatabaseAsync(databaseName).catch((error) => {
+      _databases.delete(databaseName);
+      throw error;
+    });
+    _databases.set(databaseName, opening);
+  }
+  return _databases.get(databaseName);
 }
 
-const DATA_TABLES = [
-  'weapons', 'weapon_mods', 'weapon_mod_slots', 'ammo_types',
-  'weapon_qualities', 'perks', 'items', 'perk_effects',
-];
 
 export async function initDatabase() {
   const db = await getDb();
@@ -25,7 +40,7 @@ export async function initDatabase() {
   const storedVersion = row ? Number(row.value) : 0;
 
   if (storedVersion !== SCHEMA_VERSION) {
-    for (const t of DATA_TABLES) {
+    for (const t of getLegacyCatalogTables()) {
       await db.execAsync(`DROP TABLE IF EXISTS ${t}`);
     }
     for (const sql of CREATE_TABLES) {

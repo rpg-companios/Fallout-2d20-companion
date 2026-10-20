@@ -20,6 +20,7 @@ import useCharacterStore from '../../../src/store/characterStore';
 // Шаг 8б (патч 242): сохранения — обычный модуль без React.
 import * as savesModule from '../../../src/saves/characterSaves';
 import { findEnrichedOrigin } from '../../../domain/origins';
+import { getSettingService } from '../../../domain/registry.js';
 import {
   SUPPORTED_LOCALES,
   useLocale,
@@ -43,7 +44,7 @@ import {
 import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
-import { debugLog } from '../../../src/debug/falloutDebug';
+import { debugLog } from '../../../src/engine/debug/runtimeTrace.js';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
 import GameSettingsModal from '../../settings/GameSettingsModal';
@@ -380,6 +381,10 @@ export default function HomeScreen({ navigation }) {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
   const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
+  const settingHomeLinks = getSettingService('home')?.links ?? {};
+  const communityLinks = Array.isArray(settingHomeLinks.community)
+    ? settingHomeLinks.community.filter((link) => typeof link?.url === 'string')
+    : [];
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -735,7 +740,7 @@ export default function HomeScreen({ navigation }) {
 
   const handleCloudSync = async () => {
     setMenuVisible(false);
-    if (Platform.OS !== 'web') {
+    if (Platform.OS !== 'web' && Platform.OS !== 'ios' && Platform.OS !== 'android') {
       showCatalogAlert('cloudSyncUnsupported');
       return;
     }
@@ -984,17 +989,21 @@ export default function HomeScreen({ navigation }) {
               <MaterialCommunityIcons name="information-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.about')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setCommunityVisible(true); }}>
-              <FontAwesome5 name="telegram-plane" size={18} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.community')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuItem} onPress={() => {
-              setMenuVisible(false);
-              openExternalLink('https://boosty.to/fallout2d20ru');
-            }}>
-              <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee')}</Text>
-            </TouchableOpacity>
+            {communityLinks.length > 0 && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setCommunityVisible(true); }}>
+                <FontAwesome5 name="telegram-plane" size={18} color="#d4af37" />
+                <Text style={styles.menuText}>{tHomeScreen('menu.community')}</Text>
+              </TouchableOpacity>
+            )}
+            {settingHomeLinks.supportUrl && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => {
+                setMenuVisible(false);
+                openExternalLink(settingHomeLinks.supportUrl);
+              }}>
+                <MaterialCommunityIcons name="coffee-outline" size={20} color="#d4af37" />
+                <Text style={styles.menuText}>{tHomeScreen('menu.buyCoffee')}</Text>
+              </TouchableOpacity>
+            )}
 
             {/* Принудительное обновление PWA (для разработчика) */}
             <TouchableOpacity
@@ -1079,15 +1088,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.modalBackdropCenter}>
           <View style={styles.infoModal}>
             <Text style={styles.infoTitle}>{tHomeScreen('menu.community')}</Text>
-            <TouchableOpacity onPress={() => openExternalLink('https://fallout-2d20.ru')}>
-              <Text style={styles.linkText}>fallout-2d20.ru</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => openExternalLink('https://t.me/fallout_2d20_russia')}>
-              <Text style={styles.linkText}>https://t.me/fallout_2d20_russia</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => openExternalLink('https://vk.com/ttrp_fallout2d20/')}>
-              <Text style={styles.linkText}>https://vk.com/ttrp_fallout2d20/</Text>
-            </TouchableOpacity>
+            {communityLinks.map((link) => (
+              <TouchableOpacity key={link.id || link.url} onPress={() => openExternalLink(link.url)}>
+                <Text style={styles.linkText}>{link.label || link.url}</Text>
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setCommunityVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>

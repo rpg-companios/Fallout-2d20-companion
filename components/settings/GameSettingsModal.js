@@ -11,29 +11,82 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
-import { confirmAlert } from '../alerts/alertService';
+import { confirmAlert, showRawAlert } from '../alerts/alertService';
 import useSettingPackStore, {
-  getVanillaCatalog,
   selectActiveSettingId,
   selectInstalledSettings,
 } from '../../src/store/settingPackStore';
+import useSettingUpdateStore, {
+  selectSettingInstallingId,
+  selectSettingUpdateError,
+  selectSettingUpdatePlans,
+  selectSettingUpdateStatus,
+} from '../../src/store/settingUpdateStore';
 
+const MAX_TRPG_ARCHIVE_BYTES = 50 * 1024 * 1024;
 const isTrpgName = (name) => typeof name === 'string' && name.toLowerCase().endsWith('.trpg');
 
-const pickLocalTrpg = () => new Promise((resolve) => {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') {
-    resolve(null);
-    return;
+// tHomeScreen не подставляет параметры (это дело AlertHost); для строк,
+// собранных вручную, подстановка нужна здесь.
+const withParams = (template, params) => String(template).replace(
+  /\{(\w+)\}/g,
+  (match, key) => (Object.hasOwn(params, key) ? String(params[key]) : match),
+);
+
+const pickLocalTrpg = async () => {
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
+      input.type = 'file';
+      input.accept = '.trpg';
+      input.onchange = async () => {
+        const file = input.files && input.files[0];
+        input.value = '';
+        if (!file || !isTrpgName(file.name)) {
+          finish(null);
+          return;
+        }
+        if (file.size > MAX_TRPG_ARCHIVE_BYTES) {
+          reject(new Error('archive exceeds the supported size limit'));
+          return;
+        }
+        try {
+          finish({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+        } catch (error) {
+          reject(error);
+        }
+      };
+      input.addEventListener('cancel', () => finish(null), { once: true });
+      input.click();
+    });
   }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.trpg';
-  input.onchange = () => {
-    const file = input.files && input.files[0];
-    resolve(file && isTrpgName(file.name) ? file.name : null);
-  };
-  input.click();
-});
+
+  const DocumentPicker = await import('expo-document-picker');
+  const result = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
+  if (result.canceled || !result.assets?.length) return null;
+  const asset = result.assets[0];
+  if (!isTrpgName(asset.name)) return null;
+  if (asset.size !== undefined && asset.size > MAX_TRPG_ARCHIVE_BYTES) {
+    throw new Error('archive exceeds the supported size limit');
+  }
+  const { File } = await import('expo-file-system');
+  const picked = new File(asset.uri);
+  const fileSize = picked.info().size;
+  if (fileSize !== undefined && fileSize > MAX_TRPG_ARCHIVE_BYTES) {
+    throw new Error('archive exceeds the supported size limit');
+  }
+  const bytes = await picked.bytes();
+  if (bytes.byteLength > MAX_TRPG_ARCHIVE_BYTES) {
+    throw new Error('archive exceeds the supported size limit');
+  }
+  return { name: asset.name, bytes };
+};
 
 const ActionButton = ({ label, onPress, disabled = false }) => (
   <TouchableOpacity
@@ -51,19 +104,29 @@ export default function GameSettingsModal({ visible, onClose }) {
   const activeId = useSettingPackStore(selectActiveSettingId);
   const selectSetting = useSettingPackStore((state) => state.selectSetting);
   const deleteSetting = useSettingPackStore((state) => state.deleteSetting);
-  const installVanilla = useSettingPackStore((state) => state.installVanilla);
-  const installLocalFile = useSettingPackStore((state) => state.installLocalFile);
-  const [pickedFileName, setPickedFileName] = useState(null);
+  const installLocalPackage = useSettingPackStore((state) => state.installLocalPackage);
+  const updatePlans = useSettingUpdateStore(selectSettingUpdatePlans);
+  const updateStatus = useSettingUpdateStore(selectSettingUpdateStatus);
+  const updateError = useSettingUpdateStore(selectSettingUpdateError);
+  const installingId = useSettingUpdateStore(selectSettingInstallingId);
+  const checkForUpdates = useSettingUpdateStore((state) => state.checkForUpdates);
+  const installUpdate = useSettingUpdateStore((state) => state.installUpdate);
+  const [pickedFile, setPickedFile] = useState(null);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [activatingId, setActivatingId] = useState(null);
   const pickingRef = useRef(false);
-
-  const available = getVanillaCatalog().filter(
-    (entry) => !installed.some((item) => item.id === entry.id),
-  );
 
   const confirmDelete = async (entry) => {
     // Заголовок из каталога, имя пакета — подстановкой в тело диалога.
     if (await confirmAlert('settingDelete', { name: entry.name })) {
-      deleteSetting(entry.id);
+      try {
+        await deleteSetting(entry.id);
+      } catch {
+        await showRawAlert({
+          title: tHomeScreen('gameSetting.packageInstallTitle'),
+          message: tHomeScreen('gameSetting.packageDeleteFailed'),
+        });
+      }
     }
   };
 
@@ -71,10 +134,85 @@ export default function GameSettingsModal({ visible, onClose }) {
     if (pickingRef.current) return;
     pickingRef.current = true;
     try {
-      const name = await pickLocalTrpg();
-      if (name) setPickedFileName(name);
+      const file = await pickLocalTrpg();
+      if (file) setPickedFile(file);
+    } catch {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.packageInstallTitle'),
+        message: tHomeScreen('gameSetting.packagePickFailed'),
+      });
     } finally {
       pickingRef.current = false;
+    }
+  };
+
+  const handleInstallLocal = async () => {
+    if (!pickedFile || isInstalling) return;
+    setIsInstalling(true);
+    try {
+      await installLocalPackage(pickedFile);
+      setPickedFile(null);
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.packageInstallTitle'),
+        message: tHomeScreen('gameSetting.packageInstalled'),
+      });
+    } catch {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.packageInstallTitle'),
+        message: tHomeScreen('gameSetting.packageInstallFailed'),
+      });
+    } finally {
+      setIsInstalling(false);
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    if (updateStatus === 'checking') return;
+    try {
+      const found = await checkForUpdates({ force: true });
+      if (found.length === 0) {
+        await showRawAlert({
+          title: tHomeScreen('gameSetting.updateTitle'),
+          message: tHomeScreen('gameSetting.updateNone'),
+        });
+      }
+    } catch {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.updateTitle'),
+        message: tHomeScreen('gameSetting.updateError'),
+      });
+    }
+  };
+
+  const handleInstallUpdate = async (entry) => {
+    if (installingId) return;
+    try {
+      const result = await installUpdate(entry.id);
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.updateTitle'),
+        message: withParams(tHomeScreen('gameSetting.updateInstalled'), { version: result.version }),
+      });
+    } catch {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.updateTitle'),
+        message: tHomeScreen('gameSetting.updateFailed'),
+      });
+    }
+  };
+
+  const handleActivate = async (entry) => {
+    if (activatingId !== null || entry.id === activeId || !entry.runtime?.entry) return;
+    setActivatingId(entry.id);
+    try {
+      await selectSetting(entry.id);
+      onClose?.();
+    } catch {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.packageInstallTitle'),
+        message: tHomeScreen('gameSetting.packageActivationFailed'),
+      });
+    } finally {
+      setActivatingId(null);
     }
   };
 
@@ -84,16 +222,44 @@ export default function GameSettingsModal({ visible, onClose }) {
         <View style={styles.modal}>
           <Text style={styles.title}>{tHomeScreen('gameSetting.title')}</Text>
           <ScrollView style={styles.scroll}>
+            {installed.length === 0 ? (
+              <Text style={styles.packageStatus}>{tHomeScreen('gameSetting.noInstalledSettings')}</Text>
+            ) : null}
             {installed.map((entry) => {
               const selected = entry.id === activeId;
+              const activating = activatingId === entry.id;
+              const update = updatePlans[entry.id] ?? null;
+              const updating = installingId === entry.id;
               return (
                 <View key={entry.id} style={[styles.installedRow, selected && styles.installedRowActive]}>
-                  <Text style={styles.settingName} numberOfLines={2}>{entry.name}</Text>
-                  <ActionButton
-                    label={tHomeScreen('gameSetting.select')}
-                    onPress={() => selectSetting(entry.id)}
-                    disabled={selected}
-                  />
+                  <View style={styles.installedInfo}>
+                    <Text style={styles.settingName} numberOfLines={2}>{entry.name}</Text>
+                    {!entry.runtime?.entry ? (
+                      <Text style={styles.packageStatus}>{tHomeScreen('gameSetting.pendingRuntime')}</Text>
+                    ) : null}
+                    {update ? (
+                      <Text style={styles.updateStatus}>
+                        {withParams(tHomeScreen('gameSetting.updateAvailableShort'), {
+                          version: update.toVersion,
+                        })}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {update ? (
+                    <ActionButton
+                      label={updating
+                        ? tHomeScreen('gameSetting.updateInstalling')
+                        : tHomeScreen('gameSetting.updateNow')}
+                      onPress={() => handleInstallUpdate(entry)}
+                      disabled={Boolean(installingId)}
+                    />
+                  ) : (
+                    <ActionButton
+                      label={activating ? tHomeScreen('gameSetting.activating') : tHomeScreen('gameSetting.select')}
+                      onPress={() => handleActivate(entry)}
+                      disabled={selected || activatingId !== null || !entry.runtime?.entry}
+                    />
+                  )}
                   <ActionButton
                     label={tHomeScreen('gameSetting.delete')}
                     onPress={() => confirmDelete(entry)}
@@ -102,37 +268,36 @@ export default function GameSettingsModal({ visible, onClose }) {
               );
             })}
 
-            <View style={styles.plusBlock}>
-              <Text style={styles.plusMark}>+</Text>
-              <Text style={styles.blockTitle}>{tHomeScreen('gameSetting.chooseSetting')}</Text>
-              {available.map((entry) => (
-                <View key={entry.id} style={styles.availableRow}>
-                  <Text style={styles.settingName} numberOfLines={2}>{entry.name}</Text>
-                  <ActionButton
-                    label={tHomeScreen('gameSetting.install')}
-                    onPress={() => installVanilla(entry.id)}
-                  />
-                </View>
-              ))}
-            </View>
+            {installed.length > 0 ? (
+              <View style={styles.updateRow}>
+                <ActionButton
+                  label={updateStatus === 'checking'
+                    ? tHomeScreen('gameSetting.updateChecking')
+                    : tHomeScreen('gameSetting.updateCheck')}
+                  onPress={handleCheckUpdates}
+                  disabled={updateStatus === 'checking' || Boolean(installingId)}
+                />
+                {updateError ? (
+                  <Text style={styles.updateError} numberOfLines={2}>
+                    {tHomeScreen('gameSetting.updateError')}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
 
             <View style={styles.plusBlock}>
               <Text style={styles.plusMark}>+</Text>
-              <TouchableOpacity style={styles.filePick} onPress={handlePickLocal}>
+              <TouchableOpacity style={styles.filePick} onPress={handlePickLocal} disabled={isInstalling}>
                 <MaterialCommunityIcons name="file-plus-outline" size={22} color="#f0e68c" />
                 <Text style={styles.filePickText}>{tHomeScreen('gameSetting.localTrpg')}</Text>
               </TouchableOpacity>
-              {pickedFileName ? (
-                <Text style={styles.fileName}>{pickedFileName}</Text>
+              {pickedFile ? (
+                <Text style={styles.fileName}>{pickedFile.name}</Text>
               ) : null}
               <ActionButton
-                label={tHomeScreen('gameSetting.install')}
-                onPress={() => {
-                  if (!pickedFileName) return;
-                  installLocalFile(pickedFileName);
-                  setPickedFileName(null);
-                }}
-                disabled={!pickedFileName}
+                label={isInstalling ? tHomeScreen('gameSetting.installing') : tHomeScreen('gameSetting.install')}
+                onPress={handleInstallLocal}
+                disabled={!pickedFile || isInstalling}
               />
             </View>
           </ScrollView>
@@ -177,7 +342,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f2937',
   },
   installedRowActive: { borderColor: '#d4af37' },
+  installedInfo: { flex: 1, minWidth: 0 },
   settingName: { flex: 1, color: '#f9fafb', fontSize: 15 },
+  packageStatus: { color: '#fbbf24', fontSize: 11, marginTop: 4 },
+  updateStatus: { color: '#93c5fd', fontSize: 11, marginTop: 4 },
+  updateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  updateError: { color: '#fca5a5', fontSize: 11, flex: 1, minWidth: 0 },
   actionButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,

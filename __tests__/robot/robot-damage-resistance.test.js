@@ -1,12 +1,12 @@
 // __tests__/robot/robot-damage-resistance.test.js
-// Юнит-тесты расчёта итоговой СУ слота робота (domain/robotDamageResistance.js).
+// Юнит-тесты расчёта итоговой СУ слота робота (modules/fallout/logic/robotDamageResistance.js).
 // Модуль чистый (не тянет modules/fallout) — тестируется на синтетических слотах.
 import { describe, it, expect } from 'vitest';
 import {
   getLimbDamageResistance,
   getActiveRobotLayers,
   getRobotSlotDamageResistance,
-} from '../../domain/robotDamageResistance';
+} from '../../modules/fallout/logic/robotDamageResistance';
 
 const armWithDr = {
   id: 'robot_arm_robobrain',

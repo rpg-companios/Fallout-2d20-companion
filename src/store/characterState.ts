@@ -13,9 +13,8 @@
 // переименуешь поле в интерфейсе — tsc укажет на устаревший список.
 //
 // Производные/служебные поля состояния (maxLuckPoints — Правило 1
-// counters-storage.md, derivedStats, perkBonuses, pendingCoreChoice,
-// isEffectsProcessing, _characterContext) в паспорт не входят: это кеш и
-// рантайм-мостики, они не данные.
+// counters-storage.md, derivedStats, perkBonuses, isEffectsProcessing,
+// _characterContext) в паспорт не входят: это кеш и рантайм-мостики.
 //
 // Формы, которые движок держит «непрозрачными» (payload предметов, эффектов,
 // расширений сеттингов), типизированы минимально: обязательный идентификатор
@@ -49,25 +48,6 @@ export type BodySlotKey = 'head' | 'body' | 'leftArm' | 'rightArm' | 'leftLeg' |
 
 export type EquippedArmor = Record<BodySlotKey, ArmorSlot>;
 
-/** Надетый пакет силовой брони (domain/powerArmor.js). */
-export interface EquippedPowerArmor {
-  frame: StoreItem | null;
-  pieces: Record<BodySlotKey, StoreItem | null>;
-}
-
-/** Накопитель расхода Ядерного блока (§5.3, персистентный). */
-export interface PowerArmorRuntime {
-  coreAccumulatorMs: number;
-}
-
-/** Робо-слайс (robotSlice.js): корпус, слоты конечностей, модули, ОС Mk II. */
-export interface RobotState {
-  bodyPlan: string | null;
-  slots: Record<string, Record<string, unknown>>;
-  modules: StoreItem[];
-  mk2Installed: boolean;
-}
-
 /** «Эффект трейта» (стор-поле traitEffects; в сейве ключ effects). */
 export interface TraitEffectRecord {
   id: string;
@@ -85,12 +65,6 @@ export interface TimedEffectRecord {
 export interface ConditionRecord {
   id: string;
   [payloadKey: string]: unknown;
-}
-
-/** Запись журнала доз препаратов: одна попытка «Сопротивляться» в сутки. */
-export interface ChemDoseEntry {
-  chemId: string;
-  takenAt: number;
 }
 
 /** Выбранный перк (с индексом колонки). */
@@ -127,26 +101,20 @@ export interface CharacterPersistedData {
   selectedPerks: SelectedPerkRecord[];
   /** Tagged-навыки, чья стартовая награда уже выдана. */
   rewardedSkills: string[];
-  robot: RobotState;
-  /** Поля расширений сеттингов ({ survival } у Fallout и т.д.), патч 209. */
+  /** Поля расширений активных setting packages, патч 209. */
   stateExtensions: Record<string, unknown>;
   equipment: EquipmentKit | null;
-  /** Персональный счётный ресурс (в Fallout — крышки); границ нет. */
+  /** Персональный счётный ресурс; правила границ приходят от активного setting. */
   currency: number;
   /** Метаданные надетого оружия (кулаки/манипуляторы); предметы — в items. */
   equippedWeapons: StoreItem[];
   equippedArmor: EquippedArmor;
-  equippedPowerArmor: EquippedPowerArmor;
-  powerArmorRuntime: PowerArmorRuntime;
   /** Selection-списки создания персонажа (Шаг 5). */
   selectedSkills: string[];
   extraTaggedSkills: string[];
   forcedSelectedSkills: string[];
   conditions: ConditionRecord[];
-  chemDosesLog: ChemDoseEntry[];
-  /** Момент последней попытки «Сопротивляться» болезни; null = можно. */
-  lastDiseaseResistAt: number | null;
-  /** Состояния проверок риска сцен: ruleId → состояние сцены. */
+  /** Состояния проверок рисков в сценах: ruleId → состояние. */
   sceneRiskStates: Record<string, Record<string, unknown>>;
   origin: CatalogEntityRef | null;
   trait: CatalogEntityRef | null;
@@ -156,9 +124,8 @@ export interface CharacterPersistedData {
   skillsSaved: boolean;
   luckPoints: number;
   availablePerkAttributePoints: number;
-  /** Текущие ОЗ (может быть ВЫШЕ базового потолка) и радиация. */
+  /** Текущее значение общего ресурса персонажа. */
   currentHealth: number;
-  radiation: number;
   /** Сколько сцен сменилось с начала персонажа. */
   sceneCounter: number;
   traitEffects: TraitEffectRecord[];
@@ -191,20 +158,15 @@ export const CHARACTER_PERSISTED_KEYS = [
   'effects',
   'selectedPerks',
   'rewardedSkills',
-  'robot',
   'stateExtensions',
   'equipment',
   'currency',
   'equippedWeapons',
   'equippedArmor',
-  'equippedPowerArmor',
-  'powerArmorRuntime',
   'selectedSkills',
   'extraTaggedSkills',
   'forcedSelectedSkills',
   'conditions',
-  'chemDosesLog',
-  'lastDiseaseResistAt',
   'sceneRiskStates',
   'origin',
   'trait',
@@ -215,7 +177,6 @@ export const CHARACTER_PERSISTED_KEYS = [
   'luckPoints',
   'availablePerkAttributePoints',
   'currentHealth',
-  'radiation',
   'sceneCounter',
   'traitEffects',
   'modifiedItems',

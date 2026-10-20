@@ -12,7 +12,7 @@ import {
   getScrapTableLabels,
   getScrapMaterials,
   getScrapTables,
-} from '../../domain/registry';
+} from '../../modules/fallout/salvage/catalog.js';
 import junkData from '../../modules/fallout/data/junk/junk.json';
 import materialsData from '../../modules/fallout/data/junk/material.json';
 
@@ -51,11 +51,12 @@ describe('каталог для окон (добыча/покупка)', () => {
   });
 });
 
-describe('дверь сеттинга (292): пути — в одном месте', () => {
-  it('реестр и каталог читают сеттинг только через дверь (без внутренних путей)', () => {
+describe('engine setting-data boundary', () => {
+  it('registry and catalogues read only the activated runtime, with no bundled Fallout import', () => {
     for (const rel of ['domain/registry.js', 'i18n/equipmentCatalog.js']) {
       const source = readText(rel);
-      expect(source, `${rel}: дверь`).toContain('modules/fallout/index.js');
+      expect(source, `${rel}: no statically bundled Fallout`).not.toContain('modules/fallout');
+      expect(source, `${rel}: runtime data source`).toContain('getActiveSettingRuntime');
       expect(source, `${rel}: внутренности data/`).not.toMatch(/from '[^']*modules\/fallout\/data\//);
       expect(source, `${rel}: внутренности i18n/`).not.toMatch(/from '[^']*modules\/fallout\/i18n\//);
     }

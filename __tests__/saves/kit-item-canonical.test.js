@@ -15,7 +15,7 @@ import {
   LEGACY_KIT_ITEM_RENAMES,
   canonizeKitItemInstance,
   canonizeLoadedCharacterItems,
-} from '../../domain/kitItemCanonical';
+} from '../../modules/fallout/migrations/kitItemCanonical.js';
 import useCharacterStore from '../../src/store/characterStore';
 
 afterEach(async () => {

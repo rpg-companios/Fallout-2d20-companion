@@ -14,11 +14,12 @@
  */
 
 import { Platform } from 'react-native';
-import { debugLog } from '../debug/falloutDebug';
+import { debugLog } from '../engine/debug/runtimeTrace.js';
 import {
   EXPORT_FILE_EXTENSION,
   sanitizeFileName as domainSanitizeFileName,
 } from '../../domain/characterTransfer';
+import { getCharacterFilePickerDescription } from './characterFileLabels.js';
 
 const traceCharacterFileTransfer = (level, ...details) => debugLog(`characterFileTransfer.${level}`, {
   details: details.map((detail) => (detail instanceof Error
@@ -209,7 +210,7 @@ export const loadCharacterRawText = async () => {
           const blob = await fsAccess.fileOpen({
             mimeTypes: ['application/json', 'text/json', 'text/plain', 'application/octet-stream'],
             extensions: ['.json', EXPORT_FILE_EXTENSION, '*'].filter(Boolean),
-            description: 'Файл персонажа Fallout 2d20',
+            description: getCharacterFilePickerDescription(),
             multiple: false,
           });
           traceCharacterFileTransfer('info', '✅ browser-fs-access получил файл');

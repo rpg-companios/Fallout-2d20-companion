@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildMechAmmoSpend, mechAmmoSpendForWeapon } from '../../modules/fallout/weapons/weaponAmmoSpend';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
-import { deserializeSlot } from '../../domain/robotSlots';
+import { deserializeSlot } from '../../modules/fallout/logic/robotSlots';
 import { SETTING } from '../../modules/fallout/index.js';
 
 const MK_VI = 'robot_weapon_mod_assaultron_head_laser_capacitor_mk_vi';

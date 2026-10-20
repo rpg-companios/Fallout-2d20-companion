@@ -1,10 +1,11 @@
-import { debugLog } from '../../../../../src/debug/falloutDebug';
+import { debugLog } from '../../../debug.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
-import { resolveKitItems } from '../../../../../domain/kitResolver';
-import { initRobotSlots } from '../../../../../domain/robotEquip';
-import { isRobotCharacter, getBodyPlan, getBuiltinBaseWeapon } from '../../../../../domain/origins';
-import { getBodyPlan as getBodyPlanData } from '../../../../../domain/bodyplan';
+import { resolveKitItems } from '../../../kitResolver';
+import { initRobotSlots } from '../../../logic/robotEquip.js';
+import { isRobotCharacter, getBodyPlan } from '../../../logic/originTypes.js';
+import { getBuiltinBaseWeapon } from '../../../logic/startingEquipment.js';
+import { getBodyPlan as getBodyPlanData } from '../../../logic/bodyplan.js';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import styles from '../../../styles/EquipmentKitModal.styles';

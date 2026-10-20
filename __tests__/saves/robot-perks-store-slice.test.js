@@ -1,13 +1,15 @@
-// Шаг 8а (часть 2): слоты/модули робота и выбранные перки — стор.
-// setEquippedRobotSlots/setEquippedRobotModules (robotSlice) заменяют
-// useState-обёртки CharacterContext (патч 218): функциональный апдейтер
-// обязателен, bodyPlan/mk2Installed сохраняются, производные пересчитываются.
+// Robot equipment lives in the Fallout state extension; its actions are
+// reached through the engine's generic setting-action bridge. Functional
+// updaters preserve the prior slot/module payload and extension metadata.
 // selectCarryWeight — плоский номер из derivedStats (форма {base,modifiers,total}),
 // фолбэк — формула calculateCarryWeight.
 
 import { afterEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
 import { selectCarryWeight } from '../../src/store/selectors';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
+
+const robotState = () => selectFalloutRobotState(useCharacterStore.getState());
 
 afterEach(async () => {
   useCharacterStore.getState().resetCharacterStore();
@@ -17,10 +19,10 @@ afterEach(async () => {
 describe('characterStore: слоты/модули робота (Шаг 8а)', () => {
   it('setEquippedRobotSlots: значение + сохранение bodyPlan/mk2Installed', () => {
     const store = useCharacterStore.getState();
-    store.initRobot('protectron');
-    useCharacterStore.setState({ robot: { ...useCharacterStore.getState().robot, mk2Installed: true } });
-    store.setEquippedRobotSlots({ head: { limb: { id: 'l1' } } });
-    const robot = useCharacterStore.getState().robot;
+    store.getSettingAction('robotEquipment', 'initRobot')('protectron');
+    store.setStateExtension('robot', { ...robotState(), mk2Installed: true });
+    store.getSettingAction('robotEquipment', 'setEquippedRobotSlots')({ head: { limb: { id: 'l1' } } });
+    const robot = robotState();
     expect(robot.bodyPlan).toBe('protectron');
     expect(robot.mk2Installed).toBe(true);
     expect(robot.slots).toEqual({ head: { limb: { id: 'l1' } } });
@@ -28,25 +30,25 @@ describe('characterStore: слоты/модули робота (Шаг 8а)', ()
 
   it('setEquippedRobotSlots: функциональный апдейтер видит предыдущие слоты', () => {
     const store = useCharacterStore.getState();
-    store.setEquippedRobotSlots({ head: { limb: { id: 'l1' } } });
-    store.setEquippedRobotSlots((prev) => ({ ...prev, torso: { limb: { id: 'l2' } } }));
-    expect(useCharacterStore.getState().robot.slots).toEqual({
+    store.getSettingAction('robotEquipment', 'setEquippedRobotSlots')({ head: { limb: { id: 'l1' } } });
+    store.getSettingAction('robotEquipment', 'setEquippedRobotSlots')((prev) => ({ ...prev, torso: { limb: { id: 'l2' } } }));
+    expect(robotState().slots).toEqual({
       head: { limb: { id: 'l1' } },
       torso: { limb: { id: 'l2' } },
     });
   });
 
   it('setEquippedRobotSlots(null) → пустой словарь (семантика сброса контекста)', () => {
-    useCharacterStore.getState().setEquippedRobotSlots(null);
-    expect(useCharacterStore.getState().robot.slots).toEqual({});
+    useCharacterStore.getState().getSettingAction('robotEquipment', 'setEquippedRobotSlots')(null);
+    expect(robotState().slots).toEqual({});
   });
 
   it('setEquippedRobotModules: значение/апдейтер, слоты не трогает', () => {
     const store = useCharacterStore.getState();
-    store.setEquippedRobotSlots({ head: { limb: { id: 'l1' } } });
-    store.setEquippedRobotModules([{ id: 'm1' }]);
-    store.setEquippedRobotModules((prev) => [...prev, { id: 'm2' }]);
-    const robot = useCharacterStore.getState().robot;
+    store.getSettingAction('robotEquipment', 'setEquippedRobotSlots')({ head: { limb: { id: 'l1' } } });
+    store.getSettingAction('robotEquipment', 'setEquippedRobotModules')([{ id: 'm1' }]);
+    store.getSettingAction('robotEquipment', 'setEquippedRobotModules')((prev) => [...prev, { id: 'm2' }]);
+    const robot = robotState();
     expect(robot.modules).toEqual([{ id: 'm1' }, { id: 'm2' }]);
     expect(robot.slots).toEqual({ head: { limb: { id: 'l1' } } });
   });

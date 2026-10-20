@@ -8,7 +8,6 @@
 // не трогает).
 //
 // Исторические особенности формата (НЕ менять без владельца — формат сейва):
-//   - caps (не currency): ресурс назывался крышками до переименования рантайма;
 //   - effects — «эффекты трейтов» (в сторе поле traitEffects);
 //   - attributes/skills — legacy-массивы { name, value };
 //   - Формат-v2 (патч 247): ключ modifiedItems В ЗАПИСЬ НЕ ПИШЕТСЯ —
@@ -29,12 +28,9 @@
 
 import type {
   CatalogEntityRef,
-  ChemDoseEntry,
   ConditionRecord,
   EquippedArmor,
-  EquippedPowerArmor,
   EquipmentKit,
-  PowerArmorRuntime,
   SelectedPerkRecord,
   StoreItem,
   TimedEffectRecord,
@@ -68,29 +64,17 @@ export type CharacterSaveData = {
   activeTimedEffects: TimedEffectRecord[];
   sceneCounter: number;
   equippedWeapons: StoreItem[];
-  /** Робо-поля присутствуют только у персонажа с робо-состоянием. */
-  equippedRobotSlots?: Record<string, Record<string, unknown>>;
-  equippedRobotModules?: StoreItem[];
-  /** ОС Mk II присутствует только у Секьюритрона. */
-  mk2Installed?: boolean;
   equippedArmor: EquippedArmor;
-  equippedPowerArmor: EquippedPowerArmor;
-  powerArmorRuntime: PowerArmorRuntime;
-  /** Персистентный контракт: рантайм-имя currency, поле сейва caps. */
-  caps: number;
   currentHealth: number;
-  radiation: number;
   availablePerkAttributePoints: number;
   luckPoints: number;
   attributesSaved: boolean;
   skillsSaved: boolean;
   selectedPerks: SelectedPerkRecord[];
   conditions: ConditionRecord[];
-  chemDosesLog: ChemDoseEntry[];
   /** Попутный ключ мерджа со стором (загрузкой не читается). */
   rewardedSkills: string[];
   sceneRiskStates: Record<string, Record<string, unknown>>;
-  lastDiseaseResistAt: number | null;
   schemaVersion: number;
 } & {
   /** Поля расширений сеттингов ({ survival: … } и т.п.) — верхним уровнем. */
@@ -117,20 +101,14 @@ export const CHARACTER_SAVE_KEYS = [
   'sceneCounter',
   'equippedWeapons',
   'equippedArmor',
-  'equippedPowerArmor',
-  'powerArmorRuntime',
-  'caps',
   'currentHealth',
-  'radiation',
   'availablePerkAttributePoints',
   'luckPoints',
   'attributesSaved',
   'skillsSaved',
   'selectedPerks',
   'conditions',
-  'chemDosesLog',
   'rewardedSkills',
   'sceneRiskStates',
-  'lastDiseaseResistAt',
   'schemaVersion',
 ] as const;

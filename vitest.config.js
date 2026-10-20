@@ -50,6 +50,10 @@ export default defineConfig({
   plugins: [jsxInJs],
   test: {
     environment: 'node',
-    setupFiles: ['./src/store/__test-setup__/asyncStorageMock.js'],
+    setupFiles: [
+      './src/store/__test-setup__/asyncStorageMock.js',
+      './src/store/__test-setup__/reactNativeMock.js',
+      './src/store/__test-setup__/settingRuntimeFixture.js',
+    ],
   },
 });

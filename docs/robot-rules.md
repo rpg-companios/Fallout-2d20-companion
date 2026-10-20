@@ -3,7 +3,7 @@
 ## 1. Character Type Flag
 - Origin has `characterType` = `robot` → `ARMOR_POLICIES.ROBOT_ONLY`
 - `mutant` → `RAIDER_ONLY`, `human/ghoul/cyborg` → `STANDARD`
-- Determined via `domain/origins.js isRobotCharacter()`
+- Determined via `modules/fallout/logic/originTypes.js::isRobotCharacter()`
 
 ## 2. Architecture: Domain vs Private Case
 - **Domain = engine, general rules**: `domain/allowlist.js` — `isItemInAllowlist(item, allowlist)` — поддержка слага/категории/id белого списка. Общая движковая функция.
@@ -69,7 +69,7 @@ Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPla
   - install requirements (`installComplexity/PerksRequired/Skill`) exist only for the five book attachments (Buzz Saw, Construction Claw, Cryojet, Drill, Vice Grip)
 - All limbs (incl. arms) accept armor layers (plating/armor/frame) — `slotAcceptsArmor`
 - Default/standard arm per body plan comes from `bodyplans.json → defaults` (each robot has its own: misterHandy → `robot_arm_mister_handy`, securitron → `robot_arm_securitron`, assaultron → `robot_arm_assaultron`, protectron → `robot_arm_protectron`, …); kit assembly plants it before attaching an attachment to an empty arm slot
-- Migration v21→v22 (`migrateRobotArmAttachments`): slots where an attachment stood INSTEAD of an arm get the plan's standard arm; the attachment is re-planted into its palm
+- Migration v21→v22 (`modules/fallout/migrations/robotEquipment.js::migrateRobotArmAttachments`): slots where an attachment stood INSTEAD of an arm get the plan's standard arm; the attachment is re-planted into its palm
 - Inventory equip flow for robots:
   - `findFreeWeaponHand(slots, occupiedSourceSlots)` → first free arm with `canHoldWeapons=true` and no `heldWeapon`
   - occupied palm → replacement via `canReplaceArmWeapon` (strict typing), replaced item returns to inventory
@@ -77,7 +77,7 @@ Engine in `domain/allowlist.js` maps categories via `CATEGORY_ALIASES` (robotPla
   - If no arm with `canHoldWeapons` → alert `manipulatorRequired`, no equip button
 - If arm can hold weapon, robot can equip weapon via inventory. If not, cannot.
 - Unarmed attack:
-  - Humans: `unarmed_human` via `getBuiltinBaseWeapon()`
+  - Humans: `unarmed_human` via `modules/fallout/logic/startingEquipment.js::getBuiltinBaseWeapon()`
   - Robots: via arm's `builtinWeaponId` (manipulator 2 dmg, claw 3 dmg, construction claw 4 dmg) or via `builtinManipulator` flag
   - Assaultron default arm: `robot_weapon_claw` (3 dmg physical Unarmed) — as specified by owner
   - Construction claws kit: two `robot_weapon_construction_claw` as separate arm-weapons replacing arms

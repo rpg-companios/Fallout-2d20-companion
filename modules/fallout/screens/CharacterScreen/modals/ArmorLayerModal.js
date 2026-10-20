@@ -9,9 +9,11 @@ import {
   Pressable,
 } from 'react-native';
 import useCharacterStore from '../../../../../src/store/characterStore';
-import { canEquipRobotArmor } from '../../../../../domain/robotEquip';
-import { getSlotDef, withArmorLayer } from '../../../../../domain/robotSlots';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { useSettingAction } from '../../../../../src/store/useSettingAction.js';
+import { canEquipRobotArmor } from '../../../logic/robotEquip.js';
+import { selectFalloutRobotState } from '../../../store/robotSelectors.js';
+import { getSlotDef, withArmorLayer } from '../../../logic/robotSlots.js';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
@@ -109,15 +111,16 @@ const ArmorCard = ({ item, isSelected, layerColor, onPress }) => {
  */
 const ArmorLayerModal = ({ visible, slotKey, layer, currentItem, onClose }) => {
   // Шаг 8а: слоты робота — слайс robot стора напрямую.
-  const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
-  const setEquippedRobotSlots = useCharacterStore((s) => s.setEquippedRobotSlots);
+  const equippedRobotSlots = useCharacterStore((s) => selectFalloutRobotState(s).slots ?? null);
+  const setEquippedRobotSlots = useSettingAction('robotEquipment', 'setEquippedRobotSlots');
   // Шаг 8в (патч 243): контекст снесён — bodyPlan читается из стора напрямую.
-  const bodyPlan = useCharacterStore((s) => s.robot?.bodyPlan ?? null);
+  const bodyPlan = useCharacterStore((s) => selectFalloutRobotState(s).bodyPlan ?? null);
   useLocale();
   const moduleLocale = useModuleLocale();
+  const catalogRevision = useModuleCatalogRevision();
   const equipmentCatalog = useMemo(
     () => getEquipmentCatalog(moduleLocale),
-    [moduleLocale],
+    [moduleLocale, catalogRevision],
   );
   const layerColor = LAYER_COLORS[layer] ?? '#888';
   const [selectedItem, setSelectedItem] = useState(null);

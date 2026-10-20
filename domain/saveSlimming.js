@@ -1,83 +1,60 @@
 // domain/saveSlimming.js
-// Ужиматель/восстановитель «тела» сейва персонажа (character.data).
-//
-// ЦЕЛЬ.
-//   Сейв должен хранить ТОЛЬКО состояние экземпляра предмета (см. INSTANCE/SAVE_STATE_FIELDS),
-//   а имя/цену/вес/редкость/статы/качества/эффекты код достаёт из каталога через
-//   domain/resolveItem.js («Каталог = источник истины»). Это:
-//     - делает файл заметно легче (в сейве нет дублей каталога);
-//     - убирает «дрейф» — правки JSON применяются к уже созданным персонажам;
-//     - пере-локализует имена под текущий язык программы.
-//
-// ПОЧЕМУ ДВА ПРОХОДА (а не только миграция).
-//   Часть потребителей читает поля предмета напрямую из состояния, поэтому:
-//     - на ЭКСПОРТЕ  (saveCharacter / автосейв) — УЖИМАЕМ → файл/БД худые;
-//     - на ИМПОРТЕ  (deserializeState)          — ВОССТАНАВЛИВАЕМ → состояние снова полное.
-//   Так нет регрессий в рендере, а на диске сейв лёгкий.
-//
-// БЕЗОПАСНОСТЬ (обратная совместимость).
-//   Поле вырезается ТОЛЬКО если у id есть каталожная запись, И эта запись
-//   реально «владеет» полем (key in catalogEntry). Иначе инстанс сохраняется
-//   целиком — кастом/стабы вроде trinkets_stub_2 («Заглючивший голодиск»),
-//   у которых в каталоге нет имени/веса/цены, не теряют данных.
-//
-// МОДУЛЬ ЧИСТЫЙ: каталог и функции поиска/разрешения ПЕРЕДАЮТСЯ как зависимости
-// (см. контракт resolveItem), поэтому его можно тестировать с синтетическим
-// каталогом без подключения modules/fallout.
+// Generic character-save item projection. Shared item containers and the
+// stable instance fields are handled here; setting-owned containers and extra
+// per-item fields are supplied by the active package's save/inventory services.
+
+import { getSettingService } from './registry.js';
 
 /**
- * Поля СОСТОЯНИЯ экземпляра, которые ОБЯЗАНЫ переживать сейв↔загрузку.
- * Надмножество INSTANCE_FIELDS из domain/resolveItem.js: добавляет instanceId,
- * requiresMkII и т.п., чтобы ничего не терять при восстановлении.
+ * Engine-neutral item instance fields that must survive a save round trip.
+ * Setting-specific fields are declared by services.inventory.itemSaveStateFields.
  */
 export const SAVE_STATE_FIELDS = new Set([
-  // идентификаторы / ключ экземпляра
-  'id', 'instanceId', 'weaponId', 'code', 'Name',
-  // тип и состояние инвентаря
-  'itemType', 'quantity', 'equipped', 'locked', 'requiresMkII',
-  // 343: мод установлен на предмет (hostKey) — экипирован и невидим в сумке
-  'installedOn',
-  // моды и подпись стопки
-  'appliedMods', 'stackKey',
-  'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
-  // прочность / заряды / HP
-  'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
-  'equipInstanceId', 'uniqueId', 'charges', 'hpCurrent',
-  // мета отображения / роботов
-  'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', 'installedWeapons',
-  // Legacy robot slots must be split into own and installed weapons before
-  // serialization; retain this transient list until serializeSlot() consumes it.
-  'builtinWeapons', 'builtinWeaponId', 'attackId', 'itemCategory',
+  'id',
+  'instanceId',
+  'itemType',
+  'quantity',
+  'equipped',
+  'locked',
+  'stackKey',
+  'equipInstanceId',
+  'uniqueId',
 ]);
+
+const getSaveStateFields = () => {
+  const declaredFields = getSettingService('inventory')?.itemSaveStateFields;
+  return new Set([
+    ...SAVE_STATE_FIELDS,
+    ...(Array.isArray(declaredFields)
+      ? declaredFields.filter((field) => typeof field === 'string')
+      : []),
+  ]);
+};
 
 /**
  * Ужать один инстанс предмета.
- * @param {object} instance      — запись из сейва (может быть «жирной»).
- * @param {object|null} entry    — каталожная запись по id (или null, если нет в каталоге).
- * @returns {object}             — «худой» инстанс.
+ * @param {object} instance — запись из сейва (может быть «жирной»).
+ * @param {object|null} entry — каталожная запись по id (или null, если нет в каталоге).
+ * @param {Set<string>} stateFields — generic и setting-owned instance fields.
+ * @returns {object} «худой» инстанс.
  */
-export const slimItem = (instance, entry) => {
+export const slimItem = (instance, entry, stateFields = getSaveStateFields()) => {
   if (!instance || typeof instance !== 'object') return instance;
-  // Нет каталожной записи (кастом/стаб/робо-встроенное оружие) → не трогаем,
-  // чтобы не потерять «локальные» имя/вес/цену.
+  // Нет каталожной записи (кастом/стаб/встроенное содержимое) → не трогаем,
+  // чтобы не потерять локальные имя/вес/цену.
   if (!entry || typeof entry !== 'object') return { ...instance };
 
-  // Для известного каталогу предмета файл содержит исключительно состояние
-  // экземпляра. Локальные displayName/baseWeaponName и произвольные поля не
-  // являются состоянием: они либо восстанавливаются из каталога, либо были
-  // устаревшей копией UI. Неизвестные (кастомные) предметы по-прежнему
-  // сохраняются целиком в раннем return выше.
+  const allowedFields = stateFields instanceof Set ? stateFields : new Set(stateFields || []);
   return Object.fromEntries(Object.entries(instance)
-    .filter(([key]) => SAVE_STATE_FIELDS.has(key)));
+    .filter(([key]) => allowedFields.has(key)));
 };
 
 /**
  * Восстановить один инстанс каталожными данными.
  * resolve(instance) — обычно domain/resolveItem#resolveItem(instance, catalog).
- * Слияние { ...instance, ...resolved } сохраняет все поля инстанса (в т.ч.
- * instanceId/requiresMkII, которые resolveItem может не вернуть) и
- * замещает «жирные» поля корректными данными каталога/модов.
- * Если записи в каталоге нет — item не изменится (никаких потерь).
+ * Слияние { ...instance, ...resolved } сохраняет все поля инстанса и
+ * замещает каталожные данные корректными данными каталога/модов.
+ * Если записи в каталоге нет — item не изменится.
  */
 export const restoreItem = (instance, resolve) => {
   if (!instance || typeof instance !== 'object') return instance;
@@ -86,23 +63,13 @@ export const restoreItem = (instance, resolve) => {
   return { ...instance, ...resolved };
 };
 
-import { deserializeSlot, isSlimSlot, serializeSlot } from './robotSlots';
-
 const mapArray = (arr, fn) => (Array.isArray(arr) ? arr.map(fn) : arr);
 
-/**
- * Обход всех контейнеров предметов в data + применение fn к каждому инстансу.
- * Контейнеры: equipment.items, equippedWeapons, equippedArmor.*.{armor,clothing},
- * equippedPowerArmor.{frame,pieces.*}, equippedRobotSlots.*.{heldWeapon,limb,
- * armor,plating,frame}.
- * Слоты робота в худой форме (content/armorLayers/heldWeaponId) разворачиваются
- * в объекты, после чего их содержимое восстанавливается каталогом как обычно.
- */
-const mapItemContainers = (data, fn) => {
+/** Map the shared, setting-neutral item containers. */
+const mapCommonItemContainers = (data, fn) => {
   if (!data || typeof data !== 'object') return data;
   const next = { ...data };
 
-  // equipment.items
   if (next.equipment && typeof next.equipment === 'object') {
     next.equipment = {
       ...next.equipment,
@@ -110,103 +77,71 @@ const mapItemContainers = (data, fn) => {
     };
   }
 
-  // equippedWeapons
   if (Array.isArray(next.equippedWeapons)) {
     next.equippedWeapons = mapArray(next.equippedWeapons, fn);
   }
 
-  // equippedArmor — { head:{armor,clothing}, body:{...}, leftArm:{...}, ... }
   if (next.equippedArmor && typeof next.equippedArmor === 'object') {
-    const slots = next.equippedArmor;
     const out = {};
-    for (const [k, slot] of Object.entries(slots)) {
-      if (!slot || typeof slot !== 'object') { out[k] = slot; continue; }
-      const s = { ...slot };
-      if (s.armor) s.armor = fn(s.armor);
-      if (s.clothing) s.clothing = fn(s.clothing);
-      out[k] = s;
+    for (const [key, slot] of Object.entries(next.equippedArmor)) {
+      if (!slot || typeof slot !== 'object') {
+        out[key] = slot;
+        continue;
+      }
+      const mappedSlot = { ...slot };
+      if (mappedSlot.armor) mappedSlot.armor = fn(mappedSlot.armor);
+      if (mappedSlot.clothing) mappedSlot.clothing = fn(mappedSlot.clothing);
+      out[key] = mappedSlot;
     }
     next.equippedArmor = out;
-  }
-
-  // equippedPowerArmor — { frame, pieces:{head,body,leftArm,rightArm,leftLeg,rightLeg} }
-  if (next.equippedPowerArmor && typeof next.equippedPowerArmor === 'object') {
-    const pa = { ...next.equippedPowerArmor };
-    if (pa.frame) pa.frame = fn(pa.frame);
-    if (pa.pieces && typeof pa.pieces === 'object') {
-      const pieces = {};
-      for (const [k, v] of Object.entries(pa.pieces)) pieces[k] = fn(v);
-      pa.pieces = pieces;
-    }
-    next.equippedPowerArmor = pa;
-  }
-
-  // equippedRobotSlots — худая форма (id + моды) разворачивается обратно в
-  // объекты, после чего предметы (конечность, слои защиты, оружие в ладони)
-  // обогащаются каталогом как обычно.
-  if (next.equippedRobotSlots && typeof next.equippedRobotSlots === 'object') {
-    const slots = next.equippedRobotSlots;
-    const out = {};
-    for (const [k, slot] of Object.entries(slots)) {
-      if (!slot || typeof slot !== 'object') { out[k] = slot; continue; }
-      const s = isSlimSlot(slot) ? deserializeSlot(slot) : { ...slot };
-      if (s.limb) s.limb = fn(s.limb);
-      if (s.armor) s.armor = fn(s.armor);
-      if (s.plating) s.plating = fn(s.plating);
-      if (s.frame) s.frame = fn(s.frame);
-      if (s.heldWeapon) s.heldWeapon = fn(s.heldWeapon);
-      out[k] = s;
-    }
-    next.equippedRobotSlots = out;
   }
 
   return next;
 };
 
 /**
- * Слоты робота → худая форма (только id и моды).
- *
- * Отдельно от mapItemContainers: здесь меняется сама структура слота, а не
- * начинка предметов. На импорте это разворачивается в mapItemContainers.
- *
- * @param {object} data
- * @returns {object}
+ * Let the active setting traverse its own save containers without teaching the
+ * engine their keys or nested payload shape.
  */
-export const slimRobotSlots = (data) => {
-  if (!data || typeof data !== 'object' || !data.equippedRobotSlots
-      || typeof data.equippedRobotSlots !== 'object') {
-    return data;
-  }
-  const out = {};
-  for (const [key, slot] of Object.entries(data.equippedRobotSlots)) {
-    out[key] = slot && typeof slot === 'object' ? serializeSlot(slot) : slot;
-  }
-  return { ...data, equippedRobotSlots: out };
+const mapSettingItemContainers = (data, fn) => {
+  const map = getSettingService('characterSave')?.mapItemContainers;
+  return typeof map === 'function' ? map(data, fn) : data;
+};
+
+const mapItemContainers = (data, fn) => mapSettingItemContainers(
+  mapCommonItemContainers(data, fn),
+  fn,
+);
+
+const slimSettingContainers = (data) => {
+  const slim = getSettingService('characterSave')?.slimSettingContainers;
+  return typeof slim === 'function' ? slim(data) : data;
 };
 
 /**
  * Ужать тело сейва на экспорте.
- * @param {object} data      — character.data (или уже сериализованный объект).
- * @param {object} deps      — { getEntry(id, itemType): catalogEntry|null }.
+ * @param {object} data — character.data (или уже сериализованный объект).
+ * @param {object} deps — { getEntry(id, itemType): catalogEntry|null }.
  * @returns {object}
  */
 export const slimSaveData = (data, { getEntry } = {}) => {
   const lookup = typeof getEntry === 'function' ? getEntry : () => null;
+  const getCatalogItemId = getSettingService('inventory')?.getCatalogItemId;
+  const stateFields = getSaveStateFields();
   const slimmed = mapItemContainers(data, (item) => {
     if (!item || typeof item !== 'object') return item;
-    const id = item.weaponId || item.id;
+    const settingItemId = typeof getCatalogItemId === 'function' ? getCatalogItemId(item) : null;
+    const id = settingItemId || item.id;
     const entry = id ? lookup(id, item.itemType) : null;
-    return slimItem(item, entry);
+    return slimItem(item, entry, stateFields);
   });
-  // Слоты робота ужимаются последними: предметы внутри них уже приведены к
-  // ссылкам, поэтому от оружия в ладони остаётся id да список модов.
-  return slimRobotSlots(slimmed);
+  return slimSettingContainers(slimmed);
 };
 
 /**
  * Восстановить тело сейва на импорте.
- * @param {object} data      — character.data (возможно «худой»).
- * @param {object} deps      — { resolve(instance): resolvedInstance }.
+ * @param {object} data — character.data (возможно «худой»).
+ * @param {object} deps — { resolve(instance): resolvedInstance }.
  * @returns {object}
  */
 export const restoreSaveData = (data, { resolve } = {}) => {

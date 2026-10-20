@@ -26,7 +26,7 @@ import {
   MISSING_CATEGORY_ORDER,
 } from '../../scripts/build-crafting-data.mjs';
 
-import { ALL_SKILL_KEYS } from '../../domain/characterCreation';
+import { ALL_SKILL_KEYS } from '../../modules/fallout/logic/characterCreation.js';
 
 import weaponsData from '../../modules/fallout/data/equipment/weapons.json';
 import ammoData from '../../modules/fallout/data/equipment/ammo.json';

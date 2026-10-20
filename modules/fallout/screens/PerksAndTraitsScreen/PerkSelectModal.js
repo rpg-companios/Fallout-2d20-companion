@@ -3,7 +3,8 @@ import { Modal, View, Text, TextInput, TouchableOpacity, ScrollView } from 'reac
 import styles from '../../styles/PerkSelectModal.styles';
 import { tPerksAndTraits } from './perksAndTraitsScreenI18n';
 import { getPerkModalDisplay } from './perksDisplay';
-import { PERK_ATTRIBUTE_FILTER_CODES, perkMatchesAttributeFilters } from '../../../../domain/perks';
+import { perkMatchesAttributeFilters } from '../../../../domain/perks.js';
+import { PERK_ATTRIBUTE_FILTER_CODES } from '../../perks/attributeFilters.js';
 
 const isSamePerkRank = (a, b) => a?.id === b?.id && (a?.rank ?? null) === (b?.rank ?? null);
 

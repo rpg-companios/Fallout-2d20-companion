@@ -11,9 +11,9 @@ export type SpendOutcome = { ok: true } | { ok: false; reason: string };
 
 /** Объявление счётчика. */
 export interface CounterDefinition {
-  /** Полный id с префиксом сеттинга ('fallout.luckPoints'). */
+  /** Полный id с префиксом сеттинга ('setting.resource'). */
   id: string;
-  /** Потолок: число ИЛИ id производного ('fallout.maxHealth'). */
+  /** Потолок: число ИЛИ id производного ('setting.maxHealth'). */
   max: number | string;
   /** Человекочитаемое имя. */
   label: string;

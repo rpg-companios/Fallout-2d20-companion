@@ -79,17 +79,17 @@
 
 ## Чеклист для запроса вида «перевести экран Inventory»
 
-1. Создать:
-   - `i18n/ru-RU/screens/inventory/screen.json`
-   - `i18n/en-EN/screens/inventory/screen.json`
-2. Для каждой модалки Inventory создать отдельные файлы переводов:
-   - `i18n/ru-RU/screens/inventory/modals/<ModalName>.json`
-   - `i18n/en-EN/screens/inventory/modals/<ModalName>.json`
+1. В wallet активного setting создать:
+   - `modules/<setting>/i18n/ru-RU/screens/inventory/screen.json`
+   - `modules/<setting>/i18n/en-EN/screens/inventory/screen.json`
+2. Для каждой setting-owned модалки Inventory создать отдельные файлы переводов:
+   - `modules/<setting>/i18n/ru-RU/screens/inventory/modals/<ModalName>.json`
+   - `modules/<setting>/i18n/en-EN/screens/inventory/modals/<ModalName>.json`
 3. Перенести строки из старых файлов/хардкодов в новые json.
 4. Обновить вызовы переводов в:
    - `components/screens/InventoryScreen/*`
    - `components/screens/InventoryScreen/modals/*`
-5. Обновить регистрационные пути i18n в центральной конфигурации.
+5. Зарегистрировать словари в активном setting runtime (`names[locale].screens.inventory`); engine не должен держать fallback для строк конкретного setting.
 6. Удалить устаревшие плоские json экрана (если больше не используются).
 7. Проверить, что ключи едины и в `camelCase`.
 

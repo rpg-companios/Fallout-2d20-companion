@@ -25,8 +25,8 @@ vi.mock('../../modules/fallout/screens/WeaponsAndArmorScreen/weaponsAndArmorScre
 import { SETTING } from '../../modules/fallout/index.js';
 
 const kits = SETTING.data.equipmentKits;
-import { resolveKitItems } from '../../domain/kitResolver';
-import { initRobotSlots } from '../../domain/robotEquip';
+import { resolveKitItems } from '../../modules/fallout/kitResolver';
+import { initRobotSlots } from '../../modules/fallout/logic/robotEquip';
 import limbs from '../../modules/fallout/data/equipment/robot/limbs.json';
 import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLimb.json';
 import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';

@@ -7,10 +7,9 @@
 // «Cannot update a component (CharacterProvider) while rendering a
 // different component (CharacterProvider)».
 //
-// Шаг 8а снял обёртки, Шаг 8в (патч 243) снёс сам CharacterContext:
-// сеттеры — прямые действия стора (robotSlice / characterStore),
-// функциональный апдейтер исполняет сам стор, React-рендер в запись не
-// вовлечён. Статические проверки контекста умерли вместе с файлом;
+// The context wrappers are gone: shared setters remain in the engine store,
+// while robot extension actions use the generic setting-action bridge. The
+// store executes functional updaters, so React render is not part of writes.
 // остались селекторы экранов и динамические проверки апдейтеров
 // (обязательное требование к сеттерам, прецедент setEquippedWeapons).
 
@@ -18,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import useCharacterStore from '../../src/store/characterStore';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
 
 // Патч 243: контекст снесён; сеттеры берут напрямую экраны-потребители.
 const SCREEN_FILE = path.resolve(__dirname, '../../modules/fallout/screens/CharacterScreen/CharacterScreen.js');
@@ -38,16 +38,22 @@ describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-д�
       setSelectedPerks: fs.readFileSync(PERKS_FILE, 'utf8'),
     };
     for (const setterName of SETTERS) {
-      expect(sources[setterName]).toContain(`useCharacterStore((s) => s.${setterName})`);
+      const expected = setterName === 'setSelectedPerks'
+        ? `useCharacterStore((s) => s.${setterName})`
+        : `useSettingAction('robotEquipment', '${setterName}')`;
+      expect(sources[setterName]).toContain(expected);
     }
   });
 
   it.each(SETTERS)('%s: функциональный апдейтер исполняет стор', (setterName) => {
     const store = useCharacterStore.getState();
     const initial = setterName === 'setSelectedPerks' ? [] : setterName === 'setEquippedRobotModules' ? [] : {};
-    expect(store[setterName]).toBeTypeOf('function');
+    const action = setterName === 'setSelectedPerks'
+      ? store[setterName]
+      : store.getSettingAction('robotEquipment', setterName);
+    expect(action).toBeTypeOf('function');
     // (prev) => next — апдейтер видит предыдущее значение стора.
-    store[setterName]((prev) => {
+    action((prev) => {
       expect(prev).toEqual(initial);
       if (setterName === 'setSelectedPerks') return [{ perkId: 'x', index: 0 }];
       if (setterName === 'setEquippedRobotSlots') return { legs: { limb: {} } };
@@ -57,9 +63,9 @@ describe('Шаг 8а: Raw-обёртки патча 218 сняты, стор-д�
     if (setterName === 'setSelectedPerks') {
       expect(state.selectedPerks).toEqual([{ perkId: 'x', index: 0 }]);
     } else if (setterName === 'setEquippedRobotSlots') {
-      expect(state.robot.slots).toEqual({ legs: { limb: {} } });
+      expect(selectFalloutRobotState(state).slots).toEqual({ legs: { limb: {} } });
     } else {
-      expect(state.robot.modules).toEqual([{ id: 'm1' }]);
+      expect(selectFalloutRobotState(state).modules).toEqual([{ id: 'm1' }]);
     }
   });
 });

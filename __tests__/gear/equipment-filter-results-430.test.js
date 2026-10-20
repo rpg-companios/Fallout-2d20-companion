@@ -9,11 +9,12 @@
 // плоский список поиска (раньше терялась).
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { tInventory, formatInventoryText } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
 import { emptyEquipmentFilter, isEquipmentFilterEmpty } from '../../modules/fallout/logic/equipmentFilter';
 
 setCurrentLocale('ru-RU');
+setCurrentModuleLocale('ru-RU');
 
 const modal = () => readFileSync('components/screens/InventoryScreen/modals/AddItemModal.js', 'utf8');
 

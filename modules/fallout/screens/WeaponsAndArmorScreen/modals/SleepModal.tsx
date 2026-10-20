@@ -23,7 +23,7 @@ import {
     type WaitResult,
 } from '../../../survival/survival';
 import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
-import { diseaseRiskReportLines } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
+import { diseaseRiskReportLines } from '../../../consumables/resultReport.js';
 import { showRawAlert } from '../../../../../components/alerts/alertService';
 import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';

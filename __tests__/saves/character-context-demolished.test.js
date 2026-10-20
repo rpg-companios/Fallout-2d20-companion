@@ -105,7 +105,7 @@ describe('Шаг 8в: CharacterContext снесён', () => {
 
   it('ArmorLayerModal читает bodyPlan стор-селектором, SurvivalConsumeModal не знает useCharacter', () => {
     const armor = fs.readFileSync(ARMOR_MODAL, 'utf8');
-    expect(armor).toContain('useCharacterStore((s) => s.robot?.bodyPlan ?? null)');
+    expect(armor).toContain('selectFalloutRobotState(s).bodyPlan ?? null');
     expect(armor).not.toMatch(/from\s+['"][^'"]*CharacterContext['"]/);
     const survival = fs.readFileSync(SURVIVAL_MODAL, 'utf8');
     // useCharacterStore разрешён (это стор); сам хук useCharacter — нет.

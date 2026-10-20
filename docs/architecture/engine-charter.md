@@ -125,8 +125,10 @@
 
 ## 5. Архитектура после Шага 8 (карта)
 
-- `src/store/characterStore.js` — единственный источник; слайсы: `robotSlice`, `powerArmorSlice`,
-  `orchestratorsSlice` (расходники/болезни/сцены), `stateExtensions`, `effectsSync`, `selectors`.
+- `src/store/characterStore.js` — единственный источник; общие операции разделены по
+  `equipmentSlice`, `orchestratorsSlice`, `effectsSync` и `selectors`. Setting-owned action
+  factories подключаются только через generic `getSettingAction(featureId, actionId)` bridge;
+  robot/power-armor state and mechanics are not engine slices.
 - Derived-самосинхронизация: стор сам пушит данные экипировки подпиской (вне рендера);
   фабрика полей сеттингов — действие стора (`ensureStateExtensionFields`).
 - Сейвы: `src/saves/characterSaves.js` (снапшот/сохранение/загрузка/список/удаление/автосейв);
@@ -135,7 +137,13 @@
   стартует в точке входа после готовности базы и хранилища. Таймер блока СБ — в точке входа.
 - Универсальный движок: общее ядро + сеттинг-паки через реестр расширений состояния
   (`{id, fieldKey, factory, hydrate, reset}`) и встраивание сеттинговых миграций в общую цепочку.
-  Сейв = конверт с версиями (`schemaVersion`).
+  Сейв = конверт с версиями (`schemaVersion`). Inventory UI stays engine-owned and consumes optional
+  setting capabilities for weapon equip/unequip, row policy, and presentation; Fallout rules and
+  reason-to-label mapping live in the package.
+- `src/store/appSettingsStore.js` contains only engine preferences plus a generic per-setting value
+  store. Setting metadata owns legacy key aliases (`legacyKeys`); migrations preserve unknown old
+  keys under an opaque legacy bucket until an owning package activates, so the engine need not name
+  Fallout preferences.
 
 ---
 

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "settingId": "fallout",
+  "kind": "weapons",
+  "items": [
+    {
+      "id": "usr_weapon_example_44_variant",
+      "names": {
+        "ru-RU": "Тестовый вариант револьвера .44",
+        "en-EN": "Test .44 Pistol Variant"
+      },
+      "trueItemId": "weapon_44_pistol",
+      "modifiers": {
+        "damageModifier": {
+          "op": "+",
+          "value": 2
+        },
+        "rangeModifier": {
+          "op": "+",
+          "value": 1
+        },
+        "qualityChanges": [
+          {
+            "op": "gain",
+            "qualityId": "quality_accurate"
+          }
+        ],
+        "effectChanges": [
+          {
+            "op": "gain",
+            "effectId": "effect_piercing_x",
+            "value": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "usr_weapon_example_standalone",
+      "names": {
+        "ru-RU": "Тестовое самодельное оружие",
+        "en-EN": "Test Homemade Weapon"
+      },
+      "damage": 3,
+      "fireRate": 1,
+      "weight": 1.5,
+      "cost": 25,
+      "rarity": 0,
+      "ammoId": "",
+      "range": "",
+      "mainAttr": "STR",
+      "mainSkill": "MELEE_WEAPONS",
+      "damageType": "physical",
+      "weaponType": "Melee",
+      "qualities": [
+        {
+          "qualityId": "quality_reliable"
+        }
+      ],
+      "effects": []
+    }
+  ]
+}

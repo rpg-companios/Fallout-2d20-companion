@@ -1,92 +1,58 @@
-// domain/itemIdentity.js
-// Идентичность предмета в инвентаре: id и стек-ключ.
-//
-// Стек-ключ — простая склейка частей: id + прочие параметры + имя.
-//   - обычный нож:                        weapon_switchblade
-//   - нож с модом:                        weapon_switchblade_mods_mod_113
-//   - нож с прочностью 50:                weapon_switchblade_dur_50
-//   - одежда с уникальным качеством:      clothing_fancy_clothes_uniq_dashing
-//   - бритва (вариант ножа):              weapon_switchblade_опасная_бритва
-//   - бритва, мод, прочность, качество:   weapon_switchblade_dur_50_mods_mod_113_uniq_dashing_опасная_бритва
-//
-// ЗАКОН стека: два 100% идентичных предмета (id + прочность + моды +
-// уникальные качества + имя) — один стек; любой отличающийся параметр
-// разделяет: меч 50 и меч 100 прочности — разные стеки, «элегантная» и
-// «дерзкая» форменная одежда (один id, разные uniq-качества) — разные стеки.
-//
-// Вариант предмета (trueItemId) живёт под истинным id; разделение стека делает
-// имя (baseName): бритва и нож с одинаковыми параметрами — разные стеки
-// (имена не совпали), две бритвы — один стек.
+// Generic compatibility adapters for setting-owned item identity semantics.
+import { getSettingService } from './registry.js';
 
+const getIdentityService = () => getSettingService('inventory')?.itemIdentity ?? null;
 const generateId = () => `id_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-/**
- * Канонический id предмета (Шаг 8а, часть 3): ключ модификаций в сейве
- * (modifiedItems) и вообще «какой это предмет». Порядок проверок — прежний
- * (была локальная функция CharacterContext): уникальный id экземпляра
- * важнее канонического кода; Name (с заглавной) — легаси-поле старых сейвов.
- */
+/** Generic item-record identity fallback; packages may resolve legacy fields. */
 export const getItemId = (item = {}) => {
-  if (item.uniqueId) return item.uniqueId;
-  return item.weaponId || item.code || item.id || item.Name;
+  const resolve = getIdentityService()?.getItemId;
+  return typeof resolve === 'function'
+    ? resolve(item)
+    : item.uniqueId || item.catalogId || item.id || null;
 };
 
-/**
- * Канонический код каталога, в отличие от идентификатора экземпляра/строки.
- *
- * `getItemId` намеренно сохраняет исторический приоритет `uniqueId`: он нужен
- * там, где ключом является конкретный экземпляр (например, старый альбом
- * модификаций). В UI инвентаря `uniqueId` может быть синтетическим ключом
- * отображаемого стека (`inv-stack-…`), поэтому для поиска предмета в каталоге
- * его использовать нельзя. Этот резолвер предназначен именно для правил,
- * привязанных к каталожной записи (разбор, состав материалов и т. п.).
- */
-export const getCanonicalItemId = (item = {}) =>
-  item.weaponId || item.itemId || item.armorId || item.clothingId || item.code || item.id || item.Name;
+/** Generic catalog identity fallback; packages may resolve legacy fields. */
+export const getCanonicalItemId = (item = {}) => {
+  const resolve = getIdentityService()?.getCanonicalItemId;
+  return typeof resolve === 'function'
+    ? resolve(item)
+    : item.catalogId || item.id || null;
+};
 
-/** slug для имени в ключе: читаемый, без пробелов/спецсимволов. */
+/** Shared text normalization helper, with no catalog semantics. */
 export const slugifyBaseName = (baseName = '') => String(baseName)
   .toLowerCase()
   .replace(/[^a-zа-яё0-9]+/gi, '_')
   .replace(/^_+|_+$/g, '')
   .slice(0, 40);
 
-/**
- * Собирает стек-ключ/инстанс-id из частей: id + прочность + моды +
- * уникальные качества + имя.
- * - durability — прочность (только для предметов с отслеживаемой прочностью);
- * - mods — отсортированные id установленных модов;
- * - uniqQualities — id уникальных качеств (сортировка — ключ не зависит
- *   от порядка крепления; id, а не имена — ключ не зависит от локали);
- * - baseName — перезаписанное имя варианта (иначе имя истинного предмета).
- * Предметы со своим ключом (силовая броня, Ядерный Блок — signature по
- * прочности/зарядам/модам, см. domain/powerArmor) приносят ключ с собой.
- */
-const buildKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities = []) => {
-  if (!weaponId) return generateId();
-  const modIds = Object.entries(appliedMods || {})
-    .sort(([k1], [k2]) => k1.localeCompare(k2))
-    .map(([slot, modId]) => modId)
-    .join('_');
-  const parts = [weaponId];
-  if (durability !== undefined && durability !== null && durability !== '') {
-    parts.push(`dur_${durability}`);
-  }
-  if (modIds) parts.push(`mods_${modIds}`);
-  const uniqIds = [...(uniqQualities || [])].filter(Boolean).sort();
-  uniqIds.forEach((id) => parts.push(`uniq_${id}`));
-  if (baseName) parts.push(slugifyBaseName(baseName));
-  return parts.join('_');
+/** Forward legacy positional identity construction to the active package. */
+export const generateItemId = (...args) => {
+  const generate = getIdentityService()?.generateItemId;
+  if (typeof generate === 'function') return generate(...args);
+  const [identity] = args;
+  return (typeof identity === 'string' && identity) || generateId();
 };
 
-/**
- * Уникальный id инстанса предмета (см. buildKey).
- */
-export const generateItemId = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities) =>
-  buildKey(weaponId, appliedMods, baseName, durability, uniqQualities);
+/** Forward legacy positional stack-key construction to the active package. */
+export const generateStackKey = (...args) => {
+  const generate = getIdentityService()?.generateStackKey;
+  if (typeof generate === 'function') return generate(...args);
+  const [identity] = args;
+  return (typeof identity === 'string' && identity) || generateId();
+};
 
-/**
- * Стек-ключ для склеивания одинаковых предметов (см. buildKey).
- */
-export const generateStackKey = (weaponId, appliedMods = {}, baseName = '', durability, uniqQualities) =>
-  buildKey(weaponId, appliedMods, baseName, durability, uniqQualities);
+/** Create an item identifier without interpreting package-owned payload fields. */
+export const generateItemIdForItem = (item, options = {}) => {
+  const generate = getIdentityService()?.generateItemIdForItem;
+  if (typeof generate === 'function') return generate(item, options);
+  return item?.uniqueId || options.identityId || item?.catalogId || item?.id || generateId();
+};
+
+/** Create a stack signature without interpreting package-owned payload fields. */
+export const generateStackKeyForItem = (item, options = {}) => {
+  const generate = getIdentityService()?.generateStackKeyForItem;
+  if (typeof generate === 'function') return generate(item, options);
+  return item?.stackKey || options.identityId || item?.catalogId || item?.id || generateId();
+};

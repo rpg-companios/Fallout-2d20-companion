@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drainActiveCore, adjustPieceHp, repairPowerArmorPiece } from '../../domain/powerArmor';
+import { drainActiveCore, adjustPieceHp, repairPowerArmorPiece } from '../../modules/fallout/logic/powerArmor.js';
 
 // Правило 4 (docs/architecture/counters-storage.md): заряд ядерного блока и
 // прочность части силовой брони — каунтеры, но их current живёт в самом

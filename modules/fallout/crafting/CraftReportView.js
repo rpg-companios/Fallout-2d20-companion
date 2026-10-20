@@ -7,7 +7,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { craftDict, craftFormat, formatCraftMinutes } from './windowModel';
-import { getActionPoints } from '../../../domain/actionPoints';
+import { getActionPoints } from '../logic/actionPoints.js';
 import s from '../styles/CraftReportView.styles';
 
 // report — результат buildCraftReport (плюс run для решения про 2 ОД);

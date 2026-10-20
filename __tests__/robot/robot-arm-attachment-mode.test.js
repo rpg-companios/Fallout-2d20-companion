@@ -19,15 +19,15 @@ import moduleSettings from '../../modules/fallout/settings.json';
 import ruSettings from '../../modules/fallout/i18n/ru-RU/data/system/settings.json';
 import enSettings from '../../modules/fallout/i18n/en-EN/data/system/settings.json';
 import { CURRENT_SCHEMA_VERSION } from '../../src/store/saveSchema';
-import { migrateRobotArmAttachments } from '../../src/store/migrations';
+import { migrateRobotArmAttachments } from '../../modules/fallout/migrations/robotEquipment.js';
 import {
   isArmAttachment,
   canReplaceArmWeapon,
   canEquip,
   limbOptionsForSlot,
-} from '../../domain/robotSlots';
-import { initRobotSlots } from '../../domain/robotEquip';
-import { getRobotLimbCatalog } from '../../domain/registry';
+} from '../../modules/fallout/logic/robotSlots';
+import { initRobotSlots } from '../../modules/fallout/logic/robotEquip';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 
 const LIMBS = limbsFile;
 const WEAPONS_AS_LIMB = weaponAsLimbFile;
@@ -250,7 +250,7 @@ describe('патч 191: навес — оружие на руке, а не ко�
 
   // ------------------------------------------------------------------ каталог
   it('навесы не числятся конечностями в едином каталоге', () => {
-    const catalog = getRobotLimbCatalog();
+    const catalog = getFalloutRobotLimbCatalog();
     for (const attachment of WEAPONS_AS_LIMB) {
       expect(LIMBS.some((l) => l.id === attachment.id)).toBe(false);
       expect(isArmAttachment({ id: attachment.id }, catalog)).toBe(true);

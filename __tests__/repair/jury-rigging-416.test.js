@@ -15,6 +15,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import useCharacterStore from '../../src/store/characterStore';
+import { applyAmmoSpendDurability } from '../../modules/fallout/inventoryFeatures/durability.js';
+import { normalizeDurabilityItemState } from '../../modules/fallout/inventoryFeatures/durability.js';
 import {
   juryRiggingRanksFor,
   markTemporaryRepairOnItem,
@@ -23,12 +25,24 @@ import {
   performRepair,
   performEquippedPieceRepair,
   repairPreview,
+  buildRepairReport,
 } from '../../modules/fallout/repair/operations';
-import { performEquippedPieceRepair } from '../../modules/fallout/repair/operations';
 import { setCurrentModuleLocale } from '../../i18n/locale';
-import { buildRepairReport } from '../../modules/fallout/repair/operations';
+import {
+  FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY,
+  selectFalloutPowerArmorState,
+} from '../../modules/fallout/store/powerArmorState.js';
 
 const state = () => useCharacterStore.getState();
+const withPowerArmorState = (prev, patch) => ({
+  stateExtensions: {
+    ...(prev.stateExtensions || {}),
+    [FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY]: {
+      ...selectFalloutPowerArmorState(prev),
+      ...patch,
+    },
+  },
+});
 const seedPerk = () => useCharacterStore.setState({ selectedPerks: [{ perkId: 'juryRigging', index: 0 }] });
 
 beforeEach(() => {
@@ -130,13 +144,15 @@ describe('Патч 417: «Без затрат (некачественно)» —
   it('надетая часть СБ: бесплатно, флаг на части', () => {
     seedPerk();
     useCharacterStore.setState((prev) => ({
-      equippedPowerArmor: {
-        ...(prev.equippedPowerArmor || {}),
-        pieces: {
-          ...(prev.equippedPowerArmor?.pieces || {}),
-          torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3 },
+      ...withPowerArmorState(prev, {
+        equippedPowerArmor: {
+          ...selectFalloutPowerArmorState(prev).equippedPowerArmor,
+          pieces: {
+            ...selectFalloutPowerArmorState(prev).equippedPowerArmor.pieces,
+            torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3 },
+          },
         },
-      },
+      }),
       items: {
         ...(prev.items || {}),
         seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 8 },
@@ -149,7 +165,7 @@ describe('Патч 417: «Без затрат (некачественно)» —
     const result = performEquippedPieceRepair('torso', { mode: 'free', ports: { rollD20: () => [2, 3][i++ % 2] } });
     expect(result.done).toBe(true);
     expect(result.temporary).toBe(true);
-    const piece = state().equippedPowerArmor.pieces.torso;
+    const piece = selectFalloutPowerArmorState(state()).equippedPowerArmor.pieces.torso;
     expect(piece.hpCurrent).toBe(10);
     expect(piece.temporaryRepair).toBe(true);
   });
@@ -205,8 +221,10 @@ describe('Патч 417: «Без затрат (некачественно)» —
       weaponInstanceId: key,
       ammoIds: ['ammo_10mm'],
       ammoAmount: 10,
-      durabilityEnabled: true,
-      baseLossPer10Shots: 1,
+      itemUsePolicy: ({ item, amount }) => applyAmmoSpendDurability(item, amount, {
+        durabilityLossEnabled: true,
+        baseLossPer10Shots: 1,
+      }),
     });
     expect(spend.ok).toBe(true);
     expect(state().items[key].durability).toBeLessThan(100);
@@ -236,13 +254,15 @@ describe('Патч 416: флаг временного ремонта снима�
   it('честный ремонт надетой части снимает флаг', () => {
     setCurrentModuleLocale('ru-RU');
     useCharacterStore.setState((prev) => ({
-      equippedPowerArmor: {
-        ...(prev.equippedPowerArmor || {}),
-        pieces: {
-          ...(prev.equippedPowerArmor?.pieces || {}),
-          torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3, temporaryRepair: true },
+      ...withPowerArmorState(prev, {
+        equippedPowerArmor: {
+          ...selectFalloutPowerArmorState(prev).equippedPowerArmor,
+          pieces: {
+            ...selectFalloutPowerArmorState(prev).equippedPowerArmor.pieces,
+            torso: { catalogId: 'power_armor_raider_chest', hpCurrent: 3, temporaryRepair: true },
+          },
         },
-      },
+      }),
       items: {
         ...(prev.items || {}),
         seed_mat: { id: 'item_common_materials', weaponId: 'item_common_materials', quantity: 6 },
@@ -254,7 +274,7 @@ describe('Патч 416: флаг временного ремонта снима�
     let i = 0;
     const result = performEquippedPieceRepair('torso', { ports: { rollD20: () => [2, 3][i++ % 2] } });
     expect(result.done).toBe(true);
-    expect(state().equippedPowerArmor.pieces.torso.temporaryRepair).toBeUndefined();
+    expect(selectFalloutPowerArmorState(state()).equippedPowerArmor.pieces.torso.temporaryRepair).toBeUndefined();
   });
 
   it('разделение пачки не наследует флаг (паспорт)', () => {
@@ -264,11 +284,10 @@ describe('Патч 416: флаг временного ремонта снима�
     expect(state().items[key].temporaryRepair).toBeUndefined();
   });
 
-  it('паспорт загрузки: не-булев флаг отбрасывается (normalizeItemParameters)', async () => {
-    const { normalizeItemParameters } = await import('../../src/store/resolvers');
-    expect(normalizeItemParameters({ id: 'x', temporaryRepair: true }).temporaryRepair).toBe(true);
-    expect(normalizeItemParameters({ id: 'x', temporaryRepair: 'yes' }).temporaryRepair).toBeUndefined();
-    expect(normalizeItemParameters({ id: 'x', temporaryRepair: 0 }).temporaryRepair).toBeUndefined();
+  it('паспорт загрузки: Fallout normalizes the legacy repair flag', () => {
+    expect(normalizeDurabilityItemState({ id: 'x', temporaryRepair: true }).temporaryRepair).toBe(true);
+    expect(normalizeDurabilityItemState({ id: 'x', temporaryRepair: 'yes' }).temporaryRepair).toBeUndefined();
+    expect(normalizeDurabilityItemState({ id: 'x', temporaryRepair: 0 }).temporaryRepair).toBeUndefined();
   });
 });
 
@@ -395,7 +414,7 @@ describe('Патч 416: настройка прочности включена �
   it('старые сейвы без явного выбора получают включённую (fallback true в мерже стора)', () => {
     const srcStore = readFileSync('src/store/appSettingsStore.js', 'utf8');
     // 421: три ветки — явный выбор, легаси-переключатель, иначе включена.
-    expect(srcStore).toContain('fallout.weaponDurabilityLossEnabled = true;');
+    expect(srcStore).toContain('legacyFalloutValues.weaponDurabilityLossEnabled = true;');
     expect(srcStore).toContain("Boolean(old.randomWeaponDurabilityEnabled)");
   });
 });

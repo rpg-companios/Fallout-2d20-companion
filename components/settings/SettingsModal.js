@@ -16,12 +16,29 @@ import {
   SETTING_CONTROL_SURFACES,
 } from '../../domain/settingsCatalog';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
-import { getModuleI18n } from '../../domain/registry';
+import { getSettingNames } from '../../domain/registry.js';
 import {
   getCurrentModuleLocale,
   useLocale,
   useModuleLocale,
 } from '../../i18n/locale';
+import { getActiveModuleId } from '../../domain/moduleLocale';
+import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import {
+  createUserEquipmentTemplate,
+  USER_EQUIPMENT_FILE_NAMES,
+  USER_EQUIPMENT_KINDS,
+} from '../../domain/userEquipment.js';
+import useUserEquipmentStore from '../../src/store/userEquipmentStore.js';
+import {
+  pickUserEquipmentJsonFile,
+  saveUserEquipmentJsonFile,
+} from '../../src/utils/userEquipmentFileTransfer.js';
+import { showRawAlert } from '../alerts/alertService';
+import {
+  syncUserEquipmentToCloudIfEnabled,
+  syncUserEquipmentWithCloud,
+} from '../cloudSync/googleDriveSync.js';
 
 const resolvePath = (dictionary, key) => {
   let current = dictionary;
@@ -36,7 +53,7 @@ const isEngineSetting = (setting) =>
   ENGINE_SETTINGS.some((candidate) => candidate.id === setting.id);
 
 const requireModuleText = (key) => {
-  const value = resolvePath(getModuleI18n(getCurrentModuleLocale()), key);
+  const value = resolvePath(getSettingNames(getCurrentModuleLocale()), key);
   if (typeof value !== 'string') {
     throw new Error(`[SettingsModal] В активном сеттинге отсутствует строка "${key}"`);
   }
@@ -57,8 +74,6 @@ const tSection = (section) => (
     ? tHomeScreen(`settings.${section.sectionKey}Title`)
     : requireModuleText(`settings.${section.sectionKey}`)
 );
-
-const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
 
 // Число со свободным вводом (флаг freeInput в данных настройки, например
 // курс времени выживания): ввод с клавиатуры + −/+, фиксация при потере
@@ -181,12 +196,155 @@ const SettingRow = ({ setting }) => {
   );
 };
 
+const USER_EQUIPMENT_LABEL_KEYS = Object.freeze({
+  weapons: 'weapons',
+  armor: 'armor',
+  weaponMods: 'weaponMods',
+  armorMods: 'armorMods',
+});
+
+const formatSettingText = (key, params = {}) => Object.entries(params).reduce(
+  (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+  tHomeScreen(`settings.userEquipment.${key}`),
+);
+
+const UserEquipmentSection = ({ moduleLocale }) => {
+  const settingId = getActiveModuleId();
+  const settingData = useUserEquipmentStore((state) => state.bySetting[settingId]);
+  const revision = useUserEquipmentStore((state) => state.revision);
+  const importDocument = useUserEquipmentStore((state) => state.importDocument);
+  const [busy, setBusy] = useState(null);
+  void revision;
+
+  const reportError = (error) => showRawAlert({
+    title: tHomeScreen('settings.userEquipment.errorTitle'),
+    message: error?.message || String(error),
+  });
+
+  const handleImport = async (kind) => {
+    if (busy) return;
+    setBusy(kind);
+    try {
+      const selected = await pickUserEquipmentJsonFile();
+      if (!selected) return;
+      if (selected.error) throw selected.error;
+      const result = importDocument({
+        rawText: selected.text,
+        settingId,
+        expectedKind: kind,
+        fileName: selected.name,
+        catalog: getEquipmentCatalog(moduleLocale),
+      });
+      if (!result.ok) {
+        await reportError(result.errors.slice(0, 8).map((entry) => entry.message).join('\n'));
+        return;
+      }
+      let cloudMessage = '';
+      try {
+        const cloud = await syncUserEquipmentToCloudIfEnabled();
+        if (cloud?.synced) cloudMessage = `\n\n${formatSettingText('syncSuccess')}`;
+        else if (cloud?.reason === 'not-configured') cloudMessage = `\n\n${formatSettingText('syncSkipped')}`;
+      } catch (error) {
+        cloudMessage = `\n\n${formatSettingText('syncError')} ${error?.message || ''}`;
+      }
+      await showRawAlert({
+        title: tHomeScreen('settings.userEquipment.successTitle'),
+        message: `${formatSettingText('importSuccess')}\n${formatSettingText('count', { count: result.importedCount })}${cloudMessage}`,
+      });
+    } catch (error) {
+      await reportError(error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleTemplate = async (kind) => {
+    if (busy) return;
+    setBusy(`template:${kind}`);
+    try {
+      const template = createUserEquipmentTemplate(kind, settingId);
+      const saved = await saveUserEquipmentJsonFile(template, USER_EQUIPMENT_FILE_NAMES[kind]);
+      if (!saved) throw new Error(tHomeScreen('settings.userEquipment.transferError'));
+      await showRawAlert({
+        title: tHomeScreen('settings.userEquipment.successTitle'),
+        message: `${formatSettingText('templateSaved')}\n${USER_EQUIPMENT_FILE_NAMES[kind]}`,
+      });
+    } catch (error) {
+      await reportError(error);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleCloudSync = async () => {
+    if (busy) return;
+    setBusy('cloud');
+    try {
+      const result = await syncUserEquipmentWithCloud();
+      if (result?.synced) {
+        await showRawAlert({
+          title: tHomeScreen('settings.userEquipment.cloudTitle'),
+          message: `${formatSettingText('syncSuccess')}\n${formatSettingText('count', { count: result.records })}`,
+        });
+      } else {
+        await showRawAlert({
+          title: tHomeScreen('settings.userEquipment.cloudTitle'),
+          message: formatSettingText('syncSkipped'),
+        });
+      }
+    } catch (error) {
+      await reportError(new Error(`${formatSettingText('syncError')}\n${error?.message || ''}`));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <View style={styles.userEquipmentSection}>
+      <Text style={styles.sectionTitle}>{tHomeScreen('settings.userEquipment.title')}</Text>
+      <Text style={styles.description}>{tHomeScreen('settings.userEquipment.description')}</Text>
+      {USER_EQUIPMENT_KINDS.map((kind) => (
+        <View key={kind} style={styles.userEquipmentRow}>
+          <View style={styles.userEquipmentText}>
+            <Text style={styles.label}>{tHomeScreen(`settings.userEquipment.${USER_EQUIPMENT_LABEL_KEYS[kind]}`)}</Text>
+            <Text style={styles.description}>{formatSettingText('count', { count: settingData?.[kind]?.length || 0 })}</Text>
+          </View>
+          <View style={styles.userEquipmentActions}>
+            <TouchableOpacity
+              style={[styles.userEquipmentButton, busy && styles.userEquipmentButtonDisabled]}
+              disabled={Boolean(busy)}
+              onPress={() => handleImport(kind)}
+            >
+              <Text style={styles.userEquipmentButtonText}>{tHomeScreen('settings.userEquipment.import')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.userEquipmentButton, busy && styles.userEquipmentButtonDisabled]}
+              disabled={Boolean(busy)}
+              onPress={() => handleTemplate(kind)}
+            >
+              <Text style={styles.userEquipmentButtonText}>{tHomeScreen('settings.userEquipment.template')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+      <TouchableOpacity
+        style={[styles.userEquipmentButton, styles.userEquipmentSyncButton, busy && styles.userEquipmentButtonDisabled]}
+        disabled={Boolean(busy)}
+        onPress={handleCloudSync}
+      >
+        <Text style={styles.userEquipmentButtonText}>{tHomeScreen('settings.userEquipment.sync')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 export default function SettingsModal({ visible, onClose }) {
   useLocale();
-  useModuleLocale();
+  const moduleLocale = useModuleLocale();
+  const activeSettingId = getActiveModuleId();
   useAppSettingsStore((state) => state.values); // зависимости между настройками
   const getSettingValue = useAppSettingsStore((state) => state.getSettingValue);
-  const visibleSettings = SETTINGS_SCREEN_SETTINGS.filter(
+  const visibleSettings = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS).filter(
     (setting) => !setting.dependsOn || getSettingValue(setting.dependsOn) === true,
   );
 
@@ -222,6 +380,7 @@ export default function SettingsModal({ visible, onClose }) {
                 <View style={styles.separator} />
               </View>
             ))}
+            {activeSettingId ? <UserEquipmentSection moduleLocale={moduleLocale} /> : null}
           </ScrollView>
 
           <TouchableOpacity onPress={onClose} style={styles.close}>
@@ -244,6 +403,14 @@ const styles = StyleSheet.create({
   scroll: { flexShrink: 1 },
   title: { fontSize: 22, fontWeight: '700', marginBottom: 18 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 12 },
+  userEquipmentSection: { borderTopWidth: 1, borderColor: '#ddd', marginTop: 8, paddingTop: 16 },
+  userEquipmentRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderColor: '#eee', paddingVertical: 10 },
+  userEquipmentText: { flex: 1, minWidth: 130 },
+  userEquipmentActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  userEquipmentButton: { backgroundColor: '#e8e2ca', borderColor: '#c9b458', borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 7, alignItems: 'center' },
+  userEquipmentButtonDisabled: { opacity: 0.5 },
+  userEquipmentButtonText: { color: '#333', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  userEquipmentSyncButton: { marginTop: 12, alignSelf: 'flex-start' },
   row: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   settingRow: { marginTop: 16 },
   text: { flex: 1 },

@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest';
 import settingsJson from '../../modules/fallout/settings.json';
 import ruSettings from '../../modules/fallout/i18n/ru-RU/data/system/settings.json';
 import enSettings from '../../modules/fallout/i18n/en-EN/data/system/settings.json';
-import ruScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
-import enScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
+import ruScreen from '../../modules/fallout/i18n/ru-RU/screens/weaponsAndArmor/screen.json';
+import enScreen from '../../modules/fallout/i18n/en-EN/screens/weaponsAndArmor/screen.json';
 import { filterModsByInventory } from '../../domain/modsEquip';
 import { readFileSync } from 'node:fs';
 

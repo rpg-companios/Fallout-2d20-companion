@@ -23,8 +23,8 @@ import {
   catalogGetWeaponModById,
   catalogGetWeaponMods,
 } from '../../db/catalogSource';
-import { deserializeSlot, serializeSlot, toModIds, collectAttacks } from '../../domain/robotSlots';
-import { getRobotLimbCatalog } from '../../domain/registry';
+import { deserializeSlot, serializeSlot, toModIds, collectAttacks } from '../../modules/fallout/logic/robotSlots';
+import { getFalloutRobotLimbCatalog } from '../../modules/fallout/logic/robotCatalog.js';
 import { applyWeaponMods } from '../../domain/enrichItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { resolveWeaponWithAppliedMods } from '../../domain/resolveItem';
@@ -36,7 +36,6 @@ const enWeaponMods = SETTING.names['en-EN'].equipment.robot.weaponMods;
 const ruRobotWeapons = SETTING.names['ru-RU'].equipment.robot.weapons;
 const enRobotWeapons = SETTING.names['en-EN'].equipment.robot.weapons;
 const robotWeaponsData = SETTING.data.equipment.robot.weapons;
-import { getRobotLimbCatalog } from '../../domain/registry';
 
 const LASER_ID = 'robot_weapon_assaultron_head_laser';
 
@@ -82,7 +81,7 @@ describe('уникальные моды Головного лазера Штур
   });
 
   it('реестр знает: пул weaponMods содержит конденсаторы, слоты и список — на месте', () => {
-    const catalog = getRobotLimbCatalog();
+    const catalog = getFalloutRobotLimbCatalog();
     for (const mod of robotWeaponMods) {
       expect(catalog.weaponMods.some((m) => m?.id === mod.id), `${mod.id} в пуле weaponMods`).toBe(true);
     }
@@ -304,7 +303,7 @@ describe('применение: установленный конденсато�
   });
 
   it('конвейер: лазер 5 урона / 115 цены / 8 веса + Mk III → 6 / 119 / 8', () => {
-    const catalog = getRobotLimbCatalog();
+    const catalog = getFalloutRobotLimbCatalog();
     const base = SETTING.data.equipment.robot.weapons.find((w) => w.id === LASER);
     const mod = catalog.weaponMods.find((m) => m.id === MK3);
     expect(mod).toBeTruthy();

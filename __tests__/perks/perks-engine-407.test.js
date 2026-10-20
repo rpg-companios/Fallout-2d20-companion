@@ -7,7 +7,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import useCharacterStore from '../../src/store/characterStore';
-import { resolveConsumableVitalChanges, applyConsumableToEffects } from '../../domain/effects';
+import { applyFalloutConsumableToEffects } from '../../modules/fallout/consumables/effectApplication.js';
+import { resolveConsumableVitalChanges } from '../../modules/fallout/consumables/vitalChanges.js';
 import drinksData from '../../modules/fallout/data/consumables/drinks.json';
 import perksCatalog from '../../modules/fallout/data/perks/perks.json';
 import recipesIndex from '../../modules/fallout/data/recipes/index.json';
@@ -75,14 +76,14 @@ describe('Патч 407→408: Гулеподобный — ручная ради
     };
     // Как и в конвейере (applyConsumableFull), перк приходит опцией.
     const vital = resolveConsumableVitalChanges(irradiated, {
-      currentHealth: 5, maxHealth: 20, radiation: 0, ghoulish: { hpPerUnits: 4 },
+      currentHealth: 5, maxHealth: 20, radiation: 0, radiationHealing: { hpPerUnits: 4 },
     });
     expect(vital.healAmount).toBe(2); // floor(8/4)
     expect(vital.radiationAfter).toBe(8); // радиация действует как обычно
     // applyConsumableFull зовёт setRadiation(radiationAfter, skip) —
     // повторного лечения быть не должно.
     useCharacterStore.setState({ currentHealth: 5, radiation: 0 });
-    state().setRadiation(vital.radiationAfter, { skipGhoulishHeal: true });
+    state().setRadiation(vital.radiationAfter, { skipSettingRadiationGainHealing: true });
     expect(state().currentHealth).toBe(5);
     expect(state().radiation).toBe(8);
   });
@@ -105,7 +106,7 @@ describe('Патч 407: Светящийся пакет крови — +5 Рад
     });
     expect(vital.healAmount).toBe(4);
 
-    const { effects } = applyConsumableToEffects(pack, []);
+    const { effects } = applyFalloutConsumableToEffects(pack, []);
     // Форма timed-эффекта — плоская: { type, op, value }.
     const drEffect = effects.find((e) => e.damageResistanceModifier?.type === 'radiation');
     expect(drEffect).toBeTruthy();
@@ -116,7 +117,7 @@ describe('Патч 407: Светящийся пакет крови — +5 Рад
 
 describe('Патч 407: расклад каталога — механика / текст', () => {
   const ALL = 185;
-  const registryDir = resolve(__dirname, '../../domain/perks');
+  const registryDir = resolve(__dirname, '../../modules/fallout/perks/effects');
   const registryIds = readdirSync(registryDir)
     .filter((f) => f.endsWith('.js') && f !== 'index.js')
     .map((f) => f.replace(/\.js$/, ''));

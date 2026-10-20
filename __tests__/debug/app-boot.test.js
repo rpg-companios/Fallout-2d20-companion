@@ -16,7 +16,6 @@ describe('хребет загрузки приложения (диагности
       () => import('../../modules/fallout/diseases/migration'),
       () => import('../../db/catalogSource'),
       () => import('../../src/store/resolvers'),
-      () => import('../../src/store/powerArmorSlice'),
       () => import('../../src/store/migrations'),
     ];
     for (const load of steps) {

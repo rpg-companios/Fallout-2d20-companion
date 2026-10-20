@@ -1,7 +1,7 @@
 // Предохранитель трассировки: в рантайм-коде НЕТ плоских console.*.
 //
-// Правило (docs/debug-tracing.md): всё логирование идёт через один гейт
-// src/debug/falloutDebug.js — по умолчанию выключен (ноль шума и аллокаций
+// Правило (docs/debug-tracing.md): логирование идёт через один engine-owned гейт
+// src/engine/debug/runtimeTrace.js — по умолчанию выключен (ноль шума и аллокаций
 // в проде), включается вручную из консоли браузера. Восстановлен патчем 278
 // после того, как тест потерялся, а ссылки на него остались в коде и доке.
 //
@@ -28,7 +28,7 @@ const SCAN_TARGETS = [
   path.join(ROOT, 'index.js'),
 ];
 const FILE_RE = /\.(js|jsx|ts|tsx)$/;
-const GATE_FILE = path.join(ROOT, 'src', 'debug', 'falloutDebug.js');
+const GATE_FILE = path.join(ROOT, 'src', 'engine', 'debug', 'runtimeTrace.js');
 // Плоский вызов: console.log(...) / console . error (...) / console?.warn?(...)
 const FLAT_CONSOLE_RE = /\bconsole\s*(?:\?\.|\.)\s*(?:log|warn|error|info|debug|trace)\s*\(/g;
 
@@ -47,7 +47,7 @@ const collectFiles = (target, acc = []) => {
 };
 
 describe('предохранитель: плоских console.* в рантайме нет', () => {
-  it('весь логирование — только через гейт falloutDebug', () => {
+  it('весь логирование — только через engine runtimeTrace', () => {
     const files = SCAN_TARGETS.flatMap((target) => collectFiles(target));
     const violations = [];
     for (const file of files) {

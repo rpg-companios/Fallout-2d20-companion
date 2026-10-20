@@ -2,9 +2,9 @@
 //
 // Проверяет паспорт src/store/characterActions.ts против живого стора:
 //
-//   1) ПОЛНОЕ покрытие (с части 3 — без исключений): сеттеры-апдейтеры +
-//      запись с семантикой + именованные операции + CRUD/робот/СБ =
-//      ВСЕ действия стора, в обе стороны. Новое действие без паспорта
+//   1) Полное покрытие root-действий: сеттеры-апдейтеры + запись с
+//      семантикой + именованные операции + общий CRUD = все actions стора.
+//      Setting-owned actions доступны только через generic dispatcher. Новое действие без паспорта
 //      падает тестом — «тихо проскочить мимо типизации» не выйдет;
 //   2) семья апдейтеров: каждый сеттер из SETTER_UPDATER_KEYS принимает
 //     функциональный апдейтер — вызов с identity (prev => prev) не падает
@@ -24,6 +24,7 @@ import {
   NAMED_OP_KEYS,
   CRUD_OP_KEYS,
 } from '../../src/store/characterActions';
+import { selectFalloutRobotState } from '../../modules/fallout/store/robotSelectors.js';
 
 const state = () => useCharacterStore.getState();
 const actionKeys = () => new Set(
@@ -127,13 +128,13 @@ describe('патч 245: паспорт операций против живог�
     expect(state().attributes.STR.base).toBe(5);
 
     // Робот: инициализация плана и сброс.
-    state().initRobot('protectron');
-    expect(state().robot.bodyPlan).toBe('protectron');
-    state().resetRobot();
-    expect(state().robot.bodyPlan).toBeNull();
+    state().getSettingAction('robotEquipment', 'initRobot')('protectron');
+    expect(selectFalloutRobotState(state()).bodyPlan).toBe('protectron');
+    state().getSettingAction('robotEquipment', 'resetRobot')();
+    expect(selectFalloutRobotState(state()).bodyPlan).toBeNull();
 
     // Отказы с reason (инвариант {ok,reason}):
-    const mk2 = state().applyMk2Driver('mk2_chip');
+    const mk2 = state().getSettingAction('robotEquipment', 'applyMk2Driver')('mk2_chip');
     expect(mk2.ok).toBe(false);
     expect(typeof mk2.reason).toBe('string');
 
@@ -141,13 +142,11 @@ describe('патч 245: паспорт операций против живог�
       weaponInstanceId: 'no_such_weapon',
       ammoIds: ['ammo_10mm'],
       ammoAmount: 1,
-      durabilityEnabled: false,
-      baseLossPer10Shots: 1,
     });
     expect(ammo.ok).toBe(false);
     expect(ammo.reason).toBe('weapon-not-found');
 
-    const held = state().equipHeldWeapon('no_such_slot', { id: 'w' }, { origin: null, trait: null });
+    const held = state().getSettingAction('robotEquipment', 'equipHeldWeapon')('no_such_slot', { id: 'w' }, { origin: null, trait: null });
     expect(held.ok).toBe(false);
     expect(typeof held.reason).toBe('string');
   });

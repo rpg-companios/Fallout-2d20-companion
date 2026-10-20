@@ -16,7 +16,7 @@ import weaponAsLimb from '../../modules/fallout/data/equipment/robot/weaponAsLim
 import robotWeapons from '../../modules/fallout/data/equipment/robot/weapons.json';
 import ruKits from '../../modules/fallout/i18n/ru-RU/data/system/equipmentKits.json';
 import enKits from '../../modules/fallout/i18n/en-EN/data/system/equipmentKits.json';
-import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../domain/robotEquip';
+import { initRobotSlots, getBuiltinWeaponsFromSlots } from '../../modules/fallout/logic/robotEquip';
 
 const ASSAULTRON_KIT_IDS = [
   'assaultron_us_military',
@@ -180,7 +180,7 @@ describe('комплекты снаряжения Штурмотрона', () =>
     // и мокаем getDefaultPlating через прямой вызов с кастомным bodyPlan объектом.
     // Простой способ: вызвать initRobotSlots с bodyPlan, у которого есть defaults и defaultPlating в JSON.
     // Для этого создаём временный bodyPlan в памяти через импорт bodyplan.js
-    const { getDefaultPlating } = await import('../../domain/bodyplan.js');
+    const { getDefaultPlating } = await import('../../modules/fallout/logic/bodyplan.js');
     // Реальный assaultron defaultPlating пустой
     expect(getDefaultPlating('assaultron')).toEqual({});
     // Но функция должна возвращать объект (не undefined) — возможность указать остаётся

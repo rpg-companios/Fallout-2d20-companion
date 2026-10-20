@@ -72,8 +72,8 @@ export const formatDifficulty = (n) => String(n);
 ## Точки интеграции (UI)
 
 В `components/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js` (`WeaponCard`):
-- Уже доступны: `attributes`, `hasTrait`, `getAttributeValue`, `displayWeapon`.
-- Сила: `getAttributeValue(attributes, 'STR')`.
+- Значение атрибута поступает через capability активного setting package.
+- Для Fallout-силы: `characterCreation.getAttributeValue(attributes, 'STR')`.
 - `hasSecondUsableHand`: для робота — посчитать по `robot.slots` (число рук с
   `canHoldWeapons`/`weaponSlots>0` и наличием limb); для человека — пока `true`
   (до внедрения «повреждённых» конечностей).

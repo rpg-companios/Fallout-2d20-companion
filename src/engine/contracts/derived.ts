@@ -14,7 +14,7 @@ export type { DerivationContext } from './parameter';
 
 /** Объявление производного значения. */
 export interface DerivedDefinition {
-  /** Полный id с префиксом сеттинга ('fallout.maxHealth'). */
+  /** Полный id с префиксом сеттинга ('setting.maxHealth'). */
   id: string;
   /** Вид производного — движок различает режимы пересчёта (v1: 'derived'). */
   kind: 'derived' | 'max' | 'rankCeiling';

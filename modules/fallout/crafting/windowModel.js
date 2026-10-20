@@ -12,7 +12,8 @@
 // сумки попытки останавливаются, остальные не начинаются.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import { getCraftingRecipeById, getCraftingRecipes, getScrapMaterials } from '../../../domain/registry';
+import { getCraftingRecipeById, getCraftingRecipes } from '../../../domain/registry';
+import { getScrapMaterials } from '../salvage/catalog.js';
 import { findCatalogEntry } from '../../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
 import { getCurrentModuleLocale } from '../../../i18n/locale';
@@ -24,7 +25,7 @@ import ruDict from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enDict from '../i18n/en-EN/screens/inventory/craftingModal.json';
 import { craftMinutesForRecipe, complicationExtraMinutesFor, craftRecipe, craftingPreview, settleCraftTime, juryRigFor } from './operations';
 // 404: «Ломовые патроны» — виртуальная строка материалов «любой хлам».
-import { JUNK_RIG_ANY_ID } from '../../../domain/perks/juryRiggedAmmo';
+import { JUNK_RIG_ANY_ID } from '../perks/effects/juryRiggedAmmo.js';
 import { CRAFT_RULES } from './rules';
 
 // Порядок квадратов (патч 318, слово владельца): еда, напитки, препараты,

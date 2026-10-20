@@ -77,7 +77,7 @@ export const roundValue = (value: number, mode: RoundingMode): number => {
 
 /** Объявление параметра. Значение живёт в состоянии; объявление — в сеттинге. */
 export interface ParameterDefinition {
-  /** Полный id: с префиксом сеттинга ('fallout.maxHealth'). */
+  /** Полный id: с префиксом сеттинга ('setting.maxHealth'). */
   id: string;
   kind: ParameterValueKind;
   /** Человекочитаемое имя для ошибок и трассировки. */

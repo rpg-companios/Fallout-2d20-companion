@@ -8,12 +8,12 @@
 // кнопки и строки эффектов скрываются сами, состояние в сейве остаётся.
 
 import useCharacterStore from '../../../src/store/characterStore';
-import useAppSettingsStore, { selectSurvivalModeEnabled } from '../../../src/store/appSettingsStore';
+import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { sleepSurvival, waitSurvival } from './operations';
 
 /** Текущее состояние выживания (null: выключено настройкой, робот/киборг, не создано). */
 export const useSurvivalState = () => {
-  const enabled = useAppSettingsStore(selectSurvivalModeEnabled);
+  const enabled = useAppSettingsStore((state) => state.getSettingValue('survivalModeEnabled'));
   const survival = useCharacterStore((s) => s.stateExtensions?.survival ?? null);
   return enabled ? survival : null;
 };

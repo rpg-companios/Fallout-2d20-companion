@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import {
   WEAPON_MOD_ID_MAP,
   migrateWeaponModIdsToCanonical,
-} from '../../domain/weaponModCanonical';
+} from '../../modules/fallout/migrations/weaponModCanonical.js';
 import catalog from '../../modules/fallout/data/equipment/weapon_mods.json';
 
 describe('патч 398: мод-предметы инвентаря канонизируются при загрузке', () => {

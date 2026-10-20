@@ -1,8 +1,8 @@
 // domain/itemfitRules.js
-// Связка чистой механики (domain/itemfit.js) с данными сеттинга:
-//   - профили fitProfile по characterType   — modules/fallout/data/origins/fitProfiles.json
-//   - справочник категорий                  — modules/fallout/data/equipment/categories.json
-// Читает их через реестр (единственная точка доступа к данным движка).
+// Adapter between pure fit rules and active-setting data:
+//   - fit profiles by character type
+//   - item categories and their fit semantics
+// Both are read through the generic active-setting registry.
 //
 // Публичный API:
 //   getFitProfile(character)         -> fitProfile (origin.fitProfile ?? type.fitProfile ?? {})

@@ -9,7 +9,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import useCharacterStore from '../../src/store/characterStore';
 import { selectCarryWeight } from '../../src/store/selectors';
-import { getAttributeLimits } from '../../domain/characterCreation';
+import { getAttributeLimits } from '../../modules/fallout/logic/characterCreation.js';
 
 afterEach(async () => {
   useCharacterStore.getState().resetCharacterStore();

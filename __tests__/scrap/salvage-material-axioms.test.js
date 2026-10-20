@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import useCharacterStore from '../../src/store/characterStore';
 import { salvageItem, salvagePreview } from '../../modules/fallout/salvage/operations';
 import { salvageButtonForItem, salvageSublineForItem } from '../../modules/fallout/salvage/subline';
-import { buildSalvageReport } from '../../components/screens/InventoryScreen/logic/salvageResultReport';
+import { buildSalvageReport } from '../../modules/fallout/salvage/report';
 import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
 
 const ROOT = new URL('../../', import.meta.url).pathname;

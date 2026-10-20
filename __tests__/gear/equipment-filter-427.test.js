@@ -8,7 +8,7 @@
 // галочки она пряталась бы при любой отметке.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { setCurrentLocale } from '../../i18n/locale';
+import { setCurrentLocale, setCurrentModuleLocale } from '../../i18n/locale';
 import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n';
 import {
   GEAR_KINDS,
@@ -20,6 +20,7 @@ import {
 } from '../../modules/fallout/logic/equipmentFilter';
 
 setCurrentLocale('ru-RU');
+setCurrentModuleLocale('ru-RU');
 
 const gear = (itemType, extra = {}) => ({ itemType, ...extra });
 const weapon = () => gear('weapon', { damage: 3, rarity: 1 });

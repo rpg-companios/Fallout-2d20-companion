@@ -3,30 +3,32 @@
 // ЗАЧЕМ.
 //   Универсальный движок не должен знать правила сеттинга, но сеттинг вправе
 //   добавлять персонажу состояние (поле сейва, инициализацию при создании,
-//   миграцию старых сейвов, операции). До сих пор выживание Fallout было
-//   зашито в CharacterContext и в цепочку миграций напрямую — сеттинговая
-//   фича протекала в движок. Реестр — то место, где сеттинг регистрирует
-//   своё расширение, а движок применяет его без знания правил.
+//   миграцию старых сейвов, операции). Раньше механика одного сеттинга была
+//   зашита в engine-код и цепочку миграций напрямую. Реестр — то место, где
+//   активный пакет регистрирует своё расширение, а движок применяет его без
+//   знания правил.
 //
 // КОНТРАКТ РАСШИРЕНИЯ.
-//   { id, fieldKey, factory(character), hydrate(saved, character)?, reset() }
-//   - id       — уникальный ключ расширения (например, 'survival').
+//   { id, fieldKey, factory(character), hydrate(saved, character)?, reset()?, serialize(value)? }
+//   - id       — уникальный ключ расширения.
 //   - fieldKey — имя поля в сейве, которым владеет расширение.
 //   - factory  — начальное состояние при создании персонажа (origin уже
 //                выбран). Может вернуть null — поле создаётся, но пустое
-//                (как survival у роботов/киборгов).
+//                для типов персонажей, которым расширение не применимо.
 //   - hydrate  — НЕОБЯЗАТЕЛЬНО: нормализация поля при загрузке сейва. Должна
 //                быть идемпотентна. По умолчанию поле берётся как есть.
 //   - reset    — состояние поля при сбросе персонажа. По умолчанию null.
+//   - serialize — необязательная проекция кэшируемого значения (например,
+//                 исключение временных диалоговых данных).
 //   Миграции версий регистрируются отдельно (registerStateMigration): они
-//   встраиваются в цепочку migrateCharacterState на место, указанное
-//   владельцем фичи (индекс в массиве MIGRATIONS). Отдельно регистрируются
+//   компонуются с переходом migrateCharacterState на зарезервированном
+//   индексе MIGRATIONS и не меняют нумерацию schemaVersion. Отдельно регистрируются
 //   слушатели применённых расходников (registerConsumableAppliedListener):
 //   движок уведомляет их из applyConsumableFull.
 //
 // ПРАВИЛА (владелец):
 //   - никаких сеттинговых имён/правил в этом файле — только движковый
-//     реестр; сеттинг регистрирует себя сам (см. modules/fallout/survival/).
+//     реестр; активный пакет регистрирует свои расширения сам.
 //   - поле сейва появляется миграцией версии (а не `|| fallback` при
 //     загрузке), как и раньше: hydrate не заменяет миграции.
 //   - регистрация идемпотентна: повторный вызов с тем же id — ошибка
@@ -53,6 +55,9 @@ export const registerStateExtension = (extension) => {
   if (extension.reset !== undefined && typeof extension.reset !== 'function') {
     throw new Error(`[stateExtensions] reset расширения "${extension.id}" должен быть функцией`);
   }
+  if (extension.serialize !== undefined && typeof extension.serialize !== 'function') {
+    throw new Error(`[stateExtensions] serialize расширения "${extension.id}" должен быть функцией`);
+  }
   if (EXTENSIONS.has(extension.id)) {
     throw new Error(`[stateExtensions] Расширение "${extension.id}" уже зарегистрировано`);
   }
@@ -64,6 +69,9 @@ export const registerStateExtension = (extension) => {
     }
   }
   EXTENSIONS.set(extension.id, extension);
+  return () => {
+    if (EXTENSIONS.get(extension.id) === extension) EXTENSIONS.delete(extension.id);
+  };
 };
 
 export const getRegisteredStateExtensions = () => Array.from(EXTENSIONS.values());
@@ -109,12 +117,23 @@ export const resetStateExtensionFields = () => {
   return fields;
 };
 
+/** Project runtime extension values into their local persisted-cache shape. */
+export const serializeStateExtensionFields = (stateExtensions = {}) => {
+  const fields = { ...(stateExtensions || {}) };
+  for (const extension of EXTENSIONS.values()) {
+    const { fieldKey } = extension;
+    if (!Object.hasOwn(fields, fieldKey) || typeof extension.serialize !== 'function') continue;
+    fields[fieldKey] = extension.serialize(fields[fieldKey]);
+  }
+  return fields;
+};
+
 // --- Миграции расширений ---------------------------------------------------
 
-// Зарегистрированные миграции: [{ migration, index }]. index — место в
-// массиве MIGRATIONS движка (переход vN -> vN+1). Вставки происходят до
-// прогона цепочки, без поднятия CURRENT_SCHEMA_VERSION.
-const MIGRATION_INSERTIONS = [];
+// Зарегистрированные миграции: [{ migration, index }]. index — зарезервированный
+// переход в массиве MIGRATIONS движка (vN -> vN+1). Миграции сеттинга
+// компонуются внутри этого перехода и не добавляют версию схемы.
+const MIGRATION_REGISTRATIONS = [];
 
 export const registerStateMigration = (migration, index) => {
   if (typeof migration !== 'function') {
@@ -123,17 +142,22 @@ export const registerStateMigration = (migration, index) => {
   if (!Number.isInteger(index) || index < 0) {
     throw new Error(`[stateExtensions] Некорректный индекс миграции расширения: ${index}`);
   }
-  MIGRATION_INSERTIONS.push({ migration, index });
+  const registration = { migration, index };
+  MIGRATION_REGISTRATIONS.push(registration);
+  return () => {
+    const registrationIndex = MIGRATION_REGISTRATIONS.indexOf(registration);
+    if (registrationIndex >= 0) MIGRATION_REGISTRATIONS.splice(registrationIndex, 1);
+  };
 };
 
-export const getRegisteredStateMigrations = () => Array.from(MIGRATION_INSERTIONS);
+export const getRegisteredStateMigrations = () => Array.from(MIGRATION_REGISTRATIONS);
 
 // --- Слушатели применённых расходников -------------------------------------
 
 // Родовое уведомление «расходник применён на себя» (патч 208). Движок
 // вызывает слушателей в конце applyConsumableFull и собирает их результаты
-// в extensionResults; сеттинг сам решает, что делать (например, Fallout
-// двигает шкалы еды/воды выживания). Движок правил не знает.
+// в extensionResults; пакет сам решает, какие собственные поля обновить.
+// Движок правил не знает.
 //
 // Контракт слушателя: (item, ctx) => result | null, где ctx —
 // { stateExtensions, setStateExtension } (чтение/запись полей расширений),
@@ -156,6 +180,9 @@ export const registerConsumableAppliedListener = (entry) => {
     throw new Error(`[stateExtensions] Слушатель расходников "${entry.id}" уже зарегистрирован`);
   }
   CONSUMABLE_LISTENERS.set(entry.id, entry.listener);
+  return () => {
+    if (CONSUMABLE_LISTENERS.get(entry.id) === entry.listener) CONSUMABLE_LISTENERS.delete(entry.id);
+  };
 };
 
 export const getRegisteredConsumableAppliedListeners = () =>
@@ -172,14 +199,12 @@ export const notifyConsumableApplied = (item, ctx) => {
   return results;
 };
 
-// --- Слушатели событий состояний (болезни, патч 215) -----------------------
+// --- Слушатели событий состояний -------------------------------------------
 
-// Родовое уведомление «состояние персонажа изменилось» — для сеттинговых
-// правил, завязанных на условия (сейчас — болезнь: заражение и излечение).
-// Движок вызывает слушателей при заражении и излечении болезни и передаёт
-// { kind: 'disease', event: 'infected' | 'cured', conditionId }; сеттинг
-// сам решает, что делать (например, Fallout двигает усталость источника
-// «болезнь»: +1 при заражении, −1 при излечении). Движок правил не знает.
+// Родовое уведомление об изменении состояния персонажа. Движок вызывает
+// подписанные слушатели с пакетом { kind, event, ...payload } и передаёт
+// их результаты вызывающему коду; активный пакет решает, какие собственные
+// поля обновить. Движок правил не знает.
 //
 // Контракт слушателя: (payload, ctx) => result | null, где ctx —
 // { stateExtensions, setStateExtension }; result — произвольный объект
@@ -208,6 +233,9 @@ export const registerConditionEventListener = (entry) => {
     throw new Error(`[stateExtensions] Слушатель \"${entry.id}\" (${entry.kind}:${entry.event}) уже зарегистрирован`);
   }
   CONDITION_EVENT_LISTENERS.set(key, entry);
+  return () => {
+    if (CONDITION_EVENT_LISTENERS.get(key) === entry) CONDITION_EVENT_LISTENERS.delete(key);
+  };
 };
 
 export const getRegisteredConditionEventListeners = () =>

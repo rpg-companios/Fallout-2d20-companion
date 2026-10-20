@@ -15,7 +15,7 @@
 //   3) аргумент reload(true) («force reload») игнорируется современными
 //      браузерами — спецификация его убрала.
 
-import { debugLog } from '../debug/falloutDebug';
+import { debugLog } from '../engine/debug/runtimeTrace.js';
 
 export const forcePwaUpdate = async () => {
   if (typeof window === 'undefined') return;

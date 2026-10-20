@@ -39,7 +39,7 @@
 ## Навыки
 
 Канонические ключи: `ALL_SKILL_KEYS` (`SKILL_CATALOG_ORDER` в
-`domain/characterCreation.js`):
+`modules/fallout/logic/characterCreation.js`):
 `ATHLETICS, BARTER, BIG_GUNS, ENERGY_WEAPONS, EXPLOSIVES, LOCKPICK,
 MEDICINE, MELEE_WEAPONS, PILOT, REPAIR, SCIENCE, SMALL_GUNS, SNEAK,
 SPEECH, SURVIVAL, THROWING, UNARMED`.

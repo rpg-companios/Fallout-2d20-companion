@@ -2,11 +2,7 @@ import { registerRootComponent } from 'expo';
 import React from 'react';
 import { View, Text } from 'react-native';
 
-import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
-import { debugLog } from './src/debug/falloutDebug';
-// Глобально: любой <Text> рендерит токен {/CD} как картинку кубика (assets/CD.png).
-setupRichText();
-
+import { debugLog } from './src/engine/debug/runtimeTrace.js';
 import App from './App';
 
 class ErrorBoundary extends React.Component {
