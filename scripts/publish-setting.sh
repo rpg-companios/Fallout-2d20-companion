@@ -54,19 +54,39 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
   exit 1
 fi
 
-# .trpg собирается esbuild'ом. В Replit зависимости могут быть не установлены
-# или установлены без devDependencies — тогда ставим только сборщик.
-if [ "$RELEASE" -eq 1 ] && ! node -e "require.resolve('esbuild')" >/dev/null 2>&1; then
-  if [ "$INSTALL" -eq 1 ]; then
-    ESBUILD_VERSION="$(node -p "require('./package.json').devDependencies.esbuild" 2>/dev/null || echo '')"
-    echo "[publish-setting] esbuild не найден — ставлю ${ESBUILD_VERSION:-esbuild} (это займёт несколько секунд)"
-    npm install --no-save --no-audit --no-fund "esbuild@${ESBUILD_VERSION:-latest}"
+# .trpg собирается esbuild'ом. В Replit дерево зависимостей может быть
+# создано pnpm, и `npm install` поверх него падает (npm: "Cannot read
+# properties of null (reading 'isDescendantOf')"). Поэтому сборщик ставится
+# в отдельный кэш вне репозитория, а путь к нему отдаётся через NODE_PATH.
+TOOL_CACHE_DIR="${POSITRONIUM_TOOLS_DIR:-${TMPDIR:-/tmp}/positronium-build-tools}"
+
+ensure_esbuild() {
+  if node -e "require.resolve('esbuild')" >/dev/null 2>&1; then
+    return 0
   fi
-  if ! node -e "require.resolve('esbuild')" >/dev/null 2>&1; then
-    echo "[publish-setting] без esbuild пакет .trpg не собрать." >&2
-    echo "[publish-setting] выполните: npm install   (или npm install --no-save esbuild)" >&2
-    exit 1
+  if [ -f "$TOOL_CACHE_DIR/node_modules/esbuild/lib/main.js" ]; then
+    export NODE_PATH="$TOOL_CACHE_DIR/node_modules${NODE_PATH:+:$NODE_PATH}"
+    return 0
   fi
+  if [ "$INSTALL" -ne 1 ]; then
+    echo "[publish-setting] esbuild не найден, а --no-install задан." >&2
+    return 1
+  fi
+  ESBUILD_VERSION="$(node -p "require('./package.json').devDependencies.esbuild" 2>/dev/null || echo 'latest')"
+  echo "[publish-setting] esbuild не найден — ставлю esbuild@${ESBUILD_VERSION} в ${TOOL_CACHE_DIR}"
+  mkdir -p "$TOOL_CACHE_DIR"
+  if [ ! -f "$TOOL_CACHE_DIR/package.json" ]; then
+    printf '{"name":"positronium-build-tools","private":true}\n' > "$TOOL_CACHE_DIR/package.json"
+  fi
+  npm install --prefix "$TOOL_CACHE_DIR" --no-save --no-audit --no-fund "esbuild@${ESBUILD_VERSION}" >/dev/null
+  export NODE_PATH="$TOOL_CACHE_DIR/node_modules${NODE_PATH:+:$NODE_PATH}"
+  node -e "require.resolve('esbuild')" >/dev/null 2>&1
+}
+
+if [ "$RELEASE" -eq 1 ] && ! ensure_esbuild; then
+  echo "[publish-setting] без esbuild пакет .trpg не собрать." >&2
+  echo "[publish-setting] выполните: npm install   (или повторите без --no-install)" >&2
+  exit 1
 fi
 
 if [ -z "${PUBLISH_GITHUB_TOKEN:-}${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]; then

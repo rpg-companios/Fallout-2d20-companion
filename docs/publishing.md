@@ -65,9 +65,16 @@ npm install
 ```
 
 `publish-setting.sh` сам доустановит только сборщик, если его не хватает
-(флаг `--no-install` это отключает). Тот же путь работает и в отдельном
-репозитории сеттинга: `tools/build-setting-runtime.mjs` ищет `esbuild`
-в checkout'е движка (`POSITRONIUM_ENGINE`), а не рядом с собой.
+(флаг `--no-install` это отключает). Сборщик ставится **в кэш вне проекта**
+(`$TMPDIR/positronium-build-tools` или `POSITRONIUM_TOOLS_DIR`) и подключается
+через `NODE_PATH` — дерево `node_modules` проекта не трогается. Это важно там,
+где зависимости поставлены pnpm: `npm install` поверх такого дерева падает
+(`Cannot read properties of null (reading 'isDescendantOf')`).
+
+В репозитории сеттинга `npm install` не нужен вовсе: там нет `package.json`,
+и npm уходит вверх по дереву к чужому проекту. Собирайте пакет либо из
+совмещённого репозитория, либо через `tools/pack-setting.py` с
+`POSITRONIUM_ENGINE` на checkout движка.
 
 ## Если что-то пошло не так
 
@@ -76,7 +83,29 @@ npm install
 | `Permission ... denied` / 403 | токен без прав на целевой репозиторий: выдать доступ и повторить |
 | `Resource not accessible by integration` | подключение GitHub выдано только этому репозиторию, а не двум целевым |
 | `engine checkout not found` при ручной сборке | задать `POSITRONIUM_ENGINE=/path/to/engine` |
-| `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | `npm install` в корне движка или просто повторить `./scripts/publish-setting.sh` — сборщик доустановится сам |
+| `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | просто повторить `./scripts/publish-setting.sh` — сборщик доустановится в кэш сам |
+| `Cannot read properties of null (reading 'isDescendantOf')` | это `npm install` в дереве, созданном pnpm (частая причина — запуск в репозитории сеттинга, где нет `package.json`). Здесь ставить зависимости не нужно; если пострадал `node_modules` проекта — переустановите его тем менеджером, которым он создавался |
+
+### Если `npm install` всё-таки запустили в репозитории сеттинга
+
+Команда уходит вверх по дереву и работает с чужим проектом. Проверка и уборка:
+
+```sh
+cd positronium-game-settings
+ls -a                      # ожидаемы только .git, fallout, tools, README.md, release.json, LICENSE, NOTICE
+git status --porcelain     # должно быть пусто
+```
+
+Появились `package.json`, `package-lock.json` или `node_modules` — они созданы этим
+запуском, их можно удалить:
+
+```sh
+rm -rf node_modules package.json package-lock.json
+```
+
+Если npm успел пройтись по корню основного проекта (`~/workspace`), переустановите
+его зависимости тем менеджером, который создавал дерево: `pnpm install` для
+pnpm-дерева или `rm -rf node_modules && npm install` для npm.
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<version>` |
 | push работает из Replit, а скрипт получает 403 | запустить с `PUBLISH_NO_TOKEN=1` — скрипт возьмёт системные git-креды вместо переменной окружения |
 

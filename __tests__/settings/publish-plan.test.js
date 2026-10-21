@@ -178,6 +178,25 @@ describe('shell-обёртки', () => {
     expect(script).toContain('--no-release');
   });
 
+  it('сборщик ставится в кэш вне проекта, дерево node_modules не трогается', () => {
+    const script = read('publish-setting.sh');
+    // npm install --prefix <кэш> + NODE_PATH: иначе в pnpm-дереве Replit
+    // падает «Cannot read properties of null (reading 'isDescendantOf')».
+    expect(script).toContain('--prefix "$TOOL_CACHE_DIR"');
+    expect(script).toContain('NODE_PATH');
+    expect(script).not.toMatch(/npm install\s+--no-save[^\n]*esbuild/);
+  });
+
+  it('README репозитория сеттинга предупреждает, что npm install там не нужен', () => {
+    const readme = renderSettingReadme({
+      repository: 'rpg-companios/positronium-game-settings',
+      wallets: { fallout: { path: 'modules/fallout' } },
+      engineRepository: 'rpg-companios/ttrpg-engine',
+    });
+    expect(readme).toContain('npm install');
+    expect(readme).toMatch(/нет Node-проекта/);
+  });
+
   it('обёртки исполняемые', () => {
     for (const name of ['publish-engine.sh', 'publish-setting.sh']) {
       const mode = fs.statSync(path.join(ROOT, 'scripts', name)).mode;

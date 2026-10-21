@@ -22,6 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -297,37 +298,79 @@ const copyFile = (source, target) => {
 
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
-// .trpg собирается esbuild'ом (devDependency). Проверяем заранее: иначе
-// упаковщик упадёт уже после клонирования и десятков скопированных файлов.
-const ensurePackToolchain = () => {
+// .trpg собирается esbuild'ом (devDependency движка). Проверяем заранее:
+// иначе упаковщик упадёт уже после клонирования и десятков скопированных файлов.
+//
+// Ставить сборщик в дерево проекта нельзя: в Replit node_modules может быть
+// создан pnpm, и `npm install` поверх такого дерева падает
+// («Cannot read properties of null (reading 'isDescendantOf')»). Поэтому
+// отсутствующий esbuild ставится в отдельный кэш вне репозитория, а путь к
+// нему передаётся дочерним процессам через NODE_PATH.
+const TOOL_CACHE_DIR = process.env.POSITRONIUM_TOOLS_DIR
+  || path.join(os.tmpdir(), 'positronium-build-tools');
+
+const esbuildVersion = () => {
   try {
-    createRequire(path.join(ROOT, 'package.json')).resolve('esbuild');
-    return;
+    return readJson(path.join(ROOT, 'package.json'))?.devDependencies?.esbuild || 'latest';
   } catch {
-    if (hasCommand('npm')) {
-      console.log('[publish] esbuild не найден — ставлю (devDependency движка)');
-      try {
-        execFileSync('npm', ['install', '--no-save', '--no-audit', '--no-fund', 'esbuild'], {
-          cwd: ROOT,
-          stdio: 'inherit',
-        });
-        createRequire(path.join(ROOT, 'package.json')).resolve('esbuild');
-        return;
-      } catch {
-        // падаем ниже с понятным сообщением
-      }
-    }
-    fail('для сборки .trpg нужен esbuild: выполните "npm install" в корне движка');
+    return 'latest';
   }
 };
 
-const buildTrpg = (wallet, outputFile) => {
+/** Путь к node_modules с esbuild (кэш вне проекта) или null. */
+const ensurePackToolchain = () => {
+  try {
+    createRequire(path.join(ROOT, 'package.json')).resolve('esbuild');
+    return null; // сборщик уже доступен из проекта, NODE_PATH не нужен
+  } catch {
+    // ставим в изолированный кэш
+  }
+  if (!hasCommand('npm')) {
+    fail('для сборки .trpg нужен esbuild: выполните "npm install" в корне движка');
+  }
+
+  const nodeModules = path.join(TOOL_CACHE_DIR, 'node_modules');
+  const cached = path.join(nodeModules, 'esbuild', 'lib', 'main.js');
+  if (!fs.existsSync(cached)) {
+    fs.mkdirSync(TOOL_CACHE_DIR, { recursive: true });
+    // Свой package.json не даёт npm уйти вверх по дереву к чужому проекту.
+    const guard = path.join(TOOL_CACHE_DIR, 'package.json');
+    if (!fs.existsSync(guard)) {
+      fs.writeFileSync(guard, `${JSON.stringify({ name: 'positronium-build-tools', private: true })}\n`);
+    }
+    const version = esbuildVersion();
+    console.log(`[publish] esbuild не найден — ставлю esbuild@${version} в ${TOOL_CACHE_DIR}`);
+    try {
+      execFileSync('npm', ['install', '--no-save', '--no-audit', '--no-fund', `esbuild@${version}`], {
+        cwd: TOOL_CACHE_DIR,
+        stdio: 'inherit',
+      });
+    } catch {
+      fail(
+        'не удалось поставить esbuild. Выполните вручную: '
+        + `npm install --prefix ${TOOL_CACHE_DIR} esbuild`,
+      );
+    }
+  }
+  return nodeModules;
+};
+
+const withNodePath = (nodeModules) => {
+  if (!nodeModules) return process.env;
+  const current = process.env.NODE_PATH;
+  return {
+    ...process.env,
+    NODE_PATH: current ? `${nodeModules}${path.delimiter}${current}` : nodeModules,
+  };
+};
+
+const buildTrpg = (wallet, outputFile, nodeModules) => {
   fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   execFileSync('python3', [
     path.join(ROOT, 'scripts', 'pack-setting.py'),
     wallet.sourceDir,
     '--output', outputFile,
-  ], { cwd: ROOT, stdio: 'inherit' });
+  ], { cwd: ROOT, stdio: 'inherit', env: withNodePath(nodeModules) });
   return outputFile;
 };
 
@@ -414,13 +457,14 @@ const publishSetting = async (args, config) => {
     ? fs.readFileSync(previousReleaseFile, 'utf8')
     : null;
 
-  if (args.release) ensurePackToolchain();
+  // Проверяем сборщик до сборки релиза и подставляем его дочерним процессам.
+  const toolNodeModules = args.release ? ensurePackToolchain() : null;
 
   const artifactsDir = path.join(workdir, 'artifacts');
   const packages = wallets.map((wallet) => {
     const manifest = readJson(path.join(wallet.sourceDir, 'manifest.json'));
     if (args.release) {
-      const artifact = buildTrpg(wallet, path.join(artifactsDir, wallet.asset));
+      const artifact = buildTrpg(wallet, path.join(artifactsDir, wallet.asset), toolNodeModules);
       return {
         id: wallet.id,
         manifest,

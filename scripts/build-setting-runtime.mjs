@@ -11,8 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // а не стектрейсом ERR_MODULE_NOT_FOUND.
 const ESBUILD_MISSING = [
   'esbuild не установлен — без него нельзя собрать manifest.runtime.source.',
-  'Установите зависимости движка: npm install',
-  'или только сборщик: npm install --no-save esbuild',
+  'Поставьте зависимости движка (npm install) или укажите каталог со сборщиком',
+  'через NODE_PATH=/path/to/node_modules.',
 ].join(' ');
 
 const loadEsbuild = async (appRoot) => {
