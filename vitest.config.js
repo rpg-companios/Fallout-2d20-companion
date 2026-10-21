@@ -1,6 +1,16 @@
+import fs from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import babel from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
+
+// В репозитории движка папки modules/ нет: фикстура сеттинга подключается
+// только там, где кошелёк лежит рядом (совмещённый checkout).
+const SETTING_FIXTURE = './src/store/__test-setup__/settingRuntimeFixture.js';
+const setupFiles = [
+  './src/store/__test-setup__/asyncStorageMock.js',
+  './src/store/__test-setup__/reactNativeMock.js',
+  ...(fs.existsSync(new URL(SETTING_FIXTURE, import.meta.url)) ? [SETTING_FIXTURE] : []),
+];
 
 // Кодовая база — React Native: компоненты лежат в .js с JSX (Metro это
 // переваривает, а rolldown-парсер vitest — нет). Преобразуем JSX в .js через
@@ -50,10 +60,8 @@ export default defineConfig({
   plugins: [jsxInJs],
   test: {
     environment: 'node',
-    setupFiles: [
-      './src/store/__test-setup__/asyncStorageMock.js',
-      './src/store/__test-setup__/reactNativeMock.js',
-      './src/store/__test-setup__/settingRuntimeFixture.js',
-    ],
+    // В репозитории движка тестов нет (они живут в совмещённом репозитории).
+    passWithNoTests: true,
+    setupFiles,
   },
 });

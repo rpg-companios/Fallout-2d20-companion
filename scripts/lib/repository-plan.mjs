@@ -29,7 +29,21 @@ const COMBINED_ONLY = [
 ];
 
 // Только для движка: всё, что относится к сеттингу, уезжает в другой репозиторий.
-const ENGINE_ONLY_EXCLUDES = ['modules'];
+// Тесты пока остаются в совмещённом репозитории: половина наборов проверяет
+// механику сеттинга и требует папки modules/, а унаследованный долг диффа
+// (docs/known-test-failures.md) сделал бы публичный движок красно-зелёным.
+const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'src/store/__test-setup__'];
+
+// Публикация — механизм совмещённого репозитория: в самом движке этим
+// скриптам нечего делать (они собирают в том числе сам движок).
+const PUBLISH_ONLY_FILES = [
+  'scripts/publish-repositories.mjs',
+  'scripts/publish-engine.sh',
+  'scripts/publish-setting.sh',
+  'scripts/lib/repository-plan.mjs',
+  'docs/publishing.md',
+  'settings/repositories.json',
+];
 
 const SETTING_ID_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 
@@ -79,7 +93,8 @@ export const listRepositoryFiles = (root, { exclude = [] } = {}) => {
 };
 
 /** Файлы для репозитория движка: всё, кроме сеттингов и служебных каталогов. */
-export const planEngineFiles = (root) => listRepositoryFiles(root, { exclude: ENGINE_ONLY_EXCLUDES });
+export const planEngineFiles = (root) => listRepositoryFiles(root, { exclude: ENGINE_ONLY_EXCLUDES })
+  .filter((relative) => !PUBLISH_ONLY_FILES.includes(relative));
 
 const assertWallet = (settingId, wallet) => {
   if (!SETTING_ID_RE.test(settingId)) {

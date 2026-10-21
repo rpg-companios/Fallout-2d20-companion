@@ -1,0 +1,125 @@
+# Сборка APK движка
+
+Приложение не содержит сеттинга: Fallout приходит отдельным `.trpg` и ставится
+из папки-сеттинга (вручную) или из релиза репозитория сеттингов (по сети).
+Поэтому APK движка — это «чистый движок»; после установки он предложит поставить
+сеттинг сам (см. ниже).
+
+## Что уже готово в репозитории движка
+
+- `app.json` — `name: Positronium`, `slug: positronium`,
+  `android.package`/`ios.bundleIdentifier`: `com.rpgcompanios.positronium`,
+  схема `positronium`, `version: 1.0.0` (совпадает с `ENGINE_VERSION`).
+- `eas.json` — профили `preview` (APK), `production` (AAB для Google Play),
+  `development` (dev-client).
+- npm-скрипты: `npm run apk`, `npm run aab`, `npm run apk:local`.
+- Иконки и сплэш в `assets/`.
+
+Папки `modules/`, `__tests__/` и скрипты публикации в репозиторий движка не
+попадают: тесты проверяют механику сеттинга и живут в совмещённом репозитории.
+
+## Вариант 1 — EAS Build (облако, без Android SDK)
+
+Нужен аккаунт Expo (бесплатный тариф подходит) и интернет.
+
+```sh
+npm install
+npx eas-cli login
+npx eas-cli build --platform android --profile preview
+```
+
+Или из корня репозитория:
+
+```sh
+npm run apk
+```
+
+EAS соберёт **APK** (профиль `preview`, `buildType: apk`) и даст ссылку на
+скачивание. Первый запуск спросит про Android keystore — согласитесь, EAS
+сгенерирует его сам.
+
+Для Google Play нужен AAB:
+
+```sh
+npm run aab      # профиль production, buildType: app-bundle, autoIncrement
+```
+
+Проверить сборку без отправки в облако (нужен Android SDK локально):
+
+```sh
+npx eas-cli build --platform android --profile preview --local
+```
+
+## Вариант 2 — локально (Gradle)
+
+Нужны JDK 17 и Android SDK (`ANDROID_HOME`), например Android Studio или
+`commandline-tools`.
+
+```sh
+npm install
+npm run apk:local
+```
+
+Скрипт делает `expo prebuild` (генерирует `android/`) и `gradlew assembleRelease`.
+Готовый файл:
+
+```
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+`android/` и `ios/` генерируются заново и в git не коммитятся: единственный
+источник правды — `app.json` и `eas.json`.
+
+## Проверка JS-бандла без сборки APK
+
+Полезно, если нужно быстро понять, что приложение собирается:
+
+```sh
+npx expo export --platform android --output-dir dist
+```
+
+В репозитории движка это уже проверено: бандл Hermes ≈ 3.7 МБ собирается без
+папки `modules/`.
+
+## Установка сеттинга в собранное приложение
+
+**Автоматически (по сети).** При запуске приложение читает
+`release.json` из репозитория сеттингов. Если пакета ещё нет, оно предложит
+поставить первый релиз (≈20 МБ), проверит размер и sha256 и активирует Fallout.
+Нужен только интернет и опубликованный релиз
+(`./scripts/publish-setting.sh` в совмещённом репозитории).
+
+**Вручную (файл).** Настройки → настройки сеттинга → «Локальный .trpg» →
+выбрать файл → «Установить» → выбрать сеттинг.
+
+Собрать `.trpg` в репозитории сеттинга:
+
+```sh
+git clone https://github.com/rpg-companios/ttrpg-engine ../ttrpg-engine
+POSITRONIUM_ENGINE=../ttrpg-engine python3 tools/pack-setting.py fallout -o dist/fallout.trpg
+```
+
+Проверить пакет перед установкой:
+
+```sh
+python3 tools/unpack-setting.py dist/fallout.trpg --dest /tmp/fallout-check
+```
+
+## Что будет видно без сеттинга
+
+Это нормальное состояние чистого движка: каталоги пусты, экраны сеттинга
+(бой, перки, инвентарь Fallout) не появляются, пока пакет не установлен.
+Кнопка «Проверить обновления» в настройках сеттинга работает и на пустой
+установке — ею можно поставить сеттинг вручную, если автопроверка не сработала.
+
+## Частые проблемы
+
+| Симптом | Причина |
+| --- | --- |
+| `eas: command not found` | запускайте `npx eas-cli …` или `npm i -g eas-cli` |
+| EAS просит `owner` | сборка пойдёт под личным аккаунтом; для организации добавьте `"owner": "<org>"` в `app.json` |
+| `SDK location not found` | не задан `ANDROID_HOME` / нет Android SDK |
+| `Unsupported class file major version` | нужен JDK 17 |
+| APK ставится рядом со старым Fallout-приложением | изменился `applicationId` на `com.rpgcompanios.positronium`; это ожидаемо |
+| после установки пустые экраны | сеттинг ещё не установлен — см. раздел выше |
+| приложение не видит релиз | проверьте `release.json` в ветке репозитория сеттингов и тег `fallout-v<version>` |

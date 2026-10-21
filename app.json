@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Positronium",
-    "slug": "fallout2d20companionapp",
+    "slug": "positronium",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -14,15 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fallout2d20companionapp.app"
+      "bundleIdentifier": "com.rpgcompanios.positronium"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.fallout2d20companionapp.app"
+      "package": "com.rpgcompanios.positronium"
     },
     "web": {
       "bundler": "metro",
@@ -38,6 +37,6 @@
       "expo-asset",
       "expo-sqlite"
     ],
-    "scheme": "fallout2d20companionapp"
+    "scheme": "positronium"
   }
 }

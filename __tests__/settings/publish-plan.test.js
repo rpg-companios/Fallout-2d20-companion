@@ -50,6 +50,9 @@ describe('что уезжает в репозиторий движка', () => {
     expect(files.some((file) => file.startsWith('node_modules/'))).toBe(false);
     // Сборки и архивы уезжают релизами, а не в git.
     expect(files.some((file) => file.endsWith('.zip'))).toBe(false);
+    // Тесты и публикация остаются в совмещённом репозитории.
+    expect(files.some((file) => file.startsWith('__tests__/'))).toBe(false);
+    expect(files.some((file) => file.includes('publish-'))).toBe(false);
   });
 
   it('в этом репозитории движок и правда отделён от модулей', () => {
@@ -57,6 +60,12 @@ describe('что уезжает в репозиторий движка', () => {
     expect(files).toContain('App.js');
     expect(files).toContain('src/engine/settings/settingRelease.js');
     expect(files.some((file) => file.startsWith('modules/'))).toBe(false);
+    // APK собирается из репозитория движка: конфигурация сборки едет с ним,
+    // а тесты и скрипты публикации — нет.
+    expect(files).toContain('eas.json');
+    expect(files).toContain('app.json');
+    expect(files.some((file) => file.startsWith('__tests__/'))).toBe(false);
+    expect(files.some((file) => file.includes('publish-'))).toBe(false);
   });
 });
 

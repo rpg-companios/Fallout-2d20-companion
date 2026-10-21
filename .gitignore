@@ -46,3 +46,7 @@ package-lock — копия.json
 
 # деревья/патчи публикации в целевые репозитории
 .publish/
+
+# нативные проекты генерируются из app.json/eas.json
+/android
+/ios
