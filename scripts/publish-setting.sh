@@ -9,8 +9,12 @@
 #   ./scripts/publish-setting.sh --message "..."
 #
 # Нужны node 18+, git, python3 и токен с правом записи в целевой репозиторий
-# (GH_TOKEN или GITHUB_TOKEN). Без токена релиз создаётся через gh CLI,
-# если он авторизован. Подпись коммита — PUBLISH_GIT_NAME / PUBLISH_GIT_EMAIL.
+# (PUBLISH_GITHUB_TOKEN, GH_TOKEN или GITHUB_TOKEN). Без токена релиз
+# создаётся через gh CLI, если он авторизован.
+# Подпись коммита — PUBLISH_GIT_NAME / PUBLISH_GIT_EMAIL.
+#
+# Сборка .trpg требует esbuild (devDependency движка). Если его нет,
+# скрипт доустановит только сборщик; --no-install отключает это поведение.
 
 set -euo pipefail
 
@@ -23,6 +27,7 @@ usage() {
 
 PUSH=1
 RELEASE=1
+INSTALL=1
 ARGS=()
 for argument in "$@"; do
   case "$argument" in
@@ -31,6 +36,7 @@ for argument in "$@"; do
     --no-push) PUSH=0 ;;
     --no-release) RELEASE=0 ;;
     --release) RELEASE=1 ;;
+    --no-install) INSTALL=0 ;;
     *) ARGS+=("$argument") ;;
   esac
 done
@@ -46,6 +52,21 @@ NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 if [ "$NODE_MAJOR" -lt 18 ]; then
   echo "[publish-setting] нужен node 18+, сейчас $(node -v)" >&2
   exit 1
+fi
+
+# .trpg собирается esbuild'ом. В Replit зависимости могут быть не установлены
+# или установлены без devDependencies — тогда ставим только сборщик.
+if [ "$RELEASE" -eq 1 ] && ! node -e "require.resolve('esbuild')" >/dev/null 2>&1; then
+  if [ "$INSTALL" -eq 1 ]; then
+    ESBUILD_VERSION="$(node -p "require('./package.json').devDependencies.esbuild" 2>/dev/null || echo '')"
+    echo "[publish-setting] esbuild не найден — ставлю ${ESBUILD_VERSION:-esbuild} (это займёт несколько секунд)"
+    npm install --no-save --no-audit --no-fund "esbuild@${ESBUILD_VERSION:-latest}"
+  fi
+  if ! node -e "require.resolve('esbuild')" >/dev/null 2>&1; then
+    echo "[publish-setting] без esbuild пакет .trpg не собрать." >&2
+    echo "[publish-setting] выполните: npm install   (или npm install --no-save esbuild)" >&2
+    exit 1
+  fi
 fi
 
 if [ -z "${PUBLISH_GITHUB_TOKEN:-}${GH_TOKEN:-}${GITHUB_TOKEN:-}" ]; then

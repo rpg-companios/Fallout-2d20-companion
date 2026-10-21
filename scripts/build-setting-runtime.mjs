@@ -1,9 +1,38 @@
 #!/usr/bin/env node
 
-import esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// esbuild — devDependency движка, а скрипт может лежать и в репозитории
+// сеттинга (tools/), где node_modules нет вовсе. Поэтому пакет ищется от
+// корня движка, а не от файла скрипта; отсутствие объясняется по-человечески,
+// а не стектрейсом ERR_MODULE_NOT_FOUND.
+const ESBUILD_MISSING = [
+  'esbuild не установлен — без него нельзя собрать manifest.runtime.source.',
+  'Установите зависимости движка: npm install',
+  'или только сборщик: npm install --no-save esbuild',
+].join(' ');
+
+const loadEsbuild = async (appRoot) => {
+  const anchors = [
+    path.join(appRoot, 'package.json'),
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'),
+    path.join(process.cwd(), 'package.json'),
+  ];
+  for (const anchor of anchors) {
+    if (!fs.existsSync(anchor)) continue;
+    try {
+      const resolved = createRequire(anchor).resolve('esbuild');
+      const loaded = await import(pathToFileURL(resolved).href);
+      return loaded.default ?? loaded;
+    } catch {
+      // пробуем следующий якорь: node_modules может лежать у движка, а не здесь
+    }
+  }
+  throw new Error(ESBUILD_MISSING);
+};
 
 // Корень движка. По умолчанию — репозиторий, в котором лежит скрипт
 // (совмещённый checkout: <root>/scripts/build-setting-runtime.mjs).
@@ -80,6 +109,7 @@ const run = async () => {
     throw new Error(`setting runtime source not found: ${sourcePath}`);
   }
 
+  const esbuild = await loadEsbuild(appRoot);
   const result = await esbuild.build({
     absWorkingDir: appRoot,
     entryPoints: [sourcePath],

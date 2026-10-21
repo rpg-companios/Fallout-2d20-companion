@@ -19,6 +19,7 @@
 // целевой репозиторий в .publish/ и печатает список изменений.
 
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -296,6 +297,30 @@ const copyFile = (source, target) => {
 
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
+// .trpg собирается esbuild'ом (devDependency). Проверяем заранее: иначе
+// упаковщик упадёт уже после клонирования и десятков скопированных файлов.
+const ensurePackToolchain = () => {
+  try {
+    createRequire(path.join(ROOT, 'package.json')).resolve('esbuild');
+    return;
+  } catch {
+    if (hasCommand('npm')) {
+      console.log('[publish] esbuild не найден — ставлю (devDependency движка)');
+      try {
+        execFileSync('npm', ['install', '--no-save', '--no-audit', '--no-fund', 'esbuild'], {
+          cwd: ROOT,
+          stdio: 'inherit',
+        });
+        createRequire(path.join(ROOT, 'package.json')).resolve('esbuild');
+        return;
+      } catch {
+        // падаем ниже с понятным сообщением
+      }
+    }
+    fail('для сборки .trpg нужен esbuild: выполните "npm install" в корне движка');
+  }
+};
+
 const buildTrpg = (wallet, outputFile) => {
   fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   execFileSync('python3', [
@@ -388,6 +413,8 @@ const publishSetting = async (args, config) => {
   const previousRelease = fs.existsSync(previousReleaseFile)
     ? fs.readFileSync(previousReleaseFile, 'utf8')
     : null;
+
+  if (args.release) ensurePackToolchain();
 
   const artifactsDir = path.join(workdir, 'artifacts');
   const packages = wallets.map((wallet) => {
