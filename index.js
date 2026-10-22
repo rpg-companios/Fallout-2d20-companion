@@ -1,8 +1,11 @@
 import { registerRootComponent } from 'expo';
 import React from 'react';
-import { ScrollView, View, Text } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { debugLog } from './src/engine/debug/runtimeTrace.js';
+import { showRawAlert } from './components/alerts/alertService';
+import { tApp } from './src/i18n/appI18n';
+import useSettingPackStore from './src/store/settingPackStore';
 import App from './App';
 
 class ErrorBoundary extends React.Component {
@@ -13,10 +16,49 @@ class ErrorBoundary extends React.Component {
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
+  autoRecoveries = 0;
+
   componentDidCatch(error, info) {
     this.setState({ componentStack: info?.componentStack ?? null });
     debugLog('app.crash', { error, info });
+
+    // Приложение не должно умирать из-за пакета сеттинга. Если активен
+    // сеттинг, выключаем его и поднимаем движок заново; игрок увидит
+    // объяснение, а не мёртвый экран. Больше двух автоматических попыток
+    // за сессию не делаем: иначе неисправный движок зациклит перезапуск.
+    const state = useSettingPackStore.getState();
+    if (!state.activeId || this.autoRecoveries >= 2) return;
+    this.autoRecoveries += 1;
+    const failedName = state.installed.find((item) => item.id === state.activeId)?.name
+      ?? state.activeId;
+    const component = String(info?.componentStack ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('at ')) ?? '';
+    const message = [
+      String(tApp('settingCrash.message')).replace('{name}', failedName),
+      String(tApp('settingCrash.details')).replace('{message}', error?.message ?? String(error)),
+      component ? String(tApp('settingCrash.component')).replace('{component}', component) : '',
+    ].filter(Boolean).join('\n\n');
+
+    Promise.resolve(state.disableBrokenSetting({ reason: error?.message || String(error) }))
+      .catch(() => {})
+      .then(() => {
+        this.setState({ hasError: false, error: null, componentStack: null });
+        showRawAlert({ title: tApp('settingCrash.title'), message }).catch(() => {});
+      });
   }
+  // Последний рубеж: даже если упал сам App, игрок не должен оставаться
+  // с мёртвым экраном и советом «сбросить данные». Отключаем активный
+  // сеттинг и поднимаем приложение заново.
+  handleDisableSetting = async () => {
+    try {
+      await useSettingPackStore.getState().disableBrokenSetting({ reason: String(this.state.error) });
+    } catch {
+      // Стор мог не подняться — тогда просто показываем приложение заново.
+    }
+    this.setState({ hasError: false, error: null, componentStack: null });
+  };
   render() {
     if (this.state.hasError) {
       const { error, componentStack } = this.state;
@@ -28,6 +70,16 @@ class ErrorBoundary extends React.Component {
       return (
         <View style={{ flex: 1, backgroundColor: '#1a1a1a', padding: 20 }}>
           <Text style={{ color: '#ff4444', fontSize: 16, marginBottom: 10 }}>App Error</Text>
+          {useSettingPackStore.getState().activeId ? (
+            <TouchableOpacity
+              onPress={this.handleDisableSetting}
+              style={{ backgroundColor: '#c9b458', borderRadius: 10, padding: 12, alignItems: 'center', marginBottom: 12 }}
+            >
+              <Text style={{ color: '#1a1a1a', fontSize: 14, fontWeight: '700' }}>
+                {tApp('settingCrash.disable')}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           <ScrollView>
             <Text selectable style={{ color: '#ffffff', fontSize: 11, fontFamily: 'monospace' }}>
               {details}

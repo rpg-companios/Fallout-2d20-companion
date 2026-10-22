@@ -4,7 +4,7 @@ if (Appearance.removeChangeListener === undefined) {
   Appearance.removeChangeListener = () => {};
 }
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,10 @@ import { Provider as PaperProvider } from 'react-native-paper';
 // Шаг 8б (патч 242): автосейв — модуль src/saves/characterSaves.js (zustand-subscribe).
 import { startCharacterAutosave } from './src/saves/characterSaves';
 import AlertHost from './components/alerts/AlertHost';
+import { showRawAlert } from './components/alerts/alertService';
+// Предохранитель вокруг кода сеттинга: падение экрана пакета не должно
+// превращать всё приложение в App Error.
+import SettingRuntimeBoundary from './components/SettingRuntimeBoundary';
 // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
 // /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
@@ -35,6 +39,7 @@ import useAppSettingsStore, {
 } from './src/store/appSettingsStore';
 import useSettingPackStore, {
   selectActiveSettingId,
+  selectActivationGuard,
   selectActiveSettingRuntime,
   selectSettingStoreHydrated,
 } from './src/store/settingPackStore';
@@ -42,6 +47,7 @@ import useSettingUpdateStore, { selectSettingUpdatesHydrated } from './src/store
 import { startSettingUpdateBootstrap } from './src/utils/settingUpdates';
 import useAppUpdateStore, { selectAppUpdatesHydrated } from './src/store/appUpdateStore';
 import { startAppUpdateBootstrap } from './src/utils/appUpdates';
+import { checkForOtaUpdate } from './src/utils/otaUpdates';
 
 const Tab = createMaterialTopTabNavigator();
 // Каноническое название приложения (Google OAuth branding, PWA, заголовок вкладки).
@@ -74,15 +80,95 @@ function App() {
   const settingUpdatesHydrated = useSettingUpdateStore(selectSettingUpdatesHydrated);
   const appUpdatesHydrated = useAppUpdateStore(selectAppUpdatesHydrated);
   const activateSetting = useSettingPackStore((state) => state.selectSetting);
+  const activationGuard = useSettingPackStore(selectActivationGuard);
   const moduleTabsActive = Boolean(activeRuntime);
-  const activeGlobalComponents = Object.entries(activeRuntime?.globalComponents ?? {});
+
+  /**
+   * Сбой рендера внутри сеттинга: выключаем пакет и оставляем движку рабочее
+   * состояние. Никаких «сбросить данные» — activeId сбрасывается сам, поэтому
+   * следующий запуск чист.
+   */
+  const handleSettingRuntimeCrash = useCallback(({ error, info }) => {
+    const state = useSettingPackStore.getState();
+    const failedId = state.activeId;
+    const failedName = state.installed.find((item) => item.id === failedId)?.name ?? failedId ?? '';
+    debugLog('setting.runtime.crash', {
+      settingId: failedId,
+      message: error?.message ?? String(error),
+      stack: typeof error?.stack === 'string' ? error.stack.slice(0, 4000) : null,
+      componentStack: typeof info?.componentStack === 'string' ? info.componentStack.slice(0, 4000) : null,
+    });
+    state.disableBrokenSetting({ reason: error?.message || String(error) }).catch(() => {});
+    // Диалог короткий, но с диагнозом: без него в релизе не остаётся следа,
+    // какой компонент пакета упал.
+    const component = String(info?.componentStack ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .find((line) => line.startsWith('at ')) ?? '';
+    const details = [
+      String(tApp('settingCrash.details')).replace('{message}', error?.message ?? String(error)),
+      component ? String(tApp('settingCrash.component')).replace('{component}', component) : '',
+    ].filter(Boolean).join('\n');
+    showRawAlert({
+      title: tApp('settingCrash.title'),
+      message: `${String(tApp('settingCrash.message')).replace('{name}', failedName)}\n\n${details}`,
+    }).catch(() => {});
+  }, []);
+
+  // Стабильные обёртки: Tab.Screen не должен пересоздавать компоненты на каждом рендере.
+  const settingScreens = useMemo(() => (activeRuntime?.screens ?? []).map((screen) => {
+    const RuntimeComponent = screen.component;
+    const Guarded = (props) => (
+      <SettingRuntimeBoundary onError={handleSettingRuntimeCrash}>
+        <RuntimeComponent {...props} />
+      </SettingRuntimeBoundary>
+    );
+    Guarded.displayName = `SettingScreen(${screen.id})`;
+    return { ...screen, component: Guarded };
+  }), [activeRuntime, handleSettingRuntimeCrash]);
+
+  const activeGlobalComponents = useMemo(
+    () => Object.entries(activeRuntime?.globalComponents ?? {}).map(([id, RuntimeComponent]) => {
+      const Guarded = () => (
+        <SettingRuntimeBoundary onError={handleSettingRuntimeCrash}>
+          <RuntimeComponent />
+        </SettingRuntimeBoundary>
+      );
+      Guarded.displayName = `SettingGlobal(${id})`;
+      return [id, Guarded];
+    }),
+    [activeRuntime, handleSettingRuntimeCrash],
+  );
 
   // Restore a persisted package before character state/database bootstrap, so
   // setting-owned save extensions register before saved characters are read.
   useEffect(() => {
     if (!settingStoreHydrated) return undefined;
-    if (!activeSettingId || activeRuntime) {
+    if (activeRuntime) {
       setSettingBootstrapped(true);
+      return undefined;
+    }
+    if (!activeSettingId) {
+      // Нет активного сеттинга — забываем осиротевший guard, иначе он
+      // заблокирует следующую осознанную активацию.
+      if (activationGuard) useSettingPackStore.getState().confirmActivation();
+      setSettingBootstrapped(true);
+      return undefined;
+    }
+    if (activationGuard) {
+      // Прошлый запуск активировал пакет, но так и не подтвердил живой рендер
+      // (падение или принудительное закрытие сразу после активации). Повторная
+      // автозагрузка рискует повторить падение до бесконечности — стартуем без
+      // сеттинга и сообщаем об этом.
+      debugLog('setting.runtime.guard.blocked', { settingId: activationGuard.id });
+      useSettingPackStore.getState()
+        .disableBrokenSetting({ reason: 'previous activation was not confirmed' })
+        .catch(() => {})
+        .finally(() => setSettingBootstrapped(true));
+      showRawAlert({
+        title: tApp('settingCrash.title'),
+        message: tApp('settingCrash.recovered'),
+      }).catch(() => {});
       return undefined;
     }
     let cancelled = false;
@@ -102,7 +188,35 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [activateSetting, activeRuntime, activeSettingId, settingStoreHydrated]);
+  }, [activateSetting, activationGuard, activeRuntime, activeSettingId, settingStoreHydrated]);
+
+  // Подтверждаем активацию только когда пакет отрисовался без падений:
+  // после этого его можно смело поднимать автоматически при следующем запуске.
+  useEffect(() => {
+    if (!activeRuntime || !settingBootstrapped) return undefined;
+    const timer = setTimeout(() => {
+      const state = useSettingPackStore.getState();
+      if (state.activeRuntime === activeRuntime) state.confirmActivation();
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [activeRuntime, settingBootstrapped]);
+
+  // OTA-обновление бандла: качаем в фоне и спрашиваем, перезапуститься ли.
+  // Молчаливых обновлений больше нет (слово владельца 2026-10-22).
+  useEffect(() => {
+    if (!settingBootstrapped || !dbReady || !characterStoreReady) return undefined;
+    let cancelled = false;
+    checkForOtaUpdate()
+      .then((result) => {
+        if (!cancelled) debugLog('ota.update.checked', result);
+      })
+      .catch((error) => {
+        debugLog('ota.update.failed', { message: error?.message ?? String(error) });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [characterStoreReady, dbReady, settingBootstrapped]);
 
   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
   // даже если версия @react-navigation/native не поддерживает documentTitle.
@@ -301,7 +415,7 @@ function App() {
                         ),
                       }}
                     />
-                    {moduleTabsActive ? activeRuntime.screens.map((screen) => (
+                    {moduleTabsActive ? settingScreens.map((screen) => (
                       <Tab.Screen
                         key={screen.id}
                         name={screen.route}

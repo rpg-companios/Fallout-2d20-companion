@@ -25,6 +25,18 @@ const normalizePersistedState = (persistedState, currentState) => {
   const activeId = installed.some((entry) => entry.id === persisted.activeId)
     ? persisted.activeId
     : null;
+  // Guard is written right before a runtime becomes active and cleared after
+  // the first successful render window. A guard left in storage means the
+  // previous launch never confirmed the setting: the app must not auto-load
+  // it again, otherwise one broken package turns into a boot loop that only
+  // «clear app data» can break.
+  const guard = persisted.activationGuard;
+  const activationGuard = guard
+    && typeof guard.id === 'string'
+    && SETTING_ID_RE.test(guard.id)
+    && Number.isFinite(guard.at)
+    ? { id: guard.id, at: guard.at }
+    : null;
 
   return {
     ...currentState,
@@ -34,6 +46,7 @@ const normalizePersistedState = (persistedState, currentState) => {
     activeRuntime: null,
     activationStatus: 'idle',
     activationError: null,
+    activationGuard,
     hydrated: false,
   };
 };
@@ -48,6 +61,7 @@ const useSettingPackStore = create(
       activeRuntime: null,
       activationStatus: 'idle',
       activationError: null,
+      activationGuard: null,
       hydrated: false,
 
       setHydrated: (hydrated) => set({ hydrated }),
@@ -78,6 +92,9 @@ const useSettingPackStore = create(
           }
 
           const previousRuntime = get().activeRuntime;
+          // Persist the guard before the new runtime can be rendered: if the
+          // render crashes, the next launch knows the setting is suspect.
+          set({ activationGuard: { id: entry.id, at: Date.now() } });
           setActiveSettingRuntime(settingRuntime);
           const appSettingsModule = await import('./appSettingsStore');
           appSettingsModule.default.getState().activateActiveModuleSettings(settingRuntime.id);
@@ -105,10 +122,43 @@ const useSettingPackStore = create(
             set({
               activationStatus: 'error',
               activationError: error?.message || String(error),
+              activationGuard: null,
               ...(previousRuntime ? {} : { activeId: null }),
             });
           }
           throw error;
+        }
+      },
+
+      /** The runtime rendered without crashing: it is safe to auto-load next launch. */
+      confirmActivation: () => set({ activationGuard: null }),
+
+      /**
+       * Disable a setting that crashed while rendering. The engine UI must stay
+       * usable: drop the runtime, forget activeId so the next launch is clean,
+       * and keep the message for the settings screen.
+       */
+      disableBrokenSetting: async ({ reason = '' } = {}) => {
+        ++activationAttempt;
+        const runtime = get().activeRuntime;
+        const failedId = get().activeId;
+        setActiveSettingRuntime(null);
+        set((state) => ({
+          activeId: null,
+          activeRuntime: null,
+          activationStatus: 'error',
+          activationError: reason || 'setting runtime crashed',
+          activationGuard: null,
+          installed: state.installed.map((item) => (
+            item.id === failedId ? { ...item, runtimeReady: false } : item
+          )),
+        }));
+        if (!runtime) return;
+        try {
+          const { disposeSettingPackageModule } = await import('../engine/settings/settingPackageRuntime.js');
+          disposeSettingPackageModule(runtime);
+        } catch {
+          // Disposal is best-effort: the app is already running without it.
         }
       },
 
@@ -132,6 +182,7 @@ const useSettingPackStore = create(
           activeRuntime: deletingActive ? null : get().activeRuntime,
           activationStatus: 'idle',
           activationError: null,
+          ...(deletingActive ? { activationGuard: null } : {}),
         });
         if (activeRuntime) {
           const { disposeSettingPackageModule } = await import('../engine/settings/settingPackageRuntime.js');
@@ -167,6 +218,7 @@ const useSettingPackStore = create(
             activeRuntime: null,
             activationStatus: 'idle',
             activationError: null,
+            activationGuard: null,
           } : {}),
         });
 
@@ -187,6 +239,7 @@ const useSettingPackStore = create(
       partialize: (state) => ({
         installed: state.installed,
         activeId: state.activeId,
+        activationGuard: state.activationGuard,
       }),
       merge: normalizePersistedState,
       onRehydrateStorage: () => (state) => {
@@ -203,3 +256,4 @@ export const selectActiveSettingId = (state) => state.activeId;
 export const selectActiveSettingRuntime = (state) => state.activeRuntime;
 export const selectBundledSettingActive = (state) => Boolean(state.activeRuntime);
 export const selectSettingStoreHydrated = (state) => state.hydrated;
+export const selectActivationGuard = (state) => state.activationGuard;

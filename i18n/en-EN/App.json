@@ -19,5 +19,19 @@
     "download": "Download APK",
     "reload": "Update the app",
     "later": "Later"
+  },
+  "otaUpdate": {
+    "title": "Update ready",
+    "message": "A new app version has been downloaded. Restart now to apply it?",
+    "restart": "Restart",
+    "later": "Later"
+  },
+  "settingCrash": {
+    "title": "Setting disabled",
+    "message": "The setting \"{name}\" failed to start. It has been disabled — the app keeps working without it.",
+    "recovered": "The setting failed to start last time and was disabled. You can try activating it again in the settings.",
+    "disable": "Disable setting and continue",
+    "details": "Error: {message}",
+    "component": "Component: {component}"
   }
 }
