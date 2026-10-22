@@ -12,6 +12,15 @@ import path from 'node:path';
 
 export const RELEASE_INDEX_FILE = 'release.json';
 export const RELEASE_INDEX_SCHEMA_VERSION = 1;
+
+// Индекс обновлений самого приложения: лежит в корне репозитория движка,
+// его читает APK/PWA (src/engine/updates/appRelease.js). Отдельный от
+// release.json: у движка один APK, у сеттингов — набор пакетов.
+export const APP_RELEASE_FILE = 'app-release.json';
+export const APP_RELEASE_SCHEMA_VERSION = 1;
+// Постоянное имя ассета: адрес /releases/latest/download/positronium.apk
+// не меняется от релиза к релизу (docs/publishing.md).
+export const ENGINE_APK_ASSET = 'positronium.apk';
 export const TOOLS_DIR = 'tools';
 
 // Служебные каталоги, которые не публикуются никуда.
@@ -96,9 +105,16 @@ export const listRepositoryFiles = (root, { exclude = [] } = {}) => {
   return files.sort();
 };
 
-/** Файлы для репозитория движка: всё, кроме сеттингов и служебных каталогов. */
+/**
+ * Файлы для репозитория движка: всё, кроме сеттингов и служебных каталогов.
+ *
+ * app-release.json сюда не входит осознанно: его пишет только публикация
+ * релиза (версия + размер и sha256 APK), а обычный push должен сохранять
+ * то, что уже лежит в репозитории, — иначе индекс обновлений откатится.
+ */
 export const planEngineFiles = (root) => listRepositoryFiles(root, { exclude: ENGINE_ONLY_EXCLUDES })
   .filter((relative) => !PUBLISH_ONLY_FILES.includes(relative))
+  .filter((relative) => relative !== APP_RELEASE_FILE)
   .filter((relative) => (
     !relative.startsWith('release-notes/') || relative === ENGINE_RELEASE_NOTES
   ));
@@ -366,6 +382,60 @@ export const releaseAssetUrls = ({ repository, tag, asset }) => ({
   assetUrl: `https://github.com/${repository}/releases/download/${tag}/${asset}`,
   latestUrl: `https://github.com/${repository}/releases/latest/download/${asset}`,
 });
+
+/**
+ * Содержимое app-release.json движка: одна запись про последний релиз.
+ * Публикация пишет файл в корень репозитория движка, клиент читает его с
+ * raw.githubusercontent.com и решает, показывать ли окно обновления.
+ *
+ * @param {object} params
+ * @param {string} params.repository   owner/name движка
+ * @param {string} params.version      semver из app.json
+ * @param {object} params.notes        {locale: string[]} — верхняя секция release-notes/engine.md
+ * @param {string} params.asset        имя файла APK в релизе (постоянное)
+ * @param {number} params.bytes        размер APK
+ * @param {string} params.sha256       sha256 APK
+ * @param {string} [params.publishedAt]
+ */
+export const buildAppReleaseIndex = ({
+  repository,
+  version,
+  notes,
+  asset = ENGINE_APK_ASSET,
+  bytes,
+  sha256,
+  publishedAt,
+}) => {
+  if (!SEMVER_RE.test(String(version ?? ''))) {
+    throw new Error(`[publish] app-release: версия должна быть MAJOR.MINOR.PATCH, получено "${version}"`);
+  }
+  if (!repository || !repository.includes('/')) {
+    throw new Error(`[publish] app-release: нужен репозиторий owner/name, получено "${repository}"`);
+  }
+  if (!asset || asset.includes('/') || asset.includes('\\')) {
+    throw new Error(`[publish] app-release: недопустимое имя ассета "${asset}"`);
+  }
+  if (!Number.isInteger(bytes) || bytes <= 0) {
+    throw new Error('[publish] app-release: нужен размер APK в байтах');
+  }
+  if (!/^[a-f0-9]{64}$/.test(String(sha256 ?? ''))) {
+    throw new Error('[publish] app-release: нужен sha256 APK');
+  }
+  const tag = engineReleaseTag(version);
+  return {
+    schemaVersion: APP_RELEASE_SCHEMA_VERSION,
+    version,
+    tag,
+    repository,
+    asset,
+    bytes,
+    sha256,
+    downloadUrl: `https://github.com/${repository}/releases/latest/download/${asset}`,
+    pageUrl: `https://github.com/${repository}/releases`,
+    notes: notes ?? {},
+    publishedAt: publishedAt ?? new Date().toISOString(),
+  };
+};
 
 /**
  * Содержимое release.json: по записи на каждый опубликованный кошелёк.

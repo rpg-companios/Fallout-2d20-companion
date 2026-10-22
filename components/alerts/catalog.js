@@ -230,4 +230,20 @@ export const ALERTS = {
     titleKey: 'gameSetting.updateTitle',
     messageKey: 'gameSetting.updateFailed',
   },
+
+  // Обновление самого приложения (2026-10-22): ручная проверка из окна
+  // «О приложении». Доступное обновление показывает AppUpdateModal, а эти
+  // два диалога закрывают случаи «нет новее» и «сеть недоступна».
+  appUpdateUpToDate: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'menu.about',
+    messageKey: 'appUpdateUpToDate',
+  },
+  appUpdateCheckFailed: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'menu.about',
+    messageKey: 'appUpdateCheckFailed',
+  },
 };

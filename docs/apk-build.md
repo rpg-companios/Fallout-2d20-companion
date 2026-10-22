@@ -10,8 +10,12 @@
 - `app.json` — `name: Positronium`, `slug: positronium`,
   `android.package`/`ios.bundleIdentifier`: `com.rpgcompanios.positronium`,
   схема `positronium`, `version: 1.0.0` (совпадает с `ENGINE_VERSION`).
-- `eas.json` — профили `preview` (APK), `production` (AAB для Google Play),
-  `development` (dev-client).
+- `eas.json` — профили `preview` (APK, канал `preview`), `production`
+  (AAB для Google Play, канал `production`), `development` (dev-client).
+  `appVersionSource: remote`: `versionCode` ведёт EAS и поднимает при каждом
+  билде — иначе Android не даст обновить установленное приложение.
+- `expo-updates` — OTA: правки JS доезжают до установленных APK без новой
+  сборки (`app.json` → `updates.url`, `runtimeVersion.policy: appVersion`).
 - npm-скрипты: `npm run apk`, `npm run aab`, `npm run apk:local`.
 - Иконки и сплэш в `assets/`.
 
@@ -94,13 +98,24 @@ npm run apk
 ```
 
 Текст релиза берётся из верхней секции `release-notes/engine.md`; её номер
-должен совпадать с версией приложения. Без `--asset` релиз создаётся с
-описанием, файл добавляется позже:
+должен совпадать с версией приложения. APK обязателен: публикация переименует
+его в `positronium.apk`, положит рядом `app-release.json` и оставит у людей
+постоянную ссылку
+<https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>.
+
+## OTA-обновление (без новой сборки)
+
+`expo-updates` доставляет правки JS в уже установленный APK:
 
 ```sh
-gh release upload engine-v1.0.0 positronium-1.0.0.apk \
-  --repo rpg-companios/ttrpg-engine --clobber
+npm run ota -- --message "Что изменилось"          # канал preview
+npx eas-cli update --channel production --message "..." # канал production
 ```
+
+Через OTA нельзя менять нативную часть (новый модуль, разрешение, иконку,
+`versionCode`) — для такого нужен новый APK по инструкции выше. Проект EAS,
+`projectId` и каналы уже прописаны в `app.json`/`eas.json`, повторный
+`eas update:configure` не нужен.
 
 ## Установка сеттинга в собранное приложение
 

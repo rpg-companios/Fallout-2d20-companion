@@ -27,7 +27,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  APP_RELEASE_FILE,
+  buildAppReleaseIndex,
   buildReleaseIndex,
+  ENGINE_APK_ASSET,
   ENGINE_RELEASE_NOTES,
   engineReleaseTag,
   hostModuleIds,
@@ -296,12 +299,17 @@ const publishEngineRelease = async ({ repository, release, assets }) => {
       branch: repository.branch,
     });
     for (const asset of assets) {
-      await uploadReleaseAsset({
-        repository: repository.repository,
-        releaseId: created.id,
-        file: asset,
-        name: path.basename(asset),
-      });
+      const staged = stageEngineAsset(asset);
+      try {
+        await uploadReleaseAsset({
+          repository: repository.repository,
+          releaseId: created.id,
+          file: staged.file,
+          name: staged.name,
+        });
+      } finally {
+        staged.cleanup();
+      }
     }
   } else if (hasCommand('gh')) {
     const base = ['--repo', repository.repository];
@@ -311,20 +319,26 @@ const publishEngineRelease = async ({ repository, release, assets }) => {
     } catch {
       exists = false;
     }
-    if (exists) {
-      for (const asset of assets) {
-        execFileSync('gh', ['release', 'upload', release.tag, asset, ...base, '--clobber'], {
-          stdio: 'inherit',
-        });
+    // Постоянные имена ассетов: gh берёт имя из файла — готовим копии.
+    const staged = assets.map(stageEngineAsset);
+    try {
+      if (exists) {
+        for (const asset of staged) {
+          execFileSync('gh', ['release', 'upload', release.tag, asset.file, ...base, '--clobber'], {
+            stdio: 'inherit',
+          });
+        }
+      } else {
+        execFileSync('gh', [
+          'release', 'create', release.tag, ...staged.map((asset) => asset.file),
+          ...base,
+          '--target', repository.branch,
+          '--title', title,
+          '--notes', notesBody,
+        ], { stdio: 'inherit' });
       }
-    } else {
-      execFileSync('gh', [
-        'release', 'create', release.tag, ...assets,
-        ...base,
-        '--target', repository.branch,
-        '--title', title,
-        '--notes', notesBody,
-      ], { stdio: 'inherit' });
+    } finally {
+      for (const asset of staged) asset.cleanup();
     }
   } else {
     fail(
@@ -429,6 +443,50 @@ const copyFile = (source, target) => {
 };
 
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+
+// Имя ассета в релизе. APK всегда называется positronium.apk: по этому
+// имени собирается постоянная ссылка /releases/latest/download/, которую
+// можно давать людям навсегда (docs/publishing.md).
+const engineAssetName = (file) => (/\.[aA][pP][kK]$/.test(file) ? ENGINE_APK_ASSET : path.basename(file));
+
+/** Файл под нужным именем: gh upload берёт имя из файла, поэтому копируем. */
+const stageEngineAsset = (file) => {
+  const name = engineAssetName(file);
+  if (name === path.basename(file)) return { file, name, cleanup: () => {} };
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-asset-'));
+  const target = path.join(directory, name);
+  fs.copyFileSync(file, target);
+  return { file: target, name, cleanup: () => fs.rmSync(directory, { recursive: true, force: true }) };
+};
+
+// Строки для окна «Доступна новая версия»: клиент рисует их списком, поэтому
+// отдаём пункты, а не переносы markdown. Абзац склеивается в одну строку
+// (иначе окно покажет обрывки фраз), маркеры списка снимаются.
+const appReleaseNotes = (notes) => {
+  const lines = [];
+  if (notes?.title) lines.push(notes.title);
+
+  const paragraphs = [];
+  let current = [];
+  const flush = () => {
+    if (current.length > 0) {
+      paragraphs.push(current.join(' '));
+      current = [];
+    }
+  };
+  for (const raw of String(notes?.body ?? '').split('\n')) {
+    const line = raw.replace(/^\s*[-*]\s+/, '').trim();
+    if (!line) { flush(); continue; }
+    if (line.startsWith('#')) continue;
+    current.push(line);
+  }
+  flush();
+
+  for (const paragraph of paragraphs) {
+    if (paragraph) lines.push(paragraph);
+  }
+  return lines.length > 0 ? { 'ru-RU': lines } : {};
+};
 
 // .trpg собирается esbuild'ом (devDependency движка). Проверяем заранее:
 // иначе упаковщик упадёт уже после клонирования и десятков скопированных файлов.
@@ -536,6 +594,7 @@ const publishEngine = async (args, config) => {
   // верхней секции release-notes/engine.md. Проверяем до клонирования
   // и копирования файлов, чтобы не гонять дерево впустую.
   let release = null;
+  let appRelease = null;
   if (args.release) {
     const version = readEngineVersion(ROOT);
     const notes = readReleaseNotes(ROOT, 'engine');
@@ -551,12 +610,44 @@ const publishEngine = async (args, config) => {
         fail(`--asset: файл не найден: ${asset}`);
       }
     }
+    // Игроки узнают о релизе из приложения и качают APK по постоянной
+    // ссылке — значит, релиз движка без APK бессмысленен: обновляться
+    // будет не на что. AAB (для Play) можно приложить дополнительно.
+    const apk = args.assets.find((asset) => /\.[aA][pP][kK]$/.test(asset));
+    if (!apk) {
+      fail(
+        'релиз движка требует APK (--asset path/to/app-release.apk): '
+        + 'по нему собирается постоянная ссылка обновления и app-release.json',
+      );
+    }
     release = { version, tag: engineReleaseTag(version), notes };
+    appRelease = buildAppReleaseIndex({
+      repository: repository.repository,
+      version,
+      notes: appReleaseNotes(notes),
+      asset: ENGINE_APK_ASSET,
+      bytes: fs.statSync(apk).size,
+      sha256: sha256(apk),
+    });
   }
+
+  // app-release.json не входит в план файлов: его содержимое знает только
+  // публикация. Без релиза сохраняем тот, что уже лежит в репозитории, —
+  // иначе обычный push затёр бы индекс обновлений прошлым состоянием.
+  const appReleasePath = path.join(directory, APP_RELEASE_FILE);
+  const existingAppRelease = fs.existsSync(appReleasePath)
+    ? fs.readFileSync(appReleasePath)
+    : null;
 
   clearWorktree(directory);
   for (const relative of files) {
     copyFile(path.join(ROOT, relative), path.join(directory, relative));
+  }
+
+  if (appRelease) {
+    fs.writeFileSync(appReleasePath, `${JSON.stringify(appRelease, null, 2)}\n`);
+  } else if (existingAppRelease) {
+    fs.writeFileSync(appReleasePath, existingAppRelease);
   }
 
   git(directory, 'add', '-A');
@@ -567,6 +658,9 @@ const publishEngine = async (args, config) => {
     files: files.length,
     changed: status ? status.split('\n').length : 0,
     release: release ? { tag: release.tag, version: release.version, assets: args.assets } : null,
+    appRelease: appRelease
+      ? { version: appRelease.version, asset: appRelease.asset, bytes: appRelease.bytes }
+      : (existingAppRelease ? 'kept' : null),
   };
   console.log(JSON.stringify(report, null, 2));
   if (!status) {

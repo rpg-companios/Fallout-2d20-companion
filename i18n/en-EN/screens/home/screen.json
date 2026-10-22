@@ -169,7 +169,9 @@
   "about": {
     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",
     "privacyPolicy": "Privacy policy",
-    "termsOfService": "Terms of service"
+    "termsOfService": "Terms of service",
+    "version": "Version",
+    "checkUpdates": "Check for updates"
   },
   "gameSetting": {
     "title": "Game setting",
@@ -204,5 +206,7 @@
     "linkInstall": "Install from link",
     "linkFailed": "Could not install from the link. Check the address and connection.",
     "sourceAdded": "Source added. No newer versions yet."
-  }
+  },
+  "appUpdateUpToDate": "You have the latest version: {version}.",
+  "appUpdateCheckFailed": "Could not check for updates. Check your internet connection and try again later."
 }

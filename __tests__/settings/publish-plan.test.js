@@ -6,7 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 
 import {
+  APP_RELEASE_FILE,
+  buildAppReleaseIndex,
   buildReleaseIndex,
+  ENGINE_APK_ASSET,
   ENGINE_RELEASE_NOTES,
   engineReleaseTag,
   listRepositoryFiles,
@@ -198,6 +201,47 @@ describe('заметки о релизах', () => {
 
   it('движок не публикует заметки о релизах сеттинга', () => {
     expect(planEngineFiles(ROOT)).not.toContain('release-notes/fallout.md');
+  });
+});
+
+describe('app-release.json движка', () => {
+  const build = (overrides = {}) => buildAppReleaseIndex({
+    repository: 'rpg-companios/ttrpg-engine',
+    version: '1.0.0',
+    notes: { 'ru-RU': ['Первый выпуск'] },
+    asset: ENGINE_APK_ASSET,
+    bytes: 20_000_000,
+    sha256: 'a'.repeat(64),
+    publishedAt: '2026-10-22T00:00:00.000Z',
+    ...overrides,
+  });
+
+  it('содержит версию, тег, размер, сумму и постоянную ссылку на APK', () => {
+    expect(build()).toMatchObject({
+      schemaVersion: 1,
+      version: '1.0.0',
+      tag: 'engine-v1.0.0',
+      repository: 'rpg-companios/ttrpg-engine',
+      asset: 'positronium.apk',
+      bytes: 20_000_000,
+      sha256: 'a'.repeat(64),
+      downloadUrl: 'https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk',
+      pageUrl: 'https://github.com/rpg-companios/ttrpg-engine/releases',
+      notes: { 'ru-RU': ['Первый выпуск'] },
+    });
+  });
+
+  it('неверные данные не превращаются в индекс', () => {
+    expect(() => build({ version: 'v1' })).toThrow(/MAJOR\.MINOR\.PATCH/);
+    expect(() => build({ repository: 'engine' })).toThrow(/owner\/name/);
+    expect(() => build({ bytes: 0 })).toThrow(/размер APK/);
+    expect(() => build({ sha256: 'zzz' })).toThrow(/sha256/);
+    expect(() => build({ asset: '../app.apk' })).toThrow(/недопустимое имя/);
+  });
+
+  it('индекс обновлений не попадает в план публикации: его пишет только релиз', () => {
+    expect(APP_RELEASE_FILE).toBe('app-release.json');
+    expect(planEngineFiles(ROOT)).not.toContain(APP_RELEASE_FILE);
   });
 });
 

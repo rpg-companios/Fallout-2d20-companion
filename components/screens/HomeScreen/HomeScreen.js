@@ -44,6 +44,8 @@ import {
 import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+import { runManualAppUpdateCheck } from '../../../src/utils/appUpdates';
+import { ENGINE_VERSION } from '../../../src/engine/version';
 import { debugLog } from '../../../src/engine/debug/runtimeTrace.js';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
@@ -1048,6 +1050,19 @@ export default function HomeScreen({ navigation }) {
               {tHomeScreen('about.description'
               )}
             </Text>
+            {/* Версия и проверка обновлений (2026-10-22): человеку нужно
+                видеть, что у него стоит, и уметь спросить «а новее есть?».
+                Доступное обновление покажет AppUpdateModal, «нет новее» и
+                «сеть недоступна» — обычные диалоги каталога. */}
+            <Text style={styles.infoVersion}>
+              {`${tHomeScreen('about.version')}: ${ENGINE_VERSION}`}
+            </Text>
+            <TouchableOpacity
+              style={styles.infoAction}
+              onPress={() => { runManualAppUpdateCheck(); }}
+            >
+              <Text style={styles.linkText}>{tHomeScreen('about.checkUpdates')}</Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('privacy'); }}>
               <Text style={styles.linkText}>{tHomeScreen('about.privacyPolicy')}</Text>
             </TouchableOpacity>

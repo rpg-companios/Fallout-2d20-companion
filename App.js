@@ -17,6 +17,9 @@ import AlertHost from './components/alerts/AlertHost';
 // Окно «Что нового» (321; 335 — один раз на релиз, без галочки):
 // /version.json + описание релиза (логика — src/utils/appVersion.js).
 import UpdateNoticeModal from './components/UpdateNotice/UpdateNoticeModal';
+// Окно «Доступна новая версия» (2026-10-22): app-release.json движка —
+// проверка обновлений для APK и PWA (логика — src/utils/appUpdates.js).
+import AppUpdateModal from './components/UpdateNotice/AppUpdateModal';
 import { initDatabase } from './db/Database';
 import { seedDatabase } from './db/seed';
 import { useLocale, useModuleLocale } from './i18n/locale';
@@ -37,6 +40,8 @@ import useSettingPackStore, {
 } from './src/store/settingPackStore';
 import useSettingUpdateStore, { selectSettingUpdatesHydrated } from './src/store/settingUpdateStore';
 import { startSettingUpdateBootstrap } from './src/utils/settingUpdates';
+import useAppUpdateStore, { selectAppUpdatesHydrated } from './src/store/appUpdateStore';
+import { startAppUpdateBootstrap } from './src/utils/appUpdates';
 
 const Tab = createMaterialTopTabNavigator();
 // Каноническое название приложения (Google OAuth branding, PWA, заголовок вкладки).
@@ -67,6 +72,7 @@ function App() {
   const activeRuntime = useSettingPackStore(selectActiveSettingRuntime);
   const settingStoreHydrated = useSettingPackStore(selectSettingStoreHydrated);
   const settingUpdatesHydrated = useSettingUpdateStore(selectSettingUpdatesHydrated);
+  const appUpdatesHydrated = useAppUpdateStore(selectAppUpdatesHydrated);
   const activateSetting = useSettingPackStore((state) => state.selectSetting);
   const moduleTabsActive = Boolean(activeRuntime);
   const activeGlobalComponents = Object.entries(activeRuntime?.globalComponents ?? {});
@@ -184,6 +190,26 @@ function App() {
     settingUpdatesHydrated,
   ]);
 
+  // Обновление самого приложения (2026-10-22): раз в 6 часов смотрим
+  // app-release.json движка; окно покажет AppUpdateModal. Проверка не
+  // блокирует запуск и молчит при любой сетевой неудаче.
+  useEffect(() => {
+    if (!settingBootstrapped || !appUpdatesHydrated) return undefined;
+    let cancelled = false;
+    startAppUpdateBootstrap({ hydrated: appUpdatesHydrated })
+      .then((plan) => {
+        if (!cancelled && plan?.status === 'available') {
+          debugLog('app.update.bootstrap', { version: plan.version });
+        }
+      })
+      .catch((error) => {
+        debugLog('app.update.bootstrap.failed', { message: error?.message ?? String(error) });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appUpdatesHydrated, settingBootstrapped]);
+
   useEffect(() => {
     if (!settingBootstrapped) return undefined;
     let cancelled = false;
@@ -296,6 +322,7 @@ function App() {
           </NavigationContainer>
           <AlertHost />
           <UpdateNoticeModal />
+          <AppUpdateModal />
           {activeGlobalComponents.map(([id, Component]) => (
             Component ? <Component key={id} /> : null
           ))}

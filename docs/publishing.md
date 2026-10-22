@@ -73,12 +73,49 @@ npm run apk                                   # получить APK (ссылк
 и приложенным APK. Если номер секции не совпадает с версией, публикация
 остановится до копирования дерева.
 
-Без `--asset` релиз создаётся с описанием; файл можно добавить позже:
+**APK обязателен.** Публикация сама называет его `positronium.apk` (имя файла
+на диске не важно) и пишет в корень репозитория `app-release.json` — по нему
+приложение узнаёт о новой версии. Без APK релиз не выпускается: обновляться
+игрокам было бы не на что.
+
+Постоянные адреса (не меняются от релиза к релизу, их можно давать людям):
+
+- страница всех версий — <https://github.com/rpg-companios/ttrpg-engine/releases>;
+- последний APK — <https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>;
+- индекс обновлений — <https://raw.githubusercontent.com/rpg-companios/ttrpg-engine/main/app-release.json>.
+
+`app-release.json` пишет только релиз (версия, тег, имя ассета, размер, sha256,
+заметки). Обычный `publish-engine.sh` без `--release` файл не трогает: то, что
+уже лежит в репозитории, сохраняется как есть, поэтому push не откатывает
+индекс обновлений.
+
+```json
+{
+  "schemaVersion": 1,
+  "version": "1.1.0",
+  "tag": "engine-v1.1.0",
+  "repository": "rpg-companios/ttrpg-engine",
+  "asset": "positronium.apk",
+  "bytes": 20123456,
+  "sha256": "…",
+  "downloadUrl": "https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk",
+  "pageUrl": "https://github.com/rpg-companios/ttrpg-engine/releases",
+  "notes": { "ru-RU": ["Что изменилось для игрока"] }
+}
+```
+
+Второй канал доставки — OTA (`expo-updates`): правки JS доезжают до уже
+установленных APK без новой сборки. Только нативные изменения (новый модуль,
+разрешение, иконка) требуют `npm run apk`; OTA-обновление не меняет
+`versionCode` и не показывается в окне обновления.
 
 ```sh
-gh release upload engine-v1.0.0 positronium-1.0.0.apk \
-  --repo rpg-companios/ttrpg-engine --clobber
+npm run ota -- --message "Исправления интерфейса"   # канал preview
+npx eas-cli update --channel production --message "..."  # канал production
 ```
+
+Первый APK с `expo-updates` — база OTA; на сборки, выпущенные до его установки,
+обновления не приезжают.
 
 ## Версии и заметки о релизах
 
@@ -172,6 +209,8 @@ pnpm-дерева или `rm -rf node_modules && npm install` для npm.
 | `manifest.version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
 | `верхняя секция release-notes/engine.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок движка |
 | `--asset: файл не найден` | передать путь к собранному APK/AAB |
+| `релиз движка требует APK` | собрать `npm run apk` и передать `--asset`; без APK игрокам нечего скачивать |
+| APK установлен, а обновление не приходит | проверить, что сборка содержит `expo-updates` (новый билд после 2026-10-22), и что релиз содержит `app-release.json` |
 | push работает из Replit, а скрипт получает 403 | запустить с `PUBLISH_NO_TOKEN=1` — скрипт возьмёт системные git-креды вместо переменной окружения |
 
 Проверить решение клиента об обновлении можно без публикации:

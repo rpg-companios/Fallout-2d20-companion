@@ -268,6 +268,9 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: '#f0e68c', fontSize: 18, fontWeight: '700', marginBottom: 10 },
   infoText: { color: '#e5e7eb', fontSize: 14, lineHeight: 20 },
+  // 2026-10-22: версия и проверка обновлений в окне «О приложении».
+  infoVersion: { color: '#cfc9a3', fontSize: 13, marginTop: 10 },
+  infoAction: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6 },
   // 389: диагностика установки PWA
   diagBlock: { width: '100%', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#ddd' },
   diagTitle: { fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 4 },
