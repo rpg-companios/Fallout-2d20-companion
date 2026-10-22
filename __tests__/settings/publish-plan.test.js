@@ -25,6 +25,8 @@ import {
   readReleaseNotes,
   releaseAssetUrls,
   releaseNotesFile,
+  releaseNotesLines,
+  renderReleaseBody,
   releaseTag,
   renderSettingReadme,
   renderToolsPackageJson,
@@ -208,7 +210,7 @@ describe('app-release.json движка', () => {
   const build = (overrides = {}) => buildAppReleaseIndex({
     repository: 'rpg-companios/ttrpg-engine',
     version: '1.0.0',
-    notes: { 'ru-RU': ['Первый выпуск'] },
+    notes: { version: '1.0.0', title: 'Первый выпуск', body: 'Приложение без сеттинга.\n\nПравила ставятся пакетом.' },
     asset: ENGINE_APK_ASSET,
     bytes: 20_000_000,
     sha256: 'a'.repeat(64),
@@ -227,8 +229,27 @@ describe('app-release.json движка', () => {
       sha256: 'a'.repeat(64),
       downloadUrl: 'https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk',
       pageUrl: 'https://github.com/rpg-companios/ttrpg-engine/releases',
-      notes: { 'ru-RU': ['Первый выпуск'] },
+      notes: {
+        'ru-RU': [
+          'Первый выпуск',
+          'Приложение без сеттинга.',
+          'Правила ставятся пакетом.',
+        ],
+      },
     });
+  });
+
+  it('заметки для окна: заголовок и абзацы, без markdown-переносов', () => {
+    expect(releaseNotesLines({
+      version: '1.0.0',
+      title: 'Ремонт',
+      body: '- Исправлено сохранение\n- Ускорен старт\n\nВторой абзац\nна двух строках',
+    })).toEqual({ 'ru-RU': ['Ремонт', 'Исправлено сохранение Ускорен старт', 'Второй абзац на двух строках'] });
+  });
+
+  it('тело GitHub Release — заголовок секции и её текст', () => {
+    expect(renderReleaseBody({ version: '1.0.0', title: 'Первый выпуск', body: 'Текст.' }))
+      .toBe('## 1.0.0 — Первый выпуск\n\nТекст.');
   });
 
   it('неверные данные не превращаются в индекс', () => {
@@ -237,6 +258,21 @@ describe('app-release.json движка', () => {
     expect(() => build({ bytes: 0 })).toThrow(/размер APK/);
     expect(() => build({ sha256: 'zzz' })).toThrow(/sha256/);
     expect(() => build({ asset: '../app.apk' })).toThrow(/недопустимое имя/);
+  });
+
+  it('релизные скрипты едут в движок: релиз выпускается там же, где сборка', () => {
+    const files = planEngineFiles(ROOT);
+    for (const file of [
+      'scripts/release.mjs',
+      'scripts/release.sh',
+      'scripts/lib/app-release.mjs',
+      'scripts/lib/release-notes.mjs',
+    ]) {
+      expect(files).toContain(file);
+    }
+    // Скрипты публикации — механизм смешанного репозитория, в движок не едут.
+    expect(files).not.toContain('scripts/publish-engine.sh');
+    expect(files).not.toContain('scripts/publish-repositories.mjs');
   });
 
   it('индекс обновлений не попадает в план публикации: его пишет только релиз', () => {

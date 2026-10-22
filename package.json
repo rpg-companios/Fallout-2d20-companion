@@ -11,6 +11,8 @@
     "apk:local": "npx expo prebuild --platform android --clean && cd android && ./gradlew assembleRelease",
     "aab": "npx eas-cli build --platform android --profile production",
     "ota": "npx eas-cli update --channel preview",
+    "release": "node scripts/release.mjs",
+    "release:play": "node scripts/release.mjs --aab --submit",
     "serve": "npx serve -s dist -l 5000",
     "test": "vitest run",
     "publish:plan": "node scripts/publish-repositories.mjs",

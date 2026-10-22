@@ -85,22 +85,27 @@ npx expo export --platform android --output-dir dist
 В репозитории движка это уже проверено: бандл Hermes ≈ 3.7 МБ собирается без
 папки `modules/`.
 
-## Публикация APK в релиз
+## Сборка и публикация релиза — одна команда
 
-Готовый APK прикладывается к GitHub Release движка (тег `engine-v<версия>`,
-версия — `expo.version` в `app.json`). Собирает его EAS, публикация только
-прикладывает файл:
+Всё делается здесь же, в репозитории движка (в смешанном репозитории — только
+разработка и веб-режим). Ручное скачивание APK не нужно:
 
 ```sh
-npm run apk
-# из совмещённого репозитория:
-./scripts/publish-engine.sh --release --asset ~/Downloads/positronium-1.0.0.apk
+npm run release                     # APK → GitHub Release + app-release.json
+npm run release -- --aab            # AAB (файл для Google Play) в релиз
+npm run release -- --aab --submit   # плюс загрузка AAB в Play Console
 ```
 
-Текст релиза берётся из верхней секции `release-notes/engine.md`; её номер
-должен совпадать с версией приложения. APK обязателен: публикация переименует
-его в `positronium.apk`, положит рядом `app-release.json` и оставит у людей
-постоянную ссылку
+Скрипт `scripts/release.mjs`: проверяет версию (`app.json`) и заметки
+(`release-notes/engine.md` — номер верхней секции должен совпасть), собирает
+профиль EAS (`preview` → APK, `production` → AAB), скачивает артефакт, создаёт
+релиз `engine-v<версия>` с файлом `positronium.apk`, пишет `app-release.json`
+и коммитит его.
+
+Другие режимы: `--build-id <id>` (опубликовать уже собранную сборку),
+`--skip-build` (взять последнюю успешную), `--dry-run` (показать план).
+
+Постоянная ссылка, которую можно давать людям:
 <https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>.
 
 ## OTA-обновление (без новой сборки)

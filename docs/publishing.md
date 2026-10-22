@@ -31,10 +31,11 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 - `--dry-run` — показать изменения, ничего не отправляя;
 - `--patch` — сохранить `.publish/patches/engine.patch`;
 - `--message "..."` — своё сообщение коммита;
-- `--release` — дополнительно выпустить GitHub Release `engine-v<версия>`
-  (версия из `app.json`) с описанием из `release-notes/engine.md`;
-- `--asset <файл>` — приложить к релизу APK/AAB (флаг можно повторять;
-  `--asset` сам включает `--release`).
+- релиза не делает: APK собирается и публикуется в самом репозитории движка
+  (`npm run release` там же, см. ниже). `--release`/`--asset` для движка —
+  ошибка с подсказкой;
+- `app-release.json` (индекс обновлений) не трогает: сохраняет тот, что уже
+  лежит в репозитории движка.
 
 **`scripts/publish-setting.sh`** — собирает репозиторий сеттингов и выпускает
 релиз:
@@ -57,26 +58,39 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 
 Оба скрипта идемпотентны: повторный запуск без изменений ничего не коммитит.
 
-## Релизы движка
+## Релизы движка — в репозитории движка
 
-APK публикация не собирает — его собирает EAS (`npm run apk`) или локальный
-Gradle (`npm run apk:local`). Публикация прикладывает готовый файл к релизу:
+Порядок работы: разработка и веб-режим — здесь, в смешанном репозитории;
+`publish-engine.sh` доставляет сюда код; **сборка и релиз живут в самом
+движке**. Одна команда там, без путей из других чекаутов:
 
 ```sh
-npm run apk                                   # получить APK (ссылка от EAS)
-./scripts/publish-engine.sh --release --asset ~/Downloads/positronium-1.0.0.apk
+cd ~/workspace/ttrpg-engine
+git pull
+./scripts/release.sh            # APK → GitHub Release → app-release.json → push
 ```
 
-Что создаётся: тег `engine-v<версия>` (версия — `expo.version` в `app.json`,
-она же `ENGINE_VERSION` в `src/engine/version.js`), GitHub Release
-«Positronium <версия>» с текстом из верхней секции `release-notes/engine.md`
-и приложенным APK. Если номер секции не совпадает с версией, публикация
-остановится до копирования дерева.
+Что делает `./scripts/release.sh` (`npm run release`):
 
-**APK обязателен.** Публикация сама называет его `positronium.apk` (имя файла
-на диске не важно) и пишет в корень репозитория `app-release.json` — по нему
-приложение узнаёт о новой версии. Без APK релиз не выпускается: обновляться
-игрокам было бы не на что.
+1. берёт версию из `app.json` и заметки из `release-notes/engine.md`;
+2. собирает профиль EAS `preview` (APK) — ждёт завершения;
+3. скачивает артефакт сборки сам;
+4. создаёт GitHub Release `engine-v<версия>` с ассетом `positronium.apk`
+   (текст — верхняя секция `release-notes/engine.md`);
+5. пишет `app-release.json` и коммитит его в репозиторий.
+
+Другие режимы:
+
+```sh
+./scripts/release.sh --aab            # AAB (файл для Google Play) в релиз
+./scripts/release.sh --aab --submit   # плюс загрузка AAB в Play Console (eas submit)
+./scripts/release.sh --build-id <id>  # опубликовать уже собранную сборку
+./scripts/release.sh --skip-build     # взять последнюю успешную сборку профиля
+./scripts/release.sh --dry-run        # только показать план
+```
+
+Проверка версии: номер верхней секции `release-notes/engine.md` должен
+совпадать с `expo.version` — иначе скрипт останавливается до сборки.
 
 Постоянные адреса (не меняются от релиза к релизу, их можно давать людям):
 
@@ -84,9 +98,9 @@ npm run apk                                   # получить APK (ссылк
 - последний APK — <https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>;
 - индекс обновлений — <https://raw.githubusercontent.com/rpg-companios/ttrpg-engine/main/app-release.json>.
 
-`app-release.json` пишет только релиз (версия, тег, имя ассета, размер, sha256,
-заметки). Обычный `publish-engine.sh` без `--release` файл не трогает: то, что
-уже лежит в репозитории, сохраняется как есть, поэтому push не откатывает
+`app-release.json` пишет только релиз движка (версия, тег, имя ассета, размер,
+sha256, заметки). Публикация кода (`publish-engine.sh`) файл не трогает: то,
+что уже лежит в репозитории, сохраняется как есть, поэтому push не откатывает
 индекс обновлений.
 
 ```json
@@ -208,9 +222,9 @@ pnpm-дерева или `rm -rf node_modules && npm install` для npm.
 | `верхняя секция release-notes/fallout.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок |
 | `manifest.version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
 | `верхняя секция release-notes/engine.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок движка |
-| `--asset: файл не найден` | передать путь к собранному APK/AAB |
-| `релиз движка требует APK` | собрать `npm run apk` и передать `--asset`; без APK игрокам нечего скачивать |
+| `релиз движка выпускается в самом репозитории движка` | `publish-engine.sh` только доставляет код; релиз — `./scripts/release.sh` в движке |
 | APK установлен, а обновление не приходит | проверить, что сборка содержит `expo-updates` (новый билд после 2026-10-22), и что релиз содержит `app-release.json` |
+| `нет успешных сборок профиля preview` | убрать `--skip-build` или передать `--build-id` |
 | push работает из Replit, а скрипт получает 403 | запустить с `PUBLISH_NO_TOKEN=1` — скрипт возьмёт системные git-креды вместо переменной окружения |
 
 Проверить решение клиента об обновлении можно без публикации:

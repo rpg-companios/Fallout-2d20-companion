@@ -6,9 +6,13 @@
 //
 // Порядок работы владельца: сначала правим здесь, потом запускаем скрипт.
 // Скрипт собирает дерево целевого репозитория из текущего checkout, пишет
-// патч (--patch), коммитит и пушит (--push), а для сеттинга собирает `.trpg`,
-// обновляет release.json и создаёт релиз GitHub (--release) — по нему клиент
-// и узнаёт о новой версии.
+// патч (--patch), коммитит и пушит (--push). Для сеттинга он ещё собирает
+// `.trpg`, обновляет release.json и создаёт релиз GitHub (--release).
+//
+// Релиз ДВИЖКА здесь не выпускается: APK собирается и публикуется в самом
+// репозитории движка (`npm run release` там — scripts/release.mjs). Этот
+// скрипт только доставляет туда код, поэтому engine + --release — ошибка с
+// подсказкой, а app-release.json сохраняется как есть.
 //
 // Примеры:
 //   node scripts/publish-repositories.mjs                     # план, ничего не меняет
@@ -28,11 +32,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   APP_RELEASE_FILE,
-  buildAppReleaseIndex,
   buildReleaseIndex,
-  ENGINE_APK_ASSET,
-  ENGINE_RELEASE_NOTES,
-  engineReleaseTag,
   hostModuleIds,
   isLegacyReleaseTag,
   nextReleaseVersion,
@@ -40,8 +40,6 @@ import {
   planSettingLegalFiles,
   planSettingToolFiles,
   planSettingWallets,
-  readEngineVersion,
-  readReleaseNotes,
   releaseNotesFile,
   RELEASE_INDEX_FILE,
   renderSettingReadme,
@@ -99,7 +97,7 @@ const parseArguments = (argv) => {
     fail(`unknown --bump level: ${args.bump} (expected patch|minor|major)`);
   }
   if (args.release && args.target === 'setting' && args.assets.length > 0) {
-    fail('--asset is for engine releases (APK/AAB); the setting release uploads the built .trpg');
+    fail('--asset не нужен: релиз сеттинга сам собирает и прикладывает .trpg');
   }
   return args;
 };
@@ -275,79 +273,7 @@ const publishRelease = async ({ repository, branch, entry }) => {
   console.log(`[publish] release: ${tag} → ${repository.repository}`);
 };
 
-/**
- * Релиз движка: тег `engine-v<версия>`, APK/AAB — ассетами.
- *
- * Сборку APK делает EAS (или локальный Gradle) — публикация не собирает
- * приложение, она только прикладывает готовые файлы. Без `--asset` релиз
- * создаётся с описанием, файл можно добавить позже.
- */
-const publishEngineRelease = async ({ repository, release, assets }) => {
-  const notesBody = [
-    release.notes.title ? `## ${release.version} — ${release.notes.title}` : `## ${release.version}`,
-    '',
-    release.notes.body ?? '',
-  ].join('\n').trim();
-  const title = `Positronium ${release.version}`;
 
-  if (TOKEN) {
-    const created = await ensureRelease({
-      repository: repository.repository,
-      tag: release.tag,
-      title,
-      notes: notesBody,
-      branch: repository.branch,
-    });
-    for (const asset of assets) {
-      const staged = stageEngineAsset(asset);
-      try {
-        await uploadReleaseAsset({
-          repository: repository.repository,
-          releaseId: created.id,
-          file: staged.file,
-          name: staged.name,
-        });
-      } finally {
-        staged.cleanup();
-      }
-    }
-  } else if (hasCommand('gh')) {
-    const base = ['--repo', repository.repository];
-    let exists = true;
-    try {
-      execFileSync('gh', ['release', 'view', release.tag, ...base], { stdio: 'ignore' });
-    } catch {
-      exists = false;
-    }
-    // Постоянные имена ассетов: gh берёт имя из файла — готовим копии.
-    const staged = assets.map(stageEngineAsset);
-    try {
-      if (exists) {
-        for (const asset of staged) {
-          execFileSync('gh', ['release', 'upload', release.tag, asset.file, ...base, '--clobber'], {
-            stdio: 'inherit',
-          });
-        }
-      } else {
-        execFileSync('gh', [
-          'release', 'create', release.tag, ...staged.map((asset) => asset.file),
-          ...base,
-          '--target', repository.branch,
-          '--title', title,
-          '--notes', notesBody,
-        ], { stdio: 'inherit' });
-      }
-    } finally {
-      for (const asset of staged) asset.cleanup();
-    }
-  } else {
-    fail(
-      'для релиза нужен токен GitHub: задайте PUBLISH_GITHUB_TOKEN (или GH_TOKEN) '
-      + 'либо авторизуйте gh CLI',
-    );
-  }
-  console.log(`[publish] engine release: ${release.tag} → ${repository.repository}`);
-};
 
 /**
  * Убрать релизы и теги до-семантической нумерации (`fallout-v1`).
@@ -440,53 +366,16 @@ const clearWorktree = (directory) => {
 const copyFile = (source, target) => {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.copyFileSync(source, target);
+  // Права переносим явно: copyFileSync создаёт файл по umask, и исполняемый
+  // scripts/release.sh в движке стал бы неисполняемым.
+  fs.chmodSync(target, fs.statSync(source).mode);
 };
 
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
-// Имя ассета в релизе. APK всегда называется positronium.apk: по этому
-// имени собирается постоянная ссылка /releases/latest/download/, которую
-// можно давать людям навсегда (docs/publishing.md).
-const engineAssetName = (file) => (/\.[aA][pP][kK]$/.test(file) ? ENGINE_APK_ASSET : path.basename(file));
 
-/** Файл под нужным именем: gh upload берёт имя из файла, поэтому копируем. */
-const stageEngineAsset = (file) => {
-  const name = engineAssetName(file);
-  if (name === path.basename(file)) return { file, name, cleanup: () => {} };
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'publish-asset-'));
-  const target = path.join(directory, name);
-  fs.copyFileSync(file, target);
-  return { file: target, name, cleanup: () => fs.rmSync(directory, { recursive: true, force: true }) };
-};
 
-// Строки для окна «Доступна новая версия»: клиент рисует их списком, поэтому
-// отдаём пункты, а не переносы markdown. Абзац склеивается в одну строку
-// (иначе окно покажет обрывки фраз), маркеры списка снимаются.
-const appReleaseNotes = (notes) => {
-  const lines = [];
-  if (notes?.title) lines.push(notes.title);
 
-  const paragraphs = [];
-  let current = [];
-  const flush = () => {
-    if (current.length > 0) {
-      paragraphs.push(current.join(' '));
-      current = [];
-    }
-  };
-  for (const raw of String(notes?.body ?? '').split('\n')) {
-    const line = raw.replace(/^\s*[-*]\s+/, '').trim();
-    if (!line) { flush(); continue; }
-    if (line.startsWith('#')) continue;
-    current.push(line);
-  }
-  flush();
-
-  for (const paragraph of paragraphs) {
-    if (paragraph) lines.push(paragraph);
-  }
-  return lines.length > 0 ? { 'ru-RU': lines } : {};
-};
 
 // .trpg собирается esbuild'ом (devDependency движка). Проверяем заранее:
 // иначе упаковщик упадёт уже после клонирования и десятков скопированных файлов.
@@ -586,54 +475,14 @@ const publishEngine = async (args, config) => {
   const directory = ensureWorktree(repository, workdir);
   const files = planEngineFiles(ROOT);
 
-  if (args.push || args.release) {
+  if (args.push) {
     assertPushAccess(directory, repository, repository.branch);
   }
 
-  // Релиз движка: версия одна на app.json и ENGINE_VERSION, текст — из
-  // верхней секции release-notes/engine.md. Проверяем до клонирования
-  // и копирования файлов, чтобы не гонять дерево впустую.
-  let release = null;
-  let appRelease = null;
-  if (args.release) {
-    const version = readEngineVersion(ROOT);
-    const notes = readReleaseNotes(ROOT, 'engine');
-    if (!notes) fail(`нет файла заметок ${ENGINE_RELEASE_NOTES}: без него релиз не выпускается`);
-    if (notes.version !== version) {
-      fail(
-        `верхняя секция ${ENGINE_RELEASE_NOTES} — ${notes.version}, `
-        + `а публикуется ${version}. Добавьте раздел "## ${version}" в начало файла.`,
-      );
-    }
-    for (const asset of args.assets) {
-      if (!fs.existsSync(asset) || !fs.statSync(asset).isFile()) {
-        fail(`--asset: файл не найден: ${asset}`);
-      }
-    }
-    // Игроки узнают о релизе из приложения и качают APK по постоянной
-    // ссылке — значит, релиз движка без APK бессмысленен: обновляться
-    // будет не на что. AAB (для Play) можно приложить дополнительно.
-    const apk = args.assets.find((asset) => /\.[aA][pP][kK]$/.test(asset));
-    if (!apk) {
-      fail(
-        'релиз движка требует APK (--asset path/to/app-release.apk): '
-        + 'по нему собирается постоянная ссылка обновления и app-release.json',
-      );
-    }
-    release = { version, tag: engineReleaseTag(version), notes };
-    appRelease = buildAppReleaseIndex({
-      repository: repository.repository,
-      version,
-      notes: appReleaseNotes(notes),
-      asset: ENGINE_APK_ASSET,
-      bytes: fs.statSync(apk).size,
-      sha256: sha256(apk),
-    });
-  }
-
-  // app-release.json не входит в план файлов: его содержимое знает только
-  // публикация. Без релиза сохраняем тот, что уже лежит в репозитории, —
-  // иначе обычный push затёр бы индекс обновлений прошлым состоянием.
+  // app-release.json пишет только релизный сценарий движка (npm run release
+  // там же, где собирается APK). Публикация кода его не трогает: то, что уже
+  // лежит в репозитории, сохраняется как есть, иначе push откатил бы индекс
+  // обновлений к прошлому релизу.
   const appReleasePath = path.join(directory, APP_RELEASE_FILE);
   const existingAppRelease = fs.existsSync(appReleasePath)
     ? fs.readFileSync(appReleasePath)
@@ -644,9 +493,7 @@ const publishEngine = async (args, config) => {
     copyFile(path.join(ROOT, relative), path.join(directory, relative));
   }
 
-  if (appRelease) {
-    fs.writeFileSync(appReleasePath, `${JSON.stringify(appRelease, null, 2)}\n`);
-  } else if (existingAppRelease) {
+  if (existingAppRelease) {
     fs.writeFileSync(appReleasePath, existingAppRelease);
   }
 
@@ -657,15 +504,11 @@ const publishEngine = async (args, config) => {
     repository: repository.repository,
     files: files.length,
     changed: status ? status.split('\n').length : 0,
-    release: release ? { tag: release.tag, version: release.version, assets: args.assets } : null,
-    appRelease: appRelease
-      ? { version: appRelease.version, asset: appRelease.asset, bytes: appRelease.bytes }
-      : (existingAppRelease ? 'kept' : null),
+    appRelease: existingAppRelease ? 'kept' : null,
   };
   console.log(JSON.stringify(report, null, 2));
   if (!status) {
     console.log('[publish] engine: no changes');
-    if (release) await publishEngineRelease({ repository, release, assets: args.assets });
     return report;
   }
 
@@ -675,7 +518,7 @@ const publishEngine = async (args, config) => {
     console.log(`[publish] engine patch: ${patchFile} (${bytes} bytes)`);
     report.patch = patchFile;
   }
-  if (args.push || args.release) {
+  if (args.push) {
     commit(directory, commitMessage(args));
     git(directory, 'push', 'origin', `HEAD:${repository.branch}`);
     console.log('[publish] engine: pushed');
@@ -684,7 +527,6 @@ const publishEngine = async (args, config) => {
     git(directory, 'reset', '--hard', 'HEAD');
     git(directory, 'clean', '-fdx');
   }
-  if (release) await publishEngineRelease({ repository, release, assets: args.assets });
   if (args.keep) console.log(`[publish] engine tree kept: ${directory}`);
   return report;
 };
@@ -893,7 +735,17 @@ const main = async () => {
   const config = readJson(args.config);
   console.log(`[publish] auth: ${TOKEN ? 'токен GitHub из окружения' : 'без токена (git credential helper / gh)'}`);
   const reports = [];
-  if (args.target === 'all' || args.target === 'engine') reports.push(await publishEngine(args, config));
+  const touchesEngine = args.target === 'all' || args.target === 'engine';
+  if (touchesEngine && args.release) {
+    fail(
+      'релиз движка выпускается в самом репозитории движка: ./scripts/release.sh '
+      + '(npm run release там же, где собирается APK). Здесь — только публикация кода.',
+    );
+  }
+  if (touchesEngine && args.assets.length > 0) {
+    fail('--asset больше не нужен: APK собирает и прикладывает релизный сценарий движка');
+  }
+  if (touchesEngine) reports.push(await publishEngine(args, config));
   if (args.target === 'all' || args.target === 'setting') reports.push(await publishSetting(args, config));
   console.log(JSON.stringify({ ok: true, reports }, null, 2));
 };

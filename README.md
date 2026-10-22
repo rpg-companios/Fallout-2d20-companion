@@ -118,18 +118,22 @@ npm run apk:local
 Одна-две строки для игрока.
 ```
 
-Выпуск (из совмещённого репозитория, откуда идёт публикация):
+Выпуск — из самого репозитория движка, одной командой:
 
 ```sh
-./scripts/publish-engine.sh --release --asset ~/Downloads/positronium-1.0.0.apk
+npm run release            # APK → GitHub Release → app-release.json → push
+npm run release -- --aab   # AAB (файл для Google Play) в релиз
+npm run release -- --aab --submit   # плюс загрузка AAB в Play Console
 ```
 
-Релиз требует APK: по нему собирается постоянная ссылка и `app-release.json`
-(индекс обновлений для приложения). Файл на диске может называться как угодно —
-в релиз он попадает как `positronium.apk`.
+Скрипт сам собирает профиль EAS (`preview` для APK, `production` для AAB),
+скачивает артефакт, создаёт тег `engine-v<версия>` и релиз с ассетом
+`positronium.apk` (имя постоянное — ссылка `latest/download` не меняется),
+затем пишет `app-release.json` (индекс обновлений для приложения) и коммитит
+его. Ручного скачивания файла и проброса путей из другого чекаута нет.
 
-Публикация также пишет в корень репозитория движка `app-release.json` — его
-читают APK и PWA. Обычный `publish-engine.sh` без `--release` файл не трогает.
+Код в этот репозиторий доставляется публикацией из смешанного репозитория
+(`./scripts/publish-engine.sh` там) — она файл `app-release.json` не трогает.
 
 OTA-обновление (только JS, без новой сборки; нативные изменения требуют
 `npm run apk`):

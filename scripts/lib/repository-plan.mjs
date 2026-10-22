@@ -10,17 +10,46 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import {
+  APP_RELEASE_FILE,
+  APP_RELEASE_SCHEMA_VERSION,
+  ENGINE_AAB_ASSET,
+  ENGINE_APK_ASSET,
+  ENGINE_RELEASE_NOTES,
+  SEMVER_RE,
+  buildAppReleaseIndex,
+  engineReleaseTag,
+  isSemanticVersion,
+  readEngineVersion,
+  releaseNotesLines,
+  renderAppReleaseIndex,
+  renderReleaseBody,
+} from './app-release.mjs';
+import { parseReleaseNotes, readReleaseNotes as readReleaseNotesFile } from './release-notes.mjs';
+
+// Общее с репозиторием движка: релиз выпускается там же, где собирается APK
+// (scripts/release.mjs), и правила про версию/заметки/index обязаны совпадать.
+// Реэкспорт сохраняет прежние импорты из repository-plan.mjs.
+export {
+  APP_RELEASE_FILE,
+  APP_RELEASE_SCHEMA_VERSION,
+  ENGINE_AAB_ASSET,
+  ENGINE_APK_ASSET,
+  ENGINE_RELEASE_NOTES,
+  buildAppReleaseIndex,
+  engineReleaseTag,
+  isSemanticVersion,
+  parseReleaseNotes,
+  readEngineVersion,
+  releaseNotesLines,
+  renderAppReleaseIndex,
+  renderReleaseBody,
+};
+
 export const RELEASE_INDEX_FILE = 'release.json';
 export const RELEASE_INDEX_SCHEMA_VERSION = 1;
 
-// Индекс обновлений самого приложения: лежит в корне репозитория движка,
-// его читает APK/PWA (src/engine/updates/appRelease.js). Отдельный от
-// release.json: у движка один APK, у сеттингов — набор пакетов.
-export const APP_RELEASE_FILE = 'app-release.json';
-export const APP_RELEASE_SCHEMA_VERSION = 1;
-// Постоянное имя ассета: адрес /releases/latest/download/positronium.apk
-// не меняется от релиза к релизу (docs/publishing.md).
-export const ENGINE_APK_ASSET = 'positronium.apk';
+
 export const TOOLS_DIR = 'tools';
 
 // Служебные каталоги, которые не публикуются никуда.
@@ -43,9 +72,7 @@ const COMBINED_ONLY = [
 // (docs/known-test-failures.md) сделал бы публичный движок красно-зелёным.
 const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'src/store/__test-setup__'];
 
-// Заметки о релизах у каждого репозитория свои: движку нужен только его файл,
-// а `release-notes/fallout.md` остаётся в репозитории сеттинга.
-export const ENGINE_RELEASE_NOTES = 'release-notes/engine.md';
+
 
 // Публикация — механизм совмещённого репозитория: в самом движке этим
 // скриптам нечего делать (они собирают в том числе сам движок).
@@ -209,11 +236,7 @@ export const planSettingLegalFiles = (root) => SETTING_LEGAL_FILES
  * до-семантической и не продолжает линию — первый семантический выпуск
  * получает номер из манифеста (1.0.0), а старый тег убирается публикацией.
  */
-export const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
-export const isSemanticVersion = (value) => (
-  typeof value === 'string' && SEMVER_RE.test(value.trim())
-);
 
 /** Разобрать `MAJOR.MINOR.PATCH` в тройку чисел; иначе null. */
 export const parseSemver = (value) => {
@@ -300,18 +323,7 @@ export const nextReleaseVersion = ({
   return bumpVersion(publishedVersion, level);
 };
 
-/** Тег релиза движка: `engine-v<version>` (например, engine-v1.0.0). */
-export const engineReleaseTag = (version) => `engine-v${version}`;
 
-/** Версия движка из app.json (`expo.version`) — то же число, что ENGINE_VERSION. */
-export const readEngineVersion = (root) => {
-  const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
-  const version = app?.expo?.version;
-  if (typeof version !== 'string' || !isSemanticVersion(version)) {
-    throw new Error(`[publish] app.json expo.version must be MAJOR.MINOR.PATCH: ${version}`);
-  }
-  return version;
-};
 
 /** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v1.0.1). */
 export const releaseTag = (settingId, version) => `${settingId}-v${version}`;
@@ -321,61 +333,17 @@ export const isLegacyReleaseTag = (settingId, tag) => (
   typeof tag === 'string' && new RegExp(`^${settingId}-v\\d+$`).test(tag)
 );
 
+/** Верхняя секция заметок из рабочего дерева (null, если файла нет). */
+export const readReleaseNotes = (root, settingId) => (
+  readReleaseNotesFile(root, `release-notes/${settingId}.md`)
+);
+
 /** Путь файла заметок о релизах внутри репозитория (один на сеттинг). */
 export const releaseNotesFile = (settingId) => `release-notes/${settingId}.md`;
 
-/**
- * Разобрать заметки о релизах. Формат — markdown, секции `## <version>`:
- *
- *   ## 1.0.1
- *   Что изменилось...
- *
- * Публикация берёт верхнюю секцию и проверяет, что её версия совпадает с
- * выпускаемой: заметки и пакет всегда про один и тот же номер.
- *
- * @returns {{version: string, title: string, body: string}}
- */
-export const parseReleaseNotes = (text, { file = 'release-notes.md' } = {}) => {
-  const lines = String(text ?? '').split(/\r?\n/);
-  // Заголовки внутри ``` — примеры, а не секции: их пропускаем.
-  const headings = [];
-  let fenced = false;
-  for (let index = 0; index < lines.length; index += 1) {
-    if (/^\s*```/.test(lines[index])) { fenced = !fenced; continue; }
-    if (!fenced && /^##\s+/.test(lines[index])) headings.push(index);
-  }
-  if (headings.length === 0) {
-    throw new Error(`[publish] ${file} has no "## <version>" section`);
-  }
 
-  const start = headings[0];
-  const end = headings.length > 1 ? headings[1] : lines.length;
-  const heading = lines[start].replace(/^##\s+/, '').trim();
-  const match = /^(\d+(?:\.\d+)*)\s*(?:[—–-]\s*(.*))?$/.exec(heading);
-  if (!match) {
-    throw new Error(`[publish] ${file}: section title must start with a version, got "${heading}"`);
-  }
 
-  const body = [];
-  fenced = false;
-  for (let index = start + 1; index < end; index += 1) {
-    if (/^\s*```/.test(lines[index])) fenced = !fenced;
-    body.push(lines[index]);
-  }
 
-  return {
-    version: match[1],
-    title: (match[2] ?? '').trim(),
-    body: body.join('\n').trim(),
-  };
-};
-
-/** Верхняя секция заметок сеттинга из рабочего дерева (null, если файла нет). */
-export const readReleaseNotes = (root, settingId) => {
-  const file = path.join(root, releaseNotesFile(settingId));
-  if (!fs.existsSync(file)) return null;
-  return { ...parseReleaseNotes(fs.readFileSync(file, 'utf8'), { file: releaseNotesFile(settingId) }), file };
-};
 
 /** Адреса скачивания архива релиза. */
 export const releaseAssetUrls = ({ repository, tag, asset }) => ({
@@ -383,59 +351,7 @@ export const releaseAssetUrls = ({ repository, tag, asset }) => ({
   latestUrl: `https://github.com/${repository}/releases/latest/download/${asset}`,
 });
 
-/**
- * Содержимое app-release.json движка: одна запись про последний релиз.
- * Публикация пишет файл в корень репозитория движка, клиент читает его с
- * raw.githubusercontent.com и решает, показывать ли окно обновления.
- *
- * @param {object} params
- * @param {string} params.repository   owner/name движка
- * @param {string} params.version      semver из app.json
- * @param {object} params.notes        {locale: string[]} — верхняя секция release-notes/engine.md
- * @param {string} params.asset        имя файла APK в релизе (постоянное)
- * @param {number} params.bytes        размер APK
- * @param {string} params.sha256       sha256 APK
- * @param {string} [params.publishedAt]
- */
-export const buildAppReleaseIndex = ({
-  repository,
-  version,
-  notes,
-  asset = ENGINE_APK_ASSET,
-  bytes,
-  sha256,
-  publishedAt,
-}) => {
-  if (!SEMVER_RE.test(String(version ?? ''))) {
-    throw new Error(`[publish] app-release: версия должна быть MAJOR.MINOR.PATCH, получено "${version}"`);
-  }
-  if (!repository || !repository.includes('/')) {
-    throw new Error(`[publish] app-release: нужен репозиторий owner/name, получено "${repository}"`);
-  }
-  if (!asset || asset.includes('/') || asset.includes('\\')) {
-    throw new Error(`[publish] app-release: недопустимое имя ассета "${asset}"`);
-  }
-  if (!Number.isInteger(bytes) || bytes <= 0) {
-    throw new Error('[publish] app-release: нужен размер APK в байтах');
-  }
-  if (!/^[a-f0-9]{64}$/.test(String(sha256 ?? ''))) {
-    throw new Error('[publish] app-release: нужен sha256 APK');
-  }
-  const tag = engineReleaseTag(version);
-  return {
-    schemaVersion: APP_RELEASE_SCHEMA_VERSION,
-    version,
-    tag,
-    repository,
-    asset,
-    bytes,
-    sha256,
-    downloadUrl: `https://github.com/${repository}/releases/latest/download/${asset}`,
-    pageUrl: `https://github.com/${repository}/releases`,
-    notes: notes ?? {},
-    publishedAt: publishedAt ?? new Date().toISOString(),
-  };
-};
+
 
 /**
  * Содержимое release.json: по записи на каждый опубликованный кошелёк.
