@@ -1,4 +1,6 @@
 import * as ReactModule from 'react';
+import * as ReactJsxRuntime from 'react/jsx-runtime';
+import * as ReactJsxDevRuntime from 'react/jsx-dev-runtime';
 import * as ActiveSettingRuntime from './activeSettingRuntime.js';
 import * as ExpoVectorIcons from '@expo/vector-icons';
 import * as ReactNative from 'react-native';
@@ -55,6 +57,8 @@ export const SETTING_RUNTIME_HOST_MODULES = Object.freeze({
   '@expo/vector-icons': ExpoVectorIcons,
   react: ReactModule,
   'react-native': ReactNative,
+  'react/jsx-runtime': ReactJsxRuntime,
+  'react/jsx-dev-runtime': ReactJsxDevRuntime,
   'zustand/react/shallow': ZustandReactShallow,
   'engine:components/screens/InventoryScreen/InventoryScreen': InventoryScreenComponent,
   'engine:components/screens/InventoryScreen/logic/inventoryI18n': InventoryI18n,
