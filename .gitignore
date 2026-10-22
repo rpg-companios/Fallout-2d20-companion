@@ -9,6 +9,11 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Кэш Expo CLI / React Native DevTools (dotslash): внутри встречаются
+# read-only каталоги, и EAS Build падает на упаковке архива
+# («EACCES: permission denied, rmdir .../.cache/dotslash/...»).
+.cache/
+
 # Native
 .kotlin/
 *.orig.*
@@ -50,3 +55,7 @@ package-lock — копия.json
 # нативные проекты генерируются из app.json/eas.json
 /android
 /ios
+
+# локальное окружение Replit и скачанный вручную node
+.replit
+.node/

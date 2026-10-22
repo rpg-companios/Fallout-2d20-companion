@@ -371,6 +371,22 @@ describe('release.json', () => {
     expect(source).toContain('нужно делать в смешанном репозитории');
   });
 
+  it('кэш Expo не попадает в архив EAS и убирается перед сборкой', () => {
+    // EAS копирует рабочее дерево по правилам .gitignore и падает на удалении
+    // read-only каталогов внутри .cache/dotslash (EACCES: rmdir).
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'eas-ignore-'));
+    try {
+      fs.copyFileSync(path.join(ROOT, '.gitignore'), path.join(root, '.gitignore'));
+      fs.mkdirSync(path.join(root, '.cache', 'dotslash', '64'), { recursive: true });
+      expect(spawnSync('git', ['init', '-q', root]).status).toBe(0);
+      expect(spawnSync('git', ['-C', root, 'check-ignore', '-q', '.cache/dotslash/64/app']).status).toBe(0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    expect(source).toContain('clearExpoCache');
+  });
+
   it('перед EAS-сборкой релиз ставит зависимости приложения', () => {
     const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
     // EAS читает плагины из node_modules; в свежем клоне их нет.

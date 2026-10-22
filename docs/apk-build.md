@@ -137,6 +137,26 @@ Entity Not Authorized: AppEntity[...] (action = READ)
    У нового проекта будет новый keystore: уже установленный APK так не
    обновить (подпись другая), его придётся переустановить.
 
+## EAS падает на упаковке архива (`EACCES … .cache/dotslash`)
+
+```
+Failed to upload the project tarball to EAS Build
+Reason: EACCES: permission denied, rmdir '.../.cache/dotslash/.../React Native DevTools-linux-x64'
+```
+
+EAS Build копирует рабочее дерево во временный клон по правилам `.gitignore`
+и после архивации удаляет клон. В `.cache/dotslash/` Expo CLI складывает
+React Native DevTools; каталоги там бывают без права записи, поэтому удаление
+падает.
+
+Что делать:
+
+- `.cache/` должен быть в `.gitignore` (он там);
+- `release.sh` перед сборкой сам убирает `.cache` из проекта;
+- вручную, если нужно: `chmod -R u+w .cache && rm -rf .cache`.
+
+Кэш восстановится сам при следующем запуске Expo CLI — на сборку он не влияет.
+
 ## OTA-обновление (без новой сборки)
 
 `expo-updates` доставляет правки JS в уже установленный APK:

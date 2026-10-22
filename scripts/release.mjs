@@ -328,6 +328,37 @@ const parseJson = (text, what) => {
 };
 
 /**
+ * Кэш Expo CLI (React Native DevTools через dotslash) в корне проекта.
+ *
+ * Внутри бывают каталоги без права записи, а EAS Build копирует рабочее
+ * дерево во временный клон и потом не может его удалить:
+ * «EACCES: permission denied, rmdir .../.cache/dotslash/...». Кэш не нужен ни
+ * сборке, ни приложению — убираем его перед упаковкой.
+ */
+const clearExpoCache = () => {
+  const cache = path.join(ROOT, '.cache');
+  if (!fs.existsSync(cache)) return;
+  const relax = (target) => {
+    const stat = fs.lstatSync(target);
+    if (stat.isSymbolicLink()) return;
+    fs.chmodSync(target, stat.isDirectory() ? 0o755 : 0o644);
+    if (stat.isDirectory()) {
+      for (const entry of fs.readdirSync(target)) relax(path.join(target, entry));
+    }
+  };
+  try {
+    relax(cache);
+    fs.rmSync(cache, { recursive: true, force: true });
+    console.log('[release] убран кэш .cache (мешал упаковке EAS)');
+  } catch (error) {
+    console.warn(
+      `[release] не удалось убрать .cache: ${error?.message ?? error}. `
+      + 'Если сборка упадёт на упаковке — удалите каталог вручную.',
+    );
+  }
+};
+
+/**
  * Зависимости приложения перед EAS-сборкой.
  *
  * EAS перед отправкой в облако собирает архив проекта локально и читает
@@ -484,6 +515,7 @@ const releaseEngine = async ({ args, repository }) => {
   }
 
   ensureEngineDependencies();
+  clearExpoCache();
   const account = easAccount();
   if (account) console.log(`[release] EAS: ${account}`);
   const build = resolveBuild({ args, profile });
