@@ -5,7 +5,7 @@ import falloutSettings from './settings.json';
 import { SETTING } from './index.js';
 import FusionCoreChoiceModal from './screens/PowerArmor/FusionCoreChoiceModal.js';
 import PowerCoreClock from './powerArmor/PowerCoreClock.js';
-import InventoryScreen from '../../components/screens/InventoryScreen/InventoryScreen.js';
+import InventoryScreen from 'engine:components/screens/InventoryScreen/InventoryScreen';
 import CharacterScreen from './screens/CharacterScreen/CharacterScreen.js';
 import EquipmentScreen from './screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js';
 import PerksAndTraitsScreen from './screens/PerksAndTraitsScreen/PerksAndTraitsScreen.js';

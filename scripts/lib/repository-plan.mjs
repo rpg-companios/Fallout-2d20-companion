@@ -131,6 +131,33 @@ export const planSettingWallets = (root, wallets) => {
   return planned;
 };
 
+/**
+ * Список `engine:` модулей, которые отдаёт хост движка. Сборщик сеттинга
+ * сверяет с ним внешние импорты бандла, поэтому файл живёт рядом с tools/:
+ * в репозитории сеттинга исходников движка нет.
+ */
+export const hostModuleIds = (root) => {
+  const file = path.join(root, 'src/engine/settings/settingRuntimeHost.js');
+  if (!fs.existsSync(file)) return [];
+  const source = fs.readFileSync(file, 'utf8');
+  return [...new Set(
+    [...source.matchAll(/(['"])(engine:[^'"]+)\1\s*:/g)].map((match) => match[2]),
+  )].sort();
+};
+
+/** package.json для tools/: единственная зависимость — сборщик бандла. */
+export const renderToolsPackageJson = ({ engineVersion } = {}) => `${JSON.stringify({
+  name: 'positronium-setting-tools',
+  private: true,
+  description: 'Сборщик пакетов .trpg (checkout движка не требуется)',
+  scripts: {
+    build: 'python3 pack-setting.py fallout -o dist/fallout.trpg',
+  },
+  devDependencies: {
+    esbuild: engineVersion ?? 'latest',
+  },
+}, null, 2)}\n`;
+
 /** Инструменты упаковки переезжают в репозиторий сеттинга (папка tools/). */
 export const SETTING_TOOL_SOURCES = [
   { from: 'scripts/pack-setting.py', to: `${TOOLS_DIR}/pack-setting.py` },
@@ -213,27 +240,25 @@ export const renderSettingReadme = ({ repository, wallets, engineRepository }) =
     '',
     'Каждый кошелёк содержит `manifest.json`, `runtimeEntry.js`, данные, переводы и экраны.',
     '',
-    'В этом репозитории нет Node-проекта: `npm install` здесь не нужен и вреден',
-    '(npm уйдёт вверх по дереву и попытается переставить чужие зависимости).',
-    'Сборщик `esbuild` берётся из checkout\'а движка или из кэша',
-    '`$TMPDIR/positronium-build-tools`, который ставит `tools/pack-setting.py`.',
+    'Сборщик живёт в репозитории: `npm install --prefix tools` ставит esbuild',
+    'в `tools/node_modules`. Checkout движка не нужен — кошелёк обращается к',
+    'движку только через `engine:<id>`, эти модули отдаёт хост приложения.',
+    'Список доступных модулей — `tools/host-modules.json` (обновляет публикация).',
     `Готовый пакет для игрока — файл \`.trpg\`, он публикуется в релизах этого репозитория (см. \`${RELEASE_INDEX_FILE}\`).`,
     '',
     '## Сборка пакета',
     '',
-    'В репозитории сеттинга нет исходников движка, поэтому упаковщику нужно',
-    'указать его checkout:',
+    'Движок для сборки не нужен:',
     '',
     '```sh',
-    `git clone https://github.com/${engineRepository} ../ttrpg-engine`,
-    'POSITRONIUM_ENGINE=../ttrpg-engine python3 tools/pack-setting.py fallout -o dist/fallout.trpg',
+    'npm install --prefix tools',
+    'python3 tools/pack-setting.py fallout -o dist/fallout.trpg',
     '```',
     '',
-    'Без `POSITRONIUM_ENGINE` (или `--engine <path>`) упаковщик остановится с',
-    'понятной ошибкой, а не соберёт пакет без runtime-бандла.',
-    '',
-    'Runtime-бандл собирает esbuild, поэтому в checkout движка должны быть',
-    'установлены зависимости: npm install (достаточно npm install esbuild).',
+    'Импорты `engine:<id>` остаются в бандле внешними; приложение отдаёт их',
+    'из `src/engine/settings/settingRuntimeHost.js` во время работы. Если',
+    'кошелёк запросит модуль, которого хост не объявляет, сборка остановится',
+    'с ошибкой и списком недостающих id.',
     '',
     '## Лицензия',
     '',
@@ -256,6 +281,16 @@ export const renderToolsReadme = () => [
   '`pack-setting.py` — собрать `.trpg` из папки кошелька.',
   '`unpack-setting.py` — проверить и распаковать `.trpg` в отдельную папку.',
   '`build-setting-runtime.mjs` — собрать CommonJS runtime-бандл, объявленный в манифесте.',
+  '`host-modules.json` — какие `engine:` модули отдаёт хост движка (обновляет публикация).',
+  '',
+  'Сборка не требует checkout движка: кошелёк обращается к движку только через',
+  '`engine:<id>`, эти импорты остаются внешними и их отдаёт приложение.',
+  '',
+  '```bash',
+  'npm install --prefix tools      # ставит esbuild в tools/node_modules',
+  'python3 tools/pack-setting.py fallout -o dist/fallout.trpg',
+  'python3 tools/unpack-setting.py dist/fallout.trpg --dest /tmp/check --force',
+  '```',
   '',
   'Скрипты не запускают код сеттинга: они только проверяют манифест и укладывают файлы.',
   '',

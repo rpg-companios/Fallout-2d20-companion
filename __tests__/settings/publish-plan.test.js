@@ -9,11 +9,13 @@ import {
   buildReleaseIndex,
   listRepositoryFiles,
   planEngineFiles,
+  hostModuleIds,
   planSettingLegalFiles,
   planSettingWallets,
   releaseAssetUrls,
   releaseTag,
   renderSettingReadme,
+  renderToolsPackageJson,
 } from '../../scripts/lib/repository-plan.mjs';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -155,7 +157,8 @@ describe('release.json', () => {
     });
     expect(readme).toContain('fallout/');
     expect(readme).toContain('tools/pack-setting.py');
-    expect(readme).toContain('POSITRONIUM_ENGINE');
+    expect(readme).toContain('npm install --prefix tools');
+    expect(readme).toContain('engine:<id>');
     expect(readme).toContain('AGPL-3.0');
   });
 });
@@ -187,14 +190,15 @@ describe('shell-обёртки', () => {
     expect(script).not.toMatch(/npm install\s+--no-save[^\n]*esbuild/);
   });
 
-  it('README репозитория сеттинга предупреждает, что npm install там не нужен', () => {
+  it('README объясняет, что сборщик живёт в tools/, а checkout движка не нужен', () => {
     const readme = renderSettingReadme({
       repository: 'rpg-companios/positronium-game-settings',
       wallets: { fallout: { path: 'modules/fallout' } },
       engineRepository: 'rpg-companios/ttrpg-engine',
     });
-    expect(readme).toContain('npm install');
-    expect(readme).toMatch(/нет Node-проекта/);
+    expect(readme).toContain('npm install --prefix tools');
+    expect(readme).toContain('Движок для сборки не нужен');
+    expect(readme).not.toContain('POSITRONIUM_ENGINE');
   });
 
   it('обёртки исполняемые', () => {
@@ -213,9 +217,59 @@ describe('конфигурация в репозитории', () => {
     expect(config.setting.wallets.fallout.path).toBe('modules/fallout');
   });
 
-  it('settings/release-sources.json: источник обновления указывает на репозиторий сеттингов', () => {
+  it('settings/release-sources.json: движок не знает ни одного сеттинга заранее', () => {
     const sources = JSON.parse(fs.readFileSync(path.join(ROOT, 'settings/release-sources.json'), 'utf8'));
-    expect(sources.settings.fallout.repository).toBe('rpg-companios/positronium-game-settings');
+    expect(sources.settings).toEqual({});
     expect(sources.defaults.checkIntervalHours).toBeGreaterThan(0);
+  });
+});
+
+describe('сеттинг — самодостаточный плагин', () => {
+  it('tools/ несёт свой package.json со сборщиком', () => {
+    const pkg = JSON.parse(renderToolsPackageJson({ engineVersion: '^0.28.2' }));
+    expect(pkg.private).toBe(true);
+    expect(pkg.devDependencies.esbuild).toBe('^0.28.2');
+  });
+
+  it('движок объявляет host-модули, а кошелёк использует только их', () => {
+    const host = new Set(hostModuleIds(ROOT));
+    expect(host.size).toBeGreaterThan(40);
+
+    const used = new Set();
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== 'node_modules') walk(full);
+          continue;
+        }
+        if (!/\.(js|jsx|ts|tsx)$/.test(entry.name)) continue;
+        const text = fs.readFileSync(full, 'utf8');
+        for (const match of text.matchAll(/(['"])(engine:[^'"]+)\1/g)) used.add(match[2]);
+      }
+    };
+    walk(path.join(ROOT, 'modules/fallout'));
+
+    expect([...used].filter((id) => !host.has(id))).toEqual([]);
+  });
+
+  it('в кошельке нет относительных импортов за его пределы', () => {
+    // Именно они заставляли упаковщика требовать checkout движка.
+    const wallet = path.join(ROOT, 'modules/fallout');
+    const escaping = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) { walk(full); continue; }
+        if (!/\.(js|jsx|ts|tsx)$/.test(entry.name)) continue;
+        const text = fs.readFileSync(full, 'utf8');
+        for (const match of text.matchAll(/(['"])(\.{1,2}\/[^'"]+)\1/g)) {
+          const target = path.resolve(path.dirname(full), match[2]);
+          if (!target.startsWith(wallet)) escaping.push(`${path.relative(wallet, full)} -> ${match[2]}`);
+        }
+      }
+    };
+    walk(wallet);
+    expect(escaping).toEqual([]);
   });
 });

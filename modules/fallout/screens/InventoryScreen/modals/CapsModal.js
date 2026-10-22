@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { showRawAlert } from '../../../../../components/alerts/alertService.js';
-import { formatInventoryText, tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
-import { useModuleLocale } from '../../../../../i18n/locale.js';
+import { showRawAlert } from 'engine:components/alerts/alertService';
+import { formatInventoryText, tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
+import { useModuleLocale } from 'engine:i18n/locale';
 
 const CapsModal = ({ visible, onClose, onSave, operationType, balance = 0 }) => {
   useModuleLocale();

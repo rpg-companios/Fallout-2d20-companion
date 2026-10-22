@@ -2,10 +2,10 @@
 // The setting owns these row shapes; the engine's db/catalogSource.js is a
 // generic dispatcher preserving existing database query call sites.
 
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
-import { getPerks, getPerksI18n } from '../../../domain/registry.js';
-import useUserEquipmentStore from '../../../src/store/userEquipmentStore.js';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { getPerks, getPerksI18n } from 'engine:domain/registry';
+import useUserEquipmentStore from 'engine:src/store/userEquipmentStore';
 
 // ─── helpers (mirrors seed.js) ──────────────────────────────────────────────
 const safeStr = (v) => (v === null || v === undefined ? null : String(v));

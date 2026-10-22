@@ -1,4 +1,4 @@
-import { getSettingData } from '../../../domain/registry.js';
+import { getSettingData } from 'engine:domain/registry';
 
 const getBodyPlans = () => getSettingData('bodyplans') ?? {};
 const getOrigins = () => getSettingData('origins') ?? [];

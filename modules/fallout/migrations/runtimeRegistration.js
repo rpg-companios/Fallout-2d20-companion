@@ -1,4 +1,4 @@
-import { registerStateMigration } from '../../../src/store/stateExtensions.js';
+import { registerStateMigration } from 'engine:src/store/stateExtensions';
 import {
   migrateChairmenClothingV7V8,
   migrateConflictingWeaponQualitiesV2V3,

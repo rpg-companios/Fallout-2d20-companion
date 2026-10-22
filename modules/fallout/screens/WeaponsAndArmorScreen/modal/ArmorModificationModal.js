@@ -1,15 +1,15 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from 'engine:i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import {
   applyFalloutArmorMods as applyArmorMods,
   filterFalloutModsByInventory as filterModsByInventory,
   formatFalloutArmorModBonuses as formatModBonuses,
   getAvailableFalloutArmorMods as getAvailableArmorMods,
 } from '../../../logic/armorMods.js';
-import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
-import useCharacterStore from '../../../../../src/store/characterStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
+import useCharacterStore from 'engine:src/store/characterStore';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import styles from '../../../styles/ArmorModificationModal.styles';
 

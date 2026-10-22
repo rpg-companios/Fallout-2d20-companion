@@ -8,9 +8,9 @@
  */
 
 import { rollByType } from './diceRollsLogic.js';
-import { createCounter, consume, restore } from '../../../domain/counters.js';
+import { createCounter, consume, restore } from 'engine:domain/counters';
 import { getCanonicalAttributeKey } from './characterCreation.js';
-import { isItemAllowed, ACTIONS } from '../../../domain/itemfitRules.js';
+import { isItemAllowed, ACTIONS } from 'engine:domain/itemfitRules';
 import { isRobotCharacter } from './originTypes.js';
 
 // Расход зарядов Ядерного блока каркасом, зарядов в час. Временное значение (§3.3 плана).

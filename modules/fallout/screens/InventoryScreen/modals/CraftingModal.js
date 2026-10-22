@@ -27,7 +27,7 @@ import { getActionPoints } from '../../../logic/actionPoints.js';
 // 364 (слово владельца: в приложении ЕДИНЫЙ механизм всплывающих окон —
 // components/alerts/alertService + AlertHost, работает и на вебе, и на
 // нативе; системный Alert на Web — тихая заглушка).
-import { showRawAlert } from '../../../../../components/alerts/alertService';
+import { showRawAlert } from 'engine:components/alerts/alertService';
 // 357: отчёт о крафте — общий компонент окна крафта и модалки установки модов.
 import CraftReportView from '../../../crafting/CraftReportView';
 

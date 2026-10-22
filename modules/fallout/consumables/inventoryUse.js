@@ -1,5 +1,5 @@
-import { canConsumeOnSelf, canConsumeOnOther } from '../../../domain/itemfitRules.js';
-import { tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { canConsumeOnSelf, canConsumeOnOther } from 'engine:domain/itemfitRules';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 import { buildConsumableResultReport } from './resultReport.js';
 
 const NO_RADIATION_PREVIEW = Object.freeze({

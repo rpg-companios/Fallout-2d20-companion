@@ -13,6 +13,8 @@ import {
   compareVersions,
   normalizeReleaseSource,
   parseReleaseIndex,
+  parseSettingLink,
+  repositoryFromAssetUrl,
   parseVersionRequirement,
   planSettingUpdate,
   releaseIndexUrl,
@@ -197,5 +199,38 @@ describe('скачивание релиза', () => {
 
   it('сумма считается через expo-crypto (заглушка даёт 32 байта 0xab)', async () => {
     await expect(settingReleaseDigest(new Uint8Array([1]))).resolves.toBe('ab'.repeat(32));
+  });
+});
+
+describe('ссылка, введённая пользователем', () => {
+  it('репозиторий понимается в короткой и полной записи', () => {
+    expect(parseSettingLink('owner/repo')).toEqual({ repository: 'owner/repo', branch: 'main' });
+    expect(parseSettingLink('https://github.com/owner/repo')).toEqual({
+      repository: 'owner/repo',
+      branch: 'main',
+    });
+    expect(parseSettingLink('https://github.com/owner/repo/tree/dev')).toEqual({
+      repository: 'owner/repo',
+      branch: 'dev',
+    });
+  });
+
+  it('release.json и прямой архив .trpg тоже принимаются', () => {
+    expect(parseSettingLink('https://raw.githubusercontent.com/owner/repo/main/release.json'))
+      .toEqual({ repository: 'owner/repo', branch: 'main' });
+    expect(parseSettingLink('https://github.com/owner/repo/releases/download/v1/setting.trpg'))
+      .toEqual({ assetUrl: 'https://github.com/owner/repo/releases/download/v1/setting.trpg' });
+  });
+
+  it('чужой адрес отвергается с понятной причиной', () => {
+    expect(() => parseSettingLink('https://example.com/setting')).toThrow(/unsupported setting link/);
+    expect(() => parseSettingLink('  ')).toThrow(/empty setting link/);
+  });
+
+  it('после установки по ссылке известен репозиторий для проверки обновлений', () => {
+    expect(repositoryFromAssetUrl(
+      'https://github.com/owner/repo/releases/download/v1/setting.trpg',
+    )).toBe('owner/repo');
+    expect(repositoryFromAssetUrl('https://example.com/setting.trpg')).toBeNull();
   });
 });

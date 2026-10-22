@@ -3,7 +3,7 @@
 // No React, no UI dependencies. No locale literals — skill identity is the
 // canonical UPPER_SNAKE_CASE key from SKILL_CATALOG_ORDER below.
 
-import { getOrigins, getTraits } from '../../../domain/registry.js';
+import { getOrigins, getTraits } from 'engine:domain/registry';
 import { isRobotCharacter } from './originTypes.js';
 
 // SPECIAL identities and aliases belong to this setting package. The engine

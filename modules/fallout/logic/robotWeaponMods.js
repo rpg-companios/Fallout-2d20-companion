@@ -1,4 +1,4 @@
-import { classifyModWritePlan } from '../../../src/engine/items/weaponMods';
+import { classifyModWritePlan } from 'engine:src/engine/items/weaponMods';
 import { deserializeSlot, isSlimSlot } from './robotSlots.js';
 
 /** Stable host identity for a weapon nested in a Fallout robot equipment slot. */

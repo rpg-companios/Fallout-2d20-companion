@@ -8,6 +8,7 @@ import * as Database from '../../../db/Database';
 import * as CurrentLocale from '../../../i18n/locale';
 import * as Effects from '../../../domain/effects.js';
 import * as RuntimeTrace from '../debug/runtimeTrace.js';
+import * as SettingManifest from '../contracts/settingManifest';
 import * as CharacterSaves from '../../../src/saves/characterSaves';
 import * as AppSettingsStore from '../../../src/store/appSettingsStore';
 import * as CharacterStore from '../../../src/store/characterStore';
@@ -22,6 +23,7 @@ import * as InventoryI18n from '../../../components/screens/InventoryScreen/logi
 import * as AddItemModal from '../../../components/screens/InventoryScreen/modals/AddItemModal.js';
 import * as CatalogSource from '../../../db/catalogSource.js';
 import * as Counters from '../../../domain/counters.js';
+import * as UserEquipment from '../../../domain/userEquipment.js';
 import * as CraftingEngine from '../../../domain/craftingEngine.js';
 import * as D20Checks from '../../../domain/d20Checks.js';
 import * as DeepMerge from '../../../domain/deepMerge.js';
@@ -59,6 +61,7 @@ export const SETTING_RUNTIME_HOST_MODULES = Object.freeze({
   'engine:components/screens/InventoryScreen/modals/AddItemModal': AddItemModal,
   'engine:db/catalogSource': CatalogSource,
   'engine:domain/counters': Counters,
+  'engine:domain/userEquipment': UserEquipment,
   'engine:domain/craftingEngine': CraftingEngine,
   'engine:domain/d20Checks': D20Checks,
   'engine:domain/deepMerge': DeepMerge,
@@ -86,6 +89,7 @@ export const SETTING_RUNTIME_HOST_MODULES = Object.freeze({
   'engine:i18n/locale': CurrentLocale,
   'engine:domain/effects': Effects,
   'engine:src/engine/debug/runtimeTrace': RuntimeTrace,
+  'engine:src/engine/contracts/settingManifest': SettingManifest,
   'engine:src/saves/characterSaves': CharacterSaves,
   'engine:src/store/appSettingsStore': AppSettingsStore,
   'engine:src/store/characterStore': CharacterStore,

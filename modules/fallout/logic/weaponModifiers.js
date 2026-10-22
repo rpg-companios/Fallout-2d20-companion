@@ -25,7 +25,7 @@
 //     stockNames.without → каталожное имя.
 
 import { clampRangeIndex, indexToRangeName, rangeToIndex } from './weaponRange.js';
-import { applyNumericModifier } from '../../../domain/numericModifier.js';
+import { applyNumericModifier } from 'engine:domain/numericModifier';
 
 const toNumber = (value) => {
   const n = Number(String(value ?? 0).replace(',', '.'));

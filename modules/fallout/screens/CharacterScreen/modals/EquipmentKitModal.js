@@ -6,8 +6,8 @@ import { initRobotSlots } from '../../../logic/robotEquip.js';
 import { isRobotCharacter, getBodyPlan } from '../../../logic/originTypes.js';
 import { getBuiltinBaseWeapon } from '../../../logic/startingEquipment.js';
 import { getBodyPlan as getBodyPlanData } from '../../../logic/bodyplan.js';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { useLocale, useModuleLocale } from 'engine:i18n/locale';
 import styles from '../../../styles/EquipmentKitModal.styles';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 

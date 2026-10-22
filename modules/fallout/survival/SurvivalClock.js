@@ -25,8 +25,8 @@
 
 import { useEffect } from 'react';
 import { AppState } from 'react-native';
-import useCharacterStore from '../../../src/store/characterStore';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useCharacterStore from 'engine:src/store/characterStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
 import { advanceRealMinutes, fatigueHpLossFromEvents } from './survival';
 
 const TICK_INTERVAL_MS = 30_000;

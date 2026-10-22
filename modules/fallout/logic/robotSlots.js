@@ -28,7 +28,7 @@ import { getFalloutRobotLimbCatalog as getRobotLimbCatalog } from './robotCatalo
 import { applyFalloutWeaponMods as applyWeaponMods } from './weaponModifiers.js';
 // Единая форма правды модов — движковый контракт (311): список id на
 // экземпляре, карта «слот → id» выводится. Локальный toModIds ниже — фасад.
-import { modIdList } from '../../../src/engine/items/weaponMods';
+import { modIdList } from 'engine:src/engine/items/weaponMods';
 
 /** Слои защиты в порядке приоритета (armor и frame совместимы, plating — нет). */
 export const LAYER_KEYS = ['armor', 'frame', 'plating'];

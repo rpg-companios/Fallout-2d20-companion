@@ -1,4 +1,4 @@
-import { hasDamageImmunity } from '../../../domain/immunities.js';
+import { hasDamageImmunity } from 'engine:domain/immunities';
 
 /** Fallout's origin/trait immunity rules. */
 export const getTraitImmunities = (trait) => (

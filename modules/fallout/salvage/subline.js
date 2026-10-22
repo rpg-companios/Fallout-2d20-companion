@@ -10,10 +10,10 @@
 // слой UI, здесь их нет намеренно.
 
 import { getCanonicalItemId } from '../logic/itemIdentity.js';
-import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
+import { findCatalogEntry, inferItemType } from 'engine:domain/resolveItem';
 import { getSalvageComposition } from './catalog.js';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { getCurrentModuleLocale } from '../../../i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { filterCompositionByCeiling, isScrapMaterial, salvagePreview, scrapperCeiling, scrapperRankForRarity } from './operations';
 
 const nameIndex = () => {

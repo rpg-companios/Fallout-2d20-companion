@@ -1,5 +1,5 @@
 // Fallout-specific interpretation of stored weapon-mod payloads.
-import { catalogGetWeaponModById } from '../../../db/catalogSource.js';
+import { catalogGetWeaponModById } from 'engine:db/catalogSource';
 
 export const applyFalloutStoredItemModifiers = (item) => {
   const appliedMods = item?.appliedMods || {};

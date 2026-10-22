@@ -1,15 +1,13 @@
 // Проверка обновлений сеттинга при запуске приложения.
 //
 // Слово владельца (2026-10-20): «Сеттинг смотрит в свой репозиторий и при
-// запуске проверяет релиз». Для официального сеттинга включён autoInstall —
-// новая версия ставится сама, без вопроса; для остальных (коммьюнити)
-// по умолчанию спрашиваем подтверждение, потому что код пакета исполняется
-// в общем JS-контексте приложения, а не в песочнице.
+// запуске проверяет релиз». Источники добавляет пользователь ссылкой, поэтому
+// autoInstall по умолчанию выключен; подтверждение спрашиваем всегда, кроме
+// случая, когда источник явно разрешил ставить обновления без вопроса.
 //
 // Провал проверки/установки не ломает запуск: игра продолжает работать на
 // установленной версии, событие уходит в трассу.
 
-import releaseSourcesConfig from '../../settings/release-sources.json';
 import { showAlert } from '../../components/alerts/alertService';
 import { debugLog } from '../engine/debug/runtimeTrace';
 import useSettingUpdateStore from '../store/settingUpdateStore';
@@ -21,7 +19,11 @@ export const resetSettingUpdateBootstrap = () => {
   startedForSession = false;
 };
 
-const sourceFor = (settingId) => releaseSourcesConfig?.settings?.[settingId] ?? null;
+/** Правила установки для найденного плана: их приносит сам план. */
+const sourceFor = (plan) => ({
+  autoInstall: plan.autoInstall === true,
+  repository: plan.repository ?? null,
+});
 
 /**
  * Проверить обновления и, если они есть, установить их.
@@ -50,8 +52,7 @@ export const runSettingUpdateCheck = async ({
 
   const results = [];
   for (const plan of plans) {
-    const source = sourceFor(plan.settingId);
-    if (!source) continue;
+    const source = sourceFor(plan);
 
     // Первую установку подтверждаем всегда: приложение не несёт сеттинг
     // внутри, и качать десятки мегабайт без спроса нельзя. autoInstall

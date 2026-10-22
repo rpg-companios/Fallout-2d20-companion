@@ -1,9 +1,9 @@
 import { debugLog } from './debug.js';
-import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from '../../db/Database';
+import { getWeaponById, getWeaponModById, getAmmoById, getItemByName } from 'engine:db/Database';
 import { resolveRandomLootByRoll } from './screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './logic/diceRollsLogic.js';
-import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
-import { resolveLevelValue } from '../../domain/levelBands';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { resolveLevelValue } from 'engine:domain/levelBands';
 import { getFalloutUniqQualityName as getUniqQualityName } from './logic/uniqQualities.js';
 import { enrichFalloutWeaponItem as enrichWeaponItem } from './logic/weaponModifiers.js';
 import { composeFalloutNameWithQualities } from './logic/uniqQualities.js';

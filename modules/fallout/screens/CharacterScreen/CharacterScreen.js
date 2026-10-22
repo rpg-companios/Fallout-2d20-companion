@@ -12,18 +12,18 @@ import {
   TextInput,
 } from "react-native";
 // Шаг 8б (патч 242): сохранение — модуль сейвов (без React).
-import { saveCharacter } from "../../../../src/saves/characterSaves";
-import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
-import useCharacterStore from "../../../../src/store/characterStore";
-import { useSettingAction } from "../../../../src/store/useSettingAction.js";
-import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
-import { selectActiveTimedEffects } from "../../../../src/store/selectors";
+import { saveCharacter } from 'engine:src/saves/characterSaves';
+import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from 'engine:components/alerts/alertService';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { useSettingAction } from 'engine:src/store/useSettingAction';
+import { selectLegacyAttributes, selectLegacySkills } from 'engine:src/store/selectors';
+import { selectActiveTimedEffects } from 'engine:src/store/selectors';
 import { useShallow } from 'zustand/react/shallow';
 import OriginModal from "./modals/OriginModal";
 import EquipmentKitModal from "./modals/EquipmentKitModal";
-import { loadEnrichedOrigins } from "../../../../domain/origins";
+import { loadEnrichedOrigins } from 'engine:domain/origins';
 import { loadTraitsData, tTrait, getBannedTagSkills, hasTraitEffect } from "../../logic/traits.js";
-import { filterKitsForCharacter } from "../../../../domain/equipmentKits";
+import { filterKitsForCharacter } from 'engine:domain/equipmentKits';
 import { resolveKitItemEquipState } from "../../logic/kitEquip.js";
 import StartingPurchaseModal from "./modals/StartingPurchaseModal";
 import { rollCombatDiceEffects } from "../../logic/diceRollsLogic.js";
@@ -57,14 +57,14 @@ import {
   getSkillDisplayName,
   tCharacterScreen,
 } from "./logic/characterScreenI18n";
-import { useLocale, useModuleLocale, useModuleCatalogRevision } from "../../../../i18n/locale";
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from 'engine:i18n/locale';
 import { AttributesSection } from "./AttributesSection";
 import styles from '../../styles/CharacterScreen.styles';
 import { getTimedAttributeModifiers } from "../../logic/timedEffectModifiers.js";
-import { createEmptyEquippedArmor } from "../../../../domain/equippedArmor";
+import { createEmptyEquippedArmor } from 'engine:domain/equippedArmor';
 import { resolveSkillRewards } from "../../skillRewards";
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../debug.js";
-import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков

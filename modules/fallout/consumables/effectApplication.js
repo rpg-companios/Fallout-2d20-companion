@@ -1,7 +1,7 @@
 import {
   applyOrStackTimedEffect,
   createTimedEffectRecord,
-} from '../../../domain/effects.js';
+} from 'engine:domain/effects';
 import {
   getDefenseModifierEffectLabel,
   getFalloutEffectText,

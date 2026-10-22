@@ -1,5 +1,5 @@
 // Fallout catalog item sublines used by the shared add-item modal.
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { resolveAmmoName, weaponEffectsLabel, weaponQualitiesLabel } from './weaponDisplay.js';
 import { isFalloutArmorLikeItem } from './itemType.js';
 

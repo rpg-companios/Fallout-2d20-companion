@@ -22,7 +22,7 @@
 //   { done: false, stage: 'store', reason: 'spend-refused', spent: [], granted: [],
 //     check, time }
 
-import { resolveD20Check } from '../../../domain/d20Checks.js';
+import { resolveD20Check } from 'engine:domain/d20Checks';
 
 const pickOption = (list, choose) => {
   if (!Array.isArray(list) || list.length === 0) return null;

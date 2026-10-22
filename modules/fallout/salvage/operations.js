@@ -9,19 +9,19 @@
 // Как и операции крафта: читают СВЕЖЕЕ состояние прямо из стора, пишут —
 // действиями того же стора; React-контекста модуль не знает.
 
-import useCharacterStore from '../../../src/store/characterStore';
+import useCharacterStore from 'engine:src/store/characterStore';
 import { debugLog } from '../debug.js';
 import { getSalvageComposition, getScrapMaterials } from './catalog.js';
 import { runSalvage } from './engine.js';
-import { isSkillTagged } from '../../../domain/d20Checks';
-import { countActivePerkSelections } from '../../../domain/perks';
+import { isSkillTagged } from 'engine:domain/d20Checks';
+import { countActivePerkSelections } from 'engine:domain/perks';
 import perksCatalog from '../data/perks/perks.json';
 import { getCanonicalItemId } from '../logic/itemIdentity.js';
-import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
+import { findCatalogEntry, inferItemType } from 'engine:domain/resolveItem';
 import { rollCombatDiceEffects, facesToCombatUnits } from '../logic/diceRollsLogic.js';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { getCurrentModuleLocale } from '../../../i18n/locale';
-import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { selectSkillTotal, selectAttributeTotal } from 'engine:src/store/selectors';
 import { SALVAGE_RULES } from './rules';
 import { applyActivityMinutes } from '../survival/operations';
 

@@ -1,4 +1,4 @@
-import { getSettingData } from '../../../domain/registry.js';
+import { getSettingData } from 'engine:domain/registry';
 
 const EMPTY_ARRAY = Object.freeze([]);
 const EMPTY_OBJECT = Object.freeze({});

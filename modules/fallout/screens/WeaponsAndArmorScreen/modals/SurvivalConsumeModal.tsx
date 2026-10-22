@@ -15,11 +15,11 @@
 
 import React, { useMemo } from 'react';
 import { FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
-import useCharacterStore from '../../../../../src/store/characterStore';
-import { selectItemsByEquipped } from '../../../../../src/store/selectors';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
-import { resolveItem } from '../../../../../domain/resolveItem';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { selectItemsByEquipped } from 'engine:src/store/selectors';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from 'engine:i18n/locale';
+import { resolveItem } from 'engine:domain/resolveItem';
 import {
   drinkGain,
   foodGain,
@@ -27,11 +27,11 @@ import {
   type SurvivalState,
 } from '../../../survival/survival';
 import { useSurvivalState } from '../../../survival/hooks';
-import { canConsumeOnSelf } from '../../../../../domain/itemfitRules';
-import { getSettingService } from '../../../../../domain/registry';
+import { canConsumeOnSelf } from 'engine:domain/itemfitRules';
+import { getSettingService } from 'engine:domain/registry';
 import { rerollConsumableRadiationRoll } from '../../../consumables/radiation.js';
 import { buildConsumableResultReport } from '../../../consumables/resultReport.js';
-import { showAlert as showCatalogAlert, showRawAlert } from '../../../../../components/alerts/alertService';
+import { showAlert as showCatalogAlert, showRawAlert } from 'engine:components/alerts/alertService';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { survivalModalStyles as styles } from './survivalModalStyles';
 

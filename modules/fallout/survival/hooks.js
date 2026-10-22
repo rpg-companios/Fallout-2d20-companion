@@ -7,8 +7,8 @@
 // survivalModeEnabled (док §10): выключено — хук возвращает null, шкалы,
 // кнопки и строки эффектов скрываются сами, состояние в сейве остаётся.
 
-import useCharacterStore from '../../../src/store/characterStore';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useCharacterStore from 'engine:src/store/characterStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
 import { sleepSurvival, waitSurvival } from './operations';
 
 /** Текущее состояние выживания (null: выключено настройкой, робот/киборг, не создано). */

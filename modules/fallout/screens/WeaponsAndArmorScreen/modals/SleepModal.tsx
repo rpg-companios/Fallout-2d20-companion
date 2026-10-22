@@ -9,8 +9,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
-import useCharacterStore from '../../../../../src/store/characterStore';
-import { selectLegacyAttributes } from '../../../../../src/store/selectors';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { selectLegacyAttributes } from 'engine:src/store/selectors';
 // МК-3 (патч 316): формула макс. ОЗ — часть сеттинга.
 import { calculateMaxHealth } from '../../../logic/derivedStats';
 import {
@@ -24,8 +24,8 @@ import {
 } from '../../../survival/survival';
 import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
 import { diseaseRiskReportLines } from '../../../consumables/resultReport.js';
-import { showRawAlert } from '../../../../../components/alerts/alertService';
-import { useLocale, useModuleLocale } from '../../../../../i18n/locale';
+import { showRawAlert } from 'engine:components/alerts/alertService';
+import { useLocale, useModuleLocale } from 'engine:i18n/locale';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { survivalModalStyles as styles } from './survivalModalStyles';
 

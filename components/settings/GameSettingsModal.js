@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  TextInput,
   } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
@@ -16,6 +17,11 @@ import useSettingPackStore, {
   selectActiveSettingId,
   selectInstalledSettings,
 } from '../../src/store/settingPackStore';
+import { downloadSettingRelease } from '../../src/engine/settings/settingReleaseClient';
+import {
+  parseSettingLink,
+  repositoryFromAssetUrl,
+} from '../../src/engine/settings/settingRelease';
 import useSettingUpdateStore, {
   selectSettingInstallingId,
   selectSettingUpdateError,
@@ -111,6 +117,9 @@ export default function GameSettingsModal({ visible, onClose }) {
   const installingId = useSettingUpdateStore(selectSettingInstallingId);
   const checkForUpdates = useSettingUpdateStore((state) => state.checkForUpdates);
   const installUpdate = useSettingUpdateStore((state) => state.installUpdate);
+  const addSource = useSettingUpdateStore((state) => state.addSource);
+  const [linkText, setLinkText] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
   const [pickedFile, setPickedFile] = useState(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [activatingId, setActivatingId] = useState(null);
@@ -163,6 +172,48 @@ export default function GameSettingsModal({ visible, onClose }) {
       });
     } finally {
       setIsInstalling(false);
+    }
+  };
+
+  // Единственный способ получить сеттинг — ссылка или файл: приложение
+  // не знает ни одного адреса заранее и ничего не предлагает установить.
+  const handleInstallLink = async () => {
+    const text = linkText.trim();
+    if (!text || linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const parsed = parseSettingLink(text);
+      if (parsed.assetUrl) {
+        const asset = parsed.assetUrl.split('/').pop() || 'setting.trpg';
+        const archive = await downloadSettingRelease({
+          release: { asset, assetUrl: parsed.assetUrl },
+        });
+        await installLocalPackage({ name: archive.name, bytes: archive.bytes });
+        const repository = repositoryFromAssetUrl(parsed.assetUrl);
+        if (repository) addSource({ repository });
+        setLinkText('');
+        await showRawAlert({
+          title: tHomeScreen('gameSetting.packageInstallTitle'),
+          message: tHomeScreen('gameSetting.packageInstalled'),
+        });
+      } else {
+        addSource(parsed);
+        const found = await checkForUpdates({ force: true });
+        setLinkText('');
+        if (found.length === 0) {
+          await showRawAlert({
+            title: tHomeScreen('gameSetting.updateTitle'),
+            message: tHomeScreen('gameSetting.sourceAdded'),
+          });
+        }
+      }
+    } catch (error) {
+      await showRawAlert({
+        title: tHomeScreen('gameSetting.packageInstallTitle'),
+        message: error?.message ? String(error.message) : tHomeScreen('gameSetting.linkFailed'),
+      });
+    } finally {
+      setLinkBusy(false);
     }
   };
 
@@ -313,6 +364,21 @@ export default function GameSettingsModal({ visible, onClose }) {
 
             <View style={styles.plusBlock}>
               <Text style={styles.plusMark}>+</Text>
+              <TextInput
+                style={styles.linkInput}
+                value={linkText}
+                onChangeText={setLinkText}
+                placeholder={tHomeScreen('gameSetting.linkPlaceholder')}
+                placeholderTextColor="#9ca3af"
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!linkBusy}
+              />
+              <ActionButton
+                label={linkBusy ? tHomeScreen('gameSetting.installing') : tHomeScreen('gameSetting.linkInstall')}
+                onPress={handleInstallLink}
+                disabled={!linkText.trim() || linkBusy}
+              />
               <TouchableOpacity style={styles.filePick} onPress={handlePickLocal} disabled={isInstalling}>
                 <MaterialCommunityIcons name="file-plus-outline" size={22} color="#f0e68c" />
                 <Text style={styles.filePickText}>{tHomeScreen('gameSetting.localTrpg')}</Text>
@@ -410,6 +476,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginBottom: 8,
+  },
+  linkInput: {
+    borderWidth: 1,
+    borderColor: '#4b5563',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: '#f9fafb',
+    backgroundColor: '#1f2937',
     marginBottom: 8,
   },
   filePick: {

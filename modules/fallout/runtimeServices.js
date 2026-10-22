@@ -115,7 +115,7 @@ import { getOriginImage } from './originImages.js';
 import { getFalloutEnrichedOrigins } from './originPresentation.js';
 import { tCharacterScreen } from './screens/CharacterScreen/logic/characterScreenI18n.js';
 import { getPerkDisplay } from './screens/PerksAndTraitsScreen/perksDisplay.js';
-import { tInventory } from '../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 import CraftingModal from './screens/InventoryScreen/modals/CraftingModal.js';
 import CapsModal from './screens/InventoryScreen/modals/CapsModal.js';
 import RepairModal from './screens/InventoryScreen/modals/RepairModal.js';
@@ -149,7 +149,7 @@ import {
   shiftRange,
   resolveWeaponRangeFields,
 } from './logic/weaponRange.js';
-import { getCurrentModuleLocale } from '../../i18n/locale.js';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import ruAppI18n from './i18n/ru-RU/App.json';
 import enAppI18n from './i18n/en-EN/App.json';
 import { createFalloutPowerArmorActions } from './store/powerArmorActions.js';
@@ -260,7 +260,7 @@ import {
   isFalloutRobotWeaponActionLocked,
 } from './inventoryFeatures/robotWeaponUnequip.js';
 import { selectRobotArmPartsStrictReplace } from './settingsSelectors.js';
-import { getSurvivalRules } from '../../domain/registry.js';
+import { getSurvivalRules } from 'engine:domain/registry';
 import { getCanonicalAttributeKey } from './logic/characterCreation.js';
 import { getPerkEffect } from './perks/effects/index.js';
 import {

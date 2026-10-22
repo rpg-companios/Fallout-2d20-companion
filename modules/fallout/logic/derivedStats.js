@@ -18,7 +18,7 @@
 //   • модуль (экраны) — прямой импорт из этого файла;
 //   • движок (store и пр.) — ТОЛЬКО через дверь: domain/registry.js → getDerivedStatsLogic().
 
-import { calculateAttributeTotal } from '../../../src/store/resolvers.js';
+import { calculateAttributeTotal } from 'engine:src/store/resolvers';
 import {
   getAttributeValue,
   getEquipmentCarryWeightModifier,
@@ -31,7 +31,7 @@ import {
   getTimedDefenseBonus,
 } from './timedEffectModifiers.js';
 
-import { effectsDictToLegacyArray } from '../../../src/store/effectsSync.js';
+import { effectsDictToLegacyArray } from 'engine:src/store/effectsSync';
 
 // Каркас силовой брони: каталог данных сеттинга (ранее читался из store — нарушение границы).
 import dataPowerArmor from '../data/equipment/powerArmor.json';

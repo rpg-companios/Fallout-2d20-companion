@@ -1,6 +1,6 @@
 import ruCharacterScreen from '../../../i18n/ru-RU/screens/character/screen.json';
 import enCharacterScreen from '../../../i18n/en-EN/screens/character/screen.json';
-import { getCurrentModuleLocale } from '../../../../../i18n/locale';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 export const CHARACTER_DICTIONARIES = {
   'ru-RU': ruCharacterScreen,

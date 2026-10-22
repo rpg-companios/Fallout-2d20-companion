@@ -1,5 +1,5 @@
-import { registerStateExtension } from '../../../src/store/stateExtensions.js';
-import useCharacterStore from '../../../src/store/characterStore.js';
+import { registerStateExtension } from 'engine:src/store/stateExtensions';
+import useCharacterStore from 'engine:src/store/characterStore';
 import { FALLOUT_RESOURCE_FIELDS } from '../logic/radiationResource.js';
 import {
   FALLOUT_ROBOT_STATE_EXTENSION_KEY,

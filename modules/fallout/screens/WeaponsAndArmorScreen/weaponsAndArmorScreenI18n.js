@@ -1,6 +1,6 @@
 import ruWeaponsAndArmorScreen from '../../i18n/ru-RU/screens/weaponsAndArmor/screen.json';
 import enWeaponsAndArmorScreen from '../../i18n/en-EN/screens/weaponsAndArmor/screen.json';
-import { getCurrentModuleLocale } from '../../../../i18n/locale';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 export const WEAPONS_DICTIONARIES = {
   'ru-RU': ruWeaponsAndArmorScreen,

@@ -7,7 +7,7 @@ import {
   dumpRuntimeTrace,
   enableRuntimeTrace,
   getRuntimeTraceStatus,
-} from '../../src/engine/debug/runtimeTrace.js';
+} from 'engine:src/engine/debug/runtimeTrace';
 
 export const FALLOUT_DEBUG_MARKER = 'fallout-runtime-debug-2026-06-23-01';
 export { debugLog };

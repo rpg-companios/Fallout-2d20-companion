@@ -22,7 +22,7 @@
 //   { done: false, stage: 'gate', reasons }
 //   { done: false, stage: 'check', reason: 'check-failed', check, complications }
 
-import { resolveD20Check } from '../../../domain/d20Checks.js';
+import { resolveD20Check } from 'engine:domain/d20Checks';
 
 const MIN_LOSS_FACE = 19;
 const MAX_LOSS_FACE = 20;

@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Pressable,
 } from 'react-native';
-import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from 'engine:i18n/locale';
 import { normalizeSlot } from '../../../logic/robotSlots.js';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import ArmorLayerModal from './ArmorLayerModal';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 

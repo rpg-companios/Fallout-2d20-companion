@@ -1,6 +1,6 @@
-import { getActiveSettingRuntime } from '../../../src/engine/settings/activeSettingRuntime.js';
-import { getSettingData, getSettingNames } from '../../../domain/registry.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getActiveSettingRuntime } from 'engine:src/engine/settings/activeSettingRuntime';
+import { getSettingData, getSettingNames } from 'engine:domain/registry';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 const EMPTY_ARRAY = Object.freeze([]);
 

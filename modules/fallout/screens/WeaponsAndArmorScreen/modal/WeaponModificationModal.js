@@ -6,14 +6,14 @@ import {
   TouchableOpacity,
   ScrollView
 } from 'react-native';
-import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from '../../../../../db/Database';
+import { getSlotsForWeapon, getModsForWeaponSlot, getWeaponById, getWeaponModById } from 'engine:db/Database';
 import { applyFalloutWeaponMods as applyWeaponMods } from '../../../logic/weaponModifiers.js';
 import { tWeaponsAndArmorScreen } from '../weaponsAndArmorScreenI18n';
 import { resolveWeaponQualities, resolveWeaponEffects, weaponModRowDescription } from '../../../logic/weaponDisplay.js';
 import styles from '../../../styles/WeaponModificationModal.styles';
 import { debugLog } from '../../../debug.js';
-import useAppSettingsStore from '../../../../../src/store/appSettingsStore';
-import useCharacterStore from '../../../../../src/store/characterStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
+import useCharacterStore from 'engine:src/store/characterStore';
 import { buildModCraftHint, buildCraftReport } from '../../../crafting/windowModel';
 import { craftRecipe, settleCraftTime, craftingPreview } from '../../../crafting/operations';
 import { getActionPoints } from '../../../logic/actionPoints.js';
@@ -22,7 +22,7 @@ import { getActionPoints } from '../../../logic/actionPoints.js';
 import CraftReportView from '../../../crafting/CraftReportView';
 // 364: вопросы/отказы — через ЕДИНУЮ точку диалогов (AlertHost работает
 // везде; системный Alert на Web — тихая заглушка).
-import { showRawAlert } from '../../../../../components/alerts/alertService';
+import { showRawAlert } from 'engine:components/alerts/alertService';
 
 
 function toNumber(v) {

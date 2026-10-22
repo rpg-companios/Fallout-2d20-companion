@@ -13,7 +13,7 @@ import {
   rollCustomDice,
   rollDie,
   rollMultipleCombatDice,
-} from '../../../domain/diceRollsLogic.js';
+} from 'engine:domain/diceRollsLogic';
 
 export {
   COMBAT_DIE_EFFECT_FACES,

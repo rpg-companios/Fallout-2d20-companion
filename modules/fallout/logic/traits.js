@@ -1,8 +1,8 @@
 // Fallout trait data interpretation, modifier extraction, and display helpers.
 // No React or UI dependencies.
 
-import { getTraits, getTraitI18n } from '../../../domain/registry.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getTraits, getTraitI18n } from 'engine:domain/registry';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 /**
  * Resolves a dot-separated i18n key like "traits.brotherhood.chainThatBinds.name"

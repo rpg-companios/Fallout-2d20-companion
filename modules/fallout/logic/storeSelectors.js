@@ -1,6 +1,6 @@
 // Fallout-specific projections from normalized store records to legacy screens.
-import { createEmptyEquippedArmor } from '../../../domain/equippedArmor.js';
-import { flattenItemParams } from '../../../src/store/selectors.js';
+import { createEmptyEquippedArmor } from 'engine:domain/equippedArmor';
+import { flattenItemParams } from 'engine:src/store/selectors';
 import { resolveWeaponRangeFields } from './weaponRange.js';
 
 const getSlotsForProtectedAreas = (item) => {

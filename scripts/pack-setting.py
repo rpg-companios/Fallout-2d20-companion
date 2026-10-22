@@ -155,12 +155,13 @@ def iter_files(source: Path) -> list[Path]:
     return sorted(files, key=lambda path: path.relative_to(source).as_posix())
 
 
-def resolve_engine_root(explicit: str | None) -> Path:
-    """Корень движка: --engine, затем POSITRONIUM_ENGINE, затем этот репозиторий.
+def resolve_engine_root(explicit: str | None) -> Path | None:
+    """Корень движка, если он рядом: --engine, POSITRONIUM_ENGINE, этот репозиторий.
 
-    В совмещённом репозитории движок лежит рядом с папкой сеттинга; в
-    отдельном репозитории сеттинга исходников движка нет, поэтому путь
-    передаётся явно (или через переменную окружения).
+    Сборщику сеттинга движок не нужен: кошелёк обращается к движку только
+    через `engine:<id>`, такие импорты остаются внешними и их отдаёт хост
+    во время работы приложения. Движок нужен лишь чтобы проверить список
+    host-модулей и для старых кошельков с относительными импортами.
     """
     candidate = explicit or os.environ.get('POSITRONIUM_ENGINE')
     if candidate:
@@ -168,10 +169,36 @@ def resolve_engine_root(explicit: str | None) -> Path:
         if not (root / 'src' / 'engine').is_dir():
             fail(f'engine root has no src/engine: {root}')
         return root
-    return Path(__file__).resolve().parent.parent
+    here = Path(__file__).resolve().parent.parent
+    return here if (here / 'src' / 'engine').is_dir() else None
 
 
-def build_runtime_bundle(source: Path, runtime: dict, engine_root: Path) -> bytes | None:
+ESCAPING_IMPORT_RE = re.compile(r"""(['"])(\.{1,2}/[^'"]+)\1""")
+SOURCE_SUFFIXES = {'.js', '.jsx', '.ts', '.tsx', '.mjs'}
+
+
+def has_escaping_imports(source: Path) -> bool:
+    """Есть ли в кошельке относительные импорты за его пределы.
+
+    Такие импорты привязывают пакет к конкретной глубине в дереве движка —
+    их место занимает `engine:<id>`. Проверка нужна, чтобы не копировать
+    кошелёк внутрь движка без причины.
+    """
+    for path in iter_files(source):
+        if path.suffix not in SOURCE_SUFFIXES:
+            continue
+        try:
+            text = path.read_text(encoding='utf-8', errors='ignore')
+        except OSError:
+            continue
+        for match in ESCAPING_IMPORT_RE.finditer(text):
+            target = (path.parent / match.group(2)).resolve()
+            if not is_within(source, target):
+                return True
+    return False
+
+
+def build_runtime_bundle(source: Path, runtime: dict, engine_root: Path | None) -> bytes | None:
     source_relative = runtime.get('source')
     entry_relative = runtime['entry']
     entry_path = source / entry_relative
@@ -189,25 +216,28 @@ def build_runtime_bundle(source: Path, runtime: dict, engine_root: Path) -> byte
     if entry_path.exists() or entry_path.is_symlink():
         fail(f'manifest.runtime.entry is generated; remove the source copy before packing: {entry_relative}')
 
-    app_root = engine_root
-    builder = app_root / 'scripts' / 'build-setting-runtime.mjs'
-    if not builder.is_file():
-        # Скрипт может лежать рядом с упаковщиком (репозиторий сеттинга, tools/).
-        builder = Path(__file__).resolve().parent / 'build-setting-runtime.mjs'
+    # Сборщик всегда едет рядом с упаковщиком: в репозитории сеттинга это
+    # tools/, в совмещённом — scripts/. Checkout движка для сборки не нужен.
+    builder = Path(__file__).resolve().parent / 'build-setting-runtime.mjs'
+    if not builder.is_file() and engine_root is not None:
+        builder = engine_root / 'scripts' / 'build-setting-runtime.mjs'
     if not builder.is_file():
         fail(f'runtime bundle compiler not found: {builder}')
 
     try:
         with tempfile.TemporaryDirectory(prefix='setting-runtime-') as temporary_directory:
             bundle_path = Path(temporary_directory) / 'setting.cjs'
+            command = [
+                'node', str(builder),
+                '--wallet', str(source),
+                '--source', source_relative,
+                '--output', str(bundle_path),
+            ]
+            if engine_root is not None:
+                command += ['--engine', str(engine_root)]
             result = subprocess.run(
-                [
-                    'node', str(builder),
-                    '--wallet', str(source),
-                    '--source', source_relative,
-                    '--output', str(bundle_path),
-                ],
-                cwd=app_root,
+                command,
+                cwd=engine_root or source,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -241,19 +271,14 @@ def pack(source: Path, output: Path | None, engine: str | None = None) -> Path:
     manifest = load_manifest(source)
     setting_id = manifest['id']
     engine_root = resolve_engine_root(engine)
-    if not (engine_root / 'src' / 'engine').is_dir():
-        fail(
-            'engine checkout not found: pass --engine <path> or set POSITRONIUM_ENGINE '
-            f'(checked {engine_root})'
-        )
 
-    # Кошелёк из чужого репозитория (репозиторий сеттинга) пока импортирует
-    # файлы движка относительными путями. Чтобы собрать пакет без переноса
-    # исходников, кладём копию кошелька на ту же глубину внутрь checkout'а
-    # движка (<engine>/<tmp>/<id>) и собираем там. Оригинал не трогаем.
+    # Старый кошелёк может импортировать файлы движка относительными путями
+    # (../../src/...). Тогда сборка возможна, только если положить копию
+    # кошелька на ту же глубину внутрь checkout'а движка. Новые кошельки
+    # ходят в движок через `engine:<id>` и в этом не нуждаются.
     build_source = source
     staging_root: Path | None = None
-    if not is_within(engine_root, source):
+    if engine_root is not None and not is_within(engine_root, source) and has_escaping_imports(source):
         try:
             staging_root = Path(tempfile.mkdtemp(dir=engine_root, prefix='.setting-build-'))
             build_source = staging_root / setting_id
@@ -271,7 +296,7 @@ def pack(source: Path, output: Path | None, engine: str | None = None) -> Path:
             shutil.rmtree(staging_root, ignore_errors=True)
 
 
-def _pack_staged(build_source: Path, output: Path | None, setting_id: str, manifest: dict, engine_root: Path) -> Path:
+def _pack_staged(build_source: Path, output: Path | None, setting_id: str, manifest: dict, engine_root: Path | None) -> Path:
     source = build_source
     files = iter_files(source)
 
@@ -354,7 +379,7 @@ def main() -> None:
     parser.add_argument('-o', '--output', help='output .trpg path (default: dist/<id>-<version>.trpg)')
     parser.add_argument(
         '--engine',
-        help='engine checkout root (default: POSITRONIUM_ENGINE or this repository)',
+        help='engine checkout root (optional; default: POSITRONIUM_ENGINE or this repository)',
     )
     args = parser.parse_args()
     pack(

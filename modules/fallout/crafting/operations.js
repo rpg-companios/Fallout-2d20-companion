@@ -10,18 +10,18 @@
 // Как и операции выживания: читают СВЕЖЕЕ состояние прямо из стора, пишут —
 // действиями того же стора; React-контекста модуль не знает.
 
-import useCharacterStore from '../../../src/store/characterStore';
+import useCharacterStore from 'engine:src/store/characterStore';
 import { debugLog } from '../debug.js';
-import { getCraftingCategoryRules, getCraftingRecipeById } from '../../../domain/registry';
+import { getCraftingCategoryRules, getCraftingRecipeById } from 'engine:domain/registry';
 import { getScrapMaterials, getScrapJunkItems } from '../salvage/catalog.js';
-import { evaluateCraft, runCraft } from '../../../domain/craftingEngine';
+import { evaluateCraft, runCraft } from 'engine:domain/craftingEngine';
 import { assertFalloutOutputQuantity, resolveFalloutOutputQuantity } from './outputQuantity.js';
-import { isSkillTagged } from '../../../domain/d20Checks';
-import { countActivePerkSelections } from '../../../domain/perks';
+import { isSkillTagged } from 'engine:domain/d20Checks';
+import { countActivePerkSelections } from 'engine:domain/perks';
 import perksCatalog from '../data/perks/perks.json';
 import { getItemId } from '../logic/itemIdentity.js';
 import { rollByType, rollCombatDiceEffects } from '../logic/diceRollsLogic.js';
-import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+import { selectSkillTotal, selectAttributeTotal } from 'engine:src/store/selectors';
 import { CRAFT_RULES } from './rules';
 // 404: «Ломовые патроны» — хлам вместо материалов для патронов низкой редкости.
 import {
@@ -31,7 +31,7 @@ import {
   juryRigMaxRarityByRank,
 } from '../perks/effects/juryRiggedAmmo.js';
 import { applyActivityMinutes } from '../survival/operations';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
 import { earnActionPoints, getActionPoints, spendActionPoints } from '../logic/actionPoints.js';
 
 // Сколько в сумке стока с данным КАНОНИЧЕСКИМ id (та же цепочка, по которой

@@ -1,4 +1,4 @@
-import { formatInventoryText, tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { formatInventoryText, tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 
 const bulletList = (messages) => messages.map((message) => `• ${message}`).join('\n');
 

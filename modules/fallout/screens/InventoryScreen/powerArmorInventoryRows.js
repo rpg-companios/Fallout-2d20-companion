@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { formatInventoryText, tInventory } from '../../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { formatInventoryText, tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 
 export const getFalloutPowerArmorCatalogItems = (catalogData = {}) =>
   Object.values(catalogData).flatMap((set) => set?.pieces ?? []);

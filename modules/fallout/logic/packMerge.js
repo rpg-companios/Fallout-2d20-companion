@@ -1,6 +1,6 @@
 // Fallout catalog inheritance and variant modifier rules.
-import { deepMerge } from '../../../domain/deepMerge.js';
-import { applyNumericModifier } from '../../../domain/numericModifier.js';
+import { deepMerge } from 'engine:domain/deepMerge';
+import { applyNumericModifier } from 'engine:domain/numericModifier';
 import { clampRangeIndex, indexToRangeName, rangeToIndex } from './weaponRange.js';
 
 const VARIANT_NUMERIC_FIELDS = Object.freeze([

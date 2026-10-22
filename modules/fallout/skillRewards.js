@@ -3,10 +3,10 @@
 // Механизм похож на kitResolver, но без UI — молча добавляет предметы в стор.
 
 import rewardData from './data/skillRewards.json';
-import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import { resolveRandomLootByRoll } from './screens/CharacterScreen/logic/RandomLootLogic';
 import { evaluateRollConfig } from './logic/diceRollsLogic.js';
-import { findCatalogEntry } from '../../domain/resolveItem';
+import { findCatalogEntry } from 'engine:domain/resolveItem';
 import { debugLog } from './debug.js';
 
 const toNumber = (v) => Number.isFinite(v) ? v : Number(v) || 0;

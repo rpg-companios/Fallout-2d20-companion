@@ -1,4 +1,4 @@
-import { tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 
 const FALLOUT_ITEM_TYPE_PRESENTATION = Object.freeze({
   weapon: Object.freeze({ icon: '🔫', labelKey: 'weapon' }),

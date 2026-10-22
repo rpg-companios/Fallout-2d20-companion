@@ -1,4 +1,4 @@
-import { getSettingService } from '../../../domain/registry.js';
+import { getSettingService } from 'engine:domain/registry';
 import { getFalloutRobotState } from './robotState.js';
 
 const EMPTY_ROBOT_STATE = Object.freeze({

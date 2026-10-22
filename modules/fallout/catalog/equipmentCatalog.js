@@ -1,10 +1,10 @@
 // Fallout-owned equipment catalog projection. Data and localized names are
 // read from the active package only when requested.
-import { getActiveSettingRuntime } from '../../../src/engine/settings/activeSettingRuntime.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
-import { buildUserEquipmentOverlay } from '../../../domain/userEquipment.js';
-import { getActiveModuleId } from '../../../domain/moduleLocale.js';
-import useUserEquipmentStore from '../../../src/store/userEquipmentStore.js';
+import { getActiveSettingRuntime } from 'engine:src/engine/settings/activeSettingRuntime';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { buildUserEquipmentOverlay } from 'engine:domain/userEquipment';
+import { getActiveModuleId } from 'engine:domain/moduleLocale';
+import useUserEquipmentStore from 'engine:src/store/userEquipmentStore';
 
 const EMPTY_ARRAY = Object.freeze([]);
 const EMPTY_OBJECT = Object.freeze({});

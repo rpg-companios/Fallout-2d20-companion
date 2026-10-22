@@ -1,5 +1,5 @@
 // Fallout equip restrictions and denial-reason identifiers.
-import { isItemAllowed, ACTIONS } from '../../../domain/itemfitRules.js';
+import { isItemAllowed, ACTIONS } from 'engine:domain/itemfitRules';
 import { getFalloutProtectionKind } from './itemType.js';
 import { isRobotCharacter } from './originTypes.js';
 

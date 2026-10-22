@@ -10,9 +10,9 @@ import junk from '../../../data/loot/junk.json';
 import lootStubs from '../../../data/loot/_stubs.json';
 import ruLootStubs from '../../../i18n/ru-RU/data/loot/stubs.json';
 import enLootStubs from '../../../i18n/en-EN/data/loot/stubs.json';
-import { getWeaponById } from '../../../../../db/Database';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
-import { getCurrentModuleLocale } from '../../../../../i18n/locale';
+import { getWeaponById } from 'engine:db/Database';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 const LOOT_STUBS_BY_LOCALE = {
   'ru-RU': ruLootStubs,
@@ -176,7 +176,7 @@ async function resolveItemFromTable(rollResult, tag, lootTable) {
 
         // Try weapons by name via DB
         try {
-            const { getWeaponByName } = await import('../../../../../db/Database');
+            const { getWeaponByName } = await import('engine:db/Database');
             const weapon = await getWeaponByName(name);
             if (weapon) return { ...weapon, name: weapon.name, quantity: 1, itemType: 'weapon' };
         } catch (e) {}

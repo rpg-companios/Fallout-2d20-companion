@@ -1,7 +1,7 @@
 // Fallout consumable rules and item-payload interpretation. The engine owns
 // store mutations and generic timed-effect lifecycle; this capability resolves
 // setting-shaped effects, vital changes, perk modifiers, chem duration, and addiction.
-import { recordDoseWithinWindow } from '../../../domain/effects.js';
+import { recordDoseWithinWindow } from 'engine:domain/effects';
 import { applyFalloutConsumableToEffects, scaleDuration } from './effectApplication.js';
 import { checkAddiction } from './addiction.js';
 import { previewFalloutConsumableRadiation } from './radiation.js';
@@ -14,7 +14,7 @@ import {
   getFalloutVitalTargets,
   resolveConsumableVitalModifiers,
 } from './vitalChanges.js';
-import { syncTimedEffectsToStore } from '../../../src/store/effectsSync.js';
+import { syncTimedEffectsToStore } from 'engine:src/store/effectsSync';
 
 export const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
 

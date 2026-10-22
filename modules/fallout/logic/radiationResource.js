@@ -1,6 +1,6 @@
-import { set as setCounter } from '../../../domain/counters.js';
-import { getDerivedStatsLogic } from '../../../domain/registry.js';
-import { selectLegacyAttributes } from '../../../src/store/selectors.js';
+import { set as setCounter } from 'engine:domain/counters';
+import { getDerivedStatsLogic } from 'engine:domain/registry';
+import { selectLegacyAttributes } from 'engine:src/store/selectors';
 
 export const FALLOUT_RESOURCE_FIELDS = Object.freeze({
   radiation: 'radiation',

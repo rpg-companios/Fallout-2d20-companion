@@ -99,8 +99,70 @@ export const isRepositorySlug = (value) => (
 );
 
 /**
+ * Разобрать ссылку, которую пользователь вставил в настройках.
+ *
+ * Приложение не знает ни одного сеттинга заранее: адрес всегда вводит
+ * пользователь. Поддерживаются:
+ *  - `owner/repo` и `https://github.com/owner/repo[/tree/<branch>]` — репозиторий
+ *    сеттинга с `release.json` в корне;
+ *  - `https://raw.githubusercontent.com/owner/repo/<branch>/release.json`;
+ *  - прямая ссылка на архив `.trpg` (в том числе release-asset GitHub).
+ *
+ * @returns {{repository: string, branch: string}|{assetUrl: string}}
+ */
+export const parseSettingLink = (input) => {
+  const text = typeof input === 'string' ? input.trim() : '';
+  if (!text) throw new Error('[setting-release] empty setting link');
+
+  if (!/^https?:\/\//i.test(text)) {
+    if (isRepositorySlug(text)) return { repository: text, branch: 'main' };
+    throw new Error(`[setting-release] unsupported setting link: ${text}`);
+  }
+
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new Error(`[setting-release] unsupported setting link: ${text}`);
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error(`[setting-release] unsupported setting link: ${text}`);
+  }
+  if (/\.trpg$/i.test(url.pathname)) return { assetUrl: text };
+
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (url.hostname === 'raw.githubusercontent.com' && parts.length >= 3) {
+    const repository = `${parts[0]}/${parts[1]}`;
+    if (isRepositorySlug(repository)) return { repository, branch: parts[2] };
+  }
+  if (url.hostname === 'github.com' && parts.length >= 2) {
+    const repository = `${parts[0]}/${parts[1]}`;
+    if (!isRepositorySlug(repository)) {
+      throw new Error(`[setting-release] unsupported setting link: ${text}`);
+    }
+    const branch = parts[2] === 'tree' && parts[3] ? parts[3] : 'main';
+    return { repository, branch };
+  }
+
+  throw new Error(`[setting-release] unsupported setting link: ${text}`);
+};
+
+/** Репозиторий, из которого скачан релиз: нужен, чтобы проверять обновления дальше. */
+export const repositoryFromAssetUrl = (input) => {
+  try {
+    const url = new URL(String(input));
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (url.hostname !== 'github.com' || parts.length < 4 || parts[2] !== 'releases') return null;
+    const repository = `${parts[0]}/${parts[1]}`;
+    return isRepositorySlug(repository) ? repository : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Привести запись источника обновлений к строгому виду.
- * Источник объявлен в settings/release-sources.json.
+ * Источник либо объявлен в settings/release-sources.json, либо добавлен пользователем ссылкой.
  */
 export const normalizeReleaseSource = (settingId, raw) => {
   if (!SETTING_ID_RE.test(settingId ?? '')) {

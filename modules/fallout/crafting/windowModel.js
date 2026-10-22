@@ -11,13 +11,13 @@
 // пяти сжигает материалы только третьей (решение владельца); при нехватке
 // сумки попытки останавливаются, остальные не начинаются.
 
-import useCharacterStore from '../../../src/store/characterStore';
-import { getCraftingRecipeById, getCraftingRecipes } from '../../../domain/registry';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { getCraftingRecipeById, getCraftingRecipes } from 'engine:domain/registry';
 import { getScrapMaterials } from '../salvage/catalog.js';
-import { findCatalogEntry } from '../../../domain/resolveItem';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { getCurrentModuleLocale } from '../../../i18n/locale';
-import { selectSkillTotal, selectAttributeTotal } from '../../../src/store/selectors';
+import { findCatalogEntry } from 'engine:domain/resolveItem';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { selectSkillTotal, selectAttributeTotal } from 'engine:src/store/selectors';
 import { getSkillDisplayName } from '../screens/CharacterScreen/logic/characterScreenI18n';
 import ruPerks from '../i18n/ru-RU/data/perks/perks.json';
 import enPerks from '../i18n/en-EN/data/perks/perks.json';

@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import useCharacterStore from '../../../../src/store/characterStore';
-import { selectLegacyAttributes } from '../../../../src/store/selectors';
-import { showRawAlert } from '../../../../components/alerts/alertService';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { selectLegacyAttributes } from 'engine:src/store/selectors';
+import { showRawAlert } from 'engine:components/alerts/alertService';
 import { getTraitI18nById } from '../../logic/traits.js';
 import {
   annotatePerks,
@@ -13,9 +13,9 @@ import {
   getPerkSelectionCount,
   removeSelectedPerkAt,
   withAssignedPerkRanks,
-} from '../../../../domain/perks';
+} from 'engine:domain/perks';
 import { isRobotCharacter } from '../../logic/originTypes.js';
-import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+import { useLocale, useModuleLocale } from 'engine:i18n/locale';
 import perksData from '../../data/perks/perks.json';
 import PerkSelectModal from './PerkSelectModal';
 import { renderTextWithIcons } from '../WeaponsAndArmorScreen/textUtils';

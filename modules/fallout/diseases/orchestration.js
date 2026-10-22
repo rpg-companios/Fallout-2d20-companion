@@ -4,14 +4,14 @@
 import {
   effectsDictToLegacyArray,
   syncTimedEffectsToStore,
-} from '../../../src/store/effectsSync.js';
-import { selectLegacyAttributes, selectLegacySkills } from '../../../src/store/selectors.js';
-import { pruneExpiredTimedEffects } from '../../../domain/effects.js';
-import { hasDamageImmunity } from '../../../domain/immunities.js';
-import { createSceneRiskTracker, getSceneRiskEventForRule } from '../../../domain/sceneRiskChecks.js';
-import { isSkillTagged } from '../../../domain/d20Checks.js';
+} from 'engine:src/store/effectsSync';
+import { selectLegacyAttributes, selectLegacySkills } from 'engine:src/store/selectors';
+import { pruneExpiredTimedEffects } from 'engine:domain/effects';
+import { hasDamageImmunity } from 'engine:domain/immunities';
+import { createSceneRiskTracker, getSceneRiskEventForRule } from 'engine:domain/sceneRiskChecks';
+import { isSkillTagged } from 'engine:domain/d20Checks';
 import { getFalloutDiseaseCatalog, getFalloutSceneRiskRules } from './catalog.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { getAttributeValue } from '../logic/characterCreation.js';
 import {
   addPersistentDiseaseEffect,

@@ -12,8 +12,8 @@
 // Зависимости приходят объектом контекста (useCharacter()): модуль не
 // импортирует React и не знает, где живёт состояние.
 
-import useCharacterStore from '../../../src/store/characterStore';
-import useAppSettingsStore from '../../../src/store/appSettingsStore';
+import useCharacterStore from 'engine:src/store/characterStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
 import { debugLog } from '../debug.js';
 import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest, wait } from './survival';
 // 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость

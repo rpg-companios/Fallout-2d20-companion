@@ -2,7 +2,7 @@
 // Правила категорий (включая сгорание материалов) живут в реестре группы
 // recipes/index.js и читаются через единый реестр.
 //
-import { getCraftingCategoryRuleRegistry } from '../../../domain/registry';
+import { getCraftingCategoryRuleRegistry } from 'engine:domain/registry';
 
 // По образцу SURVIVAL_RULES: это НЕ поля рецептов и не сейв — модульные числа,
 // одинаковые для всех рецептов и правящиеся без перегенерации данных. Универсальный

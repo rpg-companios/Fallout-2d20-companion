@@ -1,6 +1,6 @@
-import { getOrigins, getOriginI18n } from '../../domain/registry.js';
-import { getEquipmentCatalog } from '../../i18n/equipmentCatalog.js';
-import { getCurrentModuleLocale } from '../../i18n/locale.js';
+import { getOrigins, getOriginI18n } from 'engine:domain/registry';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { getOriginImage } from './originImages.js';
 
 const getFalloutOriginName = (id) => {

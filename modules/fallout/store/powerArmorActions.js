@@ -7,12 +7,12 @@
  * optional inventory.powerArmor capability; no engine file imports this module.
  */
 
-import { showAlert as showCatalogAlert, showRawAlert } from '../../../components/alerts/alertService.js';
-import { getInventoryDictionary } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog.js';
-import { canEquipArmor } from '../../../domain/equipEquip.js';
-import { createEmptyEquippedArmor } from '../../../domain/equippedArmor.js';
+import { showAlert as showCatalogAlert, showRawAlert } from 'engine:components/alerts/alertService';
+import { getInventoryDictionary } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { canEquipArmor } from 'engine:domain/equipEquip';
+import { createEmptyEquippedArmor } from 'engine:domain/equippedArmor';
 import {
   FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY,
   createInitialFalloutPowerArmorState,

@@ -199,6 +199,10 @@
     "updateInstalled": "Setting updated to version {version}.",
     "updateFailed": "Could not update the setting. The previous version is kept.",
     "updateNone": "No updates.",
-    "updateError": "Could not check for updates. Check the connection and try again later."
+    "updateError": "Could not check for updates. Check the connection and try again later.",
+    "linkPlaceholder": "Repository link or .trpg file URL",
+    "linkInstall": "Install from link",
+    "linkFailed": "Could not install from the link. Check the address and connection.",
+    "sourceAdded": "Source added. No newer versions yet."
   }
 }

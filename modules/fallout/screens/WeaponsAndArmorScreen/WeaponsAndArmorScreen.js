@@ -1,17 +1,17 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, ImageBackground, TouchableOpacity, SafeAreaView, Modal, PanResponder } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { showRawAlert } from '../../../../components/alerts/alertService';
+import { showRawAlert } from 'engine:components/alerts/alertService';
 import { DISEASE_RESIST_COOLDOWN_MS, effectDiseaseRank } from '../../diseases/diseaseConditions.js';
-import useCharacterStore from '../../../../src/store/characterStore';
-import { useSettingAction } from '../../../../src/store/useSettingAction.js';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { useSettingAction } from 'engine:src/store/useSettingAction';
 import { useShallow } from 'zustand/react/shallow';
 import {
   selectItemsByEquipped,
   selectActiveTimedEffects,
   selectLegacyAttributes,
   selectLegacySkills,
-} from '../../../../src/store/selectors';
+} from 'engine:src/store/selectors';
 import {
   getFalloutEquippedArmor as getEquippedArmor,
   storeItemToFalloutWeaponDisplay as storeItemToWeaponDisplay,
@@ -26,20 +26,20 @@ import { isRobotCharacter } from '../../logic/originTypes.js';
 import { resolveBodyPlan } from '../../logic/bodyplan.js';
 import { normalizeSlot, setInstalledWeaponMods, setOwnWeaponMods } from '../../logic/robotSlots.js';
 // Единый путь записи модов (311): классификация места хранения — движок.
-import { modIdList } from '../../../../src/engine/items/weaponMods';
+import { modIdList } from 'engine:src/engine/items/weaponMods';
 import { classifyFalloutModWritePlan, robotWeaponHostKey } from '../../logic/robotWeaponMods.js';
 // 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
 import { applyLoadAndFireToWeapon } from '../../perks/loadAndFire.js';
-import { diffModInstallPlan } from '../../../../domain/modsEquip';
+import { diffModInstallPlan } from 'engine:domain/modsEquip';
 import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
-import { useLocale, useModuleLocale } from '../../../../i18n/locale';
-import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+import { useLocale, useModuleLocale } from 'engine:i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import { getFalloutDiseaseCatalog } from '../../diseases/catalog.js';
-import { resolveItem, resolveWeaponWithAppliedMods } from '../../../../domain/resolveItem';
-import { getProtectionKind, PROTECTION_KINDS } from '../../../../domain/protectionKind';
+import { resolveItem, resolveWeaponWithAppliedMods } from 'engine:domain/resolveItem';
+import { getProtectionKind, PROTECTION_KINDS } from 'engine:domain/protectionKind';
 import {
   getDefenseModifierEffectLabel,
   getEffectTimeText,
@@ -85,7 +85,7 @@ import RobotSlot from './RobotSlot';
 import LimbUpgradeModal from '../CharacterScreen/modals/LimbUpgradeModal';
 import ArmorPickerModal from '../CharacterScreen/modals/ArmorPickerModal';
 import { debugLog } from '../../debug.js';
-import useAppSettingsStore from '../../../../src/store/appSettingsStore';
+import useAppSettingsStore from 'engine:src/store/appSettingsStore';
 import { isAmmoWeapon } from '../../logic/weaponDurability.js';
 import { applyAmmoSpendDurability } from '../../inventoryFeatures/durability.js';
 

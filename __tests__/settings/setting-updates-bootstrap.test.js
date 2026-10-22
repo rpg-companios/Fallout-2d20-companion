@@ -43,11 +43,15 @@ import {
   startSettingUpdateBootstrap,
 } from '../../src/utils/settingUpdates';
 
+// План несёт правила своего источника: раньше их брали из конфига движка,
+// теперь источник добавляет пользователь, и autoInstall — свойство ссылки.
 const plan = (overrides = {}) => ({
   settingId: 'fallout',
   fromVersion: 1,
   toVersion: 2,
   installed: true,
+  repository: 'rpg-companios/positronium-game-settings',
+  autoInstall: true,
   release: { asset: 'fallout.trpg' },
   ...overrides,
 });
@@ -83,7 +87,7 @@ describe('обновление сеттинга при запуске', () => {
   });
 
   it('коммьюнити-сеттинг без autoInstall спрашивает и ставится после согласия', async () => {
-    mocks.checkForUpdates.mockResolvedValue([plan({ settingId: 'community' })]);
+    mocks.checkForUpdates.mockResolvedValue([plan({ settingId: 'community', autoInstall: false })]);
     mocks.showAlert.mockResolvedValue(true);
     await runSettingUpdateCheck({ notify: false });
     expect(mocks.installUpdate).toHaveBeenCalledWith('community', expect.any(Object));

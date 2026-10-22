@@ -28,12 +28,14 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildReleaseIndex,
+  hostModuleIds,
   planEngineFiles,
   planSettingLegalFiles,
   planSettingToolFiles,
   planSettingWallets,
   RELEASE_INDEX_FILE,
   renderSettingReadme,
+  renderToolsPackageJson,
   renderToolsReadme,
   TOOLS_DIR,
 } from './lib/repository-plan.mjs';
@@ -494,6 +496,17 @@ const publishSetting = async (args, config) => {
     copyFile(path.join(ROOT, name), path.join(directory, name));
   }
   fs.writeFileSync(path.join(directory, TOOLS_DIR, 'README.md'), renderToolsReadme());
+  // Сборщик в репозитории сеттинга самодостаточен: esbuild ставится
+  // в tools/node_modules, а список host-модулей приезжает из движка.
+  const engineDeps = readJson(path.join(ROOT, 'package.json'));
+  fs.writeFileSync(
+    path.join(directory, TOOLS_DIR, 'package.json'),
+    renderToolsPackageJson({ engineVersion: engineDeps.devDependencies?.esbuild }),
+  );
+  fs.writeFileSync(
+    path.join(directory, TOOLS_DIR, 'host-modules.json'),
+    `${JSON.stringify(hostModuleIds(ROOT), null, 2)}\n`,
+  );
   fs.writeFileSync(path.join(directory, 'README.md'), renderSettingReadme({
     repository: repository.repository,
     wallets: repository.wallets,

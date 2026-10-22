@@ -3,9 +3,9 @@
 // никаких бросков и мутаций здесь нет. Минуты считаются как в контракте:
 // база × множитель осложнения (262), «не начался» — ноль.
 
-import { tInventory, formatInventoryText } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { tInventory, formatInventoryText } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 const materialName = (itemId) => {
   const catalog = getEquipmentCatalog(getCurrentModuleLocale());

@@ -1,10 +1,10 @@
 // Fallout-owned historical migrations for catalog IDs and rules. These are
 // registered by the active setting at their original schema transitions.
-import { catalogGetWeaponModById } from '../../../db/catalogSource.js';
+import { catalogGetWeaponModById } from 'engine:db/catalogSource';
 import { generateItemId } from '../logic/itemIdentity.js';
-import { getPerks } from '../../../domain/registry.js';
+import { getPerks } from 'engine:domain/registry';
 import { getFalloutUniqQualityName as getUniqQualityName } from '../logic/uniqQualities.js';
-import { trimSelectedPerksToMaxRanks } from '../../../domain/perks.js';
+import { trimSelectedPerksToMaxRanks } from 'engine:domain/perks';
 import { composeFalloutNameWithQualities } from '../logic/uniqQualities.js';
 import { resolveMutuallyExclusiveQualities } from '../logic/weaponQualityConflicts.js';
 

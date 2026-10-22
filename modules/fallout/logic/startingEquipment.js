@@ -1,5 +1,5 @@
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog.js';
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 /**
  * Returns Fallout's built-in unarmed weapon for characters that need one.

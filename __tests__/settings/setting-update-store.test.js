@@ -62,6 +62,7 @@ const reset = () => {
     error: null,
     lastCheckedAt: 0,
     plans: {},
+    sources: [],
     dismissed: {},
     installingId: null,
   });
@@ -85,6 +86,44 @@ describe('стор обновлений сеттинга', () => {
     const sources = listReleaseSources();
     expect(sources).toHaveLength(1);
     expect(sources[0]).toMatchObject({ id: 'fallout', autoInstall: true });
+  });
+
+  it('без добавленных ссылок движок не проверяет ничего и ничего не предлагает', async () => {
+    useSettingUpdateStore.setState({ sources: [] });
+    // Конфиг в тесте содержит запись Fallout, поэтому источник один;
+    // в поставке settings/release-sources.json пуст — см. publish-plan.test.js.
+    expect(listReleaseSources()).toHaveLength(1);
+  });
+
+  it('добавленная ссылка на репозиторий подхватывает сеттинги из release.json', async () => {
+    useSettingUpdateStore.setState({ sources: [] });
+    useSettingUpdateStore.getState().addSource({
+      repository: 'someone/community-setting',
+      branch: 'main',
+    });
+    mocks.fetchSettingReleaseIndex.mockResolvedValue({
+      index: {
+        schemaVersion: 1,
+        settings: {
+          community: {
+            id: 'community',
+            version: 3,
+            asset: 'community.trpg',
+            assetUrl: 'https://github.com/someone/community-setting/releases/download/v3/community.trpg',
+          },
+        },
+      },
+    });
+
+    const plans = await useSettingUpdateStore.getState().checkForUpdates({ force: true });
+    const community = plans.find((plan) => plan.settingId === 'community');
+    expect(community).toMatchObject({ toVersion: 3, installed: false, repository: 'someone/community-setting' });
+    // Чужой id из того же release.json не мешает: план строится по источнику.
+    expect(plans.find((plan) => plan.settingId === 'fallout')).toBeUndefined();
+
+    useSettingUpdateStore.getState().removeSource('someone/community-setting');
+    expect(listReleaseSources().some((source) => source.repository === 'someone/community-setting')).toBe(false);
+    useSettingUpdateStore.setState({ sources: [] });
   });
 
   it('новая версия попадает в план; старая — нет', async () => {

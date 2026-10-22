@@ -1,4 +1,4 @@
-import { formatInventoryText, tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { formatInventoryText, tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 import { salvageButtonForItem } from './subline.js';
 
 /** Localized button and subline presentation for Fallout's optional salvage feature. */

@@ -1,7 +1,7 @@
 // Fallout-owned historical save migrations. Their indexes correspond to
 // reserved engine schema transitions; registering them composes the rule into
 // that same transition without changing schemaVersion numbering.
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog.js';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import { resolveKitItems } from '../kitResolver.js';
 import { debugLog } from '../debug.js';
 

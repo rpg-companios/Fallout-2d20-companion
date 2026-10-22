@@ -10,11 +10,11 @@
  */
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, StyleSheet } from 'react-native';
-import useCharacterStore from '../../../../src/store/characterStore.js';
-import { useSettingAction } from '../../../../src/store/useSettingAction.js';
-import { tInventory } from '../../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
-import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog.js';
-import { useLocale, useModuleLocale } from '../../../../i18n/locale.js';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { useSettingAction } from 'engine:src/store/useSettingAction';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { useLocale, useModuleLocale } from 'engine:i18n/locale';
 import { FUSION_CORE_ID } from '../../logic/powerArmor.js';
 import { selectFalloutPowerArmorState } from '../../store/powerArmorState.js';
 

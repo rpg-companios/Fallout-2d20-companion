@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
-import AddItemModal from '../../../../../components/screens/InventoryScreen/modals/AddItemModal';
+import AddItemModal from 'engine:components/screens/InventoryScreen/modals/AddItemModal';
 import {
   getItemPrice, getCartTotal, getRemaining,
   addToCart, changeQuantity, finishPurchase,

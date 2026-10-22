@@ -1,6 +1,6 @@
 import { canEquipFalloutWeapon } from '../logic/equipEligibility.js';
 import { isRobotCharacter } from '../logic/originTypes.js';
-import { formatInventoryText, tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { formatInventoryText, tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 
 const toWeight = (value) => parseFloat(String(value ?? 0).replace(',', '.')) || 0;
 

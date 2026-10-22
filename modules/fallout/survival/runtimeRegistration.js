@@ -3,7 +3,7 @@ import {
   registerConsumableAppliedListener,
   registerStateExtension,
   registerStateMigration,
-} from '../../../src/store/stateExtensions';
+} from 'engine:src/store/stateExtensions';
 import { createSurvivalState, withDiseaseFatigue, withoutDiseaseFatigue } from './survival';
 import { migrateSurvivalField } from './migration';
 import { survivalConsumableListener } from './operations';

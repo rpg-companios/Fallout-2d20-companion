@@ -71,10 +71,12 @@ npm install
 где зависимости поставлены pnpm: `npm install` поверх такого дерева падает
 (`Cannot read properties of null (reading 'isDescendantOf')`).
 
-В репозитории сеттинга `npm install` не нужен вовсе: там нет `package.json`,
-и npm уходит вверх по дереву к чужому проекту. Собирайте пакет либо из
-совмещённого репозитория, либо через `tools/pack-setting.py` с
-`POSITRONIUM_ENGINE` на checkout движка.
+В репозитории сеттинга зависимости ставит только публикация в `tools/`:
+`npm install --prefix tools` кладёт `esbuild` в `tools/node_modules`. Checkout
+движка для сборки не нужен — кошелёк ходит в движок через `engine:<id>`,
+и такие импорты отдаёт приложение (`src/engine/settings/settingRuntimeHost.js`).
+Список доступных модулей едет вместе с инструментами: `tools/host-modules.json`
+(его пишет публикация).
 
 ## Если что-то пошло не так
 
@@ -82,7 +84,7 @@ npm install
 | --- | --- |
 | `Permission ... denied` / 403 | токен без прав на целевой репозиторий: выдать доступ и повторить |
 | `Resource not accessible by integration` | подключение GitHub выдано только этому репозиторию, а не двум целевым |
-| `engine checkout not found` при ручной сборке | задать `POSITRONIUM_ENGINE=/path/to/engine` |
+| `engine imports missing from the host module list` | кошелёк просит модуль, которого нет в `tools/host-modules.json`; обновить файл публикацией или добавить модуль в хост |
 | `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | просто повторить `./scripts/publish-setting.sh` — сборщик доустановится в кэш сам |
 | `Cannot read properties of null (reading 'isDescendantOf')` | это `npm install` в дереве, созданном pnpm (частая причина — запуск в репозитории сеттинга, где нет `package.json`). Здесь ставить зависимости не нужно; если пострадал `node_modules` проекта — переустановите его тем менеджером, которым он создавался |
 

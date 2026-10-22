@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import useCharacterStore from '../../../src/store/characterStore.js';
+import useCharacterStore from 'engine:src/store/characterStore';
 
 const TICK_INTERVAL_MS = 1000;
 

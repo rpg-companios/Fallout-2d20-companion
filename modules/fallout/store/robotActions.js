@@ -18,8 +18,8 @@
  *   }
  */
 
-import { modIdList } from '../../../src/engine/items/weaponMods';
-import { getSettingService } from '../../../domain/registry.js';
+import { modIdList } from 'engine:src/engine/items/weaponMods';
+import { getSettingService } from 'engine:domain/registry';
 import { robotWeaponHostKey } from '../logic/robotWeaponMods.js';
 import { debugLog } from '../debug.js';
 import {

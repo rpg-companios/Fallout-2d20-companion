@@ -1,6 +1,6 @@
 // Fallout armor-mod eligibility, presentation, and derived protection statistics.
-import { getProtectionKind, PROTECTION_KINDS, resolveArmorCategoryKey } from '../../../domain/protectionKind.js';
-import { applyNumericModifier } from '../../../domain/numericModifier.js';
+import { getProtectionKind, PROTECTION_KINDS, resolveArmorCategoryKey } from 'engine:domain/protectionKind';
+import { applyNumericModifier } from 'engine:domain/numericModifier';
 
 const hasIntersection = (a = [], b = []) => a.some((value) => b.includes(value));
 

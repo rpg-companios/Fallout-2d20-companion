@@ -1,4 +1,4 @@
-import { tInventory } from '../../../components/screens/InventoryScreen/logic/inventoryI18n.js';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 import { applyWeaponWear, isAmmoWeapon, rollWeaponDurability } from '../logic/weaponDurability.js';
 
 /** Preserve the legacy repair flag only in its canonical boolean form. */

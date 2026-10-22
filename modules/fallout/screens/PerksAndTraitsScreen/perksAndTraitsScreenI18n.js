@@ -1,6 +1,6 @@
 import ruPerksAndTraitsScreen from '../../i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../../i18n/en-EN/screens/perksAndTraits/screen.json';
-import { getCurrentModuleLocale } from '../../../../i18n/locale';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 const DICTIONARIES = {
   'ru-RU': ruPerksAndTraitsScreen,

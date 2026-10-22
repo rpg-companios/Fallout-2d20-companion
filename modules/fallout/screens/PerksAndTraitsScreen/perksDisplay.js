@@ -1,6 +1,6 @@
 import ruPerksData from '../../i18n/ru-RU/data/perks/perks.json';
 import enPerksData from '../../i18n/en-EN/data/perks/perks.json';
-import { getCurrentModuleLocale } from '../../../../i18n/locale';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 
 const DICTIONARIES = {
   'ru-RU': ruPerksData,

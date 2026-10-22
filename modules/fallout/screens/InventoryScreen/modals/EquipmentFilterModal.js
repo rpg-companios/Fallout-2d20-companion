@@ -10,7 +10,7 @@
 // панели, чтобы не занимать список предметов.
 import React, { useState } from 'react';
 import { Modal, SafeAreaView, ScrollView, View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
 import styles from '../../../styles/EquipmentFilterModal.styles';
 
 const t = (key) => tInventory(`modals.addItemModal.filter.${key}`);

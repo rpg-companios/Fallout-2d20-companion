@@ -4,7 +4,7 @@
  * from structured data to localized human-readable strings.
  */
 
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { getFalloutModuleI18n } from './settingI18n.js';
 
 const DAMAGE_TYPE_LABELS = {

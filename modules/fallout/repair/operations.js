@@ -12,23 +12,23 @@
 //   - время: 30 минут (успех + 2 ОД → 15; осложнение +15 каждое; провал —
 //     время зря, материалы остаются — закон верстака, 323).
 
-import useCharacterStore from '../../../src/store/characterStore';
-import { selectAttributeTotal, selectSkillTotal } from '../../../src/store/selectors';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { selectAttributeTotal, selectSkillTotal } from 'engine:src/store/selectors';
 import { getFalloutPowerArmorState, FALLOUT_POWER_ARMOR_STATE_EXTENSION_KEY } from '../store/powerArmorState.js';
 import { evaluateRepair, runRepair } from './engine.js';
 import { repairWeaponDurability } from '../logic/weaponDurability.js';
-import { isSkillTagged } from '../../../domain/d20Checks';
+import { isSkillTagged } from 'engine:domain/d20Checks';
 import { applyActivityMinutes } from '../survival/operations';
 import { getActionPoints, spendActionPoints } from '../logic/actionPoints.js';
 import { REPAIR_RULES, repairMaterialsPlan } from './rules';
 import weaponsCatalog from '../data/equipment/weapons.json';
 import armorCatalog from '../data/equipment/armor.json';
 import powerArmorCatalog from '../data/equipment/powerArmor.json';
-import { countActivePerkSelections } from '../../../domain/perks';
+import { countActivePerkSelections } from 'engine:domain/perks';
 import perksCatalog from '../data/perks/perks.json';
-import { getCurrentModuleLocale } from '../../../i18n/locale';
-import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
-import { findCatalogEntry } from '../../../domain/resolveItem';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
+import { findCatalogEntry } from 'engine:domain/resolveItem';
 import ruCraft from '../i18n/ru-RU/screens/inventory/craftingModal.json';
 import enCraft from '../i18n/en-EN/screens/inventory/craftingModal.json';
 import ruScreen from '../i18n/ru-RU/screens/inventory/screen.json';

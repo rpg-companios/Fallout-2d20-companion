@@ -1,4 +1,4 @@
-import { getSettingData } from '../../../domain/registry.js';
+import { getSettingData } from 'engine:domain/registry';
 
 const EMPTY_OBJECT = Object.freeze({});
 const search = (items, id) => (items || []).find((entry) => entry && entry.id === id) || null;

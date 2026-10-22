@@ -10,10 +10,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import styles from '../../../styles/RepairModal.styles';
-import { tInventory } from '../../../../../components/screens/InventoryScreen/logic/inventoryI18n';
-import useCharacterStore from '../../../../../src/store/characterStore';
-import { selectAttributeTotal, selectSkillTotal } from '../../../../../src/store/selectors';
-import { getCurrentModuleLocale } from '../../../../../i18n/locale';
+import { tInventory } from 'engine:components/screens/InventoryScreen/logic/inventoryI18n';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { selectAttributeTotal, selectSkillTotal } from 'engine:src/store/selectors';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import CraftReportView from '../../../crafting/CraftReportView';
 import {
   repairPreview,

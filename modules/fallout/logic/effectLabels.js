@@ -1,6 +1,6 @@
-import { getCurrentModuleLocale } from '../../../i18n/locale.js';
+import { getCurrentModuleLocale } from 'engine:i18n/locale';
 import { getFalloutModuleI18n } from './settingI18n.js';
-import { SCENE_RULES } from '../../../domain/effects.js';
+import { SCENE_RULES } from 'engine:domain/effects';
 
 export const getFalloutEffectText = (path, vars = {}) => {
   const parts = path.split('.');

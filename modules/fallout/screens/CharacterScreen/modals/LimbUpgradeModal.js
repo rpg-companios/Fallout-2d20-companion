@@ -1,5 +1,5 @@
-import useCharacterStore from '../../../../../src/store/characterStore';
-import { useSettingAction } from '../../../../../src/store/useSettingAction.js';
+import useCharacterStore from 'engine:src/store/characterStore';
+import { useSettingAction } from 'engine:src/store/useSettingAction';
 import React, { useMemo } from 'react';
 import {
   Modal,
@@ -13,8 +13,8 @@ import {
 import { applyLimbReplacement } from '../../../logic/robotEquip.js';
 import { selectFalloutRobotState } from '../../../store/robotSelectors.js';
 import { limbOptionsForSlot } from '../../../logic/robotSlots.js';
-import { useLocale, useModuleLocale, useModuleCatalogRevision } from '../../../../../i18n/locale';
-import { getEquipmentCatalog } from '../../../../../i18n/equipmentCatalog';
+import { useLocale, useModuleLocale, useModuleCatalogRevision } from 'engine:i18n/locale';
+import { getEquipmentCatalog } from 'engine:i18n/equipmentCatalog';
 import { tCharacterScreen } from '../logic/characterScreenI18n';
 
 // ---------------------------------------------------------------------------
