@@ -9,7 +9,7 @@
 
 - `app.json` — `name: Positronium`, `slug: positronium`,
   `android.package`/`ios.bundleIdentifier`: `com.rpgcompanios.positronium`,
-  схема `positronium`, `version: 1.0.0` (совпадает с `ENGINE_VERSION`).
+  схема `positronium`, `version: 1.0.1` (совпадает с `ENGINE_VERSION`).
 - `eas.json` — профили `preview` (APK, канал `preview`), `production`
   (AAB для Google Play, канал `production`), `development` (dev-client).
   `appVersionSource: remote`: `versionCode` ведёт EAS и поднимает при каждом

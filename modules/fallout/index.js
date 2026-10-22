@@ -367,6 +367,9 @@ export const SETTING = Object.freeze({
   names: {
     'ru-RU': {
       app: ruAppI18n,
+      // Строки настроек движок читает как settings.<ключ> в корне словаря
+      // (SettingsModal: labelKey/descriptionKey/sectionKey из settings.json).
+      settings: ruSystemSettings,
       system: {
         origins: ruSystemOrigins,
         traits: ruSystemTraits,
@@ -375,7 +378,6 @@ export const SETTING = Object.freeze({
         qualities: ruSystemQualities,
         effects: ruSystemEffects,
         damageEffects: ruSystemDamageEffects,
-        settings: ruSystemSettings,
       },
       equipment: {
         weapons: ruEquipmentWeapons,
@@ -435,6 +437,7 @@ export const SETTING = Object.freeze({
     },
     'en-EN': {
       app: enAppI18n,
+      settings: enSystemSettings,
       system: {
         origins: enSystemOrigins,
         traits: enSystemTraits,
@@ -443,7 +446,6 @@ export const SETTING = Object.freeze({
         qualities: enSystemQualities,
         effects: enSystemEffects,
         damageEffects: enSystemDamageEffects,
-        settings: enSystemSettings,
       },
       equipment: {
         weapons: enEquipmentWeapons,

@@ -26,7 +26,7 @@ export const getFalloutModuleI18n = (locale) => {
     weaponMods: equipment.weaponMods ?? EMPTY_ARRAY,
     food: consumables.food ?? EMPTY_ARRAY,
     drinks: consumables.drinks ?? EMPTY_ARRAY,
-    settings: system.settings ?? EMPTY_OBJECT,
+    settings: names?.settings ?? EMPTY_OBJECT,
     armor,
     junk: junk.items ?? EMPTY_ARRAY,
     materials: junk.materials ?? EMPTY_ARRAY,

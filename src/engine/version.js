@@ -5,4 +5,4 @@
 // Одна точка правды: значение обязано совпадать с `expo.version` в app.json —
 // это закреплено тестом __tests__/settings/engine-version.test.js. Поднимать
 // вместе с релизом движка, не отдельно.
-export const ENGINE_VERSION = '1.0.0';
+export const ENGINE_VERSION = '1.0.1';
