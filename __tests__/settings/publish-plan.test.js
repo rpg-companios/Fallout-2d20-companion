@@ -446,11 +446,13 @@ describe('релиз сеттинга — в репозитории сеттин
     }));
     fs.mkdirSync(path.join(root, 'release-notes'));
     fs.writeFileSync(path.join(root, 'release-notes/fallout.md'), notes);
-    fs.writeFileSync(path.join(root, 'release.json'), JSON.stringify({
-      schemaVersion: 1,
-      repository: 'rpg-companios/positronium-game-settings',
-      settings: { fallout: { id: 'fallout', version: published } },
-    }));
+    if (published !== null) {
+      fs.writeFileSync(path.join(root, 'release.json'), JSON.stringify({
+        schemaVersion: 1,
+        repository: 'rpg-companios/positronium-game-settings',
+        settings: { fallout: { id: 'fallout', version: published } },
+      }));
+    }
     return root;
   };
 
@@ -483,6 +485,34 @@ describe('релиз сеттинга — в репозитории сеттин
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('верхняя секция release-notes/fallout.md');
     expect(result.stderr).toContain('1.0.1');
+  });
+
+  it('первый релиз без release.json берёт версию из манифеста', () => {
+    const root = makeSettingRepo({ notes: '## 1.0.0 — Первый\n', published: null });
+    const result = runRelease(root);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('fallout-v1.0.0');
+    // dry-run ничего не пишет: индекс создаст только настоящий релиз.
+    expect(fs.existsSync(path.join(root, 'release.json'))).toBe(false);
+  });
+
+  it('--version при нескольких сеттингах требует --setting', () => {
+    const root = makeSettingRepo({ notes: '## 1.0.1 — A\n' });
+    fs.mkdirSync(path.join(root, 'westland'));
+    fs.writeFileSync(path.join(root, 'westland/manifest.json'), JSON.stringify({
+      id: 'westland', name: 'Westland', version: '1.0.0', packFormat: 1, requiresCore: '>=1.0',
+    }));
+    fs.writeFileSync(path.join(root, 'release-notes/westland.md'), '## 1.0.1 — B\n');
+
+    const all = runRelease(root, ['--version', '1.0.1']);
+    expect(all.status).toBe(1);
+    expect(all.stderr).toContain('--setting');
+
+    const one = runRelease(root, ['--setting', 'fallout']);
+    expect(one.status).toBe(0);
+    expect(one.stdout).toContain('fallout-v1.0.1');
+    expect(one.stdout).not.toContain('westland-v');
+    expect(one.stdout).not.toContain('westland:');
   });
 
   it('флаги движка в репозитории сеттинга отклоняются', () => {

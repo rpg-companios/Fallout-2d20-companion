@@ -70,7 +70,7 @@ fallout/
 
 | Поле | Зачем |
 |---|---|
-| `version` | контент, семантический номер: добавил пушку → `1.0.1` (публикация поднимает сама) |
+| `version` | контент, семантический номер: добавил пушку → `1.0.1` (релиз поднимает сам) |
 | `requiresCore` | какой движок нужен |
 | `packFormat` | правила укладки файлов. Поменяли дерево → format 2, старый движок не лезет вслепую |
 
@@ -170,7 +170,7 @@ fallout/
 
 **Осталось в engine:** disease exposure, лечение, сопротивление и disease effects живут в `modules/fallout/diseases/`; Fallout-бонусы расходников, длительность химии, учёт доз, зависимость и cleanup-эффекты — в `modules/fallout/consumables/` и setting capabilities. Versioned save transitions регистрируются пакетами на исходных индексах; legacy weapon-mod/item ID repairs находятся в `modules/fallout/migrations/`. `characterSaves.js` вызывает optional `saveMigrations` и `characterLoad.prepare`, оставляя правила каталога и пост-загрузочную подготовку пакету. В аудите 2026-10-19 snapshot-поля robot/power-armor делегированы `characterSave.getSnapshotFields` без смены legacy keys/schema; Fallout catalog lookup/type candidates, robot/power-armor catalog projections, protection-kind и armor-like display extensions вынесены в inventory capabilities/модуль. ID-prefix inference и power-armor recognition/equip policy также принадлежат Fallout feature. Остальные compatibility helpers в `domain/` требуют отдельного аудита. Тесты не запускались по прямому указанию владельца; runtime bundle и syntax/diff checks прошли.
 
-**Репозитории (2026-10-20):** три роли, адреса закреплены — §15. Совмещённый checkout — этот репозиторий; из него же скрипт публикации собирает деревья/патчи/релизы для `ttrpg-engine` и `positronium-game-settings`.
+**Репозитории (2026-10-20):** три роли, адреса закреплены — §15. Совмещённый checkout — этот репозиторий; из него же скрипт публикации доставляет код в `ttrpg-engine` и `positronium-game-settings`. Сборка и релиз живут в самих целевых репозиториях — там же, где артефакт (2026-10-22).
 
 ## 9. Дорожная карта
 
@@ -182,7 +182,7 @@ fallout/
 6. Комплекты: убрать `equipmentKits/index.js`, один JSON-индекс.
 7. **Следующее:** собрать единый runtime bundle полного Fallout-кошелька; объявить entrypoint/API в manifest; дать setting-коду подключаться к общим механизмам через engine API; при выборе активировать из одного `.trpg` его данные, экраны и уникальные правила. Убрать статический Fallout fallback: без пакета движок пустой. Проверить ручной импорт/запуск в PWA и APK.
 8. **После первого полного прохода:** продолжить вынос межмодульных импортов за явный engine API, чтобы кошелёк Fallout можно было собирать в отдельном репозитории без исходников движка. Содержимое сеттинга остаётся целостным; не разделять его на независимые «пакет данных» и «пакет экранов».
-9. ~~Публикация в целевые репозитории~~ — `scripts/publish-repositories.mjs`: правки здесь → дерево/патч/коммит/релиз для движка и сеттинга. Папки под сеттинги: `modules/<id>` → `<id>/`.
+9. ~~Публикация в целевые репозитории~~ — `scripts/publish-repositories.mjs`: правки здесь → дерево/патч/коммит для движка и сеттинга; сборка и релиз — в целевом репозитории. Папки под сеттинги: `modules/<id>` → `<id>/`.
 10. ~~Обновление сеттинга по сети~~ — `release.json` в репозитории сеттинга, клиент проверяет релиз при запуске и ставит `.trpg` (сверить `requiresCore`, размер и sha256).
 11. **Затем:** проверить установку/обновление на Web/PWA, Android/iOS. Совместимость исполнения пакетного кода с Google Play — отдельная проверка перед публикацией; она не отменяет ручной staging-тест.
 12. Промоут кирпичей — по мере второго сеттинга: сначала рамка с одним числом, потом с двумя. Не заранее.
@@ -248,37 +248,38 @@ fallout/
 | --- | --- | --- |
 | Совмещённая разработка + APK | `rpg-companios/Fallout-2d20-companion` (этот checkout) | движок, Fallout, скрипты сборки; здесь делаются правки |
 | Движок | `rpg-companios/ttrpg-engine` | код приложения без `modules/`, `patchs/`, `artifacts/` |
-| Сеттинги | `rpg-companios/positronium-game-settings` | папка на сеттинг, инструменты сборки, `release.json` |
+| Сеттинги | `rpg-companios/positronium-game-settings` | папка на сеттинг, инструменты сборки и сценарий релиза, `release.json` |
 
-**Правки делаются здесь.** Целевые репозитории не редактируются руками: `scripts/publish-repositories.mjs` собирает их деревья из текущего checkout и публикует.
+**Правки кода делаются здесь.** `scripts/publish-repositories.mjs` собирает деревья целевых репозиториев из текущего checkout и публикует их. Исключение — выпуск релиза: он в целевом репозитории сам поднимает версию в манифесте и пишет индекс обновлений.
 
 ```sh
-./scripts/publish-engine.sh     # движок: собрать и запушить
-./scripts/publish-setting.sh    # сеттинг: дерево + .trpg + release.json + релиз
+./scripts/publish-engine.sh     # движок: собрать дерево и запушить
+./scripts/publish-setting.sh    # сеттинг: собрать дерево и запушить
 ```
 
-Обе обёртки — тонкие: `--dry-run` показывает изменения, `--patch` сохраняет
-патч, `--message` задаёт сообщение коммита, у сеттинга ещё `--no-release`.
-Токен — `GH_TOKEN` (или `GITHUB_TOKEN`); подробности и разбор ошибок —
-`docs/publishing.md`.
+Обе обёртки — тонкие: `--dry-run`/`--no-push` показывает изменения, `--patch`
+сохраняет патч, `--message` задаёт сообщение коммита. Флаги релиза
+(`--release`, `--bump`, `--version`, `--asset`, `--no-install`) отклоняются с
+подсказкой: релиз выпускается в целевом репозитории. Токен — `GH_TOKEN`
+(или `GITHUB_TOKEN`); подробности и разбор ошибок — `docs/publishing.md`.
 
 Ручной запуск без обёрток тоже возможен:
 
 ```sh
-node scripts/publish-repositories.mjs                      # план: что изменится
+node scripts/publish-repositories.mjs              # план: что изменится
 node scripts/publish-repositories.mjs --target engine --patch
-node scripts/publish-repositories.mjs --target setting --push --release
+node scripts/publish-repositories.mjs --target setting --push
 ```
 
-- `--target engine|setting|all`, `--workdir <dir>` (по умолчанию `.publish/`, в git не попадает), `--message`, `--patch`, `--push`, `--release`.
+- `--target engine|setting|all`, `--workdir <dir>` (по умолчанию `.publish/`, в git не попадает), `--message`, `--patch`, `--push`.
 - Движок: копируется всё, кроме `modules/`, `__tests__/`, `patchs/`, `artifacts/`, `сеттинги/`, закладок, бэкапов, скриптов публикации и готовых архивов. Тесты проверяют механику сеттинга и остаются в совмещённом репозитории.
 - APK движка: `npm run apk` (EAS, профиль `preview`) или `npm run apk:local`; подробности — `docs/apk-build.md`. Пакет приложения — `com.rpgcompanios.positronium`, версия — `ENGINE_VERSION`.
-- Сеттинг: `modules/<id>/` → `<id>/` в корне; `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs` → `tools/`; README генерируются.
-- `--release` собирает `.trpg` упаковщиком этого репозитория, пишет `release.json` в корень репозитория сеттингов и создаёт GitHub-релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`.
-- Без `--push`/`--release` клон откатывается: скрипт ничего не публикует, только показывает изменения и (с `--patch`) пишет патч.
+- Сеттинг: `modules/<id>/` → `<id>/` в корне; `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs`, `host-modules.json` → `tools/`; `scripts/release.mjs`, `scripts/release.sh` и `scripts/lib/*` → `scripts/`; README генерируются. `release.json` и версию в манифесте публикация сохраняет — их меняет только релиз.
+- Релиз сеттинга — `./scripts/release.sh` в репозитории сеттинга: поднимает версию, собирает `.trpg`, создаёт GitHub-релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`, пишет и коммитит `release.json`.
+- Без `--push` клон откатывается: скрипт ничего не публикует, только показывает изменения и (с `--patch`) пишет патч.
 - Адреса и кошельки — `settings/repositories.json`; подпись коммита — `PUBLISH_GIT_NAME`/`PUBLISH_GIT_EMAIL`.
 
-**Права.** Публикация пишет в два чужих репозитория, поэтому подключение Arena должно включать `rpg-companios/ttrpg-engine` и `rpg-companios/positronium-game-settings` (Arena → GitHub → выбор репозиториев). Перед сборкой скрипт делает `git push --dry-run` и при 403 останавливается с просьбой выдать доступ, не собирая `.trpg` впустую.
+**Права.** Публикация пишет в два чужих репозитория, поэтому подключение Arena должно включать `rpg-companios/ttrpg-engine` и `rpg-companios/positronium-game-settings` (Arena → GitHub → выбор репозиториев). Перед копированием дерева скрипт делает `git push --dry-run` и при 403 останавливается с просьбой выдать доступ, ничего не собирая впустую.
 
 **Папки под сеттинги.** В репозитории сеттингов каждый сеттинг — папка в корне (`fallout/…`, позже другие). Внутри — ровно содержимое кошелька: `manifest.json` в корне папки, `files` в манифесте перечисляет файлы относительно неё. `release.json` и `tools/` лежат рядом с папками и не входят ни в один пакет.
 
@@ -388,7 +389,7 @@ Archive validation, local install/cache, allowlisted reading, manifest runtime-e
 }
 ```
 
-`release.json` пишет `scripts/publish-repositories.mjs --release`, он же создаёт релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`. Версия семантическая (`1.0.0` → `1.0.1` по умолчанию), публикация поднимает её в манифесте и берёт текст релиза из верхней секции `release-notes/<id>.md`.
+`release.json` пишет `scripts/release.sh` в самом репозитории сеттинга: он же создаёт релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`. Версия семантическая (`1.0.0` → `1.0.1` по умолчанию), релиз поднимает её в манифесте и берёт текст из верхней секции `release-notes/<id>.md`. Публикация кода из совмещённого репозитория индекс и версию не откатывает.
 
 **Решение принимает чистая функция** (`src/engine/settings/settingRelease.js`): `update-available`, `up-to-date`, `incompatible-core`, `not-released`. Правила:
 
