@@ -1,6 +1,7 @@
 // Публикация в целевые репозитории: правила отбора файлов и release.json.
 // Проверяются чистые функции scripts/lib/repository-plan.mjs — без git и сети.
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,7 +16,9 @@ import {
   listRepositoryFiles,
   planEngineFiles,
   hostModuleIds,
+  keepPublishedVersion,
   planSettingLegalFiles,
+  planSettingReleaseFiles,
   planSettingWallets,
   bumpVersion,
   isLegacyReleaseTag,
@@ -300,7 +303,7 @@ describe('release.json', () => {
       generatedAt: '2026-10-20T00:00:00.000Z',
       packages: [{
         id: 'fallout',
-        manifest: { id: 'fallout', name: 'Fallout 2d20', version: 2, packFormat: 1, requiresCore: '>=1.0' },
+        manifest: { id: 'fallout', name: 'Fallout 2d20', version: '2.0.0', packFormat: 1, requiresCore: '>=1.0' },
         asset: 'fallout.trpg',
         bytes: 123,
         sha256: 'b'.repeat(64),
@@ -308,12 +311,38 @@ describe('release.json', () => {
     });
     expect(index.schemaVersion).toBe(1);
     expect(index.settings.fallout).toMatchObject({
-      version: 2,
+      version: '2.0.0',
       requiresCore: '>=1.0',
-      tag: 'fallout-v2',
+      tag: 'fallout-v2.0.0',
       bytes: 123,
       sha256: 'b'.repeat(64),
     });
+  });
+
+  it('сценарий релиза едет в репозиторий сеттинга', () => {
+    const files = planSettingReleaseFiles(ROOT);
+    expect(files).toEqual([
+      'scripts/release.mjs',
+      'scripts/release.sh',
+      'scripts/lib/semver.mjs',
+      'scripts/lib/release-notes.mjs',
+      'scripts/lib/app-release.mjs',
+      'scripts/lib/setting-release.mjs',
+    ]);
+    // Скрипт запускают как ./scripts/release.sh — право на запуск обязательно.
+    expect(fs.statSync(path.join(ROOT, 'scripts/release.sh')).mode & 0o111).toBeTruthy();
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    expect(source).toContain('pack-setting.py');
+    expect(source).toContain('buildReleaseIndex');
+    expect(source).toContain('createRelease');
+  });
+
+  it('публикация кода не откатывает версию, выпущенную релизом', () => {
+    const incoming = { id: 'fallout', version: '1.0.0' };
+    expect(keepPublishedVersion(incoming, { version: '1.0.1' }).version).toBe('1.0.1');
+    expect(keepPublishedVersion(incoming, { version: '1.0.0' })).toBe(incoming);
+    // Номер подняли в исходниках — он и уезжает.
+    expect(keepPublishedVersion({ id: 'fallout', version: '1.1.0' }, { version: '1.0.1' }).version).toBe('1.1.0');
   });
 
   it('инструменты сеттинга уезжают с лицензией движка', () => {
@@ -344,21 +373,41 @@ describe('shell-обёртки', () => {
     expect(script).toContain('--dry-run');
   });
 
-  it('сеттинг публикуется обёрткой с --target setting, --push и --release', () => {
+  it('сеттинг публикуется обёрткой с --target setting и --push', () => {
     const script = read('publish-setting.sh');
     expect(script).toContain('--target setting');
     expect(script).toContain('--push');
-    expect(script).toContain('--release');
-    expect(script).toContain('--no-release');
+    expect(script).toContain('--dry-run');
+    // Релиз живёт в репозитории сеттинга, а не здесь.
+    expect(script).not.toMatch(/CMD\+=\(--release\)/);
+    expect(script).toContain('./scripts/release.sh');
   });
 
-  it('сборщик ставится в кэш вне проекта, дерево node_modules не трогается', () => {
+  it('обёртка публикации отклоняет флаги релиза с подсказкой', () => {
+    for (const name of ['publish-setting.sh', 'publish-engine.sh']) {
+      const script = read(name);
+      expect(script).toContain('--release');
+      expect(script).toContain('release.sh');
+      expect(script).toContain('только'); // «здесь только код»
+    }
+  });
+
+  it('публикация отклоняет --release: релиз переехал в целевой репозиторий', () => {
+    const result = spawnSync(process.execPath, [
+      path.join(ROOT, 'scripts/publish-repositories.mjs'), '--target', 'setting', '--release',
+    ], { encoding: 'utf8' });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('release.sh');
+    expect(result.stderr).toContain('целевом репозитории');
+  });
+
+  it('публикация не собирает .trpg и не ставит esbuild', () => {
+    // Сборка — забота ./scripts/release.sh в целевом репозитории: здесь нет
+    // ни упаковщика, ни кэша сборщика, ни NODE_PATH.
     const script = read('publish-setting.sh');
-    // npm install --prefix <кэш> + NODE_PATH: иначе в pnpm-дереве Replit
-    // падает «Cannot read properties of null (reading 'isDescendantOf')».
-    expect(script).toContain('--prefix "$TOOL_CACHE_DIR"');
-    expect(script).toContain('NODE_PATH');
-    expect(script).not.toMatch(/npm install\s+--no-save[^\n]*esbuild/);
+    expect(script).not.toContain('esbuild');
+    expect(script).not.toContain('NODE_PATH');
+    expect(script).not.toContain('python3');
   });
 
   it('README объясняет, что сборщик живёт в tools/, а checkout движка не нужен', () => {
@@ -377,6 +426,69 @@ describe('shell-обёртки', () => {
       const mode = fs.statSync(path.join(ROOT, 'scripts', name)).mode;
       expect(mode & 0o111).toBeTruthy();
     }
+  });
+});
+
+describe('релиз сеттинга — в репозитории сеттинга', () => {
+  // Дерево как в positronium-game-settings: кошелёк, tools/, scripts/release.*
+  const makeSettingRepo = ({ notes, manifestVersion = '1.0.0', published = '1.0.0' }) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'release-cli-'));
+    fs.mkdirSync(path.join(root, 'scripts', 'lib'), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, 'scripts/release.mjs'), path.join(root, 'scripts/release.mjs'));
+    for (const file of ['semver.mjs', 'release-notes.mjs', 'app-release.mjs', 'setting-release.mjs']) {
+      fs.copyFileSync(path.join(ROOT, 'scripts/lib', file), path.join(root, 'scripts/lib', file));
+    }
+    fs.mkdirSync(path.join(root, 'tools'));
+    fs.writeFileSync(path.join(root, 'tools/pack-setting.py'), '# stub: сборку проверяет релиз в цельном дереве\n');
+    fs.mkdirSync(path.join(root, 'fallout'));
+    fs.writeFileSync(path.join(root, 'fallout/manifest.json'), JSON.stringify({
+      id: 'fallout', name: 'Fallout 2d20', version: manifestVersion, packFormat: 1, requiresCore: '>=1.0',
+    }));
+    fs.mkdirSync(path.join(root, 'release-notes'));
+    fs.writeFileSync(path.join(root, 'release-notes/fallout.md'), notes);
+    fs.writeFileSync(path.join(root, 'release.json'), JSON.stringify({
+      schemaVersion: 1,
+      repository: 'rpg-companios/positronium-game-settings',
+      settings: { fallout: { id: 'fallout', version: published } },
+    }));
+    return root;
+  };
+
+  const runRelease = (root, args = []) => spawnSync(process.execPath, [
+    path.join(root, 'scripts/release.mjs'), '--dry-run', '--repo', 'rpg-companios/positronium-game-settings', ...args,
+  ], { encoding: 'utf8' });
+
+  it('dry-run поднимает патч от release.json и называет тег', () => {
+    const root = makeSettingRepo({ notes: '## 1.0.1 — Ремонт\nТекст.\n' });
+    const result = runRelease(root);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('fallout: 1.0.0 → 1.0.1');
+    expect(result.stdout).toContain('fallout-v1.0.1');
+    // План ничего не пишет: индекс и манифест меняет только настоящий релиз.
+    expect(JSON.parse(fs.readFileSync(path.join(root, 'release.json'), 'utf8')).settings.fallout.version).toBe('1.0.0');
+  });
+
+  it('--bump minor и --version задают шаг', () => {
+    const minor = runRelease(makeSettingRepo({ notes: '## 1.1.0 — Новое\n' }), ['--bump', 'minor']);
+    expect(minor.status).toBe(0);
+    expect(minor.stdout).toContain('fallout-v1.1.0');
+
+    const explicit = runRelease(makeSettingRepo({ notes: '## 2.0.0 — Крупное\n' }), ['--version', '2.0.0']);
+    expect(explicit.status).toBe(0);
+    expect(explicit.stdout).toContain('fallout-v2.0.0');
+  });
+
+  it('заметки про другую версию останавливают релиз до сборки', () => {
+    const result = runRelease(makeSettingRepo({ notes: '## 1.0.0 — Старое\n' }));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('верхняя секция release-notes/fallout.md');
+    expect(result.stderr).toContain('1.0.1');
+  });
+
+  it('флаги движка в репозитории сеттинга отклоняются', () => {
+    const result = runRelease(makeSettingRepo({ notes: '## 1.0.1 — Ремонт\n' }), ['--aab']);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('относятся к релизу движка');
   });
 });
 

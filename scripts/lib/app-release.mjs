@@ -11,6 +11,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isSemanticVersion } from './semver.mjs';
+
 export const APP_RELEASE_FILE = 'app-release.json';
 export const APP_RELEASE_SCHEMA_VERSION = 1;
 
@@ -20,12 +22,6 @@ export const ENGINE_APK_ASSET = 'positronium.apk';
 export const ENGINE_AAB_ASSET = 'positronium.aab';
 
 export const ENGINE_RELEASE_NOTES = 'release-notes/engine.md';
-
-export const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
-
-export const isSemanticVersion = (value) => (
-  typeof value === 'string' && SEMVER_RE.test(value.trim())
-);
 
 /** Версия движка из app.json (`expo.version`) — то же число, что ENGINE_VERSION. */
 export const readEngineVersion = (root) => {

@@ -16,16 +16,32 @@ import {
   ENGINE_AAB_ASSET,
   ENGINE_APK_ASSET,
   ENGINE_RELEASE_NOTES,
-  SEMVER_RE,
   buildAppReleaseIndex,
   engineReleaseTag,
-  isSemanticVersion,
   readEngineVersion,
   releaseNotesLines,
   renderAppReleaseIndex,
   renderReleaseBody,
 } from './app-release.mjs';
 import { parseReleaseNotes, readReleaseNotes as readReleaseNotesFile } from './release-notes.mjs';
+import {
+  RELEASE_INDEX_FILE,
+  RELEASE_INDEX_SCHEMA_VERSION,
+  buildReleaseIndex,
+  isLegacyReleaseTag,
+  releaseAssetUrls,
+  releaseNotesFile,
+  releaseTag,
+} from './setting-release.mjs';
+import {
+  RELEASE_LEVELS,
+  SEMVER_RE,
+  bumpVersion,
+  compareSemver,
+  isSemanticVersion,
+  nextReleaseVersion,
+  parseSemver,
+} from './semver.mjs';
 
 // Общее с репозиторием движка: релиз выпускается там же, где собирается APK
 // (scripts/release.mjs), и правила про версию/заметки/index обязаны совпадать.
@@ -36,21 +52,38 @@ export {
   ENGINE_AAB_ASSET,
   ENGINE_APK_ASSET,
   ENGINE_RELEASE_NOTES,
+  RELEASE_INDEX_FILE,
+  RELEASE_INDEX_SCHEMA_VERSION,
+  RELEASE_LEVELS,
+  SEMVER_RE,
   buildAppReleaseIndex,
+  buildReleaseIndex,
+  bumpVersion,
+  compareSemver,
   engineReleaseTag,
+  isLegacyReleaseTag,
   isSemanticVersion,
+  nextReleaseVersion,
   parseReleaseNotes,
+  parseSemver,
   readEngineVersion,
+  releaseAssetUrls,
+  releaseNotesFile,
   releaseNotesLines,
+  releaseTag,
   renderAppReleaseIndex,
   renderReleaseBody,
 };
 
-export const RELEASE_INDEX_FILE = 'release.json';
-export const RELEASE_INDEX_SCHEMA_VERSION = 1;
+
 
 
 export const TOOLS_DIR = 'tools';
+
+/** Верхняя секция заметок из рабочего дерева (null, если файла нет). */
+export const readReleaseNotes = (root, settingId) => (
+  readReleaseNotesFile(root, `release-notes/${settingId}.md`)
+);
 
 // Служебные каталоги, которые не публикуются никуда.
 const COMMON_IGNORED_DIRS = new Set([
@@ -159,6 +192,20 @@ const assertWallet = (settingId, wallet) => {
 };
 
 /**
+ * Манифест для целевого репозитория: версия не откатывается публикацией кода.
+ *
+ * Релиз поднимает номер в репозитории сеттинга (и коммитит его), а исходники
+ * здесь могут остаться на старом. Публикация кода берёт номер оттуда, чтобы
+ * push не превратил 1.0.1 обратно в 1.0.0.
+ */
+export const keepPublishedVersion = (incoming, published) => {
+  if (!published || String(published.version) === String(incoming.version)) return incoming;
+  const comparison = compareSemver(String(published.version), String(incoming.version));
+  if (comparison === null || comparison <= 0) return incoming;
+  return { ...incoming, version: published.version };
+};
+
+/**
  * Файлы для репозитория сеттингов: каждая папка `modules/<id>` становится
  * папкой `<id>` в корне репозитория (папки под сеттинги — решение владельца).
  *
@@ -220,6 +267,23 @@ export const planSettingToolFiles = (root) => SETTING_TOOL_SOURCES
   .map((tool) => ({ ...tool }));
 
 /**
+ * Сценарий релиза переезжает в репозиторий сеттинга: там собирается `.trpg`,
+ * выпускается GitHub Release и пишется release.json. Скрипт универсальный —
+ * он же релизит движок, — поэтому едут все его зависимости.
+ */
+export const SETTING_RELEASE_FILES = [
+  'scripts/release.mjs',
+  'scripts/release.sh',
+  'scripts/lib/semver.mjs',
+  'scripts/lib/release-notes.mjs',
+  'scripts/lib/app-release.mjs',
+  'scripts/lib/setting-release.mjs',
+];
+
+export const planSettingReleaseFiles = (root) => SETTING_RELEASE_FILES
+  .filter((relative) => fs.existsSync(path.join(root, relative)));
+
+/**
  * Юридические файлы, которые остаются в корне репозитория сеттингов:
  * инструменты сборки — производные движка (AGPL-3.0), поэтому лицензия и
  * NOTICE обязаны ехать вместе с ними.
@@ -238,159 +302,11 @@ export const planSettingLegalFiles = (root) => SETTING_LEGAL_FILES
  */
 
 
-/** Разобрать `MAJOR.MINOR.PATCH` в тройку чисел; иначе null. */
-export const parseSemver = (value) => {
-  if (typeof value !== 'string') return null;
-  const match = SEMVER_RE.exec(value.trim());
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
-};
-
-/** Сравнить две семантические версии: -1 | 0 | 1. */
-export const compareSemver = (left, right) => {
-  const a = parseSemver(left);
-  const b = parseSemver(right);
-  if (!a || !b) return null;
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1;
-  }
-  return 0;
-};
-
-export const RELEASE_LEVELS = ['patch', 'minor', 'major'];
-
-/** Поднять версию на один уровень; уровень по умолчанию — patch. */
-export const bumpVersion = (version, level = 'patch') => {
-  const parts = parseSemver(version);
-  if (!parts) throw new Error(`[publish] not a semantic version: ${version}`);
-  if (!RELEASE_LEVELS.includes(level)) {
-    throw new Error(`[publish] unknown release level: ${level} (expected ${RELEASE_LEVELS.join('|')})`);
-  }
-  const [major, minor, patch] = parts;
-  if (level === 'major') return `${major + 1}.0.0`;
-  if (level === 'minor') return `${major}.${minor + 1}.0`;
-  return `${major}.${minor}.${patch + 1}`;
-};
-
-/**
- * Номер следующего релиза кошелька.
- *
- * - Манифест поднят вручную выше опубликованного — публикуем его как есть.
- * - Иначе шагаем на `level` от опубликованной версии (по умолчанию patch).
- * - Опубликованной семантической версии нет (первый выпуск или старый
- *   целочисленный тег) — берём версию из манифеста без изменений.
- *
- * @param {object} params
- * @param {string} params.manifestVersion
- * @param {string} [params.publishedVersion]  версия из release.json
- * @param {'patch'|'minor'|'major'} [params.level]
- * @param {string} [params.explicitVersion]   номер, заданный вручную
- */
-export const nextReleaseVersion = ({
-  manifestVersion,
-  publishedVersion,
-  level = 'patch',
-  explicitVersion,
-}) => {
-  if (!isSemanticVersion(manifestVersion)) {
-    throw new Error(
-      `[publish] manifest.version must be MAJOR.MINOR.PATCH: ${manifestVersion}`,
-    );
-  }
-  if (explicitVersion !== undefined && explicitVersion !== null && explicitVersion !== '') {
-    if (!isSemanticVersion(explicitVersion)) {
-      throw new Error(`[publish] --version must be MAJOR.MINOR.PATCH: ${explicitVersion}`);
-    }
-    const comparison = publishedVersion && isSemanticVersion(publishedVersion)
-      ? compareSemver(explicitVersion, publishedVersion)
-      : 1;
-    if (comparison !== null && comparison <= 0) {
-      throw new Error(
-        `[publish] ${
-          explicitVersion
-        } must be greater than the published ${publishedVersion}`,
-      );
-    }
-    if (compareSemver(explicitVersion, manifestVersion) < 0) {
-      throw new Error(`[publish] ${explicitVersion} is lower than manifest.version ${manifestVersion}`);
-    }
-    return explicitVersion;
-  }
-
-  // Целочисленный или отсутствующий релиз — начало семантической линии.
-  if (!publishedVersion || !isSemanticVersion(publishedVersion)) return manifestVersion;
-
-  if (compareSemver(manifestVersion, publishedVersion) > 0) return manifestVersion;
-  return bumpVersion(publishedVersion, level);
-};
-
-
-
-/** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v1.0.1). */
-export const releaseTag = (settingId, version) => `${settingId}-v${version}`;
-
-/** Тег до-семантической эпохи (`fallout-v1`) — его публикация убирает. */
-export const isLegacyReleaseTag = (settingId, tag) => (
-  typeof tag === 'string' && new RegExp(`^${settingId}-v\\d+$`).test(tag)
-);
-
-/** Верхняя секция заметок из рабочего дерева (null, если файла нет). */
-export const readReleaseNotes = (root, settingId) => (
-  readReleaseNotesFile(root, `release-notes/${settingId}.md`)
-);
-
-/** Путь файла заметок о релизах внутри репозитория (один на сеттинг). */
-export const releaseNotesFile = (settingId) => `release-notes/${settingId}.md`;
 
 
 
 
 
-/** Адреса скачивания архива релиза. */
-export const releaseAssetUrls = ({ repository, tag, asset }) => ({
-  assetUrl: `https://github.com/${repository}/releases/download/${tag}/${asset}`,
-  latestUrl: `https://github.com/${repository}/releases/latest/download/${asset}`,
-});
-
-
-
-/**
- * Содержимое release.json: по записи на каждый опубликованный кошелёк.
- * Клиент читает этот файл и решает, обновляться ли (src/engine/settings/
- * settingRelease.js).
- *
- * @param {object} params
- * @param {string} params.repository  owner/name
- * @param {Array<{id: string, manifest: object, asset: string, sha256: string,
- *                bytes: number}>} params.packages
- * @param {string} [params.generatedAt]
- */
-export const buildReleaseIndex = ({ repository, packages, generatedAt }) => {
-  const settings = {};
-  for (const entry of packages) {
-    const { id, manifest, asset, sha256, bytes } = entry;
-    if (!SETTING_ID_RE.test(id)) throw new Error(`[publish] invalid setting id: ${id}`);
-    const tag = releaseTag(id, manifest.version);
-    const urls = releaseAssetUrls({ repository, tag, asset });
-    settings[id] = {
-      id,
-      name: manifest.name ?? id,
-      version: manifest.version,
-      packFormat: manifest.packFormat ?? 1,
-      requiresCore: manifest.requiresCore ?? '>=0',
-      tag,
-      asset,
-      bytes,
-      sha256,
-      ...urls,
-    };
-  }
-  return {
-    schemaVersion: RELEASE_INDEX_SCHEMA_VERSION,
-    generatedAt: generatedAt ?? new Date().toISOString(),
-    repository,
-    settings,
-  };
-};
 
 /** README репозитория сеттингов: папки, сборка, релиз. */
 export const renderSettingReadme = ({ repository, wallets, engineRepository }) => {
@@ -414,9 +330,19 @@ export const renderSettingReadme = ({ repository, wallets, engineRepository }) =
     'Список доступных модулей — `tools/host-modules.json` (обновляет публикация).',
     `Готовый пакет для игрока — файл \`.trpg\`, он публикуется в релизах этого репозитория (см. \`${RELEASE_INDEX_FILE}\`).`,
     '',
-    '## Сборка пакета',
+    '## Сборка и релиз',
     '',
-    'Движок для сборки не нужен:',
+    'Движок для сборки не нужен. Одна команда собирает пакеты, выпускает',
+    'GitHub Release и обновляет `release.json`:',
+    '',
+    '```sh',
+    './scripts/release.sh                 # шаг patch',
+    './scripts/release.sh --bump minor   # 1.0.1 → 1.1.0',
+    './scripts/release.sh --version 2.0.0',
+    './scripts/release.sh --dry-run      # показать план',
+    '```',
+    '',
+    'Только собрать пакет без релиза:',
     '',
     '```sh',
     'npm install --prefix tools',
@@ -437,8 +363,18 @@ export const renderSettingReadme = ({ repository, wallets, engineRepository }) =
     '',
     '## Релиз',
     '',
-    `Релизы и \`${RELEASE_INDEX_FILE}\` собирает скрипт публикации из совмещённого репозитория;`,
-    'вручную тег и файл не создаются, иначе клиенты не увидят обновление.',
+    `Релизы и \`${RELEASE_INDEX_FILE}\` рождаются здесь, рядом с кошельком.`,
+    '`./scripts/release.sh` поднимает версию в `manifest.json` (по умолчанию патч),',
+    'берёт текст из верхней секции `release-notes/<id>.md`, собирает `.trpg`,',
+    'создаёт GitHub Release `<id>-v<версия>` и коммитит индекс обновлений.',
+    `Версия в верхней секции заметок должна совпадать с выпускаемой — иначе`,
+    'релиз останавливается до сборки. Файл релиза называется одинаково от',
+    'версии к версии, поэтому постоянная ссылка не ломается:',
+    `\`https://github.com/${repository}/releases/latest/download/fallout.trpg\`.`,
+    '',
+    'Публикация кода из совмещённого репозитория (`publish-setting.sh`) приезжает',
+    'сюда же, но `release.json` и версию в манифесте не откатывает: их меняет',
+    'только релиз.',
     '',
   ].join('\n');
 };

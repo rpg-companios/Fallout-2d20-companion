@@ -1,8 +1,13 @@
 # Публикация в целевые репозитории
 
-Правки сначала делаются в этом checkout. Потом два shell-скрипта раскладывают их
-по целевым репозиториям: движок — в `rpg-companios/ttrpg-engine`, сеттинг — в
+Правки сначала делаются в этом checkout. Потом два shell-скрипта раскладывают
+их по целевым репозиториям: движок — в `rpg-companios/ttrpg-engine`, сеттинг — в
 `rpg-companios/positronium-game-settings`.
+
+Здесь только **код**. Сборка и релиз живут в целевых репозиториях, рядом с
+артефактом: движок собирает APK/AAB и выпускает `app-release.json`, сеттинг
+собирает `.trpg` и выпускает `release.json`. Никаких путей из других чекаутов
+и ручного скачивания файлов нет.
 
 ## Быстрый запуск (Replit)
 
@@ -32,29 +37,29 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 - `--patch` — сохранить `.publish/patches/engine.patch`;
 - `--message "..."` — своё сообщение коммита;
 - релиза не делает: APK собирается и публикуется в самом репозитории движка
-  (`npm run release` там же, см. ниже). `--release`/`--asset` для движка —
-  ошибка с подсказкой;
+  (`npm run release` там же, см. ниже). `--release`/`--asset` — ошибка с
+  подсказкой;
 - `app-release.json` (индекс обновлений) не трогает: сохраняет тот, что уже
   лежит в репозитории движка.
 
-**`scripts/publish-setting.sh`** — собирает репозиторий сеттингов и выпускает
-релиз:
+**`scripts/publish-setting.sh`** — собирает репозиторий сеттингов и пушит его:
 
 - `modules/fallout/` → папка `fallout/` в корне (папка = сеттинг);
-- `tools/` — `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs`;
+- `tools/` — `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs`,
+  `package.json` (esbuild) и `host-modules.json` (список `engine:` модулей);
+- `scripts/release.mjs`, `scripts/release.sh` и `scripts/lib/*` — сценарий
+  релиза, который живёт рядом с кошельком;
 - `LICENSE`, `NOTICE` — лицензия относится к инструментам;
-- README репозитория;
-- `release-notes/fallout.md` — заметки о релизах (см. ниже);
-- собирает `fallout.trpg` (20 МБ) упаковщиком этого репозитория;
-- пишет `release.json` (версия, `requiresCore`, размер, sha256, тег, ссылки);
-- создаёт GitHub-релиз с тегом `fallout-v<версия>` и загружает в него `.trpg`
-  через REST API (или `gh`, если токена нет, а `gh` авторизован);
-- `--dry-run` — показать изменения;
-- `--no-release` — только запушить дерево, без нового релиза и без пересборки `.trpg`;
-- `--bump minor|major` — шаг версии (по умолчанию `patch`);
-- `--version 1.2.0` — задать номер вручную (должен быть выше опубликованного);
-- `--no-prune-legacy` — не убирать старые целочисленные теги (`fallout-v1`);
-- `--patch`, `--message` — как у движка.
+- README репозитория и `release-notes/fallout.md` — заметки о релизах;
+- **не** собирает `.trpg` и **не** выпускает релиз: это делает
+  `./scripts/release.sh` в самом репозитории сеттинга;
+- не откатывает `release.json` и версию в `fallout/manifest.json`, даже если
+  в этом checkout они ниже: номер двигает только релиз;
+- `--dry-run`/`--no-push` — показать изменения, ничего не отправляя;
+- `--patch`, `--message` — как у движка;
+- флаги `--release`, `--no-release`, `--bump`, `--version`, `--asset`,
+  `--no-install`, `--no-prune-legacy` теперь отклоняются с подсказкой: они
+  переехали в релизный сценарий сеттинга.
 
 Оба скрипта идемпотентны: повторный запуск без изменений ничего не коммитит.
 
@@ -131,10 +136,77 @@ npx eas-cli update --channel production --message "..."  # канал production
 Первый APK с `expo-updates` — база OTA; на сборки, выпущенные до его установки,
 обновления не приезжают.
 
+## Релизы сеттинга — в репозитории сеттинга
+
+Сеттинг — самостоятельное рабочее место: `.trpg` собирается там же, где лежит
+кошелёк, и релиз выпускается оттуда же. Публикация кода только привозит туда
+исходники, инструменты и сам сценарий релиза.
+
+```sh
+cd ~/workspace/positronium-game-settings
+git pull
+./scripts/release.sh                 # .trpg → GitHub Release → release.json → push
+```
+
+Что делает `./scripts/release.sh`:
+
+1. читает версии из `<id>/manifest.json` и опубликованный номер из
+   `release.json`;
+2. поднимает версию (по умолчанию patch), пишет её в манифест и сверяет с
+   верхней секцией `release-notes/<id>.md`;
+3. ставит esbuild в `tools/node_modules` (если его нет) и собирает
+   `<id>.trpg` упаковщиком `tools/pack-setting.py`;
+4. создаёт GitHub Release `<id>-v<версия>` и загружает туда `.trpg`;
+5. убирает до-семантические теги (`fallout-v1`) этого сеттинга;
+6. пишет `release.json` (версия, `requiresCore`, размер, sha256, тег, ссылки)
+   и коммитит его вместе с манифестом.
+
+Другие режимы:
+
+```sh
+./scripts/release.sh --bump minor      # 1.0.1 → 1.1.0
+./scripts/release.sh --version 2.0.0   # задать номер вручную
+./scripts/release.sh --setting fallout # только этот сеттинг (если их несколько)
+./scripts/release.sh --dry-run         # только показать план
+```
+
+Постоянные адреса сеттинга:
+
+- страница всех версий — <https://github.com/rpg-companios/positronium-game-settings/releases>;
+- последний пакет — <https://github.com/rpg-companios/positronium-game-settings/releases/latest/download/fallout.trpg>;
+- индекс обновлений — <https://raw.githubusercontent.com/rpg-companios/positronium-game-settings/main/release.json>.
+
+`release.json` пишет только релиз сеттинга. Публикация кода его сохраняет:
+если в целевом репозитории номер уже 1.0.1, а в этом checkout ещё 1.0.0,
+push не откатит ни индекс, ни манифест.
+
+```json
+{
+  "schemaVersion": 1,
+  "repository": "rpg-companios/positronium-game-settings",
+  "settings": {
+    "fallout": {
+      "id": "fallout",
+      "name": "Fallout 2d20",
+      "version": "1.0.1",
+      "packFormat": 1,
+      "requiresCore": ">=1.0",
+      "tag": "fallout-v1.0.1",
+      "asset": "fallout.trpg",
+      "bytes": 20229745,
+      "sha256": "…",
+      "assetUrl": "https://github.com/rpg-companios/positronium-game-settings/releases/download/fallout-v1.0.1/fallout.trpg",
+      "latestUrl": "https://github.com/rpg-companios/positronium-game-settings/releases/latest/download/fallout.trpg"
+    }
+  }
+}
+```
+
 ## Версии и заметки о релизах
 
-Номер релиза — семантический: `MAJOR.MINOR.PATCH`. Он живёт в
-`modules/fallout/manifest.json`, и публикация сама поднимает его перед сборкой:
+Номер релиза — семантический: `MAJOR.MINOR.PATCH`. Для сеттинга он живёт в
+`modules/<id>/manifest.json`, а опубликованный — в `release.json` целевого
+репозитория. Релиз поднимает номер сам:
 
 | ситуация | номер релиза |
 | --- | --- |
@@ -142,10 +214,12 @@ npx eas-cli update --channel production --message "..."  # канал production
 | манифест выше `release.json` (номер подняли вручную) | берётся из манифеста как есть |
 | иначе | шаг `--bump` от опубликованной версии: `1.0.0 → 1.0.1` |
 
-После подъёма манифест в рабочем дереве меняется — этот файл нужно закоммитить
-в совмещённом репозитории вместе с остальными правками.
+Поднятый номер релиз записывает в манифест сам и коммитит вместе с
+`release.json` — вручную править номер перед выпуском не нужно. В совмещённом
+репозитории манифест может остаться на старом номере: публикация кода версию
+не понижает.
 
-Текст GitHub Release берётся из верхней секции `release-notes/fallout.md`:
+Текст GitHub Release берётся из верхней секции `release-notes/<id>.md`:
 
 ```markdown
 ## 1.0.1 — Ремонт по книге
@@ -153,40 +227,20 @@ npx eas-cli update --channel production --message "..."  # канал production
 ```
 
 Секция сверху должна совпадать с выпускаемым номером. Если она про другую
-версию, публикация останавливается **до** сборки архива и просит добавить
-раздел. Блоки в ```` ``` ```` не считаются секциями — в них можно держать пример.
+версию, релиз останавливается **до** сборки архива и просит добавить раздел.
+Блоки в ```` ``` ```` не считаются секциями — в них можно держать пример.
 
 Старые целочисленные теги (`fallout-v1`) при выпуске удаляются вместе с
 релизом: они не продолжают семантическую линию, и рядом с `fallout-v1.0.0`
-только путают. Отключается флагом `--no-prune-legacy`.
+только путают.
 
 Сборка APK из репозитория движка — отдельная инструкция: `docs/apk-build.md`.
 
 ## Требования
 
-`node` 18+, `git`; для сеттинга ещё `python3` (упаковщик) и `esbuild`
-(devDependency движка — им собирается runtime-бандл сеттинга). `gh` не
-обязателен, если задан токен.
-
-Если зависимостей нет, достаточно один раз выполнить в корне движка:
-
-```sh
-npm install
-```
-
-`publish-setting.sh` сам доустановит только сборщик, если его не хватает
-(флаг `--no-install` это отключает). Сборщик ставится **в кэш вне проекта**
-(`$TMPDIR/positronium-build-tools` или `POSITRONIUM_TOOLS_DIR`) и подключается
-через `NODE_PATH` — дерево `node_modules` проекта не трогается. Это важно там,
-где зависимости поставлены pnpm: `npm install` поверх такого дерева падает
-(`Cannot read properties of null (reading 'isDescendantOf')`).
-
-В репозитории сеттинга зависимости ставит только публикация в `tools/`:
-`npm install --prefix tools` кладёт `esbuild` в `tools/node_modules`. Checkout
-движка для сборки не нужен — кошелёк ходит в движок через `engine:<id>`,
-и такие импорты отдаёт приложение (`src/engine/settings/settingRuntimeHost.js`).
-Список доступных модулей едет вместе с инструментами: `tools/host-modules.json`
-(его пишет публикация).
+`node` 18+, `git`; для релиза сеттинга ещё `python3` (упаковщик) и `esbuild`
+(ставится в `tools/node_modules` при первом релизе). `gh` не обязателен, если
+задан токен: релиз работает и через REST API.
 
 ## Если что-то пошло не так
 
@@ -195,34 +249,14 @@ npm install
 | `Permission ... denied` / 403 | токен без прав на целевой репозиторий: выдать доступ и повторить |
 | `Resource not accessible by integration` | подключение GitHub выдано только этому репозиторию, а не двум целевым |
 | `engine imports missing from the host module list` | кошелёк просит модуль, которого нет в `tools/host-modules.json`; обновить файл публикацией или добавить модуль в хост |
-| `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | просто повторить `./scripts/publish-setting.sh` — сборщик доустановится в кэш сам |
-| `Cannot read properties of null (reading 'isDescendantOf')` | это `npm install` в дереве, созданном pnpm (частая причина — запуск в репозитории сеттинга, где нет `package.json`). Здесь ставить зависимости не нужно; если пострадал `node_modules` проекта — переустановите его тем менеджером, которым он создавался |
-
-### Если `npm install` всё-таки запустили в репозитории сеттинга
-
-Команда уходит вверх по дереву и работает с чужим проектом. Проверка и уборка:
-
-```sh
-cd positronium-game-settings
-ls -a                      # ожидаемы только .git, fallout, tools, README.md, release.json, LICENSE, NOTICE
-git status --porcelain     # должно быть пусто
-```
-
-Появились `package.json`, `package-lock.json` или `node_modules` — они созданы этим
-запуском, их можно удалить:
-
-```sh
-rm -rf node_modules package.json package-lock.json
-```
-
-Если npm успел пройтись по корню основного проекта (`~/workspace`), переустановите
-его зависимости тем менеджером, который создавал дерево: `pnpm install` для
-pnpm-дерева или `rm -rf node_modules && npm install` для npm.
+| `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | повторить `./scripts/release.sh` в репозитории сеттинга — сборщик доустановится в `tools/` |
+| `не понял, что релизить` | запустить релиз в репозитории движка (`app.json`) или сеттинга (`tools/pack-setting.py`) |
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<версия>` |
-| `верхняя секция release-notes/fallout.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок |
-| `manifest.version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
-| `верхняя секция release-notes/engine.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок движка |
+| `верхняя секция release-notes/fallout.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок |
+| `version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
+| `верхняя секция release-notes/engine.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок движка |
 | `релиз движка выпускается в самом репозитории движка` | `publish-engine.sh` только доставляет код; релиз — `./scripts/release.sh` в движке |
+| `--release: сборка и релиз теперь в целевом репозитории` | публикация сеттинга больше не релизит: релиз — `./scripts/release.sh` в сеттинге |
 | APK установлен, а обновление не приходит | проверить, что сборка содержит `expo-updates` (новый билд после 2026-10-22), и что релиз содержит `app-release.json` |
 | `нет успешных сборок профиля preview` | убрать `--skip-build` или передать `--build-id` |
 | push работает из Replit, а скрипт получает 403 | запустить с `PUBLISH_NO_TOKEN=1` — скрипт возьмёт системные git-креды вместо переменной окружения |
