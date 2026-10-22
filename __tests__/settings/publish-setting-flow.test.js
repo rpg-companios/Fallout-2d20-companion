@@ -61,6 +61,7 @@ describe('publish-setting.sh: код едет, релиз остаётся в ц
       '--target', 'setting',
       '--config', config,
       '--workdir', publish,
+      '--no-pull',
       '--push',
     ], { encoding: 'utf8', env: { ...process.env, PUBLISH_NO_TOKEN: '1' } });
 

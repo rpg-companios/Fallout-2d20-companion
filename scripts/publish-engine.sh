@@ -7,6 +7,10 @@
 #   ./scripts/publish-engine.sh --dry-run    # только показать, что изменится
 #   ./scripts/publish-engine.sh --patch      # дополнительно сохранить .publish/patches/engine.patch
 #   ./scripts/publish-engine.sh --message "..." --patch
+#   ./scripts/publish-engine.sh --no-pull  # не обновлять checkout из origin
+#
+# Перед сборкой дерева скрипт обновляет свой checkout из origin (только
+# fast-forward и только при чистом дереве): публикуется то, что уже на GitHub.
 #
 # Это ТОЛЬКО доставка кода в репозиторий движка. Релиз (сборка APK/AAB и
 # публикация на GitHub) выпускается там же, в репозитории движка:

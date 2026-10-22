@@ -431,6 +431,16 @@ describe('shell-обёртки', () => {
     expect(readme).not.toContain('POSITRONIUM_ENGINE');
   });
 
+  it('публикация обновляет checkout из origin (--no-pull отключает)', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/publish-repositories.mjs'), 'utf8');
+    expect(source).toContain("from './lib/git-sync.mjs'");
+    expect(source).toContain('syncCheckout({ root: ROOT, label: \'publish\' })');
+    expect(source).toContain("case '--no-pull'");
+    for (const name of ['publish-engine.sh', 'publish-setting.sh']) {
+      expect(fs.readFileSync(path.join(ROOT, 'scripts', name), 'utf8')).toContain('--no-pull');
+    }
+  });
+
   it('обёртки исполняемые', () => {
     for (const name of ['publish-engine.sh', 'publish-setting.sh']) {
       const mode = fs.statSync(path.join(ROOT, 'scripts', name)).mode;

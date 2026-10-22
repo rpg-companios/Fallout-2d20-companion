@@ -52,6 +52,7 @@ export const currentGitBranch = (root) => {
  * @param {string} options.root корень репозитория
  * @param {string} [options.remote] имя remote (по умолчанию origin)
  * @param {boolean} [options.dryRun] только показать, что доступно
+ * @param {string} [options.label] префикс сообщений (`release` / `publish`)
  * @param {(message: string) => void} [options.log]
  * @returns {{skipped?: string, updated?: boolean, branch?: string, before?: string, after?: string, changed?: string[], available?: string}}
  */
@@ -59,16 +60,17 @@ export const syncCheckout = ({
   root,
   remote = 'origin',
   dryRun = false,
+  label = 'release',
   log = console.log,
 } = {}) => {
   if (!isGitCheckout(root)) {
-    log('[release] это не git-репозиторий — обновление из origin пропущено');
+    log(`[${label}] это не git-репозиторий — обновление из origin пропущено`);
     return { skipped: 'not-a-git-repo' };
   }
 
   const branch = process.env.RELEASE_BRANCH || currentGitBranch(root);
   if (!branch) {
-    log('[release] отсоединённый HEAD — обновление из origin пропущено');
+    log(`[${label}] отсоединённый HEAD — обновление из origin пропущено`);
     return { skipped: 'detached-head' };
   }
 
@@ -82,12 +84,12 @@ export const syncCheckout = ({
     const shown = dirty.slice(0, 5).join(', ');
     throw new Error(
       `незакоммиченные изменения (${shown}${dirty.length > 5 ? ', …' : ''}): `
-      + 'закоммитьте или уберите их, либо запустите релиз с --no-pull',
+      + 'закоммитьте или уберите их, либо запустите с --no-pull',
     );
   }
 
   if (!git(root, ['remote', 'get-url', remote], { allowFail: true }).ok) {
-    log(`[release] нет remote ${remote} — обновление пропущено`);
+    log(`[${label}] нет remote ${remote} — обновление пропущено`);
     return { skipped: 'no-remote', branch };
   }
 
@@ -95,13 +97,13 @@ export const syncCheckout = ({
   const target = `refs/remotes/${remote}/${branch}`;
   const remoteHead = git(root, ['rev-parse', '--verify', target], { allowFail: true });
   if (!remoteHead.ok) {
-    log(`[release] в ${remote} ещё нет ветки ${branch} — обновление пропущено`);
+    log(`[${label}] в ${remote} ещё нет ветки ${branch} — обновление пропущено`);
     return { skipped: 'no-upstream', branch };
   }
 
   const before = git(root, ['rev-parse', 'HEAD']).out;
   if (before === remoteHead.out) {
-    log(`[release] код уже совпадает с ${remote}/${branch} (${before.slice(0, 7)})`);
+    log(`[${label}] код уже совпадает с ${remote}/${branch} (${before.slice(0, 7)})`);
     return { updated: false, branch, before, after: before, changed: [] };
   }
 
@@ -114,7 +116,7 @@ export const syncCheckout = ({
   }
 
   if (dryRun) {
-    log(`[release] доступно обновление ${before.slice(0, 7)} → ${remoteHead.out.slice(0, 7)} (dry-run: не применяю)`);
+    log(`[${label}] доступно обновление ${before.slice(0, 7)} → ${remoteHead.out.slice(0, 7)} (dry-run: не применяю)`);
     return { updated: false, available: remoteHead.out, branch, before, after: before, changed: [] };
   }
 
@@ -124,6 +126,6 @@ export const syncCheckout = ({
     .out
     .split('\n')
     .filter(Boolean);
-  log(`[release] обновлено ${before.slice(0, 7)} → ${after.slice(0, 7)} (${remote}/${branch}, файлов: ${changed.length})`);
+  log(`[${label}] обновлено ${before.slice(0, 7)} → ${after.slice(0, 7)} (${remote}/${branch}, файлов: ${changed.length})`);
   return { updated: true, branch, before, after, changed };
 };

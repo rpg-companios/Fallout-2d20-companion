@@ -9,14 +9,34 @@
 собирает `.trpg` и выпускает `release.json`. Никаких путей из других чекаутов
 и ручного скачивания файлов нет.
 
+## Три проекта Replit — три репозитория GitHub
+
+| Проект в Replit | Свой репозиторий на GitHub | Роль |
+| --- | --- | --- |
+| смешанный | `rpg-companios/Fallout-2d20-companion` | разработка и веб-режим; публикует код в два целевых репозитория |
+| движок | `rpg-companios/ttrpg-engine` | тянет свой код, собирает APK/AAB, выпускает релиз |
+| сеттинг | `rpg-companios/positronium-game-settings` | тянет свой код, собирает `.trpg`, выпускает релиз |
+
+Обмена файлами между проектами нет — только через GitHub:
+
+```
+правка → смешанный → GitHub смешанного
+                   ↓ publish-*.sh
+        GitHub движка / GitHub сеттинга
+                   ↓ git pull (release.sh делает сам)
+        Replit: движок / сеттинг → сборка → релиз
+```
+
+Каждый проект обновляется **из своего** репозитория: движок и сеттинг —
+`release.sh` перед сборкой, смешанный — `publish-*.sh` перед отправкой кода.
+
 ## Быстрый запуск (Replit)
 
 ```sh
 git switch arena/0b69018a-fallout-2d20-companion
-git pull --ff-only origin arena/0b69018a-fallout-2d20-companion
 
 export GH_TOKEN=...        # токен с правом записи в оба репозитория
-./scripts/publish-engine.sh
+./scripts/publish-engine.sh    # сам обновит checkout из origin и отправит код
 ./scripts/publish-setting.sh
 ```
 
@@ -29,7 +49,9 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 репозитория: в ней работает агент, и только в неё Arena сохраняет правки.
 Целевые репозитории (`ttrpg-engine`, `positronium-game-settings`) — отдельные:
 публикация копирует туда файлы, а не историю, поэтому этой ветки там нет и
-быть не может.
+быть не может. В проектах Replit «движок» и «сеттинг» обновление — это
+обычный `git pull --ff-only` своей ветки (обычно `main`), его же делает
+`./scripts/release.sh` перед сборкой.
 
 ```sh
 git fetch origin
@@ -64,6 +86,9 @@ git reset --hard origin/arena/0b69018a-fallout-2d20-companion
   `modules/`, поэтому остаются в совмещённом репозитории;
 - коммит подписывается `PUBLISH_GIT_NAME`/`PUBLISH_GIT_EMAIL`
   (по умолчанию «Positronium publish»);
+- перед сборкой дерева обновляет свой checkout из origin (fast-forward,
+  только при чистом дереве): публикуется то, что уже на GitHub; `--no-pull`
+  отключает обновление;
 - `--dry-run` — показать изменения, ничего не отправляя;
 - `--patch` — сохранить `.publish/patches/engine.patch`;
 - `--message "..."` — своё сообщение коммита;
@@ -86,6 +111,8 @@ git reset --hard origin/arena/0b69018a-fallout-2d20-companion
   `./scripts/release.sh` в самом репозитории сеттинга;
 - не откатывает `release.json` и версию в `fallout/manifest.json`, даже если
   в этом checkout они ниже: номер двигает только релиз;
+- перед сборкой дерева обновляет свой checkout из origin (fast-forward,
+  только при чистом дереве); `--no-pull` отключает обновление;
 - `--dry-run`/`--no-push` — показать изменения, ничего не отправляя;
 - `--patch`, `--message` — как у движка;
 - флаги `--release`, `--no-release`, `--bump`, `--version`, `--asset`,
@@ -302,7 +329,9 @@ checkout остаётся источником истины.
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<версия>` |
 | `верхняя секция release-notes/fallout.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок |
 | `version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
-| `незакоммиченные изменения (...)` | в целевом checkout есть правки: закоммитьте/уберите их или запустите с `--no-pull` |
+| `незакоммиченные изменения (...)` | в checkout есть правки: закоммитьте/уберите их или запустите с `--no-pull` |
+| publish: `git fetch` не проходит | у проекта Replit нет доступа к своему GitHub: настройте креды или запустите с `--no-pull` |
+| publish: «код уже совпадает», а правок нет | проект Replit стоит не на той ветке: `git branch --show-current`; правки агента — в `arena/0b69018a-fallout-2d20-companion` |
 | `ветка ... разошлась с origin/...` | локальные коммиты не отправлены: `git pull`/`git push` либо `--no-pull` |
 | `верхняя секция release-notes/engine.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок движка |
 | `релиз движка выпускается в самом репозитории движка` | `publish-engine.sh` только доставляет код; релиз — `./scripts/release.sh` в движке |

@@ -23,14 +23,19 @@
 //   node scripts/publish-repositories.mjs --target engine --patch
 //   node scripts/publish-repositories.mjs --target setting --push
 //
+// Перед сборкой дерева checkout обновляется из origin (fast-forward, только
+// при чистом дереве): публикуется то, что уже лежит на GitHub, а не случайно
+// устаревшая копия. Отключить — --no-pull.
+//
 // Без --push скрипт работает как «показать, что уедет»: клонирует целевой
 // репозиторий в .publish/ и печатает список изменений.
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { syncCheckout } from './lib/git-sync.mjs';
 import {
   APP_RELEASE_FILE,
   hostModuleIds,
@@ -73,6 +78,7 @@ const parseArguments = (argv) => {
     push: false,
     message: null,
     keep: false,
+    pull: true,
     config: DEFAULT_REPOSITORIES_FILE,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -88,6 +94,7 @@ const parseArguments = (argv) => {
       case '--patch': args.patch = true; break;
       case '--push': args.push = true; break;
       case '--keep': args.keep = true; break;
+      case '--no-pull': args.pull = false; break;
       default:
         fail(`unknown argument: ${argument}`);
     }
@@ -386,8 +393,29 @@ const publishSetting = async (args, config) => {
   return finish({ args, directory, repository, report, workdir, label: 'setting' });
 };
 
+const restartedForUpdate = () => {
+  if (process.env.PUBLISH_SYNC_REEXEC === '1') {
+    console.log('[publish] сценарий публикации уже перезапускался — продолжаю на текущей версии');
+    return false;
+  }
+  console.log('[publish] сценарий публикации обновился — перезапускаю');
+  const child = spawnSync(
+    process.execPath,
+    [fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+    { stdio: 'inherit', env: { ...process.env, PUBLISH_SYNC_REEXEC: '1' } },
+  );
+  process.exit(child.status ?? 1);
+};
+
 const main = async () => {
   const args = parseArguments(process.argv.slice(2));
+  if (args.pull) {
+    const sync = syncCheckout({ root: ROOT, label: 'publish' });
+    const scriptChanged = (sync.changed ?? []).some((file) => file.startsWith('scripts/'));
+    if (sync.updated && scriptChanged) restartedForUpdate();
+  } else {
+    console.log('[publish] обновление из origin отключено (--no-pull)');
+  }
   if (!fs.existsSync(args.config)) fail(`missing ${args.config}`);
   const config = readJson(args.config);
   console.log(`[publish] auth: ${TOKEN ? 'токен GitHub из окружения' : 'без токена (git credential helper / gh)'}`);

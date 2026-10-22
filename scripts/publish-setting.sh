@@ -7,6 +7,10 @@
 #   ./scripts/publish-setting.sh --no-push        # собрать дерево, но не отправлять
 #   ./scripts/publish-setting.sh --patch          # дополнительно сохранить .publish/patches/setting.patch
 #   ./scripts/publish-setting.sh --message "..."  # текст коммита в целевом репозитории
+#   ./scripts/publish-setting.sh --no-pull        # не обновлять checkout из origin
+#
+# Перед сборкой дерева скрипт обновляет свой checkout из origin (только
+# fast-forward и только при чистом дереве): публикуется то, что уже на GitHub.
 #
 # Сборки и релиза здесь нет: `.trpg` собирается и публикуется в самом
 # репозитории сеттинга — `./scripts/release.sh` там же, где лежит кошелёк.
