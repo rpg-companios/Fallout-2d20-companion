@@ -72,6 +72,34 @@ git reset --hard origin/arena/0b69018a-fallout-2d20-companion
 После обновления перезапустите приложение в Replit (Run / `npm run web`),
 чтобы веб-режим отдавал новый код.
 
+### Если файлы в проекте удалены
+
+`git fetch` файлы не восстанавливает — он только обновляет ссылки на ветки.
+Пустой проект останется пустым, пока рабочую копию не перемотают на коммит:
+
+```sh
+cd ~/workspace                    # папка проекта, узнать: pwd
+git status                        # «not a git repository» → см. вариант ниже
+git fetch origin
+git reset --hard origin/arena/0b69018a-fallout-2d20-companion
+git clean -fd                     # остатки неотслеживаемых файлов; node_modules не тронет
+npm ci                            # node_modules в git не лежит — ставим заново
+```
+
+Если вместе с файлами удалён и `.git`, проект клонируется заново (для
+приватного репозитория нужен подключённый в Replit GitHub):
+
+```sh
+cd ~
+git clone https://github.com/rpg-companios/Fallout-2d20-companion.git workspace
+cd workspace
+git switch arena/0b69018a-fallout-2d20-companion
+npm ci
+```
+
+Replit Secrets (Tools → Secrets) от удаления файлов не страдают. А `.env`,
+если он был, в git не хранится и его нужно создать заново.
+
 Токен можно положить в Replit → Tools → Secrets под именем `GH_TOKEN`
 (скрипты также понимают `GITHUB_TOKEN` и `PUBLISH_GITHUB_TOKEN`).
 

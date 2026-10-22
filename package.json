@@ -17,7 +17,7 @@
     "test": "vitest run",
     "publish:plan": "node scripts/publish-repositories.mjs",
     "publish:engine": "node scripts/publish-repositories.mjs --target engine --patch --push",
-    "publish:setting": "node scripts/publish-repositories.mjs --target setting --patch --push --release",
+    "publish:setting": "node scripts/publish-repositories.mjs --target setting --patch --push",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
