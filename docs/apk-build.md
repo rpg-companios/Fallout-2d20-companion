@@ -108,6 +108,35 @@ npm run release -- --aab --submit   # плюс загрузка AAB в Play Cons
 Постоянная ссылка, которую можно давать людям:
 <https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>.
 
+## Чей аккаунт Expo владеет проектом
+
+`app.json` → `extra.eas.projectId` (сейчас
+`3f9910a4-6111-4eba-b6e1-382da3b977ad`) закрепляет приложение за конкретным
+аккаунтом Expo. Если войти другим аккаунтом, EAS ответит
+
+```
+Entity Not Authorized: AppEntity[...] (action = READ)
+```
+
+и сборка не начнётся. `npx eas-cli whoami` показывает, под кем вы вошли;
+`release.sh` печатает эту же строку перед сборкой и при отказе подсказывает
+дальнейшие шаги.
+
+Три способа привести аккаунт и проект в согласие:
+
+1. **Войти владельцем** — собрать `EXPO_TOKEN` в этом аккаунте
+   (<https://expo.dev/settings/access-tokens>) и положить его в
+   Replit → Tools → Secrets. Ничего в проекте менять не нужно, keystore
+   Android остаётся прежним.
+2. **Передать проект** — expo.dev → проект → Project settings → Transfer
+   на нужный аккаунт.
+3. **Создать новый проект** — `npx eas-cli init` в проекте движка запишет
+   новый `projectId` и `updates.url` в `app.json`. Тогда правку надо перенести
+   в `app.json` **смешанного** репозитория: в движок `app.json` приезжает
+   публикацией, и следующий `publish-engine.sh` вернул бы старое значение.
+   У нового проекта будет новый keystore: уже установленный APK так не
+   обновить (подпись другая), его придётся переустановить.
+
 ## OTA-обновление (без новой сборки)
 
 `expo-updates` доставляет правки JS в уже установленный APK:

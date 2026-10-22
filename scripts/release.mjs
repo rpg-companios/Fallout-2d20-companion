@@ -352,7 +352,72 @@ const ensureEngineDependencies = () => {
   }
 };
 
-const eas = (args) => run('npx', ['eas-cli', ...args]);
+/**
+ * projectId Expo из app.json: ошибка доступа к чужому проекту иначе выглядит
+ * как загадочное «Entity Not Authorized».
+ */
+const easProjectId = () => {
+  try {
+    const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
+    return app?.expo?.extra?.eas?.projectId ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/** Аккаунт, под которым работает EAS (`handylinux (…)`); null — не узнать. */
+const easAccount = () => {
+  try {
+    const out = execFileSync('npx', ['eas-cli', 'whoami'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return (out ?? '').trim().split('\n')[0].trim() || null;
+  } catch {
+    return null;
+  }
+};
+
+const easAuthHint = () => {
+  const projectId = easProjectId();
+  const account = easAccount();
+  return [
+    '',
+    `  Проект Expo ${projectId ?? '(нет projectId в app.json)'} этому аккаунту недоступен`
+      + `${account ? ` (вход выполнен: ${account})` : ''}.`,
+    '  Варианты:',
+    '    • войти аккаунтом-владельцем проекта — EXPO_TOKEN в Replit → Tools → Secrets,',
+    '    • перенести проект на свой аккаунт: expo.dev → проект → Project settings → Transfer,',
+    '    • создать новый проект: npx eas-cli init (запишет projectId и updates.url в app.json).',
+    '  app.json приезжает в репозиторий движка публикацией: правку projectId',
+    '  нужно делать в смешанном репозитории (app.json там) и потом публиковать,',
+    '  иначе следующий publish вернёт старое значение.',
+  ].join('\n');
+};
+
+/** EAS; сетевые ошибки и отказ доступа дополняются подсказкой. */
+const eas = (args) => {
+  try {
+    return execFileSync('npx', ['eas-cli', ...args], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: process.env,
+    });
+  } catch (error) {
+    const output = `${error?.stderr ?? ''}\n${error?.stdout ?? ''}`
+      .split('\n')
+      .filter((line) => !/deprecated|is deprecated/i.test(line))
+      .join('\n')
+      .trim();
+    const hint = /not authorized|Entity Not Authorized|incorrect user/i.test(output)
+      ? easAuthHint()
+      : '';
+    fail(`npx eas-cli ${args.join(' ')} не удался\n${output}${hint}`);
+    return '';
+  }
+};
 
 const resolveBuild = ({ args, profile }) => {
   if (args.buildId) return parseJson(eas(['build:view', args.buildId, '--json']), 'build:view');
@@ -419,6 +484,8 @@ const releaseEngine = async ({ args, repository }) => {
   }
 
   ensureEngineDependencies();
+  const account = easAccount();
+  if (account) console.log(`[release] EAS: ${account}`);
   const build = resolveBuild({ args, profile });
   console.log(`[release] сборка ${build.id}: ${build.status}`);
   const artifact = await downloadArtifact(build);

@@ -361,6 +361,16 @@ describe('release.json', () => {
     expect(source).toContain('createRelease');
   });
 
+  it('отказ EAS в доступе к чужому проекту объясняется по-человечески', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    expect(source).toContain('easAuthHint');
+    expect(source).toContain('Project settings → Transfer');
+    expect(source).toContain('npx eas-cli init');
+    // Подсказка должна отправлять править app.json в смешанный репозиторий:
+    // в движок он приезжает публикацией.
+    expect(source).toContain('нужно делать в смешанном репозитории');
+  });
+
   it('перед EAS-сборкой релиз ставит зависимости приложения', () => {
     const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
     // EAS читает плагины из node_modules; в свежем клоне их нет.
