@@ -46,7 +46,7 @@ npm run typecheck  # tsc --noEmit
 
 ```sh
 npm run build      # expo export --platform web → dist/
-npm run serve      # раздать собранное на :5000
+npm run serve      # раздать собранное на :5000 (npx serve, ставится на лету)
 ```
 
 ## Сборка APK
