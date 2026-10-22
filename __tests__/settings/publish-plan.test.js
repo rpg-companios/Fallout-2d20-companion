@@ -361,6 +361,14 @@ describe('release.json', () => {
     expect(source).toContain('createRelease');
   });
 
+  it('перед EAS-сборкой релиз ставит зависимости приложения', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    // EAS читает плагины из node_modules; в свежем клоне их нет.
+    expect(source).toContain('ensureEngineDependencies');
+    expect(source).toContain("'expo-asset'");
+    expect(source).toContain("[command, '--no-audit', '--no-fund']");
+  });
+
   it('токен важнее gh CLI, а авторизация проверяется до сборки', () => {
     const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
     // Установленный, но не авторизованный gh не должен ломать релиз, когда

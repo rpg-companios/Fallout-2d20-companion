@@ -214,11 +214,13 @@ cd ~/workspace/ttrpg-engine
 Что делает `./scripts/release.sh` (`npm run release`):
 
 1. берёт версию из `app.json` и заметки из `release-notes/engine.md`;
-2. собирает профиль EAS `preview` (APK) — ждёт завершения;
-3. скачивает артефакт сборки сам;
-4. создаёт GitHub Release `engine-v<версия>` с ассетом `positronium.apk`
+2. если нет `node_modules` — ставит зависимости (`npm ci`): EAS читает плагины
+   Expo локально и без них падает на `expo-asset`;
+3. собирает профиль EAS `preview` (APK) — ждёт завершения;
+4. скачивает артефакт сборки сам;
+5. создаёт GitHub Release `engine-v<версия>` с ассетом `positronium.apk`
    (текст — верхняя секция `release-notes/engine.md`);
-5. пишет `app-release.json` и коммитит его в репозиторий.
+6. пишет `app-release.json` и коммитит его в репозиторий.
 
 Другие режимы:
 

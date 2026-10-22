@@ -327,6 +327,31 @@ const parseJson = (text, what) => {
   }
 };
 
+/**
+ * Зависимости приложения перед EAS-сборкой.
+ *
+ * EAS перед отправкой в облако собирает архив проекта локально и читает
+ * плагины Expo из node_modules. Свежий клон (или дерево после `git clean -fd`)
+ * их не имеет, и сборка падает на «Failed to resolve plugin for module
+ * "expo-asset"». node_modules в git не лежит — ставим сами.
+ */
+const ensureEngineDependencies = () => {
+  const installed = path.join(ROOT, 'node_modules', 'expo-asset');
+  if (fs.existsSync(installed)) return;
+  if (!hasCommand('npm')) fail('для сборки APK нужен npm: поставьте node 18+ и npm');
+  const lock = path.join(ROOT, 'package-lock.json');
+  const command = fs.existsSync(lock) ? 'ci' : 'install';
+  console.log(`[release] нет node_modules — ставлю зависимости (npm ${command})`);
+  try {
+    execFileSync('npm', [command, '--no-audit', '--no-fund'], { cwd: ROOT, stdio: 'inherit' });
+  } catch {
+    fail(`не удалось поставить зависимости: выполните "npm ${command}" вручную`);
+  }
+  if (!fs.existsSync(installed)) {
+    fail('после npm ' + command + ' в node_modules нет expo-asset: проверьте package.json');
+  }
+};
+
 const eas = (args) => run('npx', ['eas-cli', ...args]);
 
 const resolveBuild = ({ args, profile }) => {
@@ -393,6 +418,7 @@ const releaseEngine = async ({ args, repository }) => {
     return;
   }
 
+  ensureEngineDependencies();
   const build = resolveBuild({ args, profile });
   console.log(`[release] сборка ${build.id}: ${build.status}`);
   const artifact = await downloadArtifact(build);
