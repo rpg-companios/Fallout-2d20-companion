@@ -339,6 +339,17 @@ describe('release.json', () => {
     expect(source).toContain('createRelease');
   });
 
+  it('токен важнее gh CLI, а авторизация проверяется до сборки', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    // Установленный, но не авторизованный gh не должен ломать релиз, когда
+    // задан PUBLISH_GITHUB_TOKEN: с токеном идём по REST.
+    expect(source).toContain("if (!key && hasCommand('gh'))");
+    expect(source).toContain('assertReleaseAuth()');
+    expect(source).toContain('gh установлен, но не авторизован');
+    // Проверка — до сборки: 20 МБ .trpg не собираются зря.
+    expect(source.indexOf('assertReleaseAuth();')).toBeLessThan(source.indexOf('releaseSettings({'));
+  });
+
   it('перед сборкой релиз обновляет checkout из origin (--no-pull отключает)', () => {
     const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
     expect(source).toContain("from './lib/git-sync.mjs'");

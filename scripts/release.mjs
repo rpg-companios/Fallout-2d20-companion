@@ -163,10 +163,30 @@ const token = () => (
   process.env.PUBLISH_GITHUB_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || ''
 );
 
+/** Авторизация до сборки: без неё 20 МБ .trpg собирались бы зря. */
+const assertReleaseAuth = () => {
+  if (token()) return;
+  if (!hasCommand('gh')) {
+    fail('для релиза нужен токен GH_TOKEN / PUBLISH_GITHUB_TOKEN или gh CLI');
+  }
+  try {
+    execFileSync('gh', ['auth', 'status'], { stdio: 'ignore' });
+  } catch {
+    fail(
+      'gh установлен, но не авторизован: выполните gh auth login '
+      + 'или задайте токен GH_TOKEN / PUBLISH_GITHUB_TOKEN',
+    );
+  }
+};
+
 /** GitHub Release: gh CLI, а без него — REST по токену. */
 const createRelease = async ({ repository, tag, title, body, file, assetName }) => {
   const branch = currentBranch();
-  if (hasCommand('gh')) {
+  const key = token();
+  // Токен важнее gh CLI: gh может быть установлен, но не авторизован (или
+  // авторизован другим аккаунтом без прав), а PUBLISH_GITHUB_TOKEN он не
+  // читает. С токеном идём по REST — одинаково на любой машине.
+  if (!key && hasCommand('gh')) {
     let exists = true;
     try {
       execFileSync('gh', ['release', 'view', tag, '--repo', repository], { stdio: 'ignore' });
@@ -198,7 +218,6 @@ const createRelease = async ({ repository, tag, title, body, file, assetName }) 
     return;
   }
 
-  const key = token();
   if (!key) fail('для релиза нужен gh CLI или токен GH_TOKEN / PUBLISH_GITHUB_TOKEN');
 
   const headers = {
@@ -356,6 +375,7 @@ const releaseEngine = async ({ args, repository }) => {
   console.log(`[release] сборка ${build.id}: ${build.status}`);
   const artifact = await downloadArtifact(build);
   console.log(`[release] файл: ${artifact.bytes} байт, sha256 ${artifact.sha256}`);
+  console.log(`[release] скачанный файл: ${artifact.file}`);
 
   const index = args.aab
     ? null
@@ -449,7 +469,8 @@ const buildTrpg = ({ setting, output, nodeModules }) => {
  */
 const pruneLegacyReleases = async ({ repository, settingId }) => {
   const removed = [];
-  if (hasCommand('gh')) {
+  const key = token();
+  if (!key && hasCommand('gh')) {
     const list = parseJson(
       run('gh', ['release', 'list', '--repo', repository, '--limit', '100', '--json', 'tagName']),
       'release list',
@@ -462,7 +483,6 @@ const pruneLegacyReleases = async ({ repository, settingId }) => {
     return removed;
   }
 
-  const key = token();
   if (!key) return removed;
   const headers = {
     Authorization: `Bearer ${key}`,
@@ -539,6 +559,7 @@ const releaseSettings = async ({ args, repository }) => {
     const bytes = fs.statSync(file).size;
     const digest = sha256(file);
     console.log(`[release] ${asset}: ${bytes} байт, sha256 ${digest}`);
+    console.log(`[release] файл: ${file} (временный, удалится после релиза)`);
     return { setting, version, notes, asset, file, bytes, sha256: digest };
   });
 
@@ -645,6 +666,7 @@ const main = async () => {
   } else {
     console.log('[release] обновление из origin отключено (--no-pull)');
   }
+  assertReleaseAuth();
   const mode = detectMode();
   if (!mode) {
     fail(
