@@ -5,6 +5,7 @@ import * as ActiveSettingRuntime from './activeSettingRuntime.js';
 import * as ExpoVectorIcons from '@expo/vector-icons';
 import * as ReactNative from 'react-native';
 import * as ZustandReactShallow from 'zustand/react/shallow';
+import { commonJsHostModule } from './hostModule.js';
 import * as AlertService from '../../../components/alerts/alertService';
 import * as Database from '../../../db/Database';
 import * as CurrentLocale from '../../../i18n/locale';
@@ -54,12 +55,14 @@ import * as WeaponMods from '../items/weaponMods';
  * against this map so a package cannot ship with an unresolved host dependency.
  */
 export const SETTING_RUNTIME_HOST_MODULES = Object.freeze({
-  '@expo/vector-icons': ExpoVectorIcons,
-  react: ReactModule,
-  'react-native': ReactNative,
-  'react/jsx-runtime': ReactJsxRuntime,
-  'react/jsx-dev-runtime': ReactJsxDevRuntime,
-  'zustand/react/shallow': ZustandReactShallow,
+  // Пакеты грузятся пакетом сеттинга через require(): отдаём CommonJS-модуль,
+  // а не обёртку Metro, иначе на Hermes терялись функции (см. hostModule.js).
+  '@expo/vector-icons': commonJsHostModule(ExpoVectorIcons),
+  react: commonJsHostModule(ReactModule),
+  'react-native': commonJsHostModule(ReactNative),
+  'react/jsx-runtime': commonJsHostModule(ReactJsxRuntime),
+  'react/jsx-dev-runtime': commonJsHostModule(ReactJsxDevRuntime),
+  'zustand/react/shallow': commonJsHostModule(ZustandReactShallow),
   'engine:components/screens/InventoryScreen/InventoryScreen': InventoryScreenComponent,
   'engine:components/screens/InventoryScreen/logic/inventoryI18n': InventoryI18n,
   'engine:components/screens/InventoryScreen/modals/AddItemModal': AddItemModal,
