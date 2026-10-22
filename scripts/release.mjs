@@ -20,10 +20,14 @@
 // называется одинаково от релиза к релизу, а индекс обновлений коммитится
 // в репозиторий.
 //
+// Перед сборкой checkout обновляется из origin (только fast-forward, только
+// при чистом дереве): релиз собирается из того кода, что лежит на GitHub.
+// Отключить — --no-pull.
+//
 // Токен: gh CLI (если авторизован) или GH_TOKEN / GITHUB_TOKEN /
 // PUBLISH_GITHUB_TOKEN. Сборка APK идёт под аккаунтом Expo (`npx eas-cli login`).
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -41,6 +45,7 @@ import {
   renderAppReleaseIndex,
   renderReleaseBody,
 } from './lib/app-release.mjs';
+import { syncCheckout } from './lib/git-sync.mjs';
 import { readReleaseNotes } from './lib/release-notes.mjs';
 import { nextReleaseVersion } from './lib/semver.mjs';
 import {
@@ -94,6 +99,7 @@ const baseArgs = (argv) => {
     buildId: null,
     skipBuild: false,
     dryRun: false,
+    pull: true,
     repository: null,
     bump: 'patch',
     version: null,
@@ -106,6 +112,7 @@ const baseArgs = (argv) => {
       case '--submit': args.submit = true; break;
       case '--skip-build': args.skipBuild = true; break;
       case '--dry-run': args.dryRun = true; break;
+      case '--no-pull': args.pull = false; break;
       case '--build-id':
         args.buildId = argv[++index];
         if (!args.buildId) fail('--build-id требует идентификатор сборки EAS');
@@ -615,6 +622,29 @@ const detectMode = () => {
 
 const main = async () => {
   const args = baseArgs(process.argv);
+  if (args.pull) {
+    const sync = syncCheckout({ root: ROOT, dryRun: args.dryRun });
+    const scriptChanged = (sync.changed ?? []).some((file) => (
+      file === 'scripts/release.mjs' || file.startsWith('scripts/lib/')
+    ));
+    if (sync.updated && scriptChanged) {
+      if (process.env.RELEASE_SYNC_REEXEC === '1') {
+        console.log('[release] сценарий релиза уже перезапускался — продолжаю на текущей версии');
+      } else {
+        // Обновился сам сценарий: старый процесс продолжил бы работать по
+        // старым правилам. Перезапускаем уже новым файлом.
+        console.log('[release] сценарий релиза обновился — перезапускаю');
+        const child = spawnSync(
+          process.execPath,
+          [fileURLToPath(import.meta.url), ...process.argv.slice(2)],
+          { stdio: 'inherit', env: { ...process.env, RELEASE_SYNC_REEXEC: '1' } },
+        );
+        process.exit(child.status ?? 1);
+      }
+    }
+  } else {
+    console.log('[release] обновление из origin отключено (--no-pull)');
+  }
   const mode = detectMode();
   if (!mode) {
     fail(

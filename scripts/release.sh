@@ -17,6 +17,9 @@
 # Версия: движок — из app.json (expo.version), сеттинг — поднимается от
 # release.json (по умолчанию patch). Текст — верхняя секция
 # release-notes/<id>.md, номер секции обязан совпасть с версией.
+#
+# Перед сборкой checkout обновляется из origin: только fast-forward и только
+# при чистом дереве (незакоммиченные правки — стоп). Отключить — --no-pull.
 # Сборка APK — EAS; .trpg — tools/pack-setting.py. Файл скачивается/собирается
 # сам, релиз создаётся через gh CLI (или токеном GH_TOKEN /
 # PUBLISH_GITHUB_TOKEN).

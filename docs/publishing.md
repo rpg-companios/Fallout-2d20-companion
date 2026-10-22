@@ -13,11 +13,36 @@
 
 ```sh
 git switch arena/0b69018a-fallout-2d20-companion
+git pull --ff-only origin arena/0b69018a-fallout-2d20-companion
 
 export GH_TOKEN=...        # токен с правом записи в оба репозитория
 ./scripts/publish-engine.sh
 ./scripts/publish-setting.sh
 ```
+
+### Обновить рабочую копию Replit
+
+Правки приезжают из GitHub: перед публикацией Replit должен догнать ветку,
+иначе он отправит в целевые репозитории старый код.
+
+```sh
+git fetch origin
+git status                    # локальные правки? их нужно убрать или закоммитить
+git pull --ff-only origin arena/0b69018a-fallout-2d20-companion
+npm install                   # только если менялись package.json / package-lock.json
+```
+
+`--ff-only` не создаёт merge-коммитов: если ветки разошлись, команда просто
+остановится и покажет, что мешает. Переставить рабочую копию ровно на ветку
+из GitHub (локальные правки пропадут):
+
+```sh
+git fetch origin
+git reset --hard origin/arena/0b69018a-fallout-2d20-companion
+```
+
+После обновления перезапустите приложение в Replit (Run / `npm run web`),
+чтобы веб-режим отдавал новый код.
 
 Токен можно положить в Replit → Tools → Secrets под именем `GH_TOKEN`
 (скрипты также понимают `GITHUB_TOKEN` и `PUBLISH_GITHUB_TOKEN`).
@@ -71,8 +96,7 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 
 ```sh
 cd ~/workspace/ttrpg-engine
-git pull
-./scripts/release.sh            # APK → GitHub Release → app-release.json → push
+./scripts/release.sh            # обновит checkout → APK → GitHub Release → app-release.json
 ```
 
 Что делает `./scripts/release.sh` (`npm run release`):
@@ -96,6 +120,12 @@ git pull
 
 Проверка версии: номер верхней секции `release-notes/engine.md` должен
 совпадать с `expo.version` — иначе скрипт останавливается до сборки.
+
+Перед сборкой `release.sh` сам обновляет checkout из `origin` — только
+fast-forward и только при чистом дереве. Незакоммиченные правки или локальные
+коммиты впереди `origin` останавливают релиз с подсказкой: разберитесь с ними
+вручную либо запустите `./scripts/release.sh --no-pull`. Если обновился сам
+сценарий релиза, он перезапускается уже новой версией.
 
 Постоянные адреса (не меняются от релиза к релизу, их можно давать людям):
 
@@ -144,8 +174,7 @@ npx eas-cli update --channel production --message "..."  # канал production
 
 ```sh
 cd ~/workspace/positronium-game-settings
-git pull
-./scripts/release.sh                 # .trpg → GitHub Release → release.json → push
+./scripts/release.sh                 # обновит checkout → .trpg → GitHub Release → release.json
 ```
 
 Что делает `./scripts/release.sh`:
@@ -169,6 +198,9 @@ git pull
 ./scripts/release.sh --setting fallout # только этот сеттинг (если их несколько)
 ./scripts/release.sh --dry-run         # только показать план
 ```
+
+Обновление checkout'а — то же, что у движка: fast-forward из `origin`,
+остановка на грязном дереве, `--no-pull` для отключения.
 
 Постоянные адреса сеттинга:
 
@@ -259,6 +291,8 @@ checkout остаётся источником истины.
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<версия>` |
 | `верхняя секция release-notes/fallout.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок |
 | `version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
+| `незакоммиченные изменения (...)` | в целевом checkout есть правки: закоммитьте/уберите их или запустите с `--no-pull` |
+| `ветка ... разошлась с origin/...` | локальные коммиты не отправлены: `git pull`/`git push` либо `--no-pull` |
 | `верхняя секция release-notes/engine.md — X, а выпускается Y` | добавить раздел `## Y` в начало заметок движка |
 | `релиз движка выпускается в самом репозитории движка` | `publish-engine.sh` только доставляет код; релиз — `./scripts/release.sh` в движке |
 | `--release: сборка и релиз теперь в целевом репозитории` | публикация сеттинга больше не релизит: релиз — `./scripts/release.sh` в сеттинге |

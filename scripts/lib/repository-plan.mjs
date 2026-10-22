@@ -278,6 +278,7 @@ export const SETTING_RELEASE_FILES = [
   'scripts/lib/release-notes.mjs',
   'scripts/lib/app-release.mjs',
   'scripts/lib/setting-release.mjs',
+  'scripts/lib/git-sync.mjs',
 ];
 
 export const planSettingReleaseFiles = (root) => SETTING_RELEASE_FILES

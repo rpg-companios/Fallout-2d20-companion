@@ -275,7 +275,7 @@ node scripts/publish-repositories.mjs --target setting --push
 - Движок: копируется всё, кроме `modules/`, `__tests__/`, `patchs/`, `artifacts/`, `сеттинги/`, закладок, бэкапов, скриптов публикации и готовых архивов. Тесты проверяют механику сеттинга и остаются в совмещённом репозитории.
 - APK движка: `npm run apk` (EAS, профиль `preview`) или `npm run apk:local`; подробности — `docs/apk-build.md`. Пакет приложения — `com.rpgcompanios.positronium`, версия — `ENGINE_VERSION`.
 - Сеттинг: `modules/<id>/` → `<id>/` в корне; `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs`, `host-modules.json` → `tools/`; `scripts/release.mjs`, `scripts/release.sh` и `scripts/lib/*` → `scripts/`; README генерируются. `release.json` и версию в манифесте публикация сохраняет — их меняет только релиз.
-- Релиз сеттинга — `./scripts/release.sh` в репозитории сеттинга: поднимает версию, собирает `.trpg`, создаёт GitHub-релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`, пишет и коммитит `release.json`.
+- Релиз сеттинга — `./scripts/release.sh` в репозитории сеттинга: обновляет checkout из `origin` (fast-forward, только при чистом дереве; `--no-pull` отключает), поднимает версию, собирает `.trpg`, создаёт GitHub-релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`, пишет и коммитит `release.json`.
 - Без `--push` клон откатывается: скрипт ничего не публикует, только показывает изменения и (с `--patch`) пишет патч.
 - Адреса и кошельки — `settings/repositories.json`; подпись коммита — `PUBLISH_GIT_NAME`/`PUBLISH_GIT_EMAIL`.
 

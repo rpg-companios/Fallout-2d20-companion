@@ -270,6 +270,7 @@ describe('app-release.json движка', () => {
       'scripts/release.sh',
       'scripts/lib/app-release.mjs',
       'scripts/lib/release-notes.mjs',
+      'scripts/lib/git-sync.mjs',
     ]) {
       expect(files).toContain(file);
     }
@@ -328,6 +329,7 @@ describe('release.json', () => {
       'scripts/lib/release-notes.mjs',
       'scripts/lib/app-release.mjs',
       'scripts/lib/setting-release.mjs',
+      'scripts/lib/git-sync.mjs',
     ]);
     // Скрипт запускают как ./scripts/release.sh — право на запуск обязательно.
     expect(fs.statSync(path.join(ROOT, 'scripts/release.sh')).mode & 0o111).toBeTruthy();
@@ -335,6 +337,14 @@ describe('release.json', () => {
     expect(source).toContain('pack-setting.py');
     expect(source).toContain('buildReleaseIndex');
     expect(source).toContain('createRelease');
+  });
+
+  it('перед сборкой релиз обновляет checkout из origin (--no-pull отключает)', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    expect(source).toContain("from './lib/git-sync.mjs'");
+    expect(source).toContain('syncCheckout(');
+    expect(source).toContain("case '--no-pull'");
+    expect(fs.readFileSync(path.join(ROOT, 'scripts/release.sh'), 'utf8')).toContain('--no-pull');
   });
 
   it('публикация кода не откатывает версию, выпущенную релизом', () => {
@@ -435,7 +445,7 @@ describe('релиз сеттинга — в репозитории сеттин
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'release-cli-'));
     fs.mkdirSync(path.join(root, 'scripts', 'lib'), { recursive: true });
     fs.copyFileSync(path.join(ROOT, 'scripts/release.mjs'), path.join(root, 'scripts/release.mjs'));
-    for (const file of ['semver.mjs', 'release-notes.mjs', 'app-release.mjs', 'setting-release.mjs']) {
+    for (const file of ['semver.mjs', 'release-notes.mjs', 'app-release.mjs', 'setting-release.mjs', 'git-sync.mjs']) {
       fs.copyFileSync(path.join(ROOT, 'scripts/lib', file), path.join(root, 'scripts/lib', file));
     }
     fs.mkdirSync(path.join(root, 'tools'));
