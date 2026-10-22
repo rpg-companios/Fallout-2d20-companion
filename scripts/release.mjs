@@ -270,6 +270,28 @@ const createRelease = async ({ repository, tag, title, body, file, assetName }) 
   }
 };
 
+/**
+ * Push ветки. С токеном передаём его заголовком, а не в URL: он не попадает
+ * в .git/config и работает там, где git-креды не настроены (Replit Shell с
+ * одним лишь PUBLISH_GITHUB_TOKEN). Без токена — обычный push (gh/креды).
+ */
+const pushHead = (branch) => {
+  const key = token();
+  if (!key) {
+    run('git', ['push', 'origin', `HEAD:${branch}`]);
+    return;
+  }
+  const basic = Buffer.from(`x-access-token:${key}`).toString('base64');
+  run('git', ['push', 'origin', `HEAD:${branch}`], {
+    env: {
+      ...process.env,
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader',
+      GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basic}`,
+    },
+  });
+};
+
 /** Закоммитить и запушить изменённые файлы релиза. */
 const commitRelease = ({ files, message }) => {
   const status = run('git', ['status', '--porcelain', '--', ...files]).trim();
@@ -285,7 +307,7 @@ const commitRelease = ({ files, message }) => {
     '-c', `user.email=${process.env.PUBLISH_GIT_EMAIL || 'release@positronium.local'}`,
     'commit', '-m', message,
   ]);
-  run('git', ['push', 'origin', `HEAD:${currentBranch()}`]);
+  pushHead(currentBranch());
   console.log('[release] изменения закоммичены и отправлены');
   return true;
 };

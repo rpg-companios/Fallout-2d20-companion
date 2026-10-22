@@ -346,6 +346,9 @@ describe('release.json', () => {
     expect(source).toContain("if (!key && hasCommand('gh'))");
     expect(source).toContain('assertReleaseAuth()');
     expect(source).toContain('gh установлен, но не авторизован');
+    // Push индекса тоже идёт с токеном: в Replit Shell git-креды не настроены.
+    expect(source).toContain('http.https://github.com/.extraheader');
+    expect(source).toContain('x-access-token');
     // Проверка — до сборки: 20 МБ .trpg не собираются зря.
     expect(source.indexOf('assertReleaseAuth();')).toBeLessThan(source.indexOf('releaseSettings({'));
   });
