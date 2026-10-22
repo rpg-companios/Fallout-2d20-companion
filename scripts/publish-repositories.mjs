@@ -279,6 +279,17 @@ const publishSetting = async (args, config) => {
   const wallets = planSettingWallets(ROOT, repository.wallets);
   const tools = planSettingToolFiles(ROOT);
   const releaseFiles = planSettingReleaseFiles(ROOT);
+  // Заметки о релизах живут в репозитории сеттинга: правятся здесь,
+  // публикуются туда, оттуда же берутся в текст GitHub Release. Проверяем
+  // до клонирования/очистки дерева: без файла релиз там не выпустить.
+  const noteSources = wallets.map((wallet) => {
+    const notesFile = releaseNotesFile(wallet.id);
+    const source = path.join(ROOT, notesFile);
+    if (!fs.existsSync(source)) {
+      fail(`нет ${notesFile}: без заметок релиз ${wallet.id} не выпустить`);
+    }
+    return { notesFile, source };
+  });
 
   if (args.push) {
     assertPushAccess(directory, repository, repository.branch);
@@ -317,12 +328,8 @@ const publishSetting = async (args, config) => {
   for (const name of planSettingLegalFiles(ROOT)) {
     copyFile(path.join(ROOT, name), path.join(directory, name));
   }
-  // Заметки о релизах живут в репозитории сеттинга: правятся здесь,
-  // публикуются туда, оттуда же берутся в текст GitHub Release.
-  for (const wallet of wallets) {
-    const notesFile = releaseNotesFile(wallet.id);
-    const source = path.join(ROOT, notesFile);
-    if (fs.existsSync(source)) copyFile(source, path.join(directory, notesFile));
+  for (const { notesFile, source } of noteSources) {
+    copyFile(source, path.join(directory, notesFile));
   }
   fs.writeFileSync(path.join(directory, TOOLS_DIR, 'README.md'), renderToolsReadme());
   // Сборщик в репозитории сеттинга самодостаточен: esbuild ставится

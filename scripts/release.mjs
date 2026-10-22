@@ -507,7 +507,8 @@ const releaseSettings = async ({ args, repository }) => {
         + `а выпускается ${version}. Добавьте раздел "## ${version}" в начало файла.`,
       );
     }
-    console.log(`[release] ${setting.id}: ${setting.manifest.version} → ${version}`);
+    const from = String(setting.manifest.version);
+    console.log(`[release] ${setting.id}: ${from === version ? `${version} (без изменений)` : `${from} → ${version}`}`);
     packages.push({ setting, version, notes });
   }
 
