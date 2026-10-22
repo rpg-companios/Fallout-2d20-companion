@@ -105,7 +105,38 @@ const COMBINED_ONLY = [
 // (docs/known-test-failures.md) сделал бы публичный движок красно-зелёным.
 const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'src/store/__test-setup__'];
 
+// Инструменты сборки сеттинга и генераторы данных Fallout: они нужны в
+// совмещённом репозитории и в репозитории сеттинга, но не в движке. Там
+// остаются только то, что собирает приложение, и сценарий релиза.
+const ENGINE_ONLY_SETTING_TOOLS = [
+  'scripts/pack-setting.py',
+  'scripts/unpack-setting.py',
+  'scripts/build-setting-runtime.mjs',
+  'scripts/setting-status.py',
+  'scripts/split-i18n-setting.py',
+  'scripts/build-crafting-data.mjs',
+  'scripts/build-scrap-data.mjs',
+  'scripts/scrap-source.json',
+  'scripts/validate-robot-data.mjs',
+  'scripts/migrate-bodyplans.mjs',
+  'scripts/migrate-robot-limbs.mjs',
+];
 
+// Справочники и скриншоты по сеттингу тоже не часть движка.
+const ENGINE_ONLY_SETTING_DOCS = [
+  'docs/reference-data/',
+  'docs/agents/',
+  'screenshots/',
+  'tools/fix-double-json.js',
+  'settings/pins.example.json',
+];
+
+const isEngineExcluded = (relative) => (
+  ENGINE_ONLY_SETTING_TOOLS.includes(relative)
+  || ENGINE_ONLY_SETTING_DOCS.some((prefix) => (
+    prefix.endsWith('/') ? relative.startsWith(prefix) : relative === prefix
+  ))
+);
 
 // Публикация — механизм совмещённого репозитория: в самом движке этим
 // скриптам нечего делать (они собирают в том числе сам движок).
@@ -173,6 +204,7 @@ export const listRepositoryFiles = (root, { exclude = [] } = {}) => {
  * то, что уже лежит в репозитории, — иначе индекс обновлений откатится.
  */
 export const planEngineFiles = (root) => listRepositoryFiles(root, { exclude: ENGINE_ONLY_EXCLUDES })
+  .filter((relative) => !isEngineExcluded(relative))
   .filter((relative) => !PUBLISH_ONLY_FILES.includes(relative))
   .filter((relative) => relative !== APP_RELEASE_FILE)
   .filter((relative) => (

@@ -279,6 +279,28 @@ describe('app-release.json движка', () => {
     expect(files).not.toContain('scripts/publish-repositories.mjs');
   });
 
+  it('движок не увозит инструменты сеттинга и справочники Fallout', () => {
+    const files = planEngineFiles(ROOT);
+    // Сборка приложения и релиз — на месте.
+    expect(files).toContain('scripts/release.sh');
+    expect(files).toContain('scripts/release.mjs');
+    expect(files).toContain('settings/release-sources.json');
+    // А инструменты упаковки сеттинга и её данные — нет.
+    for (const file of [
+      'scripts/pack-setting.py',
+      'scripts/unpack-setting.py',
+      'scripts/build-setting-runtime.mjs',
+      'scripts/build-crafting-data.mjs',
+      'scripts/scrap-source.json',
+      'tools/fix-double-json.js',
+      'settings/pins.example.json',
+    ].filter((candidate) => fs.existsSync(path.join(ROOT, candidate)))) {
+      expect(files).not.toContain(file);
+    }
+    expect(files.some((file) => file.startsWith('docs/reference-data/'))).toBe(false);
+    expect(files.some((file) => file.startsWith('screenshots/'))).toBe(false);
+  });
+
   it('индекс обновлений не попадает в план публикации: его пишет только релиз', () => {
     expect(APP_RELEASE_FILE).toBe('app-release.json');
     expect(planEngineFiles(ROOT)).not.toContain(APP_RELEASE_FILE);

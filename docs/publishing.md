@@ -156,6 +156,11 @@ Replit Secrets (Tools → Secrets) от удаления файлов не ст�
 
 - копирует всё, кроме `modules/`, `__tests__/`, `patchs/`, `artifacts/`,
   `сеттинги/`, рабочих файлов чекаута, скриптов публикации и готовых архивов;
+- не берёт инструменты сборки сеттинга (`pack-setting.py`,
+  `build-setting-runtime.mjs`, генераторы данных Fallout, миграции),
+  `docs/reference-data/`, `docs/agents/`, `screenshots/` и
+  `settings/pins.example.json` — это части смешанного репозитория, а не
+  движка; сценарий релиза (`scripts/release.*`, `scripts/lib/*`) едет;
 - в движке нет тестов: наборы проверяют механику сеттинга и требуют папки
   `modules/`, поэтому остаются в совмещённом репозитории;
 - коммит подписывается `PUBLISH_GIT_NAME`/`PUBLISH_GIT_EMAIL`
