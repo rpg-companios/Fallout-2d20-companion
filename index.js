@@ -1,6 +1,6 @@
 import { registerRootComponent } from 'expo';
 import React from 'react';
-import { View, Text } from 'react-native';
+import { ScrollView, View, Text } from 'react-native';
 
 import { debugLog } from './src/engine/debug/runtimeTrace.js';
 import App from './App';
@@ -8,20 +8,31 @@ import App from './App';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, componentStack: null };
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
   componentDidCatch(error, info) {
+    this.setState({ componentStack: info?.componentStack ?? null });
     debugLog('app.crash', { error, info });
   }
   render() {
     if (this.state.hasError) {
+      const { error, componentStack } = this.state;
+      // Стек и дерево компонентов — единственный след сбоя в release-сборке:
+      // без них экран сообщает только тип ошибки и починить причину нельзя.
+      const details = [String(error), error?.stack ?? '', componentStack ?? '']
+        .filter(Boolean)
+        .join('\n\n');
       return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', padding: 20 }}>
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a', padding: 20 }}>
           <Text style={{ color: '#ff4444', fontSize: 16, marginBottom: 10 }}>App Error</Text>
-          <Text style={{ color: '#ffffff', fontSize: 12 }}>{String(this.state.error)}</Text>
+          <ScrollView>
+            <Text selectable style={{ color: '#ffffff', fontSize: 11, fontFamily: 'monospace' }}>
+              {details}
+            </Text>
+          </ScrollView>
         </View>
       );
     }
