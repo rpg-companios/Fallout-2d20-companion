@@ -7,6 +7,8 @@ import path from 'node:path';
 
 import {
   buildReleaseIndex,
+  ENGINE_RELEASE_NOTES,
+  engineReleaseTag,
   listRepositoryFiles,
   planEngineFiles,
   hostModuleIds,
@@ -16,6 +18,7 @@ import {
   isLegacyReleaseTag,
   nextReleaseVersion,
   parseReleaseNotes,
+  readEngineVersion,
   readReleaseNotes,
   releaseAssetUrls,
   releaseNotesFile,
@@ -359,5 +362,45 @@ describe('сеттинг — самодостаточный плагин', () =>
     };
     walk(wallet);
     expect(escaping).toEqual([]);
+  });
+});
+
+describe('оформление репозитория движка', () => {
+  it('README движка объясняет, что это и как собрать APK', () => {
+    const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
+    expect(readme).toContain('# Positronium');
+    expect(readme).toContain('npm run apk');
+    expect(readme).toContain('npm run apk:local');
+    expect(readme).toContain('engine-v');
+    expect(readme).toContain('AGPL-3.0');
+    // README уезжает в движок, а не в репозиторий сеттинга.
+    expect(planEngineFiles(ROOT)).toContain('README.md');
+  });
+
+  it('релизы движка: тег engine-v<версия> и версия из app.json', () => {
+    const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
+    expect(engineReleaseTag(app.expo.version)).toBe(`engine-v${app.expo.version}`);
+    expect(readEngineVersion(ROOT)).toBe(app.expo.version);
+    expect(ENGINE_RELEASE_NOTES).toBe('release-notes/engine.md');
+  });
+
+  it('заметки о релизе движка есть и совпадают с версией приложения', () => {
+    const notes = readReleaseNotes(ROOT, 'engine');
+    expect(notes).not.toBeNull();
+    expect(notes.version).toBe(readEngineVersion(ROOT));
+    expect(notes.body.length).toBeGreaterThan(0);
+  });
+
+  it('в движок едут только его заметки, в сеттинг — только его', () => {
+    const engineFiles = planEngineFiles(ROOT);
+    expect(engineFiles).toContain(ENGINE_RELEASE_NOTES);
+    expect(engineFiles).not.toContain('release-notes/fallout.md');
+
+    const wallets = planSettingWallets(ROOT, {
+      fallout: { path: 'modules/fallout', asset: 'fallout.trpg' },
+    });
+    const settingNotes = releaseNotesFile('fallout');
+    expect(fs.existsSync(path.join(wallets[0].sourceDir, '..', '..', settingNotes))).toBe(true);
+    expect(fs.existsSync(path.join(wallets[0].sourceDir, ENGINE_RELEASE_NOTES))).toBe(false);
   });
 });

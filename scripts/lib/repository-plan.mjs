@@ -32,8 +32,11 @@ const COMBINED_ONLY = [
 // Тесты пока остаются в совмещённом репозитории: половина наборов проверяет
 // механику сеттинга и требует папки modules/, а унаследованный долг диффа
 // (docs/known-test-failures.md) сделал бы публичный движок красно-зелёным.
-// Заметки о релизах принадлежат репозиторию сеттинга: в движке им нечего делать.
-const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'release-notes', 'src/store/__test-setup__'];
+const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'src/store/__test-setup__'];
+
+// Заметки о релизах у каждого репозитория свои: движку нужен только его файл,
+// а `release-notes/fallout.md` остаётся в репозитории сеттинга.
+export const ENGINE_RELEASE_NOTES = 'release-notes/engine.md';
 
 // Публикация — механизм совмещённого репозитория: в самом движке этим
 // скриптам нечего делать (они собирают в том числе сам движок).
@@ -95,7 +98,10 @@ export const listRepositoryFiles = (root, { exclude = [] } = {}) => {
 
 /** Файлы для репозитория движка: всё, кроме сеттингов и служебных каталогов. */
 export const planEngineFiles = (root) => listRepositoryFiles(root, { exclude: ENGINE_ONLY_EXCLUDES })
-  .filter((relative) => !PUBLISH_ONLY_FILES.includes(relative));
+  .filter((relative) => !PUBLISH_ONLY_FILES.includes(relative))
+  .filter((relative) => (
+    !relative.startsWith('release-notes/') || relative === ENGINE_RELEASE_NOTES
+  ));
 
 const assertWallet = (settingId, wallet) => {
   if (!SETTING_ID_RE.test(settingId)) {
@@ -276,6 +282,19 @@ export const nextReleaseVersion = ({
 
   if (compareSemver(manifestVersion, publishedVersion) > 0) return manifestVersion;
   return bumpVersion(publishedVersion, level);
+};
+
+/** Тег релиза движка: `engine-v<version>` (например, engine-v1.0.0). */
+export const engineReleaseTag = (version) => `engine-v${version}`;
+
+/** Версия движка из app.json (`expo.version`) — то же число, что ENGINE_VERSION. */
+export const readEngineVersion = (root) => {
+  const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
+  const version = app?.expo?.version;
+  if (typeof version !== 'string' || !isSemanticVersion(version)) {
+    throw new Error(`[publish] app.json expo.version must be MAJOR.MINOR.PATCH: ${version}`);
+  }
+  return version;
 };
 
 /** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v1.0.1). */

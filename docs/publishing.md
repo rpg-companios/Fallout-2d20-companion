@@ -30,7 +30,11 @@ export GH_TOKEN=...        # токен с правом записи в оба �
   (по умолчанию «Positronium publish»);
 - `--dry-run` — показать изменения, ничего не отправляя;
 - `--patch` — сохранить `.publish/patches/engine.patch`;
-- `--message "..."` — своё сообщение коммита.
+- `--message "..."` — своё сообщение коммита;
+- `--release` — дополнительно выпустить GitHub Release `engine-v<версия>`
+  (версия из `app.json`) с описанием из `release-notes/engine.md`;
+- `--asset <файл>` — приложить к релизу APK/AAB (флаг можно повторять;
+  `--asset` сам включает `--release`).
 
 **`scripts/publish-setting.sh`** — собирает репозиторий сеттингов и выпускает
 релиз:
@@ -52,6 +56,29 @@ export GH_TOKEN=...        # токен с правом записи в оба �
 - `--patch`, `--message` — как у движка.
 
 Оба скрипта идемпотентны: повторный запуск без изменений ничего не коммитит.
+
+## Релизы движка
+
+APK публикация не собирает — его собирает EAS (`npm run apk`) или локальный
+Gradle (`npm run apk:local`). Публикация прикладывает готовый файл к релизу:
+
+```sh
+npm run apk                                   # получить APK (ссылка от EAS)
+./scripts/publish-engine.sh --release --asset ~/Downloads/positronium-1.0.0.apk
+```
+
+Что создаётся: тег `engine-v<версия>` (версия — `expo.version` в `app.json`,
+она же `ENGINE_VERSION` в `src/engine/version.js`), GitHub Release
+«Positronium <версия>» с текстом из верхней секции `release-notes/engine.md`
+и приложенным APK. Если номер секции не совпадает с версией, публикация
+остановится до копирования дерева.
+
+Без `--asset` релиз создаётся с описанием; файл можно добавить позже:
+
+```sh
+gh release upload engine-v1.0.0 positronium-1.0.0.apk \
+  --repo rpg-companios/ttrpg-engine --clobber
+```
 
 ## Версии и заметки о релизах
 
@@ -143,6 +170,8 @@ pnpm-дерева или `rm -rf node_modules && npm install` для npm.
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<версия>` |
 | `верхняя секция release-notes/fallout.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок |
 | `manifest.version must be MAJOR.MINOR.PATCH` | номер в манифесте должен быть `1.0.0`, а не `1` |
+| `верхняя секция release-notes/engine.md — X, а публикуется Y` | добавить раздел `## Y` в начало заметок движка |
+| `--asset: файл не найден` | передать путь к собранному APK/AAB |
 | push работает из Replit, а скрипт получает 403 | запустить с `PUBLISH_NO_TOKEN=1` — скрипт возьмёт системные git-креды вместо переменной окружения |
 
 Проверить решение клиента об обновлении можно без публикации:

@@ -28,6 +28,8 @@ import { fileURLToPath } from 'node:url';
 
 import {
   buildReleaseIndex,
+  ENGINE_RELEASE_NOTES,
+  engineReleaseTag,
   hostModuleIds,
   isLegacyReleaseTag,
   nextReleaseVersion,
@@ -35,6 +37,7 @@ import {
   planSettingLegalFiles,
   planSettingToolFiles,
   planSettingWallets,
+  readEngineVersion,
   readReleaseNotes,
   releaseNotesFile,
   RELEASE_INDEX_FILE,
@@ -65,6 +68,8 @@ const parseArguments = (argv) => {
     bump: 'patch',
     version: null,
     pruneLegacy: true,
+    // Файлы, которые прикладываются к релизу движка (APK/AAB после EAS).
+    assets: [],
     config: DEFAULT_REPOSITORIES_FILE,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -75,6 +80,7 @@ const parseArguments = (argv) => {
       case '--message': args.message = argv[++index]; break;
       case '--bump': args.bump = argv[++index]; break;
       case '--version': args.version = argv[++index]; break;
+      case '--asset': args.assets.push(path.resolve(argv[++index])); break;
       case '--no-prune-legacy': args.pruneLegacy = false; break;
       case '--config': args.config = path.resolve(argv[++index]); break;
       case '--patch': args.patch = true; break;
@@ -89,7 +95,9 @@ const parseArguments = (argv) => {
   if (!['patch', 'minor', 'major'].includes(args.bump)) {
     fail(`unknown --bump level: ${args.bump} (expected patch|minor|major)`);
   }
-  if (args.release && args.target === 'engine') fail('--release is supported for the setting repository only');
+  if (args.release && args.target === 'setting' && args.assets.length > 0) {
+    fail('--asset is for engine releases (APK/AAB); the setting release uploads the built .trpg');
+  }
   return args;
 };
 
@@ -262,6 +270,69 @@ const publishRelease = async ({ repository, branch, entry }) => {
     );
   }
   console.log(`[publish] release: ${tag} → ${repository.repository}`);
+};
+
+/**
+ * Релиз движка: тег `engine-v<версия>`, APK/AAB — ассетами.
+ *
+ * Сборку APK делает EAS (или локальный Gradle) — публикация не собирает
+ * приложение, она только прикладывает готовые файлы. Без `--asset` релиз
+ * создаётся с описанием, файл можно добавить позже.
+ */
+const publishEngineRelease = async ({ repository, release, assets }) => {
+  const notesBody = [
+    release.notes.title ? `## ${release.version} — ${release.notes.title}` : `## ${release.version}`,
+    '',
+    release.notes.body ?? '',
+  ].join('\n').trim();
+  const title = `Positronium ${release.version}`;
+
+  if (TOKEN) {
+    const created = await ensureRelease({
+      repository: repository.repository,
+      tag: release.tag,
+      title,
+      notes: notesBody,
+      branch: repository.branch,
+    });
+    for (const asset of assets) {
+      await uploadReleaseAsset({
+        repository: repository.repository,
+        releaseId: created.id,
+        file: asset,
+        name: path.basename(asset),
+      });
+    }
+  } else if (hasCommand('gh')) {
+    const base = ['--repo', repository.repository];
+    let exists = true;
+    try {
+      execFileSync('gh', ['release', 'view', release.tag, ...base], { stdio: 'ignore' });
+    } catch {
+      exists = false;
+    }
+    if (exists) {
+      for (const asset of assets) {
+        execFileSync('gh', ['release', 'upload', release.tag, asset, ...base, '--clobber'], {
+          stdio: 'inherit',
+        });
+      }
+    } else {
+      execFileSync('gh', [
+        'release', 'create', release.tag, ...assets,
+        ...base,
+        '--target', repository.branch,
+        '--title', title,
+        '--notes', notesBody,
+      ], { stdio: 'inherit' });
+    }
+  } else {
+    fail(
+      'для релиза нужен токен GitHub: задайте PUBLISH_GITHUB_TOKEN (или GH_TOKEN) '
+      + 'либо авторизуйте gh CLI',
+    );
+  }
+  console.log(`[publish] engine release: ${release.tag} → ${repository.repository}`);
 };
 
 /**
@@ -450,15 +521,37 @@ const writePatch = (directory, patchFile) => {
   return fs.statSync(patchFile).size;
 };
 
-const publishEngine = (args, config) => {
+const publishEngine = async (args, config) => {
   const repository = config.engine;
   if (!repository?.repository) fail('settings/repositories.json has no engine repository');
-  const workdir = path.resolve(ROOT, args.workdir);
+  const workdir = path.resolve(args.workdir);
   const directory = ensureWorktree(repository, workdir);
   const files = planEngineFiles(ROOT);
 
   if (args.push || args.release) {
     assertPushAccess(directory, repository, repository.branch);
+  }
+
+  // Релиз движка: версия одна на app.json и ENGINE_VERSION, текст — из
+  // верхней секции release-notes/engine.md. Проверяем до клонирования
+  // и копирования файлов, чтобы не гонять дерево впустую.
+  let release = null;
+  if (args.release) {
+    const version = readEngineVersion(ROOT);
+    const notes = readReleaseNotes(ROOT, 'engine');
+    if (!notes) fail(`нет файла заметок ${ENGINE_RELEASE_NOTES}: без него релиз не выпускается`);
+    if (notes.version !== version) {
+      fail(
+        `верхняя секция ${ENGINE_RELEASE_NOTES} — ${notes.version}, `
+        + `а публикуется ${version}. Добавьте раздел "## ${version}" в начало файла.`,
+      );
+    }
+    for (const asset of args.assets) {
+      if (!fs.existsSync(asset) || !fs.statSync(asset).isFile()) {
+        fail(`--asset: файл не найден: ${asset}`);
+      }
+    }
+    release = { version, tag: engineReleaseTag(version), notes };
   }
 
   clearWorktree(directory);
@@ -473,10 +566,12 @@ const publishEngine = (args, config) => {
     repository: repository.repository,
     files: files.length,
     changed: status ? status.split('\n').length : 0,
+    release: release ? { tag: release.tag, version: release.version, assets: args.assets } : null,
   };
   console.log(JSON.stringify(report, null, 2));
   if (!status) {
     console.log('[publish] engine: no changes');
+    if (release) await publishEngineRelease({ repository, release, assets: args.assets });
     return report;
   }
 
@@ -486,7 +581,7 @@ const publishEngine = (args, config) => {
     console.log(`[publish] engine patch: ${patchFile} (${bytes} bytes)`);
     report.patch = patchFile;
   }
-  if (args.push) {
+  if (args.push || args.release) {
     commit(directory, commitMessage(args));
     git(directory, 'push', 'origin', `HEAD:${repository.branch}`);
     console.log('[publish] engine: pushed');
@@ -495,6 +590,7 @@ const publishEngine = (args, config) => {
     git(directory, 'reset', '--hard', 'HEAD');
     git(directory, 'clean', '-fdx');
   }
+  if (release) await publishEngineRelease({ repository, release, assets: args.assets });
   if (args.keep) console.log(`[publish] engine tree kept: ${directory}`);
   return report;
 };
@@ -703,7 +799,7 @@ const main = async () => {
   const config = readJson(args.config);
   console.log(`[publish] auth: ${TOKEN ? 'токен GitHub из окружения' : 'без токена (git credential helper / gh)'}`);
   const reports = [];
-  if (args.target === 'all' || args.target === 'engine') reports.push(publishEngine(args, config));
+  if (args.target === 'all' || args.target === 'engine') reports.push(await publishEngine(args, config));
   if (args.target === 'all' || args.target === 'setting') reports.push(await publishSetting(args, config));
   console.log(JSON.stringify({ ok: true, reports }, null, 2));
 };

@@ -81,6 +81,27 @@ npx expo export --platform android --output-dir dist
 В репозитории движка это уже проверено: бандл Hermes ≈ 3.7 МБ собирается без
 папки `modules/`.
 
+## Публикация APK в релиз
+
+Готовый APK прикладывается к GitHub Release движка (тег `engine-v<версия>`,
+версия — `expo.version` в `app.json`). Собирает его EAS, публикация только
+прикладывает файл:
+
+```sh
+npm run apk
+# из совмещённого репозитория:
+./scripts/publish-engine.sh --release --asset ~/Downloads/positronium-1.0.0.apk
+```
+
+Текст релиза берётся из верхней секции `release-notes/engine.md`; её номер
+должен совпадать с версией приложения. Без `--asset` релиз создаётся с
+описанием, файл добавляется позже:
+
+```sh
+gh release upload engine-v1.0.0 positronium-1.0.0.apk \
+  --repo rpg-companios/ttrpg-engine --clobber
+```
+
 ## Установка сеттинга в собранное приложение
 
 Движок не знает ни одного сеттинга заранее и ничего не предлагает поставить:
