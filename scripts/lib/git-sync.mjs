@@ -109,9 +109,17 @@ export const syncCheckout = ({
 
   const ancestor = git(root, ['merge-base', '--is-ancestor', 'HEAD', target], { allowFail: true });
   if (!ancestor.ok) {
+    // Показываем, что именно не отправлено: без этого «разошлась» не даёт
+    // понять, свой ли это коммит и что с ним делать.
+    const ahead = git(root, ['log', '--oneline', `${remote}/${branch}..HEAD`], { allowFail: true }).out;
+    const commits = ahead
+      ? ` Не отправлено (${ahead.split('\n').length}): ${ahead.split('\n').slice(0, 3).join('; ')}.`
+      : '';
     throw new Error(
-      `ветка ${branch} разошлась с ${remote}/${branch}: локальные коммиты не отправлены. `
-      + 'Приведите checkout в порядок (git pull / git push) или запустите релиз с --no-pull',
+      `ветка ${branch} разошлась с ${remote}/${branch}: локальные коммиты не отправлены.${commits} `
+      + 'Приведите checkout в порядок (git pull / git push для обычных коммитов; '
+      + 'git reset --hard origin/<ветка>, если локальные коммиты не нужны) '
+      + 'или запустите релиз с --no-pull',
     );
   }
 
