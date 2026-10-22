@@ -137,7 +137,7 @@ describe('граница сеттингов (292): public entrypoints', () => {
     expect(SETTING.meta).toMatchObject({
       id: 'fallout',
       name: 'Fallout 2d20',
-      version: 1,
+      version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
       requiresCore: '>=1.0',
       defaultLocale: 'ru-RU',
       locales: ['ru-RU', 'en-EN'],

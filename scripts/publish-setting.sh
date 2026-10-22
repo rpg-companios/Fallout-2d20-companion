@@ -6,7 +6,14 @@
 #   ./scripts/publish-setting.sh --dry-run        # только показать, что изменится
 #   ./scripts/publish-setting.sh --no-release     # запушить без нового релиза
 #   ./scripts/publish-setting.sh --patch          # дополнительно сохранить .publish/patches/setting.patch
-#   ./scripts/publish-setting.sh --message "..."
+#   ./scripts/publish-setting.sh --bump minor     # шаг версии: patch (по умолчанию), minor, major
+#   ./scripts/publish-setting.sh --message "..."  # текст коммита в целевом репозитории
+#
+# Номер релиза — семантический (1.0.0 → 1.0.1). Он хранится в
+# modules/<id>/manifest.json: публикация поднимает его там и берёт текст
+# релиза из верхней секции release-notes/<id>.md, поэтому версия в заметках
+# и в пакете всегда совпадает. Старые целочисленные теги (fallout-v1) при
+# выпуске убираются; --no-prune-legacy это отключает.
 #
 # Нужны node 18+, git, python3 и токен с правом записи в целевой репозиторий
 # (PUBLISH_GITHUB_TOKEN, GH_TOKEN или GITHUB_TOKEN). Без токена релиз
@@ -22,7 +29,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 usage() {
-  sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,26p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 PUSH=1

@@ -29,10 +29,14 @@ import { fileURLToPath } from 'node:url';
 import {
   buildReleaseIndex,
   hostModuleIds,
+  isLegacyReleaseTag,
+  nextReleaseVersion,
   planEngineFiles,
   planSettingLegalFiles,
   planSettingToolFiles,
   planSettingWallets,
+  readReleaseNotes,
+  releaseNotesFile,
   RELEASE_INDEX_FILE,
   renderSettingReadme,
   renderToolsPackageJson,
@@ -57,6 +61,10 @@ const parseArguments = (argv) => {
     release: false,
     message: null,
     keep: false,
+    // Каждый релиз — шаг по семантической версии; по умолчанию патч.
+    bump: 'patch',
+    version: null,
+    pruneLegacy: true,
     config: DEFAULT_REPOSITORIES_FILE,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -65,6 +73,9 @@ const parseArguments = (argv) => {
       case '--target': args.target = argv[++index]; break;
       case '--workdir': args.workdir = argv[++index]; break;
       case '--message': args.message = argv[++index]; break;
+      case '--bump': args.bump = argv[++index]; break;
+      case '--version': args.version = argv[++index]; break;
+      case '--no-prune-legacy': args.pruneLegacy = false; break;
       case '--config': args.config = path.resolve(argv[++index]); break;
       case '--patch': args.patch = true; break;
       case '--push': args.push = true; break;
@@ -75,6 +86,9 @@ const parseArguments = (argv) => {
     }
   }
   if (!['all', 'engine', 'setting'].includes(args.target)) fail(`unknown target: ${args.target}`);
+  if (!['patch', 'minor', 'major'].includes(args.bump)) {
+    fail(`unknown --bump level: ${args.bump} (expected patch|minor|major)`);
+  }
   if (args.release && args.target === 'engine') fail('--release is supported for the setting repository only');
   return args;
 };
@@ -219,7 +233,13 @@ const publishReleaseWithGh = ({ repository, tag, title, notes, file, id }) => {
 const publishRelease = async ({ repository, branch, entry }) => {
   const tag = `${entry.id}-v${entry.manifest.version}`;
   const title = `${entry.manifest.name ?? entry.id} ${entry.manifest.version}`;
-  const notes = `Пакет сеттинга ${entry.id} версии ${entry.manifest.version}.`;
+  // Текст релиза — верхняя секция release-notes/<id>.md; версию уже сверили
+  // при сборке пакета, поэтому заметки и архив всегда про один номер.
+  const notes = [
+    entry.notes?.title ? `## ${entry.manifest.version} — ${entry.notes.title}` : `## ${entry.manifest.version}`,
+    '',
+    entry.notes?.body ?? '',
+  ].join('\n').trim();
 
   if (TOKEN) {
     const release = await ensureRelease({
@@ -242,6 +262,45 @@ const publishRelease = async ({ repository, branch, entry }) => {
     );
   }
   console.log(`[publish] release: ${tag} → ${repository.repository}`);
+};
+
+/**
+ * Убрать релизы и теги до-семантической нумерации (`fallout-v1`).
+ *
+ * Старые теги не должны висеть рядом с `fallout-v1.0.0`: клиент сравнивает
+ * версии из release.json, а человек — список релизов, и «v1» рядом с «v1.0.0»
+ * только путает. Удаляются лишь теги этого кошелька, у которых после `-v`
+ * стоит целое число.
+ */
+const pruneLegacyReleases = async ({ repository, settingId, dryRun }) => {
+  const removed = [];
+  const releases = await apiRequest(`${API_BASE}/repos/${repository}/releases?per_page=100`);
+  if (!releases.ok) {
+    if (!dryRun) console.log(`[publish] prune: не удалось прочитать релизы (HTTP ${releases.status})`);
+    return removed;
+  }
+  for (const release of Array.isArray(releases.body) ? releases.body : []) {
+    if (!isLegacyReleaseTag(settingId, release.tag_name)) continue;
+    removed.push(release.tag_name);
+    if (dryRun) continue;
+    if (TOKEN) {
+      const deleted = await apiRequest(`${API_BASE}/repos/${repository}/releases/${release.id}`, {
+        method: 'DELETE',
+      });
+      if (!deleted.ok) {
+        fail(`не удалось удалить старый релиз ${release.tag_name}: ${describeApiError(deleted)}`);
+      }
+      // Удаление релиза оставляет тег: снимаем и его.
+      await apiRequest(`${API_BASE}/repos/${repository}/git/refs/tags/${encodeURIComponent(release.tag_name)}`, {
+        method: 'DELETE',
+      });
+    } else if (hasCommand('gh')) {
+      execFileSync('gh', ['release', 'delete', release.tag_name, '--repo', repository, '--yes', '--cleanup-tag'], {
+        stdio: 'inherit',
+      });
+    }
+  }
+  return removed;
 };
 
 /**
@@ -462,21 +521,56 @@ const publishSetting = async (args, config) => {
   // Проверяем сборщик до сборки релиза и подставляем его дочерним процессам.
   const toolNodeModules = args.release ? ensurePackToolchain() : null;
 
+  const publishedVersions = previousRelease
+    ? (JSON.parse(previousRelease).settings ?? {})
+    : {};
+
   const artifactsDir = path.join(workdir, 'artifacts');
   const packages = wallets.map((wallet) => {
-    const manifest = readJson(path.join(wallet.sourceDir, 'manifest.json'));
-    if (args.release) {
-      const artifact = buildTrpg(wallet, path.join(artifactsDir, wallet.asset), toolNodeModules);
-      return {
-        id: wallet.id,
-        manifest,
-        asset: wallet.asset,
-        file: artifact,
-        bytes: fs.statSync(artifact).size,
-        sha256: sha256(artifact),
-      };
+    const manifestFile = path.join(wallet.sourceDir, 'manifest.json');
+    const manifest = readJson(manifestFile);
+    if (!args.release) {
+      return { id: wallet.id, manifest, asset: wallet.asset, file: null, bytes: null, sha256: null };
     }
-    return { id: wallet.id, manifest, asset: wallet.asset, file: null, bytes: null, sha256: null };
+
+    // Версия и заметки проверяются до сборки: 20-мегабайтный архив незачем
+    // собирать, если номер не совпал с верхней секцией заметок.
+    const version = nextReleaseVersion({
+      manifestVersion: String(manifest.version),
+      publishedVersion: publishedVersions[wallet.id]?.version,
+      level: args.bump,
+      explicitVersion: args.version,
+    });
+    const notes = readReleaseNotes(ROOT, wallet.id);
+    if (!notes) {
+      fail(`нет файла заметок ${releaseNotesFile(wallet.id)}: без него релиз не выпускается`);
+    }
+    if (notes.version !== version) {
+      fail(
+        `верхняя секция ${releaseNotesFile(wallet.id)} — ${notes.version}, `
+        + `а публикуется ${version}. Добавьте раздел "## ${version}" в начало файла.`,
+      );
+    }
+
+    if (String(manifest.version) !== version) {
+      // Номер живёт в манифесте кошелька: публикация поднимает его здесь,
+      // чтобы следующий выпуск считался от него же.
+      fs.writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`);
+      console.log(`[publish] ${wallet.id}: версия ${manifest.version} → ${version} (манифест обновлён)`);
+      manifest.version = version;
+    }
+
+    const artifact = buildTrpg(wallet, path.join(artifactsDir, wallet.asset), toolNodeModules);
+    return {
+      id: wallet.id,
+      manifest,
+      asset: wallet.asset,
+      file: artifact,
+      bytes: fs.statSync(artifact).size,
+      sha256: sha256(artifact),
+      version,
+      notes,
+    };
   });
 
   clearWorktree(directory);
@@ -494,6 +588,13 @@ const publishSetting = async (args, config) => {
   const legalFiles = planSettingLegalFiles(ROOT);
   for (const name of legalFiles) {
     copyFile(path.join(ROOT, name), path.join(directory, name));
+  }
+  // Заметки о релизах живут в репозитории сеттинга: правятся здесь,
+  // публикуются туда, оттуда же берутся в текст GitHub Release.
+  for (const wallet of wallets) {
+    const notesFile = releaseNotesFile(wallet.id);
+    const source = path.join(ROOT, notesFile);
+    if (fs.existsSync(source)) copyFile(source, path.join(directory, notesFile));
   }
   fs.writeFileSync(path.join(directory, TOOLS_DIR, 'README.md'), renderToolsReadme());
   // Сборщик в репозитории сеттинга самодостаточен: esbuild ставится
@@ -575,6 +676,19 @@ const publishSetting = async (args, config) => {
       await publishRelease({ repository, branch: repository.branch, entry });
     }
     report.released = true;
+    if (args.pruneLegacy) {
+      for (const entry of packages) {
+        const removed = await pruneLegacyReleases({
+          repository: repository.repository,
+          settingId: entry.id,
+          dryRun: false,
+        });
+        if (removed.length > 0) {
+          console.log(`[publish] ${entry.id}: убраны старые релизы ${removed.join(', ')}`);
+          report.pruned = [...(report.pruned ?? []), ...removed];
+        }
+      }
+    }
   } else if (!args.push && !args.keep) {
     git(directory, 'reset', '--hard', 'HEAD');
     git(directory, 'clean', '-fdx');

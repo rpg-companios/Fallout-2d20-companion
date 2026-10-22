@@ -70,7 +70,7 @@ fallout/
 
 | Поле | Зачем |
 |---|---|
-| `version` | контент: добавил пушку → 2 |
+| `version` | контент, семантический номер: добавил пушку → `1.0.1` (публикация поднимает сама) |
 | `requiresCore` | какой движок нужен |
 | `packFormat` | правила укладки файлов. Поменяли дерево → format 2, старый движок не лезет вслепую |
 
@@ -377,18 +377,18 @@ Archive validation, local install/cache, allowlisted reading, manifest runtime-e
   "repository": "rpg-companios/positronium-game-settings",
   "settings": {
     "fallout": {
-      "id": "fallout", "name": "Fallout 2d20", "version": 2,
+      "id": "fallout", "name": "Fallout 2d20", "version": "1.0.1",
       "packFormat": 1, "requiresCore": ">=1.0",
-      "tag": "fallout-v2", "asset": "fallout.trpg",
+      "tag": "fallout-v1.0.1", "asset": "fallout.trpg",
       "bytes": 20229846, "sha256": "…",
-      "assetUrl": "https://github.com/<owner>/<repo>/releases/download/fallout-v2/fallout.trpg",
+      "assetUrl": "https://github.com/<owner>/<repo>/releases/download/fallout-v1.0.1/fallout.trpg",
       "latestUrl": "https://github.com/<owner>/<repo>/releases/latest/download/fallout.trpg"
     }
   }
 }
 ```
 
-`release.json` пишет `scripts/publish-repositories.mjs --release`, он же создаёт релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`.
+`release.json` пишет `scripts/publish-repositories.mjs --release`, он же создаёт релиз с тегом `<id>-v<version>` и ассетом `<id>.trpg`. Версия семантическая (`1.0.0` → `1.0.1` по умолчанию), публикация поднимает её в манифесте и берёт текст релиза из верхней секции `release-notes/<id>.md`.
 
 **Решение принимает чистая функция** (`src/engine/settings/settingRelease.js`): `update-available`, `up-to-date`, `incompatible-core`, `not-released`. Правила:
 

@@ -1,10 +1,13 @@
 {
   "id": "fallout",
   "name": "Fallout 2d20",
-  "version": 1,
+  "version": "1.0.0",
   "requiresCore": ">=1.0",
   "defaultLocale": "ru-RU",
-  "locales": ["ru-RU", "en-EN"],
+  "locales": [
+    "ru-RU",
+    "en-EN"
+  ],
   "runtime": {
     "apiVersion": 1,
     "source": "runtimeEntry.js",

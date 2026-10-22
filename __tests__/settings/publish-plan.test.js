@@ -12,7 +12,13 @@ import {
   hostModuleIds,
   planSettingLegalFiles,
   planSettingWallets,
+  bumpVersion,
+  isLegacyReleaseTag,
+  nextReleaseVersion,
+  parseReleaseNotes,
+  readReleaseNotes,
   releaseAssetUrls,
+  releaseNotesFile,
   releaseTag,
   renderSettingReadme,
   renderToolsPackageJson,
@@ -110,9 +116,91 @@ describe('папки под сеттинги в репозитории сетт�
   });
 });
 
+describe('семантические версии релизов', () => {
+  it('шаг по уровням: patch, minor, major', () => {
+    expect(bumpVersion('1.0.0')).toBe('1.0.1');
+    expect(bumpVersion('1.0.0', 'minor')).toBe('1.1.0');
+    expect(bumpVersion('1.4.9', 'major')).toBe('2.0.0');
+  });
+
+  it('первый выпуск берёт номер из манифеста, дальше — шаг от опубликованного', () => {
+    // Старый целочисленный тег не продолжает семантическую линию.
+    expect(nextReleaseVersion({ manifestVersion: '1.0.0', publishedVersion: '1' })).toBe('1.0.0');
+    expect(nextReleaseVersion({ manifestVersion: '1.0.0', publishedVersion: undefined })).toBe('1.0.0');
+    expect(nextReleaseVersion({ manifestVersion: '1.0.0', publishedVersion: '1.0.0' })).toBe('1.0.1');
+    expect(nextReleaseVersion({ manifestVersion: '1.0.0', publishedVersion: '1.0.1', level: 'minor' }))
+      .toBe('1.1.0');
+  });
+
+  it('поднятый вручную манифест публикуется как есть', () => {
+    expect(nextReleaseVersion({ manifestVersion: '2.0.0', publishedVersion: '1.0.3' })).toBe('2.0.0');
+  });
+
+  it('номер, заданный вручную, обязан быть выше опубликованного', () => {
+    expect(nextReleaseVersion({
+      manifestVersion: '1.0.0', publishedVersion: '1.0.3', explicitVersion: '1.1.0',
+    })).toBe('1.1.0');
+    expect(() => nextReleaseVersion({
+      manifestVersion: '1.0.0', publishedVersion: '1.0.3', explicitVersion: '1.0.3',
+    })).toThrow(/greater than/);
+    expect(() => nextReleaseVersion({
+      manifestVersion: '1.0.0', publishedVersion: '1.0.3', level: 'beta',
+    })).toThrow(/unknown release level/);
+  });
+
+  it('старым считается только тег с целым номером', () => {
+    expect(isLegacyReleaseTag('fallout', 'fallout-v1')).toBe(true);
+    expect(isLegacyReleaseTag('fallout', 'fallout-v1.0.0')).toBe(false);
+    expect(isLegacyReleaseTag('other', 'fallout-v1')).toBe(false);
+  });
+});
+
+describe('заметки о релизах', () => {
+  const notes = [
+    '# Заметки',
+    '',
+    '```',
+    '## 9.9.9 — пример, не секция',
+    '```',
+    '',
+    '## 1.0.1 — Обновление',
+    'Первая строка.',
+    'Вторая строка.',
+    '',
+    '## 1.0.0 — Первый пакет',
+    'Старое.',
+  ].join('\n');
+
+  it('верхняя секция вне примеров — текст релиза', () => {
+    expect(parseReleaseNotes(notes)).toEqual({
+      version: '1.0.1',
+      title: 'Обновление',
+      body: 'Первая строка.\nВторая строка.',
+    });
+  });
+
+  it('файл без секций и заголовок без версии — ошибка', () => {
+    expect(() => parseReleaseNotes('# только заголовок')).toThrow(/no "## <version>" section/);
+    expect(() => parseReleaseNotes('## Заголовок\nтекст')).toThrow(/must start with a version/);
+  });
+
+  it('в репозитории есть заметки для выпускаемой версии', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'modules/fallout/manifest.json'), 'utf8'));
+    const file = readReleaseNotes(ROOT, 'fallout');
+    expect(file).not.toBeNull();
+    expect(releaseNotesFile('fallout')).toBe('release-notes/fallout.md');
+    expect(file.version).toBe(manifest.version);
+    expect(file.body.length).toBeGreaterThan(0);
+  });
+
+  it('движок не публикует заметки о релизах сеттинга', () => {
+    expect(planEngineFiles(ROOT)).not.toContain('release-notes/fallout.md');
+  });
+});
+
 describe('release.json', () => {
   it('тег и адреса архива: стабильные latest и конкретный релиз', () => {
-    expect(releaseTag('fallout', 2)).toBe('fallout-v2');
+    expect(releaseTag('fallout', '1.0.1')).toBe('fallout-v1.0.1');
     expect(releaseAssetUrls({
       repository: 'rpg-companios/positronium-game-settings',
       tag: 'fallout-v2',

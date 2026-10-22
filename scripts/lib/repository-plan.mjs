@@ -32,7 +32,8 @@ const COMBINED_ONLY = [
 // Тесты пока остаются в совмещённом репозитории: половина наборов проверяет
 // механику сеттинга и требует папки modules/, а унаследованный долг диффа
 // (docs/known-test-failures.md) сделал бы публичный движок красно-зелёным.
-const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'src/store/__test-setup__'];
+// Заметки о релизах принадлежат репозиторию сеттинга: в движке им нечего делать.
+const ENGINE_ONLY_EXCLUDES = ['modules', '__tests__', 'release-notes', 'src/store/__test-setup__'];
 
 // Публикация — механизм совмещённого репозитория: в самом движке этим
 // скриптам нечего делать (они собирают в том числе сам движок).
@@ -179,8 +180,167 @@ export const SETTING_LEGAL_FILES = ['LICENSE', 'NOTICE'];
 export const planSettingLegalFiles = (root) => SETTING_LEGAL_FILES
   .filter((name) => fs.existsSync(path.join(root, name)));
 
-/** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v2). */
+/**
+ * Версии пакетов — семантические `MAJOR.MINOR.PATCH`.
+ *
+ * Старые релизы нумеровались целыми (`fallout-v1`): такая версия считается
+ * до-семантической и не продолжает линию — первый семантический выпуск
+ * получает номер из манифеста (1.0.0), а старый тег убирается публикацией.
+ */
+export const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
+
+export const isSemanticVersion = (value) => (
+  typeof value === 'string' && SEMVER_RE.test(value.trim())
+);
+
+/** Разобрать `MAJOR.MINOR.PATCH` в тройку чисел; иначе null. */
+export const parseSemver = (value) => {
+  if (typeof value !== 'string') return null;
+  const match = SEMVER_RE.exec(value.trim());
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+};
+
+/** Сравнить две семантические версии: -1 | 0 | 1. */
+export const compareSemver = (left, right) => {
+  const a = parseSemver(left);
+  const b = parseSemver(right);
+  if (!a || !b) return null;
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index] > b[index] ? 1 : -1;
+  }
+  return 0;
+};
+
+export const RELEASE_LEVELS = ['patch', 'minor', 'major'];
+
+/** Поднять версию на один уровень; уровень по умолчанию — patch. */
+export const bumpVersion = (version, level = 'patch') => {
+  const parts = parseSemver(version);
+  if (!parts) throw new Error(`[publish] not a semantic version: ${version}`);
+  if (!RELEASE_LEVELS.includes(level)) {
+    throw new Error(`[publish] unknown release level: ${level} (expected ${RELEASE_LEVELS.join('|')})`);
+  }
+  const [major, minor, patch] = parts;
+  if (level === 'major') return `${major + 1}.0.0`;
+  if (level === 'minor') return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
+};
+
+/**
+ * Номер следующего релиза кошелька.
+ *
+ * - Манифест поднят вручную выше опубликованного — публикуем его как есть.
+ * - Иначе шагаем на `level` от опубликованной версии (по умолчанию patch).
+ * - Опубликованной семантической версии нет (первый выпуск или старый
+ *   целочисленный тег) — берём версию из манифеста без изменений.
+ *
+ * @param {object} params
+ * @param {string} params.manifestVersion
+ * @param {string} [params.publishedVersion]  версия из release.json
+ * @param {'patch'|'minor'|'major'} [params.level]
+ * @param {string} [params.explicitVersion]   номер, заданный вручную
+ */
+export const nextReleaseVersion = ({
+  manifestVersion,
+  publishedVersion,
+  level = 'patch',
+  explicitVersion,
+}) => {
+  if (!isSemanticVersion(manifestVersion)) {
+    throw new Error(
+      `[publish] manifest.version must be MAJOR.MINOR.PATCH: ${manifestVersion}`,
+    );
+  }
+  if (explicitVersion !== undefined && explicitVersion !== null && explicitVersion !== '') {
+    if (!isSemanticVersion(explicitVersion)) {
+      throw new Error(`[publish] --version must be MAJOR.MINOR.PATCH: ${explicitVersion}`);
+    }
+    const comparison = publishedVersion && isSemanticVersion(publishedVersion)
+      ? compareSemver(explicitVersion, publishedVersion)
+      : 1;
+    if (comparison !== null && comparison <= 0) {
+      throw new Error(
+        `[publish] ${
+          explicitVersion
+        } must be greater than the published ${publishedVersion}`,
+      );
+    }
+    if (compareSemver(explicitVersion, manifestVersion) < 0) {
+      throw new Error(`[publish] ${explicitVersion} is lower than manifest.version ${manifestVersion}`);
+    }
+    return explicitVersion;
+  }
+
+  // Целочисленный или отсутствующий релиз — начало семантической линии.
+  if (!publishedVersion || !isSemanticVersion(publishedVersion)) return manifestVersion;
+
+  if (compareSemver(manifestVersion, publishedVersion) > 0) return manifestVersion;
+  return bumpVersion(publishedVersion, level);
+};
+
+/** Тег релиза одного кошелька: `<id>-v<version>` (например, fallout-v1.0.1). */
 export const releaseTag = (settingId, version) => `${settingId}-v${version}`;
+
+/** Тег до-семантической эпохи (`fallout-v1`) — его публикация убирает. */
+export const isLegacyReleaseTag = (settingId, tag) => (
+  typeof tag === 'string' && new RegExp(`^${settingId}-v\\d+$`).test(tag)
+);
+
+/** Путь файла заметок о релизах внутри репозитория (один на сеттинг). */
+export const releaseNotesFile = (settingId) => `release-notes/${settingId}.md`;
+
+/**
+ * Разобрать заметки о релизах. Формат — markdown, секции `## <version>`:
+ *
+ *   ## 1.0.1
+ *   Что изменилось...
+ *
+ * Публикация берёт верхнюю секцию и проверяет, что её версия совпадает с
+ * выпускаемой: заметки и пакет всегда про один и тот же номер.
+ *
+ * @returns {{version: string, title: string, body: string}}
+ */
+export const parseReleaseNotes = (text, { file = 'release-notes.md' } = {}) => {
+  const lines = String(text ?? '').split(/\r?\n/);
+  // Заголовки внутри ``` — примеры, а не секции: их пропускаем.
+  const headings = [];
+  let fenced = false;
+  for (let index = 0; index < lines.length; index += 1) {
+    if (/^\s*```/.test(lines[index])) { fenced = !fenced; continue; }
+    if (!fenced && /^##\s+/.test(lines[index])) headings.push(index);
+  }
+  if (headings.length === 0) {
+    throw new Error(`[publish] ${file} has no "## <version>" section`);
+  }
+
+  const start = headings[0];
+  const end = headings.length > 1 ? headings[1] : lines.length;
+  const heading = lines[start].replace(/^##\s+/, '').trim();
+  const match = /^(\d+(?:\.\d+)*)\s*(?:[—–-]\s*(.*))?$/.exec(heading);
+  if (!match) {
+    throw new Error(`[publish] ${file}: section title must start with a version, got "${heading}"`);
+  }
+
+  const body = [];
+  fenced = false;
+  for (let index = start + 1; index < end; index += 1) {
+    if (/^\s*```/.test(lines[index])) fenced = !fenced;
+    body.push(lines[index]);
+  }
+
+  return {
+    version: match[1],
+    title: (match[2] ?? '').trim(),
+    body: body.join('\n').trim(),
+  };
+};
+
+/** Верхняя секция заметок сеттинга из рабочего дерева (null, если файла нет). */
+export const readReleaseNotes = (root, settingId) => {
+  const file = path.join(root, releaseNotesFile(settingId));
+  if (!fs.existsSync(file)) return null;
+  return { ...parseReleaseNotes(fs.readFileSync(file, 'utf8'), { file: releaseNotesFile(settingId) }), file };
+};
 
 /** Адреса скачивания архива релиза. */
 export const releaseAssetUrls = ({ repository, tag, asset }) => ({
@@ -239,6 +399,9 @@ export const renderSettingReadme = ({ repository, wallets, engineRepository }) =
     ...walletList,
     '',
     'Каждый кошелёк содержит `manifest.json`, `runtimeEntry.js`, данные, переводы и экраны.',
+    '',
+    'Заметки о релизах — `release-notes/<id>.md`: верхняя секция приезжает в текст',
+    'GitHub Release вместе с новой версией пакета.',
     '',
     'Сборщик живёт в репозитории: `npm install --prefix tools` ставит esbuild',
     'в `tools/node_modules`. Checkout движка не нужен — кошелёк обращается к',
