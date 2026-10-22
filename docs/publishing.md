@@ -72,6 +72,31 @@ git reset --hard origin/arena/0b69018a-fallout-2d20-companion
 После обновления перезапустите приложение в Replit (Run / `npm run web`),
 чтобы веб-режим отдавал новый код.
 
+### Полная синхронизация с GitHub (выбросить локальные коммиты)
+
+Если локальные коммиты не нужны — например, в них случайно попал секрет или
+удаление файлов, — рабочую копию приводят ровно к ветке из GitHub:
+
+```sh
+git fetch --prune origin
+git reset --hard origin/main          # локальные коммиты отброшены
+git clean -fd                         # удалить неотслеживаемое: .replit, .node, tools/node_modules
+git reflog expire --expire=now --all
+git gc --prune=now                    # вычистить отброшенные объекты вместе с секретами
+```
+
+После этого дерево совпадает с GitHub один в один. Локальный `.replit` (он не
+хранится в репозитории) нужно создать заново, иначе после перезапуска Replit
+не поставит Node:
+
+```sh
+printf 'modules = ["nodejs-20", "python-3.11"]\n' > .replit
+grep -qxF '.replit' .git/info/exclude || echo '.replit' >> .git/info/exclude
+```
+
+`tools/node_modules` релиз поставит сам. Секреты (токены) в файлы не пишутся:
+Replit → Tools → Secrets, имя `GH_TOKEN`.
+
 ### Что должно быть в проекте Replit
 
 `release.sh` в репозитории сеттинга — Node-скрипт, который для упаковки
