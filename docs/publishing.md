@@ -222,6 +222,23 @@ cd ~/workspace/ttrpg-engine
    (текст — верхняя секция `release-notes/engine.md`);
 6. пишет `app-release.json` и коммитит его в репозиторий.
 
+Во время ожидания печатается состояние сборки (`in queue` → `in progress` →
+`finished`) и ссылка на страницу сборки на expo.dev:
+
+```
+[release] сборка 9f3c1a2b поставлена в очередь
+[release] смотреть: https://expo.dev/accounts/handylinux/projects/positronium/builds/9f3c1a2b
+[release] сборка 9f3c1a2b: in queue (0 мин) — ждёт свободный слот Expo
+[release] сборка 9f3c1a2b: in progress (6 мин)
+[release] сборка 9f3c1a2b: finished (21 мин)
+```
+
+Раньше `eas build --wait` молчал всё это время, и нельзя было отличить
+сборку от зависания. Ограничения (по умолчанию 90 мин и опрос раз в 30 с)
+меняются переменными `RELEASE_BUILD_TIMEOUT_MS` и `RELEASE_BUILD_POLL_MS`.
+Ctrl+C не отменяет сборку на сервере: когда она закончится, опубликуйте её
+без новой сборки — `./scripts/release.sh --build-id <id>`.
+
 Другие режимы:
 
 ```sh

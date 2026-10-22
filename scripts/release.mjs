@@ -404,7 +404,9 @@ const easAccount = () => {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return (out ?? '').trim().split('\n')[0].trim() || null;
+    const line = (out ?? '').trim().split('\n')[0].trim();
+    // whoami печатает «handylinux (authenticated using EXPO_TOKEN)».
+    return line ? (line.split(/\s+/)[0] || null) : null;
   } catch {
     return null;
   }
@@ -450,29 +452,102 @@ const eas = (args) => {
   }
 };
 
-const resolveBuild = ({ args, profile }) => {
-  if (args.buildId) return parseJson(eas(['build:view', args.buildId, '--json']), 'build:view');
+const expoSlug = () => {
+  try {
+    const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8'));
+    return app?.expo?.slug ?? null;
+  } catch {
+    return null;
+  }
+};
+
+/** Страница сборки на expo.dev — чтобы было видно прогресс без терминала. */
+const buildPageUrl = (buildId) => {
+  const owner = easAccount();
+  const project = expoSlug();
+  if (!buildId || !owner || !project) return null;
+  return `https://expo.dev/accounts/${owner}/projects/${project}/builds/${buildId}`;
+};
+
+const BUILD_TIMEOUT_MS = Number(process.env.RELEASE_BUILD_TIMEOUT_MS) || 90 * 60 * 1000;
+const BUILD_POLL_MS = Number(process.env.RELEASE_BUILD_POLL_MS) || 30_000;
+const FINISHED = 'finished';
+const FAILED_STATUSES = ['errored', 'canceled', 'cancelled', 'expired'];
+
+const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+const viewBuild = (buildId) => {
+  const builds = parseJson(eas(['build:view', buildId, '--json']), 'build:view');
+  return Array.isArray(builds) ? builds[0] : builds;
+};
+
+/**
+ * Дождаться сборки, печатая её состояние.
+ *
+ * `eas build --wait` молчит все 20–30 минут: непонятно, идёт сборка или
+ * висит очередь. Поэтому сборка запускается без --wait, сразу печатается
+ * ссылка на expo.dev, а дальше статус опрашивается с отметкой времени.
+ */
+const waitForBuild = async ({ buildId, pageUrl }) => {
+  const startedAt = Date.now();
+  const elapsed = () => `${Math.round((Date.now() - startedAt) / 60_000)} мин`;
+  let build = viewBuild(buildId);
+  let lastStatus = null;
+  for (;;) {
+    const status = String(build?.status ?? 'unknown').toLowerCase();
+    if (status !== lastStatus) {
+      const line = `[release] сборка ${buildId}: ${status} (${elapsed()})`;
+      console.log(status === 'in queue' ? `${line} — ждёт свободный слот Expo` : line);
+      lastStatus = status;
+    }
+    if (status === FINISHED) return build;
+    if (FAILED_STATUSES.includes(status)) {
+      fail(
+        `сборка ${buildId} завершилась со статусом ${status}`
+        + `${pageUrl ? `\n  лог: ${pageUrl}` : ''}`
+        + `${build?.error?.message ? `\n  ошибка: ${build.error.message}` : ''}`,
+      );
+    }
+    if (Date.now() - startedAt > BUILD_TIMEOUT_MS) {
+      fail(
+        `сборка ${buildId} не завершилась за ${Math.max(1, Math.round(BUILD_TIMEOUT_MS / 60_000))} мин. `
+        + 'Она продолжается на серверах EAS: когда закончится, опубликуйте её без новой сборки — '
+        + `./scripts/release.sh --build-id ${buildId}`,
+      );
+    }
+    await sleep(BUILD_POLL_MS);
+    build = viewBuild(buildId);
+  }
+};
+
+const resolveBuild = async ({ args, profile }) => {
+  if (args.buildId) {
+    console.log(`[release] сборка ${args.buildId}: беру готовый билд`);
+    return waitForBuild({ buildId: args.buildId, pageUrl: buildPageUrl(args.buildId) });
+  }
   if (args.skipBuild) {
     const list = parseJson(
       eas(['build:list', '--platform', 'android', '--status', 'finished', '--build-profile', profile, '--limit', '1', '--json']),
       'build:list',
     );
-    const build = Array.isArray(list) ? list[0] : null;
-    if (!build) fail(`нет успешных сборок профиля ${profile}; уберите --skip-build`);
-    return build;
+    const entry = Array.isArray(list) ? list[0] : null;
+    if (!entry) fail(`нет успешных сборок профиля ${profile}; уберите --skip-build`);
+    console.log(`[release] беру последнюю успешную сборку ${entry.id}`);
+    return viewBuild(entry.id);
   }
 
-  console.log(`[release] EAS build: профиль ${profile} (это займёт несколько минут)`);
+  console.log(`[release] EAS build: профиль ${profile} (запуск, ~1–2 мин на загрузку проекта)`);
   const builds = parseJson(
-    eas(['build', '--platform', 'android', '--profile', profile, '--non-interactive', '--wait', '--json']),
+    eas(['build', '--platform', 'android', '--profile', profile, '--non-interactive', '--json']),
     'build',
   );
-  const build = Array.isArray(builds) ? builds[0] : builds;
-  if (!build) fail('EAS не вернул сборку');
-  if (String(build.status).toLowerCase() !== 'finished') {
-    fail(`сборка ${build.id} завершилась со статусом ${build.status}; лог: ${build.logsUrl ?? 'см. expo.dev'}`);
-  }
-  return build;
+  const started = Array.isArray(builds) ? builds[0] : builds;
+  if (!started?.id) fail('EAS не вернул сборку');
+  const pageUrl = buildPageUrl(started.id);
+  console.log(`[release] сборка ${started.id} поставлена в очередь`);
+  if (pageUrl) console.log(`[release] смотреть: ${pageUrl}`);
+  console.log('[release] обычная сборка 15–25 мин, первая может дольше; Ctrl+C не отменяет её на сервере');
+  return waitForBuild({ buildId: started.id, pageUrl });
 };
 
 const downloadArtifact = async (build) => {
@@ -518,7 +593,7 @@ const releaseEngine = async ({ args, repository }) => {
   clearExpoCache();
   const account = easAccount();
   if (account) console.log(`[release] EAS: ${account}`);
-  const build = resolveBuild({ args, profile });
+  const build = await resolveBuild({ args, profile });
   console.log(`[release] сборка ${build.id}: ${build.status}`);
   const artifact = await downloadArtifact(build);
   console.log(`[release] файл: ${artifact.bytes} байт, sha256 ${artifact.sha256}`);

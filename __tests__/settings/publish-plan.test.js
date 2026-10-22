@@ -387,6 +387,17 @@ describe('release.json', () => {
     expect(source).toContain('clearExpoCache');
   });
 
+  it('ожидание сборки печатает прогресс и ссылку на expo.dev', () => {
+    const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
+    // --wait молчит все 20–30 минут: запускаем без него и опрашиваем статус.
+    expect(source).not.toContain("'--wait'");
+    expect(source).toContain('waitForBuild');
+    expect(source).toContain('https://expo.dev/accounts/');
+    expect(source).toContain('ждёт свободный слот Expo');
+    // Ctrl+C не отменяет сборку — подсказываем, как опубликовать готовую.
+    expect(source).toContain('--build-id ${buildId}');
+  });
+
   it('перед EAS-сборкой релиз ставит зависимости приложения', () => {
     const source = fs.readFileSync(path.join(ROOT, 'scripts/release.mjs'), 'utf8');
     // EAS читает плагины из node_modules; в свежем клоне их нет.
