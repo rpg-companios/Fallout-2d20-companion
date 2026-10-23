@@ -25,8 +25,9 @@ const describeScreenProblem = (problem) => {
   switch (problem.code) {
     case SETTING_SCREEN_CODES.NO_SCREENS:
       return withParams(tHomeScreen('gameSetting.screen.noScreens'), params);
-    case SETTING_SCREEN_CODES.TOO_MANY_SCREENS:
-      return withParams(tHomeScreen('gameSetting.screen.tooManyScreens'), params);
+    case SETTING_SCREEN_CODES.SCREEN_SLOTS_UNAVAILABLE:
+      // Не «пакет сломан», а «этой сборке нужен патч движка» — с числами.
+      return withParams(tHomeScreen('gameSetting.screen.slotsUnavailable'), params);
     case SETTING_SCREEN_CODES.INVALID_SCREEN:
       return withParams(tHomeScreen('gameSetting.screen.invalidScreen'), params);
     case SETTING_SCREEN_CODES.DUPLICATE_SCREEN:
@@ -43,10 +44,17 @@ export const describeSettingCompatibilityError = (error) => {
     : (error.code ? [{ code: error.code, params: error.params ?? {} }] : []);
   if (problems.length === 0) return null;
 
-  // У экранов свой заголовок: «пакет не подходит» и «пакет собран неверно» —
-  // разные разговоры с человеком.
-  const isScreenProblem = problems.some((problem) => Object.values(SETTING_SCREEN_CODES).includes(problem.code));
-  const title = String(tHomeScreen(isScreenProblem ? 'gameSetting.screenTitle' : 'gameSetting.incompatibleTitle'));
+  // Три разных разговора с человеком: «пакет не подходит к движку», «пакет
+  // собран неверно» и «движку нужен патч под этот пакет».
+  const screenCodes = Object.values(SETTING_SCREEN_CODES);
+  const isScreenProblem = problems.some((problem) => screenCodes.includes(problem.code));
+  const needsNewerEngine = problems.some(
+    (problem) => problem.code === SETTING_SCREEN_CODES.SCREEN_SLOTS_UNAVAILABLE,
+  );
+  const titleKey = needsNewerEngine
+    ? 'gameSetting.screenSlotsTitle'
+    : (isScreenProblem ? 'gameSetting.screenTitle' : 'gameSetting.incompatibleTitle');
+  const title = String(tHomeScreen(titleKey));
   const lines = problems.map((problem) => {
     switch (problem.code) {
       case SETTING_COMPATIBILITY_CODES.ENGINE_TOO_OLD:

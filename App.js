@@ -37,7 +37,10 @@ import useAppSettingsStore, {
   selectBootScreenEnabled,
   selectSettingsHydrated,
 } from './src/store/appSettingsStore';
-import { SETTING_THEME_DEFAULTS } from './src/engine/settings/settingScreens';
+import {
+  SETTING_THEME_DEFAULTS,
+  shouldScrollSettingTabBar,
+} from './src/engine/settings/settingScreens';
 import useSettingPackStore, {
   selectActiveSettingId,
   selectActivationGuard,
@@ -129,6 +132,10 @@ function App() {
 
   // Оформление рамки задаёт сеттинг; движок подставляет своё, если пакет молчит.
   const tabTheme = activeRuntime?.theme?.tabBar ?? SETTING_THEME_DEFAULTS.tabBar;
+  // Пакету может понадобиться больше вкладок, чем помещается в ширину экрана.
+  // Тогда панель прокручивается: решение принимает движок, сеттинг об этом
+  // ничего не пишет.
+  const scrollTabs = shouldScrollSettingTabBar(settingScreens.length);
 
   const activeGlobalComponents = useMemo(
     () => Object.entries(activeRuntime?.globalComponents ?? {}).map(([id, RuntimeComponent]) => {
@@ -403,6 +410,10 @@ function App() {
                       tabBarActiveTintColor: tabTheme.active,
                       tabBarInactiveTintColor: tabTheme.inactive,
                       tabBarShowIcon: true,
+                      tabBarScrollEnabled: scrollTabs,
+                      // При прокрутке вкладка не сжимается до нечитаемого: у неё
+                      // своя ширина, остальное уезжает за край.
+                      ...(scrollTabs ? { tabBarItemStyle: { width: 88 } } : {}),
                       tabBarIndicatorStyle: { backgroundColor: tabTheme.active, height: 2 },
                       swipeEnabled: true,
                       animationEnabled: true,

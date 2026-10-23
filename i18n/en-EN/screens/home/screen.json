@@ -216,13 +216,14 @@
       "missingHostModules": "The app does not provide modules the package depends on: {modules}.",
       "missingServices": "The package declared services it does not implement: {services}."
     },
-    "screenTitle": "Screen slots",
+    "screenTitle": "The package is built incorrectly",
     "screen": {
-      "noScreens": "The package declares no screens. A setting must fill at least one of the seven slots.",
-      "tooManyScreens": "The package declares {count} screens, but the engine provides {limit}. Remove the extra ones.",
+      "noScreens": "The package declares no screens. A setting must fill at least one slot.",
+      "slotsUnavailable": "The package needs {needed} screens, this engine version provides {available}. Update the app or declare fewer screens.",
       "invalidScreen": "Screen \"{screen}\" is filled incorrectly: field {field} should be {expected}.",
       "duplicateScreen": "Screen is duplicated: {field} = \"{value}\"."
-    }
+    },
+    "screenSlotsTitle": "This package needs a newer engine"
   },
   "appUpdateUpToDate": "You have the latest version: {version}.",
   "appUpdateCheckFailed": "Could not check for updates. Check your internet connection and try again later."

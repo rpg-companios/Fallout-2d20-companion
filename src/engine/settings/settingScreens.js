@@ -1,18 +1,30 @@
 // Экран сеттинга = слот движка + содержимое сеттинга.
 //
-// Движок владеет ограниченным набором экранов: `screen:1` … `screen:7`. Он
-// задаёт их порядок, маршрут в навигации, рамку (панель вкладок) и защиту от
-// падения при рендере. Сеттинг заполняет слот: что на экране написано и как он
-// выглядит — это код и данные пакета.
+// Движок владеет набором экранов: `screen:1` … `screen:N`. Он задаёт их
+// порядок, маршрут в навигации, рамку (панель вкладок) и защиту от падения при
+// рендере. Сеттинг заполняет слот: что на экране написано и как он выглядит —
+// это код и данные пакета.
 //
-// Восьмой экран — отказ с причиной, а не «поехавшая» панель вкладок: движок
-// обязан остаться рабочим, а автор пакета — понять, что именно не так.
+// Сколько слотов даёт движок — это ОДНА константа (`SETTING_SCREEN_SLOTS`).
+// Нужно 12 экранов? Значит выходит патч движка, который поднимает набор до 12+,
+// а не отказ пакету. Старые пакеты от такого патча не ломаются: они занимают
+// свои первые слоты и не знают о новых. Поэтому число слотов здесь — данные, а
+// не зашитое условие «больше семи нельзя».
+//
+// Ровно то же правило действует для любой механики: движок даёт элементы и
+// состояния, сеттинг расширяет их по правилам движка. Не хватает механизма —
+// это задача на патч движка, а не повод сказать «движком не предусмотрено».
 //
 // Что проверяется (до рендера, на активации):
-//   1. экранов от 1 до 7;
+//   1. объявлен хотя бы один экран;
 //   2. у каждого есть `id` (уникальный), заголовок и компонент;
-//   3. `slot` — один из семи, без повторов; без `slot` экран занимает первую
-//      свободную позицию в порядке объявления.
+//   3. `slot` — из набора движка, без повторов; без `slot` экран занимает
+//      первую свободную позицию в порядке объявления;
+//   4. экранов не больше, чем слотов у этой версии движка.
+//
+// Ошибка «пакет собран неверно» и «движку нужен патч» — разные разговоры с
+// человеком, поэтому и коды разные: `invalid-screen` против
+// `screen-slots-unavailable`.
 //
 // Роль экрана (`role`) нужна движку там, где он сам ведёт человека: «создать
 // персонажа» ведёт на экран с ролью `character`, а не на первый попавшийся.
@@ -29,14 +41,20 @@ export const SETTING_SCREEN_SLOTS = Object.freeze([
 
 export const SETTING_SCREEN_LIMIT = SETTING_SCREEN_SLOTS.length;
 
+// Санитарный предел имени слота: `screen:999999` — опечатка, а не запрос на
+// миллион вкладок. Это не ограничение движка, а защита от мусора в манифесте.
+export const SETTING_SCREEN_SLOT_CEILING = 64;
+
 export const SETTING_SCREEN_CODES = Object.freeze({
   NO_SCREENS: 'no-screens',
-  TOO_MANY_SCREENS: 'too-many-screens',
+  // Слотов не хватает: это ограничение ЭТОЙ версии движка, а не ошибка пакета.
+  SCREEN_SLOTS_UNAVAILABLE: 'screen-slots-unavailable',
   INVALID_SCREEN: 'invalid-screen',
   DUPLICATE_SCREEN: 'duplicate-screen',
 });
 
 const SCREEN_ID_RE = /^[a-z][a-z0-9-]{0,31}$/;
+const SLOT_RE = /^screen:([1-9]\d{0,2})$/;
 
 /**
  * Роли, которые движок ищет сам. Сеттинг может объявить любые свои роли —
@@ -47,6 +65,13 @@ export const SETTING_SCREEN_ROLES = Object.freeze({
   INVENTORY: 'inventory',
   EQUIPMENT: 'equipment',
 });
+
+// Сколько вкладок движок раскладывает по всей ширине. Больше — панель
+// прокручивается: двенадцать вкладок поровну в 360 точках дают по 30 точек на
+// подпись, и это уже не интерфейс. Порог — такое же данные-решение движка, как
+// и число экранов.
+export const SETTING_TABBAR_FIXED_LIMIT = 5;
+
 // Цвет либо hex, либо имя, которое понимает React Native (`gray`), либо rgb()/rgba().
 // Русское «зелёный» здесь не пройдёт — опечатка должна быть видна автору пакета.
 const COLOR_RE = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{3,20}|rgba?\([\d\s.,%]+\))$/;
@@ -64,6 +89,18 @@ export class SettingScreensError extends Error {
 /** Маршрут движка для слота. Сеттинг маршруты не придумывает. */
 export const settingScreenRoute = (index) => `SettingScreen${index + 1}`;
 
+/** Номер слота (`screen:7` → 7) или null, если имя не про слот. */
+export const parseSettingScreenSlot = (slot) => {
+  if (typeof slot !== 'string') return null;
+  const match = SLOT_RE.exec(slot.trim());
+  if (!match) return null;
+  const number = Number(match[1]);
+  return number <= SETTING_SCREEN_SLOT_CEILING ? number : null;
+};
+
+/** Панель вкладок прокручивается, когда вкладки перестают помещаться. */
+export const shouldScrollSettingTabBar = (count) => Number(count) > SETTING_TABBAR_FIXED_LIMIT;
+
 const isComponent = (value) => typeof value === 'function'
   || (value !== null && typeof value === 'object');
 
@@ -75,20 +112,31 @@ const textOrNull = (value) => (
  * Привести экраны сеттинга к слотам движка.
  *
  * @param {readonly object[]|undefined} screens
+ * @param {{ slots?: readonly string[] }} [options]
+ *   `slots` — набор слотов этой версии движка. Параметр существует ровно для
+ *   того, чтобы патч движка («теперь 16 слотов») и тесты не переписывали логику.
  * @returns {readonly object[]} экраны в порядке слотов, с маршрутами движка
  * @throws {SettingScreensError}
  */
-export const normalizeSettingScreens = (screens) => {
+export const normalizeSettingScreens = (screens, { slots = SETTING_SCREEN_SLOTS } = {}) => {
+  if (!Array.isArray(slots) || slots.length === 0) {
+    throw new SettingScreensError([{
+      code: SETTING_SCREEN_CODES.NO_SCREENS,
+      params: { limit: 0 },
+    }]);
+  }
   if (!Array.isArray(screens) || screens.length === 0) {
     throw new SettingScreensError([{
       code: SETTING_SCREEN_CODES.NO_SCREENS,
-      params: { limit: SETTING_SCREEN_LIMIT },
+      params: { limit: slots.length },
     }]);
   }
-  if (screens.length > SETTING_SCREEN_LIMIT) {
+  // Пакету нужно больше экранов, чем даёт эта версия движка. Не «пакет
+  // сломан», а «этой сборке нужен патч движка» — и человек это прочитает.
+  if (screens.length > slots.length) {
     throw new SettingScreensError([{
-      code: SETTING_SCREEN_CODES.TOO_MANY_SCREENS,
-      params: { count: screens.length, limit: SETTING_SCREEN_LIMIT },
+      code: SETTING_SCREEN_CODES.SCREEN_SLOTS_UNAVAILABLE,
+      params: { needed: screens.length, available: slots.length },
     }]);
   }
 
@@ -99,7 +147,7 @@ export const normalizeSettingScreens = (screens) => {
   // Сначала занимаем явно объявленные слоты, затем раздаём свободные.
   screens.forEach((screen) => {
     const slot = screen && typeof screen === 'object' ? screen.slot : undefined;
-    if (typeof slot === 'string' && SETTING_SCREEN_SLOTS.includes(slot)) takenSlots.add(slot);
+    if (typeof slot === 'string' && slots.includes(slot)) takenSlots.add(slot);
   });
 
   const entries = screens.map((screen, index) => {
@@ -126,15 +174,31 @@ export const normalizeSettingScreens = (screens) => {
       ids.set(id, index);
     }
 
-    if (screen.slot !== undefined && !SETTING_SCREEN_SLOTS.includes(screen.slot)) {
-      problems.push({
-        code: SETTING_SCREEN_CODES.INVALID_SCREEN,
-        params: {
-          screen: id ?? index + 1,
-          field: 'slot',
-          expected: SETTING_SCREEN_SLOTS.join(', '),
-        },
-      });
+    // Слот бывает двух видов ошибки:
+    //   `screen:abc` — мусор в манифесте (invalid-screen);
+    //   `screen:12` на движке с семью слотами — движку нужен патч.
+    const explicitSlot = screen.slot;
+    if (explicitSlot !== undefined) {
+      const slotNumber = parseSettingScreenSlot(explicitSlot);
+      if (slotNumber === null) {
+        problems.push({
+          code: SETTING_SCREEN_CODES.INVALID_SCREEN,
+          params: {
+            screen: id ?? index + 1,
+            field: 'slot',
+            expected: `screen:1 … screen:${slots.length}`,
+          },
+        });
+      } else if (!slots.includes(explicitSlot)) {
+        problems.push({
+          code: SETTING_SCREEN_CODES.SCREEN_SLOTS_UNAVAILABLE,
+          params: {
+            needed: slotNumber,
+            available: slots.length,
+            screen: id ?? index + 1,
+          },
+        });
+      }
     }
 
     if (!isComponent(screen.component)) {
@@ -167,15 +231,15 @@ export const normalizeSettingScreens = (screens) => {
       });
     }
 
-    const explicitSlot = typeof screen.slot === 'string' && SETTING_SCREEN_SLOTS.includes(screen.slot)
-      ? screen.slot
+    const pinnedSlot = typeof explicitSlot === 'string' && slots.includes(explicitSlot)
+      ? explicitSlot
       : null;
-    const slot = explicitSlot ?? SETTING_SCREEN_SLOTS.find((candidate) => !takenSlots.has(candidate));
-    if (slot && !explicitSlot) takenSlots.add(slot);
+    const slot = pinnedSlot ?? slots.find((candidate) => !takenSlots.has(candidate));
+    if (slot && !pinnedSlot) takenSlots.add(slot);
 
     return {
       slot,
-      order: slot ? SETTING_SCREEN_SLOTS.indexOf(slot) : index,
+      order: slot ? slots.indexOf(slot) : index,
       id: id ?? `screen-${index + 1}`,
       titleKey: titleKey ?? undefined,
       title: title ?? undefined,
@@ -210,7 +274,6 @@ export const normalizeSettingScreens = (screens) => {
   );
 };
 
-/** Рамка экранов. Сеттинг может её перекрасить, но не обязан. */
 /**
  * Найти экран по роли. Порядок поиска задан явно, потому что от него зависит
  * поведение кнопок движка («создать персонажа» открывает именно лист).
@@ -233,6 +296,7 @@ export const resolveCharacterScreenRoute = (screens) => {
     ?? null;
 };
 
+/** Рамка экранов. Сеттинг может её перекрасить, но не обязан. */
 export const SETTING_THEME_DEFAULTS = Object.freeze({
   tabBar: Object.freeze({
     background: '#1a1a1a',
