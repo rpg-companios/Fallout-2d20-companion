@@ -33,20 +33,19 @@ describe('setting runtime host modules', () => {
     }
   });
 
-  it('hands packages over as their CommonJS module, not as a Metro namespace', () => {
-    // Пакет оборачивает каждый require() в esbuild-овский __toESM, а тот копирует
-    // свойства модуля. У react/react-native/zustand нет `__esModule`, поэтому
-    // `import * as` возвращает пересобранную Babel-обёртку: на Hermes её копия
-    // теряла `useMemo` — «Object is not a function» в CharacterScreen.
-    for (const line of [
-      "'@expo/vector-icons': commonJsHostModule(ExpoVectorIcons),",
-      'react: commonJsHostModule(ReactModule),',
-      "'react-native': commonJsHostModule(ReactNative),",
-      "'react/jsx-runtime': commonJsHostModule(ReactJsxRuntime),",
-      "'react/jsx-dev-runtime': commonJsHostModule(ReactJsxDevRuntime),",
-      "'zustand/react/shallow': commonJsHostModule(ZustandReactShallow),",
-    ]) {
-      expect(HOST_SOURCE).toContain(line);
+  it('wraps every host module in hostModule()', () => {
+    // Пакет сеттинга копирует модуль через __toESM, а на Hermes такая копия
+    // теряет функции (баг привязки в цикле). Фасад hostModule() отдаёт объект
+    // без собственных свойств, поэтому копировать нечего — см. hostModule.js.
+    const start = HOST_SOURCE.indexOf('SETTING_RUNTIME_HOST_MODULES = Object.freeze({');
+    const end = HOST_SOURCE.indexOf('\n});', start);
+    const entries = HOST_SOURCE.slice(start, end)
+      .split('\n')
+      .filter((line) => /^\s*(?:'[^']+'|[A-Za-z_$][\w$]*)\s*:/.test(line));
+
+    expect(entries.length).toBeGreaterThanOrEqual(49);
+    for (const entry of entries) {
+      expect(entry).toMatch(/^\s*(?:'[^']+'|[A-Za-z_$][\w$]*)\s*: hostModule\([A-Za-z_$][\w$]*\),$/);
     }
   });
 

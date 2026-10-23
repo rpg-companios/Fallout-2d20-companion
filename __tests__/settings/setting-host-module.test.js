@@ -1,38 +1,100 @@
 import { describe, expect, it } from 'vitest';
 
-import { commonJsHostModule } from '../../src/engine/settings/hostModule.js';
+import { hostModule } from '../../src/engine/settings/hostModule.js';
 
-// Пакет сеттинга грузит host-модули через require() и оборачивает результат
-// в esbuild-овский __toESM (копия собственных свойств). Babel/Metro отдают
-// CommonJS-пакет как namespace-обёртку, и её копия на Hermes теряла функции —
-// «Object is not a function» в CharacterScreen (setting.cjs:65459).
-describe('commonJsHostModule', () => {
-  it('returns module.exports for a CommonJS package handed over as a namespace', () => {
-    const moduleExports = { useMemo: () => 'memo', createElement: () => null };
-    // Так Babel собирает `import * as React from 'react'` для CJS-модуля.
-    const namespace = { ...moduleExports, default: moduleExports };
+/**
+ * Копия модуля так, как её делает esbuild-овский __toESM в бандле сеттинга.
+ * `hermes: true` повторяет баг Hermes: в цикле одна привязка `key` на всю
+ * функцию, поэтому все геттеры читают последний ключ (facebook/hermes#575).
+ */
+const copyLikeToESM = (source, { hermes = false } = {}) => {
+  const target = Object.create(Object.getPrototypeOf(source));
+  if (!source.__esModule) {
+    Object.defineProperty(target, 'default', { value: source, enumerable: true });
+  }
+  if (hermes) {
+    let key;
+    for (key of Object.getOwnPropertyNames(source)) {
+      if (!Object.prototype.hasOwnProperty.call(target, key)) {
+        Object.defineProperty(target, key, { get: () => source[key], enumerable: true });
+      }
+    }
+  } else {
+    for (const key of Object.getOwnPropertyNames(source)) {
+      if (!Object.prototype.hasOwnProperty.call(target, key)) {
+        Object.defineProperty(target, key, { get: () => source[key], enumerable: true });
+      }
+    }
+  }
+  return target;
+};
 
-    expect(commonJsHostModule(namespace)).toBe(moduleExports);
-    expect(typeof commonJsHostModule(namespace).useMemo).toBe('function');
+const commonJsLike = () => ({
+  useMemo: () => 'memo',
+  createElement: () => null,
+  version: '19.2.3', // последнее свойство react — из-за него падал Hermes
+});
+
+describe('hostModule', () => {
+  it('survives the Hermes loop-binding bug: every property stays a function', () => {
+    // Без фасада __toESM заводит геттеры, и на Hermes все они возвращают
+    // последнее свойство модуля: useMemo превращался в '19.2.3'.
+    const broken = copyLikeToESM(commonJsLike(), { hermes: true });
+    expect(broken.useMemo).toBe('19.2.3');
+
+    const fixed = copyLikeToESM(hostModule(commonJsLike()), { hermes: true });
+    expect(typeof fixed.useMemo).toBe('function');
+    expect(fixed.useMemo()).toBe('memo');
+    expect(typeof fixed.createElement).toBe('function');
   });
 
-  it('keeps an ES module namespace as is', () => {
+  it('has no own properties, so there is nothing for __toESM to copy', () => {
+    const facade = hostModule(commonJsLike());
+
+    expect(Object.getOwnPropertyNames(facade)).toEqual([]);
+    expect(facade.__esModule).toBe(true);
+  });
+
+  it('keeps the CommonJS default import working', () => {
+    const source = commonJsLike();
+    const facade = hostModule(source);
+
+    expect(facade.default).toBe(source);
+    expect(copyLikeToESM(facade).default).toBe(source);
+    expect(copyLikeToESM(facade, { hermes: true }).default).toBe(source);
+  });
+
+  it('keeps ES module namespaces intact, including their own default', () => {
     const component = () => null;
     const namespace = { __esModule: true, default: component, named: () => 1 };
+    const facade = hostModule(namespace);
 
-    expect(commonJsHostModule(namespace)).toBe(namespace);
-    expect(commonJsHostModule(namespace).default).toBe(component);
+    const copy = copyLikeToESM(facade, { hermes: true });
+    expect(copy.default).toBe(component);
+    expect(copy.named()).toBe(1);
   });
 
-  it('keeps a namespace whose default is not a module', () => {
-    const namespace = { __esModule: false, default: 'text', value: 1 };
+  it('does not shadow a real default export of a module without __esModule', () => {
+    // Так выглядят ES-модули, собранные esbuild: у namespace есть default,
+    // но нет Babel-маркера __esModule.
+    const store = () => null;
+    store.getState = () => ({ level: 3 });
+    const namespace = { default: store };
 
-    expect(commonJsHostModule(namespace)).toBe(namespace);
+    const facade = hostModule(namespace);
+    expect(facade.default).toBe(store);
+    expect(facade.default.getState()).toEqual({ level: 3 });
+  });
+
+  it('returns the same facade for the same module', () => {
+    const source = commonJsLike();
+
+    expect(hostModule(source)).toBe(hostModule(source));
   });
 
   it('passes non-object values through untouched', () => {
-    expect(commonJsHostModule(undefined)).toBeUndefined();
-    expect(commonJsHostModule(null)).toBeNull();
-    expect(typeof commonJsHostModule(() => null)).toBe('function');
+    expect(hostModule(undefined)).toBeUndefined();
+    expect(hostModule(null)).toBeNull();
+    expect(hostModule('text')).toBe('text');
   });
 });

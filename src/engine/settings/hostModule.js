@@ -1,24 +1,44 @@
 // src/engine/settings/hostModule.js
-// Значения host-мапы для пакетов, которые пакет сеттинга грузит через require().
+// Форма модуля, которую движок отдаёт пакету сеттинга.
 
 /**
- * Возвращает CommonJS-модуль для пакета, собранного без ES-обёртки.
+ * Пакет сеттинга — CommonJS-бандл esbuild: каждый require() он оборачивает в
+ * `__toESM`, а тот копирует собственные свойства модуля геттерами:
  *
- * Пакет сеттинга — обычный CommonJS, и каждый require() он оборачивает в
- * esbuild-овский __toESM, который копирует собственные свойства модуля.
- * `import * as` отдаёт наружу не сам модуль, а обёртку Babel/Metro
- * (_interopRequireWildcard): у пакетов без `__esModule` она собирается вручную
- * (`{ ...exports, default: exports }`), и на Hermes копия теряла `useMemo` —
- * падение «Object is not a function» в CharacterScreen (setting.cjs:65459).
+ *   for (let key of __getOwnPropNames(from))
+ *     __defProp(to, key, { get: () => from[key], ... });
  *
- * Модуль с `__esModule` (ES-сборка, например @expo/vector-icons или
- * react-native-web) уже отдаётся как есть — его и возвращаем.
+ * Hermes (движок React Native) не заводит отдельную привязку `key` на каждую
+ * итерацию цикла: все геттеры читают последний ключ (facebook/hermes#575).
+ * Поэтому у копии любой host-модуль отвечал своим последним свойством — react
+ * вместо useMemo отдавал `version`, и вызов падал с `'19.2.3' is not a function`
+ * (до этого — с `Object is not a function`, когда последним был `default`).
+ *
+ * Лечится формой, которую копировать нечего: у фасада нет собственных свойств,
+ * все члены живут в прототипе и достаются по цепочке. `__toESM` копирует ноль
+ * свойств, геттеры не создаются, значения остаются настоящими функциями.
+ *
+ * Фасад создаётся один раз на модуль: `require()` из разных мест пакета должен
+ * получать один и тот же объект.
  */
-export const commonJsHostModule = (namespace) => {
-  if (!namespace || typeof namespace !== 'object') return namespace;
-  if (namespace.__esModule) return namespace;
-  const defaultExport = namespace.default;
-  const isModule = defaultExport
-    && (typeof defaultExport === 'object' || typeof defaultExport === 'function');
-  return isModule ? defaultExport : namespace;
+const facades = new WeakMap();
+
+export const hostModule = (source) => {
+  if (!source || (typeof source !== 'object' && typeof source !== 'function')) return source;
+  const cached = facades.get(source);
+  if (cached) return cached;
+
+  const facadePrototype = Object.create(source);
+  // __toESM проверяет mod.__esModule, чтобы не подменять default.
+  Object.defineProperty(facadePrototype, '__esModule', { value: true });
+  // Для CommonJS-модуля __toESM подставляет default = module.exports; здесь это
+  // делает прототип — иначе `import React from 'react'` получил бы undefined.
+  // Если у модуля есть собственный default (ES-сборка, Babel), он и главнее.
+  if (!('default' in source)) {
+    Object.defineProperty(facadePrototype, 'default', { value: source, enumerable: true });
+  }
+
+  const facade = Object.freeze(Object.create(facadePrototype));
+  facades.set(source, facade);
+  return facade;
 };
