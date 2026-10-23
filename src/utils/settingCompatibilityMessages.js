@@ -1,0 +1,83 @@
+// Перевести отказ по контракту в текст для человека.
+//
+// Смысл жёсткой привязки: несовместимый пакет объясняет причину, а не роняет
+// приложение. Коды приходят из `settingCompatibility.js`, тексты — из i18n
+// (`gameSetting.incompatible.*`), чтобы сообщение можно было править без кода.
+import { tHomeScreen } from '../../components/screens/HomeScreen/logic/homeScreenI18n';
+import { SETTING_COMPATIBILITY_CODES } from '../engine/settings/settingCompatibility';
+
+const withParams = (template, params = {}) => String(template).replace(
+  /\{(\w+)\}/g,
+  (match, key) => (
+    params && Object.prototype.hasOwnProperty.call(params, key) ? String(params[key]) : match
+  ),
+);
+
+const list = (values) => (Array.isArray(values) ? values.join(', ') : String(values ?? ''));
+
+/**
+ * @returns {{ title: string, message: string } | null}
+ *   null — ошибка не про контракт (показывать надо как раньше).
+ */
+export const describeSettingCompatibilityError = (error) => {
+  if (!error || typeof error !== 'object') return null;
+  const problems = Array.isArray(error.problems) && error.problems.length > 0
+    ? error.problems
+    : (error.code ? [{ code: error.code, params: error.params ?? {} }] : []);
+  if (problems.length === 0) return null;
+
+  const title = String(tHomeScreen('gameSetting.incompatibleTitle'));
+  const lines = problems.map((problem) => {
+    switch (problem.code) {
+      case SETTING_COMPATIBILITY_CODES.ENGINE_TOO_OLD:
+        return withParams(tHomeScreen('gameSetting.incompatible.engineTooOld'), problem.params);
+      case SETTING_COMPATIBILITY_CODES.ENGINE_TOO_NEW:
+        return withParams(tHomeScreen('gameSetting.incompatible.engineTooNew'), problem.params);
+      case SETTING_COMPATIBILITY_CODES.UNSUPPORTED_RUNTIME_API:
+        return withParams(tHomeScreen('gameSetting.incompatible.runtimeApi'), problem.params);
+      case SETTING_COMPATIBILITY_CODES.UNKNOWN_CAPABILITIES:
+        return withParams(tHomeScreen('gameSetting.incompatible.unknownCapabilities'), {
+          capabilities: list(problem.params?.capabilities),
+        });
+      case SETTING_COMPATIBILITY_CODES.MISSING_HOST_MODULES:
+        return withParams(tHomeScreen('gameSetting.incompatible.missingHostModules'), {
+          modules: list(problem.params?.modules),
+        });
+      case SETTING_COMPATIBILITY_CODES.INVALID_COMPATIBILITY:
+        return withParams(tHomeScreen('gameSetting.incompatible.invalidRange'), {
+          fields: list(problem.params?.fields),
+        });
+      case SETTING_COMPATIBILITY_CODES.MISSING_SERVICES:
+        return withParams(tHomeScreen('gameSetting.incompatible.missingServices'), {
+          services: list(problem.params?.services),
+        });
+      default:
+        return String(problem.code ?? '');
+    }
+  }).filter(Boolean);
+
+  return { title, message: lines.join('\n\n') };
+};
+
+/** Текст для перехвата ошибки установки/активации. */
+export const settingErrorAlertMessage = (error, fallbackKey) => {
+  const described = describeSettingCompatibilityError(error);
+  if (described) return described.message;
+  return String(error?.message ?? '') || String(tHomeScreen(fallbackKey));
+};
+
+/**
+ * Заголовок и текст для алерта: у отказа по контракту свой заголовок
+ * («Пакет не подходит к этой версии приложения»), у прочих ошибок — прежний.
+ *
+ * @param {unknown} error
+ * @param {{ titleKey: string, messageKey: string }} fallback
+ */
+export const settingErrorAlert = (error, { titleKey, messageKey }) => {
+  const described = describeSettingCompatibilityError(error);
+  if (described) return { title: described.title, message: described.message };
+  return {
+    title: String(tHomeScreen(titleKey)),
+    message: String(error?.message ?? '') || String(tHomeScreen(messageKey)),
+  };
+};

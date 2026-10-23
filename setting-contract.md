@@ -86,6 +86,60 @@ fallout/
 
 `settings.json` живёт в пакете. Значения в сторе по `settingId`, пакеты не смешиваются.
 
+### 3.1 Проверка совместимости (2026-10-23)
+
+Манифест объявляет три списка, и все три проверяются **до исполнения кода пакета**:
+
+```json
+{
+  "requiresCore": "1.0.1",
+  "compatibility": { "minimum": "1.0.1", "maximum": "1.0.9" },
+  "capabilities": ["inventory", "perks", "damage"],
+  "hostModules": ["engine:domain/perks", "engine:data/equipment"]
+}
+```
+
+| Поле | Что означает | Что будет при нарушении |
+|---|---|---|
+| `compatibility.minimum` | ниже какой версии движка пакет не работает | `engine-too-old`, установка отклоняется |
+| `compatibility.maximum` | выше какой версии движка пакет не проверялся | `engine-too-new`, установка отклоняется |
+| `capabilities` | какие механизмы движка сеттинг использует | `unknown-capabilities` — опечатка или механизм из будущего |
+| `hostModules` | какие модули движка нужны бандлу | `missing-host-modules` — отказ при активации, до `new Function` |
+
+Ещё два кода: `unsupported-runtime-api` (пакет собран под другой runtime-контракт)
+и `invalid-compatibility` (диапазон в манифесте не читается — это испорченный
+манифест, а не «старая версия»).
+
+Правила жёсткие, как у Foundry: непрочитанная версия, неизвестная возможность или
+недостающий модуль — это отказ с причиной, а не «попробуем и посмотрим». Причина
+показывается пользователем текстом (`gameSetting.incompatible.*` в `ru-RU`/`en-EN`),
+а не общим «не удалось установить».
+
+Три точки проверки:
+
+1. `validateSettingManifest` (`src/engine/contracts/settingManifest.ts`) — форма полей;
+2. `installSettingPackage` — до расчёта SHA-256 и записи в кэш: версия, возможности, API;
+3. `openSettingPackageRuntime` / `loadModule` — повторно, до `loadSettingAssetModules`, то есть до исполнения бандла.
+
+Каталог возможностей — `src/engine/settings/settingCapabilities.js` (14 записей:
+`inventory`, `consumables`, `perks`, `origins`, `diseases`, `alerts`, `saves`,
+`migrations`, `cloud`, `damage`, `bodyplan`, `equipment`, `crafting`, `trading`).
+Сервисные возможности требуют, чтобы сеттинг вернул одноимённый сервис; проверка
+идёт до `activeRuntime`.
+
+Проверить пакет без запуска приложения:
+
+```bash
+npm run check:package -- dist/fallout-1.0.1.trpg
+npm run check:package -- dist/fallout-1.0.1.trpg --json
+```
+
+Стенд печатает версию пакета, диапазон, число host-модулей и возможностей и
+возвращает код 1 с человеко-читаемой причиной, если пакет с этим движком несовместим.
+`__tests__/settings/setting-contract-drift.test.js` дополнительно сверяет манифест
+Fallout с фактическими импортами `engine:*` в кошельке: список `hostModules` не может
+разойтись с кодом незаметно.
+
 ---
 
 ## 4. Доступ к файлам и игровой адаптер (частично)

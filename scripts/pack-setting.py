@@ -103,7 +103,58 @@ def load_manifest(source: Path) -> dict:
         if 'source' in runtime and not safe_relative_path(runtime['source']):
             fail('manifest.runtime.source must be a safe relative package path')
 
+    validate_contract(data)
     return data
+
+
+VERSION_TEXT_RE = re.compile(r'^v?\d+(?:\.\d+){0,2}$')
+CAPABILITY_ID_RE = re.compile(r'^[a-z][a-z0-9-]{0,63}$')
+HOST_MODULE_RE = re.compile(r'^(?:engine:[A-Za-z0-9_@./-]+|[a-z0-9@][A-Za-z0-9@._/-]*)$')
+
+
+def validate_contract(data: dict) -> None:
+    """Проверить жёсткую привязку пакета к движку до упаковки.
+
+    Тот же контракт проверяет приложение при установке и активации
+    (src/engine/settings/settingCompatibility.js). Здесь он ловится раньше —
+    на сборке, чтобы несовместимый пакет вообще не попал в релиз.
+    """
+    compatibility = data.get('compatibility')
+    if compatibility is not None:
+        if not isinstance(compatibility, dict):
+            fail('manifest.compatibility must be an object')
+        if 'minimum' not in compatibility and 'maximum' not in compatibility:
+            fail('manifest.compatibility must declare minimum or maximum')
+        for field in ('minimum', 'maximum'):
+            value = compatibility.get(field)
+            if value is None:
+                continue
+            if not isinstance(value, str) or not VERSION_TEXT_RE.match(value.strip()):
+                fail(f'manifest.compatibility.{field} must be a version like "1.0.0"')
+
+    host_modules = data.get('hostModules')
+    if host_modules is not None:
+        if not isinstance(host_modules, list) or not host_modules:
+            fail('manifest.hostModules must be a non-empty list of module ids')
+        seen = set()
+        for module_id in host_modules:
+            if not isinstance(module_id, str) or not HOST_MODULE_RE.match(module_id):
+                fail(f'manifest.hostModules has an invalid entry: {module_id!r}')
+            if module_id in seen:
+                fail(f'manifest.hostModules must not contain duplicates: {module_id}')
+            seen.add(module_id)
+
+    capabilities = data.get('capabilities')
+    if capabilities is not None:
+        if not isinstance(capabilities, list) or not capabilities:
+            fail('manifest.capabilities must be a non-empty list of capability ids')
+        seen = set()
+        for capability in capabilities:
+            if not isinstance(capability, str) or not CAPABILITY_ID_RE.match(capability):
+                fail(f'manifest.capabilities has an invalid entry: {capability!r}')
+            if capability in seen:
+                fail(f'manifest.capabilities must not contain duplicates: {capability}')
+            seen.add(capability)
 
 
 def should_skip_file(path: Path) -> bool:

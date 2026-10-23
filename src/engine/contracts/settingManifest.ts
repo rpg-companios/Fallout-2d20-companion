@@ -15,7 +15,23 @@ export interface SettingManifest {
   packFormat?: number;
   files?: readonly string[];
   runtime?: SettingRuntimeManifest;
+  /** Диапазон версий движка, на котором пакет работает. */
+  compatibility?: SettingCompatibilityRange;
+  /** Host-модули, без которых пакет не запустится (`engine:*` и npm-пакеты). */
+  hostModules?: readonly string[];
+  /** Возможности движка, которые пакет использует (см. settingCapabilities.js). */
+  capabilities?: readonly string[];
   [extensionField: string]: unknown;
+}
+
+/**
+ * Жёсткая привязка пакета к версии движка. Оба поля необязательны, но если
+ * указаны — проверяются до исполнения кода пакета и несовместимость означает
+ * отказ в установке и активации.
+ */
+export interface SettingCompatibilityRange {
+  minimum?: string;
+  maximum?: string;
 }
 
 /** Manifest fields required after opening a packaged .trpg archive. */
@@ -55,6 +71,49 @@ export const isSafeSettingPackagePath = (path: unknown): path is string => {
   return segments.every((segment) => (
     segment.length > 0 && segment !== '.' && segment !== '..'
   ));
+};
+
+const VERSION_TEXT_RE = /^v?\d+(?:\.\d+){0,2}$/;
+const CAPABILITY_ID_RE = /^[a-z][a-z0-9-]{0,63}$/;
+const HOST_MODULE_RE = /^(?:engine:[A-Za-z0-9_@./-]+|[a-z0-9@][A-Za-z0-9@._/-]*)$/;
+
+const validateCompatibility = (value: unknown): SettingCompatibilityRange | undefined => {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) {
+    throw new Error('[setting-manifest] compatibility must be an object');
+  }
+  for (const field of ['minimum', 'maximum'] as const) {
+    const entry = value[field];
+    if (entry === undefined) continue;
+    if (typeof entry !== 'string' || !VERSION_TEXT_RE.test(entry.trim())) {
+      throw new Error(`[setting-manifest] compatibility.${field} must be a version like "1.0.0"`);
+    }
+  }
+  if (value.minimum === undefined && value.maximum === undefined) {
+    throw new Error('[setting-manifest] compatibility must declare minimum or maximum');
+  }
+  return Object.freeze({
+    ...(value.minimum === undefined ? {} : { minimum: String(value.minimum).trim() }),
+    ...(value.maximum === undefined ? {} : { maximum: String(value.maximum).trim() }),
+  });
+};
+
+const validateStringList = (value: unknown, field: string, pattern: RegExp, hint: string): readonly string[] | undefined => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`[setting-manifest] ${field} must be a non-empty array ${hint}`);
+  }
+  const seen = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !pattern.test(entry)) {
+      throw new Error(`[setting-manifest] ${field} has an invalid entry: ${String(entry)} (${hint})`);
+    }
+    if (seen.has(entry)) {
+      throw new Error(`[setting-manifest] ${field} must not contain duplicates: ${entry}`);
+    }
+    seen.add(entry);
+  }
+  return Object.freeze([...seen]);
 };
 
 const validateRuntime = (value: unknown): SettingRuntimeManifest | undefined => {
@@ -173,6 +232,9 @@ export const validateSettingManifest = (input: unknown): SettingManifest => {
 
   const files = validateFiles(input.files, false);
   const runtime = validateRuntime(input.runtime);
+  const compatibility = validateCompatibility(input.compatibility);
+  const hostModules = validateStringList(input.hostModules, 'hostModules', HOST_MODULE_RE, 'module id like "engine:domain/perks"');
+  const capabilities = validateStringList(input.capabilities, 'capabilities', CAPABILITY_ID_RE, 'capability id like "inventory"');
   return Object.freeze({
     ...input,
     id: id as string,
@@ -184,6 +246,9 @@ export const validateSettingManifest = (input: unknown): SettingManifest => {
     ...(input.packFormat === undefined ? {} : { packFormat: input.packFormat as number }),
     ...(files === undefined ? {} : { files }),
     ...(runtime === undefined ? {} : { runtime }),
+    ...(compatibility === undefined ? {} : { compatibility }),
+    ...(hostModules === undefined ? {} : { hostModules }),
+    ...(capabilities === undefined ? {} : { capabilities }),
   }) as SettingManifest;
 };
 

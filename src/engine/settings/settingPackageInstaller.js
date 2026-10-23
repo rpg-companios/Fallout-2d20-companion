@@ -1,6 +1,8 @@
 import { CryptoDigestAlgorithm, digest } from 'expo-crypto';
 import { cacheSettingPackage } from './settingPackageCache';
 import { parseSettingPackageArchive } from './settingPackageArchive';
+import { assertSettingCompatibility, checkRuntimeApi } from './settingCompatibility';
+import { SUPPORTED_SETTING_RUNTIME_API_VERSION } from './settingPackageRuntime';
 
 const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 
@@ -19,6 +21,14 @@ export const installSettingPackage = async ({ name, bytes }, { reservedIds = [] 
   if (reservedIds.includes(parsed.manifest.id)) {
     throw new Error(`[setting-package] setting id "${parsed.manifest.id}" is already provided by the app`);
   }
+
+  // Жёсткая привязка проверяется на входе: неподходящий пакет не попадает
+  // в кэш, и человек сразу видит причину. Host-модули сверяются при активации:
+  // здесь их списка ещё нет.
+  assertSettingCompatibility(
+    { manifest: parsed.manifest },
+    checkRuntimeApi(parsed.manifest, SUPPORTED_SETTING_RUNTIME_API_VERSION),
+  );
 
   const digestBuffer = await digest(CryptoDigestAlgorithm.SHA256, bytes);
   const digestHex = bytesToHex(new Uint8Array(digestBuffer));

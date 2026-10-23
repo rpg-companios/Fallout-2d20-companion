@@ -13,6 +13,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../i18n/locale';
 import { tHomeScreen } from '../screens/HomeScreen/logic/homeScreenI18n';
 import { confirmAlert, showRawAlert } from '../alerts/alertService';
+import { settingErrorAlert } from '../../src/utils/settingCompatibilityMessages';
 import useSettingPackStore, {
   selectActiveSettingId,
   selectInstalledSettings,
@@ -165,11 +166,13 @@ export default function GameSettingsModal({ visible, onClose }) {
         title: tHomeScreen('gameSetting.packageInstallTitle'),
         message: tHomeScreen('gameSetting.packageInstalled'),
       });
-    } catch {
-      await showRawAlert({
-        title: tHomeScreen('gameSetting.packageInstallTitle'),
-        message: tHomeScreen('gameSetting.packageInstallFailed'),
-      });
+    } catch (error) {
+      // Несовместимый пакет объясняет причину (версия движка, модули,
+      // возможности), а не показывает общее «не установлено».
+      await showRawAlert(settingErrorAlert(error, {
+        titleKey: 'gameSetting.packageInstallTitle',
+        messageKey: 'gameSetting.packageInstallFailed',
+      }));
     } finally {
       setIsInstalling(false);
     }
@@ -208,10 +211,10 @@ export default function GameSettingsModal({ visible, onClose }) {
         }
       }
     } catch (error) {
-      await showRawAlert({
-        title: tHomeScreen('gameSetting.packageInstallTitle'),
-        message: error?.message ? String(error.message) : tHomeScreen('gameSetting.linkFailed'),
-      });
+      await showRawAlert(settingErrorAlert(error, {
+        titleKey: 'gameSetting.packageInstallTitle',
+        messageKey: 'gameSetting.linkFailed',
+      }));
     } finally {
       setLinkBusy(false);
     }
@@ -263,11 +266,11 @@ export default function GameSettingsModal({ visible, onClose }) {
     try {
       await selectSetting(entry.id);
       onClose?.();
-    } catch {
-      await showRawAlert({
-        title: tHomeScreen('gameSetting.packageInstallTitle'),
-        message: tHomeScreen('gameSetting.packageActivationFailed'),
-      });
+    } catch (error) {
+      await showRawAlert(settingErrorAlert(error, {
+        titleKey: 'gameSetting.packageInstallTitle',
+        messageKey: 'gameSetting.packageActivationFailed',
+      }));
     } finally {
       setActivatingId(null);
     }

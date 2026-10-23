@@ -18,7 +18,8 @@
     "publish:plan": "node scripts/publish-repositories.mjs",
     "publish:engine": "node scripts/publish-repositories.mjs --target engine --patch --push",
     "publish:setting": "node scripts/publish-repositories.mjs --target setting --patch --push",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:package": "node scripts/check-setting-package.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",

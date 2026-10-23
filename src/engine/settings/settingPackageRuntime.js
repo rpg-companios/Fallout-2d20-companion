@@ -8,6 +8,12 @@ import {
   SUPPORTED_SETTING_PACK_FORMAT,
 } from './settingPackageArchive';
 import { getCachedSettingFileUri, readCachedSettingFile } from './settingPackageCache';
+import {
+  assertSettingCompatibility,
+  checkDeclaredServices,
+  checkRuntimeApi,
+  SettingCompatibilityError,
+} from './settingCompatibility';
 
 const SETTING_ID_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const DIGEST_RE = /^[a-f0-9]{64}$/;
@@ -86,14 +92,22 @@ export const disposeSettingPackageModule = (settingModule) => {
 const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi) => {
   const descriptor = manifest.runtime;
   if (!descriptor) throw runtimeError(`setting "${manifest.id}" has no runtime entry`);
-  if (descriptor.apiVersion !== SUPPORTED_SETTING_RUNTIME_API_VERSION) {
-    throw runtimeError(
-      `unsupported runtime API ${descriptor.apiVersion}; this engine supports ${SUPPORTED_SETTING_RUNTIME_API_VERSION}`,
-    );
-  }
   if (!engineApi || typeof engineApi !== 'object') {
     throw runtimeError('an engine API object is required to activate the setting');
   }
+
+  // Контракт проверяется до загрузки ассетов и до исполнения кода пакета:
+  // несовместимый пакет не должен ни разу коснуться диска, а пользователь
+  // получает причину отказа, а не экран ошибки.
+  const declaredHostModules = Object.keys(
+    engineApi.modules && typeof engineApi.modules === 'object' ? engineApi.modules : {},
+  );
+  // Версия runtime-API — та же проверка, что при установке: пакет, собранный под
+  // другой контракт, обязан отказать с причиной, а не падать внутри бандла.
+  assertSettingCompatibility(
+    { manifest, hostModuleIds: declaredHostModules },
+    checkRuntimeApi(manifest, SUPPORTED_SETTING_RUNTIME_API_VERSION),
+  );
 
   const { modules: settingAssetModules, dispose } = await loadSettingAssetModules({
     manifest,
@@ -170,6 +184,13 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
     throw runtimeError(
       `runtime manifest id "${String(settingRuntime.manifest.id)}" does not match package id "${manifest.id}"`,
     );
+  }
+  // Объявленные возможности должны быть реально реализованы: «заявил inventory,
+  // а services.inventory нет» — это несовместимость, а не сюрприз при торговле.
+  const missingServices = checkDeclaredServices({ manifest, services: settingRuntime.services });
+  if (missingServices.length > 0) {
+    dispose();
+    throw new SettingCompatibilityError(missingServices);
   }
   const activeRuntime = { ...settingRuntime, manifest };
   moduleDisposers.set(activeRuntime, () => {

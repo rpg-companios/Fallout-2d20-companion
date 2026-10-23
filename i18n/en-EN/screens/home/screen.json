@@ -205,7 +205,17 @@
     "linkPlaceholder": "Repository link or .trpg file URL",
     "linkInstall": "Install from link",
     "linkFailed": "Could not install from the link. Check the address and connection.",
-    "sourceAdded": "Source added. No newer versions yet."
+    "sourceAdded": "Source added. No newer versions yet.",
+    "incompatibleTitle": "Package does not match this app version",
+    "incompatible": {
+      "engineTooOld": "The package needs engine {required} or newer; this build is {actual}. Update the app or install a package version built for this release.",
+      "engineTooNew": "The package targets engine {required} or older; this build is {actual}. A newer package version is required.",
+      "runtimeApi": "The package targets runtime API {required}; the app supports {supported}.",
+      "invalidRange": "The package manifest declares an unreadable version range: {fields}. A broken manifest is a refusal, not a guess.",
+      "unknownCapabilities": "The package uses capabilities missing from this engine version: {capabilities}.",
+      "missingHostModules": "The app does not provide modules the package depends on: {modules}.",
+      "missingServices": "The package declared services it does not implement: {services}."
+    }
   },
   "appUpdateUpToDate": "You have the latest version: {version}.",
   "appUpdateCheckFailed": "Could not check for updates. Check your internet connection and try again later."
