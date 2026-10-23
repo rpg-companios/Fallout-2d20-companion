@@ -5,6 +5,7 @@
 // (`gameSetting.incompatible.*`), чтобы сообщение можно было править без кода.
 import { tHomeScreen } from '../../components/screens/HomeScreen/logic/homeScreenI18n';
 import { SETTING_COMPATIBILITY_CODES } from '../engine/settings/settingCompatibility';
+import { SETTING_SCREEN_CODES } from '../engine/settings/settingScreens';
 
 const withParams = (template, params = {}) => String(template).replace(
   /\{(\w+)\}/g,
@@ -19,6 +20,22 @@ const list = (values) => (Array.isArray(values) ? values.join(', ') : String(val
  * @returns {{ title: string, message: string } | null}
  *   null — ошибка не про контракт (показывать надо как раньше).
  */
+const describeScreenProblem = (problem) => {
+  const params = problem.params ?? {};
+  switch (problem.code) {
+    case SETTING_SCREEN_CODES.NO_SCREENS:
+      return withParams(tHomeScreen('gameSetting.screen.noScreens'), params);
+    case SETTING_SCREEN_CODES.TOO_MANY_SCREENS:
+      return withParams(tHomeScreen('gameSetting.screen.tooManyScreens'), params);
+    case SETTING_SCREEN_CODES.INVALID_SCREEN:
+      return withParams(tHomeScreen('gameSetting.screen.invalidScreen'), params);
+    case SETTING_SCREEN_CODES.DUPLICATE_SCREEN:
+      return withParams(tHomeScreen('gameSetting.screen.duplicateScreen'), params);
+    default:
+      return null;
+  }
+};
+
 export const describeSettingCompatibilityError = (error) => {
   if (!error || typeof error !== 'object') return null;
   const problems = Array.isArray(error.problems) && error.problems.length > 0
@@ -26,7 +43,10 @@ export const describeSettingCompatibilityError = (error) => {
     : (error.code ? [{ code: error.code, params: error.params ?? {} }] : []);
   if (problems.length === 0) return null;
 
-  const title = String(tHomeScreen('gameSetting.incompatibleTitle'));
+  // У экранов свой заголовок: «пакет не подходит» и «пакет собран неверно» —
+  // разные разговоры с человеком.
+  const isScreenProblem = problems.some((problem) => Object.values(SETTING_SCREEN_CODES).includes(problem.code));
+  const title = String(tHomeScreen(isScreenProblem ? 'gameSetting.screenTitle' : 'gameSetting.incompatibleTitle'));
   const lines = problems.map((problem) => {
     switch (problem.code) {
       case SETTING_COMPATIBILITY_CODES.ENGINE_TOO_OLD:
@@ -52,7 +72,7 @@ export const describeSettingCompatibilityError = (error) => {
           services: list(problem.params?.services),
         });
       default:
-        return String(problem.code ?? '');
+        return describeScreenProblem(problem) ?? String(problem.code ?? '');
     }
   }).filter(Boolean);
 

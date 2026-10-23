@@ -53,6 +53,7 @@ import GameSettingsModal from '../../settings/GameSettingsModal';
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
+import { resolveCharacterScreenRoute } from '../../../src/engine/settings/settingScreens';
 import useAppSettingsStore, {
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
@@ -383,6 +384,10 @@ export default function HomeScreen({ navigation }) {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
   const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
+  // «Создать» и «открыть персонажа» ведут на экран с ролью `character`.
+  // Движок не знает, как этот экран называется у сеттинга: он спрашивает слоты.
+  const settingRuntime = useSettingPackStore((state) => state.activeRuntime);
+  const characterRoute = resolveCharacterScreenRoute(settingRuntime?.screens);
   const settingHomeLinks = getSettingService('home')?.links ?? {};
   const communityLinks = Array.isArray(settingHomeLinks.community)
     ? settingHomeLinks.community.filter((link) => typeof link?.url === 'string')
@@ -617,16 +622,16 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleCreate = () => {
-    if (!bundledSettingActive) return;
+    if (!bundledSettingActive || !characterRoute) return;
     resetCharacter();
-    navigation.navigate('CharacterTab');
+    navigation.navigate(characterRoute);
   };
 
   const handleOpen = async (id) => {
-    if (!bundledSettingActive) return;
+    if (!bundledSettingActive || !characterRoute) return;
     const ok = await loadCharacter(id);
     if (ok) {
-      navigation.navigate('CharacterTab');
+      navigation.navigate(characterRoute);
     }
   };
 

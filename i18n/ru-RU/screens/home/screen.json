@@ -215,6 +215,13 @@
       "unknownCapabilities": "Пакет использует возможности, которых нет в этой версии движка: {capabilities}.",
       "missingHostModules": "В приложении нет модулей, на которые опирается пакет: {modules}.",
       "missingServices": "Пакет объявил сервисы, но не реализовал их: {services}."
+    },
+    "screenTitle": "Слоты экранов",
+    "screen": {
+      "noScreens": "Пакет не объявил ни одного экрана. Сеттинг обязан занять хотя бы один слот из семи.",
+      "tooManyScreens": "Пакет объявил {count} экранов, а движок даёт {limit}. Уберите лишние.",
+      "invalidScreen": "Экран «{screen}» заполнен неверно: поле {field} — ожидается {expected}.",
+      "duplicateScreen": "Экран повторяется: поле {field} = «{value}»."
     }
   },
   "appUpdateUpToDate": "У вас последняя версия: {version}.",

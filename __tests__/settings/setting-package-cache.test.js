@@ -94,7 +94,7 @@ describe('setting package web cache', () => {
       {
         path: 'runtime/setting.cjs',
         bytes: new TextEncoder().encode(
-          `const logo = ${requireAsset}; const shared = require("engine:example/shared"); module.exports = (engineApi) => { engineApi.activations.push("fallout"); return { id: engineApi.settingId, screens: ["character"], mechanics: ["combat"], asset: logo, availableAsset: engineApi.modules[${JSON.stringify(assetModuleId)}], shared: shared.name, dispose: () => engineApi.disposals.push("fallout") }; };`,
+          `const logo = ${requireAsset}; const shared = require("engine:example/shared"); module.exports = (engineApi) => { engineApi.activations.push("fallout"); return { id: engineApi.settingId, screens: [{ id: "character", slot: "screen:1", role: "character", titleKey: "tabs.character", component: () => null }], mechanics: ["combat"], asset: logo, availableAsset: engineApi.modules[${JSON.stringify(assetModuleId)}], shared: shared.name, dispose: () => engineApi.disposals.push("fallout") }; };`,
         ),
       },
     ];
@@ -125,7 +125,7 @@ describe('setting package web cache', () => {
     expect(engineApi.activations).toEqual(['fallout']);
     expect(settingModule).toMatchObject({
       id: 'sample_setting',
-      screens: ['character'],
+      screens: [expect.objectContaining({ id: 'character', slot: 'screen:1', route: 'SettingScreen1' })],
       mechanics: ['combat'],
       asset: { uri: expect.stringMatching(/^blob:/) },
       availableAsset: { uri: expect.stringMatching(/^blob:/) },

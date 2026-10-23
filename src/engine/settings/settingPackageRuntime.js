@@ -14,6 +14,11 @@ import {
   checkRuntimeApi,
   SettingCompatibilityError,
 } from './settingCompatibility';
+import {
+  normalizeSettingGlobalComponents,
+  normalizeSettingScreens,
+  normalizeSettingTheme,
+} from './settingScreens';
 
 const SETTING_ID_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const DIGEST_RE = /^[a-f0-9]{64}$/;
@@ -192,7 +197,20 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
     dispose();
     throw new SettingCompatibilityError(missingServices);
   }
-  const activeRuntime = { ...settingRuntime, manifest };
+  // Экраны сеттинга раскладываются по слотам движка здесь, до рендера:
+  // у App не должно быть шанса получить экран без компонента или восьмой экран.
+  let screens;
+  let theme;
+  let globalComponents;
+  try {
+    screens = normalizeSettingScreens(settingRuntime.screens);
+    theme = normalizeSettingTheme(settingRuntime.theme);
+    globalComponents = normalizeSettingGlobalComponents(settingRuntime.globalComponents);
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+  const activeRuntime = { ...settingRuntime, manifest, screens, theme, globalComponents };
   moduleDisposers.set(activeRuntime, () => {
     try {
       if (typeof settingRuntime.dispose === 'function') settingRuntime.dispose();

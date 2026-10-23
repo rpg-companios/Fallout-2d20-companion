@@ -215,6 +215,13 @@
       "unknownCapabilities": "The package uses capabilities missing from this engine version: {capabilities}.",
       "missingHostModules": "The app does not provide modules the package depends on: {modules}.",
       "missingServices": "The package declared services it does not implement: {services}."
+    },
+    "screenTitle": "Screen slots",
+    "screen": {
+      "noScreens": "The package declares no screens. A setting must fill at least one of the seven slots.",
+      "tooManyScreens": "The package declares {count} screens, but the engine provides {limit}. Remove the extra ones.",
+      "invalidScreen": "Screen \"{screen}\" is filled incorrectly: field {field} should be {expected}.",
+      "duplicateScreen": "Screen is duplicated: {field} = \"{value}\"."
     }
   },
   "appUpdateUpToDate": "You have the latest version: {version}.",

@@ -47,12 +47,50 @@ export default function createFalloutRuntime(engineApi) {
       active = false;
       disposers.reverse().forEach((dispose) => dispose?.());
     },
+    // Экраны 1–7 — слоты движка. Здесь Fallout говорит только, что он в них
+    // кладёт: маршрут, порядок и рамку вкладок даёт движок.
     screens: [
-      { id: 'character', route: 'CharacterTab', icon: 'person', component: CharacterScreen, labelKey: 'tabs.character' },
-      { id: 'equipment', route: 'EquipmentTab', icon: 'shield', component: EquipmentScreen, labelKey: 'tabs.equipment' },
-      { id: 'inventory', route: 'InventoryTab', icon: 'briefcase', component: InventoryScreen, labelKey: 'tabs.inventory' },
-      { id: 'perks', route: 'PerksTab', icon: 'star', component: PerksAndTraitsScreen, labelKey: 'tabs.perks' },
+      {
+        slot: 'screen:1',
+        id: 'character',
+        role: 'character',
+        icon: 'person',
+        component: CharacterScreen,
+        titleKey: 'tabs.character',
+      },
+      {
+        slot: 'screen:2',
+        id: 'equipment',
+        role: 'equipment',
+        icon: 'shield',
+        component: EquipmentScreen,
+        titleKey: 'tabs.equipment',
+      },
+      {
+        slot: 'screen:3',
+        id: 'inventory',
+        role: 'inventory',
+        icon: 'briefcase',
+        component: InventoryScreen,
+        titleKey: 'tabs.inventory',
+      },
+      {
+        slot: 'screen:4',
+        id: 'perks',
+        icon: 'star',
+        component: PerksAndTraitsScreen,
+        titleKey: 'tabs.perks',
+      },
     ],
+    // Оформление вкладок. Цвета именно те, что были зашиты в App.js:
+    // экран не должен поменяться от того, что Fallout начал объявлять свою тему.
+    theme: {
+      tabBar: {
+        background: '#1a1a1a',
+        active: '#f0e68c',
+        inactive: 'gray',
+      },
+    },
     globalComponents: {
       survivalClock: SurvivalClock,
       fusionCoreChoice: FusionCoreChoiceModal,
