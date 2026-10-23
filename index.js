@@ -4,7 +4,7 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
 import { debugLog } from './src/engine/debug/runtimeTrace.js';
 import { showRawAlert } from './components/alerts/alertService';
-import { tApp } from './src/i18n/appI18n';
+import { tApp } from './i18n/appI18n';
 import useSettingPackStore from './src/store/settingPackStore';
 import App from './App';
 
