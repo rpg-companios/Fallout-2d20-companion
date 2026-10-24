@@ -144,3 +144,41 @@ EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID=808936097288-....apps.googleusercontent.com
 Код в `googleDriveSync.js` сначала читает `process.env.EXPO_PUBLIC_GOOGLE_DRIVE_CLIENT_ID`,
 затем `window.SETTING_GOOGLE_DRIVE_CLIENT_ID`. Сейчас сработает вариант с `window`,
 он одинаков для всех доменов, поэтому менять ничего не нужно.
+
+## 5. Android (APK) — отдельная настройка, веб-ключ не подходит
+
+На телефоне браузерного ключа недостаточно: `getClientId()` берёт
+`EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID` (`googleDriveSync.js:78`), а его в
+репозитории нет ни в `eas.json`, ни в `.env`. Поэтому APK отвечает «client id is
+not configured» — это не сбой сети и не отказ Google.
+
+Порядок (нативная часть, OTA её не привезёт — нужна пересборка APK):
+
+1. **Google Cloud → Credentials → Create credentials → OAuth client ID → Android.**
+   - Package name: `com.rpgcompanios.positronium` (из `app.json`).
+   - SHA-1: отпечаток ключа, которым подписан APK. Для сборок EAS —
+     `npx eas-cli credentials -p android` (строка `SHA1 Fingerprint`).
+   - Advanced settings → **Enable custom URI scheme** (без этой галочки Google
+     отвечает «Custom URI scheme is not enabled for your Android client»).
+2. **Вернуть приложение по редиректу.** `requestNativeAccessToken()` строит
+   `redirectUri = com.rpgcompanios.positronium:/oauthredirect`
+   (`googleDriveSync.js:123`). Android отдаёт такой переход приложению только
+   если в манифесте есть intent filter на эту схему — в `app.json`:
+   ```json
+   "android": {
+     "intentFilters": [{
+       "action": "VIEW",
+       "category": ["BROWSABLE", "DEFAULT"],
+       "data": [{ "scheme": "com.rpgcompanios.positronium", "path": "/oauthredirect" }]
+     }]
+   }
+   ```
+3. **Ключ в сборку.** EAS → Project → Environment variables (или
+   `build.<profile>.env` в `eas.json`):
+   ```
+   EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID=808936097288-....apps.googleusercontent.com
+   ```
+   Значение — id Android-клиента из п.1, не веб-клиента.
+4. Пересобрать APK. Пока ключа нет, кнопка синхронизации говорит прямо: «В этой
+   сборке не настроен вход в Google» (`cloudSync.notConfigured`), а персонажи
+   остаются сохранёнными на устройстве.
