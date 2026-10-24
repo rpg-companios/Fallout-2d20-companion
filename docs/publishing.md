@@ -181,7 +181,9 @@ Replit Secrets (Tools → Secrets) от удаления файлов не ст�
 
 - `modules/fallout/` → папка `fallout/` в корне (папка = сеттинг);
 - `tools/` — `pack-setting.py`, `unpack-setting.py`, `build-setting-runtime.mjs`,
-  `package.json` (esbuild) и `host-modules.json` (список `engine:` модулей);
+  `package.json` (esbuild) и `host-modules.json` (что отдаёт хост: `engine:*`
+  И обычные пакеты — `react`, `react-native`, `zustand/react/shallow`,
+  `@expo/vector-icons`);
 - `scripts/release.mjs`, `scripts/release.sh` и `scripts/lib/*` — сценарий
   релиза, который живёт рядом с кошельком;
 - `LICENSE`, `NOTICE` — лицензия относится к инструментам;
@@ -421,13 +423,31 @@ checkout остаётся источником истины.
 (ставится в `tools/node_modules` при первом релизе). `gh` не обязателен, если
 задан токен: релиз работает и через REST API.
 
+### JSX собирается внутрь пакета
+
+`tools/build-setting-runtime.mjs` компилирует JSX с автоматическим рантаймом,
+но `react/jsx-runtime` не оставляет внешним: три обёртки над
+`React.createElement` кладутся внутрь бандла. Причина — совместимость со
+старыми сборками приложения: APK `engine-v1.0.1` отдаёт пакету `react`, но не
+`react/jsx-runtime`, и пакет с таким требованием ставился и не запускался
+(«Не удалось запустить сеттинг»).
+
+Заодно трансформ зафиксирован (`tsconfig` сборщика): раньше ближайший
+`tsconfig.json` с `"jsx": "react"` переключал сборку на классический JSX, и
+один и тот же кошелёк давал разные бандлы в зависимости от того, где его
+собрали.
+
+Проверка перед записью бандла теперь смотрит на КАЖДЫЙ внешний импорт, а не
+только на `engine:*`: пакет, которому нужен модуль вне `tools/host-modules.json`
+(и вне `setting-asset:`), не соберётся.
+
 ## Если что-то пошло не так
 
 | Симптом | Что делать |
 | --- | --- |
 | `Permission ... denied` / 403 | токен без прав на целевой репозиторий: выдать доступ и повторить |
 | `Resource not accessible by integration` | подключение GitHub выдано только этому репозиторию, а не двум целевым |
-| `engine imports missing from the host module list` | кошелёк просит модуль, которого нет в `tools/host-modules.json`; обновить файл публикацией или добавить модуль в хост |
+| `runtime bundle requires modules the engine host does not provide: X` | бандл просит модуль, которого нет у хоста; `X` назван по имени. Обычно лечится публикацией движка (обновляет `tools/host-modules.json`) или удалением импорта из кошелька |
 | `esbuild не установлен` / `ERR_MODULE_NOT_FOUND: esbuild` | повторить `./scripts/release.sh` в репозитории сеттинга — сборщик доустановится в `tools/` |
 | `не понял, что релизить` | запустить релиз в репозитории движка (`app.json`) или сеттинга (`tools/pack-setting.py`) |
 | релиз создан, а приложение обновление не видит | проверить `release.json` в ветке репозитория сеттинга и тег `<id>-v<версия>` |

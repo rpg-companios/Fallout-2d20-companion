@@ -12,6 +12,7 @@ import {
   assertSettingCompatibility,
   checkDeclaredServices,
   checkRuntimeApi,
+  SETTING_COMPATIBILITY_CODES,
   SettingCompatibilityError,
 } from './settingCompatibility';
 import {
@@ -145,7 +146,16 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
     if (Object.prototype.hasOwnProperty.call(runtimeEngineApi.modules, moduleId)) {
       return runtimeEngineApi.modules[moduleId];
     }
-    throw runtimeError(`runtime requested unavailable host module: ${String(moduleId)}`);
+    // Это не поломка пакета, а нехватка модуля в ЭТОЙ сборке приложения
+    // (например, `react/jsx-runtime` в APK до 1.0.2). Отдельный код и
+    // переведённый текст: человек должен прочитать причину, а не увидеть
+    // «не удалось запустить сеттинг».
+    const error = new SettingCompatibilityError([{
+      code: SETTING_COMPATIBILITY_CODES.MISSING_HOST_MODULES,
+      params: { modules: [String(moduleId)] },
+    }]);
+    error.cause = new Error(`runtime requested unavailable host module: ${String(moduleId)}`);
+    throw error;
   };
 
   try {
@@ -159,6 +169,9 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
     evaluateBundle(module, module.exports, runtimeEngineApi, requireModule);
   } catch (error) {
     dispose();
+    // Отказ по совместимости уже объяснён человеку (переводится в UI):
+    // оборачивать его в «could not evaluate» — значит спрятать причину.
+    if (error instanceof SettingCompatibilityError) throw error;
     const detail = error instanceof Error ? error.message : String(error);
     throw runtimeError(`could not evaluate runtime entry ${descriptor.entry}: ${detail}`, error);
   }
@@ -176,6 +189,7 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
     settingRuntime = await factory(runtimeEngineApi);
   } catch (error) {
     dispose();
+    if (error instanceof SettingCompatibilityError) throw error;
     const detail = error instanceof Error ? error.message : String(error);
     throw runtimeError(`setting factory failed for "${manifest.id}": ${detail}`, error);
   }

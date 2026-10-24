@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -46,9 +47,12 @@ const readHostModuleIds = (appRoot) => {
   const hostFile = appRoot ? path.join(appRoot, 'src/engine/settings/settingRuntimeHost.js') : null;
   try {
     if (hostFile && fs.existsSync(hostFile)) {
+      // Ключи карты бывают в кавычках и без (`react: hostModule(...)`), и там
+      // лежат не только `engine:*`: пакетные модули тоже приходят от хоста.
       return new Set(
-        [...fs.readFileSync(hostFile, 'utf8').matchAll(/(['"])(engine:[^'"]+)\1\s*:/g)]
-          .map((match) => match[2]),
+        [...fs.readFileSync(hostFile, 'utf8')
+          .matchAll(/^\s*(?:'([^']+)'|"([^"]+)"|([A-Za-z_$][\w$]*))\s*:\s*hostModule\(/gm)]
+          .map((match) => match[1] ?? match[2] ?? match[3]),
       );
     }
   } catch {
@@ -115,6 +119,63 @@ const isSharedEngineModule = (relativePath) => (
   || /^src\/engine\/(?:debug\/runtimeTrace|items\/weaponMods|settings\/activeSettingRuntime)(?:\.[^/]+)?$/.test(relativePath)
 );
 
+// --- JSX без привязки к host-модулю react/jsx-runtime ----------------------
+//
+// Автоматический JSX (esbuild `jsx: 'automatic'`) вставляет
+// `import { jsx } from 'react/jsx-runtime'`. Такой импорт остаётся внешним, и
+// пакет начинает требовать host-модуль, которого в установленном APK может не
+// быть: сборки движка до 1.0.2 знают `react`, но не `react/jsx-runtime`.
+// Итог — «Не удалось запустить сеттинг», причём APK ещё и прячет причину.
+//
+// Поэтому react/jsx-runtime собирается внутрь пакета: три обёртки над
+// `React.createElement`. `react` есть в карте host-модулей у любой сборки,
+// значит пакет работает и на старом APK, и на новом — без новых требований.
+const JSX_RUNTIME_SHIM = [
+  "import * as React from 'react';",
+  'export const Fragment = React.Fragment;',
+  'export const jsx = (type, props, key) => React.createElement(type, props, key);',
+  'export const jsxs = jsx;',
+  'export const jsxDEV = jsx;',
+  '',
+].join('\n');
+
+const jsxRuntimeShimPlugin = {
+  name: 'setting-runtime-jsx-shim',
+  setup(build) {
+    build.onResolve({ filter: /^react\/jsx-(?:dev-)?runtime$/ }, (args) => ({
+      path: args.path,
+      namespace: 'setting-jsx-shim',
+    }));
+    // `react` из шима — тот же host-модуль, что и остальные пакетные импорты.
+    // Явное правило нужно, потому что виртуальный модуль резолвится не из
+    // кошелька, и общее `packages: 'external'` на него не распространяется.
+    build.onResolve({ filter: /^react$/ }, () => ({ path: 'react', external: true }));
+    build.onLoad({ filter: /.*/, namespace: 'setting-jsx-shim' }, () => ({
+      contents: JSX_RUNTIME_SHIM,
+      loader: 'js',
+    }));
+  },
+};
+
+/**
+ * tsconfig с зафиксированным JSX пишется во временный каталог: esbuild иначе
+ * берёт ближайший файл от собираемого исходника, и трансформ зависит от того,
+ * где лежит кошелёк. Файл удаляется после сборки.
+ */
+const PINNED_TSCONFIG = '{"compilerOptions":{"jsx":"react-jsx","jsxImportSource":"react"}}';
+let pinnedTsconfigPath = null;
+const writePinnedTsconfig = () => {
+  if (pinnedTsconfigPath) return pinnedTsconfigPath;
+  pinnedTsconfigPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'setting-tsconfig-')), 'tsconfig.json');
+  fs.writeFileSync(pinnedTsconfigPath, PINNED_TSCONFIG);
+  return pinnedTsconfigPath;
+};
+const cleanupPinnedTsconfig = () => {
+  if (!pinnedTsconfigPath) return;
+  fs.rmSync(path.dirname(pinnedTsconfigPath), { recursive: true, force: true });
+  pinnedTsconfigPath = null;
+};
+
 const run = async () => {
   const args = parseArguments(process.argv.slice(2));
   // В репозитории сеттинга исходников движка нет: путь передаётся
@@ -153,8 +214,14 @@ const run = async () => {
     target: 'es2020',
     packages: 'external',
     jsx: 'automatic',
+    // Ближайший tsconfig.json перебивает jsx: 'automatic' — в совмещённом
+    // репозитории (там "jsx": "react") пакет молча собирался классическим
+    // трансформом, в репозитории сеттинга — автоматическим. Один и тот же
+    // кошелёк давал разные бандлы. Свой tsconfig убирает зависимость от места
+    // сборки: результат одинаков везде.
+    tsconfig: writePinnedTsconfig(),
     loader: { '.js': 'jsx', '.tsx': 'tsx' },
-    plugins: [{
+    plugins: [jsxRuntimeShimPlugin, {
       name: 'setting-runtime-host-boundary',
       setup(build) {
         build.onResolve({ filter: /^\.\.?\// }, (resolveArgs) => {
@@ -206,15 +273,21 @@ const run = async () => {
     .filter((entry) => entry.external)
     .map((entry) => entry.path);
   // Список host-модулей: из checkout'а движка либо из tools/host-modules.json.
+  // Проверяется КАЖДЫЙ внешний импорт, а не только `engine:*`: пакет,
+  // требующий `react/jsx-runtime`, на APK без такого модуля ставится и не
+  // запускается («Не удалось запустить сеттинг»). Такое лучше поймать здесь.
+  // `setting-asset:` и `engine-asset:` — свои файлы пакета, они всегда есть.
   const hostModuleIds = readHostModuleIds(appRoot);
   if (hostModuleIds) {
     const missingHostModules = [...new Set(externalImports)]
-      .filter((moduleId) => moduleId.startsWith('engine:') && !hostModuleIds.has(moduleId))
+      .filter((moduleId) => !moduleId.startsWith('setting-asset:')
+        && !moduleId.startsWith('engine-asset:')
+        && !hostModuleIds.has(moduleId))
       .sort();
     if (missingHostModules.length > 0) {
       throw new Error(
-        'engine imports missing from the host module list: '
-        + `${missingHostModules.join(', ')} (update tools/host-modules.json)`,
+        `runtime bundle requires modules the engine host does not provide: ${missingHostModules.join(', ')}. `
+        + 'Обновите движок или уберите эти импорты из кошелька (список: tools/host-modules.json).',
       );
     }
   }
@@ -229,7 +302,9 @@ const run = async () => {
   }) + '\n');
 };
 
-run().catch((error) => {
-  process.stderr.write(`[build-setting-runtime] ${error?.message ?? String(error)}\n`);
-  process.exitCode = 1;
-});
+run()
+  .catch((error) => {
+    process.stderr.write(`[build-setting-runtime] ${error?.message ?? String(error)}\n`);
+    process.exitCode = 1;
+  })
+  .finally(cleanupPinnedTsconfig);

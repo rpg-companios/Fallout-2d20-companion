@@ -23,6 +23,7 @@ import {
   renderAppReleaseIndex,
   renderReleaseBody,
 } from './app-release.mjs';
+import { parseHostModuleIds } from './host-modules.mjs';
 import { parseReleaseNotes, readReleaseNotes as readReleaseNotesFile } from './release-notes.mjs';
 import {
   RELEASE_INDEX_FILE,
@@ -265,13 +266,20 @@ export const planSettingWallets = (root, wallets) => {
  * сверяет с ним внешние импорты бандла, поэтому файл живёт рядом с tools/:
  * в репозитории сеттинга исходников движка нет.
  */
+/**
+ * Все id, которые движок отдаёт пакету: `engine:*` и обычные пакеты
+ * (`react`, `react-native`, `zustand/react/shallow`, `@expo/vector-icons`,
+ * `react/jsx-runtime`).
+ *
+ * Пакетные id нужны не для красоты: сборщик пакета проверяет, что бандл не
+ * требует ничего лишнего. Пока в списке были только `engine:*`, требование
+ * `react/jsx-runtime` проходило мимо проверки — и пакет падал на APK, где
+ * такого модуля нет.
+ */
 export const hostModuleIds = (root) => {
   const file = path.join(root, 'src/engine/settings/settingRuntimeHost.js');
   if (!fs.existsSync(file)) return [];
-  const source = fs.readFileSync(file, 'utf8');
-  return [...new Set(
-    [...source.matchAll(/(['"])(engine:[^'"]+)\1\s*:/g)].map((match) => match[2]),
-  )].sort();
+  return [...new Set(parseHostModuleIds(fs.readFileSync(file, 'utf8')))].sort();
 };
 
 /** package.json для tools/: единственная зависимость — сборщик бандла. */
