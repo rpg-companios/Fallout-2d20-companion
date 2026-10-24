@@ -14,6 +14,7 @@
     "product:push": "./scripts/product-push.sh",
     "ota": "./scripts/testing-push.sh",
     "release": "node scripts/release.mjs",
+    "release:test": "node scripts/release.mjs --prerelease",
     "release:play": "node scripts/release.mjs --aab --submit",
     "serve": "npx serve -s dist -l 5000",
     "test": "vitest run",

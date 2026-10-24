@@ -37,6 +37,39 @@ export const readEngineVersion = (root) => {
 /** Тег релиза движка: `engine-v1.0.0`. */
 export const engineReleaseTag = (version) => `engine-v${version}`;
 
+/** Метка времени тестового релиза (UTC): `20261024-1612`. */
+export const releaseStamp = (date = new Date()) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  const day = [date.getUTCFullYear(), pad(date.getUTCMonth() + 1), pad(date.getUTCDate())].join('');
+  return `${day}-${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}`;
+};
+
+/**
+ * Тег тестового релиза движка: `engine-v1.0.1-test.20261024-1612`.
+ *
+ * Отдельный тег обязателен, иначе тестовый релиз занял бы `engine-v1.0.1`, и
+ * публичный APK той же версии выпустить было бы уже некуда. Метка времени
+ * вместо счётчика — не нужен запрос к GitHub, чтобы узнать следующий номер.
+ */
+export const engineTestReleaseTag = (version, date = new Date()) => (
+  `${engineReleaseTag(version)}-test.${releaseStamp(date)}`
+);
+
+/**
+ * Что именно выпускаем: тег, профиль сборки, имя файла и надо ли обновлять
+ * `app-release.json`. Правило в одном месте и без сети — проверяется тестами.
+ *
+ * Тестовый выпуск (`prerelease`) собирается профилем `preview` и не трогает
+ * индекс обновлений: по индексу приложение предлагает обновиться всем.
+ */
+export const planEngineRelease = ({ version, prerelease = false, aab = false, at = new Date() }) => ({
+  tag: prerelease ? engineTestReleaseTag(version, at) : engineReleaseTag(version),
+  title: prerelease ? `Positronium ${version} (тест)` : `Positronium ${version}`,
+  profile: aab ? 'production' : (prerelease ? 'preview' : 'public'),
+  asset: aab ? ENGINE_AAB_ASSET : ENGINE_APK_ASSET,
+  writeIndex: !aab && !prerelease,
+});
+
 /**
  * Текст GitHub Release: заголовок секции заметок и её тело.
  * Один и тот же текст видят и в релизе, и в приложении (через заметки).

@@ -3,6 +3,7 @@
 #
 # Движок (есть app.json и release-notes/engine.md):
 #   ./scripts/release.sh             # APK → GitHub Release + app-release.json
+#   ./scripts/release.sh --prerelease  # тестовый APK: prerelease, канал preview
 #   ./scripts/release.sh --aab       # AAB (файл для Google Play) в релиз
 #   ./scripts/release.sh --aab --submit   # ещё и загрузка AAB в Play Console
 #   ./scripts/release.sh --build-id <id>  # опубликовать уже собранную сборку

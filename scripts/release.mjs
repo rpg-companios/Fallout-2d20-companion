@@ -6,6 +6,7 @@
 //
 //   движок  (app.json + release-notes/engine.md)
 //     npm run release                  # APK → GitHub Release → app-release.json
+//     npm run release:test             # тестовый APK: prerelease, канал preview
 //     npm run release -- --aab         # AAB (файл для Google Play) в релиз
 //     npm run release -- --aab --submit  # плюс загрузка AAB в Play Console
 //
@@ -40,7 +41,7 @@ import {
   ENGINE_APK_ASSET,
   ENGINE_RELEASE_NOTES,
   buildAppReleaseIndex,
-  engineReleaseTag,
+  planEngineRelease,
   readEngineVersion,
   renderAppReleaseIndex,
   renderReleaseBody,
@@ -104,6 +105,7 @@ const baseArgs = (argv) => {
     bump: 'patch',
     version: null,
     setting: null,
+    prerelease: false,
   };
   for (let index = 2; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -132,6 +134,9 @@ const baseArgs = (argv) => {
       case '--setting':
         args.setting = argv[++index];
         if (!args.setting) fail('--setting требует id сеттинга');
+        break;
+      case '--prerelease':
+        args.prerelease = true;
         break;
       case '-h':
       case '--help':
@@ -180,7 +185,7 @@ const assertReleaseAuth = () => {
 };
 
 /** GitHub Release: gh CLI, а без него — REST по токену. */
-const createRelease = async ({ repository, tag, title, body, file, assetName }) => {
+const createRelease = async ({ repository, tag, title, body, file, assetName, prerelease = false }) => {
   const branch = currentBranch();
   const key = token();
   // Токен важнее gh CLI: gh может быть установлен, но не авторизован (или
@@ -213,6 +218,10 @@ const createRelease = async ({ repository, tag, title, body, file, assetName }) 
       '--target', branch,
       '--title', title,
       '--notes-file', notesFile,
+      // prerelease не становится «Latest»: постоянная ссылка
+      // /releases/latest/download/positronium.apk продолжает отдавать
+      // публичный APK, а не тестовый.
+      ...(prerelease ? ['--prerelease'] : []),
     ], { stdio: 'inherit' });
     fs.rmSync(notesFile, { force: true });
     return;
@@ -229,7 +238,13 @@ const createRelease = async ({ repository, tag, title, body, file, assetName }) 
   const created = await fetch(`${API_BASE}/repos/${repository}/releases`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tag_name: tag, name: title, body, target_commitish: branch }),
+    body: JSON.stringify({
+      tag_name: tag,
+      name: title,
+      body,
+      target_commitish: branch,
+      prerelease: Boolean(prerelease),
+    }),
   });
   let release = null;
   if (created.ok) {
@@ -577,16 +592,20 @@ const releaseEngine = async ({ args, repository }) => {
     );
   }
 
-  const tag = engineReleaseTag(version);
-  const title = `Positronium ${version}`;
-  const body = renderReleaseBody(notes);
+  // Тестовый релиз — та же версия, но отдельный тег и отдельный профиль:
+  // тег не должен занять `engine-v1.0.1`, а APK должен слушать канал preview.
   // APK для людей собирается профилем `public`: он слушает канал production.
-  // Профиль `preview` остаётся личным тестовым — иначе OTA «для теста» и OTA
-  // «для всех» приходят на одни и те же телефоны.
-  const profile = args.aab ? 'production' : 'public';
-  const assetName = args.aab ? ENGINE_AAB_ASSET : ENGINE_APK_ASSET;
+  const { tag, title, profile, asset: assetName, writeIndex } = planEngineRelease({
+    version,
+    prerelease: args.prerelease,
+    aab: args.aab,
+  });
+  const body = renderReleaseBody(notes);
 
   console.log(`[release] движок ${repository} · ${tag} · ${assetName} · профиль ${profile}`);
+  if (args.prerelease) {
+    console.log('[release] тестовый релиз: помечен prerelease, версия Latest и app-release.json не меняются');
+  }
   if (args.dryRun) {
     console.log(`[release] dry-run: собрали бы профиль ${profile} и опубликовали ${tag}`);
     return;
@@ -602,7 +621,9 @@ const releaseEngine = async ({ args, repository }) => {
   console.log(`[release] файл: ${artifact.bytes} байт, sha256 ${artifact.sha256}`);
   console.log(`[release] скачанный файл: ${artifact.file}`);
 
-  const index = args.aab
+  // Индекс обновлений — только для публичного APK: по нему приложение
+  // предлагает обновиться всем, тестовая сборка туда попадать не должна.
+  const index = !writeIndex
     ? null
     : buildAppReleaseIndex({
       repository,
@@ -613,7 +634,15 @@ const releaseEngine = async ({ args, repository }) => {
       sha256: artifact.sha256,
     });
 
-  await createRelease({ repository, tag, title, body, file: artifact.file, assetName });
+  await createRelease({
+    repository,
+    tag,
+    title,
+    body,
+    file: artifact.file,
+    assetName,
+    prerelease: args.prerelease,
+  });
   console.log(`[release] GitHub Release ${tag}: ${assetName}`);
 
   if (args.aab && args.submit) {
@@ -630,7 +659,10 @@ const releaseEngine = async ({ args, repository }) => {
 
   fs.rmSync(path.dirname(artifact.file), { recursive: true, force: true });
   console.log(`[release] готово: https://github.com/${repository}/releases/tag/${tag}`);
-  if (!args.aab) {
+  if (args.prerelease) {
+    console.log(`[release] тестовый APK: https://github.com/${repository}/releases/download/${tag}/${assetName}`);
+    console.log('[release] постоянная ссылка /releases/latest/ по-прежнему отдаёт публичный APK');
+  } else if (!args.aab) {
     console.log(`[release] постоянная ссылка: https://github.com/${repository}/releases/latest/download/${assetName}`);
   }
 };
@@ -902,10 +934,16 @@ const main = async () => {
   if (mode === 'setting' && (args.aab || args.submit || args.buildId || args.skipBuild)) {
     fail('--aab/--submit/--build-id/--skip-build относятся к релизу движка');
   }
+  if (mode === 'setting' && args.prerelease) {
+    fail('--prerelease относится к релизу движка: тестовый .trpg ставится ссылкой на ветку preview');
+  }
   if (mode === 'engine' && (args.bump !== 'patch' || args.version || args.setting)) {
     fail('--bump/--version/--setting относятся к релизу сеттинга: версия движка — в app.json');
   }
   if (args.submit && !args.aab) fail('--submit работает только вместе с --aab');
+  if (args.prerelease && args.aab) {
+    fail('--prerelease относится к APK: AAB уходит в Google Play, там тестовых каналов нет');
+  }
   const settings = mode === 'setting' ? listSettings() : [];
   if (args.setting && !settings.some((item) => item.id === args.setting)) {
     fail(`нет сеттинга "${args.setting}" (есть: ${settings.map((item) => item.id).join(', ') || 'ни одного'})`);

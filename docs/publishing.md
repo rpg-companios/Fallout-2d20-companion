@@ -216,7 +216,7 @@ cd ~/workspace/ttrpg-engine
 1. берёт версию из `app.json` и заметки из `release-notes/engine.md`;
 2. если нет `node_modules` — ставит зависимости (`npm ci`): EAS читает плагины
    Expo локально и без них падает на `expo-asset`;
-3. собирает профиль EAS `preview` (APK) — ждёт завершения;
+3. собирает профиль EAS `public` (APK, канал `production`) — ждёт завершения;
 4. скачивает артефакт сборки сам;
 5. создаёт GitHub Release `engine-v<версия>` с ассетом `positronium.apk`
    (текст — верхняя секция `release-notes/engine.md`);
@@ -232,6 +232,12 @@ cd ~/workspace/ttrpg-engine
 [release] сборка 9f3c1a2b: in progress (6 мин)
 [release] сборка 9f3c1a2b: finished (21 мин)
 ```
+
+Тестовый APK для проверки — `./scripts/release.sh --prerelease`
+(`npm run release:test`): профиль `preview`, канал `preview`, тег
+`engine-v<версия>-test.<метка времени>`, релиз помечен `prerelease` и не
+становится Latest, `app-release.json` не трогается. Публичный релиз той же
+версии остаётся за `engine-v<версия>`.
 
 Раньше `eas build --wait` молчал всё это время, и нельзя было отличить
 сборку от зависания. Ограничения (по умолчанию 90 мин и опрос раз в 30 с)

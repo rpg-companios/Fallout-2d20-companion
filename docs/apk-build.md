@@ -94,18 +94,34 @@ npx expo export --platform android --output-dir dist
 
 ```sh
 npm run release                     # APK → GitHub Release + app-release.json
+npm run release:test                # тестовый APK: prerelease, канал preview
 npm run release -- --aab            # AAB (файл для Google Play) в релиз
 npm run release -- --aab --submit   # плюс загрузка AAB в Play Console
 ```
 
 Скрипт `scripts/release.mjs`: проверяет версию (`app.json`) и заметки
 (`release-notes/engine.md` — номер верхней секции должен совпасть), собирает
-профиль EAS (`preview` → APK, `production` → AAB), скачивает артефакт, создаёт
+профиль EAS (`public` → APK, `production` → AAB), скачивает артефакт, создаёт
 релиз `engine-v<версия>` с файлом `positronium.apk`, пишет `app-release.json`
 и коммитит его.
 
 Другие режимы: `--build-id <id>` (опубликовать уже собранную сборку),
 `--skip-build` (взять последнюю успешную), `--dry-run` (показать план).
+
+**Тестовый APK** (`npm run release:test`) — то же самое, но:
+
+| | публичный `npm run release` | тестовый `npm run release:test` |
+|---|---|---|
+| профиль EAS | `public` | `preview` |
+| канал OTA | `production` | `preview` |
+| тег | `engine-v1.0.1` | `engine-v1.0.1-test.20261024-1612` |
+| GitHub | обычный релиз, становится Latest | `prerelease` |
+| `app-release.json` | обновляется | не трогается |
+
+Постоянная ссылка `/releases/latest/download/positronium.apk` после тестового
+релиза продолжает отдавать публичный APK: у GitHub Latest — это последний
+не-prerelease. Внутри приложения предупреждение «доступна новая версия» тоже
+не появится: оно читает `app-release.json`, а он не менялся.
 
 Постоянная ссылка, которую можно давать людям:
 <https://github.com/rpg-companios/ttrpg-engine/releases/latest/download/positronium.apk>.
