@@ -8,13 +8,16 @@
 export const EXPORT_FORMAT_VERSION = 1;
 export const EXPORT_FILE_EXTENSION = '.rpgc';
 
+// Ключи — в словаре ЭКРАНА «главная» (`upload.errors.*`). Раньше здесь стояло
+// `import.errors.*`, такого раздела в словаре нет: любая ошибка разбора
+// показывала человеку сам путь ключа вместо текста.
 export const IMPORT_ERRORS = {
-  invalidJson: 'import.errors.invalidJson',
-  invalidFormat: 'import.errors.invalidFormat',
-  unsupportedVersion: 'import.errors.unsupportedVersion',
-  missingCharacter: 'import.errors.missingCharacter',
-  missingName: 'import.errors.missingName',
-  missingData: 'import.errors.missingData',
+  invalidJson: 'upload.errors.invalidJson',
+  invalidFormat: 'upload.errors.invalidFormat',
+  unsupportedVersion: 'upload.errors.unsupportedVersion',
+  missingCharacter: 'upload.errors.missingCharacter',
+  missingName: 'upload.errors.missingName',
+  missingData: 'upload.errors.missingData',
 };
 
 const safeParseJson = (raw) => {

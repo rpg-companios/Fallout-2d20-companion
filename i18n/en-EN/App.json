@@ -33,5 +33,11 @@
     "disable": "Disable setting and continue",
     "details": "Error: {message}",
     "component": "Component: {component}"
+  },
+  "storage": {
+    "initFailedTitle": "Storage unavailable",
+    "initFailed": "The saves database could not be opened. Characters will not be saved or loaded until it opens.\n\n{message}",
+    "saveFailedTitle": "Character not saved",
+    "saveFailed": "Writing to the database failed — the character exists only on screen.\n\n{message}"
   }
 }

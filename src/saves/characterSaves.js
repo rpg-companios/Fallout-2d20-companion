@@ -22,6 +22,7 @@
 import * as db from '../../db';
 import { debugLog } from '../engine/debug/runtimeTrace.js';
 import { showRawAlert } from '../../components/alerts/alertService';
+import { tApp } from '../../i18n/appI18n';
 import useCharacterStore from '../store/characterStore';
 import {
   denormalizeCharacterState,
@@ -318,6 +319,13 @@ const toSerialized = (snapshot) => {
  * Сохранить персонажа (первое сохранение или переименование — зовёт экран
  * создания). Возвращает id записи или null при ошибке.
  */
+/**
+ * Последняя причина отказа записи — для экрана и разбора («ничего не
+ * происходит» больше не ответ: см. CharacterScreen и тест save-visibility).
+ */
+let lastSaveError = null;
+export const getLastSaveError = () => lastSaveError;
+
 export const saveCharacter = async (name) => {
   try {
     const state = useCharacterStore.getState();
@@ -345,8 +353,25 @@ export const saveCharacter = async (name) => {
     // Облако — фоном: его отказ не влияет на локальное состояние и UI.
     void syncCharacterToCloudIfEnabledSafe(id);
 
+    lastSaveError = null;
     return id;
   } catch (e) {
+    // Раньше здесь стоял голый `return null`: экран не сохранял флаг isSaved,
+    // оверлей не снимался, и человек видел «нажал — ничего не произошло» без
+    // единого слова о причине. Отказ обязан быть видимым и названным.
+    lastSaveError = e;
+    debugLog('character.save.failed', {
+      name: e?.name,
+      message: e?.message,
+      code: e?.code,
+    });
+    showRawAlert({
+      title: String(tApp('storage.saveFailedTitle')),
+      message: String(tApp('storage.saveFailed')).replace(
+        '{message}',
+        e?.message || String(e),
+      ),
+    });
     return null;
   }
 };

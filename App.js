@@ -345,6 +345,14 @@ function App() {
         await seedDatabase(isFirstRun);
         if (!cancelled) setBootProgress(1);
       } catch (e) {
+        // Молча продолжать нельзя: без базы не сохраняется персонаж, не
+        // импортируется файл и не идёт синхронизация — со стороны это выглядит
+        // как «нажимаю, ничего не происходит». Причину называем сразу.
+        debugLog('db.init.failed', { name: e?.name, message: e?.message });
+        showRawAlert({
+          title: String(tApp('storage.initFailedTitle')),
+          message: String(tApp('storage.initFailed')).replace('{message}', e?.message || String(e)),
+        });
         if (!cancelled) setBootProgress(1);
       } finally {
         if (!cancelled) setDbReady(true);

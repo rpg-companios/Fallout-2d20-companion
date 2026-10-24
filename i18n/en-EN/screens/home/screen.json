@@ -10,14 +10,14 @@
     "unsupported": "File import is available only in web version.",
     "overwriteConfirm": "Character with this name already exists. Overwrite it?",
     "errors": {
-      "default": "Failed to import character.",
-      "invalidJson": "The file is corrupted: invalid JSON.",
-      "invalidFormat": "Unsupported export file format.",
-      "unsupportedVersion": "This export file version is not supported.",
-      "missingCharacter": "Character block is missing in the file.",
-      "missingName": "Character name is missing in the file.",
-      "missingData": "Character data is missing in the file.",
-      "unexpected": "Could not import the character file. Make sure a valid .json/.rpgc file is selected."
+      "default": "The character could not be imported.",
+      "invalidJson": "The file does not read as JSON. This does not look like a character file: character files end with .rpgc or .json, while a rules package ends with .trpg.",
+      "invalidFormat": "This is JSON, but not a character file: the “rpg-companion-character” marker is missing.",
+      "unsupportedVersion": "The character file uses a different format version; this app reads version 1.",
+      "missingCharacter": "The file has no “character” block.",
+      "missingName": "The file has no character name.",
+      "missingData": "The file has no character data.",
+      "unexpected": "The character file could not be loaded.\n\n{message}"
     }
   },
   "download": {
@@ -82,7 +82,8 @@
     "error": "Cloud sync failed.",
     "remoteIsNewerWithCount": "Newer versions of characters were found in the cloud ({count}). Download them locally?",
     "successWithCounts": "Sync complete.\nUploaded: {uploaded}\nDownloaded: {downloaded}",
-    "errorWithReason": "Could not sync with the cloud.\n\n{reason}"
+    "errorWithReason": "Could not sync with the cloud.\n\n{reason}",
+    "notConfigured": "Google sign-in is not configured in this build: sync works in the web build or in a build with a Google Drive key. Characters stay saved on this device."
   },
   "pwa": {
     "install": "Install App",

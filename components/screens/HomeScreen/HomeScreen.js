@@ -741,7 +741,10 @@ export default function HomeScreen({ navigation }) {
       if (await confirmAlert('importOverwrite')) await persistImport();
     } catch (error) {
       debugLog('home.characterUpload.failed', { message: error?.message });
-      showCatalogAlert('uploadUnexpectedError');
+      // Текст «проверьте, что выбран корректный .json/.rpgc» отправлял человека
+      // перевыбирать файл, даже когда файл был верный, а падала запись в базу.
+      // Теперь причина называется прямо.
+      showCatalogAlert('uploadUnexpectedError', { message: error?.message || String(error) });
     }
   };
 
@@ -778,7 +781,12 @@ export default function HomeScreen({ navigation }) {
       const reason = e?.message || String(e);
       debugLog('sync.manual:failed', { message: reason });
       setSyncProgress(null);
-      await showCatalogAlert('cloudSyncError', { reason });
+      // Сборка без OAuth-ключа — не сбой сети: человеку нужен ответ «почему»,
+      // а не английская строка «Set EXPO_PUBLIC_..._CLIENT_ID».
+      const clientIdMissing = /client id is not configured/i.test(reason);
+      await showCatalogAlert('cloudSyncError', {
+        reason: clientIdMissing ? tHomeScreen('cloudSync.notConfigured') : reason,
+      });
     }
   };
 
