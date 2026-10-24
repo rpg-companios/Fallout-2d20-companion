@@ -10,13 +10,15 @@
 - `app.json` — `name: Positronium`, `slug: positronium`,
   `android.package`/`ios.bundleIdentifier`: `com.rpgcompanios.positronium`,
   схема `positronium`, `version: 1.0.1` (совпадает с `ENGINE_VERSION`).
-- `eas.json` — профили `preview` (APK, канал `preview`), `production`
-  (AAB для Google Play, канал `production`), `development` (dev-client).
+- `eas.json` — профили `preview` (тестовый APK, канал `preview`), `public`
+  (APK для людей, канал `production`), `production` (AAB для Google Play,
+  канал `production`), `development` (dev-client).
   `appVersionSource: remote`: `versionCode` ведёт EAS и поднимает при каждом
   билде — иначе Android не даст обновить установленное приложение.
 - `expo-updates` — OTA: правки JS доезжают до установленных APK без новой
   сборки (`app.json` → `updates.url`, `runtimeVersion.policy: appVersion`).
-- npm-скрипты: `npm run apk`, `npm run aab`, `npm run apk:local`.
+- npm-скрипты: `npm run apk`, `npm run aab`, `npm run apk:local`,
+  `npm run testing:push`, `npm run product:push` (OTA — см. ниже).
 - Иконки и сплэш в `assets/`.
 
 Папки `modules/`, `__tests__/` и скрипты публикации в репозиторий движка не
@@ -157,19 +159,70 @@ React Native DevTools; каталоги там бывают без права з
 
 Кэш восстановится сам при следующем запуске Expo CLI — на сборку он не влияет.
 
-## OTA-обновление (без новой сборки)
+## OTA-обновление: сначала тест, потом все
 
-`expo-updates` доставляет правки JS в уже установленный APK:
+`expo-updates` доставляет правки JS в уже установленный APK, без новой сборки.
+Каналов два, и они не пересекаются — это и есть «сначала проверю, потом выпущу».
 
-```sh
-npm run ota -- --message "Что изменилось"          # канал preview
-npx eas-cli update --channel production --message "..." # канал production
+| Что | Команда | Канал | Кто получает |
+|---|---|---|---|
+| тест | `./scripts/testing-push.sh --message "…"` | `preview` | только тестовый APK (`npm run apk`) |
+| выпуск | `./scripts/product-push.sh --message "…"` | `production` | все APK из релизов |
+
+Короткие псевдонимы: `npm run testing:push`, `npm run product:push`
+(`npm run ota` — это же, что `testing:push`).
+
+**Что делает тестовая публикация**
+
+1. собирает бандл (`expo export`) — падение импорта ловится здесь, а не на телефоне;
+2. отправляет OTA в канал `preview`;
+3. записывает отпечаток исходников в `.publish/ota/tested.json` (файл в `.gitignore`).
+
+**Что делает публикация для всех**
+
+1. сверяет код с последней тестовой публикацией: коммит и хеши всех изменённых
+   файлов. Не совпало — отказ со списком файлов, которые изменились после теста;
+2. проверяет, что версия приложения та же: `runtimeVersion` привязан к
+   `expo.version`, и бандл под другую версию до установленных APK не доедет —
+   для такого нужен новый APK;
+3. собирает бандл;
+4. отправляет OTA в канал `production`.
+
+```
+[ota] канал:     production (production — все установленные APK)
+[ota] коммит:    2b67f27 · незакоммиченных правок: 3
+[ota] сверка:    код совпадает с тем, что проверяли на тесте
+[ota] отправляю: npx eas-cli update --channel production …
 ```
 
-Через OTA нельзя менять нативную часть (новый модуль, разрешение, иконку,
-`versionCode`) — для такого нужен новый APK по инструкции выше. Проект EAS,
-`projectId` и каналы уже прописаны в `app.json`/`eas.json`, повторный
-`eas update:configure` не нужен.
+Если в продакшн действительно нужно отправить то, что на тесте не было
+(например, правка только в документации): `./scripts/product-push.sh --force`.
+
+**Почему у публичного APK отдельный профиль.** `eas.json` → профиль `public`:
+APK, канал `production`. Профиль `preview` — личный тестовый. Если оба слушают
+один канал, тестовая правка приходит всем, а публикация «для всех» не приходит
+никому. `scripts/release.mjs` собирает релизный APK профилем `public`.
+
+**Переход со старой сборки.** APK, выпущенные до появления профиля `public`,
+собраны с каналом `preview`: они получают тестовые обновления, но не
+публичные. Первый APK из нового релиза встаёт на `production` — с него и
+дальше всё как в таблице.
+
+Чего OTA не умеет: менять нативную часть (новый модуль, разрешение, иконку,
+`versionCode`). Для этого нужен новый APK — см. выше. Проект EAS, `projectId` и
+каналы уже прописаны в `app.json`/`eas.json`, повторный `eas update:configure`
+не нужен.
+
+**Откат.** Идентификатор группы печатают оба скрипта после отправки
+(`[ota] отправлено за 34 с · группа 8f21c0…`). Вернуть предыдущую группу:
+
+```sh
+npx eas-cli update:list --channel production      # найти группу до плохой
+npx eas-cli update:republish --group <id группы> -p android -m "откат"
+```
+
+`--group` и `--channel` вместе не принимаются: группа сама помнит, в какую
+ветку её вернуть.
 
 ## Установка сеттинга в собранное приложение
 

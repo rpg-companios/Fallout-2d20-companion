@@ -580,7 +580,10 @@ const releaseEngine = async ({ args, repository }) => {
   const tag = engineReleaseTag(version);
   const title = `Positronium ${version}`;
   const body = renderReleaseBody(notes);
-  const profile = args.aab ? 'production' : 'preview';
+  // APK для людей собирается профилем `public`: он слушает канал production.
+  // Профиль `preview` остаётся личным тестовым — иначе OTA «для теста» и OTA
+  // «для всех» приходят на одни и те же телефоны.
+  const profile = args.aab ? 'production' : 'public';
   const assetName = args.aab ? ENGINE_AAB_ASSET : ENGINE_APK_ASSET;
 
   console.log(`[release] движок ${repository} · ${tag} · ${assetName} · профиль ${profile}`);
