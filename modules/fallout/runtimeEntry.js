@@ -49,6 +49,13 @@ export default function createFalloutRuntime(engineApi) {
     },
     // Экраны 1–7 — слоты движка. Здесь Fallout говорит только, что он в них
     // кладёт: маршрут, порядок и рамку вкладок даёт движок.
+    //
+    // Два контракта в одной записи — намеренно. `slot`/`titleKey` читает
+    // движок 1.0.1 со слотами; `route`/`labelKey` — сборки до него (APK
+    // engine-v1.0.1 строит вкладки по `screen.route`). Без второй пары такой
+    // APK получил бы `name={undefined}` и вкладки бы не появились: пакет
+    // поставился, а экранов нет. Новый движок `route` игнорирует — он выдаёт
+    // свой маршрут сам.
     screens: [
       {
         slot: 'screen:1',
@@ -57,6 +64,8 @@ export default function createFalloutRuntime(engineApi) {
         icon: 'person',
         component: CharacterScreen,
         titleKey: 'tabs.character',
+        route: 'CharacterTab',
+        labelKey: 'tabs.character',
       },
       {
         slot: 'screen:2',
@@ -65,6 +74,8 @@ export default function createFalloutRuntime(engineApi) {
         icon: 'shield',
         component: EquipmentScreen,
         titleKey: 'tabs.equipment',
+        route: 'EquipmentTab',
+        labelKey: 'tabs.equipment',
       },
       {
         slot: 'screen:3',
@@ -73,6 +84,8 @@ export default function createFalloutRuntime(engineApi) {
         icon: 'briefcase',
         component: InventoryScreen,
         titleKey: 'tabs.inventory',
+        route: 'InventoryTab',
+        labelKey: 'tabs.inventory',
       },
       {
         slot: 'screen:4',
@@ -80,6 +93,8 @@ export default function createFalloutRuntime(engineApi) {
         icon: 'star',
         component: PerksAndTraitsScreen,
         titleKey: 'tabs.perks',
+        route: 'PerksTab',
+        labelKey: 'tabs.perks',
       },
     ],
     // Оформление вкладок. Цвета именно те, что были зашиты в App.js:

@@ -46,6 +46,35 @@ describe('экраны Fallout в слотах движка', () => {
     ]);
   });
 
+  // Вкладки в APK engine-v1.0.1 строятся по `screen.route` и `screen.labelKey`.
+  // Летом контракт сменился на слоты, и пакет, отдающий только новую форму,
+  // ставился на старый APK без экранов: `name={undefined}`. Обе формы должны
+  // быть в одной записи — это и есть «старые сборки не ломаются».
+  it('отдаёт и старый маршрут, и новую пару слот/titleKey', async () => {
+    const runtime = await activate();
+    const byId = Object.fromEntries(runtime.screens.map((screen) => [screen.id, screen]));
+    expect(byId.character).toMatchObject({
+      slot: 'screen:1',
+      titleKey: 'tabs.character',
+      route: 'CharacterTab',
+      labelKey: 'tabs.character',
+    });
+    expect(byId.equipment).toMatchObject({ route: 'EquipmentTab', labelKey: 'tabs.equipment' });
+    expect(byId.inventory).toMatchObject({ route: 'InventoryTab', labelKey: 'tabs.inventory' });
+    expect(byId.perks).toMatchObject({ route: 'PerksTab', labelKey: 'tabs.perks' });
+  });
+
+  it('старый разбор вкладок получает осмысленные маршруты', async () => {
+    const runtime = await activate();
+    // Ровно то, что делает App.js из APK 1.0.1: имя вкладки — screen.route,
+    // подпись — screen.labelKey. Ни одно не должно быть undefined.
+    for (const screen of runtime.screens) {
+      expect(typeof screen.route).toBe('string');
+      expect(screen.route.length).toBeGreaterThan(0);
+      expect(typeof screen.labelKey).toBe('string');
+    }
+  });
+
   it('объявляет роли, которые ищет движок', async () => {
     const runtime = await activate();
     const screens = normalizeSettingScreens(runtime.screens);
