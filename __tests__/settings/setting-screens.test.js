@@ -214,3 +214,35 @@ describe('нижняя панель вкладок', () => {
     expect(shouldScrollSettingTabBar(12)).toBe(true);
   });
 });
+
+describe('пакет из прошлого релиза (до слотов) продолжает работать', () => {
+  // Так выглядел runtime Fallout 1.0.1, который уже стоит у людей:
+  // свой route, labelKey, без slot, без theme. Активация не должна ломаться —
+  // иначе обновление движка ломает установленный сеттинг.
+  const legacy = [
+    { id: 'character', route: 'CharacterTab', icon: 'person', component, labelKey: 'tabs.character' },
+    { id: 'equipment', route: 'EquipmentTab', icon: 'shield', component, labelKey: 'tabs.equipment' },
+    { id: 'inventory', route: 'InventoryTab', icon: 'briefcase', component, labelKey: 'tabs.inventory' },
+    { id: 'perks', route: 'PerksTab', icon: 'star', component, labelKey: 'tabs.perks' },
+  ];
+
+  it('слоты и маршруты выдаёт движок, а не пакет', () => {
+    const screens = normalizeSettingScreens(legacy);
+    expect(screens.map((entry) => entry.slot)).toEqual([
+      'screen:1', 'screen:2', 'screen:3', 'screen:4',
+    ]);
+    expect(screens.map((entry) => entry.route)).toEqual([
+      'SettingScreen1', 'SettingScreen2', 'SettingScreen3', 'SettingScreen4',
+    ]);
+    // Маршрут старого пакета игнорируется: в App.js таких экранов больше нет.
+    expect(screens.map((entry) => entry.id)).toEqual(['character', 'equipment', 'inventory', 'perks']);
+  });
+
+  it('labelKey читается как заголовок', () => {
+    expect(normalizeSettingScreens(legacy)[0].titleKey).toBe('tabs.character');
+  });
+
+  it('без theme движок берёт свою палитру', () => {
+    expect(normalizeSettingTheme(undefined).tabBar.active).toBe('#f0e68c');
+  });
+});

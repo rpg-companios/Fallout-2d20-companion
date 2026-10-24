@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readHostModuleIds } from './lib/host-modules.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const COMPAT_MODULE = path.join(ROOT, 'src/engine/settings/settingCompatibility.js');
@@ -59,15 +60,11 @@ const loadCompatibility = async () => {
 /**
  * Host-модули, которые эта сборка отдаёт пакетам.
  *
- * Карта лежит в `settingRuntimeHost.js` и собирается из настоящих импортов
- * приложения, поэтому её нельзя импортировать в Node (потянет React Native).
- * Читаем ключи из исходника — и падаем громко, если формат изменится:
- * молча пропустить проверку хуже, чем отказаться её делать.
+ * Разбор — в scripts/lib/host-modules.mjs (общий с тестами): импортировать
+ * `settingRuntimeHost.js` в Node нельзя, он тянет React Native.
  */
-const readHostModuleIds = () => {
-  const source = fs.readFileSync(HOST_MODULES_FILE, 'utf8');
-  const ids = new Set();
-  for (const match of source.matchAll(/^\s*'([^']+)':\s*hostModule\(/gm)) ids.add(match[1]);
+const engineHostModuleIds = () => {
+  const ids = new Set(readHostModuleIds(HOST_MODULES_FILE));
   if (ids.size === 0) {
     fail(`не удалось прочитать host-модули из ${path.relative(ROOT, HOST_MODULES_FILE)} `
       + '(изменился формат карты; проверка не выполнена)');
@@ -92,7 +89,7 @@ const readManifest = async (archivePath) => {
 
 const compatibility = await loadCompatibility();
 const { manifest, rootFolder } = await readManifest(file);
-const hostModuleIds = readHostModuleIds();
+const hostModuleIds = engineHostModuleIds();
 
 const problems = [
   ...compatibility.checkSettingCompatibility({ manifest, hostModuleIds }),

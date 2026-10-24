@@ -10,12 +10,12 @@ import {
   compareEngineVersions,
 } from '../../src/engine/settings/settingCompatibility.js';
 import { ENGINE_VERSION } from '../../src/engine/version.js';
+import { readHostModuleIds } from '../../scripts/lib/host-modules.mjs';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const WALLET = path.join(ROOT, 'modules/fallout');
 const MANIFEST = JSON.parse(readFileSync(path.join(WALLET, 'manifest.json'), 'utf8'));
 const HOST_FILE = path.join(ROOT, 'src/engine/settings/settingRuntimeHost.js');
-const HOST_SOURCE = readFileSync(HOST_FILE, 'utf8');
 
 const walk = (directory, files = []) => {
   for (const entry of readdirSync(directory)) {
@@ -62,10 +62,9 @@ describe('setting contract does not drift from the code', () => {
   });
 
   it('names only host modules that exist in the engine host map', () => {
-    const missing = MANIFEST.hostModules.filter((id) => (
-      id.startsWith('engine:') && !HOST_SOURCE.includes(`'${id}':`)
-    ));
-    expect(missing).toEqual([]);
+    const available = new Set(readHostModuleIds(HOST_FILE));
+    expect(available.size).toBeGreaterThan(0);
+    expect(MANIFEST.hostModules.filter((id) => !available.has(id))).toEqual([]);
   });
 });
 

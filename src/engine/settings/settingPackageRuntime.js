@@ -32,7 +32,12 @@ const parseCacheKey = (cacheKey) => {
   return { settingId, digest };
 };
 
-const runtimeError = (message) => new Error(`[setting-runtime] ${message}`);
+// Причина сохраняется в `cause`: в сообщении для человека она лишняя, а при
+// разборе «почему пакет не активировался» без неё не видно места в бандле.
+const runtimeError = (message, cause) => new Error(
+  `[setting-runtime] ${message}`,
+  cause === undefined ? undefined : { cause },
+);
 
 export const SUPPORTED_SETTING_RUNTIME_API_VERSION = 1;
 
@@ -155,7 +160,7 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
   } catch (error) {
     dispose();
     const detail = error instanceof Error ? error.message : String(error);
-    throw runtimeError(`could not evaluate runtime entry ${descriptor.entry}: ${detail}`);
+    throw runtimeError(`could not evaluate runtime entry ${descriptor.entry}: ${detail}`, error);
   }
 
   const factory = typeof module.exports === 'function'
@@ -172,7 +177,7 @@ const executeSettingBundle = async ({ manifest, cacheKey, readBytes }, engineApi
   } catch (error) {
     dispose();
     const detail = error instanceof Error ? error.message : String(error);
-    throw runtimeError(`setting factory failed for "${manifest.id}": ${detail}`);
+    throw runtimeError(`setting factory failed for "${manifest.id}": ${detail}`, error);
   }
   if (!settingRuntime || typeof settingRuntime !== 'object' || Array.isArray(settingRuntime)) {
     dispose();

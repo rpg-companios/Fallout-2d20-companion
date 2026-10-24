@@ -61,9 +61,29 @@ vi.mock('react-native', () => {
     createAnimatedComponent: (Wrapped) => Wrapped,
   };
 
+  // Жесты, состояние приложения и клавиатура — не компоненты, а объекты с
+  // методами. Через Proxy они превратились бы в компонент и упали бы на
+  // «PanResponder.create is not a function» при рендере экрана.
+  const PanResponder = {
+    create: () => ({ panHandlers: {} }),
+  };
+  const AppState = {
+    currentState: 'active',
+    addEventListener: () => ({ remove: () => {} }),
+    removeEventListener: () => {},
+  };
+  const Keyboard = {
+    dismiss: () => {},
+    addListener: () => ({ remove: () => {} }),
+    removeListener: () => {},
+  };
+
   const overrides = {
     __esModule: true,
     Platform,
+    PanResponder,
+    AppState,
+    Keyboard,
     StyleSheet,
     Dimensions,
     Appearance,
