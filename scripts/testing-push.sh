@@ -23,4 +23,13 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-exec node "$ROOT/scripts/ota-push.mjs" --channel preview "$@"
+# Канал — не флаг вызова, а смысл файла: testing-push всегда preview.
+for arg in "$@"; do
+  if [ "$arg" = "--channel" ] || [ "${arg#--channel=}" != "$arg" ]; then
+    echo "[ota] канал выбирает скрипт: testing-push.sh → preview." >&2
+    echo "[ota] Всем — ./scripts/product-push.sh" >&2
+    exit 2
+  fi
+done
+
+exec node "$ROOT/scripts/ota-push.mjs" "$@" --channel preview
