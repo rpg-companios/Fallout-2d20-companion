@@ -146,6 +146,32 @@ describe('продакшн только после теста', () => {
     expect(codesOf(result)).toEqual(['other-runtime-version']);
   });
 
+  it('другое окружение EAS — отказ: переменные сборки разные', () => {
+    const state = stateOf({ 'App.js': 'h1' });
+    const tested = recordOf(state, { environment: 'production' });
+    const result = compareTestedWithCurrent({
+      tested,
+      current: { ...state, runtimeVersion: '1.0.1', environment: 'preview' },
+    });
+    expect(codesOf(result)).toEqual(['other-environment']);
+  });
+
+  it('окружение записывается в отпечаток теста', () => {
+    const record = recordOf(stateOf({}), { environment: 'preview' });
+    expect(record.environment).toBe('preview');
+    expect(recordOf(stateOf({})).environment).toBeNull();
+  });
+
+  it('старая запись без окружения не мешает публикации', () => {
+    const state = stateOf({ 'App.js': 'h1' });
+    const tested = recordOf(state);
+    const result = compareTestedWithCurrent({
+      tested,
+      current: { ...state, runtimeVersion: '1.0.1', environment: 'production' },
+    });
+    expect(result.ok).toBe(true);
+  });
+
   it('другая платформа — отказ', () => {
     const state = stateOf({});
     const tested = recordOf(state, { platform: 'android' });

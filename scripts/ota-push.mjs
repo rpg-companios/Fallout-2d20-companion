@@ -32,6 +32,7 @@ import {
   TESTED_STATE_FILE,
   writeTestedRecord,
 } from './lib/ota-guard.mjs';
+import { buildUpdateArgs, profileForChannel, resolveEnvironment } from './lib/ota-plan.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,6 +50,8 @@ const usage = () => [
   'Флаги:',
   '  --message "..."     текст обновления (по умолчанию — версия и коммит)',
   '  --platform P        android (по умолчанию) | ios | all',
+  '  --environment E     окружение EAS для переменных сборки',
+  '                      (по умолчанию — как у профиля APK: production)',
   '  --dry-run           показать план и проверки, ничего не отправлять',
   '  --force             product: отправить даже если код изменился после теста',
   '  --skip-export       не собирать бандл перед отправкой (быстрее, но слепо)',
@@ -57,7 +60,15 @@ const usage = () => [
   'профиль public/production → канал production.',
 ].join('\n');
 
-const args = { channel: null, message: null, platform: 'android', dryRun: false, force: false, skipExport: false };
+const args = {
+  channel: null,
+  message: null,
+  platform: 'android',
+  environment: null,
+  dryRun: false,
+  force: false,
+  skipExport: false,
+};
 const argv = process.argv.slice(2);
 for (let index = 0; index < argv.length; index += 1) {
   const arg = argv[index];
@@ -73,6 +84,7 @@ for (let index = 0; index < argv.length; index += 1) {
     case '--channel': args.channel = value(); break;
     case '--message': args.message = value(); break;
     case '--platform': args.platform = value(); break;
+    case '--environment': args.environment = value(); break;
     case '--dry-run': args.dryRun = true; break;
     case '--force': args.force = true; break;
     case '--skip-export': args.skipExport = true; break;
@@ -98,6 +110,9 @@ if (!['android', 'ios', 'all'].includes(args.platform)) {
 }
 
 const channel = CHANNELS[args.channel];
+if (args.environment !== null && !/^[A-Za-z0-9_-]{1,64}$/.test(args.environment)) {
+  fail(`--environment: ожидается имя окружения EAS (production, preview, development), получено "${args.environment}"`);
+}
 
 // maxBuffer по умолчанию 1 МБ мало: `git diff --binary` по этому репозиторию
 // легко даёт несколько мегабайт, и Node падал бы с ENOBUFS на ровном месте.
@@ -140,6 +155,16 @@ if (!app.extra?.eas?.projectId) {
   fail('в app.json нет extra.eas.projectId: проект EAS не привязан');
 }
 
+// Окружение EAS: с SDK 55 `eas update --non-interactive` без него не работает,
+// а не то окружение — это другие переменные сборки в бандле.
+const easConfig = readJson('eas.json');
+const environment = resolveEnvironment({
+  easConfig,
+  channel: args.channel,
+  override: args.environment,
+});
+const environmentProfile = profileForChannel(easConfig, args.channel);
+
 // --- состояние исходников --------------------------------------------------
 
 const shortCommit = git(['rev-parse', '--short', 'HEAD']).trim();
@@ -156,6 +181,8 @@ const dirtyCount = state.files.length;
 console.log(`[ota] канал:     ${args.channel} (${channel.title})`);
 console.log(`[ota] версия:    ${version} · runtime ${runtimeVersion}`);
 console.log(`[ota] платформа: ${args.platform}`);
+console.log(`[ota] окружение: ${environment} (EAS → переменные сборки`
+  + `${environmentProfile ? `, профиль ${environmentProfile.name}` : ''})`);
 console.log(`[ota] коммит:    ${shortCommit}${dirtyCount > 0 ? ` · незакоммиченных правок: ${dirtyCount}` : ' · дерево чистое'}`);
 
 // --- проверка «это то, что тестировали» ------------------------------------
@@ -164,7 +191,7 @@ if (args.channel === 'production') {
   const tested = readTestedRecord(ROOT);
   const comparison = compareTestedWithCurrent({
     tested,
-    current: { ...state, runtimeVersion },
+    current: { ...state, runtimeVersion, environment },
     platform: args.platform,
   });
 
@@ -197,6 +224,10 @@ if (args.channel === 'production') {
             console.error(`[ota]   версия приложения изменилась: тестировали под ${problem.params.tested}, `
               + `сейчас ${problem.params.current}. OTA на старые APK не доедет — нужен новый APK `
               + '(npm run release) и тест уже на нём.');
+            break;
+          case 'other-environment':
+            console.error(`[ota]   окружение EAS: тестировали с ${problem.params.tested}, `
+              + `публикуем с ${problem.params.current} — переменные сборки разные.`);
             break;
           case 'other-platform':
             console.error(`[ota]   платформа: тестировали ${problem.params.tested}, публикуем ${problem.params.current}.`);
@@ -262,12 +293,12 @@ const message = args.message
   ?? `OTA ${version} @ ${shortCommit}${dirtyCount > 0 ? ` (+${dirtyCount} правок)` : ''}`;
 const easArgs = [
   'eas-cli',
-  'update',
-  '--channel', args.channel,
-  '--platform', args.platform,
-  '--message', message,
-  '--non-interactive',
-  '--json',
+  ...buildUpdateArgs({
+    channel: args.channel,
+    platform: args.platform,
+    message,
+    environment,
+  }),
 ];
 
 if (args.dryRun) {
@@ -302,6 +333,7 @@ if (args.channel === 'preview') {
     version,
     runtimeVersion,
     platform: args.platform,
+    environment,
     message,
     updateId,
   }));

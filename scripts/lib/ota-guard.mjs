@@ -81,7 +81,9 @@ export const sourceFingerprint = (state) => {
 };
 
 /** Запись о тестовой публикации — то, что кладётся в файл. */
-export const buildTestedRecord = ({ channel, state, version, runtimeVersion, platform, message, updateId, at }) => ({
+export const buildTestedRecord = ({
+  channel, state, version, runtimeVersion, platform, environment, message, updateId, at,
+}) => ({
   version: TESTED_STATE_VERSION,
   channel,
   commit: state.commit,
@@ -93,6 +95,9 @@ export const buildTestedRecord = ({ channel, state, version, runtimeVersion, pla
   appVersion: String(version),
   runtimeVersion: String(runtimeVersion),
   platform,
+  // Окружение EAS задаёт переменные сборки: то же самое окружение, что было
+  // на тесте, обязано быть и в продакшне, иначе бандл отличается.
+  environment: environment ?? null,
   message: String(message ?? ''),
   updateId: updateId ?? null,
   at: at ?? new Date().toISOString(),
@@ -129,7 +134,7 @@ export const changedPathsSinceTest = (tested, current) => {
  *
  * @returns {{ok: boolean, problems: Array<{code: string, params: object}>}}
  *   Коды: нет записи о тесте, другой коммит, другие правки, другая версия
- *   приложения (OTA не доедет), другая платформа.
+ *   приложения (OTA не доедет), другое окружение EAS, другая платформа.
  */
 export const compareTestedWithCurrent = ({ tested, current, platform } = {}) => {
   if (!tested || typeof tested !== 'object' || typeof tested.fingerprint !== 'string') {
@@ -155,6 +160,13 @@ export const compareTestedWithCurrent = ({ tested, current, platform } = {}) => 
     problems.push({
       code: 'other-runtime-version',
       params: { tested: String(tested.runtimeVersion), current: String(current.runtimeVersion) },
+    });
+  }
+
+  if (tested.environment && current.environment && tested.environment !== current.environment) {
+    problems.push({
+      code: 'other-environment',
+      params: { tested: String(tested.environment), current: String(current.environment) },
     });
   }
 
