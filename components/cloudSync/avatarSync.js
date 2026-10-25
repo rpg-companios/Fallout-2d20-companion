@@ -160,7 +160,7 @@ export async function syncAvatars({
       characterId: row.character_id ?? row.characterId,
       md5: row.md5 ?? null,
       updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0),
-      mimeType: row.mime_type ?? row.mimeType ?? 'image/jpeg',
+      mimeType: row.mime_type || row.mimeType || 'image/jpeg',
     })),
     remote: remoteFiles.map((file) => ({
       fileId: file.id ?? file.fileId,
@@ -199,7 +199,7 @@ export async function syncAvatars({
       fileId: fileId ?? null,
       characterId,
       dataUrl: row.data_url ?? row.dataUrl,
-      mimeType: mimeType || row.mime_type ?? row.mimeType ?? 'image/jpeg',
+      mimeType: mimeType || row.mime_type || row.mimeType || 'image/jpeg',
     });
     if (uploaded?.md5Checksum) {
       await cacheOps.updateMd5(characterId, uploaded.md5Checksum);
