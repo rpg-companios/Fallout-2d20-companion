@@ -30,7 +30,6 @@ vi.mock('../../components/alerts/alertService', () => ({
 vi.mock('../../domain/characterAvatar', () => ({
   AVATAR_LIMITS: {
     maxBytes: 5 * 1024 * 1024,
-    maxDimension: 2000,
   },
   validateAvatarDataUrl: vi.fn((dataUrl) => {
     if (!dataUrl || typeof dataUrl !== 'string') {
@@ -129,71 +128,6 @@ describe('useCharacterImage hook', () => {
       // Arrange
       const mockAsset = {
         fileSize: 6 * 1024 * 1024, // 6MB > 5MB limit
-        base64: 'data:image/jpeg;base64,SGVsbG8=',
-        mimeType: 'image/jpeg',
-        uri: 'file:///test.jpg',
-      };
-
-      ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'granted' });
-      ImagePicker.launchImageLibraryAsync.mockResolvedValue({
-        canceled: false,
-        assets: [mockAsset],
-      });
-
-      const { result } = renderHook(() => useCharacterImage());
-      const initialVersion = result.current.imageVersion;
-
-      // Act
-      await act(async () => {
-        await result.current.pickAndSaveCharacterImage('test-char-1');
-      });
-
-      // Assert
-      expect(result.current.imageVersion).toBe(initialVersion);
-      expect(showRawAlert).toHaveBeenCalled();
-      expect(avatarCache.setAvatarCache).not.toHaveBeenCalled();
-    });
-
-    it('imageVersion does NOT increase when image dimensions are too large', async () => {
-      // Arrange
-      const mockAsset = {
-        fileSize: 1024,
-        width: 2500,  // > 2000px limit
-        height: 1500,
-        base64: 'data:image/jpeg;base64,SGVsbG8=',
-        mimeType: 'image/jpeg',
-        uri: 'file:///test.jpg',
-      };
-
-      ImagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ status: 'granted' });
-      ImagePicker.launchImageLibraryAsync.mockResolvedValue({
-        canceled: false,
-        assets: [mockAsset],
-      });
-
-      const { result } = renderHook(() => useCharacterImage());
-      const initialVersion = result.current.imageVersion;
-
-      // Act
-      await act(async () => {
-        await result.current.pickAndSaveCharacterImage('test-char-1');
-      });
-
-      // Assert
-      expect(result.current.imageVersion).toBe(initialVersion);
-      expect(showRawAlert).toHaveBeenCalledWith({
-        title: 'Предупреждение',
-        message: expect.stringContaining('Размер изображения слишком большой'),
-      });
-      expect(avatarCache.setAvatarCache).not.toHaveBeenCalled();
-    });
-
-    it('imageVersion does NOT increase when image height is too large', async () => {
-      // Arrange
-      const mockAsset = {
-        fileSize: 1024,
-        width: 1000,
-        height: 2500,  // > 2000px limit
         base64: 'data:image/jpeg;base64,SGVsbG8=',
         mimeType: 'image/jpeg',
         uri: 'file:///test.jpg',

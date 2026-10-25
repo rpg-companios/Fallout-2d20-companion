@@ -100,20 +100,6 @@ export function useCharacterImage() {
         return { success: false, error: 'Image too large' };
       }
 
-      // Проверяем размеры изображения (ширина и высота)
-      // Если есть width/height, проверяем, что ни одна сторона не превышает maxDimension
-      if ((asset.width && asset.width > AVATAR_LIMITS.maxDimension) || 
-          (asset.height && asset.height > AVATAR_LIMITS.maxDimension)) {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: image dimensions too large');
-        const width = asset.width || 0;
-        const height = asset.height || 0;
-        showRawAlert({
-          title: 'Предупреждение',
-          message: `Размер изображения слишком большой (${width}×${height}px). Максимальный размер стороны: ${AVATAR_LIMITS.maxDimension}px.`
-        });
-        return { success: false, error: 'Image dimensions too large' };
-      }
-
       console.log('[useCharacterImage] pickAndSaveCharacterImage: processing image');
       setIsLoading(true);
 
