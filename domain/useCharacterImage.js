@@ -95,9 +95,23 @@ export function useCharacterImage() {
         console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
         showRawAlert({
           title: 'Предупреждение',
-          message: `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
+          message: `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимальный размер: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
         });
         return { success: false, error: 'Image too large' };
+      }
+
+      // Проверяем размеры изображения (ширина и высота)
+      // Если есть width/height, проверяем, что ни одна сторона не превышает maxDimension
+      if ((asset.width && asset.width > AVATAR_LIMITS.maxDimension) || 
+          (asset.height && asset.height > AVATAR_LIMITS.maxDimension)) {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: image dimensions too large');
+        const width = asset.width || 0;
+        const height = asset.height || 0;
+        showRawAlert({
+          title: 'Предупреждение',
+          message: `Размер изображения слишком большой (${width}×${height}px). Максимальный размер стороны: ${AVATAR_LIMITS.maxDimension}px.`
+        });
+        return { success: false, error: 'Image dimensions too large' };
       }
 
       console.log('[useCharacterImage] pickAndSaveCharacterImage: processing image');

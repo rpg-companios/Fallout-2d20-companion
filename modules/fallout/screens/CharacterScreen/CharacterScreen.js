@@ -97,7 +97,7 @@ const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl, 
       <ImageBackground
         source={imageSource}
         style={styles.image}
-        resizeMode="cover"
+        resizeMode="contain"
       >
         {/* Иконка редактирования в правом нижнем углу */}
         {onEditPress && (
