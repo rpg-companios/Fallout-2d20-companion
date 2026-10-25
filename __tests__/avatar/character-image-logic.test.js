@@ -150,13 +150,17 @@ describe('characterAvatar: логика работы с изображениям
       expect(AVATAR_LIMITS.maxBytes).toBe(5 * 1024 * 1024);
     });
 
+    it('maxDimension равен 2000px', () => {
+      expect(AVATAR_LIMITS.maxDimension).toBe(2000);
+    });
+
     it('не имеет ограничений на форматы', () => {
       // Проверяем, что нет allowedMimeTypes
       expect(AVATAR_LIMITS.allowedMimeTypes).toBeUndefined();
     });
 
-    it('не имеет ограничений на размер стороны', () => {
-      // Проверяем, что нет maxEdge
+    it('не имеет ограничений на размер стороны (maxEdge)', () => {
+      // Проверяем, что нет maxEdge (старое ограничение для сжатия)
       expect(AVATAR_LIMITS.maxEdge).toBeUndefined();
     });
   });
