@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,14 @@ import {
   StatusBar,
   Modal,
   TextInput,
+  Image,
+  ActivityIndicator,
 } from "react-native";
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 // Шаг 8б (патч 242): сохранение — модуль сейвов (без React).
 import { saveCharacter } from "../../../../src/saves/characterSaves";
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
+import { useCharacterImage } from '../../../../domain/useCharacterImage';
 import useCharacterStore from "../../../../src/store/characterStore";
 import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
@@ -66,15 +70,56 @@ import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
-const ImageSection = ({ origin }) => {
+const ImageSection = ({ origin, characterId, onEditPress }) => {
   const defaultImage = require("../../../../assets/bg1.png");
+  const { getCharacterImageUrl } = useCharacterImage();
+  const [customImageUrl, setCustomImageUrl] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Загружаем кастомную картинку при монтировании
+  useEffect(() => {
+    if (characterId) {
+      setIsLoading(true);
+      getCharacterImageUrl(characterId)
+        .then((url) => {
+          setCustomImageUrl(url);
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+    }
+  }, [characterId, getCharacterImageUrl]);
+
+  const imageSource = customImageUrl
+    ? { uri: customImageUrl }
+    : origin?.image || defaultImage;
+
   return (
     <View style={styles.imageSection}>
       <ImageBackground
-        source={origin ? origin.image : defaultImage}
+        source={imageSource}
         style={styles.image}
         resizeMode="cover"
-      />
+      >
+        {/* Иконка редактирования в правом нижнем углу */}
+        {onEditPress && (
+          <TouchableOpacity
+            style={styles.editImageButton}
+            onPress={onEditPress}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons
+              name="image-edit"
+              size={24}
+              color="rgba(255, 255, 255, 0.7)"
+            />
+          </TouchableOpacity>
+        )}
+        {isLoading && (
+          <View style={styles.imageLoadingOverlay}>
+            <ActivityIndicator size="small" color="#fff" />
+          </View>
+        )}
+      </ImageBackground>
     </View>
   );
 };
@@ -259,6 +304,18 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 };
 
 export default function CharacterScreen() {
+  // Хук для работы с кастомными изображениями
+  const { pickAndSaveCharacterImage } = useCharacterImage();
+  const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
+
+  // Обработчик нажатия на иконку редактирования изображения
+  const handleEditImagePress = useCallback(async () => {
+    // Показываем подтверждение
+    const confirmed = await confirmAlert('changeCharacterImage');
+    if (confirmed) {
+      await pickAndSaveCharacterImage();
+    }
+  }, [pickAndSaveCharacterImage]);
 
   // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
   const isSaved = useCharacterStore((s) => s.isSaved);
@@ -1273,7 +1330,11 @@ export default function CharacterScreen() {
                 />
               </View>
 
-              <ImageSection origin={origin} />
+              <ImageSection 
+                origin={origin} 
+                characterId={currentCharacterId}
+                onEditPress={handleEditImagePress}
+              />
             </View>
 
             <View style={styles.rightColumn}>

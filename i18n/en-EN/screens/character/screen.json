@@ -66,7 +66,10 @@
     "selectOriginFirst": "Select origin first",
     "selectOriginError": "Select origin",
     "noEquipmentForOrigin": "No equipment kits for this origin.",
-    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset inventory, skills and skill rewards. Attributes are kept. Continue?"
+    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset inventory, skills and skill rewards. Attributes are kept. Continue?",
+    "changeCharacterImageConfirm": "Do you want to change the character image?",
+    "avatarTransparencyLoss": "The image has transparency. JPEG format will remove the transparent background. Continue?",
+    "avatarNotSynced": "The image is saved locally but not synced to Google Drive. It may be lost if you delete the app."
   },
   "alerts": {
     "errorTitle": "Error",
@@ -90,7 +93,8 @@
     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
     "maxSkillRank": "Error: maximum skill rank is {maxRank}",
     "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it.",
-    "saveFailed": "Could not save the character. Please try again."
+    "saveFailed": "Could not save the character. Please try again.",
+    "avatarTooLarge": "Image is too large. Maximum size is 300 KB."
   },
   "modals": {
     "origin": {

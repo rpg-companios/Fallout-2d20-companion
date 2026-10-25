@@ -55,6 +55,7 @@ import useAppSettingsStore, {
   selectCharacterFoldersEnabled,
   selectPwaInstallDiagnosticsEnabled,
 } from '../../../src/store/appSettingsStore';
+import * as avatarCache from '../../../db/avatarCache';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -85,6 +86,16 @@ const CharacterCell = ({
   onDragEnd,
 }) => {
   const originImage = getOriginImage(character.originName);
+  const [customImageUrl, setCustomImageUrl] = useState(null);
+
+  // Загружаем кастомную картинку при монтировании
+  useEffect(() => {
+    if (character?.id) {
+      avatarCache.getAvatarCache(character.id).then((cached) => {
+        setCustomImageUrl(cached?.data_url || cached?.dataUrl || null);
+      });
+    }
+  }, [character?.id]);
   const actionButtonRef = useRef(null);
   const [actionMenuPosition, setActionMenuPosition] = useState(null);
 
@@ -150,7 +161,17 @@ const CharacterCell = ({
   return (
     <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
-      <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
+      <View style={styles.characterImageContainer}>
+        {customImageUrl ? (
+          <Image source={{ uri: customImageUrl }} style={styles.characterImage} resizeMode="cover" />
+        ) : originImage ? (
+          <Image source={originImage} style={styles.characterImage} resizeMode="cover" />
+        ) : (
+          <View style={styles.characterImagePlaceholder}>
+            <Text style={styles.characterImagePlaceholderText}>?</Text>
+          </View>
+        )}
+      </View>
       {deleteActionPlacement === 'card' && (
         <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
           <Text style={styles.deleteIcon}>🗑</Text>

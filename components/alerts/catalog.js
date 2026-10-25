@@ -210,6 +210,34 @@ export const ALERTS = {
     confirmKey: 'buttons.continue',
     destructive: true,
   },
+  changeCharacterImage: {
+    scope: 'character',
+    kind: 'confirm',
+    titleKey: 'warnings.attentionTitle',
+    messageKey: 'warnings.changeCharacterImageConfirm',
+    confirmKey: 'buttons.yes',
+    destructive: false,
+  },
+  avatarTransparencyLoss: {
+    scope: 'character',
+    kind: 'confirm',
+    titleKey: 'warnings.attentionTitle',
+    messageKey: 'warnings.avatarTransparencyLoss',
+    confirmKey: 'buttons.continue',
+    destructive: false,
+  },
+  avatarTooLarge: {
+    scope: 'character',
+    kind: 'info',
+    titleKey: 'alerts.errorTitle',
+    messageKey: 'errors.avatarTooLarge',
+  },
+  avatarNotSynced: {
+    scope: 'character',
+    kind: 'info',
+    titleKey: 'warnings.attentionTitle',
+    messageKey: 'warnings.avatarNotSynced',
+  },
 
   // --- Настройки ------------------------------------------------------------
 
