@@ -97,12 +97,35 @@ export function useCharacterImage() {
       console.log('[useCharacterImage] pickAndSaveCharacterImage: compressing image');
       setIsLoading(true);
 
-      // Сжимаем изображение
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: asset.type:', asset.type, 'asset.uri:', asset.uri?.substring(0, 50));
-      const mimeType = asset.type || 
-        (asset.uri?.match(/\.([^.]+)$/)?.[1] ? 
-          `image/${asset.uri.match(/\.([^.]+)$/)[1].toLowerCase()}` : 
-          (asset.base64 ? 'image/png' : 'image/jpeg'));
+      // Определяем MIME-тип: пробуем asset.mimeType, затем asset.type, затем расширение URI
+      // В web-сборке expo-image-picker asset.type может быть просто "image"
+      let mimeType = asset.mimeType || asset.type;
+      
+      // Если mimeType это просто "image", пробуем определить из URI или base64
+      if (mimeType === 'image' || !mimeType) {
+        if (asset.uri && asset.uri.startsWith('blob:')) {
+          // В web blob URI не содержит расширения, пробуем определить по base64
+          if (asset.base64) {
+            const base64Header = asset.base64.substring(0, 100);
+            if (base64Header.includes('image/png')) {
+              mimeType = 'image/png';
+            } else if (base64Header.includes('image/jpeg') || base64Header.includes('image/jpg')) {
+              mimeType = 'image/jpeg';
+            } else if (base64Header.includes('image/gif')) {
+              mimeType = 'image/gif';
+            } else {
+              mimeType = 'image/jpeg'; // по умолчанию
+            }
+          } else {
+            mimeType = 'image/jpeg'; // по умолчанию для blob без base64
+          }
+        } else if (asset.uri?.match(/\.([^.]+)$/)?.[1]) {
+          mimeType = `image/${asset.uri.match(/\.([^.]+)$/)[1].toLowerCase()}`;
+        } else {
+          mimeType = 'image/jpeg';
+        }
+      }
+      
       console.log('[useCharacterImage] pickAndSaveCharacterImage: detected mimeType:', mimeType);
       
       const compressed = await compressAvatarImage({
