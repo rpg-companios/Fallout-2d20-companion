@@ -335,9 +335,9 @@ export default function CharacterScreen() {
   const handleEditImagePress = useCallback(async () => {
     console.log('[CharacterScreen] handleEditImagePress: start');
     // Показываем модалку с выбором действия
-    console.log('[CharacterScreen] handleEditImagePress: calling showAlert');
-    const action = await showAlert('changeCharacterImage');
-    console.log('[CharacterScreen] handleEditImagePress: showAlert returned:', action);
+    console.log('[CharacterScreen] handleEditImagePress: calling showCatalogAlert');
+    const action = await showCatalogAlert('changeCharacterImage');
+    console.log('[CharacterScreen] handleEditImagePress: showCatalogAlert returned:', action);
     
     if (action === 'change') {
       console.log('[CharacterScreen] handleEditImagePress: calling pickAndSaveCharacterImage with ID:', currentCharacterId);
