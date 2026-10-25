@@ -42,17 +42,23 @@ export function useCharacterImage() {
    * @returns {Promise<{success: boolean, dataUrl?: string, error?: string}>}
    */
   const pickAndSaveCharacterImage = useCallback(async (characterId) => {
+    console.log('[useCharacterImage] pickAndSaveCharacterImage: start, characterId:', characterId);
     if (!characterId) {
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: no characterId');
       return { success: false, error: 'No character ID provided' };
     }
 
     try {
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: requesting permissions');
       // Запрашиваем разрешение на доступ к галерее
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: permission status:', status);
       if (status !== 'granted') {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: permission denied');
         return { success: false, error: 'Permission to access gallery is required' };
       }
 
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: launching image picker');
       // Открываем пикер изображений
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -61,20 +67,26 @@ export function useCharacterImage() {
         quality: 1,
         base64: true,
       });
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: picker result:', result.canceled ? 'canceled' : 'success');
 
       if (result.canceled) {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: user canceled selection');
         return { success: false, error: 'Image selection canceled' };
       }
 
       const { assets } = result;
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: assets count:', assets?.length || 0);
       if (!assets || assets.length === 0) {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: no assets');
         return { success: false, error: 'No image selected' };
       }
 
       const asset = assets[0];
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: asset size:', asset.fileSize);
       
       // Проверяем размер файла до сжатия
       if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes * 1.5) {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
         Alert.alert(
           'Предупреждение',
           `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
@@ -82,6 +94,7 @@ export function useCharacterImage() {
         return { success: false, error: 'Image too large' };
       }
 
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: compressing image');
       setIsLoading(true);
 
       // Сжимаем изображение
@@ -92,8 +105,10 @@ export function useCharacterImage() {
         height: asset.height,
         mimeType: asset.type || `image/${asset.uri.split('.').pop()}`,
       });
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: compressed, size:', compressed.bytes);
 
       // Сохраняем в кэш
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: saving to cache');
       await avatarCache.saveAvatarCache(characterId, {
         data_url: compressed.dataUrl,
         mime_type: compressed.mimeType,
@@ -102,10 +117,11 @@ export function useCharacterImage() {
       });
 
       setIsLoading(false);
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: success');
       return { success: true, dataUrl: compressed.dataUrl };
     } catch (error) {
       setIsLoading(false);
-      console.error('Failed to pick and save character image:', error);
+      console.error('[useCharacterImage] pickAndSaveCharacterImage: error:', error);
       
       let errorMessage = 'Failed to save image';
       if (error.code === 'avatar.tooLarge') {

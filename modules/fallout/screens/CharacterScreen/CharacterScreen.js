@@ -309,10 +309,17 @@ export default function CharacterScreen() {
 
   // Обработчик нажатия на иконку редактирования изображения
   const handleEditImagePress = useCallback(async () => {
+    console.log('[CharacterScreen] handleEditImagePress: start');
     // Показываем подтверждение
+    console.log('[CharacterScreen] handleEditImagePress: calling confirmAlert');
     const confirmed = await confirmAlert('changeCharacterImage');
+    console.log('[CharacterScreen] handleEditImagePress: confirmAlert returned:', confirmed);
     if (confirmed) {
+      console.log('[CharacterScreen] handleEditImagePress: calling pickAndSaveCharacterImage with ID:', currentCharacterId);
       await pickAndSaveCharacterImage(currentCharacterId);
+      console.log('[CharacterScreen] handleEditImagePress: pickAndSaveCharacterImage completed');
+    } else {
+      console.log('[CharacterScreen] handleEditImagePress: user cancelled');
     }
   }, [pickAndSaveCharacterImage, currentCharacterId]);
 
