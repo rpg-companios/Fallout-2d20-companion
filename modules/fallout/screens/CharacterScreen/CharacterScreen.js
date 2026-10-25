@@ -78,15 +78,25 @@ const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl, 
 
   // Загружаем кастомную картинку при монтировании или изменении версии
   useEffect(() => {
+    let isMounted = true;
+
     if (characterId && getCharacterImageUrl) {
       setIsLoading(true);
       getCharacterImageUrl(characterId)
         .then((url) => {
-          setCustomImageUrl(url);
+          if (isMounted) {
+            setCustomImageUrl(url);
+          }
         })
         .catch(console.error)
-        .finally(() => setIsLoading(false));
+        .finally(() => {
+          if (isMounted) {
+            setIsLoading(false);
+          }
+        });
     }
+
+    return () => { isMounted = false; };
   }, [characterId, getCharacterImageUrl, imageVersion]);
 
   const imageSource = customImageUrl
