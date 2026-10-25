@@ -98,12 +98,19 @@ export function useCharacterImage() {
       setIsLoading(true);
 
       // Сжимаем изображение
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: asset.type:', asset.type, 'asset.uri:', asset.uri?.substring(0, 50));
+      const mimeType = asset.type || 
+        (asset.uri?.match(/\.([^.]+)$/)?.[1] ? 
+          `image/${asset.uri.match(/\.([^.]+)$/)[1].toLowerCase()}` : 
+          (asset.base64 ? 'image/png' : 'image/jpeg'));
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: detected mimeType:', mimeType);
+      
       const compressed = await compressAvatarImage({
         uri: asset.uri,
         base64: asset.base64,
         width: asset.width,
         height: asset.height,
-        mimeType: asset.type || `image/${asset.uri.split('.').pop()}`,
+        mimeType: mimeType,
       });
       console.log('[useCharacterImage] pickAndSaveCharacterImage: compressed, size:', compressed.bytes);
 
