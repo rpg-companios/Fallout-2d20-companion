@@ -212,11 +212,14 @@ export const ALERTS = {
   },
   changeCharacterImage: {
     scope: 'character',
-    kind: 'confirm',
+    kind: 'choice',
     titleKey: 'warnings.attentionTitle',
     messageKey: 'warnings.changeCharacterImageConfirm',
-    confirmKey: 'buttons.yes',
-    destructive: false,
+    buttons: [
+      { key: 'change', labelKey: 'buttons.changeImage', value: 'change' },
+      { key: 'reset', labelKey: 'buttons.resetToDefault', value: 'reset' },
+      { key: 'cancel', labelKey: 'buttons.cancel', value: null, style: 'cancel' },
+    ],
   },
   avatarTransparencyLoss: {
     scope: 'character',

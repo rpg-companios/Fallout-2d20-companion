@@ -177,6 +177,7 @@ export function useCharacterImage() {
     pickAndSaveCharacterImage,
     isLoading,
     imageVersion,
+    refreshImage,
   };
 }
 

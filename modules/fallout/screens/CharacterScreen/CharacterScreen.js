@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { saveCharacter } from "../../../../src/saves/characterSaves";
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
 import { useCharacterImage } from '../../../../domain/useCharacterImage';
+import * as avatarCache from '../../../../db/avatarCache';
 import useCharacterStore from "../../../../src/store/characterStore";
 import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
 import { selectActiveTimedEffects } from "../../../../src/store/selectors";
@@ -304,24 +305,52 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 
 export default function CharacterScreen() {
   // Хук для работы с кастомными изображениями
-  const { pickAndSaveCharacterImage, getCharacterImageUrl, imageVersion } = useCharacterImage();
+  const { pickAndSaveCharacterImage, getCharacterImageUrl, imageVersion, refreshImage } = useCharacterImage();
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
+
+  // Функция для удаления кастомного изображения
+  const handleResetImage = useCallback(async () => {
+    console.log('[CharacterScreen] handleResetImage: start, characterId:', currentCharacterId);
+    if (!currentCharacterId) {
+      console.log('[CharacterScreen] handleResetImage: no characterId');
+      return;
+    }
+
+    try {
+      console.log('[CharacterScreen] handleResetImage: deleting from cache');
+      await avatarCache.deleteAvatarCache(currentCharacterId);
+      
+      // Обновляем версию изображения, чтобы ImageSection перезагрузился
+      // и показал стандартное изображение
+      refreshImage();
+      
+      console.log('[CharacterScreen] handleResetImage: success');
+    } catch (error) {
+      console.error('[CharacterScreen] handleResetImage: error:', error);
+      showRawAlert({ title: 'Ошибка', message: 'Не удалось удалить изображение' });
+    }
+  }, [currentCharacterId, refreshImage]);
 
   // Обработчик нажатия на иконку редактирования изображения
   const handleEditImagePress = useCallback(async () => {
     console.log('[CharacterScreen] handleEditImagePress: start');
-    // Показываем подтверждение
-    console.log('[CharacterScreen] handleEditImagePress: calling confirmAlert');
-    const confirmed = await confirmAlert('changeCharacterImage');
-    console.log('[CharacterScreen] handleEditImagePress: confirmAlert returned:', confirmed);
-    if (confirmed) {
+    // Показываем модалку с выбором действия
+    console.log('[CharacterScreen] handleEditImagePress: calling showAlert');
+    const action = await showAlert('changeCharacterImage');
+    console.log('[CharacterScreen] handleEditImagePress: showAlert returned:', action);
+    
+    if (action === 'change') {
       console.log('[CharacterScreen] handleEditImagePress: calling pickAndSaveCharacterImage with ID:', currentCharacterId);
       await pickAndSaveCharacterImage(currentCharacterId);
       console.log('[CharacterScreen] handleEditImagePress: pickAndSaveCharacterImage completed');
+    } else if (action === 'reset') {
+      console.log('[CharacterScreen] handleEditImagePress: resetting to default image');
+      await handleResetImage();
+      console.log('[CharacterScreen] handleEditImagePress: reset completed');
     } else {
       console.log('[CharacterScreen] handleEditImagePress: user cancelled');
     }
-  }, [pickAndSaveCharacterImage, currentCharacterId]);
+  }, [pickAndSaveCharacterImage, currentCharacterId, handleResetImage]);
 
   // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
   const isSaved = useCharacterStore((s) => s.isSaved);
