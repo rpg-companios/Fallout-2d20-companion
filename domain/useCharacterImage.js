@@ -85,10 +85,10 @@ export function useCharacterImage() {
       // Проверяем размер файла
       if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes) {
         console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
-        showRawAlert(
-          'Предупреждение',
-          `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
-        );
+        showRawAlert({
+          title: 'Предупреждение',
+          message: `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
+        });
         return { success: false, error: 'Image too large' };
       }
 
@@ -130,7 +130,7 @@ export function useCharacterImage() {
         if (validation.reason === 'avatar.tooLarge') {
           errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
         }
-        showRawAlert('Ошибка', errorMessage);
+        showRawAlert({ title: 'Ошибка', message: errorMessage });
         setIsLoading(false);
         return { success: false, error: errorMessage };
       }
@@ -156,12 +156,12 @@ export function useCharacterImage() {
       setIsLoading(false);
       console.error('[useCharacterImage] pickAndSaveCharacterImage: error:', error);
       
-      let errorMessage = 'Failed to save image';
+      let errorMessage = 'Не удалось сохранить изображение';
       if (error.message) {
         errorMessage = error.message;
       }
       
-      showRawAlert('Ошибка', errorMessage);
+      showRawAlert({ title: 'Ошибка', message: errorMessage });
       return { success: false, error: errorMessage };
     }
   }, []);
