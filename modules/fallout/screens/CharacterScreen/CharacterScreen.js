@@ -312,9 +312,9 @@ export default function CharacterScreen() {
     // Показываем подтверждение
     const confirmed = await confirmAlert('changeCharacterImage');
     if (confirmed) {
-      await pickAndSaveCharacterImage();
+      await pickAndSaveCharacterImage(currentCharacterId);
     }
-  }, [pickAndSaveCharacterImage]);
+  }, [pickAndSaveCharacterImage, currentCharacterId]);
 
   // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
   const isSaved = useCharacterStore((s) => s.isSaved);
