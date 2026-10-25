@@ -11,10 +11,18 @@ import { showRawAlert } from '../components/alerts/alertService';
 
 /**
  * Хук для работы с кастомными изображениями персонажей.
- * Обеспечивает выбор, сжатие, валидацию и сохранение изображений.
+ * Обеспечивает выбор, валидацию и сохранение изображений.
  */
 export function useCharacterImage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [imageVersion, setImageVersion] = useState(0);
+
+  /**
+   * Обновляет версию изображения для принудительного перерисовки
+   */
+  const refreshImage = useCallback(() => {
+    setImageVersion(prev => prev + 1);
+  }, []);
 
   /**
    * Получает URL кастомного изображения персонажа из кэша.
@@ -144,6 +152,9 @@ export function useCharacterImage() {
       console.log('[useCharacterImage] pickAndSaveCharacterImage: saving to cache');
       await avatarCache.setAvatarCache(characterId, dataUrl, null, mimeType);
 
+      // Обновляем версию изображения для принудительного перерисовки
+      refreshImage();
+
       setIsLoading(false);
       console.log('[useCharacterImage] pickAndSaveCharacterImage: success');
       return { success: true, dataUrl };
@@ -165,6 +176,7 @@ export function useCharacterImage() {
     getCharacterImageUrl,
     pickAndSaveCharacterImage,
     isLoading,
+    imageVersion,
   };
 }
 

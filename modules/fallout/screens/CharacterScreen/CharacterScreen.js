@@ -70,12 +70,12 @@ import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
 const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
-const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl }) => {
+const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl, imageVersion }) => {
   const defaultImage = require("../../../../assets/bg1.png");
   const [customImageUrl, setCustomImageUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Загружаем кастомную картинку при монтировании
+  // Загружаем кастомную картинку при монтировании или изменении версии
   useEffect(() => {
     if (characterId && getCharacterImageUrl) {
       setIsLoading(true);
@@ -86,7 +86,7 @@ const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl }
         .catch(console.error)
         .finally(() => setIsLoading(false));
     }
-  }, [characterId, getCharacterImageUrl]);
+  }, [characterId, getCharacterImageUrl, imageVersion]);
 
   const imageSource = customImageUrl
     ? { uri: customImageUrl }
@@ -304,7 +304,7 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
 
 export default function CharacterScreen() {
   // Хук для работы с кастомными изображениями
-  const { pickAndSaveCharacterImage, getCharacterImageUrl } = useCharacterImage();
+  const { pickAndSaveCharacterImage, getCharacterImageUrl, imageVersion } = useCharacterImage();
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
 
   // Обработчик нажатия на иконку редактирования изображения
@@ -1341,6 +1341,7 @@ export default function CharacterScreen() {
                 characterId={currentCharacterId}
                 onEditPress={handleEditImagePress}
                 getCharacterImageUrl={getCharacterImageUrl}
+                imageVersion={imageVersion}
               />
             </View>
 
