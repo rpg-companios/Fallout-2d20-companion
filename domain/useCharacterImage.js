@@ -142,12 +142,7 @@ export function useCharacterImage() {
 
       // Сохраняем в кэш как есть
       console.log('[useCharacterImage] pickAndSaveCharacterImage: saving to cache');
-      await avatarCache.saveAvatarCache(characterId, {
-        data_url: dataUrl,
-        mime_type: mimeType,
-        md5: '',
-        updated_at: Date.now(),
-      });
+      await avatarCache.setAvatarCache(characterId, dataUrl, null, mimeType);
 
       setIsLoading(false);
       console.log('[useCharacterImage] pickAndSaveCharacterImage: success');
