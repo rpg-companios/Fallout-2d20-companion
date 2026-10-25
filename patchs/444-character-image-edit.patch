@@ -1,0 +1,1103 @@
+diff --git a/components/alerts/catalog.js b/components/alerts/catalog.js
+index b4989ca..a97a64f 100644
+--- a/components/alerts/catalog.js
++++ b/components/alerts/catalog.js
+@@ -210,6 +210,34 @@ export const ALERTS = {
+     confirmKey: 'buttons.continue',
+     destructive: true,
+   },
++  changeCharacterImage: {
++    scope: 'character',
++    kind: 'confirm',
++    titleKey: 'warnings.attentionTitle',
++    messageKey: 'warnings.changeCharacterImageConfirm',
++    confirmKey: 'buttons.yes',
++    destructive: false,
++  },
++  avatarTransparencyLoss: {
++    scope: 'character',
++    kind: 'confirm',
++    titleKey: 'warnings.attentionTitle',
++    messageKey: 'warnings.avatarTransparencyLoss',
++    confirmKey: 'buttons.continue',
++    destructive: false,
++  },
++  avatarTooLarge: {
++    scope: 'character',
++    kind: 'info',
++    titleKey: 'alerts.errorTitle',
++    messageKey: 'errors.avatarTooLarge',
++  },
++  avatarNotSynced: {
++    scope: 'character',
++    kind: 'info',
++    titleKey: 'warnings.attentionTitle',
++    messageKey: 'warnings.avatarNotSynced',
++  },
+ 
+   // --- Настройки ------------------------------------------------------------
+ 
+diff --git a/components/cloudSync/avatarSync.js b/components/cloudSync/avatarSync.js
+index a796d85..e495f81 100644
+--- a/components/cloudSync/avatarSync.js
++++ b/components/cloudSync/avatarSync.js
+@@ -7,23 +7,43 @@
+ // Google Drive») — и в будущем при первой загрузке персонажа на устройстве.
+ // Автосейв персонажа аватар не трогает.
+ //
+-// Размещение: appDataFolder/<сеттинг>/avatars/<characterId>.jpg — имя по
+-// стабильному id, переименование персонажа аватар не трогает.
++// Размещение: appDataFolder/<сеттинг>/avatars/<characterId>.<ext> — имя по
++// стабильному id, расширение соответствует формату (jpg, png, gif).
+ //
+ // Архитектура: planAvatarSync — чистая функция (протокол, легко тестировать),
+ // syncAvatars — оркестратор с инъекцией зависимостей (Drive-операции поставляет
+ // googleDriveSync.js, кэш — db/avatarCache.js). Цикл импортов исключён.
+ 
++import { getFileExtension } from '../../domain/characterAvatar';
++
+ /** Имя подпапки аватаров внутри папки сеттинга. */
+ export const AVATARS_FOLDER_NAME = 'avatars';
+ 
+-/** Имя файла аватара в Drive: <characterId>.jpg. */
+-export const avatarFileName = (characterId) => `${characterId}.jpg`;
++/** Имя файла аватара в Drive: <characterId>.<ext>. */
++export const avatarFileName = (characterId, mimeType = 'image/jpeg') => {
++  const ext = getFileExtension(mimeType);
++  return `${characterId}.${ext}`;
++};
+ 
+-/** characterId из имени файла аватара или null. */
+-export const characterIdFromAvatarFileName = (name) => {
+-  const match = String(name || '').match(/^([^\/]+)\.jpg$/i);
+-  return match ? match[1] : null;
++/** characterId и mimeType из имени файла аватара или null. */
++export const parseAvatarFileName = (name) => {
++  const match = String(name || '').match(/^([^.]+)\.([^.]+)$/i);
++  if (!match) return null;
++  
++  const characterId = match[1];
++  const ext = match[2].toLowerCase();
++  
++  // Определяем MIME-тип по расширению
++  let mimeType;
++  switch (ext) {
++    case 'jpg':
++    case 'jpeg': mimeType = 'image/jpeg'; break;
++    case 'png': mimeType = 'image/png'; break;
++    case 'gif': mimeType = 'image/gif'; break;
++    default: mimeType = 'image/jpeg';
++  }
++  
++  return { characterId, mimeType, ext };
+ };
+ 
+ /**
+@@ -45,13 +65,13 @@ export const decideAvatarAction = ({ local, remote }) => {
+  * Составить план синка аватаров (чистая функция, протокол из дизайн-дока).
+  *
+  * @param {object} args
+- * @param {Array<{characterId: string, md5?: string|null, updatedAt?: number}>} args.local — строки кэша
++ * @param {Array<{characterId: string, md5?: string|null, updatedAt?: number, mimeType?: string}>} args.local — строки кэша
+  * @param {Array<{fileId: string, name: string, md5?: string, modifiedTime?: number}>} args.remote — файлы Drive
+  * @param {Iterable<string>} args.existingCharacterIds — id живых персонажей (локальный список)
+  * @returns {{
+  *   noop: Array<{characterId: string}>,
+- *   uploads: Array<{characterId: string}>,
+- *   downloads: Array<{characterId: string, fileId: string}>,
++ *   uploads: Array<{characterId: string, mimeType: string}>,
++ *   downloads: Array<{characterId: string, fileId: string, mimeType: string}>,
+  *   localDeletes: Array<{characterId: string}>,
+  *   remoteDeletes: Array<{characterId: string, fileId: string}>,
+  * }}
+@@ -61,8 +81,8 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
+ 
+   const remoteByCharacterId = new Map();
+   for (const file of remote) {
+-    const characterId = characterIdFromAvatarFileName(file.name);
+-    if (characterId) remoteByCharacterId.set(characterId, file);
++    const parsed = parseAvatarFileName(file.name);
++    if (parsed) remoteByCharacterId.set(parsed.characterId, { ...file, ...parsed });
+   }
+   const localByCharacterId = new Map(local.map((row) => [row.characterId, row]));
+ 
+@@ -91,8 +111,8 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
+       remote: file ? { md5: file.md5 ?? null, modifiedTime: file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0 } : null,
+     });
+     if (action === 'noop') noop.push({ characterId });
+-    else if (action === 'upload') uploads.push({ characterId, fileId: file ? file.fileId : null });
+-    else downloads.push({ characterId, fileId: file.fileId });
++    else if (action === 'upload') uploads.push({ characterId, mimeType: row?.mimeType || row?.mime_type || 'image/jpeg', fileId: file ? file.fileId : null });
++    else downloads.push({ characterId, fileId: file.fileId, mimeType: file?.mimeType || 'image/jpeg' });
+   }
+ 
+   return { noop, uploads, downloads, localDeletes, remoteDeletes };
+@@ -104,7 +124,7 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
+  * @param {object} args
+  * @param {object} args.driveOps — {
+  *   listAvatarFiles(token, folderId),
+- *   uploadAvatarFile({ token, folderId, fileId, characterId, dataUrl }) → { id, md5Checksum },
++ *   uploadAvatarFile({ token, folderId, fileId, characterId, dataUrl, mimeType }) → { id, md5Checksum },
+  *   downloadAvatarFile(token, fileId) → dataUrl (текст),
+  *   deleteAvatarFile(token, fileId),
+  * }
+@@ -140,6 +160,7 @@ export async function syncAvatars({
+       characterId: row.character_id ?? row.characterId,
+       md5: row.md5 ?? null,
+       updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0),
++      mimeType: row.mime_type ?? row.mimeType ?? 'image/jpeg',
+     })),
+     remote: remoteFiles.map((file) => ({
+       fileId: file.id ?? file.fileId,
+@@ -169,7 +190,7 @@ export async function syncAvatars({
+   for (const { fileId } of plan.remoteDeletes) {
+     await driveOps.deleteAvatarFile(token, fileId);
+   }
+-  for (const { characterId, fileId } of plan.uploads) {
++  for (const { characterId, fileId, mimeType } of plan.uploads) {
+     const row = await cacheOps.get(characterId);
+     if (!row?.data_url && !row?.dataUrl) continue;
+     const uploaded = await driveOps.uploadAvatarFile({
+@@ -178,18 +199,19 @@ export async function syncAvatars({
+       fileId: fileId ?? null,
+       characterId,
+       dataUrl: row.data_url ?? row.dataUrl,
++      mimeType: mimeType || row.mime_type ?? row.mimeType ?? 'image/jpeg',
+     });
+     if (uploaded?.md5Checksum) {
+       await cacheOps.updateMd5(characterId, uploaded.md5Checksum);
+     }
+   }
+-  for (const { characterId, fileId } of plan.downloads) {
++  for (const { characterId, fileId, mimeType } of plan.downloads) {
+     const dataUrl = await driveOps.downloadAvatarFile(token, fileId);
+     // Чужой файл мог быть «толстым» или не-аватаром: валидируем до кэша.
+     if (validateDataUrl ? !validateDataUrl(dataUrl).ok : false) continue;
+     const file = remoteFiles.find((f) => (f.id ?? f.fileId) === fileId);
+     const modifiedMs = file?.modifiedTime ? new Date(file.modifiedTime).getTime() : Date.now();
+-    await cacheOps.setFromRemote(characterId, dataUrl, file?.md5Checksum ?? null, modifiedMs);
++    await cacheOps.setFromRemote(characterId, dataUrl, file?.md5Checksum ?? null, modifiedMs, mimeType);
+   }
+ 
+   return {
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index efb473f..ade26b8 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -282,19 +282,25 @@ const listAvatarFiles = async (token, avatarsFolderId) => {
+ };
+ 
+ // Контент файла — data URL текстом (масштабируется теми же лимитами, что и
+-// локальный кэш; multipart как у сейвов, но MIME image/jpeg).
+-const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl }) => {
+-  const metadata = fileId ? null : { name: avatarFileName(characterId), parents: [folderId], mimeType: 'image/jpeg' };
++// локальный кэш; multipart как у сейвов, но MIME может быть image/jpeg, image/png, image/gif).
++const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl, mimeType = 'image/jpeg' }) => {
++  const fileName = avatarFileName(characterId, mimeType);
++  const metadata = fileId ? null : { name: fileName, parents: [folderId], mimeType };
+   const delimiter = '-------fallout2d20avatar';
++  
++  // Извлекаем base64 из data URL
++  const base64Match = dataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
++  const base64Data = base64Match ? base64Match[1] : dataUrl;
++  
+   const multipartBody = [
+     `--${delimiter}`,
+     'Content-Type: application/json; charset=UTF-8',
+     '',
+     JSON.stringify(metadata || {}),
+     `--${delimiter}`,
+-    'Content-Type: image/jpeg',
++    `Content-Type: ${mimeType}`,
+     '',
+-    dataUrl,
++    base64Data,
+     `--${delimiter}--`,
+   ].join('\r\n');
+ 
+@@ -339,6 +345,69 @@ const syncAvatarsInSession = async (token, moduleFolderId) => {
+   });
+ };
+ 
++/**
++ * Загрузить один аватар в Google Drive.
++ * Используется для автосинхронизации при изменении картинки персонажа.
++ */
++export const syncCharacterAvatarToCloud = async (characterId) => {
++  if (!ensureWeb()) {
++    // На нативных платформах облачная синхронизация не поддерживается
++    return;
++  }
++
++  try {
++    const token = await requestAccessToken();
++    const moduleFolderId = await getModuleFolderId(token);
++    const avatarsFolderId = await getAvatarsFolderId(token, moduleFolderId);
++    
++    // Получаем аватар из кэша
++    const avatarRow = await avatarCache.getAvatarCache(characterId);
++    if (!avatarRow?.data_url && !avatarRow?.dataUrl) {
++      debugLog('sync.avatar:notFound', { characterId });
++      return;
++    }
++
++    const dataUrl = avatarRow.data_url || avatarRow.dataUrl;
++    
++    // Проверяем валидность
++    const validation = validateAvatarDataUrl(dataUrl);
++    if (!validation.ok) {
++      debugLog('sync.avatar:invalid', { characterId, reason: validation.reason });
++      return;
++    }
++
++    // Определяем MIME-тип из кэша
++    const mimeType = avatarRow.mime_type || avatarRow.mimeType || 'image/jpeg';
++    
++    // Проверяем, есть ли уже файл в Drive (ищем по characterId с любым расширением)
++    const avatarFiles = await listAvatarFiles(token, avatarsFolderId);
++    const existingFile = avatarFiles.find((f) => {
++      const parsed = parseAvatarFileName(f.name);
++      return parsed?.characterId === characterId;
++    });
++
++    // Загружаем или обновляем
++    const result = await uploadAvatarFile({
++      token,
++      folderId: avatarsFolderId,
++      fileId: existingFile?.id || null,
++      characterId,
++      dataUrl,
++      mimeType,
++    });
++
++    // Обновляем md5 в кэше
++    if (result?.md5Checksum) {
++      await avatarCache.updateAvatarCacheMd5(characterId, result.md5Checksum);
++    }
++
++    debugLog('sync.avatar:uploaded', { characterId, fileId: result?.id });
++  } catch (e) {
++    debugLog('sync.avatar:failed', { characterId, message: e?.message });
++    throw e;
++  }
++};
++
+ export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';
+ 
+ export const setCloudSyncConfigured = async (enabled) => {
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 7196670..9fd8ce1 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -55,6 +55,7 @@ import useAppSettingsStore, {
+   selectCharacterFoldersEnabled,
+   selectPwaInstallDiagnosticsEnabled,
+ } from '../../../src/store/appSettingsStore';
++import * as avatarCache from '../../../db/avatarCache';
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+@@ -85,6 +86,16 @@ const CharacterCell = ({
+   onDragEnd,
+ }) => {
+   const originImage = getOriginImage(character.originName);
++  const [customImageUrl, setCustomImageUrl] = useState(null);
++
++  // Загружаем кастомную картинку при монтировании
++  useEffect(() => {
++    if (character?.id) {
++      avatarCache.getAvatarCache(character.id).then((cached) => {
++        setCustomImageUrl(cached?.data_url || cached?.dataUrl || null);
++      });
++    }
++  }, [character?.id]);
+   const actionButtonRef = useRef(null);
+   const [actionMenuPosition, setActionMenuPosition] = useState(null);
+ 
+@@ -150,7 +161,17 @@ const CharacterCell = ({
+   return (
+     <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
+       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
+-      <View style={styles.characterImageContainer}>{originImage ? <Image source={originImage} style={styles.characterImage} resizeMode="cover" /> : <View style={styles.characterImagePlaceholder}><Text style={styles.characterImagePlaceholderText}>?</Text></View>}</View>
++      <View style={styles.characterImageContainer}>
++        {customImageUrl ? (
++          <Image source={{ uri: customImageUrl }} style={styles.characterImage} resizeMode="cover" />
++        ) : originImage ? (
++          <Image source={originImage} style={styles.characterImage} resizeMode="cover" />
++        ) : (
++          <View style={styles.characterImagePlaceholder}>
++            <Text style={styles.characterImagePlaceholderText}>?</Text>
++          </View>
++        )}
++      </View>
+       {deleteActionPlacement === 'card' && (
+         <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
+           <Text style={styles.deleteIcon}>🗑</Text>
+diff --git a/db/avatarCache.js b/db/avatarCache.js
+index 8014ea2..b508b10 100644
+--- a/db/avatarCache.js
++++ b/db/avatarCache.js
+@@ -11,15 +11,16 @@ import { runQuery, getAll, getFirst } from './Database';
+  * Запись аватара персонажа в локальный кэш (upsert).
+  *
+  * @param {string} characterId
+- * @param {string} dataUrl — JPEG data URL (прошёл validateAvatarDataUrl)
++ * @param {string} dataUrl — JPEG/PNG/GIF data URL (прошёл validateAvatarDataUrl)
+  * @param {string|null} md5 — md5Checksum из Drive (после выгрузки) или null
++ * @param {string} mimeType — MIME-тип изображения (image/jpeg, image/png, image/gif)
+  * @returns {Promise<void>}
+  */
+-export async function setAvatarCache(characterId, dataUrl, md5 = null) {
++export async function setAvatarCache(characterId, dataUrl, md5 = null, mimeType = 'image/jpeg') {
+   if (!characterId || typeof dataUrl !== 'string') return;
+   await runQuery(
+-    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, updated_at) VALUES (?, ?, ?, ?)',
+-    [characterId, dataUrl, md5, Date.now()],
++    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, mime_type, updated_at) VALUES (?, ?, ?, ?, ?)',
++    [characterId, dataUrl, md5, mimeType, Date.now()],
+   );
+ }
+ 
+@@ -30,12 +31,13 @@ export async function setAvatarCache(characterId, dataUrl, md5 = null) {
+  * @param {string} dataUrl
+  * @param {string|null} md5
+  * @param {number} updatedAt — время изменения файла в облаке (ms)
++ * @param {string} mimeType — MIME-тип изображения
+  */
+-export async function setAvatarCacheFromRemote(characterId, dataUrl, md5, updatedAt) {
++export async function setAvatarCacheFromRemote(characterId, dataUrl, md5, updatedAt, mimeType = 'image/jpeg') {
+   if (!characterId || typeof dataUrl !== 'string') return;
+   await runQuery(
+-    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, updated_at) VALUES (?, ?, ?, ?)',
+-    [characterId, dataUrl, md5 ?? null, Number(updatedAt) || Date.now()],
++    'INSERT OR REPLACE INTO character_avatars (character_id, data_url, md5, mime_type, updated_at) VALUES (?, ?, ?, ?, ?)',
++    [characterId, dataUrl, md5 ?? null, mimeType, Number(updatedAt) || Date.now()],
+   );
+ }
+ 
+@@ -50,18 +52,18 @@ export async function updateAvatarCacheMd5(characterId, md5) {
+   );
+ }
+ 
+-/** Строка кэша аватара персонажа или null: { character_id, data_url, md5, updated_at }. */
++/** Строка кэша аватара персонажа или null: { character_id, data_url, md5, mime_type, updated_at }. */
+ export async function getAvatarCache(characterId) {
+   if (!characterId) return null;
+   return getFirst(
+-    'SELECT character_id, data_url, md5, updated_at FROM character_avatars WHERE character_id = ?',
++    'SELECT character_id, data_url, md5, mime_type, updated_at FROM character_avatars WHERE character_id = ?',
+     [characterId],
+   );
+ }
+ 
+ /** Все строки кэша (для полного синка). */
+ export async function listAvatarCache() {
+-  return getAll('SELECT character_id, data_url, md5, updated_at FROM character_avatars');
++  return getAll('SELECT character_id, data_url, md5, mime_type, updated_at FROM character_avatars');
+ }
+ 
+ /** Удалить аватар персонажа из кэша. */
+diff --git a/domain/characterAvatar.js b/domain/characterAvatar.js
+index 0c8e939..791e7ba 100644
+--- a/domain/characterAvatar.js
++++ b/domain/characterAvatar.js
+@@ -2,9 +2,9 @@
+ //
+ // Домен кастомного аватара персонажа (задел премиум-фичи, патч 193; UI нет).
+ // Формат хранения:
+-//   — локально/в облаке: JPEG data URL (~50–150 КБ после сжатия);
+-//   — в сейве персонажа: только метаданные { md5, updatedAt } (~100 байт),
+-//     само фото рядом с сейвом (appDataFolder/<сеттинг>/avatars/<id>.jpg).
++//   — локально/в облаке: JPEG/PNG/GIF data URL (~50–150 КБ после сжатия);
++//   — в сейве персонажа: только метаданные { md5, updatedAt, mimeType } (~100 байт),
++//     само фото рядом с сейвом (appDataFolder/<сеттинг>/avatars/<id>.<ext>).
+ //
+ // Сжатие и лимиты отсюда применяет и UI-пикер (будущий), и синк при загрузке
+ // чужого аватара (защита от «толстого» файла в облаке).
+@@ -13,15 +13,18 @@
+ export const AVATAR_LIMITS = Object.freeze({
+   /** Максимальная сторона в пикселях после сжатия. */
+   maxEdge: 512,
+-  /** Качество JPEG (0..1) при сжатии. */
++  /** Качество для форматов с потерями (JPEG) (0..1) при сжатии. */
+   jpegQuality: 0.7,
++  /** Качество для PNG (0..1), 1 = без потерь. */
++  pngQuality: 1,
+   /** Жёсткий потолок размера data URL (байты base64-декодированные). */
+   maxBytes: 300 * 1024,
+-  /** Допустимый MIME. */
+-  mimeType: 'image/jpeg',
++  /** Допустимые MIME-типы для загрузки и хранения. */
++  allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif'],
+ });
+ 
+-const DATA_URL_RE = /^data:image\/jpeg;base64,([A-Za-z0-9+/=\s]+)$/;
++// Регулярка для проверки data URL (JPEG, PNG, GIF)
++const DATA_URL_RE = /^data:image\/(jpeg|png|gif);base64,([A-Za-z0-9+/=\s]+)$/i;
+ 
+ /** Размер в байтах base64-строки (без atob — работает и в RN, и в web). */
+ export function base64ByteLength(base64) {
+@@ -31,56 +34,91 @@ export function base64ByteLength(base64) {
+ }
+ 
+ /**
+- * Валиден ли data URL как аватар: формат JPEG и в пределах лимита размера.
++ * Валиден ли data URL как аватар: формат JPEG/PNG/GIF и в пределах лимита размера.
+  *
+  * @param {string} dataUrl
+- * @returns {{ ok: boolean, reason: string|null, bytes: number }}
++ * @returns {{ ok: boolean, reason: string|null, bytes: number, mimeType?: string }}
+  */
+ export function validateAvatarDataUrl(dataUrl) {
+   const value = typeof dataUrl === 'string' ? dataUrl.trim() : '';
+   const match = value.match(DATA_URL_RE);
+   if (!match) return { ok: false, reason: 'avatar.invalidFormat', bytes: 0 };
+-  const bytes = base64ByteLength(match[1]);
++  
++  const mimeType = `image/${match[1].toLowerCase()}`;
++  if (!AVATAR_LIMITS.allowedMimeTypes.includes(mimeType)) {
++    return { ok: false, reason: 'avatar.unsupportedFormat', bytes: 0, mimeType };
++  }
++  
++  const bytes = base64ByteLength(match[2]);
+   if (bytes <= 0) return { ok: false, reason: 'avatar.invalidFormat', bytes };
+   if (bytes > AVATAR_LIMITS.maxBytes) return { ok: false, reason: 'avatar.tooLarge', bytes };
+-  return { ok: true, reason: null, bytes };
++  return { ok: true, reason: null, bytes, mimeType };
+ }
+ 
+ /**
+  * Метаданные аватара для сейва персонажа (~100 байт, не фото).
+  *
+- * @param {{ characterId: string, md5?: string|null, updated_at?: number|null }|null} row — запись кэша
+- * @returns {{ md5: string|null, updatedAt: number|null }|null}
++ * @param {{ characterId: string, md5?: string|null, updated_at?: number|null, mime_type?: string|null }|null} row — запись кэша
++ * @returns {{ md5: string|null, updatedAt: number|null, mimeType: string|null }|null}
+  */
+ export function buildAvatarMetadata(row) {
+   if (!row?.characterId) return null;
+   return {
+     md5: row.md5 ?? null,
+     updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0) || null,
++    mimeType: row.mime_type ?? row.mimeType ?? null,
+   };
+ }
+ 
+ /**
+- * Сжать выбранное изображение в JPEG data URL под лимиты.
++ * Определить формат хранения по MIME-типу.
++ *
++ * @param {string} mimeType
++ * @returns {string} - расширение файла
++ */
++export function getFileExtension(mimeType) {
++  switch (mimeType?.toLowerCase()) {
++    case 'image/jpeg': return 'jpg';
++    case 'image/png': return 'png';
++    case 'image/gif': return 'gif';
++    default: return 'jpg';
++  }
++}
++
++/**
++ * Сжать выбранное изображение под лимиты, сохраняя исходный формат.
+  *
+  * Адаптер платформенно-зависим (expo-image-manipulator; зависимость появится
+  * на UI-этапе — поэтому ленивый require) и подменяется в тестах. Источник —
+  * результат expo-image-picker или uri/base64 из другого источника.
+  *
+- * @param {{ uri?: string, base64?: string, width?: number, height?: number }} source
+- * @param {object} [adapter] — { resizeToJpeg({ source, maxEdge, quality }) → { dataUrl } }
+- * @returns {Promise<{ dataUrl: string, bytes: number }>}
++ * @param {{ uri?: string, base64?: string, width?: number, height?: number, mimeType?: string }} source
++ * @param {object} [adapter] — { resize({ source, maxEdge, mimeType }) → { dataUrl, mimeType } }
++ * @returns {Promise<{ dataUrl: string, bytes: number, mimeType: string }>}
+  * @throws {Error} avatar.tooLarge / avatar.invalidFormat / adapter-ошибки
+  */
+ export async function compressAvatarImage(source, adapter = defaultImageAdapter) {
+   if (!source?.uri && !source?.base64) {
+     throw new Error('avatar.invalidSource');
+   }
+-  const { dataUrl } = await adapter.resizeToJpeg({
++  
++  // Определяем целевой MIME-тип (сохраняем исходный формат)
++  const targetMimeType = source.mimeType || 
++    (source.uri?.match(/\.([^.]+)$/)?.[1] ? 
++      `image/${source.uri.match(/\.([^.]+)$/)[1]}` : 
++      'image/jpeg');
++  
++  // Проверяем, что формат поддерживается
++  if (!AVATAR_LIMITS.allowedMimeTypes.includes(targetMimeType)) {
++    throw new Error('avatar.unsupportedFormat');
++  }
++  
++  const { dataUrl, mimeType: resultMimeType } = await adapter.resize({
+     source,
+     maxEdge: AVATAR_LIMITS.maxEdge,
+-    quality: AVATAR_LIMITS.jpegQuality,
++    mimeType: targetMimeType,
+   });
++  
+   const check = validateAvatarDataUrl(dataUrl);
+   if (!check.ok) {
+     const error = new Error(check.reason);
+@@ -88,16 +126,22 @@ export async function compressAvatarImage(source, adapter = defaultImageAdapter)
+     error.bytes = check.bytes;
+     throw error;
+   }
+-  return { dataUrl, bytes: check.bytes };
++  
++  return { 
++    dataUrl, 
++    bytes: check.bytes, 
++    mimeType: resultMimeType || targetMimeType 
++  };
+ }
+ 
+ /**
+  * Платформенный адаптер сжатия. Пакет expo-image-manipulator подключается
+  * лениво: пока UI-этап не добавил зависимость, честная ошибка вместо
+  * падения импорта. В web-сборке манипулятор работает через canvas.
++ * Сохраняет исходный формат изображения (JPEG, PNG, GIF).
+  */
+ export const defaultImageAdapter = {
+-  async resizeToJpeg({ source, maxEdge, quality }) {
++  async resize({ source, maxEdge, mimeType }) {
+     let manipulator;
+     try {
+       // Ленивый require: зависимости в package.json появится на UI-этапе.
+@@ -105,6 +149,7 @@ export const defaultImageAdapter = {
+     } catch {
+       throw new Error('avatar.manipulatorUnavailable');
+     }
++    
+     // Сторону для resize выбираем по большей стороне исходника, чтобы не
+     // искажать пропорции (манипулятор сохраняет аспект, если задана одна ось).
+     const width = Number(source.width) || 0;
+@@ -112,10 +157,35 @@ export const defaultImageAdapter = {
+     const actions = width > 0 && height > 0
+       ? [{ resize: width >= height ? { width: maxEdge } : { height: maxEdge } }]
+       : [{ resize: { width: maxEdge } }];
+-    const result = await manipulator.manipulateAsync(source.uri ?? `data:image/jpeg;base64,${source.base64}`, actions, {
++    
++    // Определяем формат для expo-image-manipulator
++    let format;
++    switch (mimeType?.toLowerCase()) {
++      case 'image/png': format = manipulator.SaveFormat.PNG; break;
++      case 'image/gif': format = manipulator.SaveFormat.GIF; break;
++      case 'image/jpeg':
++      default: format = manipulator.SaveFormat.JPEG; break;
++    }
++    
++    // Качество: для JPEG используем jpegQuality, для PNG/GIF - максимальное
++    const quality = mimeType?.toLowerCase() === 'image/jpeg' 
++      ? AVATAR_LIMITS.jpegQuality 
++      : AVATAR_LIMITS.pngQuality;
++    
++    // Определяем URI для загрузки
++    let uri = source.uri;
++    if (!uri && source.base64) {
++      uri = `data:${mimeType};base64,${source.base64}`;
++    }
++    
++    const result = await manipulator.manipulateAsync(uri, actions, {
+       compress: quality,
+-      format: manipulator.SaveFormat.JPEG,
++      format: format,
+     });
+-    return { dataUrl: `data:image/jpeg;base64,${result.base64}` };
++    
++    return { 
++      dataUrl: `data:${mimeType};base64,${result.base64}`,
++      mimeType 
++    };
+   },
+ };
+diff --git a/domain/useCharacterImage.js b/domain/useCharacterImage.js
+new file mode 100644
+index 0000000..31053f3
+--- /dev/null
++++ b/domain/useCharacterImage.js
+@@ -0,0 +1,131 @@
++// domain/useCharacterImage.js
++// Хук для выбора и управления кастомными изображениями персонажей
++
++import { useCallback, useState } from 'react';
++import * as ImagePicker from 'expo-image-picker';
++import { Alert } from 'react-native';
++
++import * as avatarCache from '../db/avatarCache';
++import { compressAvatarImage, AVATAR_LIMITS } from './characterAvatar';
++import { showRawAlert } from '../components/alerts/alertService';
++
++/**
++ * Хук для работы с кастомными изображениями персонажей.
++ * Обеспечивает выбор, сжатие, валидацию и сохранение изображений.
++ */
++export function useCharacterImage() {
++  const [isLoading, setIsLoading] = useState(false);
++
++  /**
++   * Получает URL кастомного изображения персонажа из кэша.
++   * @param {string} characterId - ID персонажа
++   * @returns {Promise<string|null>} - data URL изображения или null
++   */
++  const getCharacterImageUrl = useCallback(async (characterId) => {
++    if (!characterId) return null;
++    
++    try {
++      const cached = await avatarCache.getAvatarCache(characterId);
++      if (cached?.data_url || cached?.dataUrl) {
++        return cached.data_url || cached.dataUrl;
++      }
++      return null;
++    } catch (error) {
++      console.error('Failed to get character image URL:', error);
++      return null;
++    }
++  }, []);
++
++  /**
++   * Выбирает изображение из галереи и сохраняет его для персонажа.
++   * @param {string} characterId - ID персонажа
++   * @returns {Promise<{success: boolean, dataUrl?: string, error?: string}>}
++   */
++  const pickAndSaveCharacterImage = useCallback(async (characterId) => {
++    if (!characterId) {
++      return { success: false, error: 'No character ID provided' };
++    }
++
++    try {
++      // Запрашиваем разрешение на доступ к галерее
++      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
++      if (status !== 'granted') {
++        return { success: false, error: 'Permission to access gallery is required' };
++      }
++
++      // Открываем пикер изображений
++      const result = await ImagePicker.launchImageLibraryAsync({
++        mediaTypes: ImagePicker.MediaTypeOptions.Images,
++        allowsEditing: true,
++        aspect: [1, 1],
++        quality: 1,
++        base64: true,
++      });
++
++      if (result.canceled) {
++        return { success: false, error: 'Image selection canceled' };
++      }
++
++      const { assets } = result;
++      if (!assets || assets.length === 0) {
++        return { success: false, error: 'No image selected' };
++      }
++
++      const asset = assets[0];
++      
++      // Проверяем размер файла до сжатия
++      if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes * 1.5) {
++        Alert.alert(
++          'Предупреждение',
++          `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
++        );
++        return { success: false, error: 'Image too large' };
++      }
++
++      setIsLoading(true);
++
++      // Сжимаем изображение
++      const compressed = await compressAvatarImage({
++        uri: asset.uri,
++        base64: asset.base64,
++        width: asset.width,
++        height: asset.height,
++        mimeType: asset.type || `image/${asset.uri.split('.').pop()}`,
++      });
++
++      // Сохраняем в кэш
++      await avatarCache.saveAvatarCache(characterId, {
++        data_url: compressed.dataUrl,
++        mime_type: compressed.mimeType,
++        md5: '',
++        updated_at: Date.now(),
++      });
++
++      setIsLoading(false);
++      return { success: true, dataUrl: compressed.dataUrl };
++    } catch (error) {
++      setIsLoading(false);
++      console.error('Failed to pick and save character image:', error);
++      
++      let errorMessage = 'Failed to save image';
++      if (error.code === 'avatar.tooLarge') {
++        errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
++      } else if (error.code === 'avatar.unsupportedFormat') {
++        errorMessage = `Неподдерживаемый формат. Разрешены: ${AVATAR_LIMITS.allowedMimeTypes.join(', ')}`;
++      } else if (error.message) {
++        errorMessage = error.message;
++      }
++      
++      showRawAlert('Ошибка', errorMessage);
++      return { success: false, error: errorMessage };
++    }
++  }, []);
++
++  return {
++    getCharacterImageUrl,
++    pickAndSaveCharacterImage,
++    isLoading,
++  };
++}
++
++export default useCharacterImage;
+diff --git a/i18n/en-EN/screens/character/screen.json b/i18n/en-EN/screens/character/screen.json
+index bf698e0..2e72d51 100644
+--- a/i18n/en-EN/screens/character/screen.json
++++ b/i18n/en-EN/screens/character/screen.json
+@@ -66,7 +66,10 @@
+     "selectOriginFirst": "Select origin first",
+     "selectOriginError": "Select origin",
+     "noEquipmentForOrigin": "No equipment kits for this origin.",
+-    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset inventory, skills and skill rewards. Attributes are kept. Continue?"
++    "equipmentResetOnWeb": "Attention! Choosing a new equipment kit will reset inventory, skills and skill rewards. Attributes are kept. Continue?",
++    "changeCharacterImageConfirm": "Do you want to change the character image?",
++    "avatarTransparencyLoss": "The image has transparency. JPEG format will remove the transparent background. Continue?",
++    "avatarNotSynced": "The image is saved locally but not synced to Google Drive. It may be lost if you delete the app."
+   },
+   "alerts": {
+     "errorTitle": "Error",
+@@ -90,7 +93,8 @@
+     "exactExtraSkillsRequired": "You must select {required} extra trait skills. Selected: {selected}.",
+     "maxSkillRank": "Error: maximum skill rank is {maxRank}",
+     "cannotTagBannedSkill": "This skill cannot be tagged (trait restriction). You may still invest points into it.",
+-    "saveFailed": "Could not save the character. Please try again."
++    "saveFailed": "Could not save the character. Please try again.",
++    "avatarTooLarge": "Image is too large. Maximum size is 300 KB."
+   },
+   "modals": {
+     "origin": {
+diff --git a/i18n/ru-RU/screens/character/screen.json b/i18n/ru-RU/screens/character/screen.json
+index a69f76c..4583f51 100644
+--- a/i18n/ru-RU/screens/character/screen.json
++++ b/i18n/ru-RU/screens/character/screen.json
+@@ -66,7 +66,10 @@
+     "selectOriginFirst": "Сначала выберите происхождение",
+     "selectOriginError": "Выберите происхождение",
+     "noEquipmentForOrigin": "Для данного происхождения нет комплектов снаряжения.",
+-    "equipmentResetOnWeb": "Внимание! Выбор нового комплекта сбросит инвентарь, навыки и награды за навыки. Атрибуты сохранятся. Продолжить?"
++    "equipmentResetOnWeb": "Внимание! Выбор нового комплекта сбросит инвентарь, навыки и награды за навыки. Атрибуты сохранятся. Продолжить?",
++    "changeCharacterImageConfirm": "Вы хотите изменить изображение персонажа?",
++    "avatarTransparencyLoss": "Изображение имеет прозрачный фон. Формат JPEG удалит прозрачность. Продолжить?",
++    "avatarNotSynced": "Изображение сохранено локально, но не синхронизировано с Google Drive. Оно может быть утеряно при удалении приложения."
+   },
+   "alerts": {
+     "errorTitle": "Ошибка",
+@@ -90,7 +93,8 @@
+     "exactExtraSkillsRequired": "Необходимо выбрать {required} дополнительных навыка от черты. Выбрано: {selected}.",
+     "maxSkillRank": "Ошибка: Максимальный ранг навыков - {maxRank}",
+     "cannotTagBannedSkill": "Этот навык нельзя отметить (ограничение черты). Очки вкладывать можно.",
+-    "saveFailed": "Не удалось сохранить персонажа. Попробуйте ещё раз."
++    "saveFailed": "Не удалось сохранить персонажа. Попробуйте ещё раз.",
++    "avatarTooLarge": "Изображение слишком большое. Максимальный размер - 300 КБ."
+   },
+   "modals": {
+     "origin": {
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index ac96d6c..3670f9d 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect, useMemo } from "react";
++import React, { useState, useEffect, useMemo, useCallback } from "react";
+ import {
+   View,
+   Text,
+@@ -10,10 +10,14 @@ import {
+   StatusBar,
+   Modal,
+   TextInput,
++  Image,
++  ActivityIndicator,
+ } from "react-native";
++import { MaterialCommunityIcons } from '@expo/vector-icons';
+ // Шаг 8б (патч 242): сохранение — модуль сейвов (без React).
+ import { saveCharacter } from "../../../../src/saves/characterSaves";
+ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from "../../../../components/alerts/alertService";
++import { useCharacterImage } from '../../../../domain/useCharacterImage';
+ import useCharacterStore from "../../../../src/store/characterStore";
+ import { selectLegacyAttributes, selectLegacySkills } from "../../../../src/store/selectors";
+ import { selectActiveTimedEffects } from "../../../../src/store/selectors";
+@@ -66,15 +70,56 @@ import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+-const ImageSection = ({ origin }) => {
++const ImageSection = ({ origin, characterId, onEditPress }) => {
+   const defaultImage = require("../../../../assets/bg1.png");
++  const { getCharacterImageUrl } = useCharacterImage();
++  const [customImageUrl, setCustomImageUrl] = useState(null);
++  const [isLoading, setIsLoading] = useState(false);
++
++  // Загружаем кастомную картинку при монтировании
++  useEffect(() => {
++    if (characterId) {
++      setIsLoading(true);
++      getCharacterImageUrl(characterId)
++        .then((url) => {
++          setCustomImageUrl(url);
++        })
++        .catch(console.error)
++        .finally(() => setIsLoading(false));
++    }
++  }, [characterId, getCharacterImageUrl]);
++
++  const imageSource = customImageUrl
++    ? { uri: customImageUrl }
++    : origin?.image || defaultImage;
++
+   return (
+     <View style={styles.imageSection}>
+       <ImageBackground
+-        source={origin ? origin.image : defaultImage}
++        source={imageSource}
+         style={styles.image}
+         resizeMode="cover"
+-      />
++      >
++        {/* Иконка редактирования в правом нижнем углу */}
++        {onEditPress && (
++          <TouchableOpacity
++            style={styles.editImageButton}
++            onPress={onEditPress}
++            activeOpacity={0.7}
++          >
++            <MaterialCommunityIcons
++              name="image-edit"
++              size={24}
++              color="rgba(255, 255, 255, 0.7)"
++            />
++          </TouchableOpacity>
++        )}
++        {isLoading && (
++          <View style={styles.imageLoadingOverlay}>
++            <ActivityIndicator size="small" color="#fff" />
++          </View>
++        )}
++      </ImageBackground>
+     </View>
+   );
+ };
+@@ -259,6 +304,18 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
+ };
+ 
+ export default function CharacterScreen() {
++  // Хук для работы с кастомными изображениями
++  const { pickAndSaveCharacterImage } = useCharacterImage();
++  const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
++
++  // Обработчик нажатия на иконку редактирования изображения
++  const handleEditImagePress = useCallback(async () => {
++    // Показываем подтверждение
++    const confirmed = await confirmAlert('changeCharacterImage');
++    if (confirmed) {
++      await pickAndSaveCharacterImage();
++    }
++  }, [pickAndSaveCharacterImage]);
+ 
+   // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
+   const isSaved = useCharacterStore((s) => s.isSaved);
+@@ -1273,7 +1330,11 @@ export default function CharacterScreen() {
+                 />
+               </View>
+ 
+-              <ImageSection origin={origin} />
++              <ImageSection 
++                origin={origin} 
++                characterId={currentCharacterId}
++                onEditPress={handleEditImagePress}
++              />
+             </View>
+ 
+             <View style={styles.rightColumn}>
+diff --git a/modules/fallout/styles/CharacterScreen.styles.js b/modules/fallout/styles/CharacterScreen.styles.js
+index 8cc922e..5d728ae 100644
+--- a/modules/fallout/styles/CharacterScreen.styles.js
++++ b/modules/fallout/styles/CharacterScreen.styles.js
+@@ -186,6 +186,28 @@ const styles = StyleSheet.create({
+     backgroundColor: '#1a1a1a',
+   },
+   image: { width: '100%', height: '100%', borderRadius: 3 },
++  editImageButton: {
++    position: 'absolute',
++    right: 8,
++    bottom: 8,
++    width: 32,
++    height: 32,
++    borderRadius: 16,
++    backgroundColor: 'rgba(0, 0, 0, 0.5)',
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  imageLoadingOverlay: {
++    position: 'absolute',
++    top: 0,
++    left: 0,
++    right: 0,
++    bottom: 0,
++    justifyContent: 'center',
++    alignItems: 'center',
++    backgroundColor: 'rgba(0, 0, 0, 0.3)',
++    borderRadius: 3,
++  },
+   buttonsContainer: { flexDirection: 'column', padding: 10 },
+   button: {
+     width: '100%',
+diff --git a/package.json b/package.json
+index b0139fe..11f2dc2 100644
+--- a/package.json
++++ b/package.json
+@@ -23,6 +23,7 @@
+     "expo-document-picker": "~57.0.1",
+     "expo-file-system": "~57.0.5",
+     "expo-font": "~57.0.1",
++    "expo-image-picker": "~57.0.3",
+     "expo-sharing": "~57.0.15",
+     "expo-sqlite": "~57.0.1",
+     "expo-status-bar": "~57.0.1",
+diff --git a/domain/useCharacterImage.js b/domain/useCharacterImage.js
+new file mode 100644
+index 0000000..31053f3
+--- /dev/null
++++ b/domain/useCharacterImage.js
+@@ -0,0 +1,131 @@
++// domain/useCharacterImage.js
++// Хук для выбора и управления кастомными изображениями персонажей
++
++import { useCallback, useState } from 'react';
++import * as ImagePicker from 'expo-image-picker';
++import { Alert } from 'react-native';
++
++import * as avatarCache from '../db/avatarCache';
++import { compressAvatarImage, AVATAR_LIMITS } from './characterAvatar';
++import { showRawAlert } from '../components/alerts/alertService';
++
++/**
++ * Хук для работы с кастомными изображениями персонажей.
++ * Обеспечивает выбор, сжатие, валидацию и сохранение изображений.
++ */
++export function useCharacterImage() {
++  const [isLoading, setIsLoading] = useState(false);
++
++  /**
++   * Получает URL кастомного изображения персонажа из кэша.
++   * @param {string} characterId - ID персонажа
++   * @returns {Promise<string|null>} - data URL изображения или null
++   */
++  const getCharacterImageUrl = useCallback(async (characterId) => {
++    if (!characterId) return null;
++    
++    try {
++      const cached = await avatarCache.getAvatarCache(characterId);
++      if (cached?.data_url || cached?.dataUrl) {
++        return cached.data_url || cached.dataUrl;
++      }
++      return null;
++    } catch (error) {
++      console.error('Failed to get character image URL:', error);
++      return null;
++    }
++  }, []);
++
++  /**
++   * Выбирает изображение из галереи и сохраняет его для персонажа.
++   * @param {string} characterId - ID персонажа
++   * @returns {Promise<{success: boolean, dataUrl?: string, error?: string}>}
++   */
++  const pickAndSaveCharacterImage = useCallback(async (characterId) => {
++    if (!characterId) {
++      return { success: false, error: 'No character ID provided' };
++    }
++
++    try {
++      // Запрашиваем разрешение на доступ к галерее
++      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
++      if (status !== 'granted') {
++        return { success: false, error: 'Permission to access gallery is required' };
++      }
++
++      // Открываем пикер изображений
++      const result = await ImagePicker.launchImageLibraryAsync({
++        mediaTypes: ImagePicker.MediaTypeOptions.Images,
++        allowsEditing: true,
++        aspect: [1, 1],
++        quality: 1,
++        base64: true,
++      });
++
++      if (result.canceled) {
++        return { success: false, error: 'Image selection canceled' };
++      }
++
++      const { assets } = result;
++      if (!assets || assets.length === 0) {
++        return { success: false, error: 'No image selected' };
++      }
++
++      const asset = assets[0];
++      
++      // Проверяем размер файла до сжатия
++      if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes * 1.5) {
++        Alert.alert(
++          'Предупреждение',
++          `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
++        );
++        return { success: false, error: 'Image too large' };
++      }
++
++      setIsLoading(true);
++
++      // Сжимаем изображение
++      const compressed = await compressAvatarImage({
++        uri: asset.uri,
++        base64: asset.base64,
++        width: asset.width,
++        height: asset.height,
++        mimeType: asset.type || `image/${asset.uri.split('.').pop()}`,
++      });
++
++      // Сохраняем в кэш
++      await avatarCache.saveAvatarCache(characterId, {
++        data_url: compressed.dataUrl,
++        mime_type: compressed.mimeType,
++        md5: '',
++        updated_at: Date.now(),
++      });
++
++      setIsLoading(false);
++      return { success: true, dataUrl: compressed.dataUrl };
++    } catch (error) {
++      setIsLoading(false);
++      console.error('Failed to pick and save character image:', error);
++      
++      let errorMessage = 'Failed to save image';
++      if (error.code === 'avatar.tooLarge') {
++        errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
++      } else if (error.code === 'avatar.unsupportedFormat') {
++        errorMessage = `Неподдерживаемый формат. Разрешены: ${AVATAR_LIMITS.allowedMimeTypes.join(', ')}`;
++      } else if (error.message) {
++        errorMessage = error.message;
++      }
++      
++      showRawAlert('Ошибка', errorMessage);
++      return { success: false, error: errorMessage };
++    }
++  }, []);
++
++  return {
++    getCharacterImageUrl,
++    pickAndSaveCharacterImage,
++    isLoading,
++  };
++}
++
++export default useCharacterImage;
