@@ -103,21 +103,28 @@ export function useCharacterImage() {
       
       // Если mimeType это просто "image", пробуем определить из URI или base64
       if (mimeType === 'image' || !mimeType) {
-        if (asset.uri && asset.uri.startsWith('blob:')) {
-          // В web blob URI не содержит расширения, пробуем определить по base64
-          if (asset.base64) {
-            const base64Header = asset.base64.substring(0, 100);
-            if (base64Header.includes('image/png')) {
+        if (asset.base64) {
+          // Пробуем извлечь MIME-тип из data URL заголовка
+          if (asset.base64.startsWith('data:')) {
+            const match = asset.base64.match(/^data:(image\/[^;]+)/);
+            if (match) {
+              mimeType = match[1];
+            }
+          }
+          // Если base64 без заголовка, пробуем определить по первым байтам
+          // Это не точно, но лучше чем ничего
+          if (!mimeType || mimeType === 'image') {
+            // Проверяем первые байты base64 на сигнатуры изображений
+            const base64Start = asset.base64.substring(0, 20);
+            if (base64Start.includes('iVBOR')) {
               mimeType = 'image/png';
-            } else if (base64Header.includes('image/jpeg') || base64Header.includes('image/jpg')) {
+            } else if (base64Start.includes('/9j/')) {
               mimeType = 'image/jpeg';
-            } else if (base64Header.includes('image/gif')) {
+            } else if (base64Start.includes('R0lGOD')) {
               mimeType = 'image/gif';
             } else {
               mimeType = 'image/jpeg'; // по умолчанию
             }
-          } else {
-            mimeType = 'image/jpeg'; // по умолчанию для blob без base64
           }
         } else if (asset.uri?.match(/\.([^.]+)$/)?.[1]) {
           mimeType = `image/${asset.uri.match(/\.([^.]+)$/)[1].toLowerCase()}`;
