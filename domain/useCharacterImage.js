@@ -87,7 +87,7 @@ export function useCharacterImage() {
       // Проверяем размер файла до сжатия
       if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes * 1.5) {
         console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
-        Alert.alert(
+        showRawAlert(
           'Предупреждение',
           `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимум: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
         );
