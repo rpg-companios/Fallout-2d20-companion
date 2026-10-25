@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
 import * as avatarCache from '../db/avatarCache';
-import { compressAvatarImage, AVATAR_LIMITS } from './characterAvatar';
+import { AVATAR_LIMITS, validateAvatarDataUrl, base64ByteLength } from './characterAvatar';
 import { showRawAlert } from '../components/alerts/alertService';
 
 /**
@@ -62,9 +62,7 @@ export function useCharacterImage() {
       // Открываем пикер изображений
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
+        allowsEditing: false,
         base64: true,
       });
       console.log('[useCharacterImage] pickAndSaveCharacterImage: picker result:', result.canceled ? 'canceled' : 'success');
@@ -84,8 +82,8 @@ export function useCharacterImage() {
       const asset = assets[0];
       console.log('[useCharacterImage] pickAndSaveCharacterImage: asset size:', asset.fileSize);
       
-      // Проверяем размер файла до сжатия
-      if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes * 1.5) {
+      // Проверяем размер файла
+      if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes) {
         console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
         showRawAlert(
           'Предупреждение',
@@ -94,78 +92,72 @@ export function useCharacterImage() {
         return { success: false, error: 'Image too large' };
       }
 
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: compressing image');
+      console.log('[useCharacterImage] pickAndSaveCharacterImage: processing image');
       setIsLoading(true);
 
-      // Определяем MIME-тип: пробуем asset.mimeType, затем asset.type, затем расширение URI
-      // В web-сборке expo-image-picker asset.type может быть просто "image"
-      let mimeType = asset.mimeType || asset.type;
+      // Определяем MIME-тип
+      let mimeType = asset.mimeType || asset.type || 'image/jpeg';
       
-      // Если mimeType это просто "image", пробуем определить из URI или base64
-      if (mimeType === 'image' || !mimeType) {
-        if (asset.base64) {
-          // Пробуем извлечь MIME-тип из data URL заголовка
-          if (asset.base64.startsWith('data:')) {
-            const match = asset.base64.match(/^data:(image\/[^;]+)/);
-            if (match) {
-              mimeType = match[1];
-            }
-          }
-          // Если base64 без заголовка, пробуем определить по первым байтам
-          // Это не точно, но лучше чем ничего
-          if (!mimeType || mimeType === 'image') {
-            // Проверяем первые байты base64 на сигнатуры изображений
-            const base64Start = asset.base64.substring(0, 20);
-            if (base64Start.includes('iVBOR')) {
-              mimeType = 'image/png';
-            } else if (base64Start.includes('/9j/')) {
-              mimeType = 'image/jpeg';
-            } else if (base64Start.includes('R0lGOD')) {
-              mimeType = 'image/gif';
-            } else {
-              mimeType = 'image/jpeg'; // по умолчанию
-            }
-          }
-        } else if (asset.uri?.match(/\.([^.]+)$/)?.[1]) {
-          mimeType = `image/${asset.uri.match(/\.([^.]+)$/)[1].toLowerCase()}`;
-        } else {
-          mimeType = 'image/jpeg';
+      // Пробуем определить из base64 data URL
+      if (asset.base64 && asset.base64.startsWith('data:')) {
+        const match = asset.base64.match(/^data:(image\/[^;]+)/);
+        if (match) {
+          mimeType = match[1];
         }
       }
       
       console.log('[useCharacterImage] pickAndSaveCharacterImage: detected mimeType:', mimeType);
       
-      const compressed = await compressAvatarImage({
-        uri: asset.uri,
-        base64: asset.base64,
-        width: asset.width,
-        height: asset.height,
-        mimeType: mimeType,
-      });
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: compressed, size:', compressed.bytes);
+      // Формируем data URL
+      let dataUrl;
+      if (asset.base64) {
+        if (asset.base64.startsWith('data:')) {
+          dataUrl = asset.base64;
+        } else {
+          dataUrl = `data:${mimeType};base64,${asset.base64}`;
+        }
+      } else if (asset.uri) {
+        // Если нет base64, но есть uri - это не должно произойти с base64: true
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: no base64, using uri');
+        return { success: false, error: 'No base64 data available' };
+      }
+      
+      // Валидируем data URL
+      const validation = validateAvatarDataUrl(dataUrl);
+      if (!validation.ok) {
+        console.log('[useCharacterImage] pickAndSaveCharacterImage: validation failed:', validation.reason);
+        let errorMessage = 'Невалидное изображение';
+        if (validation.reason === 'avatar.tooLarge') {
+          errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
+        }
+        showRawAlert('Ошибка', errorMessage);
+        setIsLoading(false);
+        return { success: false, error: errorMessage };
+      }
+      
+      // Используем MIME-тип из валидации, если он есть
+      if (validation.mimeType) {
+        mimeType = validation.mimeType;
+      }
 
-      // Сохраняем в кэш
+      // Сохраняем в кэш как есть
       console.log('[useCharacterImage] pickAndSaveCharacterImage: saving to cache');
       await avatarCache.saveAvatarCache(characterId, {
-        data_url: compressed.dataUrl,
-        mime_type: compressed.mimeType,
+        data_url: dataUrl,
+        mime_type: mimeType,
         md5: '',
         updated_at: Date.now(),
       });
 
       setIsLoading(false);
       console.log('[useCharacterImage] pickAndSaveCharacterImage: success');
-      return { success: true, dataUrl: compressed.dataUrl };
+      return { success: true, dataUrl };
     } catch (error) {
       setIsLoading(false);
       console.error('[useCharacterImage] pickAndSaveCharacterImage: error:', error);
       
       let errorMessage = 'Failed to save image';
-      if (error.code === 'avatar.tooLarge') {
-        errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
-      } else if (error.code === 'avatar.unsupportedFormat') {
-        errorMessage = `Неподдерживаемый формат. Разрешены: ${AVATAR_LIMITS.allowedMimeTypes.join(', ')}`;
-      } else if (error.message) {
+      if (error.message) {
         errorMessage = error.message;
       }
       

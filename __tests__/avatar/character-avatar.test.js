@@ -8,18 +8,14 @@ import {
   base64ByteLength,
   validateAvatarDataUrl,
   buildAvatarMetadata,
-  compressAvatarImage,
 } from '../../domain/characterAvatar';
 import { CREATE_TABLES } from '../../db/schema';
 
 const smallJpeg = (bytes = 1024) => `data:image/jpeg;base64,${'A'.repeat(Math.ceil((bytes * 4) / 3))}`;
 
 describe('avatar: лимиты и валидация', () => {
-  it('лимиты зафиксированы: 512px, q0.7, 300КБ, JPEG', () => {
-    expect(AVATAR_LIMITS.maxEdge).toBe(512);
-    expect(AVATAR_LIMITS.jpegQuality).toBeLessThanOrEqual(1);
-    expect(AVATAR_LIMITS.maxBytes).toBe(300 * 1024);
-    expect(AVATAR_LIMITS.mimeType).toBe('image/jpeg');
+  it('лимит размера зафиксирован: 5МБ', () => {
+    expect(AVATAR_LIMITS.maxBytes).toBe(5 * 1024 * 1024);
   });
 
   it('base64ByteLength считает байты без atob', () => {
@@ -35,8 +31,12 @@ describe('avatar: лимиты и валидация', () => {
     expect(check.bytes).toBeGreaterThan(0);
   });
 
-  it('не-JPEG и мусор отбрасываются', () => {
-    expect(validateAvatarDataUrl('data:image/png;base64,AAAA').ok).toBe(false);
+  it('любые изображения валидны, невалидные URL отбрасываются', () => {
+    // Валидные изображения разных форматов
+    expect(validateAvatarDataUrl('data:image/png;base64,AAAA').ok).toBe(true);
+    expect(validateAvatarDataUrl('data:image/gif;base64,AAAA').ok).toBe(true);
+    expect(validateAvatarDataUrl('data:image/webp;base64,AAAA').ok).toBe(true);
+    // Невалидные URL
     expect(validateAvatarDataUrl('http://x/y.jpg').ok).toBe(false);
     expect(validateAvatarDataUrl(null).ok).toBe(false);
     expect(validateAvatarDataUrl('').ok).toBe(false);
@@ -61,37 +61,7 @@ describe('avatar: метаданные для сейва', () => {
   });
 });
 
-describe('avatar: сжатие через адаптер', () => {
-  it('адаптер вызывается с лимитами, результат валидируется', async () => {
-    const calls = [];
-    const adapter = {
-      async resizeToJpeg(args) {
-        calls.push(args);
-        return { dataUrl: smallJpeg(2048) };
-      },
-    };
-    const result = await compressAvatarImage({ uri: 'file:///x.jpg', width: 1000, height: 500 }, adapter);
-    expect(result.dataUrl).toMatch(/^data:image\/jpeg;base64,/);
-    expect(result.bytes).toBeGreaterThan(0);
-    expect(calls[0].maxEdge).toBe(AVATAR_LIMITS.maxEdge);
-    expect(calls[0].quality).toBe(AVATAR_LIMITS.jpegQuality);
-  });
 
-  it('«толстый» результат адаптера отбрасывается', async () => {
-    const adapter = {
-      async resizeToJpeg() {
-        return { dataUrl: smallJpeg(AVATAR_LIMITS.maxBytes + 8192) };
-      },
-    };
-    await expect(compressAvatarImage({ uri: 'file:///x.jpg' }, adapter)).rejects.toMatchObject({
-      message: 'avatar.tooLarge',
-    });
-  });
-
-  it('пустой источник — явная ошибка', async () => {
-    await expect(compressAvatarImage({}, {})).rejects.toThrow('avatar.invalidSource');
-  });
-});
 
 describe('avatar: схема БД', () => {
   it('таблица character_avatars объявлена в CREATE_TABLES', () => {

@@ -40,7 +40,10 @@ export const parseAvatarFileName = (name) => {
     case 'jpeg': mimeType = 'image/jpeg'; break;
     case 'png': mimeType = 'image/png'; break;
     case 'gif': mimeType = 'image/gif'; break;
-    default: mimeType = 'image/jpeg';
+    case 'webp': mimeType = 'image/webp'; break;
+    case 'bmp': mimeType = 'image/bmp'; break;
+    case 'svg': mimeType = 'image/svg+xml'; break;
+    default: mimeType = `image/${ext}`;
   }
   
   return { characterId, mimeType, ext };
