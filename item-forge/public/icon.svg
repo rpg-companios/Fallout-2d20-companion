@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0a0c10"/>
+  <rect x="16" y="16" width="480" height="480" rx="80" fill="none" stroke="#d4af37" stroke-width="12"/>
+  <!-- наковальня -->
+  <path d="M96 212 h320 v34 c0 26 -22 48 -48 48 h-24 c-40 6 -52 40 -52 70 v20 h-72 v-20 c0-30 -12 -64 -52 -70 h-24 c-26 0 -48 -22 -48 -48 z" fill="#d4af37"/>
+  <rect x="180" y="392" width="152" height="32" rx="10" fill="#d4af37"/>
+  <rect x="160" y="364" width="192" height="20" rx="8" fill="#f0e68c"/>
+  <!-- искры -->
+  <circle cx="392" cy="168" r="14" fill="#f0e68c"/>
+  <circle cx="424" cy="196" r="9" fill="#f0e68c"/>
+  <circle cx="368" cy="188" r="7" fill="#f0e68c"/>
+</svg>

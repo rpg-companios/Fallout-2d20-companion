@@ -8,8 +8,11 @@
     "web": "expo start --web",
     "build": "expo export --platform web",
     "serve": "npx serve -s dist -l 5000",
+    "serve:app": "node server/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:forge": "npm --prefix item-forge run build",
+    "dev:forge": "npm --prefix item-forge run dev"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.13",
@@ -35,6 +38,7 @@
     "react-native-paper": "^4.12.8",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-web": "~0.21.0",
+    "ws": "^8.22.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
