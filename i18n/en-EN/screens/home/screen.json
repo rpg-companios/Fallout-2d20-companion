@@ -142,7 +142,16 @@
       "tabs": "Tabs"
     },
     "pwaDiagnosticsTitle": "Install diagnostics",
-    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation."
+    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation.",
+    "ownEquipment": {
+      "title": "Own equipment",
+      "description": "Content packs from the Item Forge (JSON). Pack items appear in the \"Homebrew Equipment\" category of the add-item window, in the shop and in the weapon modification window. Deleting a pack strips its items from every character save.",
+      "load": "Load content pack JSON",
+      "empty": "No packs installed",
+      "installedOk": "Installed: {name} — {w} weapons, {m} mods, {a} ammo",
+      "errorsTitle": "Pack failed validation:",
+      "delete": "Delete"
+    }
   },
   "folders": {
     "create": "Create folder",
@@ -159,6 +168,37 @@
     "deleteMessageWithCount": "The folder and every character inside it will be deleted permanently. Characters: {count}."
   },
   "subtitle": "Positronium",
+  "gm": {
+    "enter": "Admin",
+    "exit": "User"
+  },
+  "server": {
+    "menuItem": "Server",
+    "dialogTitle": "Game master room",
+    "addressLabel": "Room address",
+    "addressPlaceholder": "GM-XXX-XXX",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "connected": "Character is in room {code}",
+    "disconnect": "Disconnect",
+    "close": "Close",
+    "invalidAddress": "This does not look like a room code (e.g. GM-7Q3-K9M).",
+    "notFound": "Room not found. Check the address.",
+    "roomFull": "The room is full.",
+    "unavailable": "Room server is unavailable. Try again later.",
+    "genericError": "Failed to connect to the room."
+  },
+  "room": {
+    "createFolder": "Create\nroom",
+    "createdTitle": "Room created",
+    "codeTitle": "Room address",
+    "copy": "Copy",
+    "copied": "Copied",
+    "hint": "Share this address with your players: they will enter it via the “Server” menu item.",
+    "players": "Players",
+    "noPlayers": "Nobody here yet",
+    "createFailed": "Failed to create the room. Check your connection and try again."
+  },
   "about": {
     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",
     "privacyPolicy": "Privacy policy",

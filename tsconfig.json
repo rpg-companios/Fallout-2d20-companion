@@ -24,7 +24,8 @@
     "src/store/characterState.ts",
     "src/saves/saveSnapshot.ts",
     "src/store/characterActions.ts",
-    "src/engine"
+    "src/engine",
+    "src/room"
   ],
   "extends": "expo/tsconfig.base"
 }

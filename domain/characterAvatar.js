@@ -81,13 +81,16 @@ export function getFileExtension(mimeType) {
     case 'image/svg+xml': return 'svg';
   }
   
-  // Для неизвестных MIME-типов пытаемся извлечь расширение
-  // Например: image/vnd.microsoft.icon -> icon
-  const match = normalized.match(/image\/([a-z0-9]+)/i);
-  if (match) {
+  // Для неизвестных MIME-типов пытаемся извлечь расширение — ЦЕЛИКОМ
+  // (дефисы/плюсы входят: image/x-icon → x-icon). «unknown» и нестроковые
+  // пустые подтипы — безликие, расширением не являются → безопасный jpg
+  // (446: «возвращает jpg по умолчанию» + «извлекает расширение из
+  // неизвестного MIME-типа» — два случая одним правилом).
+  const match = normalized.match(/^image\/([a-z0-9][a-z0-9+._-]*)$/i);
+  if (match && match[1] !== 'unknown') {
     return match[1];
   }
-  
+
   return 'jpg';
 }
 

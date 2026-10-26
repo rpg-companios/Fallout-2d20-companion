@@ -66,6 +66,8 @@ import styles from '../../styles/CharacterScreen.styles';
 import { getTimedAttributeModifiers } from "../../../../domain/effects";
 import { createEmptyEquippedArmor } from "../../../../domain/equippedArmor";
 import { resolveSkillRewards } from "../../../../domain/skillRewards";
+// 446: отладка аватаров ушла в гейт трассировки (__fallout.on(['avatar']); в проде — тишина.
+// debugLog уже импортирован рядом с FALLOUT_DEBUG_MARKER — дубль прошлой конверсии снят.
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../../src/debug/falloutDebug";
 import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
 
@@ -320,45 +322,45 @@ export default function CharacterScreen() {
 
   // Функция для удаления кастомного изображения
   const handleResetImage = useCallback(async () => {
-    console.log('[CharacterScreen] handleResetImage: start, characterId:', currentCharacterId);
+    debugLog('avatar.characterScreen', { step: 'handleResetImage: start, characterId:', value: (currentCharacterId) });
     if (!currentCharacterId) {
-      console.log('[CharacterScreen] handleResetImage: no characterId');
+      debugLog('avatar.characterScreen', { step: 'handleResetImage: no characterId' });
       return;
     }
 
     try {
-      console.log('[CharacterScreen] handleResetImage: deleting from cache');
+      debugLog('avatar.characterScreen', { step: 'handleResetImage: deleting from cache' });
       await avatarCache.deleteAvatarCache(currentCharacterId);
       
       // Обновляем версию изображения, чтобы ImageSection перезагрузился
       // и показал стандартное изображение
       refreshImage();
       
-      console.log('[CharacterScreen] handleResetImage: success');
+      debugLog('avatar.characterScreen', { step: 'handleResetImage: success' });
     } catch (error) {
-      console.error('[CharacterScreen] handleResetImage: error:', error);
+      debugLog('avatar.error', { step: '[CharacterScreen] handleResetImage: error:', error: String(error?.message ?? error) });
       showRawAlert({ title: 'Ошибка', message: 'Не удалось удалить изображение' });
     }
   }, [currentCharacterId, refreshImage]);
 
   // Обработчик нажатия на иконку редактирования изображения
   const handleEditImagePress = useCallback(async () => {
-    console.log('[CharacterScreen] handleEditImagePress: start');
+    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: start' });
     // Показываем модалку с выбором действия
-    console.log('[CharacterScreen] handleEditImagePress: calling showCatalogAlert');
+    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: calling showCatalogAlert' });
     const action = await showCatalogAlert('changeCharacterImage');
-    console.log('[CharacterScreen] handleEditImagePress: showCatalogAlert returned:', action);
+    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: showCatalogAlert returned:', value: (action) });
     
     if (action === 'change') {
-      console.log('[CharacterScreen] handleEditImagePress: calling pickAndSaveCharacterImage with ID:', currentCharacterId);
+      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: calling pickAndSaveCharacterImage with ID:', value: (currentCharacterId) });
       await pickAndSaveCharacterImage(currentCharacterId);
-      console.log('[CharacterScreen] handleEditImagePress: pickAndSaveCharacterImage completed');
+      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: pickAndSaveCharacterImage completed' });
     } else if (action === 'reset') {
-      console.log('[CharacterScreen] handleEditImagePress: resetting to default image');
+      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: resetting to default image' });
       await handleResetImage();
-      console.log('[CharacterScreen] handleEditImagePress: reset completed');
+      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: reset completed' });
     } else {
-      console.log('[CharacterScreen] handleEditImagePress: user cancelled');
+      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: user cancelled' });
     }
   }, [pickAndSaveCharacterImage, currentCharacterId, handleResetImage]);
 

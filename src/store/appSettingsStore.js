@@ -236,6 +236,9 @@ export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('c
 export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
 export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScreenEnabled');
 export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
+// Комнаты мастера (gm-rooms): 'user' | 'gm'. Кнопка переключения — в шапке
+// главного экрана и показывается только при доступном сервере комнат.
+export const selectUiMode = (state) => state.getSettingValue('uiMode');
 export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');
 export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');

@@ -219,6 +219,7 @@ export async function deleteCharacter(id) {
   await runBatch([
     { sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [id] },
     { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [id] },
+    { sql: 'DELETE FROM character_room_bindings WHERE character_id = ?', params: [id] },
     { sql: 'DELETE FROM characters WHERE id = ?', params: [id] },
   ]);
 }
@@ -337,6 +338,42 @@ export async function getCharactersInFolder(folderId) {
 }
 export async function deleteCharacterFolderAndCharacters(folderId) {
   const members = await getAll('SELECT character_id FROM character_folder_memberships WHERE folder_id = ?', [folderId]);
-  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
+  await runBatch([...members.flatMap(({ character_id }) => [{ sql: 'DELETE FROM character_rename_requests WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM character_folder_memberships WHERE character_id = ?', params: [character_id] }, { sql: 'DELETE FROM characters WHERE id = ?', params: [character_id] }]), { sql: 'DELETE FROM character_folder_memberships WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM folder_rooms WHERE folder_id = ?', params: [folderId] }, { sql: 'DELETE FROM character_folders WHERE id = ?', params: [folderId] }]);
   return members.map((row) => row.character_id);
+}
+
+// ─── Комнаты мастера (gm-rooms, этапы 0–2) ─────────────────────────────────
+// См. docs/architecture/gm-rooms-plan.md. Комната = папка со штампом;
+// штамп персонажа — связка на этом устройстве (этап 3 добавит штамп в сейв).
+
+export async function upsertFolderRoom(folderId, code, ownerToken) {
+  await runQuery('INSERT OR REPLACE INTO folder_rooms (folder_id, code, owner_token, created_at) VALUES (?, ?, ?, ?)', [folderId, code, ownerToken, Date.now()]);
+}
+
+export async function getFolderRoom(folderId) {
+  return getFirst('SELECT folder_id, code, owner_token FROM folder_rooms WHERE folder_id = ?', [folderId]);
+}
+
+export async function getFolderRooms() {
+  return getAll('SELECT folder_id, code, owner_token FROM folder_rooms');
+}
+
+export async function deleteFolderRoom(folderId) {
+  await runQuery('DELETE FROM folder_rooms WHERE folder_id = ?', [folderId]);
+}
+
+export async function setCharacterRoomBinding(characterId, code) {
+  if (!code) {
+    await runQuery('DELETE FROM character_room_bindings WHERE character_id = ?', [characterId]);
+    return;
+  }
+  await runQuery('INSERT OR REPLACE INTO character_room_bindings (character_id, code, joined_at) VALUES (?, ?, ?)', [characterId, code, Date.now()]);
+}
+
+export async function getCharacterRoomBinding(characterId) {
+  return getFirst('SELECT character_id, code FROM character_room_bindings WHERE character_id = ?', [characterId]);
+}
+
+export async function getCharacterRoomBindings() {
+  return getAll('SELECT character_id, code FROM character_room_bindings');
 }
