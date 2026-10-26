@@ -50,9 +50,9 @@ describe('avatar: лимиты и валидация', () => {
 });
 
 describe('avatar: метаданные для сейва', () => {
-  it('метаданные — только md5 и updatedAt, не фото', () => {
+  it('метаданные — только md5 и updatedAt (+mimeType с 445), не фото', () => {
     const meta = buildAvatarMetadata({ characterId: 'c1', md5: 'abc', updated_at: 123 });
-    expect(meta).toEqual({ md5: 'abc', updatedAt: 123 });
+    expect(meta).toEqual({ md5: 'abc', updatedAt: 123, mimeType: null });
   });
 
   it('без записи кэша метаданных нет', () => {

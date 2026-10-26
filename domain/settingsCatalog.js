@@ -75,6 +75,18 @@ export const ENGINE_SETTINGS = [
     defaultValue: DEFAULT_LOCALE,
     options: SUPPORTED_LOCALES.map((value) => ({ value })),
   },
+  {
+    // Комнаты мастера (gm-rooms, этап 1): режим интерфейса
+    // «пользователь/мастер». Переключатель — кнопка в шапке главного
+    // экрана, в окне настроек не показывается (surface characters, как у
+    // language). Кнопка рендерится только при доступном сервере комнат
+    // (§3.9 плана — пространства может не быть).
+    id: 'uiMode',
+    type: 'select',
+    controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
+    defaultValue: 'user',
+    options: [{ value: 'user' }, { value: 'gm' }],
+  },
 ];
 
 const SUPPORTED_TYPES = ['boolean', 'number', 'select'];

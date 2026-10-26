@@ -39,6 +39,9 @@ const CATEGORY_ICONS = {
   robotFrame: '⚙️',
   robotBodyParts: '🦾',
   robotModules: '💡',
+  // 446: самодельное снаряжение — обособленная верхняя категория паков
+  // контента (владелец, 2026-10-25): не смешивается с общими списками.
+  homebrew: '🛠️',
 };
 
 const mapWeaponTypeToDbValue = {
@@ -79,6 +82,9 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
             Object.entries(mapWeaponTypeToDbValue).map(([k, v]) => [v.toLowerCase(), k])
           );
           for (const weapon of catalog.weapons || []) {
+            // 446: паковое (isPackItem) в общие группы не попадает — ему
+            // своя категория «Самодельное снаряжение» (packData ниже).
+            if (weapon?.isPackItem) continue;
             const groupKey = typeMap[(weapon.weaponType || '').toLowerCase()];
             if (!groupKey) continue;
             const label = tInventory(`modals.addItemModal.weaponTypeLabels.${groupKey}`);
@@ -200,10 +206,45 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
     }
   }, [visible]);
 
+  // 446: «Самодельное снаряжение» — отдельная верхняя категория окна для
+  // предметов паков контента (владелец, 2026-10-25). Источник один — тот же
+  // оверлей каталога (метки isPackItem ставит src/itempack/runtime); общие
+  // группы их не получают. Подразделы параллельны родительскому каталогу:
+  // оружие — по типам (Лёгкое/Тяжёлое…), робо-оружие — «Оружие роботов»,
+  // боеприпасы — общим списком. Модов ветки нет: закон 438 (моды в списках
+  // выдачи не показываются) действует и здесь. Паков нет — ветки нет.
+  const packData = useMemo(() => {
+    const catalog = getEquipmentCatalog(moduleLocale);
+    const weaponKeyByType = Object.fromEntries(
+      Object.entries(mapWeaponTypeToDbValue).map(([k, v]) => [v, k]),
+    );
+    const groups = {};
+    for (const w of (catalog.weapons || []).filter((x) => x?.isPackItem)) {
+      const key = weaponKeyByType[w.weaponType];
+      if (!key) continue;
+      const label = tInventory(`modals.addItemModal.weaponTypeLabels.${key}`);
+      (groups[label] ??= []).push({ ...w, itemType: 'weapon' });
+    }
+    const packRobotWeapons = (catalog.robotWeaponsOnly || []).filter((x) => x?.isPackItem)
+      .map((w) => ({ ...w, itemType: 'weapon' }));
+    if (packRobotWeapons.length) {
+      groups[tInventory('modals.addItemModal.categories.robotWeapons')] = packRobotWeapons;
+    }
+    const packAmmo = (catalog.ammoTypes || []).filter((x) => x?.isPackItem);
+    if (packAmmo.length) {
+      groups[tInventory('modals.addItemModal.categories.ammo')] = packAmmo;
+    }
+    Object.keys(groups).forEach((k) => groups[k].sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''))));
+    return Object.keys(groups).length === 0
+      ? {}
+      : { [tInventory('modals.addItemModal.categories.homebrew')]: groups };
+  }, [engineLocale, moduleLocale]);
+
   const allData = useMemo(() => {
     const tree = {
       [tInventory('modals.addItemModal.categories.weapon')]: weaponsByType,
       ...staticData,
+      ...packData,
     };
     // Комплект «покупка снаряжения» задаёт потолок редкости. Предметы выше
     // порога прячем целиком: короче список и не дразнит тем, что купить
@@ -226,7 +267,7 @@ const AddItemModal = ({ visible, onClose, onSelectItem, rootTitleKey = 'modals.a
       return out;
     };
     return prune(tree);
-  }, [engineLocale, weaponsByType, staticData, maxRarity]);
+  }, [engineLocale, weaponsByType, staticData, packData, maxRarity]);
 
   // 425: фильтр снаряжения — обрезка дерева (пустые ветки прячутся).
   // 438 (слово владельца): моды в результатах НИКОГДА — «1 мод может

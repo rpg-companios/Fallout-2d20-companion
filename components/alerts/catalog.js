@@ -253,4 +253,14 @@ export const ALERTS = {
     messageTemplate: '{name}',
     destructive: true,
   },
+
+  // Удаление пользовательского пака контента (прототип P): полное, без
+  // следов — число следов по сейвам приходит {count}, имя пака — {name}.
+  contentPackDelete: {
+    scope: 'home',
+    kind: 'confirm',
+    titleKey: 'gameSetting.contentPacks.deleteTitle',
+    messageKey: 'gameSetting.contentPacks.deleteBody',
+    destructive: true,
+  },
 };

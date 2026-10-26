@@ -43,7 +43,9 @@ export const parseAvatarFileName = (name) => {
     case 'webp': mimeType = 'image/webp'; break;
     case 'bmp': mimeType = 'image/bmp'; break;
     case 'svg': mimeType = 'image/svg+xml'; break;
-    default: mimeType = `image/${ext}`;
+    // 446: чужеродные расширения (json и пр.) — НЕ аватары: возвращаем null,
+    // иначе мусорный файл в папке avatars порождает фантомные записи плана.
+    default: return null;
   }
   
   return { characterId, mimeType, ext };

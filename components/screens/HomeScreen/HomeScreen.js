@@ -46,7 +46,14 @@ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
+// 446 (владелец, 2026-10-25): окно «Игровой сеттинг» скрыто в UI — установка
+// сеттингов уходит в будущее. То, что остаётся живым из его содержимого —
+// установку паков контента — перенесено в Настройки → «Собственное
+// снаряжение». Файл окна (components/settings/GameSettingsModal.js) и его
+// стор сохранены для будущего режима установки сеттингов; ниже — только
+// погашенные места монтажа. Возврат в UI = GAME_SETTINGS_UI_ENABLED = true.
 import GameSettingsModal from '../../settings/GameSettingsModal';
+const GAME_SETTINGS_UI_ENABLED = false;
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
@@ -54,8 +61,13 @@ import useAppSettingsStore, {
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
   selectPwaInstallDiagnosticsEnabled,
+  selectUiMode,
 } from '../../../src/store/appSettingsStore';
 import * as avatarCache from '../../../db/avatarCache';
+// Комнаты мастера (gm-rooms, этапы 0–2): стор соединения + адреса комнат.
+import useRoomStore from '../../../src/room/roomStore';
+import { isRoomServerConfigured } from '../../../src/room/roomClient';
+import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -81,6 +93,9 @@ const CharacterCell = ({
   onDelete,
   onDownload,
   onDuplicate,
+  onServer,
+  serverAvailable = false,
+  serverBound = false,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -103,7 +118,8 @@ const CharacterCell = ({
     event?.stopPropagation?.();
     actionButtonRef.current?.measureInWindow((x, y, width, height) => {
       const { width: windowWidth, height: windowHeight } = Dimensions.get('window');
-      const menuHeight = deleteActionPlacement === 'menu' ? 144 : 100;
+      // Пункт «Сервер» (gm-rooms) добавляет одну строку к меню.
+      const menuHeight = (deleteActionPlacement === 'menu' ? 144 : 100) + (serverAvailable ? 44 : 0);
       const left = Math.max(8, Math.min(x + width - CHARACTER_ACTION_MENU_WIDTH, windowWidth - CHARACTER_ACTION_MENU_WIDTH - 8));
       const top = y + height + menuHeight + 8 <= windowHeight
         ? y + height + 4
@@ -160,6 +176,11 @@ const CharacterCell = ({
 
   return (
     <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
+      {serverBound && (
+        <View style={styles.characterServerBadge} pointerEvents="none">
+          <MaterialCommunityIcons name="server-network" size={16} color="#7c5c10" />
+        </View>
+      )}
       <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
       <View style={styles.characterImageContainer}>
         {customImageUrl ? (
@@ -198,6 +219,12 @@ const CharacterCell = ({
         <Pressable style={styles.characterActionBackdrop} onPress={() => setActionMenuPosition(null)}>
           {actionMenuPosition && (
             <View style={[styles.characterActionMenu, actionMenuPosition]}>
+              {serverAvailable && (
+                <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onServer)}>
+                  <MaterialCommunityIcons name="server-network" size={19} color="#111827" />
+                  <Text style={styles.characterActionText}>{tHomeScreen('server.menuItem')}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity style={styles.characterActionItem} onPress={() => runAction(onDownload)}>
                 <MaterialCommunityIcons name="download" size={19} color="#111827" />
                 <Text style={styles.characterActionText}>{tHomeScreen('characterActions.download')}</Text>
@@ -402,6 +429,22 @@ export default function HomeScreen({ navigation }) {
   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
   const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
 
+  // ── Комнаты мастера (gm-rooms, этапы 0–2) ──
+  // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9:
+  // кнопки нет, когда адрес сервера недоступен — пространства нет).
+  const uiMode = useAppSettingsStore(selectUiMode);
+  const isGmMode = uiMode === 'gm';
+  const roomServerAvailable = isRoomServerConfigured();
+  const roomRooms = useRoomStore((state) => state.rooms);
+  // В режиме мастера папки = комнаты и доступны всегда (настройка
+  // «каталоги персонажей» на них не распространяется).
+  const foldersEnabled = isGmMode || characterFoldersEnabled;
+  const [folderRooms, setFolderRooms] = useState({}); // folderId -> code
+  const [roomBindings, setRoomBindings] = useState({}); // characterId -> code
+  const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
+  const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
+  const [copiedCode, setCopiedCode] = useState(null);
+
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
   const [iosInstallVisible, setIosInstallVisible] = useState(false);
@@ -409,11 +452,11 @@ export default function HomeScreen({ navigation }) {
   const [desktopInstallVisible, setDesktopInstallVisible] = useState(false);
 
   useEffect(() => {
-    if (!characterFoldersEnabled && folderDraftVisible) {
+    if (!foldersEnabled && folderDraftVisible) {
       setFolderDraftVisible(false);
       setFolderName('');
     }
-  }, [characterFoldersEnabled, folderDraftVisible]);
+  }, [foldersEnabled, folderDraftVisible]);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -511,12 +554,26 @@ export default function HomeScreen({ navigation }) {
       setCharacters(visible);
       setFolders(savedFolders);
       setFolderCounts(counts);
+      // Комнаты мастера: штампы папок-комнат и связки персонажей.
+      // Сбой этих таблиц не должен ронять основной список персонажей.
+      if (roomServerAvailable) {
+        try {
+          const [roomRows, bindingRows] = await Promise.all([
+            db.getFolderRooms(),
+            db.getCharacterRoomBindings(),
+          ]);
+          setFolderRooms(Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code])));
+          setRoomBindings(Object.fromEntries(bindingRows.map((row) => [row.character_id, row.code])));
+        } catch (roomError) {
+          debugLog('room.dbLoad:failed', { message: roomError?.message || String(roomError) });
+        }
+      }
     } catch (e) {
       setCharacters([]);
     } finally {
       setLoading(false);
     }
-  }, [getCharactersList, activeFolder]);
+  }, [getCharactersList, activeFolder, roomServerAvailable]);
 
   useFocusEffect(
     useCallback(() => {
@@ -525,12 +582,123 @@ export default function HomeScreen({ navigation }) {
   );
 
   const handleCreateFolder = async () => {
-    if (!folderName.trim()) return;
-    await db.createCharacterFolder(folderName);
-    setFolderName('');
-    setFolderDraftVisible(false);
+    const name = folderName.trim();
+    if (!name) return;
+    if (!isGmMode) {
+      await db.createCharacterFolder(name);
+      setFolderName('');
+      setFolderDraftVisible(false);
+      loadList();
+      return;
+    }
+    // Режим мастера: папка — это серверная комната (§1 плана gm-rooms).
+    // Сначала комната на сервере, потом локальная папка со штампом;
+    // при сбое сети папку не создаём — сироты «папка без комнаты» не нужны.
+    try {
+      const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
+      const folder = await db.createCharacterFolder(name);
+      await db.upsertFolderRoom(folder.id, code, ownerToken);
+      setFolderName('');
+      setFolderDraftVisible(false);
+      setRoomDialog({ code });
+      loadList();
+    } catch (error) {
+      debugLog('room.create:failed', { message: error?.message || String(error) });
+      setFolderDraftVisible(false);
+      showHomeAlert(tHomeScreen('room.createdTitle'), tHomeScreen('room.createFailed'));
+    }
+  };
+
+  const copyRoomCode = async (code) => {
+    const text = formatRoomCodeForDisplay(code);
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopiedCode(code);
+        setTimeout(() => setCopiedCode(null), 2000);
+      } catch (error) {
+        debugLog('room.copy:failed', { message: error?.message || String(error) });
+      }
+    }
+  };
+
+  // Пункт меню персонажа «Сервер» (пользовательская сторона).
+  const handleServer = async (character) => {
+    try {
+      const binding = await db.getCharacterRoomBinding(character.id);
+      setServerDialog({ character, boundCode: binding?.code || null, address: '', busy: false, error: null });
+    } catch (error) {
+      debugLog('server.menu:failed', { message: error?.message || String(error) });
+    }
+  };
+
+  const handleServerJoin = async () => {
+    if (!serverDialog || serverDialog.busy) return;
+    const canonical = toCanonicalRoomCode(serverDialog.address);
+    if (!canonical) {
+      setServerDialog({ ...serverDialog, error: tHomeScreen('server.invalidAddress') });
+      return;
+    }
+    const joining = { ...serverDialog, busy: true, error: null };
+    setServerDialog(joining);
+    try {
+      await useRoomStore.getState().joinRoom({ code: canonical, name: joining.character.name, role: 'player' });
+      await db.setCharacterRoomBinding(joining.character.id, canonical);
+      setServerDialog(null);
+      loadList();
+    } catch (error) {
+      const code = error?.message;
+      const key = code === 'ROOM_NOT_FOUND' ? 'server.notFound'
+        : code === 'ROOM_FULL' ? 'server.roomFull'
+        : 'server.unavailable';
+      debugLog('room.join:failed', { code: canonical, error: String(code) });
+      setServerDialog({ ...joining, busy: false, error: tHomeScreen(key) });
+    }
+  };
+
+  const handleServerLeave = async () => {
+    if (!serverDialog) return;
+    const { character, boundCode } = serverDialog;
+    try {
+      await useRoomStore.getState().leaveRoom({ code: boundCode });
+    } catch (error) {
+      debugLog('room.leave:failed', { message: error?.message || String(error) });
+    }
+    await db.setCharacterRoomBinding(character.id, null);
+    setServerDialog(null);
     loadList();
   };
+
+  const handleToggleUiMode = () => {
+    setSettingValue('uiMode', isGmMode ? 'user' : 'gm');
+    setFolderDraftVisible(false);
+    setFolderName('');
+    setRoomDialog(null);
+    setServerDialog(null);
+  };
+
+  // Мастер держит свои комнаты открытыми (presence игроков).
+  useEffect(() => {
+    if (!isGmMode || !roomServerAvailable) return;
+    Object.values(folderRooms).forEach((code) => {
+      const store = useRoomStore.getState();
+      if (!store.rooms[code]) {
+        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
+      }
+    });
+  }, [isGmMode, folderRooms, roomServerAvailable]);
+
+  // Игрок переподключает своих персонажей к их комнатам (по связкам).
+  useEffect(() => {
+    if (isGmMode || !roomServerAvailable) return;
+    Object.entries(roomBindings).forEach(([characterId, code]) => {
+      const store = useRoomStore.getState();
+      if (!store.rooms[code]) {
+        const character = characters.find((item) => item.id === characterId);
+        store.joinRoom({ code, name: character?.name || '—', role: 'player' }).catch(() => {});
+      }
+    });
+  }, [isGmMode, roomBindings, characters, roomServerAvailable]);
 
   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
     if (!characterId) return;
@@ -826,13 +994,14 @@ export default function HomeScreen({ navigation }) {
     ...(activeFolder
       ? []
       : [
-          { type: 'create' },
-          { type: 'upload' },
-          ...(characterFoldersEnabled ? [{ type: 'createFolder' }] : []),
+          // В режиме мастера экран повторяет главный, но «создать/загрузить
+          // персонажа» не показываем: здесь живут комнаты и копии игроков.
+          ...(isGmMode ? [] : [{ type: 'create' }, { type: 'upload' }]),
+          ...(foldersEnabled ? [{ type: 'createFolder' }] : []),
         ]),
     ...(activeFolder
       ? []
-      : (folderDraftVisible && characterFoldersEnabled ? [{ type: 'folderDraft' }] : [])),
+      : (folderDraftVisible && foldersEnabled ? [{ type: 'folderDraft' }] : [])),
     ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
     ...characters.map(c => ({ type: 'character', ...c })),
   ];
@@ -855,6 +1024,23 @@ export default function HomeScreen({ navigation }) {
           <Pressable style={styles.menuButton} onPress={() => setMenuVisible(true)}>
             <MaterialCommunityIcons name="menu" size={22} color="#f0e68c" />
           </Pressable>
+        </View>
+        <View style={styles.headerCenter}>
+          {roomServerAvailable && (
+            <Pressable
+              style={[styles.adminButton, isGmMode && styles.adminButtonActive]}
+              onPress={handleToggleUiMode}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel={tHomeScreen(isGmMode ? 'gm.exit' : 'gm.enter')}
+            >
+              <MaterialCommunityIcons
+                name={isGmMode ? 'shield-crown-outline' : 'shield-account-outline'}
+                size={18}
+                color="#f0e68c"
+              />
+              <Text style={styles.adminButtonText}>{tHomeScreen(isGmMode ? 'gm.exit' : 'gm.enter')}</Text>
+            </Pressable>
+          )}
         </View>
         <View style={styles.languageContainer}>
           {languageOptions.map((lang, index) => {
@@ -912,6 +1098,17 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
       {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
+      {activeFolder && folderRooms[activeFolder.id] && (
+        <View style={styles.folderRoomBar}>
+          <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
+            <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
+            <Text style={styles.folderRoomBarText}>{formatRoomCodeForDisplay(folderRooms[activeFolder.id])}</Text>
+            <Text style={styles.folderRoomBarPlayers}>
+              {tHomeScreen('room.players')}: {(roomRooms[folderRooms[activeFolder.id]]?.members || []).filter((member) => member.role === 'player').length}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {movingCharacterId && !activeFolder && <Text pointerEvents="none" style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
       <ScrollView
         style={styles.scrollView}
@@ -946,13 +1143,13 @@ export default function HomeScreen({ navigation }) {
                   );
                 }
                 if (item.type === 'createFolder') {
-                  return <ActionCell key="create-folder" icon={<MaterialCommunityIcons name="folder-plus-outline" size={38} color={characterFoldersEnabled ? '#5a5a5a' : '#aaa'} />} label={tHomeScreen('folders.create')} disabled={!characterFoldersEnabled} onPress={() => setFolderDraftVisible(true)} />;
+                  return <ActionCell key="create-folder" icon={<MaterialCommunityIcons name={isGmMode ? 'server-plus-outline' : 'folder-plus-outline'} size={38} color={foldersEnabled ? '#5a5a5a' : '#aaa'} />} label={isGmMode ? tHomeScreen('room.createFolder') : tHomeScreen('folders.create')} disabled={!foldersEnabled} onPress={() => setFolderDraftVisible(true)} />;
                 }
                 if (item.type === 'folderDraft') {
                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
                 }
                 if (item.type === 'folder') {
-                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name="folder-outline" size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text><Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name={folderRooms[item.id] ? 'server-network' : 'folder-outline'} size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text>{folderRooms[item.id] && <Text style={styles.folderRoomCode}>{formatRoomCodeForDisplay(folderRooms[item.id])}</Text>}<Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
                 }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
@@ -966,6 +1163,9 @@ export default function HomeScreen({ navigation }) {
                     onDelete={() => handleDelete(item)}
                     onDownload={() => handleDownload(item)}
                     onDuplicate={() => handleDuplicate(item)}
+                    onServer={() => handleServer(item)}
+                    serverAvailable={roomServerAvailable && !isGmMode}
+                    serverBound={Boolean(roomBindings[item.id])}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
@@ -989,10 +1189,12 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setGameSettingsVisible(true); }}>
-              <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.gameSetting')}</Text>
-            </TouchableOpacity>
+            {GAME_SETTINGS_UI_ENABLED && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setGameSettingsVisible(true); }}>
+                <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color="#d4af37" />
+                <Text style={styles.menuText}>{tHomeScreen('menu.gameSetting')}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
               <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
@@ -1050,7 +1252,114 @@ export default function HomeScreen({ navigation }) {
       </Modal>
 
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
-      <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
+      {GAME_SETTINGS_UI_ENABLED && (
+        <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
+      )}
+
+      {/* Комнаты мастера (gm-rooms): адрес комнаты + участники. */}
+      <Modal visible={Boolean(roomDialog)} transparent animationType="fade" onRequestClose={() => setRoomDialog(null)}>
+        <Pressable style={styles.serverModalBackdrop} onPress={() => setRoomDialog(null)}>
+          <Pressable style={styles.serverModalPanel} onPress={() => {}}>
+            <Text style={styles.serverModalTitle}>{tHomeScreen('room.codeTitle')}</Text>
+            {roomDialog && (
+              <>
+                <Text style={styles.serverModalCode}>{formatRoomCodeForDisplay(roomDialog.code)}</Text>
+                <Text style={styles.serverModalText}>{tHomeScreen('room.hint')}</Text>
+                <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
+                  <Text style={styles.serverModalPlayersTitle}>{tHomeScreen('room.players')}</Text>
+                  {(roomRooms[roomDialog.code]?.members || []).filter((member) => member.role === 'player').length === 0 && (
+                    <Text style={styles.serverModalPlayer}>{tHomeScreen('room.noPlayers')}</Text>
+                  )}
+                  {(roomRooms[roomDialog.code]?.members || [])
+                    .filter((member) => member.role === 'player')
+                    .map((member) => (
+                      <Text key={member.clientId} style={styles.serverModalPlayer}>{member.name}</Text>
+                    ))}
+                </ScrollView>
+                <View style={styles.serverModalActions}>
+                  <TouchableOpacity
+                    style={styles.serverModalButton}
+                    onPress={() => copyRoomCode(roomDialog.code)}
+                  >
+                    <Text style={styles.serverModalButtonText}>
+                      {copiedCode === roomDialog.code ? tHomeScreen('room.copied') : tHomeScreen('room.copy')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.serverModalButton, styles.serverModalButtonSecondary]}
+                    onPress={() => setRoomDialog(null)}
+                  >
+                    <Text style={[styles.serverModalButtonText, styles.serverModalButtonTextSecondary]}>{tHomeScreen('server.close')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Пользовательская сторона: подключение персонажа к комнате мастера. */}
+      <Modal visible={Boolean(serverDialog)} transparent animationType="fade" onRequestClose={() => !serverDialog?.busy && setServerDialog(null)}>
+        <Pressable style={styles.serverModalBackdrop} onPress={() => { if (!serverDialog?.busy) setServerDialog(null); }}>
+          <Pressable style={styles.serverModalPanel} onPress={() => {}}>
+            <Text style={styles.serverModalTitle}>{tHomeScreen('server.dialogTitle')}</Text>
+            {serverDialog && (
+              <>
+                {serverDialog.boundCode ? (
+                  <>
+                    <Text style={styles.serverModalText}>
+                      {tHomeScreen('server.connected').replace('{code}', formatRoomCodeForDisplay(serverDialog.boundCode))}
+                    </Text>
+                    <View style={styles.serverModalActions}>
+                      <TouchableOpacity style={styles.serverModalButton} onPress={handleServerLeave}>
+                        <Text style={styles.serverModalButtonText}>{tHomeScreen('server.disconnect')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.serverModalButton, styles.serverModalButtonSecondary]}
+                        onPress={() => setServerDialog(null)}
+                      >
+                        <Text style={[styles.serverModalButtonText, styles.serverModalButtonTextSecondary]}>{tHomeScreen('server.close')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.serverModalText}>{tHomeScreen('server.addressLabel')}</Text>
+                    <TextInput
+                      value={serverDialog.address}
+                      onChangeText={(text) => setServerDialog({ ...serverDialog, address: text, error: null })}
+                      placeholder={tHomeScreen('server.addressPlaceholder')}
+                      placeholderTextColor="#9ca3af"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      style={styles.serverModalInput}
+                      editable={!serverDialog.busy}
+                    />
+                    {serverDialog.error && <Text style={styles.serverModalError}>{serverDialog.error}</Text>}
+                    <View style={styles.serverModalActions}>
+                      <TouchableOpacity
+                        style={[styles.serverModalButton, serverDialog.busy && { opacity: 0.6 }]}
+                        onPress={handleServerJoin}
+                        disabled={serverDialog.busy}
+                      >
+                        <Text style={styles.serverModalButtonText}>
+                          {serverDialog.busy ? tHomeScreen('server.connecting') : tHomeScreen('server.connect')}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.serverModalButton, styles.serverModalButtonSecondary]}
+                        onPress={() => { if (!serverDialog.busy) setServerDialog(null); }}
+                      >
+                        <Text style={[styles.serverModalButtonText, styles.serverModalButtonTextSecondary]}>{tHomeScreen('buttons.cancel')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>
