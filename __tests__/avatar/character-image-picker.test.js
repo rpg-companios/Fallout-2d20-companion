@@ -7,7 +7,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { renderHook, act } from '@testing-library/react';
 
 // Мокаем модули
-vi.mock('expo-image-picker');
+// 446: с фабрикой — пустой vi.mock() делает автомок, который ПОДНИМАЕТ
+// реальный граф expo (winter/runtime) и падает в vitest; фабрика не грузит.
+vi.mock('expo-image-picker', () => ({
+  requestMediaLibraryPermissionsAsync: vi.fn(),
+  launchImageLibraryAsync: vi.fn(),
+  MediaTypeOptions: { Images: 'Images', All: 'All', Videos: 'Videos' },
+}));
 vi.mock('../../domain/useCharacterImage', async () => {
   const actual = await vi.importActual('../../domain/useCharacterImage');
   return actual;

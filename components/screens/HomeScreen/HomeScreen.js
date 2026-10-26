@@ -46,7 +46,14 @@ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
+// 446 (владелец, 2026-10-25): окно «Игровой сеттинг» скрыто в UI — установка
+// сеттингов уходит в будущее. То, что остаётся живым из его содержимого —
+// установку паков контента — перенесено в Настройки → «Собственное
+// снаряжение». Файл окна (components/settings/GameSettingsModal.js) и его
+// стор сохранены для будущего режима установки сеттингов; ниже — только
+// погашенные места монтажа. Возврат в UI = GAME_SETTINGS_UI_ENABLED = true.
 import GameSettingsModal from '../../settings/GameSettingsModal';
+const GAME_SETTINGS_UI_ENABLED = false;
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
@@ -1182,10 +1189,12 @@ export default function HomeScreen({ navigation }) {
       <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
-            <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setGameSettingsVisible(true); }}>
-              <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color="#d4af37" />
-              <Text style={styles.menuText}>{tHomeScreen('menu.gameSetting')}</Text>
-            </TouchableOpacity>
+            {GAME_SETTINGS_UI_ENABLED && (
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setGameSettingsVisible(true); }}>
+                <MaterialCommunityIcons name="book-open-page-variant-outline" size={20} color="#d4af37" />
+                <Text style={styles.menuText}>{tHomeScreen('menu.gameSetting')}</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setSettingsVisible(true); }}>
               <MaterialCommunityIcons name="cog-outline" size={20} color="#d4af37" />
               <Text style={styles.menuText}>{tHomeScreen('menu.settings')}</Text>
@@ -1243,7 +1252,9 @@ export default function HomeScreen({ navigation }) {
       </Modal>
 
       <SettingsModal visible={settingsVisible} onClose={() => setSettingsVisible(false)} />
-      <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
+      {GAME_SETTINGS_UI_ENABLED && (
+        <GameSettingsModal visible={gameSettingsVisible} onClose={() => setGameSettingsVisible(false)} />
+      )}
 
       {/* Комнаты мастера (gm-rooms): адрес комнаты + участники. */}
       <Modal visible={Boolean(roomDialog)} transparent animationType="fade" onRequestClose={() => setRoomDialog(null)}>

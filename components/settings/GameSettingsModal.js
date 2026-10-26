@@ -17,33 +17,11 @@ import useSettingPackStore, {
   selectActiveSettingId,
   selectInstalledSettings,
 } from '../../src/store/settingPackStore';
-import useContentPackStore, {
-  selectContentPacks,
-} from '../../src/store/contentPackStore';
+// 446: установка паков контента из этого окна УДАЛЕНА (окно скрыто в UI —
+// владелец, 2026-10-25); она живёт в Настройках → «Собственное снаряжение»
+// (components/settings/SettingsModal.js; паковый стор там).
 
 const isTrpgName = (name) => typeof name === 'string' && name.toLowerCase().endsWith('.trpg');
-
-// Паки контента (прототип P): выбираем .json и ЧИТАЕМ текст (сами данные,
-// а не имя файла — в отличие от заглушки .trpg).
-const pickLocalContentPack = () => new Promise((resolve) => {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') {
-    resolve(null);
-    return;
-  }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json,application/json';
-  input.onchange = async () => {
-    const file = input.files && input.files[0];
-    if (!file) { resolve(null); return; }
-    try {
-      resolve({ name: file.name, text: await file.text() });
-    } catch {
-      resolve(null);
-    }
-  };
-  input.click();
-});
 
 const pickLocalTrpg = () => new Promise((resolve) => {
   if (Platform.OS !== 'web' || typeof document === 'undefined') {
@@ -80,12 +58,6 @@ export default function GameSettingsModal({ visible, onClose }) {
   const installLocalFile = useSettingPackStore((state) => state.installLocalFile);
   const [pickedFileName, setPickedFileName] = useState(null);
   const pickingRef = useRef(false);
-  // Паки контента (прототип P).
-  const contentPacks = useContentPackStore(selectContentPacks);
-  const installPackText = useContentPackStore((state) => state.installPackText);
-  const countPackUsage = useContentPackStore((state) => state.countPackUsage);
-  const deletePack = useContentPackStore((state) => state.deletePack);
-  const [packResult, setPackResult] = useState(null); // { ok, message? , errors? }
 
   const available = getVanillaCatalog().filter(
     (entry) => !installed.some((item) => item.id === entry.id),
@@ -106,39 +78,6 @@ export default function GameSettingsModal({ visible, onClose }) {
       if (name) setPickedFileName(name);
     } finally {
       pickingRef.current = false;
-    }
-  };
-
-  const handleInstallContentPack = async () => {
-    if (pickingRef.current) return;
-    pickingRef.current = true;
-    try {
-      const picked = await pickLocalContentPack();
-      if (!picked) return;
-      const result = installPackText(picked.text);
-      if (result.ok) {
-        setPackResult({
-          ok: true,
-          message: tHomeScreen('gameSetting.contentPacks.installedOk', {
-            name: result.pack.manifest.name,
-            w: result.summary.weapons,
-            m: result.summary.weaponMods,
-            a: result.summary.ammo,
-          }),
-        });
-      } else {
-        setPackResult({ ok: false, errors: result.errors });
-      }
-    } finally {
-      pickingRef.current = false;
-    }
-  };
-
-  const confirmDeleteContentPack = async (pack) => {
-    const count = await countPackUsage(pack.manifest.packId);
-    if (await confirmAlert('contentPackDelete', { name: pack.manifest.name, count })) {
-      await deletePack(pack.manifest.packId);
-      setPackResult(null);
     }
   };
 
@@ -200,43 +139,6 @@ export default function GameSettingsModal({ visible, onClose }) {
               />
             </View>
 
-            {/* Паки контента (прототип P): установка JSON из генератора,
-               удаление — полное (каскад по сейвам). */}
-            <View style={styles.plusBlock}>
-              <Text style={styles.plusMark}>+</Text>
-              <Text style={styles.blockTitle}>{tHomeScreen('gameSetting.contentPacks.title')}</Text>
-              {contentPacks.map((pack) => (
-                <View key={pack.manifest.packId} style={styles.availableRow}>
-                  <Text style={styles.settingName} numberOfLines={2}>{pack.manifest.name}</Text>
-                  <ActionButton
-                    label={tHomeScreen('gameSetting.delete')}
-                    onPress={() => confirmDeleteContentPack(pack)}
-                  />
-                </View>
-              ))}
-              {contentPacks.length === 0 && (
-                <Text style={styles.filePickText}>{tHomeScreen('gameSetting.contentPacks.empty')}</Text>
-              )}
-              <TouchableOpacity style={styles.filePick} onPress={handleInstallContentPack}>
-                <MaterialCommunityIcons name="package-variant-closed" size={22} color="#f0e68c" />
-                <Text style={styles.filePickText}>{tHomeScreen('gameSetting.contentPacks.install')}</Text>
-              </TouchableOpacity>
-              {packResult && packResult.ok && (
-                <Text style={styles.packOkText}>{packResult.message}</Text>
-              )}
-              {packResult && !packResult.ok && (
-                <View>
-                  <Text style={styles.packErrorTitle}>
-                    {tHomeScreen('gameSetting.contentPacks.errorsTitle')}
-                  </Text>
-                  {packResult.errors.slice(0, 5).map((e, i) => (
-                    <Text key={`packErr_${i}`} style={styles.packErrorText}>
-                      {`${e.path}: ${e.message}`}
-                    </Text>
-                  ))}
-                </View>
-              )}
-            </View>
           </ScrollView>
           <TouchableOpacity style={styles.close} onPress={onClose}>
             <Text style={styles.closeText}>{tHomeScreen('buttons.ok')}</Text>

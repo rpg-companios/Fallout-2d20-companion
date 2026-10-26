@@ -8,6 +8,8 @@ import { Alert } from 'react-native';
 import * as avatarCache from '../db/avatarCache';
 import { AVATAR_LIMITS, validateAvatarDataUrl, base64ByteLength } from './characterAvatar';
 import { showRawAlert } from '../components/alerts/alertService';
+// 446: отладка аватаров ушла в гейт трассировки (__fallout.on(['avatar']); в проде — тишина.
+import { debugLog } from '../src/debug/falloutDebug';
 
 /**
  * Хук для работы с кастомными изображениями персонажей.
@@ -39,7 +41,7 @@ export function useCharacterImage() {
       }
       return null;
     } catch (error) {
-      console.error('Failed to get character image URL:', error);
+      debugLog('avatar.error', { step: 'Failed to get character image URL:', error: String(error?.message ?? error) });
       return null;
     }
   }, []);
@@ -50,49 +52,49 @@ export function useCharacterImage() {
    * @returns {Promise<{success: boolean, dataUrl?: string, error?: string}>}
    */
   const pickAndSaveCharacterImage = useCallback(async (characterId) => {
-    console.log('[useCharacterImage] pickAndSaveCharacterImage: start, characterId:', characterId);
+    debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: start, characterId:', value: (characterId) });
     if (!characterId) {
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: no characterId');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: no characterId' });
       return { success: false, error: 'No character ID provided' };
     }
 
     try {
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: requesting permissions');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: requesting permissions' });
       // Запрашиваем разрешение на доступ к галерее
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: permission status:', status);
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: permission status:', value: (status) });
       if (status !== 'granted') {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: permission denied');
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: permission denied' });
         return { success: false, error: 'Permission to access gallery is required' };
       }
 
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: launching image picker');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: launching image picker' });
       // Открываем пикер изображений
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
         base64: true,
       });
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: picker result:', result.canceled ? 'canceled' : 'success');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: picker result:', value: (result.canceled ? 'canceled' : 'success') });
 
       if (result.canceled) {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: user canceled selection');
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: user canceled selection' });
         return { success: false, error: 'Image selection canceled' };
       }
 
       const { assets } = result;
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: assets count:', assets?.length || 0);
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: assets count:', value: (assets?.length || 0) });
       if (!assets || assets.length === 0) {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: no assets');
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: no assets' });
         return { success: false, error: 'No image selected' };
       }
 
       const asset = assets[0];
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: asset size:', asset.fileSize);
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: asset size:', value: (asset.fileSize) });
       
       // Проверяем размер файла
       if (asset.fileSize && asset.fileSize > AVATAR_LIMITS.maxBytes) {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: image too large');
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: image too large' });
         showRawAlert({
           title: 'Предупреждение',
           message: `Изображение слишком большое (${Math.round(asset.fileSize / 1024 / 1024)} МБ). Максимальный размер: ${Math.round(AVATAR_LIMITS.maxBytes / 1024 / 1024)} МБ.`
@@ -100,7 +102,7 @@ export function useCharacterImage() {
         return { success: false, error: 'Image too large' };
       }
 
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: processing image');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: processing image' });
       setIsLoading(true);
 
       // Определяем MIME-тип
@@ -114,7 +116,7 @@ export function useCharacterImage() {
         }
       }
       
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: detected mimeType:', mimeType);
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: detected mimeType:', value: (mimeType) });
       
       // Формируем data URL
       let dataUrl;
@@ -126,14 +128,14 @@ export function useCharacterImage() {
         }
       } else if (asset.uri) {
         // Если нет base64, но есть uri - это не должно произойти с base64: true
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: no base64, using uri');
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: no base64, using uri' });
         return { success: false, error: 'No base64 data available' };
       }
       
       // Валидируем data URL
       const validation = validateAvatarDataUrl(dataUrl);
       if (!validation.ok) {
-        console.log('[useCharacterImage] pickAndSaveCharacterImage: validation failed:', validation.reason);
+        debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: validation failed:', value: (validation.reason) });
         let errorMessage = 'Невалидное изображение';
         if (validation.reason === 'avatar.tooLarge') {
           errorMessage = `Изображение слишком большое. Максимальный размер: ${AVATAR_LIMITS.maxBytes / 1024 / 1024} МБ`;
@@ -149,18 +151,18 @@ export function useCharacterImage() {
       }
 
       // Сохраняем в кэш как есть
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: saving to cache');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: saving to cache' });
       await avatarCache.setAvatarCache(characterId, dataUrl, null, mimeType);
 
       // Обновляем версию изображения для принудительного перерисовки
       refreshImage();
 
       setIsLoading(false);
-      console.log('[useCharacterImage] pickAndSaveCharacterImage: success');
+      debugLog('avatar.useCharacterImage', { step: 'pickAndSaveCharacterImage: success' });
       return { success: true, dataUrl };
     } catch (error) {
       setIsLoading(false);
-      console.error('[useCharacterImage] pickAndSaveCharacterImage: error:', error);
+      debugLog('avatar.error', { step: '[useCharacterImage] pickAndSaveCharacterImage: error:', error: String(error?.message ?? error) });
       
       let errorMessage = 'Не удалось сохранить изображение';
       if (error.message) {

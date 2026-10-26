@@ -37,6 +37,12 @@ const audienceList = (audience) => {
 /**
  * Оверлей каталога из установленных паков под локаль.
  * → { weapons, robotWeapons, weaponMods, ammoTypes, modsOverrides }
+ *
+ * Каждая паковая запись несёт метки { isPackItem: true, packId } — по ним
+ * обзорные списки (446: модал добавления) не смешивают самодельное с
+ * общим каталогом, а собирают в своей категории «Самодельное снаряжение»;
+ * механические потребители (лавка/лут/окно модов) на метки смотреть
+ * не обязаны — их контракт не менялся.
  */
 export const buildPackCatalogOverlay = (locale) => {
   const weapons = [];
@@ -47,10 +53,12 @@ export const buildPackCatalogOverlay = (locale) => {
 
   for (const pack of installedPacks) {
     const items = pack?.items || {};
+    const packId = pack?.manifest?.packId;
+    const tag = { isPackItem: true, packId };
 
     for (const w of items.weapons ?? []) {
       const loc = localizedEntry(pack, locale, w.id);
-      const record = { ...w, ...loc, itemType: 'weapon' };
+      const record = { ...w, ...loc, ...tag, itemType: 'weapon' };
       const aud = audienceList(w.audience);
       const isRobot = aud.includes('robot');
       const isHumanSide = aud.includes('human') || aud.includes('mutant');
@@ -66,12 +74,12 @@ export const buildPackCatalogOverlay = (locale) => {
 
     for (const m of items.weaponMods ?? []) {
       const loc = localizedEntry(pack, locale, m.id);
-      weaponMods.push({ ...m, ...loc, modType: 'weapon' });
+      weaponMods.push({ ...m, ...loc, ...tag, modType: 'weapon' });
     }
 
     for (const a of items.ammo ?? []) {
       const loc = localizedEntry(pack, locale, a.id);
-      ammoTypes.push({ ...a, ...loc });
+      ammoTypes.push({ ...a, ...loc, ...tag, itemType: 'ammo', type: 'ammo' });
     }
   }
 
