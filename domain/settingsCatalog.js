@@ -69,11 +69,34 @@ export const ENGINE_SETTINGS = [
     defaultValue: false,
   },
   {
+    // 447: переключатель отображения пространства админа
+    // (экран администратора / GM-режим). По умолчанию выключен.
+    id: 'adminScreenEnabled',
+    type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+    sectionKey: 'appearance',
+    labelKey: 'settings.adminScreenTitle',
+    descriptionKey: 'settings.adminScreenDescription',
+    defaultValue: false,
+  },
+  {
     id: 'language',
     type: 'select',
     controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
     defaultValue: DEFAULT_LOCALE,
     options: SUPPORTED_LOCALES.map((value) => ({ value })),
+  },
+  {
+    // Комнаты мастера (gm-rooms, этап 1): режим интерфейса
+    // «пользователь/мастер». Переключатель — кнопка в шапке главного
+    // экрана, в окне настроек не показывается (surface characters, как у
+    // language). Кнопка рендерится только при доступном сервере комнат
+    // (§3.9 плана — пространства может не быть).
+    id: 'uiMode',
+    type: 'select',
+    controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
+    defaultValue: 'user',
+    options: [{ value: 'user' }, { value: 'gm' }],
   },
 ];
 

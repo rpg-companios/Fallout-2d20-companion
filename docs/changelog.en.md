@@ -1,4 +1,492 @@
 # Changelog
+---
+## Technical memory of session 425–440 (patch 441)
+
+The owner's word: write down how the release-3 mechanisms work — not
+"made a filter" but how it works, where the data comes from and why
+exactly this way. docs/agents/data-flows.md gained sections: gear
+filters (§10), the installer — cutoff/backup/human output (§11),
+«Sleep\Wait» (§12), session laws and traps (§13). The technical
+document serves future maintenance of the app.
+
+---
+## Release 3 — «What's new» notes (patch 440)
+
+The owner's word: "Now we make the release description. What changed
+from the previous version." version.json: release raised to 3 (the
+«What's new» window shows the notes once), notes rewritten for
+patches 402–439 in the player's language: perks by the books and old
+save migration, book repair (weapons and armor), durability and its
+settings, rarity on cards, gear filters (funnel, categories, «Show
+(N)»), the «Sleep\Wait» button with «Wait», app updates, window
+scrolling. Full text — public/version.json (ru/en).
+
+---
+## The "Sleep\Wait" button and the "Wait" option (patch 439)
+
+The owner's word: the sleep button is now called **"Sleep\Wait"**.
+The sleep modal gained a **"Wait"** option: time passes almost like
+sleep (effect timers move), but **all three** survival parameters are
+spent — Hunger, Thirst and Sleep — and nothing is replenished: no
+sleep ladder, no fatigue relief, no bonus, no bed rest. Fatigue eats
+current HP as in normal time flow. The forecast shows the drains and
+HP loss up front; if HP would drop **below zero**, the alert
+**"Character died"** is shown. Sleep place (bed/wasteland) and the
+disease check apply to sleeping only.
+
+---
+## The owner's word on mods in the filter (patch 438)
+
+Mods in the filter results — NEVER: "1 mod may fit 9 of 11 weapons,
+and if there is no 11th weapon, the mod is pointless". The "Mods"
+section is gone from the window. What a mod gives is already written
+in the mod installation screen — no labels needed in the list. And
+so: the filter's qualities are now only those actually found on
+weapons (22) — Night Vision and other mod-only abilities are not in
+the list, no empty selections.
+
+---
+## Filter button — square with a funnel (patch 437)
+
+The owner's word: the filter should be a square button with a funnel
+icon, like the category icons in the crafting screen. To the right
+of the search field there is now a square button: inside, a funnel
+icon from the same icon set as the crafting screen; in the corner, a
+colored badge with the number of active conditions (no badge when
+there are none). The search field takes all the remaining width.
+
+---
+## Search and filter fit inside the window again (patch 436)
+
+Defect: in the loot and buy windows the search field refused to
+shrink below its intrinsic width, pushing the filter button beyond
+the window border. Now the row uses exactly the space it is given.
+The installer also names the rollback command right away: if the new
+version is not to your liking, one line from the .install-backup
+folder brings everything back.
+
+---
+## Installer hints follow your workflow (patch 435)
+
+The owner's word: it is easier to accumulate commits and record them
+in one go than to commit after every install. The installer no
+longer nags: the hint now says honestly — commit whenever you like,
+several installs can be folded into one commit; if the platform
+rebuilds the project before that, just run the installer again (it
+archives your edits in advance). The manual git fetch from the
+instructions is no longer needed: it was required once, to replace
+an outdated installer.
+
+---
+## The installer speaks human (patch 434)
+
+The owner's word: "so much noise in the output, and no understanding
+of whether the patch is installed". The result is now clear from one
+line: "Done: the app is updated to №N" — with the app's own version
+shown next to it as proof. The backup message became understandable:
+what is inside (as a list) and that the folder can be deleted if
+nothing valuable is there. The bureaucratic talk about "trees" and
+"queues" is gone.
+
+---
+## The "Show" count is honest again (patch 433)
+
+Defect of 432: the found-items counter counted groups by service
+keys while the window is grouped by dictionary labels — so it always
+showed 0. Now it counts exactly the groups that reach the results,
+by the same labels; locked in with a behavioral test on the
+dictionary.
+
+---
+## Filter results contain only what matched (patch 432)
+
+Defect of 430: picking "Weapons, rarity 6" in the filter still listed
+ammo, chems and junk in the results — consumables were never cut by
+the filter, since the filter targets gear. Now the results contain
+only gear that matched plus the selected mods; consumables and junk
+stay in the usual catalog and in search. The number on the "Show"
+button is now honest — it counts exactly what will be shown. Also,
+Power Armor was added to the flat lists (filter and search) — it used
+to be missing there.
+
+---
+## Installation no longer fears local edits (patch 431)
+
+Real-life case: the project folder rolled back to an old state (the
+platform rebuilt it from git), local edits remained inside — and the
+installer refused to bring the project to the fresh version, demanding
+manual cleanup first. Now the installer itself saves all uncommitted
+edits into an archive folder `.install-backup/<date-time>/` (deletes
+nothing) and brings the project to the target version in one step.
+If the project is rebuilt from git (hosting/platform), the installer
+suggests committing the result — otherwise a rebuild brings the old
+files back.
+
+---
+## "Show" leads to results (patch 430)
+
+Defect of 429: the filter was applied, but after the "Show" button
+the window returned to the category catalog — filtered items had to
+be dug out of folders by hand. Now with an active filter the window
+immediately shows a flat, alphabetically sorted list of matches with
+a "Found: N" header (each row keeps its type label:
+Weapons/Armor/…). Reset the filter — the usual folder catalog
+returns. Also: the "Mods" section now appears in search too (it used
+to be lost).
+
+---
+## Filter — a separate window (patch 429)
+
+The owner's word about mobile screens: the item list must not hide
+behind the settings. The "Filter (N)" button in the search row now
+opens a separate window: first it shows only the category checkboxes —
+**Weapons, Armor, Power Armor, Clothing**. Parameters are NOT shown
+up front: check a category and "Rarity" plus that category's
+parameters appear (weapons — damage, fire rate, distance, damage
+type, weapon type, ammo, qualities, effects; armor — resistances and
+body parts). At the bottom, a "Show (N)" button tells how many items
+match the filter. Header and button stay put, the settings scroll.
+The main window is as before: search, filter button, full-height list.
+
+---
+## Installing the latest version — one step (patch 428)
+
+The installer's cutoff now also fires when the target is the key
+(latest) patch itself: the tree is brought to its state from the
+branch history in one step, without walking the old chain. Before,
+only installs on top of the latest were instant; installing the
+fresh version itself re-checked every patch in order. The full walk
+remains for a dirty tree (uncommitted edits — commit or stash them)
+and for installing older versions.
+
+---
+## Search and filter — together; category checkboxes (patch 427)
+
+Add-item window (loot and buy): search and the "Filter" button now
+share one row. The filter panel is pinned at the top and no longer
+scrolls with the list — a divider line separates it from the items.
+The filter gains category checkboxes, 3 per row: **Weapons, Armor,
+Power Armor, Clothing** (Clothing added as a fourth — it is in the
+window and would vanish under any check mark otherwise). With
+categories checked, the panel shows only their parameters, and the
+list shows only those kinds. The Filter button shows the number of
+active conditions. Unchecked — everything as before.
+
+---
+## Installer cutoff — at the latest patch (patch 426)
+
+The installer's key patch moved from №391 to №425 (the latest one).
+Installation no longer walks the whole old chain: a clean tree is
+brought to the №425 state from the branch history in one step, and
+only patches after it are checked and applied. Uncommitted changes
+block the fast path — commit or stash before installing. A latch
+keeps the cutoff equal to the branch's latest patch (moved by the
+agent with a patch).
+
+---
+## Filters in loot and purchase windows (patch 425)
+
+The «Add» and «Buy» windows now have a «Filter» spoiler — like the
+perks one. Weight is not filtered; the rest is as you chose:
+- «from–to» ranges with grey hints of the catalog bounds (rarity 0–6,
+  damage 0–21, fire rate 0–7, armor DR) — the hint disappears once the
+  field is touched;
+- qualities — all 32 in the game (including those absent on weapons:
+  mods grant them, except Bombardment), effects — all 10;
+- types (Light/Heavy…), damage type, range, body parts — chips;
+- ammo — a dropdown (41 variants from the catalog).
+
+Per your word «mods are mods — effects appear only when installed»:
+weapons are filtered by their own qualities/effects only; a selection
+no weapon has opens a «Mods» section listing the mods that grant it
+(night scopes, targeting computer, etc.). If nothing fits — only the
+mods remain in the window.
+
+---
+## Rarity in properties (patch 424)
+
+Weapon, armor and power armor cards now show «Редкость: N» (the
+book rarity; items without rarity have no line). The first step
+toward loot/purchase filters: the list of filterable properties is
+sent separately; the filters come after we review it.
+
+---
+## Material names in the report (patch 423)
+
+You caught the same class of defect as with the button: the report
+line said «Потрачено: item_common_materials ×2» — a service id instead
+of a name. The report now speaks properly: «Потрачено: Обычные
+материалы ×2» (Common materials ×2), with the same words as the
+window's requirement lines. A check is added: no report line may
+contain service identifiers.
+
+---
+## Repair window without placeholders (patch 422)
+
+You caught a defect: the repair button (and the whole repair window)
+showed service names instead of words — «repair.actions.remake»
+instead of «Repair» and so on. The cause: repair dictionary keys were
+called without a prefix, and by the «no fallbacks» rule the key's own
+name leaked onto the screen. All 23 call sites are fixed (card
+buttons, the repair window, the temporary-repair note). The check now
+reads the dictionary the same way the screen does — such a defect can
+no longer slip past the tests.
+
+---
+## Independent settings; armor durability (patch 421)
+
+«Weapon durability loss» and «Random weapon quality» are now two
+independent settings: quality is no longer hidden behind wear (toggle
+them separately as you like). The old combined switch in saves splits
+evenly into both settings.
+
+Armor (regular, not power armor) now has durability too: with
+«Random quality» every found armor piece is born with its own
+durability (bought = whole), the card shows «Durability: N/100», and
+damaged armor is repaired by the same repair window: with the «Jury
+Rigging» perk — three buttons; without — donor and materials. Rarity
+and mods of the armor affect the difficulty like a weapon's. Armor
+cannot wear from shots — it is only damaged by being born with poor
+durability.
+
+---
+## Repair button follows durability display (patch 420)
+
+One simple rule, as you said: if durability is not displayed — there
+is no repair button at all. If durability is visible on the card —
+the button opens the choice window (with the «Jury Rigging» perk —
+three buttons including «Without cost (poor quality)»; without the
+perk — donor and materials). A weapon shows durability when either
+the quality or the wear setting is on; power armor always shows it,
+so a damaged piece always has the button. No more instant repair:
+everything goes through the window, the test and the time.
+
+---
+## The window only when the setting is on (patch 419)
+
+You caught a real bug: with the «Jury Rigging» perk and the
+durability setting OFF, the repair window still opened — the perk
+intercepted the press before the setting was checked. The order is
+now reversed: the setting is checked first. Off — always the instant
+free «Fix» with no window, perk or not. On — the window: with the
+perk, three buttons («Without cost (poor quality)» exists only with
+the perk); without the perk — «From a donor» and «From materials».
+
+---
+## Repair rules locked in (patch 418)
+
+The app itself did not change — both of your rules were already in
+effect after the previous update; now they are locked by checks so
+they cannot be lost: the repair choice window appears only when the
+durability setting is on (off — the instant free «Fix» with no
+window), and the «Without cost (poor quality)» button in the window
+exists only with the «Jury Rigging» perk (without the perk the window
+has the donor and the materials).
+
+---
+## Repair choice window (patch 417)
+
+By your word the unconditional free repair is gone. With the
+«Jury Rigging» perk the button opens a choice window with three
+buttons: «Without cost (poor quality)», «From a donor (quick
+repair)», «From materials». No donor — the donor button is grey; no
+materials — the materials button is grey; neither — both grey, the
+free one remains. No more instant actions: every choice is the test
+and half an hour of work (2 AP halve it); the free option only spends
+nothing, and its result is temporary (a complication 19–20 breaks the
+item again — shown in the report and on the card). Without the perk
+the repair window is as before.
+
+---
+## Jury Rigging (patch 416)
+
+The «Jury Rigging» perk works now. The same single «Fix» button is
+free with this perk too, even with the durability setting on. Per the
+book, such a repair is temporary: the item breaks again at the next
+complication while being used, and the complication range for skill
+checks with the item is 19–20. While the item is temporarily repaired,
+its card shows a yellow note. A proper repair with materials (the
+«Repair» button) removes the note — the item is fixed for good. Firing
+wear does not remove the note: only a complication releases the item.
+
+The «Weapon durability loss» setting is now on by default. If it was
+saved off in your save — turn it on once in the settings; an explicit
+choice is never overridden.
+
+---
+## One repair button (patch 415)
+
+By your word there is one button again. With the durability setting
+off it is the old instant free «Fix». With it on — the book «Repair»:
+a window with the donor, materials and the crafting-style report; no
+materials (and no donor) — the button is grey. Free repair exists only
+when the settings are off (later — also with the «Jury Rigging» perk,
+on the same button). The «repair is per one piece» law now covers
+everything: a weapon stack is also repaired one instance per test,
+like power armor pieces; even the instant free fix separates one piece
+from the stack and repairs only it. The repaired piece merges with the
+whole ones.
+
+---
+## Repair — as you said (patch 414)
+
+By your corrections there are two buttons now. «Fix» is the old
+instant free repair. «Repair» is the book test with materials. The
+repair window offers a donor when a second identical item is in the
+bag; with no donor there is no selection window — pressing the button
+attempts the repair right away and shows the report. The report comes
+from the Crafting window: the same check and dice lines, the same 2 AP
+question and time — only instead of «received: item» it says «the
+item's durability has been restored». When materials are missing (and
+no donor), the «Repair» button is disabled; when the durability
+setting is off, there is no «Repair» button at all. Power armor is
+repaired one piece at a time: one test — one piece, the rest of the
+stack waits for its own tests.
+
+---
+## Repair — by the book (patch 413)
+
+The repair mechanics you provided is implemented in full. The «Repair»
+button now opens a repair window: an INT + Repair test with difficulty
+equal to the item's rarity; +1 difficulty for each installed
+modification. If you have a second identical item in the bag, you can
+mark it as a donor: it is scrapped, provides the materials and lowers
+the difficulty by 1. Materials follow the book rarity table (the
+window shows «have / need» for every line). Time is half an hour; on
+a success you may spend 2 AP to halve it; each complication adds 15
+minutes, and a d20 rolled 19–20 on a complication loses one more set
+of materials. On a failure the materials stay in the bag, but the
+time is gone. Instant free repair is no more — an item's durability
+is now honestly earned.
+
+---
+## Dormant perks: the game warns and leaves the call to you (patch 412)
+
+By your word, the migrator no longer removes perks taken under the old
+rules. If a perk does not meet the book (missing level or attributes,
+unavailable to robots, mutually exclusive with another perk, a rank the
+book does not have) — it stays in the list, shown greyed with a «Not
+active» note explaining exactly what is missing. Such a perk grants no
+bonuses and no recipes; once you meet the requirements it wakes up on
+its own — or do not wait: the «Replace» button swaps it for any other
+perk, the character decides. On load the game names the list of such
+perks once; reloading the same character does not repeat the notice.
+Only perks missing from the catalog entirely are still removed. Perk
+requirements now apply uniformly everywhere: a dormant rank unlocks no
+crafting recipes and does not affect salvage.
+
+---
+## Old saves' perks repair themselves (patch 411)
+
+The app is now public, and the book rules for perks have changed — so
+on every character load the perks are checked against the book and
+repaired automatically, without bumping the save version. If a perk
+had more ranks than allowed, the extras are removed and the picks are
+freed; if a perk was taken under the old rules (wrong level, wrong
+attributes, a robot, mutually exclusive with another perk) — it is
+removed and its slot is freed too. After such a cleanup the game shows
+a short notice naming the changed perks, in the interface language.
+Reloading changes nothing and shows no notice. Also fixed the load-time
+perk notices themselves: their text dictionary was missing, so they
+silently never worked.
+
+---
+## Perks follow the book (patch 410)
+
+By your word «the book takes priority», all perk ranks and
+requirements now match the book, guided by its descriptions wherever
+the rank number itself looked wrong. Result: 45 perks got book ranks
+(Ammosmith all 3 — this also fixed ammo recipes of rarity 2–3 that
+were unreachable before), 48 perks got book requirements (level, step
+per rank, attributes). The Pharmacist now removes +2/+3/+4 radiation
+by rank, Power User grants +3/+6/+10 charges — exactly per the book.
+Armorer, Science and Gun Nut keep 4 ranks: their descriptions
+(«and so on») continue the series to mod rank 4, otherwise rank-4 mod
+recipes would be lost. «Whatever the description says is what works»
+is now pinned by a test.
+
+---
+## Perk audit against your list (patch 409)
+
+Audited every perk against your prepared list of descriptions. Main
+fix: 123 perks still had short English blurbs in the Russian UI — now
+all 185 perks carry full Russian names and texts, verbatim from your
+catalog (Патронщик, Фанат колы, Кровосос, Водохлёб, etc.). Exceptions:
+three perks work by your word rather than the book — Field Surgeon,
+Pharmacist and Power User — their texts now describe the actual app
+behavior. The Bloodsucker gained its book detail: a blood pack also
+quenches thirst one step better than a regular drink. No coverage
+gaps: 184 from your list plus our EMT.
+
+---
+## «Гулеподобный» as written (patch 408)
+
+The perk is now three ranks, as in the book: 1 HP for every 4 points
+of radiation taken, at rank 2 — every 3, at rank 3 — every 2 (level
+requirement +8 per rank). Radiation now applies normally — the counter
+grows — and the healing comes on top. The rate counts radiation from
+food and drinks (shown in the consumption report) and manual counter
+changes; removing radiation grants no healing. Note: the book line
+«your maximum HP is still reduced» changes nothing in the app —
+radiation never reduces max HP here; that is app-wide behavior, not
+the perk's.
+
+---
+## Ghoulish and the glowing pack (patch 407)
+
+«Гулеподобный» (the Russian name of Ghoulish) now accounts for every
+radiation increase — including manual counter changes: instead of harm
+the character heals the same amount of HP, and the counter does not
+grow. The Glowing blood pack got its written mechanics: +5 radiation
+DR until the end of the scene (the +4 HP heal stays). The catalog
+split is now pinned: 43 of 185 perks have explicit mechanics, the
+other 142 are descriptive.
+
+---
+## Eleven more perks now work (patch 406)
+
+«Ghoulish»: radiation from food and drinks heals instead of harm, HP
+for HP. «Bloodsucker»: blood packs (already in the gear list) heal
+twice as much. «Super Duper»: every craft rolls a combat die — on an
+Effect, half of the spent materials go back to your inventory, and the
+craft report shows it. «Rejuvenated»: +2 max HP while fully fed, and
+fullness/thirst last twice as long. «Dromedary»: any drink quench
+thirst one step better, purified water — three steps at once. «Field
+Surgeon»: stimpaks heal +3 HP, RadAway removes 1 more radiation;
+«Pharmacist» adds another 1 (2 together). «Power User»: fusion cores
+hold 1 more charge (4 with the Nuclear Physicist). «Cap Collector»:
+the buy window opens with the 10% discount already applied. «Natural
+Resistance»: sleeping rough no longer rolls for disease. The «Chemist»
+now also doubles chem duration. «Quack Surgeon» and the night perks
+stay text until first aid and a day cycle exist.
+
+---
+## Book conditions restored to perks (patch 405)
+
+Your question prompted a full re-check, which found two gaps. «Load and
+Fire» now boosts only heavy weapons with a fire rate of 2 or higher —
+the Fat Man and other single-shot launchers are no longer sped up, as
+the book says. «In Shining Armor» rank 2 got its second half: while
+wearing glare-blocking optics (currently the Welding Shield — the only
+optics in the gear list) energy damage resistance gains another +1,
+for +3 total in metal armor with the shield. All active perks were
+also audited — every mechanic is in place.
+
+---
+## Four perks now actually work (patch 404)
+
+As you asked, all four adaptable perks from the previous step landed in
+one patch. «Old World Gourmet»: packaged and canned food heals 2 HP
+more and deals 1 less radiation (down to zero). «Load and Fire»: heavy
+weapons fire 1 (rank 1) or 2 (rank 2) more shots — visible on weapon
+cards in inventory and on the gear screen. «In Shining Armor»: +2
+energy damage resistance while wearing metal armor (the rank-2
+dazzle protection stays perk text — combat scenes are out of the
+app's scope). «Jury-Rigged Ammo»: at a workbench, ammo of rarity 1
+(and 2 with rank 2) can be made from any junk — 5 pieces and 10
+minutes instead of regular materials and an hour of work; the craft
+report reminds you: attacks with such ammo get a Complication Range +1.
+
 
 ---
 ---
@@ -15,6 +503,14 @@
 ---
 ---
 ---
+---
+## Eight new perks from your references (patch 403)
+
+The perk catalog grows from 177 to 185: Crippler, Crushing Blow,
+Fierce Loyalty, In Shining Armor, Jury-Rigged Ammo, Load and Fire,
+Miss Fortune, Old World Gourmet. Texts follow your compiled reference
+(full Russian, concise English); ranks and requirements unchanged.
+
 ---
 ## The «What's new» window scrolls (patch 402)
 

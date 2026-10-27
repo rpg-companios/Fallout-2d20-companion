@@ -1,0 +1,249 @@
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index a6e43bd..f848af4 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -64,14 +64,13 @@ const GAME_SETTINGS_UI_ENABLED = false;
+ // запереть пользователя внутри скрытого режима.
+ const GM_MODE_UI_ENABLED = false;
+ 
+-// Переключатель отображения экрана админа (для поэтапной проверки работы
+-// после каждого этапа внедрения). По умолчанию выключен.
+-// Возврат в UI = ADMIN_SCREEN_UI_ENABLED = true.
+-const ADMIN_SCREEN_UI_ENABLED = false;
++// Toggle отображения пространства админа подключён к appSettingsStore:
++// adminScreenEnabled (default: false). Управляется через настройки.
+ import useSettingPackStore, {
+   selectBundledSettingActive,
+ } from '../../../src/store/settingPackStore';
+ import useAppSettingsStore, {
++  selectAdminScreenEnabled,
+   selectCharacterDeleteActionPlacement,
+   selectCharacterFoldersEnabled,
+   selectPwaInstallDiagnosticsEnabled,
+@@ -447,6 +446,7 @@ export default function HomeScreen({ navigation }) {
+   // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9:
+   // кнопки нет, когда адрес сервера недоступен — пространства нет).
+   const uiMode = useAppSettingsStore(selectUiMode);
++  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+   const isGmMode = uiMode === 'gm';
+   const roomServerAvailable = isRoomServerConfigured();
+   const roomRooms = useRoomStore((state) => state.rooms);
+diff --git a/domain/settingsCatalog.js b/domain/settingsCatalog.js
+index 2e96017..b4bb7bd 100644
+--- a/domain/settingsCatalog.js
++++ b/domain/settingsCatalog.js
+@@ -68,6 +68,17 @@ export const ENGINE_SETTINGS = [
+     descriptionKey: 'settings.pwaDiagnosticsDescription',
+     defaultValue: false,
+   },
++  {
++    // 447: переключатель отображения пространства админа
++    // (экран администратора / GM-режим). По умолчанию выключен.
++    id: 'adminScreenEnabled',
++    type: 'boolean',
++    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
++    sectionKey: 'appearance',
++    labelKey: 'settings.adminScreenTitle',
++    descriptionKey: 'settings.adminScreenDescription',
++    defaultValue: false,
++  },
+   {
+     id: 'language',
+     type: 'select',
+@@ -75,6 +86,18 @@ export const ENGINE_SETTINGS = [
+     defaultValue: DEFAULT_LOCALE,
+     options: SUPPORTED_LOCALES.map((value) => ({ value })),
+   },
++  {
++    // Комнаты мастера (gm-rooms, этап 1): режим интерфейса
++    // «пользователь/мастер». Переключатель — кнопка в шапке главного
++    // экрана, в окне настроек не показывается (surface characters, как у
++    // language). Кнопка рендерится только при доступном сервере комнат
++    // (§3.9 плана — пространства может не быть).
++    id: 'uiMode',
++    type: 'select',
++    controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,
++    defaultValue: 'user',
++    options: [{ value: 'user' }, { value: 'gm' }],
++  },
+ ];
+ 
+ const SUPPORTED_TYPES = ['boolean', 'number', 'select'];
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index a053bcc..3fc03b9 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -142,7 +142,18 @@
+       "tabs": "Tabs"
+     },
+     "pwaDiagnosticsTitle": "Install diagnostics",
+-    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation."
++    "pwaDiagnosticsDescription": "Show a technical check inside the «Install App» dialog: whether the app is already installed, service worker status, manifest and icons availability, build version. Turn on when troubleshooting installation.",
++    "ownEquipment": {
++      "title": "Own equipment",
++      "description": "Content packs from the Item Forge (JSON). Pack items appear in the \"Homebrew Equipment\" category of the add-item window, in the shop and in the weapon modification window. Deleting a pack strips its items from every character save.",
++      "load": "Load content pack JSON",
++      "empty": "No packs installed",
++      "installedOk": "Installed: {name} — {w} weapons, {m} mods, {a} ammo",
++      "errorsTitle": "Pack failed validation:",
++      "delete": "Delete"
++    },
++    "adminScreenTitle": "Admin screen",
++    "adminScreenDescription": "Show the admin / GM mode screen for testing staged implementation stages. Hidden by default; enable when needed for verification."
+   },
+   "folders": {
+     "create": "Create folder",
+@@ -159,6 +170,37 @@
+     "deleteMessageWithCount": "The folder and every character inside it will be deleted permanently. Characters: {count}."
+   },
+   "subtitle": "Positronium",
++  "gm": {
++    "enter": "Admin",
++    "exit": "User"
++  },
++  "server": {
++    "menuItem": "Server",
++    "dialogTitle": "Game master room",
++    "addressLabel": "Room address",
++    "addressPlaceholder": "GM-XXX-XXX",
++    "connect": "Connect",
++    "connecting": "Connecting…",
++    "connected": "Character is in room {code}",
++    "disconnect": "Disconnect",
++    "close": "Close",
++    "invalidAddress": "This does not look like a room code (e.g. GM-7Q3-K9M).",
++    "notFound": "Room not found. Check the address.",
++    "roomFull": "The room is full.",
++    "unavailable": "Room server is unavailable. Try again later.",
++    "genericError": "Failed to connect to the room."
++  },
++  "room": {
++    "createFolder": "Create\nroom",
++    "createdTitle": "Room created",
++    "codeTitle": "Room address",
++    "copy": "Copy",
++    "copied": "Copied",
++    "hint": "Share this address with your players: they will enter it via the “Server” menu item.",
++    "players": "Players",
++    "noPlayers": "Nobody here yet",
++    "createFailed": "Failed to create the room. Check your connection and try again."
++  },
+   "about": {
+     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",
+     "privacyPolicy": "Privacy policy",
+@@ -172,4 +214,4 @@
+     "install": "Install",
+     "localTrpg": ".trpg"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index fff4ea0..82f4613 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -142,7 +142,18 @@
+       "tabs": "Табы"
+     },
+     "pwaDiagnosticsTitle": "Диагностика установки",
+-    "pwaDiagnosticsDescription": "Показывать в окне «Установить приложение» техническую проверку: установлено ли приложение, работает ли сервис-воркер, доступны ли манифест и иконки, версия сборки. Включайте при проблемах с установкой."
++    "pwaDiagnosticsDescription": "Показывать в окне «Установить приложение» техническую проверку: установлено ли приложение, работает ли сервис-воркер, доступны ли манифест и иконки, версия сборки. Включайте при проблемах с установкой.",
++    "ownEquipment": {
++      "title": "Собственное снаряжение",
++      "description": "Паки контента из Кузницы предметов (JSON). Предметы пака появляются в категории «Самодельное снаряжение» окна добавления, в лавке и окне модификации оружия. Удаление пака убирает его предметы из сейвов всех персонажей.",
++      "load": "Загрузить JSON пака контента",
++      "empty": "Паки не установлены",
++      "installedOk": "Установлен: {name} — {w} оруж., {m} мод., {a} патр.",
++      "errorsTitle": "Пак не прошёл проверку:",
++      "delete": "Удалить"
++    },
++    "adminScreenTitle": "Экран администратора",
++    "adminScreenDescription": "Показывать экран администратора / GM-режима для поэтапной проверки работы. По умолчанию скрыт; включайте при необходимости."
+   },
+   "folders": {
+     "create": "Создать каталог",
+@@ -159,6 +170,37 @@
+     "deleteMessageWithCount": "Каталог и все персонажи внутри него будут безвозвратно удалены. Персонажей: {count}."
+   },
+   "subtitle": "Positronium",
++  "gm": {
++    "enter": "Админ",
++    "exit": "Пользователь"
++  },
++  "server": {
++    "menuItem": "Сервер",
++    "dialogTitle": "Комната мастера",
++    "addressLabel": "Адрес комнаты",
++    "addressPlaceholder": "GM-XXX-XXX",
++    "connect": "Подключиться",
++    "connecting": "Подключение…",
++    "connected": "Персонаж в комнате {code}",
++    "disconnect": "Отключиться",
++    "close": "Закрыть",
++    "invalidAddress": "Адрес не похож на код комнаты (например, GM-7Q3-K9M).",
++    "notFound": "Комната не найдена. Проверьте адрес.",
++    "roomFull": "Комната заполнена.",
++    "unavailable": "Сервер комнат недоступен. Попробуйте позже.",
++    "genericError": "Не удалось подключиться к комнате."
++  },
++  "room": {
++    "createFolder": "Создать\nкомнату",
++    "createdTitle": "Комната создана",
++    "codeTitle": "Адрес комнаты",
++    "copy": "Копировать",
++    "copied": "Скопировано",
++    "hint": "Передайте этот адрес игрокам: они введут его у себя в пункте «Сервер».",
++    "players": "Игроки",
++    "noPlayers": "Пока никого нет",
++    "createFailed": "Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз."
++  },
+   "about": {
+     "description": "Positronium — менеджер персонажей для настольных ролевых игр: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация.",
+     "privacyPolicy": "Политика конфиденциальности",
+@@ -172,4 +214,4 @@
+     "install": "Установить",
+     "localTrpg": ".trpg"
+   }
+-}
++}
+\ No newline at end of file
+diff --git a/src/store/appSettingsStore.js b/src/store/appSettingsStore.js
+index 51c5518..4740378 100644
+--- a/src/store/appSettingsStore.js
++++ b/src/store/appSettingsStore.js
+@@ -120,13 +120,19 @@ const migrateFlatState = (persistedState) => {
+     ?? old.randomWeaponDurabilityEnabled
+     ?? false;
+ 
+-  if (old.randomWeaponDurabilityEnabled !== undefined) {
+-    fallout.randomWeaponQualityEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+-    fallout.weaponDurabilityLossEnabled = false;
++  // Слово владельца 421: «износ» и «произвольное качество» — два
++  // самостоятельных пункта, друг от друга не зависят. Старый общий
++  // переключатель (randomWeaponDurabilityEnabled) раскладывается на оба
++  // пункта поровну; явный выбор игрока всегда главнее (416: износ по
++  // умолчанию включён).
++  if (old.weaponDurabilityLossEnabled !== undefined) {
++    fallout.weaponDurabilityLossEnabled = Boolean(old.weaponDurabilityLossEnabled);
++  } else if (old.randomWeaponDurabilityEnabled !== undefined) {
++    fallout.weaponDurabilityLossEnabled = Boolean(old.randomWeaponDurabilityEnabled);
+   } else {
+-    fallout.weaponDurabilityLossEnabled = old.weaponDurabilityLossEnabled ?? false;
+-    fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
++    fallout.weaponDurabilityLossEnabled = true;
+   }
++  fallout.randomWeaponQualityEnabled = Boolean(qualityEnabled);
+ 
+   fallout.weaponDurabilityLossPer10Shots = old.weaponDurabilityLossPer10Shots ?? 1;
+   fallout.unarmedAttackVisible = old.unarmedAttackVisible ?? true;
+@@ -230,6 +236,10 @@ export const selectCharacterFoldersEnabled = (state) => state.getSettingValue('c
+ export const selectCharacterDeleteActionPlacement = (state) => state.getSettingValue('characterDeleteActionPlacement');
+ export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScreenEnabled');
+ export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
++// Комнаты мастера (gm-rooms): 'user' | 'gm'. Кнопка переключения — в шапке
++// главного экрана и показывается только при доступном сервере комнат.
++export const selectAdminScreenEnabled = (state) => state.getSettingValue('adminScreenEnabled');
++export const selectUiMode = (state) => state.getSettingValue('uiMode');
+ export const selectSettingsHydrated = (state) => state.settingsHydrated;
+ export const selectLanguage = (state) => state.getSettingValue('language');
+ export const selectWeaponCardsDisplayMode = (state) => state.getSettingValue('weaponCardsDisplayMode');

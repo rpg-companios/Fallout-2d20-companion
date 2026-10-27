@@ -10,7 +10,18 @@ import SellItemModal from './modals/SellItemModal';
 import AddItemModal from './modals/AddItemModal';
 import BuyItemModal from './modals/BuyItemModal';
 import CraftingModal from '../../../modules/fallout/screens/InventoryScreen/modals/CraftingModal';
+// 413: ремонт по книге — модалка с тестом/материалами/донором (кнопки
+// «Починить» больше не чинят мгновенно и бесплатно).
+import RepairModal from '../../../modules/fallout/screens/InventoryScreen/modals/RepairModal';
+import {
+  repairAffordableFor,
+  repairAffordableForPiece,
+  juryRiggingRanksFor,
+  itemRarityFor,
+} from '../../../modules/fallout/repair/operations';
 import { resolveTargetLayer, blocksArmorOver } from '../../../domain/equippedArmor';
+// 404: «Заряжай и стреляй» — единая точка прибавки скорострельности.
+import { applyLoadAndFireToWeapon } from '../../../domain/perks/loadAndFire';
 import { getProtectionKind, PROTECTION_KINDS } from '../../../domain/protectionKind';
 import {
   isFusionCoreItem,
@@ -103,7 +114,16 @@ const InventoryScreen = () => {
   const storeModifiedItems = useCharacterStore((s) => s.modifiedItems);
   // Read-хелпер альбома модификаций: с патча 237 альбом только читается
   // (поддержка старых сейвов); новые моды кладут id модов на сам предмет.
-  const getModifiedItem = (item) => storeModifiedItems[getItemId(item)] || item;
+  // 404: «Заряжай и стреляй» — тяжёлое оружие на карточках инвентаря
+  // показывает скорострельность с перковой прибавкой (единая точка с
+  // экраном снаряжения — domain/perks/loadAndFire).
+  const loadAndFireBonus = Number(useCharacterStore((st) => st.perkBonuses?.loadAndFireBonus)) || 0;
+  const getModifiedItem = (item) => {
+    const base = storeModifiedItems[getItemId(item)] || item;
+    return base?.weaponType === 'Heavy'
+      ? applyLoadAndFireToWeapon(base, loadAndFireBonus)
+      : base;
+  };
   // Шаг 7: origin/trait — стор напрямую.
   // Шаг 8а: слоты робота и производный вес — стор напрямую.
   const equippedRobotSlots = useCharacterStore((s) => s.robot?.slots ?? null);
@@ -123,8 +143,6 @@ const InventoryScreen = () => {
   const equipPowerArmorPiece = useCharacterStore((s) => s.equipPowerArmorPieceInto);
   const unequipPowerArmorPackage = useCharacterStore((s) => s.unequipPowerArmorPackage);
   const unequipPowerArmorPieceAt = useCharacterStore((s) => s.unequipPowerArmorPieceAt);
-  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
-  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
   // Надетое оружие (метаданные) — Шаг 3 миграции: напрямую из стора,
   // минуя фасад useCharacter().
   const equippedWeapons = useCharacterStore((s) => s.equippedWeapons);
@@ -139,7 +157,17 @@ const InventoryScreen = () => {
   const addNewItem = useCharacterStore((state) => state.addNewItem);
   const updateItem = useCharacterStore((state) => state.updateItem);
   const storePerkBonuses = useCharacterStore((state) => state.perkBonuses);
+  // 413/414: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name);
+  // «Починить» — прежнее мгновенное действие (3 экшна ниже).
+  const [repairTarget, setRepairTarget] = useState(null);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
+  const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
+  const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
+  // 416 «Очумелые ручки»: подписка на выборы перков — чтобы кнопка
+  // мгновенно переключилась на бесплатный режим.
+  useCharacterStore((state) => state.selectedPerks);
+  // Слово владельца 414: «кнопки ремонта нет, если настройка прочности
+  // не активна» — используем существующий селектор weaponDurabilityLossEnabled.
   const randomWeaponQualityEnabled = useAppSettingsStore(selectRandomWeaponQualityEnabled);
   const weaponDurabilityLossEnabled = useAppSettingsStore(selectWeaponDurabilityLossEnabled);
   const robotArmPartsStrict = useAppSettingsStore(selectRobotArmPartsStrictReplace);
@@ -593,12 +621,16 @@ const InventoryScreen = () => {
     // Прочность — параметр стека (закон): два 100% идентичных экземпляра
     // (та же прочность/моды/имя) склеиваются в один стек; разная прочность
     // разделяет. addNewItem сам склеит совпавшие (ключ = id + dur + моды + имя).
-    if (randomWeaponQualityEnabled && localizedItem.itemType === 'weapon' && isAmmoWeapon(localizedItem)) {
+    // Слово владельца 421: прочность распространяется и на БРОНЮ —
+    // при «Произвольном качестве» каждый экземпляр рождается своей прочности
+    // (покупка = 100, добыча = бросок), как оружие.
+    if (randomWeaponQualityEnabled
+        && (localizedItem.itemType === 'weapon' || localizedItem.itemType === 'armor')
+        && (localizedItem.itemType === 'armor' || isAmmoWeapon(localizedItem))) {
       for (let index = 0; index < quantity; index += 1) {
         const durability = source === 'buy' ? 100 : rollWeaponDurability();
         addNewItem({
           ...localizedItem,
-          itemType: 'weapon',
           quantity: 1,
           durabilityTracked: true,
           durability,
@@ -1272,6 +1304,7 @@ const InventoryScreen = () => {
       rows.push({
         uniqueId: `pa-content-${slot}`,
         paPieceContent: true,
+        pieceCatalogId: piece.catalogId,
         paSlot: slot,
         itemType: 'powerArmor',
         name: formatInventoryText(tInventory('screen.powerArmor.pieceInSlot'), {
@@ -1280,6 +1313,7 @@ const InventoryScreen = () => {
         }),
         hpCurrent: piece.hpCurrent,
         maxHp,
+        temporaryRepair: piece.temporaryRepair === true,
         // «Починить» — по ОДНОМУ условию hp < max (правило владельца: бесплатно до максимума).
         showRepair: Number.isFinite(maxHp) && (piece.hpCurrent ?? 0) < maxHp,
       });
@@ -1443,6 +1477,10 @@ const InventoryScreen = () => {
     }
 
     if (item.paPieceContent) {
+      const pieceAffordable = item?.pieceCatalogId
+        ? repairAffordableForPiece(item.pieceCatalogId)
+        : true;
+      const juryRiggingActive = juryRiggingRanksFor() > 0;
       // Часть внутри надетого контейнера: «Починить»/«Снять» — управление частями
       // здесь. ПРАВИЛО (владелец): в инвентаре прочность не уменьшается и не
       // увеличивается (счётчика нет), ремонт — только кнопкой «Починить».
@@ -1454,13 +1492,23 @@ const InventoryScreen = () => {
             </View>
           </View>
           <View style={styles.actionContainer}>
-            {item.showRepair && (
+            {/* Слово владельца 420: прочность части СБ отображается всегда →
+                кнопка окна ремонта есть всегда при повреждении (перк: активна —
+                есть «Без затрат»; без перка — серая без донора/материалов). */}
+            {item.showRepair && (juryRiggingActive ? (
               <TouchableOpacity
                 style={[styles.actionButton, styles.applyButton]}
-                onPress={() => repairPowerArmorPieceAt(item.paSlot)}>
-                <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
-            )}
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, styles.applyButton, !pieceAffordable && styles.applyButtonDisabled]}
+                disabled={!pieceAffordable}
+                onPress={() => setRepairTarget({ equippedSlot: item.paSlot, name: item.name })}>
+                <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+              </TouchableOpacity>
+            ))}
             <TouchableOpacity
               style={[styles.actionButton, styles.unequipButton]}
               onPress={() => unequipPowerArmorPieceAt(item.paSlot)}>
@@ -1471,6 +1519,17 @@ const InventoryScreen = () => {
             <Text style={styles.itemSubText}>
               {tInventory('screen.labels.durability')}: {item.hpCurrent}/{item.maxHp}
             </Text>
+            {(() => {
+              const pieceRarity = itemRarityFor(item.pieceCatalogId);
+              return pieceRarity > 0 ? (
+                <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {pieceRarity}</Text>
+              ) : null;
+            })()}
+            {item.temporaryRepair === true && (
+              <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+                {tInventory('screen.repair.tempNote')}
+              </Text>
+            )}
           </View>
         </View>
       );
@@ -1530,13 +1589,28 @@ const InventoryScreen = () => {
     const showPARepair = Boolean(
       isPAItem && !item.isEquipped && Number.isFinite(paMaxHp) && (item.hpCurrent ?? paMaxHp) < paMaxHp,
     );
-    const showWeaponDurability = Boolean(
-      localizedDisplayItem?.itemType === 'weapon'
+    // Слово владельца 421: прочность — и у ОРУЖИЯ, и у БРОНИ (отображение —
+    // при настройке качества или износа; кнопка окна — при повреждении).
+    const showItemDurability = Boolean(
+      (localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor')
       && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
-      && isAmmoWeapon(localizedDisplayItem),
+      && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)),
     );
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
-    const showWeaponRepair = Boolean(item.itemType === 'weapon' && item.durabilityTracked && Number(item.durability) < 100);
+    const showItemRepair = Boolean(
+      (item.itemType === 'weapon' || item.itemType === 'armor')
+      && item.durabilityTracked && Number(item.durability) < 100,
+    );
+    // Слово владельца 424: редкость в свойствах оружия/брони (и СБ).
+    const cardRarity = itemRarityFor(item.weaponId || item.id);
+    const showCardRarity = cardRarity > 0
+      && (item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'powerArmor');
+    // 416 «Очумелые ручки»: с перком кнопка бесплатная (временная починка
+    // при включённой прочности) — окно книжного ремонта не открываем.
+    const juryRiggingActive = juryRiggingRanksFor() > 0;
+    // Слово владельца 414: «если материалов нет, кнопка ремонта не
+    // активна» (донор тоже делает кнопку активной).
+    const repairAffordable = repairAffordableFor(item.id);
     const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
     const isConsumable =
       item.itemType === 'chem' || item.itemType === 'chems'
@@ -1637,21 +1711,38 @@ const InventoryScreen = () => {
               <Text style={styles.itemSubText}>{tInventory('screen.alerts.manipulatorRequiredTitle')}</Text>
           )}
 
-          {showWeaponRepair && (
+          {/* Слово владельца 420: есть отображение прочности (качество ИЛИ
+              износ) → кнопка окна ремонта с вариантами; нет отображения —
+              кнопки нет. Мгновенной починки больше нет. */}
+          {showItemRepair && showItemDurability && (juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairWeapon(item.id)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
-          )}
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+              </TouchableOpacity>
+          ))}
 
-          {showPARepair && (
+          {showPARepair && (juryRiggingActive ? (
               <TouchableOpacity
                   style={[styles.actionButton, styles.applyButton]}
-                  onPress={() => repairPowerArmorStack(item.id)}>
-                  <Text style={styles.actionButtonText}>{tInventory('screen.actions.repair')}</Text>
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.repair')}</Text>
               </TouchableOpacity>
-          )}
+          ) : (
+              <TouchableOpacity
+                  style={[styles.actionButton, styles.applyButton, !repairAffordable && styles.applyButtonDisabled]}
+                  disabled={!repairAffordable}
+                  onPress={() => setRepairTarget({ storeItemId: item.id, name: item.name })}>
+                  <Text style={styles.actionButtonText}>{tInventory('screen.repair.actions.remake')}</Text>
+              </TouchableOpacity>
+          ))}
 
           {salvage && (
               <TouchableOpacity
@@ -1687,8 +1778,16 @@ const InventoryScreen = () => {
           {Number.isFinite(paMaxHp) && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {item.hpCurrent ?? paMaxHp}/{paMaxHp}</Text>
           )}
-          {showWeaponDurability && (
+          {showItemDurability && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.durability')}: {weaponDurabilityValue}/100</Text>
+          )}
+          {showCardRarity && (
+            <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {cardRarity}</Text>
+          )}
+          {item.temporaryRepair === true && (
+            <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
+              {tInventory('screen.repair.tempNote')}
+            </Text>
           )}
           {mk2Blocked && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>{tInventory('screen.labels.requiresMkII')}</Text>
@@ -1865,6 +1964,12 @@ const InventoryScreen = () => {
           visible={isCraftModalVisible}
           onClose={() => setCraftModalVisible(false)}
         />
+        {repairTarget != null && (
+          <RepairModal
+            target={repairTarget}
+            onClose={() => setRepairTarget(null)}
+          />
+        )}
         <BuyItemModal
           visible={isBuyItemModalVisible}
           onClose={() => {

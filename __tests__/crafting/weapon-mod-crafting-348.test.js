@@ -18,6 +18,16 @@ import { findCatalogEntry } from '../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -68,6 +78,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
 
     seedStack('item_common_materials', 4);
     seedStack('item_uncommon_materials', 2);
+    grantBookProfile(2, { INT: 6 }); // книга: Фанат оружия — ИНТ6, со 2-го уровня
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, REPAIR: { ...(prev.skills?.REPAIR ?? {}), base: 6, total: 6 } },
@@ -97,6 +108,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
     seedStack('item_common_materials', 6);
     seedStack('item_uncommon_materials', 4);
     seedStack('item_rare_materials', 2);
+    grantBookProfile(10, { INT: 6 }); // книга: 3-й ранг Фаната — с 10-го уровня
     useCharacterStore.setState({
       selectedPerks: [
         { perkId: 'gunNut', index: 0 }, { perkId: 'gunNut', index: 1 }, { perkId: 'gunNut', index: 2 },
@@ -124,6 +136,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
 
     seedStack('item_common_materials', 4);
     seedStack('item_uncommon_materials', 2);
+    grantBookProfile(2, { INT: 6 }); // книга: НАУКА! — ИНТ6, со 2-го уровня
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'science', index: 0 }] });
     useCharacterStore.setState((prev) => ({
       skills: { ...prev.skills, SCIENCE: { ...(prev.skills?.SCIENCE ?? {}), base: 6, total: 6 } },
@@ -138,6 +151,7 @@ describe('Крафт модов оружия (348): квадрат «Оружи�
   it('провал жжёт материалы по правилу gear (настройка 323, как у модов брони)', () => {
     seedStack('item_common_materials', 4);
     seedStack('item_uncommon_materials', 2);
+    grantBookProfile(2, { INT: 6 }); // книга: Фанат оружия — ИНТ6, со 2-го уровня
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'gunNut', index: 0 }] });
     // ранг 0 против сложности 3 + провал на броске → крафт не удался
     const failed = craftRecipe('mod_rapid', { rollD20: () => 20 });

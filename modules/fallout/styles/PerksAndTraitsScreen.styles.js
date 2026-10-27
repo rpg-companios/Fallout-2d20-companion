@@ -59,6 +59,23 @@ const styles = StyleSheet.create({
     borderColor: '#0369a1',
   },
   addPerkButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
+
+  // 412: перки, погашенные книжными требованиями, — серые и с пояснением.
+  spoilerHeaderInactive: { backgroundColor: '#202020', borderColor: '#3d3d3d' },
+  spoilerTitleInactive: { color: '#8f8f8f' },
+  spoilerRankInactive: { color: '#8f8f8f' },
+  spoilerInactiveNote: {
+    color: '#d97706',
+    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: '#3d3d3d',
+    borderBottomLeftRadius: 5,
+    borderBottomRightRadius: 5,
+  },
 });
 
 export default styles;

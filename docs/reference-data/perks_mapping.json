@@ -1,0 +1,1804 @@
+{
+  "summary": {
+    "appPerks": 177,
+    "appPerksAfterUpdate": 185,
+    "matched": 184,
+    "addedToApp": 8,
+    "appOnly": [
+      "emt"
+    ]
+  },
+  "matched": [
+    {
+      "appId": "animalFriend",
+      "appName": "ДРУГ ЖИВОТНЫХ",
+      "myId": "animal_friend",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "шаг уровня за ранг": {
+          "app": 5,
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "aquaboy",
+      "appName": "АКВАБОЙ или АКВАГЁРЛ",
+      "myId": "aquaboy",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "radResistant",
+      "appName": "УСТОЙЧИВОСТЬ К РАДИАЦИИ",
+      "myId": "rad_resistant",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 2,
+          "pdf": 3
+        },
+        "атрибуты": {
+          "app": "ВЫН 8",
+          "pdf": "ВЫН 6"
+        },
+        "уровень": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "armorer",
+      "appName": "БРОННИК",
+      "myId": "armorer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 4,
+          "pdf": 2
+        },
+        "шаг уровня за ранг": {
+          "app": 4,
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "barbarian",
+      "appName": "ВАРВАР",
+      "myId": "barbarian",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "gunFu",
+      "appName": "ГАН-ФУ",
+      "myId": "gun_fu",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "silverTongue",
+      "appName": "ТРЕПАЧ",
+      "myId": "wheeler_dealer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "blitz",
+      "appName": "БЛИЦ",
+      "myId": "blitz",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "leadBelly",
+      "appName": "СВИНЦОВОЕ БРЮХО",
+      "myId": "lead_belly",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "juryRigging",
+      "appName": "ОЧУМЕЛЫЕ РУЧКИ",
+      "myId": "jury_rigger",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "scoundrel",
+      "appName": "ПРОЙДОХА",
+      "myId": "con_artist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "dogmeat",
+      "appName": "ПСИНА",
+      "myId": "dogmeat",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "hunter",
+      "appName": "ОХОТНИК",
+      "myId": "hunter",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "chemist",
+      "appName": "ХИМИК",
+      "myId": "chemist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "shotgunSurgeon",
+      "appName": "ХИРУРГ С ДРОБОВИКОМ",
+      "myId": "shotgun_surgeon",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "movingTarget",
+      "appName": "ДВИЖУЩАЯСЯ МИШЕНЬ",
+      "myId": "moving_target",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "basher",
+      "appName": "БАШЕР",
+      "myId": "basher",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "laserCommander",
+      "appName": "ЛАЗЕРОВ НАЧАЛЬНИК",
+      "myId": "laser_commander",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "commando",
+      "appName": "КОММАНДОС",
+      "myId": "commando",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "comprehension",
+      "appName": "ПОНИМАНИЕ",
+      "myId": "comprehension",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "canOpener",
+      "appName": "КОНСЕРВАТОР!",
+      "myId": "food_scavenger",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "betterCriticals",
+      "appName": "УЛУЧШЕННЫЕ КРИТЫ",
+      "myId": "better_criticals",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "quickDraw",
+      "appName": "БЫСТРЫЙ ДОСТУП",
+      "myId": "quick_draw",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "fortuneFinder",
+      "appName": "ИСКАТЕЛЬ УДАЧИ",
+      "myId": "fortune_finder",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "solarPowered",
+      "appName": "СОЛНЕЧНАЯ БАТАРЕЙКА",
+      "myId": "solar_powered",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "entomologist",
+      "appName": "ЭНТОМОЛОГ",
+      "myId": "entomologist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "intenseTraining",
+      "appName": "ИНТЕНСИВНЫЕ ТРЕНИРОВКИ",
+      "myId": "intense_training",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "demolitionExpert",
+      "appName": "ЭКСПЕРТ ПОДРЫВНИК",
+      "myId": "demolition_expert",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "roboticsExpert",
+      "appName": "ЭКСПЕРТ ПО РОБОТОТЕХНИКЕ",
+      "myId": "robotics_expert",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "gunNut",
+      "appName": "ФАНАТИК ОРУЖИЯ",
+      "myId": "gun_nut",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 4,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "capCollector",
+      "appName": "КОЛЛЕКЦИОНЕР КРЫШЕК",
+      "myId": "cap_collector",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "ghost",
+      "appName": "ПРИЗРАК",
+      "myId": "ghost",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "scrounger",
+      "appName": "ХАЛЯВЩИК",
+      "myId": "scrounger_ammo",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "pharmaFarmer",
+      "appName": "ФАРМА-ФЕРМЕР",
+      "myId": "pharma_farmer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "partyBoy",
+      "appName": "ТУСОВЩИК",
+      "myId": "party_animal",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "finesse",
+      "appName": "ТОЧНОСТЬ",
+      "myId": "accuracy",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "heavyHitter",
+      "appName": "ВЫСШАЯ ЛИГА",
+      "myId": "big_leagues",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "blacksmith",
+      "appName": "КУЗНЕЦ",
+      "myId": "blacksmith",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "piercingStrike",
+      "appName": "ПРОНИКАЮЩИЙ УДАР",
+      "myId": "piercing_strike",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "rifleman",
+      "appName": "КАРАБИНЕР",
+      "myId": "carbineer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "meltdown",
+      "appName": "РАСПЫЛЕНИЕ",
+      "myId": "vaporize",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "fastHealer",
+      "appName": "БЫСТРОЕ ИСЦЕЛЕНИЕ",
+      "myId": "quick_healing",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "medic",
+      "appName": "МЕДИК",
+      "myId": "medic",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "heaveHo",
+      "appName": "ЛОВИ!",
+      "myId": "throw_it",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "actionBoy",
+      "appName": "ЭКШЕН БОЙ или ГЁРЛ",
+      "myId": "action_boy",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "infiltrator",
+      "appName": "ЛАЗУТЧИК",
+      "myId": "locksmith",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "атрибуты": {
+          "app": "ВОС 8",
+          "pdf": "ВОС 6, УДЧ 6"
+        }
+      }
+    },
+    {
+      "appId": "nurse",
+      "appName": "ЛЕКАРЬ",
+      "myId": "medic_first_aid",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "атрибуты": {
+          "app": "ИНТ 8",
+          "pdf": "ИНТ 7"
+        }
+      }
+    },
+    {
+      "appId": "sizeMatters",
+      "appName": "РАЗМЕР ИМЕЕТ ЗНАЧЕНИЕ",
+      "myId": "size_matters",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "painTrain",
+      "appName": "ПОЕЗД БОЛИ",
+      "myId": "pain_train",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "атрибуты": {
+          "app": "СИЛ 9, ВЫН 7",
+          "pdf": "СИЛ 6"
+        }
+      }
+    },
+    {
+      "appId": "quickHands",
+      "appName": "ЛОВКИЕ РУКИ",
+      "myId": "nimble_hands",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "masterThief",
+      "appName": "МАСТЕР ВОР",
+      "myId": "master_thief",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "sandman",
+      "appName": "ПЕСОЧНЫЙ ЧЕЛОВЕК",
+      "myId": "sandman",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "fastMetabolism",
+      "appName": "БЫСТРЫЙ МЕТАБОЛИЗМ",
+      "myId": "fast_metabolism",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "mysteriousStranger",
+      "appName": "ТАИНСТВЕННЫЙ НЕЗНАКОМЕЦ",
+      "myId": "mysterious_stranger",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "daringNature",
+      "appName": "ДЕРЗКАЯ НАТУРА",
+      "myId": "daring_nature",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "атрибуты": {
+          "app": "УДЧ 7",
+          "pdf": "УДЧ 5"
+        }
+      }
+    },
+    {
+      "appId": "cautiousNature",
+      "appName": "ОСТОРОЖНАЯ НАТУРА",
+      "myId": "cautious_nature",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "ninja",
+      "appName": "НИНДЗЯ",
+      "myId": "ninja",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "nightPerson",
+      "appName": "НОЧНОЕ СОЗДАНИЕ",
+      "myId": "night_person",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "paralyzingPalm",
+      "appName": "ПАРАЛИЗУЮЩАЯ ЛАДОНЬ",
+      "myId": "paralyzing_palm",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "nuclearPhysicist",
+      "appName": "ФИЗИК-ЯДЕРЩИК",
+      "myId": "nuclear_physicist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "pickpocket",
+      "appName": "КАРМАННИК",
+      "myId": "pickpocket",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "lightStep",
+      "appName": "ЛЁГКИЙ ШАГ",
+      "myId": "light_step",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "hacker",
+      "appName": "ХАКЕР",
+      "myId": "hacker",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "pathfinder",
+      "appName": "СЛЕДОПЫТ",
+      "myId": "pathfinder",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 5
+        },
+        "атрибуты": {
+          "app": "ВОС 6, ВЫН 6",
+          "pdf": "—"
+        },
+        "уровень": {
+          "app": "—",
+          "pdf": 5
+        }
+      }
+    },
+    {
+      "appId": "gunslinger",
+      "appName": "СТРЕЛОК",
+      "myId": "gunslinger",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "ironFist",
+      "appName": "ЖЕЛЕЗНЫЙ КУЛАК",
+      "myId": "iron_fist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "adrenalineRush",
+      "appName": "ВЫБРОС АДРЕНАЛИНА",
+      "myId": "adrenaline_rush",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "intimidation",
+      "appName": "УЖАСАЮЩЕЕ ПРИСУТСТВИЕ",
+      "myId": "terrifying_presence",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "шаг уровня за ранг": {
+          "app": 5,
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "pyromaniac",
+      "appName": "ПИРОМАНЬЯК",
+      "myId": "pyromaniac",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "шаг уровня за ранг": {
+          "app": 4,
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "nerdRage",
+      "appName": "ЯРОСТЬ БОТАНИКА!",
+      "myId": "nerd_rage",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "snakeater",
+      "appName": "ПОЖИРАТЕЛЬ ЗМЕЙ",
+      "myId": "snake_eater",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "scrapper",
+      "appName": "МУСОРЩИК",
+      "myId": "scrapper",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "refractor",
+      "appName": "РЕФРАКТОР",
+      "myId": "refractor",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "strongBack",
+      "appName": "КРЕПКИЙ ХРЕБЕТ",
+      "myId": "strong_back",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 3,
+          "pdf": 1
+        },
+        "шаг уровня за ранг": {
+          "app": 2,
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "chemResistant",
+      "appName": "УСТОЙЧИВОСТЬ К ХИМИИ",
+      "myId": "chem_resistant",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "ricochet",
+      "appName": "РИКОШЕТ",
+      "myId": "ricochet",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "toughness",
+      "appName": "ПРОЧНОСТЬ",
+      "myId": "toughness",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "bloodyMess",
+      "appName": "КРОВАВАЯ БАНЯ",
+      "myId": "bloody_mess",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "science",
+      "appName": "НАУКА!",
+      "myId": "science",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 4,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "awareness",
+      "appName": "ОСВЕДОМЛЁННОСТЬ",
+      "myId": "awareness",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "sniper",
+      "appName": "СНАЙПЕР",
+      "myId": "sniper",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "inspirational",
+      "appName": "ВДОХНОВЛЯЮЩИЙ",
+      "myId": "inspirational",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "tag",
+      "appName": "ОТМЕТКА",
+      "myId": "tag",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "adamantiumSkeleton",
+      "appName": "АДАМАНТИЕВЫЙ СКЕЛЕТ",
+      "myId": "adamantium_skeleton",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "educated",
+      "appName": "ТРЕНИРОВАННЫЙ",
+      "myId": "skilled",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "concentratedFire",
+      "appName": "СОСРЕДОТОЧЕННЫЙ ОГОНЬ",
+      "myId": "concentrated_fire",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "dodger",
+      "appName": "ЛОВКАЧ",
+      "myId": "dodgy",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "slayer",
+      "appName": "РУБАКА",
+      "myId": "slayer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "killer",
+      "appName": "СПРИНТ МРАЧНОГО ЖНЕЦА",
+      "myId": "grim_reapers_sprint",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "атрибуты": {
+          "app": "ХАР 8",
+          "pdf": "УДЧ 8"
+        }
+      }
+    },
+    {
+      "appId": "junktownVendor",
+      "appName": "ПРОДАВЕЦ ВЯЛЕНОГО МЯСА ИЗ ДЖАНКТАУНА",
+      "myId": "jerky_vendor",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "blackWidow",
+      "appName": "ЧЕРНАЯ ВДОВА или УБИЙЦА ЖЕНЩИН",
+      "myId": "black_widow",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "steadyAim",
+      "appName": "СТАБИЛЬНЫЙ ПРИЦЕЛ",
+      "myId": "steady_aim",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "lifeGiver",
+      "appName": "ДАЮЩИЙ ЖИЗНЬ",
+      "myId": "lifegiver",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "allNightLong",
+      "appName": "НОЧЬ НАПРОЛЕТ",
+      "myId": "all_nighter",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "атрибуты": {
+          "app": "ВЫН 6",
+          "pdf": "—"
+        }
+      }
+    },
+    {
+      "appId": "ammosmith",
+      "appName": "ПАТРОНЩИК",
+      "myId": "ammosmith",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "archer",
+      "appName": "ЛУЧНИК",
+      "myId": "archer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "blocker",
+      "appName": "БЛОКАТОР",
+      "myId": "blocker",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "bloodsucker",
+      "appName": "КРОВОСОС",
+      "myId": "bloodsucker",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "bodyguards",
+      "appName": "ТЕЛОХРАНИТЕЛИ",
+      "myId": "bodyguards",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "bornSurvivor",
+      "appName": "ПРИРОЖДЕННЫЙ ВЫЖИВШИЙ",
+      "myId": "born_survivor",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "bowBeforeMe",
+      "appName": "СКЛОНИСЬ ПЕРЕД ЛУЧНИКОМ",
+      "myId": "bow_down",
+      "status": "адаптирован под приложение",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "bulletShield",
+      "appName": "ПУЛЕВОЙ ЩИТ",
+      "myId": "bullet_shield",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "butchersBounty",
+      "appName": "ДОБЫЧА МЯСНИКА",
+      "myId": "butchers_bounty",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "cannibal",
+      "appName": "КАННИБАЛ",
+      "myId": "cannibal",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "centerMass",
+      "appName": "ЦЕНТР МАСС",
+      "myId": "center_of_mass",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "colaNut",
+      "appName": "ФАНАТ КОЛЫ",
+      "myId": "cola_fan",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "communityOrganizer",
+      "appName": "ОРГАНИЗАТОР СООБЩЕСТВ",
+      "myId": "community_organizer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "contractor",
+      "appName": "ПОДРЯДЧИК",
+      "myId": "contractor",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "covertOperator",
+      "appName": "ТАЙНЫЙ ИСПОЛНИТЕЛЬ",
+      "myId": "covert_operative",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "crackShot",
+      "appName": "МЕТКИЙ СТРЕЛОК",
+      "myId": "sharpshooter_dup",
+      "status": "адаптирован под приложение",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "deadManSprinting",
+      "appName": "БЕГУЩИЙ МЕРТВЕЦ",
+      "myId": "dead_man_running",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "атрибуты": {
+          "app": "ЛОВ 7",
+          "pdf": "ЛОВ 8"
+        },
+        "уровень": {
+          "app": 8,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "dromedary",
+      "appName": "МОХАВСКИЙ ВЕРБЛЮД",
+      "myId": "mohave_camel",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "dryNurse",
+      "appName": "СИДЕЛКА",
+      "myId": "nurse",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "enforcer",
+      "appName": "БЛЮСТИТЕЛЬ",
+      "myId": "gun_warden",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "escapeArtist",
+      "appName": "МАСТЕР ПОБЕГА",
+      "myId": "escape_artist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "evasive",
+      "appName": "УКЛОНИСТ",
+      "myId": "dodger",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "fieldSurgeon",
+      "appName": "ПОЛЕВОЙ ХИРУРГ",
+      "myId": "field_surgeon",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "fireInTheHole",
+      "appName": "ГРАНАТА!",
+      "myId": "grenade",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "fireproof",
+      "appName": "ОГНЕУПОРНЫЙ",
+      "myId": "fireproof",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "ghoulish",
+      "appName": "ГУЛЕПОДОБНЫЙ",
+      "myId": "ghoulish",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "gladiator",
+      "appName": "ГЛАДИАТОР",
+      "myId": "gladiator",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "glowSight",
+      "appName": "ПРИЦЕЛ С ПОДСВЕТКОЙ",
+      "myId": "spotlight_sight",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "уровень": {
+          "app": 3,
+          "pdf": 8
+        }
+      }
+    },
+    {
+      "appId": "goatLegs",
+      "appName": "КОЗЛОНОГ",
+      "myId": "goat",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "greenThumb",
+      "appName": "ОПЫТНЫЙ ОВОЩЕВОД",
+      "myId": "forager",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "gunRunner",
+      "appName": "БЕГУЩИЙ СТРЕЛОК",
+      "myId": "running_gunner",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "happyCamper",
+      "appName": "СЧАСТЛИВЫЙ ТУРИСТ",
+      "myId": "happy_camper",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "happyGoLucky",
+      "appName": "НАВЕСЕЛЕ",
+      "myId": "tipsy",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        },
+        "атрибуты": {
+          "app": "ХАР 9",
+          "pdf": "ХАР 8, ИНТ 8"
+        },
+        "уровень": {
+          "app": 17,
+          "pdf": 15
+        }
+      }
+    },
+    {
+      "appId": "healingHands",
+      "appName": "ИСЦЕЛЯЮЩЕЕ ПРИКОСНОВЕНИЕ",
+      "myId": "healing_touch",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "hiredHelp",
+      "appName": "НАЕМНЫЙ ПЕРСОНАЛ",
+      "myId": "hired_help",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "homeDefense",
+      "appName": "ЗАЩИТА ДОМА",
+      "myId": "home_defense",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "homebody",
+      "appName": "ДОМАШНИЙ ОЧАГ",
+      "myId": "homebody",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "incisor",
+      "appName": "РАССЕКАТЕЛЬ",
+      "myId": "slasher",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "ironclad",
+      "appName": "БРОНЕНОСЕЦ",
+      "myId": "armor_bearer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "junkShield",
+      "appName": "ЩИТ ИЗ ХЛАМА",
+      "myId": "scrap_shield",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "licensedPlumber",
+      "appName": "ЛИЦЕНЗИРОВАННЫЙ САНТЕХНИК",
+      "myId": "licensed_plumber",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "localLeader",
+      "appName": "МЕСТНЫЙ ЛИДЕР",
+      "myId": "local_leader",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "lockAndLoad",
+      "appName": "ЗАКРЫТЬ И ЗАГРУЗИТЬ",
+      "myId": "lock_and_load",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "martialArtist",
+      "appName": "МАСТЕР БОЕВЫХ ИСКУССТВ",
+      "myId": "martial_artist",
+      "status": "адаптирован под приложение",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "mechanicalMenace",
+      "appName": "МЕХАНИЧЕСКАЯ УГРОЗА или МЕСТНЫЙ УРОДЕЦ",
+      "myId": "mechanical_menace",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "modernRenegade",
+      "appName": "СОВРЕМЕННЫЙ РЕНЕГАТ",
+      "myId": "modern_renegade",
+      "status": "адаптирован под приложение",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "mysteriousSavior",
+      "appName": "ТАИНСТВЕННЫЙ СПАСИТЕЛЬ",
+      "myId": "mysterious_savior",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "naturalResistance",
+      "appName": "ПРИРОДНАЯ СТОЙКОСТЬ",
+      "myId": "natural_resilience",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "nightEyes",
+      "appName": "НОЧНОЙ ГЛАЗ",
+      "myId": "night_eye",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "уровень": {
+          "app": 7,
+          "pdf": 8
+        }
+      }
+    },
+    {
+      "appId": "nocturnalFortitude",
+      "appName": "НОЧНАЯ СТОЙКОСТЬ",
+      "myId": "night_resilience",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "overlyGenerous",
+      "appName": "САМА ЩЕДРОСТЬ",
+      "myId": "generosity",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "packRat",
+      "appName": "ВЬЮЧНАЯ КРЫСА",
+      "myId": "pack_rat",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "pannapictagraphist",
+      "appName": "ПАННАПИКТОГРАФИСТ",
+      "myId": "magazine_reroll",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "pharmacist",
+      "appName": "ФАРМАЦЕВТ",
+      "myId": "pharmacist",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "photosynthetic",
+      "appName": "ФОТОСИНТЕЗ",
+      "myId": "photosynthesis",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "powerPatcher",
+      "appName": "РЕМОНТНИК СИЛОВОЙ БРОНИ",
+      "myId": "power_armor_repairer",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "powerUser",
+      "appName": "МОЩНЫЙ ПОЛЬЗОВАТЕЛЬ",
+      "myId": "power_user",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "psychopath",
+      "appName": "ПСИХОПАТ",
+      "myId": "psychopath",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "quackSurgeon",
+      "appName": "ХИРУРГ-ШАРЛАТАН",
+      "myId": "quack_surgeon",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "radicool",
+      "appName": "РАДИКАЛ",
+      "myId": "radical",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "rejuvenated",
+      "appName": "ОМОЛОДИВШИЙСЯ",
+      "myId": "rejuvenated",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "responder",
+      "appName": "РЕАНИМАТОР",
+      "myId": "resuscitator",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "retribution",
+      "appName": "ВОЗДАЯНИЕ",
+      "myId": "retribution",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "revenant",
+      "appName": "РЕВЕНАНТ",
+      "myId": "revenant",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "robotWrangler",
+      "appName": "РОБОТ-КОВБОЙ",
+      "myId": "robot_cowboy",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "scattershot",
+      "appName": "ШРАПНЕЛЬ",
+      "myId": "shrapnel",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "secretAgent",
+      "appName": "ТАЙНЫЙ АГЕНТ",
+      "myId": "covert_agent",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "serendipity",
+      "appName": "НЕВЕРОЯТНАЯ УДАЧА",
+      "myId": "incredible_luck",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "slowMetabolizer",
+      "appName": "МЕДЛЕННЫЙ МЕТАБОЛИЗМ",
+      "myId": "slow_metabolizer",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "spiritualHealer",
+      "appName": "ДУХОВНЫЙ ЦЕЛИТЕЛЬ",
+      "myId": "spiritual_healer",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "squadManeuvers",
+      "appName": "ГРУППОВЫЕ МАНЁВРЫ",
+      "myId": "group_maneuvers",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 2
+        }
+      }
+    },
+    {
+      "appId": "stabilized",
+      "appName": "СТАБИЛИЗАЦИЯ",
+      "myId": "stabilization",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        },
+        "атрибуты": {
+          "app": "ИНТ 7",
+          "pdf": "ИНТ 6"
+        },
+        "уровень": {
+          "app": 16,
+          "pdf": 5
+        }
+      }
+    },
+    {
+      "appId": "stormChaser",
+      "appName": "ОХОТНИК ЗА БУРЕЙ",
+      "myId": "storm_chaser",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "sturdyFrame",
+      "appName": "ОБЛЕГЧЕННЫЙ КАРКАС",
+      "myId": "lightweight",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "superDuper",
+      "appName": "СУПЕР-ПУПЕР",
+      "myId": "super_duper",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "suppressor",
+      "appName": "ПОДАВИТЕЛЬ",
+      "myId": "suppressor",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "takingOneForTheTeam",
+      "appName": "ПРИНИМАЕМ ОДНОГО ДЛЯ КОМАНДЫ",
+      "myId": "take_one_for_the_team",
+      "status": "адаптирован под приложение",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "tenderizer",
+      "appName": "ОТБИВНАЯ",
+      "myId": "batter",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {
+        "ранги": {
+          "app": 1,
+          "pdf": 3
+        }
+      }
+    },
+    {
+      "appId": "thirstQuencher",
+      "appName": "ВОДОХЛЁБ",
+      "myId": "waterhog",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "tinkerer",
+      "appName": "РОБОТОТЕХНИК",
+      "myId": "roboticist_care",
+      "status": "сопоставлен",
+      "confidence": "medium",
+      "diffs": {}
+    },
+    {
+      "appId": "trueFriends",
+      "appName": "НАСТОЯЩИЕ ДРУЗЬЯ",
+      "myId": "true_friends",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "vaccinated",
+      "appName": "ВАКЦИНИРОВАННЫЙ",
+      "myId": "vaccinated",
+      "status": "сопоставлен",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "crushingBlow",
+      "appName": "СОКРУШИТЕЛЬНЫЙ УДАР",
+      "myId": "crushing_blow",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "loadAndFire",
+      "appName": "ЗАРЯЖАЙ И СТРЕЛЯЙ",
+      "myId": "load_and_fire",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "missFortune",
+      "appName": "МИСС УДАЧА",
+      "myId": "miss_fortune",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "juryRiggedAmmo",
+      "appName": "ЛОМОВЫЕ ПАТРОНЫ",
+      "myId": "jury_rigged_ammo",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "crippler",
+      "appName": "ХРОМОНОЖКА",
+      "myId": "crippler",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "inShiningArmor",
+      "appName": "В СИЯЮЩИХ ДОСПЕХАХ",
+      "myId": "in_shining_armor",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "oldWorldGourmet",
+      "appName": "ГУРМАН СТАРОГО МИРА",
+      "myId": "old_world_gourmet",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    },
+    {
+      "appId": "fierceLoyalty",
+      "appName": "СВИРЕПАЯ ПРЕДАННОСТЬ",
+      "myId": "fierce_loyalty",
+      "status": "добавлен в приложение",
+      "confidence": "high",
+      "diffs": {}
+    }
+  ]
+}
