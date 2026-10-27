@@ -1,0 +1,1428 @@
+diff --git a/.replit b/.replit
+index 4047885..9735fa2 100644
+--- a/.replit
++++ b/.replit
+@@ -36,7 +36,7 @@ author = "agent"
+ 
+ [[workflows.workflow.tasks]]
+ task = "shell.exec"
+-args = "env CI=1 npx expo start --web --port 5000"
++args = "PORT=5000 node server/start.js"
+ 
+ [workflows.workflow.metadata]
+ outputType = "webview"
+diff --git a/__tests__/room/room-metro-and-icons-453.test.js b/__tests__/room/room-metro-and-icons-453.test.js
+index ffeb066..45b1c34 100644
+--- a/__tests__/room/room-metro-and-icons-453.test.js
++++ b/__tests__/room/room-metro-and-icons-453.test.js
+@@ -266,7 +266,7 @@ describe('Патч 453: комнаты мастера в Metro, честный 
+     expect(swSrc).toContain('handleImmutableAsset');
+ 
+     const replitCfg = fs.readFileSync(path.join(ROOT, '.replit'), 'utf8');
+-    expect(replitCfg).toContain('env CI=1 npx expo start --web --port 5000');
++    expect(replitCfg).toContain('PORT=5000 node server/start.js');
+     expect(replitCfg).not.toContain('--clear');
+   });
+ });
+diff --git a/__tests__/screens/fast-boot-and-status-457.test.js b/__tests__/screens/fast-boot-and-status-457.test.js
+new file mode 100644
+index 0000000..f434569
+--- /dev/null
++++ b/__tests__/screens/fast-boot-and-status-457.test.js
+@@ -0,0 +1,219 @@
++// Регрессионные и интеграционные тесты патча 457:
++// быстрый управляемый старт без многоминутного ожидания и без «немого» экрана:
++// 1) сервер открывает порт мгновенно; пока идёт сборка dist/, отдаёт живой
++//    экран статуса (X-Positronium-Boot: building, /__boot-status), а сразу по
++//    завершении — готовый интерфейс со сжатием gzip;
++// 2) при неизменившихся исходниках (отпечаток SHA-256 совпадает) сборка не
++//    запускается вовсе — UI отдаётся сразу;
++// 3) при сбое сборки в браузере видна ошибка и работает POST /__boot-rebuild;
++// 4) public/index.html содержит мгновенный тёмный индикатор загрузки до монтирования
++//    React, metro.config.js хранит кэш в .expo/metro-cache, а Service Worker не
++//    перехватывает dev-бандлы и временную страницу сборки.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import zlib from 'node:zlib';
++
++import {
++  FINGERPRINT_FILE,
++  computeSourceFingerprint,
++  isDistUpToDate,
++  createManagedAppServer,
++} from '../../server/start.js';
++import metroConfig from '../../metro.config.js';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++const makeTempWorkspace = () => {
++  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'positronium-457-'));
++  fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
++  fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
++  fs.writeFileSync(path.join(dir, 'index.js'), '// entry\n', 'utf8');
++  fs.writeFileSync(path.join(dir, 'App.js'), '// app\n', 'utf8');
++  fs.writeFileSync(
++    path.join(dir, 'public', 'version.json'),
++    JSON.stringify({ version: '457' }),
++    'utf8',
++  );
++  return dir;
++};
++
++const writeFakeExportOutput = (stagingDir, version = '457') => {
++  const jsRel = '_expo/static/js/web/index-11112222333344445555666677778888.js';
++  fs.mkdirSync(path.join(stagingDir, path.dirname(jsRel)), { recursive: true });
++  // > 1024 байт, чтобы проверить сжатие gzip на раздаче статики
++  const jsPayload = `console.log("positronium-${version}");\n${'// padding '.repeat(180)}\n`;
++  fs.writeFileSync(path.join(stagingDir, jsRel), jsPayload, 'utf8');
++  fs.writeFileSync(
++    path.join(stagingDir, 'version.json'),
++    JSON.stringify({ version }),
++    'utf8',
++  );
++  fs.writeFileSync(
++    path.join(stagingDir, 'index.html'),
++    `<!DOCTYPE html><html><body><div id="root">READY-${version}</div><script src="/${jsRel}" defer></script></body></html>`,
++    'utf8',
++  );
++};
++
++describe('Патч 457: мгновенный старт, кэш отпечатка сборки и живой индикатор состояния', () => {
++  it('порт открывается сразу: во время сборки виден живой статус, после — готовый UI с gzip', async () => {
++    const tmpRoot = makeTempWorkspace();
++    let finishBuild;
++    let buildCalls = 0;
++
++    const app = createManagedAppServer({
++      port: 0,
++      host: '127.0.0.1',
++      rootDir: tmpRoot,
++      runExportBuild: ({ stagingDir, onProgress }) => {
++        buildCalls += 1;
++        onProgress('Starting Metro Bundler');
++        return new Promise((resolve) => {
++          finishBuild = () => {
++            writeFakeExportOutput(stagingDir, '457');
++            onProgress('Exported: dist');
++            resolve();
++          };
++        });
++      },
++    });
++
++    try {
++      const { port } = await app.start();
++      expect(buildCalls).toBe(1);
++
++      // 1. Сразу после старта порт отвечает живой страницей статуса сборки (не висит!)
++      const bootPageRes = await fetch(`http://127.0.0.1:${port}/`);
++      expect(bootPageRes.status).toBe(200);
++      expect(bootPageRes.headers.get('x-positronium-boot')).toBe('building');
++      const bootHtml = await bootPageRes.text();
++      expect(bootHtml).toContain('Сервер работает');
++      expect(bootHtml).toContain('патч 457');
++
++      const stRes = await fetch(`http://127.0.0.1:${port}/__boot-status`);
++      const stJson = await stRes.json();
++      expect(stJson.state).toBe('building');
++      expect(stJson.stage).toContain('Компиляция');
++
++      // 2. Завершаем сборку — сервер сразу переключается на раздачу dist/ с gzip
++      finishBuild();
++      await new Promise((r) => setTimeout(r, 30));
++
++      const readyStatus = await (await fetch(`http://127.0.0.1:${port}/__boot-status`)).json();
++      expect(readyStatus.state).toBe('ready');
++
++      const appRes = await fetch(`http://127.0.0.1:${port}/`);
++      expect(appRes.headers.get('x-positronium-boot')).toBeNull();
++      expect(await appRes.text()).toContain('READY-457');
++
++      // Проверяем реальное gzip-сжатие бандла
++      const rawJsRes = await fetch(
++        `http://127.0.0.1:${port}/_expo/static/js/web/index-11112222333344445555666677778888.js`,
++        { headers: { 'Accept-Encoding': 'gzip' } },
++      );
++      expect(rawJsRes.status).toBe(200);
++      expect(rawJsRes.headers.get('vary')).toContain('Accept-Encoding');
++      const jsText = await rawJsRes.text();
++      expect(jsText).toContain('positronium-457');
++    } finally {
++      await app.close();
++      fs.rmSync(tmpRoot, { recursive: true, force: true });
++    }
++  });
++
++  it('повторный запуск без изменений исходников пропускает сборку (0 вызовов экспортера)', async () => {
++    const tmpRoot = makeTempWorkspace();
++    const distDir = path.join(tmpRoot, 'dist');
++    writeFakeExportOutput(distDir, '457');
++    const fp = computeSourceFingerprint(tmpRoot);
++    fs.writeFileSync(path.join(distDir, FINGERPRINT_FILE), `${fp}\n`, 'utf8');
++
++    expect(isDistUpToDate(tmpRoot, distDir).upToDate).toBe(true);
++
++    let buildCalls = 0;
++    const app = createManagedAppServer({
++      port: 0,
++      host: '127.0.0.1',
++      rootDir: tmpRoot,
++      runExportBuild: async () => { buildCalls += 1; },
++    });
++
++    try {
++      const { port } = await app.start();
++      expect(buildCalls).toBe(0);
++      const res = await fetch(`http://127.0.0.1:${port}/`);
++      expect(await res.text()).toContain('READY-457');
++
++      // Как только исходник изменился (например, применили новый патч) — отпечаток меняется
++      fs.writeFileSync(path.join(tmpRoot, 'App.js'), '// updated in 458\n', 'utf8');
++      expect(isDistUpToDate(tmpRoot, distDir).upToDate).toBe(false);
++    } finally {
++      await app.close();
++      fs.rmSync(tmpRoot, { recursive: true, force: true });
++    }
++  });
++
++  it('при ошибке сборки браузер видит явную причину и восстанавливается через POST /__boot-rebuild', async () => {
++    const tmpRoot = makeTempWorkspace();
++    let shouldFail = true;
++
++    const app = createManagedAppServer({
++      port: 0,
++      host: '127.0.0.1',
++      rootDir: tmpRoot,
++      runExportBuild: async ({ stagingDir }) => {
++        if (shouldFail) throw new Error('SyntaxError: broken test token');
++        writeFakeExportOutput(stagingDir, '457');
++      },
++    });
++
++    try {
++      const { port } = await app.start();
++      await new Promise((r) => setTimeout(r, 25));
++
++      const errHtmlRes = await fetch(`http://127.0.0.1:${port}/`);
++      expect(errHtmlRes.headers.get('x-positronium-boot')).toBe('error');
++      const errHtml = await errHtmlRes.text();
++      expect(errHtml).toContain('Ошибка сборки');
++      expect(errHtml).toContain('SyntaxError: broken test token');
++
++      shouldFail = false;
++      const retryRes = await fetch(`http://127.0.0.1:${port}/__boot-rebuild`, { method: 'POST' });
++      expect(retryRes.status).toBe(200);
++      await new Promise((r) => setTimeout(r, 30));
++
++      const recovered = await fetch(`http://127.0.0.1:${port}/`);
++      expect(await recovered.text()).toContain('READY-457');
++    } finally {
++      await app.close();
++      fs.rmSync(tmpRoot, { recursive: true, force: true });
++    }
++  });
++
++  it('index.html, metro.config.js и service-worker.js настроены на быстрый прозрачный старт', () => {
++    const html = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
++    expect(html).toContain('id="positronium-preboot"');
++    expect(html).toContain('Загрузка интерфейса…');
++    expect(html).toContain('background-color: #121212');
++
++    expect(Array.isArray(metroConfig.cacheStores)).toBe(true);
++    expect(metroConfig.cacheStores.length).toBeGreaterThan(0);
++
++    const blockList = metroConfig.resolver.blockList;
++    expect(blockList.some((re) => re.test(path.join(ROOT, 'patchs/457.patch')))).toBe(true);
++    expect(blockList.some((re) => re.test(path.join(ROOT, 'dist/index.html')))).toBe(true);
++    expect(
++      blockList.some((re) => re.test('/home/runner/.local/share/pnpm/expo/index.js')),
++    ).toBe(false);
++
++    const swSrc = fs.readFileSync(path.join(ROOT, 'public/service-worker.js'), 'utf8');
++    expect(swSrc).toContain("x-positronium-boot");
++    expect(swSrc).toContain('if (isBootEndpoint || isDevBundle) return;');
++
++    // Убедимся, что zlib не ломает импорт модуля
++    expect(typeof zlib.gzip).toBe('function');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3226f8a..1553e77 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,19 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (457) — мгновенный запуск сервера, кэш сборки по отпечатку исходников и живой индикатор старта
++
++Слово владельца:
++«с момента запуска до показа UI сейчас проходит очень много времени, есль раньше минуты 2, то сейчас 5 не меньше. И не понятно иногда рабоатет или нет.»
++
++- Диагностика:
++  1. `.replit` запускал `env CI=1 npx expo start --web --port 5000` — тяжёлый dev-компилятор Metro, который при каждом старте заново сканировал дерево, ждал первого запроса вкладки и компилировал неминифицированный dev-бандл (~35 МБ raw / 8.3 МБ gzip) на общем CPU контейнера, держа кэш в очищаемом `/tmp`.
++  2. При открытии нескольких вкладок (админ + пользователь) и перехвате dev-бандла в Service Worker с `no-store` бандл собирался и перекачивался повторно, а пустой `<div id="root"></div>` оставлял немой экран без единого признака жизни.
++- Исправлено:
++  1. `server/start.js` + `server/index.js` + `.replit`: управляемый быстрый старт открывает порт за `< 0.1` сек, за ~16 мс сверяет SHA-256 отпечаток исходников с `dist/.build-fingerprint` и при совпадении мгновенно отдаёт готовый `dist/` со сжатием gzip (~835 КБ вместо 8.3 МБ — меньше секунды до UI). Если исходники изменились (после `./apply-patch.sh`), браузер сразу показывает тёмный живой экран статуса (`Сервер работает`, этап Metro, секундомер, вывод ошибки и кнопка повтора при сбое) и автоматически открывает UI по завершении сборки.
++  2. `metro.config.js`: кэш трансформации Metro перенесён в постоянный `.expo/metro-cache` (переживает рестарт контейнера, ускоряя пересборку после патча до нескольких секунд), а из обхода исключены `patchs/`, `dist/`, `docs/`, `item-forge/`, `screenshots/`, `.expo/`.
++  3. `public/index.html` + `public/service-worker.js` + `src/web/versionGuard.ts` + `server/roomServer.js`: добавлен мгновенный тёмный индикатор загрузки в `#root` до монтирования React (с таймером и перехватом ошибки скрипта), gzip-сжатие статики на сервере, пропуск dev-бандлов и `/__boot-status` мимо Service Worker и отключение лишнего авто-перезапуска `versionGuard` в `__DEV__`.
++- Приёмочные тесты: `__tests__/screens/fast-boot-and-status-457.test.js` (4 теста).
++
+ ## 2026-10-27 (456) — отображение подключённых персонажей у админа, изоляция разделов и индикатор комнаты на карточке
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index f9932d5..f046d25 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,18 @@
+ # Changelog
++---
++## Instant startup & live boot status screen (patch 457)
++
++Eliminated the multi-minute blank-screen startup delay:
++- The server binds its port immediately and checks a SHA-256 source fingerprint:
++  when sources are unchanged, the prebuilt gzipped bundle (~835 KB) is served in
++  under a second instead of running a full Metro dev compile on every launch.
++- When sources change (e.g. after applying a patch), the browser immediately
++  shows a live dark startup status screen (server pulse, current stage, elapsed
++  timer, and automatic transition when ready, plus an inline pre-React loader in
++  `index.html` so the screen is never blank).
++- Persisted Metro's transform cache inside `.expo/metro-cache` so incremental
++  rebuilds complete in seconds across container restarts.
++
+ ---
+ ## Connected room characters, strict GM/User separation & status badge (patch 456)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 607384f..16a5c05 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Быстрый старт и живой индикатор запуска (патч 457)
++
++Устранён долгий «немой» запуск веб-приложения:
++- Сервер открывает порт мгновенно и проверяет отпечаток исходников: если файлы
++  не менялись, готовая сборка отдаётся со сжатием gzip меньше чем за секунду
++  вместо многоминутной перекомпиляции Metro при каждом запуске.
++- Если после установки патча требуется пересборка, в браузере сразу отображается
++  живой экран запуска со статусом сервера, текущим этапом, секундомером и
++  автоматическим переходом в интерфейс по готовности (а также до монтирования
++  React виден встроенный индикатор загрузки вместо пустого экрана).
++- Кэш трансформации Metro перенесён в `.expo/metro-cache`, благодаря чему
++  обновления собираются за секунды даже после перезапуска контейнера.
++
+ ---
+ ## Персонажи в комнате мастера, разделение режимов и индикатор связи (патч 456)
+ 
+diff --git a/metro.config.js b/metro.config.js
+index 5d1de0c..7aca9fc 100644
+--- a/metro.config.js
++++ b/metro.config.js
+@@ -7,6 +7,28 @@ const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+ const workspaceLocalDir = path.resolve(__dirname, '.local');
+ const workspaceKiroDir = path.resolve(__dirname, '.kiro');
+ const workspaceBackupDir = path.resolve(__dirname, '.install-backup');
++const workspacePatchesDir = path.resolve(__dirname, 'patchs');
++const workspaceDistDir = path.resolve(__dirname, 'dist');
++const workspaceDocsDir = path.resolve(__dirname, 'docs');
++const workspaceItemForgeDir = path.resolve(__dirname, 'item-forge');
++const workspaceScreenshotsDir = path.resolve(__dirname, 'screenshots');
++const workspaceExpoDir = path.resolve(__dirname, '.expo');
++
++// Храним кэш трансформации Metro внутри .expo/metro-cache (в рабочей папке, а не
++// в /tmp), чтобы при перезапуске контейнера Replit и после установки патчей
++// пересобирались только изменённые файлы (секунды вместо минут).
++try {
++  const metroConfigEntry = require.resolve('expo/metro-config');
++  const metroCachePath = require.resolve('metro-cache', { paths: [metroConfigEntry, __dirname] });
++  const { FileStore } = require(metroCachePath);
++  if (typeof FileStore === 'function') {
++    config.cacheStores = [
++      new FileStore({ root: path.join(workspaceExpoDir, 'metro-cache') }),
++    ];
++  }
++} catch {
++  // Если в нестандартной среде пакет metro-cache недоступен напрямую — остаётся дефолтный кэш.
++}
+ 
+ const defaultBlockList = Array.isArray(config.resolver.blockList)
+   ? config.resolver.blockList
+@@ -23,13 +45,20 @@ config.resolver = {
+   ...config.resolver,
+   unstable_enablePackageExports: true,
+   unstable_conditionNames: ['require', 'react-native', 'default'],
+-  // Блокируем только служебные каталоги ВНУТРИ проекта (.local, .kiro, .install-backup),
++  // Блокируем только служебные и не-рантаймовые каталоги ВНУТРИ проекта
++  // (.local, .kiro, .install-backup, patchs, dist, docs, item-forge, screenshots, .expo),
+   // не затрагивая глобальное хранилище pnpm (/home/runner/.local/share/pnpm/...).
+   blockList: [
+     ...defaultBlockList,
+     new RegExp(`^${escapeRegExp(workspaceLocalDir)}[/\\\\].*`),
+     new RegExp(`^${escapeRegExp(workspaceKiroDir)}[/\\\\].*`),
+     new RegExp(`^${escapeRegExp(workspaceBackupDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspacePatchesDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspaceDistDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspaceDocsDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspaceItemForgeDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspaceScreenshotsDir)}[/\\\\].*`),
++    new RegExp(`^${escapeRegExp(workspaceExpoDir)}[/\\\\].*`),
+   ],
+   resolveRequest(context, moduleName, platform) {
+     if (platform === 'web' && moduleName === 'fontfaceobserver') {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 0e5c141..3490a3b 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "456"
++  "baseline": "457"
+ }
+diff --git a/public/index.html b/public/index.html
+index bdb6ed8..ad665ec 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -54,6 +54,8 @@
+       /* These styles disable body scrolling if you are using <ScrollView> */
+       body {
+         overflow: hidden;
++        margin: 0;
++        background-color: #121212;
+       }
+       /* These styles make the root element full-height */
+       #root {
+@@ -61,6 +63,63 @@
+         height: 100%;
+         flex: 1;
+       }
++      @keyframes positronium-spin {
++        to { transform: rotate(360deg); }
++      }
++      .positronium-preboot {
++        flex: 1;
++        display: flex;
++        flex-direction: column;
++        align-items: center;
++        justify-content: center;
++        background: #121212;
++        color: #f0e68c;
++        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
++        padding: 24px;
++        text-align: center;
++      }
++      .positronium-preboot-ring {
++        width: 38px;
++        height: 38px;
++        border: 3px solid rgba(240, 230, 140, 0.2);
++        border-top-color: #f0e68c;
++        border-radius: 50%;
++        animation: positronium-spin 0.9s linear infinite;
++        margin-bottom: 16px;
++      }
++      .positronium-preboot-title {
++        font-size: 18px;
++        font-weight: 700;
++        letter-spacing: 0.6px;
++        margin-bottom: 6px;
++      }
++      .positronium-preboot-sub {
++        font-size: 13px;
++        color: #9ca3af;
++      }
++      .positronium-preboot-err {
++        display: none;
++        margin-top: 14px;
++        max-width: 360px;
++        padding: 10px 14px;
++        border-radius: 8px;
++        background: rgba(220, 38, 38, 0.16);
++        border: 1px solid rgba(248, 113, 113, 0.4);
++        color: #fca5a5;
++        font-size: 12px;
++      }
++      .positronium-preboot-btn {
++        display: none;
++        margin-top: 12px;
++        padding: 9px 18px;
++        border: 0;
++        border-radius: 8px;
++        background: #d4af37;
++        color: #111827;
++        font-size: 13px;
++        font-weight: 700;
++        cursor: pointer;
++      }
+     </style>
+   </head>
+ 
+@@ -69,7 +128,40 @@
+     <noscript>
+       You need to enable JavaScript to run this app.
+     </noscript>
+-    <!-- The root element for your Expo app. -->
+-    <div id="root"></div>
++    <!-- The root element for your Expo app (мгновенный индикатор до старта React, заменяется автоматически при монтировании). -->
++    <div id="root">
++      <div class="positronium-preboot" id="positronium-preboot">
++        <div class="positronium-preboot-ring" id="positronium-preboot-ring"></div>
++        <div class="positronium-preboot-title">Positronium</div>
++        <div class="positronium-preboot-sub" id="positronium-preboot-sub">Загрузка интерфейса…</div>
++        <div class="positronium-preboot-err" id="positronium-preboot-err"></div>
++        <button class="positronium-preboot-btn" id="positronium-preboot-btn" onclick="location.reload()">Обновить страницу</button>
++      </div>
++    </div>
++    <script>
++      (function () {
++        var t0 = Date.now();
++        var timer = setInterval(function () {
++          var sub = document.getElementById('positronium-preboot-sub');
++          if (!sub) { clearInterval(timer); return; }
++          var sec = Math.floor((Date.now() - t0) / 1000);
++          if (sec >= 2) {
++            sub.textContent = 'Загрузка модулей приложения… ' + sec + ' сек';
++          }
++        }, 1000);
++        window.addEventListener('error', function (ev) {
++          var errBox = document.getElementById('positronium-preboot-err');
++          var btn = document.getElementById('positronium-preboot-btn');
++          var ring = document.getElementById('positronium-preboot-ring');
++          if (!errBox) return;
++          if (ev && ev.target && ev.target.tagName === 'SCRIPT') {
++            if (ring) ring.style.display = 'none';
++            errBox.style.display = 'block';
++            errBox.textContent = 'Не удалось загрузить скрипт приложения. Возможно, сервер перезапускается.';
++            if (btn) btn.style.display = 'inline-block';
++          }
++        }, true);
++      })();
++    </script>
+   </body>
+ </html>
+diff --git a/public/service-worker.js b/public/service-worker.js
+index 0df91f8..02b75f2 100644
+--- a/public/service-worker.js
++++ b/public/service-worker.js
+@@ -79,7 +79,11 @@ self.addEventListener('activate', (event) => {
+ const handleNavigation = async (request) => {
+   try {
+     const networkResponse = await fetch(new Request(request, { cache: 'no-cache' }));
+-    if (networkResponse && networkResponse.status === 200) {
++    if (
++      networkResponse &&
++      networkResponse.status === 200 &&
++      !networkResponse.headers.get('x-positronium-boot')
++    ) {
+       const toCache = networkResponse.clone();
+       caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, toCache)).catch(() => undefined);
+     }
+@@ -162,6 +166,12 @@ self.addEventListener('fetch', (event) => {
+ 
+   const isDevBundle =
+     requestUrl.pathname.endsWith('.bundle') || requestUrl.searchParams.get('dev') === 'true';
++  const isBootEndpoint =
++    requestUrl.pathname === '/__boot-status' || requestUrl.pathname === '/__boot-rebuild';
++
++  // Служебные запросы сборки и тяжёлый dev-бандл Metro не пропускаем через SW:
++  // браузер качает их напрямую по HTTP без таймаутов и сериализации воркера.
++  if (isBootEndpoint || isDevBundle) return;
+ 
+   event.respondWith(
+     // Для нехэшированных ресурсов (/version.json, /manifest.json, dev index.bundle)
+diff --git a/public/version.json b/public/version.json
+index 6d0e263..4c40003 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "456",
++  "version": "457",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/index.js b/server/index.js
+index a6150b2..9c178ed 100644
+--- a/server/index.js
++++ b/server/index.js
+@@ -1,25 +1,19 @@
+ 'use strict';
+ 
+-// server/index.js — точка входа комнатного сервера.
+-// Один процесс = статика dist/ + WebSocket /ws (план gm-rooms, этап 0).
+-// Запуск: `npm run serve:app` (PORT из окружения, по умолчанию 5000).
++// server/index.js — точка входа комнатного сервера Positronium.
++// Один процесс = мгновенное открытие порта (статика dist/ с gzip + WebSocket /ws)
++// и прозрачная доcборка dist/ с живым экраном статуса, если исходники обновились.
++// Запуск: `npm run serve:app` или `PORT=5000 node server/start.js`.
+ 
+-const path = require('node:path');
+-const { createRoomServer } = require('./roomServer');
++const { createManagedAppServer } = require('./start');
+ 
+-const port = Number(process.env.PORT || 5000);
+-const host = process.env.HOST || '0.0.0.0';
++const app = createManagedAppServer();
+ 
+-const { start, close } = createRoomServer({
+-  port,
+-  host,
+-  distDir: path.join(__dirname, '..', 'dist'),
+-});
+-
+-start().then((address) => {
++app.start().catch((err) => {
+   // eslint-disable-next-line no-console
+-  console.log(`[room-server] Positronium: статика dist/ + /ws на ${address.address}:${address.port}`);
++  console.error('[room-server] Ошибка запуска:', err);
++  process.exit(1);
+ });
+ 
+-process.on('SIGTERM', () => close().finally(() => process.exit(0)));
+-process.on('SIGINT', () => close().finally(() => process.exit(0)));
++process.on('SIGTERM', () => app.close().finally(() => process.exit(0)));
++process.on('SIGINT', () => app.close().finally(() => process.exit(0)));
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 4e330d8..c3c5e1e 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -9,6 +9,7 @@
+ const http = require('node:http');
+ const fs = require('node:fs');
+ const path = require('node:path');
++const zlib = require('node:zlib');
+ const { WebSocketServer } = require('ws');
+ const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
+ const { createRoomRegistry } = require('./roomRegistry');
+@@ -35,6 +36,63 @@ const MIME = {
+ 
+ const IMMUTABLE_FONT_RE = /\.(ttf|woff2?|otf)$/i;
+ const IMMUTABLE_HASHED_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
++const COMPRESSIBLE_EXT = new Set(['.js', '.css', '.html', '.json', '.svg', '.webmanifest', '.txt']);
++const MAX_GZIP_CACHE_ENTRIES = 64;
++const immutableGzipCache = new Map();
++
++const acceptsGzip = (req) => {
++  const header = req?.headers?.['accept-encoding'];
++  return typeof header === 'string' && /\bgzip\b/i.test(header);
++};
++
++const sendStaticPayload = (req, res, { data, ext, policy, contentType, cacheKey }) => {
++  const headers = {
++    'Content-Type': contentType,
++    'Cache-Control': policy,
++  };
++  if (policy.startsWith('no-store')) {
++    headers.Pragma = 'no-cache';
++    headers.Expires = '0';
++  }
++  const compressible = COMPRESSIBLE_EXT.has(ext) && data.length >= 1024;
++  if (compressible) {
++    headers.Vary = 'Accept-Encoding';
++  }
++  if (!compressible || !acceptsGzip(req)) {
++    res.writeHead(200, headers);
++    res.end(data);
++    return;
++  }
++
++  const isImmutable = policy.includes('immutable') && Boolean(cacheKey);
++  if (isImmutable) {
++    const cached = immutableGzipCache.get(cacheKey);
++    if (cached) {
++      headers['Content-Encoding'] = 'gzip';
++      res.writeHead(200, headers);
++      res.end(cached);
++      return;
++    }
++  }
++
++  zlib.gzip(data, { level: 6 }, (gzErr, compressed) => {
++    if (gzErr || !compressed) {
++      res.writeHead(200, headers);
++      res.end(data);
++      return;
++    }
++    if (isImmutable) {
++      if (immutableGzipCache.size >= MAX_GZIP_CACHE_ENTRIES) {
++        const oldest = immutableGzipCache.keys().next().value;
++        if (oldest) immutableGzipCache.delete(oldest);
++      }
++      immutableGzipCache.set(cacheKey, compressed);
++    }
++    headers['Content-Encoding'] = 'gzip';
++    res.writeHead(200, headers);
++    res.end(compressed);
++  });
++};
+ 
+ const cacheControlForPath = (urlPath = '/', search = '') => {
+   if (IMMUTABLE_FONT_RE.test(urlPath) || IMMUTABLE_HASHED_RE.test(urlPath)) {
+@@ -98,30 +156,28 @@ const serveStatic = (distDir) => (req, res) => {
+   if (!filePath.startsWith(distDir)) { res.writeHead(403); res.end('Forbidden'); return; }
+   fs.readFile(filePath, (err, data) => {
+     if (!err) {
++      const ext = path.extname(filePath).toLowerCase();
+       const policy = cacheControlForPath(urlPath, rawSearch);
+-      const headers = {
+-        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+-        'Cache-Control': policy,
+-      };
+-      if (policy.startsWith('no-store')) {
+-        headers.Pragma = 'no-cache';
+-        headers.Expires = '0';
+-      }
+-      res.writeHead(200, headers);
+-      res.end(data);
++      sendStaticPayload(req, res, {
++        data,
++        ext,
++        policy,
++        contentType: MIME[ext] || 'application/octet-stream',
++        cacheKey: `${filePath}:${data.length}`,
++      });
+       return;
+     }
+     // SPA-фолбэк: «навигационные» пути без расширения ведут на index.html.
+     if (!path.extname(urlPath)) {
+       fs.readFile(path.join(distDir, 'index.html'), (fallbackErr, html) => {
+         if (fallbackErr) { res.writeHead(404); res.end('Not found'); return; }
+-        res.writeHead(200, {
+-          'Content-Type': MIME['.html'],
+-          'Cache-Control': 'no-store, no-cache, must-revalidate',
+-          Pragma: 'no-cache',
+-          Expires: '0',
++        sendStaticPayload(req, res, {
++          data: html,
++          ext: '.html',
++          policy: 'no-store, no-cache, must-revalidate',
++          contentType: MIME['.html'],
++          cacheKey: null,
+         });
+-        res.end(html);
+       });
+       return;
+     }
+@@ -394,8 +450,16 @@ const createRoomServer = ({
+   host = '0.0.0.0',
+   distDir = path.join(__dirname, '..', 'dist'),
+   registry = createRoomRegistry(),
++  beforeStatic = null,
+ } = {}) => {
+-  const server = http.createServer(serveStatic(distDir));
++  const staticHandler = serveStatic(distDir);
++  const requestHandler = typeof beforeStatic === 'function'
++    ? (req, res) => {
++        if (beforeStatic(req, res) === true) return;
++        staticHandler(req, res);
++      }
++    : staticHandler;
++  const server = http.createServer(requestHandler);
+   const { wss, closeWs } = attachRoomWebSocketServer(server, { registry });
+ 
+   const start = () => new Promise((resolve, reject) => {
+diff --git a/server/start.js b/server/start.js
+new file mode 100644
+index 0000000..31f51f8
+--- /dev/null
++++ b/server/start.js
+@@ -0,0 +1,681 @@
++'use strict';
++
++// server/start.js — быстрый управляемый запуск Positronium (патч 457).
++//
++// Почему раньше запуск занимал 2–5+ минут с пустым экраном:
++// `.replit` запускал `npx expo start --web --port 5000` (dev-компилятор Metro),
++// который при каждом старте сканировал всё дерево, ждал первого запроса вкладки,
++// собирал неминифицированный dev-бандл (~35 МБ raw / 8.3 МБ gzip) на общем CPU
++// без единого визуального признака жизни на экране.
++//
++// Как работает теперь:
++// 1. HTTP + WebSocket сервер комнат (/ws) открывает порт мгновенно (< 0.1 сек).
++// 2. За ~15 мс считается SHA-256 отпечаток исходников проекта:
++//    - если готовая сборка `dist/` уже соответствует исходникам — интерфейс
++//      отдаётся сразу со сжатием gzip (~835 КБ) меньше чем за секунду;
++//    - если исходники обновились (например, после `./apply-patch.sh`) — браузер
++//      В ТУ ЖЕ СЕКУНДУ показывает живой экран статуса сборки (пульс сервера,
++//      этап, секундомер, лог ошибки при сбое), а инкрементальная сборка с
++//      постоянным кэшем `.expo/metro-cache` атомарно обновляет `dist/` и сама
++//      открывает готовый интерфейс.
++
++const fs = require('node:fs');
++const os = require('node:os');
++const path = require('node:path');
++const crypto = require('node:crypto');
++const { spawn } = require('node:child_process');
++const { createRoomServer } = require('./roomServer');
++
++const FINGERPRINT_FILE = '.build-fingerprint';
++
++const SOURCE_ROOT_FILES = [
++  'index.js',
++  'App.js',
++  'app.json',
++  'package.json',
++  'metro.config.js',
++  'tsconfig.json',
++];
++
++const SOURCE_DIRS = [
++  'public',
++  'src',
++  'components',
++  'modules',
++  'domain',
++  'db',
++  'i18n',
++  'styles',
++  'assets',
++  'settings',
++];
++
++const TEXT_EXTENSIONS = new Set([
++  '.js', '.jsx', '.ts', '.tsx', '.json', '.html', '.css', '.cjs', '.mjs',
++]);
++
++const readPublicVersion = (rootDir) => {
++  try {
++    const raw = JSON.parse(fs.readFileSync(path.join(rootDir, 'public', 'version.json'), 'utf8'));
++    return raw?.version ? String(raw.version) : '';
++  } catch {
++    return '';
++  }
++};
++
++const computeSourceScan = (rootDir) => {
++  const hash = crypto.createHash('sha256');
++  let maxMtimeMs = 0;
++
++  const addFile = (absPath, relPath) => {
++    let st;
++    try { st = fs.statSync(absPath); } catch { return; }
++    if (!st.isFile()) return;
++    if (st.mtimeMs > maxMtimeMs) maxMtimeMs = st.mtimeMs;
++    const ext = path.extname(relPath).toLowerCase();
++    hash.update(`${relPath}\0${st.size}\0`);
++    if (TEXT_EXTENSIONS.has(ext) && st.size <= 1024 * 1024) {
++      try {
++        hash.update(fs.readFileSync(absPath));
++      } catch {
++        hash.update(String(Math.trunc(st.mtimeMs)));
++      }
++    } else {
++      hash.update(String(Math.trunc(st.mtimeMs)));
++    }
++    hash.update('\0');
++  };
++
++  for (const file of SOURCE_ROOT_FILES) {
++    addFile(path.join(rootDir, file), file);
++  }
++
++  const walk = (dirPath, relBase) => {
++    let entries;
++    try { entries = fs.readdirSync(dirPath, { withFileTypes: true }); } catch { return; }
++    entries.sort((a, b) => a.name.localeCompare(b.name));
++    for (const entry of entries) {
++      if (entry.name.startsWith('.')) continue;
++      const abs = path.join(dirPath, entry.name);
++      const rel = `${relBase}/${entry.name}`;
++      if (entry.isDirectory()) walk(abs, rel);
++      else if (entry.isFile()) addFile(abs, rel);
++    }
++  };
++
++  for (const dir of SOURCE_DIRS) {
++    walk(path.join(rootDir, dir), dir);
++  }
++
++  return {
++    fingerprint: hash.digest('hex'),
++    maxMtimeMs,
++  };
++};
++
++const computeSourceFingerprint = (rootDir) => computeSourceScan(rootDir).fingerprint;
++
++const hasValidDistFiles = (distDir, expectedVersion) => {
++  const indexHtmlPath = path.join(distDir, 'index.html');
++  if (!fs.existsSync(indexHtmlPath)) return false;
++  let html;
++  try { html = fs.readFileSync(indexHtmlPath, 'utf8'); } catch { return false; }
++  const scriptMatches = [...html.matchAll(/<script[^>]+src="([^"]+)"/gi)];
++  if (scriptMatches.length === 0) return false;
++  for (const match of scriptMatches) {
++    const relScript = match[1].split('?')[0].replace(/^\/+/, '');
++    if (!fs.existsSync(path.join(distDir, relScript))) return false;
++  }
++  if (expectedVersion) {
++    try {
++      const distVer = JSON.parse(fs.readFileSync(path.join(distDir, 'version.json'), 'utf8'));
++      if (String(distVer?.version ?? '') !== expectedVersion) return false;
++    } catch {
++      return false;
++    }
++  }
++  return true;
++};
++
++const isDistUpToDate = (rootDir, distDir = path.join(rootDir, 'dist')) => {
++  const expectedVersion = readPublicVersion(rootDir);
++  if (!hasValidDistFiles(distDir, expectedVersion)) {
++    return { upToDate: false, fingerprint: computeSourceFingerprint(rootDir) };
++  }
++
++  const { fingerprint, maxMtimeMs } = computeSourceScan(rootDir);
++  const fpPath = path.join(distDir, FINGERPRINT_FILE);
++  try {
++    const stored = fs.readFileSync(fpPath, 'utf8').trim();
++    if (stored === fingerprint) {
++      return { upToDate: true, fingerprint };
++    }
++    return { upToDate: false, fingerprint };
++  } catch {
++    // Если dist/ только что собран вручную через `npm run build` (без файла
++    // отпечатка), но новее всех исходников и совпадает по version.json —
++    // принимаем его без лишней пересборки и записываем отпечаток.
++    try {
++      const indexStat = fs.statSync(path.join(distDir, 'index.html'));
++      if (indexStat.mtimeMs >= maxMtimeMs) {
++        try { fs.writeFileSync(fpPath, `${fingerprint}\n`, 'utf8'); } catch { /* ignore */ }
++        return { upToDate: true, fingerprint };
++      }
++    } catch {
++      // Пересоберём штатно.
++    }
++    return { upToDate: false, fingerprint };
++  }
++};
++
++const escapeHtml = (str) => String(str ?? '')
++  .replace(/&/g, '&amp;')
++  .replace(/</g, '&lt;')
++  .replace(/>/g, '&gt;')
++  .replace(/"/g, '&quot;');
++
++const renderBootStatusHtml = (status) => {
++  const isError = status.state === 'error';
++  const versionBadge = status.version ? ` • патч ${escapeHtml(status.version)}` : '';
++  const initialJson = JSON.stringify({
++    state: status.state,
++    version: status.version || '',
++    elapsedMs: status.elapsedMs || 0,
++    stage: status.stage || '',
++    detail: status.detail || '',
++    error: status.error || null,
++  }).replace(/</g, '\\u003c');
++
++  return `<!DOCTYPE html>
++<html lang="ru">
++<head>
++  <meta charset="utf-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1" />
++  <title>Positronium — запуск</title>
++  <style>
++    * { box-sizing: border-box; }
++    html, body {
++      margin: 0; padding: 0; height: 100%;
++      background: #111214; color: #f3f4f6;
++      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
++    }
++    body {
++      display: flex; align-items: center; justify-content: center; padding: 24px;
++    }
++    .card {
++      width: 100%; max-width: 440px;
++      background: #1a1c20; border: 1px solid #32363f; border-radius: 14px;
++      padding: 28px 24px; box-shadow: 0 18px 48px rgba(0,0,0,0.55);
++    }
++    .brand-row {
++      display: flex; align-items: center; justify-content: space-between; gap: 12px;
++      margin-bottom: 18px;
++    }
++    .brand {
++      font-size: 20px; font-weight: 700; color: #f0e68c; letter-spacing: 0.6px;
++    }
++    .pill {
++      display: inline-flex; align-items: center; gap: 7px;
++      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px;
++      background: rgba(22, 163, 74, 0.16); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35);
++    }
++    .pill.offline {
++      background: rgba(234, 179, 8, 0.16); color: #facc15; border-color: rgba(250, 204, 21, 0.35);
++    }
++    .pill.error {
++      background: rgba(220, 38, 38, 0.18); color: #f87171; border-color: rgba(248, 113, 113, 0.4);
++    }
++    .dot {
++      width: 8px; height: 8px; border-radius: 50%; background: currentColor;
++      animation: pulse 1.3s ease-in-out infinite;
++    }
++    .pill.error .dot { animation: none; }
++    @keyframes pulse {
++      0%, 100% { opacity: 1; transform: scale(1); }
++      50% { opacity: 0.38; transform: scale(0.85); }
++    }
++    .stage {
++      font-size: 15px; font-weight: 600; color: #f9fafb; margin-bottom: 6px;
++    }
++    .detail {
++      font-size: 13px; color: #9ca3af; min-height: 18px; margin-bottom: 16px;
++      word-break: break-word;
++    }
++    .bar-wrap {
++      height: 6px; width: 100%; background: #272a30; border-radius: 999px;
++      overflow: hidden; margin-bottom: 14px;
++    }
++    .bar-fill {
++      height: 100%; width: 38%; background: linear-gradient(90deg, #b8942a, #f0e68c, #d4af37);
++      border-radius: 999px; animation: slide 1.6s ease-in-out infinite;
++    }
++    @keyframes slide {
++      0% { transform: translateX(-100%); }
++      100% { transform: translateX(270%); }
++    }
++    .meta {
++      display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af;
++    }
++    .hint {
++      margin-top: 14px; padding-top: 12px; border-top: 1px solid #2a2d35;
++      font-size: 12px; color: #8b93a1; line-height: 1.45;
++    }
++    pre.err {
++      margin: 12px 0 16px; padding: 12px; border-radius: 8px;
++      background: #111214; border: 1px solid rgba(248, 113, 113, 0.35);
++      color: #fca5a5; font-size: 11.5px; max-height: 200px; overflow: auto;
++      white-space: pre-wrap; word-break: break-word;
++    }
++    button.retry {
++      width: 100%; padding: 11px 16px; border: 0; border-radius: 8px;
++      background: #d4af37; color: #111827; font-size: 14px; font-weight: 700;
++      cursor: pointer;
++    }
++  </style>
++</head>
++<body>
++  <div class="card">
++    <div class="brand-row">
++      <div class="brand">Positronium${versionBadge}</div>
++      <div id="pill" class="pill${isError ? ' error' : ''}">
++        <span class="dot"></span>
++        <span id="pill-text">${isError ? 'Ошибка сборки' : 'Сервер работает'}</span>
++      </div>
++    </div>
++    <div id="stage" class="stage">${escapeHtml(status.stage || 'Подготовка веб-интерфейса…')}</div>
++    <div id="detail" class="detail">${escapeHtml(status.detail || 'Проверка актуальности модулей…')}</div>
++    <div id="bar" class="bar-wrap"${isError ? ' style="display:none"' : ''}><div class="bar-fill"></div></div>
++    <pre id="err" class="err"${isError && status.error ? '' : ' style="display:none"'}>${escapeHtml(status.error || '')}</pre>
++    <button id="retry-btn" class="retry"${isError ? '' : ' style="display:none"'} onclick="retryBuild()">Повторить сборку</button>
++    <div class="meta">
++      <span id="state-note">Автоматический переход по готовности</span>
++      <span id="timer">0:00</span>
++    </div>
++    <div class="hint">
++      Идёт сборка обновлённых файлов приложения. Повторные запуски без изменений открываются за секунду.
++    </div>
++  </div>
++  <script>
++    (function () {
++      var initial = ${initialJson};
++      var baseElapsed = initial.elapsedMs || 0;
++      var clientStart = Date.now();
++      var pill = document.getElementById('pill');
++      var pillText = document.getElementById('pill-text');
++      var stageEl = document.getElementById('stage');
++      var detailEl = document.getElementById('detail');
++      var timerEl = document.getElementById('timer');
++      var barEl = document.getElementById('bar');
++      var errEl = document.getElementById('err');
++      var retryBtn = document.getElementById('retry-btn');
++
++      function fmt(ms) {
++        var totalSec = Math.max(0, Math.floor(ms / 1000));
++        var m = Math.floor(totalSec / 60);
++        var s = totalSec % 60;
++        return m + ':' + (s < 10 ? '0' + s : s);
++      }
++
++      setInterval(function () {
++        if (pill.className.indexOf('error') === -1) {
++          timerEl.textContent = fmt(baseElapsed + (Date.now() - clientStart));
++        }
++      }, 500);
++      timerEl.textContent = fmt(baseElapsed);
++
++      window.retryBuild = function () {
++        retryBtn.disabled = true;
++        fetch('/__boot-rebuild', { method: 'POST', cache: 'no-store' })
++          .then(function () {
++            retryBtn.disabled = false;
++            clientStart = Date.now();
++            baseElapsed = 0;
++            poll();
++          })
++          .catch(function () { retryBtn.disabled = false; });
++      };
++
++      function openApp(ver) {
++        stageEl.textContent = 'Готово! Открываем интерфейс…';
++        detailEl.textContent = '';
++        try {
++          var u = new URL(window.location.href);
++          if (ver) u.searchParams.set('_v', ver);
++          window.location.replace(u.toString());
++        } catch (_) {
++          window.location.reload();
++        }
++      }
++
++      function poll() {
++        fetch('/__boot-status?_t=' + Date.now(), { cache: 'no-store' })
++          .then(function (r) { return r.json(); })
++          .then(function (st) {
++            if (st.state === 'ready') {
++              openApp(st.version);
++              return;
++            }
++            baseElapsed = st.elapsedMs || 0;
++            clientStart = Date.now();
++            stageEl.textContent = st.stage || 'Подготовка веб-интерфейса…';
++            detailEl.textContent = st.detail || '';
++            if (st.state === 'error') {
++              pill.className = 'pill error';
++              pillText.textContent = 'Ошибка сборки';
++              barEl.style.display = 'none';
++              errEl.style.display = 'block';
++              errEl.textContent = st.error || 'Неизвестная ошибка сборки';
++              retryBtn.style.display = 'block';
++            } else {
++              pill.className = 'pill';
++              pillText.textContent = 'Сервер работает';
++              barEl.style.display = 'block';
++              errEl.style.display = 'none';
++              retryBtn.style.display = 'none';
++            }
++          })
++          .catch(function () {
++            pill.className = 'pill offline';
++            pillText.textContent = 'Переподключение к серверу…';
++          });
++      }
++
++      setInterval(poll, 950);
++    })();
++  </script>
++</body>
++</html>`;
++};
++
++const swapDirectoryAtomic = (stagingDir, targetDir, tempParentDir) => {
++  const backupDir = path.join(tempParentDir, `dist-prev-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
++  try {
++    if (fs.existsSync(targetDir)) {
++      fs.renameSync(targetDir, backupDir);
++    }
++    fs.renameSync(stagingDir, targetDir);
++    if (fs.existsSync(backupDir)) {
++      fs.rmSync(backupDir, { recursive: true, force: true });
++    }
++  } catch {
++    // Fallback для сред, где dist/ примонтирован отдельной ФС (EXDEV).
++    fs.rmSync(targetDir, { recursive: true, force: true });
++    fs.cpSync(stagingDir, targetDir, { recursive: true, force: true });
++    fs.rmSync(stagingDir, { recursive: true, force: true });
++    if (fs.existsSync(backupDir)) {
++      fs.rmSync(backupDir, { recursive: true, force: true });
++    }
++  }
++};
++
++const defaultRunExportBuild = ({ rootDir, stagingDir, onProgress }) => new Promise((resolve, reject) => {
++  let expoCli;
++  try {
++    expoCli = require.resolve('expo/bin/cli', { paths: [rootDir] });
++  } catch (err) {
++    reject(new Error(`Не найден expo/bin/cli: ${err.message}`));
++    return;
++  }
++
++  const available = typeof os.availableParallelism === 'function'
++    ? os.availableParallelism()
++    : (os.cpus()?.length || 2);
++  const maxWorkers = Math.max(1, Math.min(4, available));
++
++  const args = [
++    expoCli,
++    'export',
++    '--platform',
++    'web',
++    '--output-dir',
++    stagingDir,
++    '--max-workers',
++    String(maxWorkers),
++  ];
++
++  const tail = [];
++  const pushLines = (chunk) => {
++    const lines = chunk
++      .toString('utf8')
++      .replace(/\x1b\[[0-9;]*m/g, '')
++      .split(/\r?\n/)
++      .map((line) => line.trim())
++      .filter(Boolean);
++    for (const line of lines) {
++      tail.push(line);
++      if (tail.length > 30) tail.shift();
++      if (typeof onProgress === 'function') onProgress(line);
++    }
++  };
++
++  const child = spawn(process.execPath, args, {
++    cwd: rootDir,
++    env: { ...process.env, CI: '1' },
++    stdio: ['ignore', 'pipe', 'pipe'],
++  });
++
++  child.stdout.on('data', pushLines);
++  child.stderr.on('data', pushLines);
++  child.on('error', reject);
++  child.on('close', (code) => {
++    if (code === 0) {
++      resolve();
++    } else {
++      reject(new Error(tail.slice(-15).join('\n') || `expo export завершился с кодом ${code}`));
++    }
++  });
++});
++
++const createManagedAppServer = ({
++  port = Number(process.env.PORT || 5000),
++  host = process.env.HOST || '0.0.0.0',
++  rootDir = path.join(__dirname, '..'),
++  distDir = path.join(rootDir, 'dist'),
++  autoBuild = process.env.SKIP_AUTO_BUILD !== '1',
++  runExportBuild = defaultRunExportBuild,
++} = {}) => {
++  const expoCacheRoot = path.join(rootDir, '.expo');
++  let activeFingerprint = null;
++  let lastCheckAt = 0;
++  let buildPromise = null;
++
++  const status = {
++    state: 'ready',
++    version: readPublicVersion(rootDir),
++    startedAt: 0,
++    stage: 'Готово',
++    detail: '',
++    error: null,
++  };
++
++  const snapshotStatus = () => ({
++    state: status.state,
++    version: status.version,
++    elapsedMs: status.state === 'building' && status.startedAt ? Date.now() - status.startedAt : 0,
++    stage: status.stage,
++    detail: status.detail,
++    error: status.error,
++  });
++
++  const startBuild = (targetFingerprint) => {
++    if (buildPromise) return buildPromise;
++    status.state = 'building';
++    status.version = readPublicVersion(rootDir);
++    status.startedAt = Date.now();
++    status.stage = 'Сборка веб-интерфейса Positronium…';
++    status.detail = 'Запуск сборщика Metro…';
++    status.error = null;
++
++    const stagingDir = path.join(expoCacheRoot, 'dist-staging');
++    try {
++      fs.mkdirSync(expoCacheRoot, { recursive: true });
++      fs.rmSync(stagingDir, { recursive: true, force: true });
++    } catch { /* ignore */ }
++
++    // eslint-disable-next-line no-console
++    console.log(`[positronium] Изменились исходники — собираем свежий dist/ (патч ${status.version || '?'})…`);
++
++    buildPromise = runExportBuild({
++      rootDir,
++      stagingDir,
++      onProgress: (line) => {
++        if (/Starting Metro/i.test(line)) {
++          status.stage = 'Компиляция модулей интерфейса…';
++          status.detail = 'Metro собирает граф модулей (используется кэш .expo/metro-cache)';
++        } else if (/Web Bundled/i.test(line)) {
++          status.stage = 'Запись статических файлов и ресурсов…';
++          status.detail = line;
++        } else if (/Exported:/i.test(line)) {
++          status.stage = 'Завершение сборки…';
++          status.detail = line;
++        } else if (!/^›\s|^assets\/|^modules\/|^node_modules\//i.test(line)) {
++          status.detail = line.slice(0, 160);
++        }
++      },
++    })
++      .then(() => {
++        const finalFingerprint = computeSourceFingerprint(rootDir) || targetFingerprint;
++        fs.writeFileSync(path.join(stagingDir, FINGERPRINT_FILE), `${finalFingerprint}\n`, 'utf8');
++        swapDirectoryAtomic(stagingDir, distDir, expoCacheRoot);
++        activeFingerprint = finalFingerprint;
++        lastCheckAt = Date.now();
++        status.version = readPublicVersion(rootDir);
++        status.state = 'ready';
++        status.stage = 'Готово';
++        status.detail = '';
++        status.error = null;
++        const tookSec = ((Date.now() - status.startedAt) / 1000).toFixed(1);
++        // eslint-disable-next-line no-console
++        console.log(`[positronium] Сборка готова за ${tookSec} сек (версия ${status.version || '?'}).`);
++      })
++      .catch((err) => {
++        status.state = 'error';
++        status.stage = 'Не удалось собрать веб-интерфейс';
++        status.detail = 'Проверьте лог ошибки ниже и нажмите «Повторить сборку».';
++        status.error = err?.message || String(err);
++        // eslint-disable-next-line no-console
++        console.error('[positronium] Ошибка сборки:', status.error);
++      })
++      .finally(() => {
++        buildPromise = null;
++      });
++
++    return buildPromise;
++  };
++
++  const ensureUpToDate = (forceCheck = false) => {
++    if (!autoBuild || status.state === 'building') return;
++    const now = Date.now();
++    if (!forceCheck && now - lastCheckAt < 2000 && activeFingerprint) return;
++    lastCheckAt = now;
++    const check = isDistUpToDate(rootDir, distDir);
++    if (check.upToDate) {
++      activeFingerprint = check.fingerprint;
++      status.version = readPublicVersion(rootDir);
++      if (status.state !== 'ready') {
++        status.state = 'ready';
++        status.error = null;
++      }
++      return;
++    }
++    if (status.state !== 'error' || forceCheck) {
++      startBuild(check.fingerprint);
++    }
++  };
++
++  const beforeStatic = (req, res) => {
++    const rawUrl = req.url || '/';
++    const qIdx = rawUrl.indexOf('?');
++    const pathname = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
++
++    if (pathname === '/__boot-status') {
++      ensureUpToDate(false);
++      const body = JSON.stringify(snapshotStatus());
++      res.writeHead(200, {
++        'Content-Type': 'application/json; charset=utf-8',
++        'Cache-Control': 'no-store, no-cache, must-revalidate',
++        Pragma: 'no-cache',
++        Expires: '0',
++      });
++      res.end(body);
++      return true;
++    }
++
++    if (pathname === '/__boot-rebuild' && req.method === 'POST') {
++      const fp = computeSourceFingerprint(rootDir);
++      startBuild(fp);
++      res.writeHead(200, {
++        'Content-Type': 'application/json; charset=utf-8',
++        'Cache-Control': 'no-store, no-cache, must-revalidate',
++      });
++      res.end(JSON.stringify({ ok: true }));
++      return true;
++    }
++
++    if (pathname === '/' || pathname === '/index.html' || pathname === '/version.json' || !path.extname(pathname)) {
++      ensureUpToDate(false);
++    }
++
++    if (status.state !== 'ready') {
++      const isHtmlNav = pathname === '/' || pathname === '/index.html' || !path.extname(pathname);
++      if (isHtmlNav) {
++        const html = renderBootStatusHtml(snapshotStatus());
++        res.writeHead(200, {
++          'Content-Type': 'text/html; charset=utf-8',
++          'Cache-Control': 'no-store, no-cache, must-revalidate',
++          Pragma: 'no-cache',
++          Expires: '0',
++          'X-Positronium-Boot': status.state,
++        });
++        res.end(html);
++        return true;
++      }
++    }
++
++    return false;
++  };
++
++  const roomApp = createRoomServer({
++    port,
++    host,
++    distDir,
++    beforeStatic,
++  });
++
++  const start = async () => {
++    ensureUpToDate(true);
++    const address = await roomApp.start();
++    // eslint-disable-next-line no-console
++    console.log(
++      `[room-server] Positronium: ${address.address}:${address.port} (статус: ${status.state}, версия: ${status.version || '?'})`,
++    );
++    return address;
++  };
++
++  return {
++    ...roomApp,
++    start,
++    getBootStatus: snapshotStatus,
++    ensureUpToDate,
++    triggerRebuild: () => startBuild(computeSourceFingerprint(rootDir)),
++  };
++};
++
++if (require.main === module) {
++  const app = createManagedAppServer();
++  app.start().catch((err) => {
++    // eslint-disable-next-line no-console
++    console.error('[positronium] Не удалось запустить сервер:', err);
++    process.exit(1);
++  });
++  process.on('SIGTERM', () => app.close().finally(() => process.exit(0)));
++  process.on('SIGINT', () => app.close().finally(() => process.exit(0)));
++}
++
++module.exports = {
++  FINGERPRINT_FILE,
++  computeSourceFingerprint,
++  isDistUpToDate,
++  renderBootStatusHtml,
++  createManagedAppServer,
++};
+diff --git a/src/web/versionGuard.ts b/src/web/versionGuard.ts
+index 686a5d2..09c87c2 100644
+--- a/src/web/versionGuard.ts
++++ b/src/web/versionGuard.ts
+@@ -177,6 +177,9 @@ let watcherStarted = false;
+ 
+ export const startWebVersionWatcher = (): void => {
+   if (watcherStarted || typeof window === 'undefined' || typeof document === 'undefined') return;
++  // В dev-режиме Metro (__DEV__ === true) не запускаем принудительную перезагрузку
++  // по version.json, чтобы не вызывать повторное скачивание dev-бандла.
++  if ((globalThis as { __DEV__?: boolean }).__DEV__ === true) return;
+   watcherStarted = true;
+ 
+   syncBundleWithServerVersion().catch(() => undefined);

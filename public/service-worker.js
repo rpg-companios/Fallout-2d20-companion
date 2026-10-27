@@ -79,7 +79,11 @@ self.addEventListener('activate', (event) => {
 const handleNavigation = async (request) => {
   try {
     const networkResponse = await fetch(new Request(request, { cache: 'no-cache' }));
-    if (networkResponse && networkResponse.status === 200) {
+    if (
+      networkResponse &&
+      networkResponse.status === 200 &&
+      !networkResponse.headers.get('x-positronium-boot')
+    ) {
       const toCache = networkResponse.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, toCache)).catch(() => undefined);
     }
@@ -162,6 +166,12 @@ self.addEventListener('fetch', (event) => {
 
   const isDevBundle =
     requestUrl.pathname.endsWith('.bundle') || requestUrl.searchParams.get('dev') === 'true';
+  const isBootEndpoint =
+    requestUrl.pathname === '/__boot-status' || requestUrl.pathname === '/__boot-rebuild';
+
+  // Служебные запросы сборки и тяжёлый dev-бандл Metro не пропускаем через SW:
+  // браузер качает их напрямую по HTTP без таймаутов и сериализации воркера.
+  if (isBootEndpoint || isDevBundle) return;
 
   event.respondWith(
     // Для нехэшированных ресурсов (/version.json, /manifest.json, dev index.bundle)

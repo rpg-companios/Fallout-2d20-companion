@@ -177,6 +177,9 @@ let watcherStarted = false;
 
 export const startWebVersionWatcher = (): void => {
   if (watcherStarted || typeof window === 'undefined' || typeof document === 'undefined') return;
+  // В dev-режиме Metro (__DEV__ === true) не запускаем принудительную перезагрузку
+  // по version.json, чтобы не вызывать повторное скачивание dev-бандла.
+  if ((globalThis as { __DEV__?: boolean }).__DEV__ === true) return;
   watcherStarted = true;
 
   syncBundleWithServerVersion().catch(() => undefined);

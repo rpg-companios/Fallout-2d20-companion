@@ -9,6 +9,7 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
+const zlib = require('node:zlib');
 const { WebSocketServer } = require('ws');
 const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
 const { createRoomRegistry } = require('./roomRegistry');
@@ -35,6 +36,63 @@ const MIME = {
 
 const IMMUTABLE_FONT_RE = /\.(ttf|woff2?|otf)$/i;
 const IMMUTABLE_HASHED_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+const COMPRESSIBLE_EXT = new Set(['.js', '.css', '.html', '.json', '.svg', '.webmanifest', '.txt']);
+const MAX_GZIP_CACHE_ENTRIES = 64;
+const immutableGzipCache = new Map();
+
+const acceptsGzip = (req) => {
+  const header = req?.headers?.['accept-encoding'];
+  return typeof header === 'string' && /\bgzip\b/i.test(header);
+};
+
+const sendStaticPayload = (req, res, { data, ext, policy, contentType, cacheKey }) => {
+  const headers = {
+    'Content-Type': contentType,
+    'Cache-Control': policy,
+  };
+  if (policy.startsWith('no-store')) {
+    headers.Pragma = 'no-cache';
+    headers.Expires = '0';
+  }
+  const compressible = COMPRESSIBLE_EXT.has(ext) && data.length >= 1024;
+  if (compressible) {
+    headers.Vary = 'Accept-Encoding';
+  }
+  if (!compressible || !acceptsGzip(req)) {
+    res.writeHead(200, headers);
+    res.end(data);
+    return;
+  }
+
+  const isImmutable = policy.includes('immutable') && Boolean(cacheKey);
+  if (isImmutable) {
+    const cached = immutableGzipCache.get(cacheKey);
+    if (cached) {
+      headers['Content-Encoding'] = 'gzip';
+      res.writeHead(200, headers);
+      res.end(cached);
+      return;
+    }
+  }
+
+  zlib.gzip(data, { level: 6 }, (gzErr, compressed) => {
+    if (gzErr || !compressed) {
+      res.writeHead(200, headers);
+      res.end(data);
+      return;
+    }
+    if (isImmutable) {
+      if (immutableGzipCache.size >= MAX_GZIP_CACHE_ENTRIES) {
+        const oldest = immutableGzipCache.keys().next().value;
+        if (oldest) immutableGzipCache.delete(oldest);
+      }
+      immutableGzipCache.set(cacheKey, compressed);
+    }
+    headers['Content-Encoding'] = 'gzip';
+    res.writeHead(200, headers);
+    res.end(compressed);
+  });
+};
 
 const cacheControlForPath = (urlPath = '/', search = '') => {
   if (IMMUTABLE_FONT_RE.test(urlPath) || IMMUTABLE_HASHED_RE.test(urlPath)) {
@@ -98,30 +156,28 @@ const serveStatic = (distDir) => (req, res) => {
   if (!filePath.startsWith(distDir)) { res.writeHead(403); res.end('Forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (!err) {
+      const ext = path.extname(filePath).toLowerCase();
       const policy = cacheControlForPath(urlPath, rawSearch);
-      const headers = {
-        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
-        'Cache-Control': policy,
-      };
-      if (policy.startsWith('no-store')) {
-        headers.Pragma = 'no-cache';
-        headers.Expires = '0';
-      }
-      res.writeHead(200, headers);
-      res.end(data);
+      sendStaticPayload(req, res, {
+        data,
+        ext,
+        policy,
+        contentType: MIME[ext] || 'application/octet-stream',
+        cacheKey: `${filePath}:${data.length}`,
+      });
       return;
     }
     // SPA-фолбэк: «навигационные» пути без расширения ведут на index.html.
     if (!path.extname(urlPath)) {
       fs.readFile(path.join(distDir, 'index.html'), (fallbackErr, html) => {
         if (fallbackErr) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, {
-          'Content-Type': MIME['.html'],
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
+        sendStaticPayload(req, res, {
+          data: html,
+          ext: '.html',
+          policy: 'no-store, no-cache, must-revalidate',
+          contentType: MIME['.html'],
+          cacheKey: null,
         });
-        res.end(html);
       });
       return;
     }
@@ -394,8 +450,16 @@ const createRoomServer = ({
   host = '0.0.0.0',
   distDir = path.join(__dirname, '..', 'dist'),
   registry = createRoomRegistry(),
+  beforeStatic = null,
 } = {}) => {
-  const server = http.createServer(serveStatic(distDir));
+  const staticHandler = serveStatic(distDir);
+  const requestHandler = typeof beforeStatic === 'function'
+    ? (req, res) => {
+        if (beforeStatic(req, res) === true) return;
+        staticHandler(req, res);
+      }
+    : staticHandler;
+  const server = http.createServer(requestHandler);
   const { wss, closeWs } = attachRoomWebSocketServer(server, { registry });
 
   const start = () => new Promise((resolve, reject) => {
