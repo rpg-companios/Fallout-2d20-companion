@@ -73,11 +73,12 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Навигация: сеть первой (чтобы обновление доезжало сразу), кэш — страховкой.
-// Именно этот путь раньше давал белый экран.
+// Навигация: сеть первой с обходом HTTP-кэша браузера (cache: 'no-cache'),
+// чтобы новая сборка или правка UI в Metro доезжала сразу по обычному F5,
+// а кэш вступал в дело только при реальном отсутствии сети.
 const handleNavigation = async (request) => {
   try {
-    const networkResponse = await fetch(request);
+    const networkResponse = await fetch(new Request(request, { cache: 'no-cache' }));
     if (networkResponse && networkResponse.status === 200) {
       const toCache = networkResponse.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, toCache)).catch(() => undefined);
@@ -92,6 +93,47 @@ const handleNavigation = async (request) => {
   }
 };
 
+const FONT_EXT_RE = /\.(ttf|woff2?|otf)$/i;
+const HASHED_ASSET_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+
+const isImmutableOrFontRequest = (request, requestUrl) => {
+  if (request.destination === 'font') return true;
+  if (FONT_EXT_RE.test(requestUrl.pathname)) return true;
+  if (HASHED_ASSET_RE.test(requestUrl.pathname)) return true;
+  if (requestUrl.pathname.startsWith('/assets/') && requestUrl.search) {
+    try {
+      const decoded = decodeURIComponent(requestUrl.search);
+      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) return true;
+    } catch (_) {
+      // Некорректный query — оставляем стандартную сетевую ветку.
+    }
+  }
+  return false;
+};
+
+// Иконочные шрифты (.ttf/.woff2) и файлы сборки с контент-хэшем неизменяемы:
+// отдаём их мгновенно из Cache Storage (cache-first), не гоняя мегабайты по сети
+// на каждый запуск. При обновлении сборки хэш в имени файла меняется сам.
+const handleImmutableAsset = async (request) => {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const networkResponse = await fetch(request);
+  const contentType = networkResponse.headers.get('content-type') || '';
+  if (request.destination === 'script' && contentType.includes('text/html')) {
+    return new Response('', {
+      status: 503,
+      statusText: 'JavaScript asset unavailable',
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+  if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+    const toCache = networkResponse.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, toCache)).catch(() => undefined);
+  }
+  return networkResponse;
+};
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
@@ -102,8 +144,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  if (isImmutableOrFontRequest(event.request, requestUrl)) {
+    event.respondWith(
+      handleImmutableAsset(event.request).catch(() => {
+        if (event.request.destination === 'script') {
+          return new Response('', {
+            status: 503,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'text/plain' },
+          });
+        }
+        return Response.error();
+      })
+    );
+    return;
+  }
+
+  const isDevBundle =
+    requestUrl.pathname.endsWith('.bundle') || requestUrl.searchParams.get('dev') === 'true';
+
   event.respondWith(
-    fetch(event.request)
+    // Для нехэшированных ресурсов (/version.json, /manifest.json, dev index.bundle)
+    // обходим эвристический HTTP-кэш браузера через cache: 'no-cache'.
+    fetch(new Request(event.request, { cache: 'no-cache' }))
       .then((networkResponse) => {
         const contentType = networkResponse.headers.get('content-type') || '';
         const isScript = event.request.destination === 'script';
@@ -118,15 +181,16 @@ self.addEventListener('fetch', (event) => {
           });
         }
 
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        if (
+          !networkResponse ||
+          networkResponse.status !== 200 ||
+          networkResponse.type !== 'basic' ||
+          isDevBundle
+        ) {
           return networkResponse;
         }
 
-        // Кэшируем клон, оригинал отдаём как есть: чтение тела до put()
-        // приводит к «Response body is already used».
-        // Скрипты теперь тоже кэшируются — их имена содержат хэш сборки,
-        // поэтому устаревший файл просто перестаёт запрашиваться, а офлайн
-        // становится рабочим.
+        // Кэшируем клон статики (кроме dev-бандла Metro без хэша в имени).
         const toCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache)).catch(() => undefined);
         return networkResponse;

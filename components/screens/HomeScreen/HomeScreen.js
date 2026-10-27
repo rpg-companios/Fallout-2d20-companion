@@ -450,10 +450,12 @@ export default function HomeScreen({ navigation }) {
   const isGmMode = uiMode === 'gm';
   const roomServerAvailable = isRoomServerConfigured();
   const roomRooms = useRoomStore((state) => state.rooms);
+  const roomStatus = useRoomStore((state) => state.status);
   // В режиме мастера папки = комнаты и доступны всегда (настройка
   // «каталоги персонажей» на них не распространяется).
   const foldersEnabled = isGmMode || characterFoldersEnabled;
   const [folderRooms, setFolderRooms] = useState({}); // folderId -> code
+  const [folderRoomRecords, setFolderRoomRecords] = useState({}); // folderId -> { code, ownerToken }
   const [roomBindings, setRoomBindings] = useState({}); // characterId -> code
   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
@@ -577,6 +579,10 @@ export default function HomeScreen({ navigation }) {
             db.getCharacterRoomBindings(),
           ]);
           setFolderRooms(Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code])));
+          setFolderRoomRecords(Object.fromEntries(roomRows.map((row) => [
+            row.folder_id,
+            { code: row.code, ownerToken: row.owner_token },
+          ])));
           setRoomBindings(Object.fromEntries(bindingRows.map((row) => [row.character_id, row.code])));
         } catch (roomError) {
           debugLog('room.dbLoad:failed', { message: roomError?.message || String(roomError) });
@@ -610,6 +616,7 @@ export default function HomeScreen({ navigation }) {
     // при сбое сети папку не создаём — сироты «папка без комнаты» не нужны.
     try {
       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
+      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
       const folder = await db.createCharacterFolder(name);
       await db.upsertFolderRoom(folder.id, code, ownerToken);
       setFolderName('');
@@ -619,7 +626,7 @@ export default function HomeScreen({ navigation }) {
     } catch (error) {
       debugLog('room.create:failed', { message: error?.message || String(error) });
       setFolderDraftVisible(false);
-      showHomeAlert(tHomeScreen('room.createdTitle'), tHomeScreen('room.createFailed'));
+      showCatalogAlert('roomCreateFailed');
     }
   };
 
@@ -691,28 +698,44 @@ export default function HomeScreen({ navigation }) {
     setServerDialog(null);
   };
 
-  // Мастер держит свои комнаты открытыми (presence игроков).
+  // Мастер держит свои комнаты открытыми (presence игроков) и прозрачно
+  // перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
   useEffect(() => {
-    if (!isGmMode || !roomServerAvailable) return;
-    Object.values(folderRooms).forEach((code) => {
+    if (!isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
+    Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
+      const code = record?.code;
+      if (!code) return;
       const store = useRoomStore.getState();
-      if (!store.rooms[code]) {
-        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
-      }
+      if (store.rooms[code] && store.rooms[code].joined !== false) return;
+      const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
+      store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
+        if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
+          try {
+            await store.createRoom({
+              name: savedTitle,
+              requestedCode: code,
+              ownerToken: record.ownerToken,
+            });
+            await store.joinRoom({ code, name: 'GM', role: 'gm' });
+          } catch {
+            // Сервер временно недоступен — повторим при переподключении.
+          }
+        }
+      });
     });
-  }, [isGmMode, folderRooms, roomServerAvailable]);
+  }, [isGmMode, folderRoomRecords, folders, roomServerAvailable, roomStatus]);
 
   // Игрок переподключает своих персонажей к их комнатам (по связкам).
   useEffect(() => {
-    if (isGmMode || !roomServerAvailable) return;
+    if (isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
     Object.entries(roomBindings).forEach(([characterId, code]) => {
       const store = useRoomStore.getState();
-      if (!store.rooms[code]) {
+      if (!store.rooms[code] || store.rooms[code].joined === false) {
         const character = characters.find((item) => item.id === characterId);
         store.joinRoom({ code, name: character?.name || '—', role: 'player' }).catch(() => {});
       }
     });
-  }, [isGmMode, roomBindings, characters, roomServerAvailable]);
+  }, [isGmMode, roomBindings, characters, roomServerAvailable, roomStatus]);
 
   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
     if (!characterId) return;

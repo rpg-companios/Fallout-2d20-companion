@@ -33,10 +33,62 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+const IMMUTABLE_FONT_RE = /\.(ttf|woff2?|otf)$/i;
+const IMMUTABLE_HASHED_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+
+const cacheControlForPath = (urlPath = '/', search = '') => {
+  if (IMMUTABLE_FONT_RE.test(urlPath) || IMMUTABLE_HASHED_RE.test(urlPath)) {
+    return 'public, max-age=31536000, immutable';
+  }
+  if (search && urlPath.startsWith('/assets/')) {
+    try {
+      const decoded = decodeURIComponent(search);
+      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) {
+        return 'public, max-age=31536000, immutable';
+      }
+    } catch {
+      // Некорректная строка запроса — отдаём без долгого кэширования.
+    }
+  }
+  return 'no-store, no-cache, must-revalidate';
+};
+
+const attachSmartCacheHeaders = (httpServer) => {
+  if (!httpServer || httpServer.__positroniumCacheHeaders) return;
+  Object.defineProperty(httpServer, '__positroniumCacheHeaders', {
+    value: true,
+    configurable: true,
+  });
+  const register = typeof httpServer.prependListener === 'function'
+    ? httpServer.prependListener.bind(httpServer)
+    : httpServer.on.bind(httpServer);
+  register('request', (req, res) => {
+    const rawUrl = typeof req?.url === 'string' ? req.url : '/';
+    const qIdx = rawUrl.indexOf('?');
+    const pathname = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
+    const search = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
+    const policy = cacheControlForPath(pathname, search);
+    const origWriteHead = res.writeHead.bind(res);
+    res.writeHead = function writeHeadWithCachePolicy(statusCode, ...rest) {
+      if (statusCode === 200 && !res.headersSent) {
+        res.setHeader('Cache-Control', policy);
+        if (policy.startsWith('no-store')) {
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+      return origWriteHead(statusCode, ...rest);
+    };
+  });
+};
+
 const serveStatic = (distDir) => (req, res) => {
   let urlPath;
+  const rawUrl = req.url || '/';
+  const qIdx = rawUrl.indexOf('?');
+  const rawSearch = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
   try {
-    urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    urlPath = decodeURIComponent(qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl);
   } catch {
     res.writeHead(400); res.end('Bad request'); return;
   }
@@ -46,7 +98,16 @@ const serveStatic = (distDir) => (req, res) => {
   if (!filePath.startsWith(distDir)) { res.writeHead(403); res.end('Forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (!err) {
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
+      const policy = cacheControlForPath(urlPath, rawSearch);
+      const headers = {
+        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': policy,
+      };
+      if (policy.startsWith('no-store')) {
+        headers.Pragma = 'no-cache';
+        headers.Expires = '0';
+      }
+      res.writeHead(200, headers);
       res.end(data);
       return;
     }
@@ -54,7 +115,12 @@ const serveStatic = (distDir) => (req, res) => {
     if (!path.extname(urlPath)) {
       fs.readFile(path.join(distDir, 'index.html'), (fallbackErr, html) => {
         if (fallbackErr) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME['.html'] });
+        res.writeHead(200, {
+          'Content-Type': MIME['.html'],
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        });
         res.end(html);
       });
       return;
@@ -63,13 +129,13 @@ const serveStatic = (distDir) => (req, res) => {
   });
 };
 
-const createRoomServer = ({
-  port = 5000,
-  host = '0.0.0.0',
-  distDir = path.join(__dirname, '..', 'dist'),
+const attachRoomWebSocketServer = (httpServer, {
   registry = createRoomRegistry(),
 } = {}) => {
-  const server = http.createServer(serveStatic(distDir));
+  if (httpServer.__positroniumRoomWs) {
+    return httpServer.__positroniumRoomWs;
+  }
+
   const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
 
   const sendEnvelope = (ws, type, payload = {}, roomCode = null, clientId = null) => {
@@ -101,13 +167,45 @@ const createRoomServer = ({
     }
   };
 
-  server.on('upgrade', (req, socket, head) => {
-    if (!req.url.startsWith('/ws')) { socket.destroy(); return; }
+  const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
       wss.emit('connection', ws, req);
     });
-  });
+  };
+
+  const isRoomWsUpgrade = (req) => {
+    if (typeof req?.url !== 'string') return false;
+    try {
+      const { pathname } = new URL(req.url, 'http://localhost');
+      return pathname === '/ws';
+    } catch {
+      const clean = req.url.split('?')[0];
+      return clean === '/ws';
+    }
+  };
+
+  // Node.js http.Server вызывает ветку upgrade ТОЛЬКО когда listenerCount('upgrade') > 0
+  // (иначе запрос с заголовком Upgrade уходит в обычный request -> 404).
+  // При этом в Metro (@expo/cli runServer-fork) штатный слушатель upgrade
+  // вызывает socket.destroy() для всех путей кроме /hot. Поэтому:
+  // 1) держим собственный слушатель 'upgrade', чтобы ветка upgrade всегда была активна;
+  // 2) перехватываем emit('upgrade', ...) для /ws ДО сторонних слушателей Metro.
+  const fallbackUpgradeListener = (_req, socket) => {
+    if (httpServer.listenerCount('upgrade') <= 1) {
+      socket?.destroy?.();
+    }
+  };
+  httpServer.on('upgrade', fallbackUpgradeListener);
+
+  const rawEmit = httpServer.emit.bind(httpServer);
+  httpServer.emit = function emitWithRoomWs(event, req, socket, head, ...rest) {
+    if (event === 'upgrade' && isRoomWsUpgrade(req)) {
+      handleUpgrade(req, socket, head);
+      return true;
+    }
+    return rawEmit(event, req, socket, head, ...rest);
+  };
 
   wss.on('connection', (ws) => {
     // ws.meta = { clientId, rooms: Set<string> } — заполняется по мере join/create.
@@ -269,19 +367,50 @@ const createRoomServer = ({
   const sweepTimer = setInterval(() => registry.sweep(), 5 * 60 * 1000);
   if (sweepTimer.unref) sweepTimer.unref();
 
+  let closed = false;
+  const closeWs = () => new Promise((resolve) => {
+    if (closed) { resolve(); return; }
+    closed = true;
+    clearInterval(sweepTimer);
+    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
+    wss.close(() => resolve());
+  });
+
+  httpServer.once('close', () => { closeWs(); });
+
+  const attached = { wss, registry, handleUpgrade, closeWs };
+  Object.defineProperty(httpServer, '__positroniumRoomWs', {
+    value: attached,
+    configurable: true,
+  });
+  return attached;
+};
+
+const createRoomServer = ({
+  port = 5000,
+  host = '0.0.0.0',
+  distDir = path.join(__dirname, '..', 'dist'),
+  registry = createRoomRegistry(),
+} = {}) => {
+  const server = http.createServer(serveStatic(distDir));
+  const { wss, closeWs } = attachRoomWebSocketServer(server, { registry });
+
   const start = () => new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => resolve(server.address()));
   });
 
   const close = () => new Promise((resolve) => {
-    clearInterval(sweepTimer);
-    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
-    wss.close(() => server.close(() => resolve()));
+    closeWs().then(() => server.close(() => resolve()));
     // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
   });
 
   return { server, wss, registry, start, close };
 };
 
-module.exports = { createRoomServer };
+module.exports = {
+  createRoomServer,
+  attachRoomWebSocketServer,
+  attachSmartCacheHeaders,
+  cacheControlForPath,
+};

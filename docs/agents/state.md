@@ -1,5 +1,53 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (454) — защита от жадного веб-кэша браузера без сброса кэша Metro (`--clear`)
+
+Слово владельца:
+«`--clear` я сам добавил в команду запуска, поскольку кэш часто мешал увидеть новые фишки UI. Я не против её убрать в команде запуска, но как тогда бороться с тем, что браузер жадно делает веб-кэш и мешает просмотру.»
+
+- Диагностика: `--clear` сбрасывал только серверный кэш трансформации Metro (`/tmp/metro-cache`, который сам инвалидируется по SHA-1 изменённых файлов), тогда как старый UI в браузере держали четыре веб-причины:
+  1. Ни `server/roomServer.js`, ни dev-сервер Metro не выставляли `Cache-Control: no-store` на `index.html`, `service-worker.js`, `version.json` и `index.bundle?...`, из-за чего браузер включал эвристическое HTTP-кэширование (RFC 9111).
+  2. `public/service-worker.js` вызывал `fetch(request)` без `{ cache: 'no-cache' }`, попадая в дисковый HTTP-кэш браузера, и складывал нехэшированный dev-бандл `index.bundle` в `Cache Storage`.
+  3. `/service-worker.js` регистрировался без `{ updateViaCache: 'none' }`.
+  4. Работающий в браузере JS-бандл не сверял свою вшитую версию патча с живым `/version.json`, поэтому открытая вкладка / установленное PWA не сбрасывали устаревший HTML/JS-кэш автоматически при выходе нового патча.
+- Исправлено:
+  1. `server/roomServer.js` + `metro.config.js` — `cacheControlForPath` и `attachSmartCacheHeaders` отдают `Cache-Control: no-store, no-cache, must-revalidate` для HTML, `service-worker.js`, `version.json` и dev-бандлов `.bundle`, но `public, max-age=31536000, immutable` для `.ttf`/`.woff2` и контент-хэшированных файлов.
+  2. `public/service-worker.js` + `index.js` — запросы навигации и нехэшированных ресурсов идут с `{ cache: 'no-cache' }`, dev-бандл не пишется в `Cache Storage`, воркер регистрируется с `{ updateViaCache: 'none' }`.
+  3. `src/web/versionGuard.ts` (+ проводка в `index.js`) — при старте и при возврате во вкладку (`visibilitychange -> visible`) сверяет вшитый `version.json` бандла с живым `/version.json?_t=...` (`cache: 'no-store'`); при расхождении вычищает устаревшие HTML/JS из `Cache Storage` (сохраняя `.ttf`-шрифты иконок!) и один раз мягко перезагружает вкладку с защитой от цикла в `sessionStorage`.
+- Приёмочные тесты: `__tests__/screens/anti-stale-web-cache-454.test.js` (5 тестов).
+
+## 2026-10-27 (453) — высокий приоритет иконок, сохранение кэша Metro/PWA и работа комнат мастера в Metro
+
+Слово владельца:
+1) «Долго грузятся иконоки в бургер меню, трёх точек и т.п Им бы приоритет повыше.»
+2) «И приложение стало очень медленно грузится, возможно из-за удаления кэша.»
+3) «При попытке создания комнаты в админ режиме: **Комната создана** — Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз. (Противоречие заголовка и сообщения об ошибке и комната не создаётся).»
+
+- Диагностика:
+  1. Иконки (`MaterialCommunityIcons` 1.3 МБ, `Ionicons` 390 КБ, `FontAwesome5_Brands` 134 КБ) запрашивались лениво только при первом монтировании `<Icon>` (а `FontAwesome5` — только в момент клика по бургер-меню!), без `<link rel="preload" fetchpriority="high">`, плюс штатный пакет `@expo/vector-icons` (`IconsLazy.js`) жадно тянул в веб-бандл все 15 семейств иконок (40 лишних модулей, ~200+ КБ карт глифов и 14 неиспользуемых `.ttf`), а `service-worker.js` ходил в сеть за `.ttf` на каждый запуск.
+  2. В `.replit` стоял флаг `--clear` (`npx expo start --clear --web --port 5000`), из-за чего при каждом перезапуске сервера на Replit кэш трансформации Metro полностью удалялся и все ~1150 модулей пересобирались с нуля.
+  3. При запуске через `expo start --web` работал только HTTP-сервер Metro без WebSocket-эндпоинта `/ws` из `server/roomServer.js` (а слушатель `upgrade` в `@expo/cli/runServer-fork` вызывал `socket.destroy()` для всех путей кроме `/hot`), поэтому `createRoom` валился по таймауту. Вдобавок в `HomeScreen.js:622` в блоке `catch` стоял ошибочный заголовок `tHomeScreen('room.createdTitle')` («Комната создана»), а после успешного `createRoom` мастер не отправлял `ROOM_JOIN` на сервер (так как `rooms[code]` уже лежал в `roomStore`).
+- Исправлено:
+  1. `index.js` + `src/web/vectorIconsWeb.js` + `metro.config.js` — на T=0 мс предзагружаются шрифты `MaterialCommunityIcons`, `Ionicons` и `FontAwesome5Free-Brand` с инъекцией `<link rel="preload" as="font" fetchpriority="high" crossorigin="anonymous">` и `font-display: swap`; на вебе `@expo/vector-icons` резолвится в узкую точку входа `src/web/vectorIconsWeb.js` (-40 модулей, -14 неиспользуемых `.ttf`).
+  2. `.replit` + `public/service-worker.js` — из `.replit` убран `--clear` (кэш Metro сохраняется между перезапусками); в `service-worker.js` для шрифтов (`.ttf`/`.woff2`) и неизменяемых файлов сборки с контент-хэшем включён мгновенный `cache-first` без удаления существующего `CACHE_NAME`.
+  3. `server/roomServer.js` + `metro.config.js` + `src/room/roomStore.ts` + `HomeScreen.js` + `components/alerts/catalog.js` + `i18n/*/screens/home/screen.json` — вынесен `attachRoomWebSocketServer(httpServer)` и подключён прямо к HTTP(S)-серверу Metro на этапе `enhanceMiddleware` (проверено вживую на `npx expo start --web`); мастер сразу делает `joinRoom` после `createRoom`, автоматически восстанавливает комнаты тем же кодом и `ownerToken` после рестарта сервера (`ROOM_NOT_FOUND` -> `createRoom({ requestedCode, ownerToken })`), а ошибка создания комнаты выводится через каталожный алерт `roomCreateFailed` с честным заголовком «Ошибка создания комнаты» / «Room creation failed».
+- Приёмочные тесты: `__tests__/room/room-metro-and-icons-453.test.js` (4 теста).
+
+## 2026-10-27 (452) — устранение краша `fontfaceobserver` и блокировки `.local/share/pnpm` на Replit
+
+Слово владельца (лог запуска на Replit после установки 451):
+`Code: fontfaceobserver.standalone.js (/home/runner/workspace/node_modules/.pnpm/fontfaceobserver@2.3.0/...:5:435) ... setTimeout$argument_0`.
+
+- Диагностика: две связанные причины при веб-старте Expo SDK 54 на Replit (`pnpm`):
+  1. В `metro.config.js` непривязанный паттерн `/\.local\/.*/` в `blockList` задевал не только `<workspace>/.local/`, но и глобальное хранилище `pnpm` на Replit (`/home/runner/.local/share/pnpm/...`), мешая Metro отдавать `.ttf`-шрифты иконок (`@expo/vector-icons`).
+  2. В самом `expo-font` (`FontLoader.web.js`, известный баг Expo `#22954`) синхронный `try { return ExpoFontLoader.loadAsync(...) } catch {}` не перехватывает асинхронный `reject` промиса от `fontfaceobserver` (`Error("<N>ms timeout exceeded")` на `5:435`), хотя правило `@font-face` уже вставлено в `<head>` и браузер сам дорисовывает иконки по мере докачки `.ttf`.
+- Исправлено:
+  1. `src/web/fontfaceobserverShim.ts` (+ `src/web` в `tsconfig.json`) — безопасная веб-замена `fontfaceobserver` через нативный `document.fonts.load` без DOM-замеров `offsetWidth` и без выброса непойманного `timeout exceeded` (при таймауте до 3 с мягко резолвится, оставляя отрисовку вставленному `@font-face`).
+  2. `metro.config.js` — `resolveRequest` перенаправляет `fontfaceobserver` на `src/web/fontfaceobserverShim.ts` для `platform === 'web'`, а `blockList` привязан строго к корню проекта (`<workspace>/.local`, `<workspace>/.kiro`, `<workspace>/.install-backup`), не блокируя `/home/runner/.local/share/pnpm/...`.
+  3. `index.js` — рантайм-страховка поверх `globalThis.expo.modules.ExpoFontLoader.loadAsync` (работает даже при горячей перезагрузке без рестарта Metro).
+  4. `apply-patch.sh` — `deps_check()` учитывает `node_modules/.pnpm` и вызывает `pnpm install`, если среда использует `pnpm`.
+- Приёмочные тесты: `__tests__/screens/web-font-timeout-452.test.js` (6 тестов). 178/178 тест-файлов зелёные, `tsc` 0, в собранном веб-бандле `dist/` строки `ms timeout exceeded` нет.
+
 ## 2026-10-27 (451) — восстановление запуска приложения, целостности дерева и установщика
 
 Слово владельца: «Прошлый агент не смог победить ошибки в приложении, помоги их победить. Оно не запускается».

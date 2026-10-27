@@ -1,5 +1,50 @@
 # Changelog
 ---
+## Anti-stale browser web cache without wiping Metro cache (patch 454)
+
+Separated server-side Metro transform caching from browser web caching so
+UI updates appear immediately without `--clear`:
+- Both `roomServer` and the Metro dev server now send `Cache-Control:
+  no-store` for `index.html`, `service-worker.js`, `version.json`, and dev
+  `.bundle` responses, while keeping fonts and content-hashed assets
+  `immutable`.
+- The service worker bypasses heuristic browser HTTP caching (`cache:
+  'no-cache'`) for navigation and unhashed scripts, skips storing dev
+  bundles in Cache Storage, and registers with `updateViaCache: 'none'`.
+- Added `versionGuard`: on startup and tab focus (`visibilitychange`), the
+  running bundle compares its compiled patch version against live
+  `/version.json` and automatically purges stale HTML/JS cache entries
+  (preserving `.ttf` icon fonts) and reloads once when a new patch lands.
+
+---
+## High-priority UI icons, preserved Metro/PWA caches & GM rooms in Metro (patch 453)
+
+- **Icon loading priority**: core UI icon fonts (`MaterialCommunityIcons`,
+  `Ionicons`, `FontAwesome5Free-Brand`) are now preloaded immediately at
+  startup with `<link rel="preload" as="font" fetchpriority="high">` and
+  `font-display: swap`, while the web `@expo/vector-icons` entry drops 12
+  unused icon families (-14 unused `.ttf` files).
+- **Startup speed & caching**: removed `--clear` from `.replit` so Metro
+  retains its transform cache across restarts, and taught the service worker
+  to serve fonts and content-hashed build assets cache-first without wiping
+  existing caches.
+- **Admin room creation**: attached the `/ws` room WebSocket relay directly
+  to Metro's HTTP(S) dev server (`expo start --web`), ensured the GM joins
+  newly created rooms and transparently rebinds saved rooms after a server
+  restart, and fixed the contradictory failure dialog title (`Room creation
+  failed` instead of `Room created`).
+
+---
+## Web font timeout & Replit pnpm asset fix (patch 452)
+
+Fixed the web startup crash (`fontfaceobserver.standalone.js: timeout
+exceeded`): anchored `.local` ignore rules in `metro.config.js` to the
+workspace root so Replit's global `pnpm` store serving icon `.ttf`
+fonts is no longer blocked, replaced `fontfaceobserver` on web with a
+non-throwing `document.fonts.load` shim, and added a runtime guard in
+`index.js` so slow font downloads never crash app startup.
+
+---
 ## App boot, character avatars, and installer recovery (patch 451)
 
 Fixed the app startup failure after the broken update: restored the full

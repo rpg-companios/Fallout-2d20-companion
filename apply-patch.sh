@@ -515,7 +515,11 @@ deps_check() {
   ' 2>/dev/null || true)"
   [[ -z "$missing" ]] && return 0
   echo "Доустановка недостающих пакетов ($missing)..."
-  (cd "$ROOT_DIR" && npm install --no-audit --no-fund)
+  if [[ -d "$ROOT_DIR/node_modules/.pnpm" ]] && command -v pnpm >/dev/null 2>&1; then
+    (cd "$ROOT_DIR" && pnpm install)
+  else
+    (cd "$ROOT_DIR" && npm install --no-audit --no-fund)
+  fi
 }
 
 # --- режим статуса -----------------------------------------------------------
