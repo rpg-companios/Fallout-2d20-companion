@@ -301,18 +301,21 @@ const attachRoomWebSocketServer = (httpServer, {
             break;
           }
           const member = room.members.get(clientId);
+          const isRemoved = Boolean(payload.removed || payload.snapshot === null);
           registry.putSnapshot({
             code: canonical,
             characterId: payload.characterId,
             revision: payload.revision,
-            snapshot: payload.snapshot,
+            snapshot: isRemoved ? null : payload.snapshot,
             fromClientId: clientId,
             fromName: member?.name,
+            removed: isRemoved,
           });
           broadcastToRoom(room, clientId, MESSAGE.CHAR_PUBLISH, {
             characterId: payload.characterId,
             revision: payload.revision,
-            snapshot: payload.snapshot,
+            snapshot: isRemoved ? null : payload.snapshot,
+            removed: isRemoved,
             fromClientId: clientId,
             fromName: member?.name,
             fromRole: member?.role,

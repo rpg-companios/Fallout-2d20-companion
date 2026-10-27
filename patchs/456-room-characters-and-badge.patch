@@ -1,0 +1,2001 @@
+diff --git a/__tests__/room/room-character-sync-456.test.js b/__tests__/room/room-character-sync-456.test.js
+new file mode 100644
+index 0000000..a9fdeda
+--- /dev/null
++++ b/__tests__/room/room-character-sync-456.test.js
+@@ -0,0 +1,240 @@
++// Регрессионные и интеграционные тесты патча 456:
++// 1) публикация подключённого персонажа игрока в комнату мастера (живой WS-сервер)
++//    и мгновенное отображение карточки персонажа внутри комнаты у админа;
++// 2) изоляция clientId между вкладками одного браузера (sessionStorage), чтобы
++//    открытые рядом вкладки «Админ» и «Пользователь» не затирали друг друга;
++// 3) строгое разделение разделов: в окне админа нет локальных персонажей и обычных
++//    папок пользователя, а в разделе пользователя не видны серверные комнаты;
++// 4) перемещение персонажа в пользовательскую папку не сбрасывает привязку к комнате;
++// 5) значок server-network в правом верхнем углу карточки персонажа: зелёный (#16a34a),
++//    когда админ в сети и комната доступна, и бледный (#9ca3af), когда админ не в сети.
++
++import { describe, expect, it, vi } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  StyleSheet: { create: (s) => s },
++}));
++
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import {
++  isRoomAvailableWithGm,
++  filterFoldersForMode,
++  buildGmRoomCharacterCards,
++} from '../../src/room/roomCharacterSync';
++import styles from '../../styles/HomeScreen.styles';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++describe('Патч 456: отображение подключённых персонажей у админа, изоляция разделов и индикатор сети', () => {
++  it('живой WS: подключённый персонаж юзера сразу появляется в комнате админа и исчезает при отключении', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const url = `ws://127.0.0.1:${port}/ws`;
++
++    const gmInbox = [];
++    const playerInbox = [];
++
++    const gmClient = createRoomClient({
++      url,
++      clientId: 'device-1:t-admin',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => gmInbox.push(m),
++    });
++
++    const playerClient = createRoomClient({
++      url,
++      clientId: 'device-1:t-player',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => playerInbox.push(m),
++    });
++
++    const waitMsg = (box, pred, timeoutMs = 4000) => new Promise((resolve, reject) => {
++      const start = Date.now();
++      const timer = setInterval(() => {
++        const hit = box.find(pred);
++        if (hit) { clearInterval(timer); resolve(hit); return; }
++        if (Date.now() - start > timeoutMs) { clearInterval(timer); reject(new Error('timeout')); }
++      }, 15);
++    });
++
++    try {
++      // 1. Админ создаёт комнату и входит как gm
++      gmClient.send(ROOM_MESSAGE.ROOM_CREATE, { name: 'Убежище 111', requestId: 'r-create' }, null);
++      const created = await waitMsg(gmInbox, (m) => m.type === ROOM_MESSAGE.ROOM_CREATED);
++      const roomCode = created.payload.code;
++
++      gmClient.send(ROOM_MESSAGE.ROOM_JOIN, { code: roomCode, name: 'GM', role: 'gm', requestId: 'r-gm-join' }, roomCode);
++      await waitMsg(gmInbox, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload.requestId === 'r-gm-join');
++
++      // 2. Юзер во второй вкладке того же браузера входит в комнату и публикует персонажа
++      playerClient.send(ROOM_MESSAGE.ROOM_JOIN, { code: roomCode, name: 'Макс', role: 'player', requestId: 'r-pl-join' }, roomCode);
++      const playerState = await waitMsg(playerInbox, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload.requestId === 'r-pl-join');
++
++      // Оба участника одновременно в комнате (админ НЕ затёрт игроком!)
++      expect(playerState.payload.members.map((m) => m.role).sort()).toEqual(['gm', 'player']);
++
++      playerClient.send(
++        ROOM_MESSAGE.CHAR_PUBLISH,
++        {
++          characterId: 'char_max',
++          revision: 100,
++          snapshot: {
++            characterId: 'char_max',
++            name: 'Выживший Макс',
++            level: 4,
++            originName: 'vault_dweller',
++            updatedAt: 100,
++            avatarDataUrl: null,
++            data: { level: 4 },
++          },
++        },
++        roomCode,
++      );
++
++      // 3. Админ получает живой CHAR_PUBLISH и видит карточку персонажа
++      const pubMsg = await waitMsg(
++        gmInbox,
++        (m) => m.type === ROOM_MESSAGE.CHAR_PUBLISH && m.payload?.characterId === 'char_max',
++      );
++      const roomEntryAtGm = {
++        code: roomCode,
++        name: 'Убежище 111',
++        role: 'gm',
++        joined: true,
++        members: playerState.payload.members,
++        snapshots: {
++          char_max: {
++            characterId: 'char_max',
++            revision: pubMsg.payload.revision,
++            snapshot: pubMsg.payload.snapshot,
++            fromClientId: pubMsg.payload.fromClientId,
++            fromName: pubMsg.payload.fromName,
++          },
++        },
++      };
++      const gmCards = buildGmRoomCharacterCards(roomEntryAtGm);
++      expect(gmCards).toHaveLength(1);
++      expect(gmCards[0]).toMatchObject({
++        id: 'char_max',
++        name: 'Выживший Макс',
++        level: 4,
++        playerOnline: true,
++      });
++
++      // 4. При отключении персонажа (removed: true) снапшот удаляется из реестра комнаты
++      playerClient.send(
++        ROOM_MESSAGE.CHAR_PUBLISH,
++        { characterId: 'char_max', revision: 101, snapshot: null, removed: true },
++        roomCode,
++      );
++      const removeMsg = await waitMsg(
++        gmInbox,
++        (m) => m.type === ROOM_MESSAGE.CHAR_PUBLISH && m.payload?.removed === true,
++      );
++      expect(removeMsg.payload.snapshot).toBeNull();
++      expect(app.registry.getState(roomCode).snapshots).toEqual([]);
++    } finally {
++      gmClient.close();
++      playerClient.close();
++      await app.close();
++    }
++  });
++
++  it('разделы изолированы: комнаты видны только у админа, обычные папки — только у пользователя', () => {
++    const allFolders = [
++      { id: 'f_user_1', name: 'Мои рейдеры' },
++      { id: 'f_room_1', name: 'Кампания Бостон' },
++      { id: 'f_user_2', name: 'Братство Стали' },
++    ];
++    const folderRooms = { f_room_1: 'GM-7Q3K9M' };
++
++    expect(filterFoldersForMode(allFolders, folderRooms, false).map((f) => f.id)).toEqual([
++      'f_user_1',
++      'f_user_2',
++    ]);
++    expect(filterFoldersForMode(allFolders, folderRooms, true).map((f) => f.id)).toEqual([
++      'f_room_1',
++    ]);
++  });
++
++  it('значок server-network горит зелёным только когда и соединение живое, и админ в комнате', () => {
++    // Админ в сети и комната присоединена -> зелёный (true)
++    expect(
++      isRoomAvailableWithGm(
++        {
++          code: 'GM-7Q3K9M',
++          name: 'Стол',
++          role: 'player',
++          joined: true,
++          members: [
++            { clientId: 'gm-1', name: 'GM', role: 'gm' },
++            { clientId: 'pl-1', name: 'Макс', role: 'player' },
++          ],
++        },
++        'online',
++      ),
++    ).toBe(true);
++
++    // Комната жива на сервере, но админ вышел из режима мастера -> бледный (false)
++    expect(
++      isRoomAvailableWithGm(
++        {
++          code: 'GM-7Q3K9M',
++          name: 'Стол',
++          role: 'player',
++          joined: true,
++          members: [{ clientId: 'pl-1', name: 'Макс', role: 'player' }],
++        },
++        'online',
++      ),
++    ).toBe(false);
++
++    // Клиент оффлайн -> бледный (false)
++    expect(
++      isRoomAvailableWithGm(
++        {
++          code: 'GM-7Q3K9M',
++          name: 'Стол',
++          role: 'player',
++          joined: true,
++          members: [{ clientId: 'gm-1', name: 'GM', role: 'gm' }],
++        },
++        'offline',
++      ),
++    ).toBe(false);
++  });
++
++  it('дизайн значка server-network: правый верхний угол в стиле круглых кнопок карточки, перенос в папку не трогает привязку', () => {
++    expect(styles.characterServerBadge).toMatchObject({
++      position: 'absolute',
++      top: 5,
++      right: 5,
++      width: 28,
++      height: 28,
++      borderRadius: 14,
++      backgroundColor: 'white',
++    });
++
++    const homeSrc = fs.readFileSync(
++      path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'),
++      'utf8',
++    );
++    expect(homeSrc).toContain("color={serverOnline ? '#16a34a' : '#9ca3af'}");
++    expect(homeSrc).toContain('const displayedCharacters = isGmMode');
++
++    // moveCharacterToFolder в обеих реализациях БД меняет только членство в папке, не трогая character_room_bindings
++    const webDb = fs.readFileSync(path.join(ROOT, 'db/Database.web.js'), 'utf8');
++    const moveBlock = webDb.slice(
++      webDb.indexOf('export async function moveCharacterToFolder'),
++      webDb.indexOf('export async function getRootCharactersList'),
++    );
++    expect(moveBlock).not.toContain('character_room_bindings');
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 87eb5f6..0748b2c 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -77,10 +77,35 @@ import useAppSettingsStore, {
+   selectUiMode,
+ } from '../../../src/store/appSettingsStore';
+ import * as avatarCache from '../../../db/avatarCache';
+-// Комнаты мастера (gm-rooms, этапы 0–2): стор соединения + адреса комнат.
++// Комнаты мастера (gm-rooms, этапы 0–3): стор соединения + адреса комнат + синхронизация.
+ import useRoomStore from '../../../src/room/roomStore';
+ import { isRoomServerConfigured } from '../../../src/room/roomClient';
+ import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
++import {
++  isRoomAvailableWithGm,
++  filterFoldersForMode,
++  buildGmRoomCharacterCards,
++  syncBoundCharacterToRoom,
++} from '../../../src/room/roomCharacterSync';
++
++const TAB_UI_MODE_STORAGE_KEY = 'positronium_tab_ui_mode';
++const readTabUiMode = () => {
++  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
++  try {
++    const val = window.sessionStorage?.getItem(TAB_UI_MODE_STORAGE_KEY);
++    return val === 'gm' || val === 'user' ? val : null;
++  } catch {
++    return null;
++  }
++};
++const writeTabUiMode = (mode) => {
++  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
++  try {
++    window.sessionStorage?.setItem(TAB_UI_MODE_STORAGE_KEY, mode);
++  } catch {
++    // sessionStorage может быть недоступен в приватном режиме.
++  }
++};
+ 
+ const getOriginImage = (originName) => {
+   if (!originName) return null;
+@@ -109,21 +134,27 @@ const CharacterCell = ({
+   onServer,
+   serverAvailable = false,
+   serverBound = false,
++  serverOnline = false,
++  readOnlyRoomCard = false,
+   onDragStart,
+   onDragMove,
+   onDragEnd,
+ }) => {
+   const originImage = getOriginImage(character.originName);
+-  const [customImageUrl, setCustomImageUrl] = useState(null);
++  const [customImageUrl, setCustomImageUrl] = useState(character?.avatarDataUrl || null);
+ 
+-  // Загружаем кастомную картинку при монтировании
++  // Загружаем кастомную картинку при монтировании (или используем пришедшую из снапшота комнаты)
+   useEffect(() => {
+-    if (character?.id) {
++    if (character?.avatarDataUrl) {
++      setCustomImageUrl(character.avatarDataUrl);
++      return;
++    }
++    if (!readOnlyRoomCard && character?.id) {
+       avatarCache.getAvatarCache(character.id).then((cached) => {
+         setCustomImageUrl(cached?.data_url || cached?.dataUrl || null);
+       });
+     }
+-  }, [character?.id]);
++  }, [character?.id, character?.avatarDataUrl, readOnlyRoomCard]);
+   const actionButtonRef = useRef(null);
+   const [actionMenuPosition, setActionMenuPosition] = useState(null);
+ 
+@@ -190,11 +221,40 @@ const CharacterCell = ({
+   return (
+     <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
+       {serverBound && (
+-        <View style={styles.characterServerBadge} pointerEvents="none">
+-          <MaterialCommunityIcons name="server-network" size={16} color="#7c5c10" />
++        readOnlyRoomCard ? (
++          <View
++            style={[styles.characterServerBadge, !serverOnline && styles.characterServerBadgeOffline]}
++            pointerEvents="none"
++          >
++            <MaterialCommunityIcons
++              name="server-network"
++              size={17}
++              color={serverOnline ? '#16a34a' : '#9ca3af'}
++            />
++          </View>
++        ) : (
++          <TouchableOpacity
++            style={[styles.characterServerBadge, !serverOnline && styles.characterServerBadgeOffline]}
++            onPress={(event) => {
++              event?.stopPropagation?.();
++              onServer?.();
++            }}
++            hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++            accessibilityLabel={tHomeScreen('server.menuItem')}
++          >
++            <MaterialCommunityIcons
++              name="server-network"
++              size={17}
++              color={serverOnline ? '#16a34a' : '#9ca3af'}
++            />
++          </TouchableOpacity>
++        )
++      )}
++      {!readOnlyRoomCard && (
++        <View {...panResponder.panHandlers} style={styles.dragHandle}>
++          <MaterialCommunityIcons name="arrow-all" size={18} color="#111827" />
+         </View>
+       )}
+-      <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
+       <View style={styles.characterImageContainer}>
+         {customImageUrl ? (
+           <Image source={{ uri: customImageUrl }} style={styles.characterImage} resizeMode="cover" />
+@@ -206,20 +266,27 @@ const CharacterCell = ({
+           </View>
+         )}
+       </View>
+-      {deleteActionPlacement === 'card' && (
+-        <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
++      {!readOnlyRoomCard && deleteActionPlacement === 'card' && (
++        <TouchableOpacity
++          style={[styles.deleteButton, serverBound && styles.deleteButtonShifted]}
++          onPress={(event) => { event?.stopPropagation?.(); onDelete(); }}
++          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++          accessibilityLabel={tHomeScreen('characterActions.delete')}
++        >
+           <Text style={styles.deleteIcon}>🗑</Text>
+         </TouchableOpacity>
+       )}
+-      <TouchableOpacity
+-        ref={actionButtonRef}
+-        style={styles.characterActionButton}
+-        onPress={openActionMenu}
+-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+-        accessibilityLabel={tHomeScreen('characterActions.openMenu')}
+-      >
+-        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
+-      </TouchableOpacity>
++      {!readOnlyRoomCard && (
++        <TouchableOpacity
++          ref={actionButtonRef}
++          style={styles.characterActionButton}
++          onPress={openActionMenu}
++          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++          accessibilityLabel={tHomeScreen('characterActions.openMenu')}
++        >
++          <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
++        </TouchableOpacity>
++      )}
+       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
+       {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
+ 
+@@ -442,10 +509,13 @@ export default function HomeScreen({ navigation }) {
+   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
+   const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
+ 
+-  // ── Комнаты мастера (gm-rooms, этапы 0–2) ──
+-  // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9:
+-  // кнопки нет, когда адрес сервера недоступен — пространства нет).
+-  const uiMode = useAppSettingsStore(selectUiMode);
++  // ── Комнаты мастера (gm-rooms, этапы 0–3) ──
++  // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9).
++  // На web режим дополнительно изолирован по вкладкам (sessionStorage), чтобы
++  // открытые рядом вкладки «Админ» и «Пользователь» не перетирали друг друга.
++  const storeUiMode = useAppSettingsStore(selectUiMode);
++  const [tabUiMode, setTabUiMode] = useState(() => readTabUiMode());
++  const uiMode = tabUiMode || storeUiMode;
+   const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+   const isGmMode = uiMode === 'gm';
+   const roomServerAvailable = isRoomServerConfigured();
+@@ -460,6 +530,7 @@ export default function HomeScreen({ navigation }) {
+   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
+   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
+   const [copiedCode, setCopiedCode] = useState(null);
++  const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
+ 
+   const [installPrompt, setInstallPrompt] = useState(null);
+   const [isStandalone, setIsStandalone] = useState(false);
+@@ -553,32 +624,15 @@ export default function HomeScreen({ navigation }) {
+   const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
+     setLoading(true);
+     try {
+-      const savedFolders = await db.getCharacterFolders();
+-      const folderLists = await Promise.all(savedFolders.map((folder) => db.getCharactersInFolder(folder.id)));
+-      const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
+-      const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
+-      visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+-      if (duplicatedCharacterId && sourceCharacterId) {
+-        const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
+-        const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+-        if (duplicateIndex >= 0 && sourceIndex >= 0) {
+-          const [duplicate] = visible.splice(duplicateIndex, 1);
+-          const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+-          visible.splice(currentSourceIndex + 1, 0, duplicate);
+-        }
+-      }
+-      setCharacters(visible);
+-      setFolders(savedFolders);
+-      setFolderCounts(counts);
+-      // Комнаты мастера: штампы папок-комнат и связки персонажей.
+-      // Сбой этих таблиц не должен ронять основной список персонажей.
++      let roomMap = {};
+       if (roomServerAvailable) {
+         try {
+           const [roomRows, bindingRows] = await Promise.all([
+             db.getFolderRooms(),
+             db.getCharacterRoomBindings(),
+           ]);
+-          setFolderRooms(Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code])));
++          roomMap = Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code]));
++          setFolderRooms(roomMap);
+           setFolderRoomRecords(Object.fromEntries(roomRows.map((row) => [
+             row.folder_id,
+             { code: row.code, ownerToken: row.owner_token },
+@@ -588,12 +642,47 @@ export default function HomeScreen({ navigation }) {
+           debugLog('room.dbLoad:failed', { message: roomError?.message || String(roomError) });
+         }
+       }
++
++      const savedFolders = await db.getCharacterFolders();
++      const userOnlyFolders = savedFolders.filter((folder) => !roomMap[folder.id]);
++      const userFolderLists = await Promise.all(
++        userOnlyFolders.map((folder) => db.getCharactersInFolder(folder.id)),
++      );
++      const counts = Object.fromEntries(
++        userOnlyFolders.map((folder, index) => [folder.id, userFolderLists[index].length]),
++      );
++
++      // В режиме мастера локальные персонажи пользователя не отображаются —
++      // туда попадают только персонажи, подключённые к серверной комнате.
++      let visible = [];
++      if (!isGmMode) {
++        if (activeFolder && !roomMap[activeFolder.id]) {
++          const idx = userOnlyFolders.findIndex((folder) => folder.id === activeFolder.id);
++          visible = idx >= 0 ? userFolderLists[idx] || [] : [];
++        } else {
++          visible = await db.getRootCharactersList();
++        }
++        visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
++        if (duplicatedCharacterId && sourceCharacterId) {
++          const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
++          const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
++          if (duplicateIndex >= 0 && sourceIndex >= 0) {
++            const [duplicate] = visible.splice(duplicateIndex, 1);
++            const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
++            visible.splice(currentSourceIndex + 1, 0, duplicate);
++          }
++        }
++      }
++
++      setCharacters(visible);
++      setFolders(savedFolders);
++      setFolderCounts(counts);
+     } catch (e) {
+       setCharacters([]);
+     } finally {
+       setLoading(false);
+     }
+-  }, [getCharactersList, activeFolder, roomServerAvailable]);
++  }, [getCharactersList, activeFolder, roomServerAvailable, isGmMode]);
+ 
+   useFocusEffect(
+     useCallback(() => {
+@@ -665,6 +754,8 @@ export default function HomeScreen({ navigation }) {
+     try {
+       await useRoomStore.getState().joinRoom({ code: canonical, name: joining.character.name, role: 'player' });
+       await db.setCharacterRoomBinding(joining.character.id, canonical);
++      await syncBoundCharacterToRoom(joining.character.id, canonical);
++      publishedRevisionsRef.current[`${canonical}:${joining.character.id}`] = Date.now();
+       setServerDialog(null);
+       loadList();
+     } catch (error) {
+@@ -681,7 +772,17 @@ export default function HomeScreen({ navigation }) {
+     if (!serverDialog) return;
+     const { character, boundCode } = serverDialog;
+     try {
+-      await useRoomStore.getState().leaveRoom({ code: boundCode });
++      await useRoomStore.getState().unpublishCharacter({
++        code: boundCode,
++        characterId: character.id,
++      });
++      delete publishedRevisionsRef.current[`${boundCode}:${character.id}`];
++      const otherStillBound = Object.entries(roomBindings).some(
++        ([charId, roomCode]) => charId !== character.id && roomCode === boundCode,
++      );
++      if (!otherStillBound) {
++        await useRoomStore.getState().leaveRoom({ code: boundCode });
++      }
+     } catch (error) {
+       debugLog('room.leave:failed', { message: error?.message || String(error) });
+     }
+@@ -691,50 +792,109 @@ export default function HomeScreen({ navigation }) {
+   };
+ 
+   const handleToggleUiMode = () => {
+-    setSettingValue('uiMode', isGmMode ? 'user' : 'gm');
++    const nextMode = isGmMode ? 'user' : 'gm';
++    if (isGmMode) {
++      Object.values(folderRoomRecords).forEach((record) => {
++        if (record?.code) {
++          useRoomStore.getState().leaveRoom({ code: record.code }).catch(() => {});
++        }
++      });
++    }
++    writeTabUiMode(nextMode);
++    setTabUiMode(nextMode);
++    setSettingValue('uiMode', nextMode);
++    setActiveFolder(null);
++    setMovingCharacterId(null);
+     setFolderDraftVisible(false);
+     setFolderName('');
+     setRoomDialog(null);
+     setServerDialog(null);
+   };
+ 
+-  // Мастер держит свои комнаты открытыми (presence игроков) и прозрачно
+-  // перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
++  // При смене режима сбрасываем открытую папку, если она принадлежит другому режиму.
+   useEffect(() => {
+-    if (!isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
+-    Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
+-      const code = record?.code;
+-      if (!code) return;
+-      const store = useRoomStore.getState();
+-      if (store.rooms[code] && store.rooms[code].joined !== false) return;
+-      const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
+-      store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
+-        if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
+-          try {
+-            await store.createRoom({
+-              name: savedTitle,
+-              requestedCode: code,
+-              ownerToken: record.ownerToken,
+-            });
+-            await store.joinRoom({ code, name: 'GM', role: 'gm' });
+-          } catch {
+-            // Сервер временно недоступен — повторим при переподключении.
++    if (!activeFolder) return;
++    const isRoomFolder = Boolean(folderRooms[activeFolder.id]);
++    if (isGmMode !== isRoomFolder) {
++      setActiveFolder(null);
++      setMovingCharacterId(null);
++    }
++  }, [activeFolder, folderRooms, isGmMode]);
++
++  // Мастер держит свои комнаты открытыми (presence игроков + приём снапшотов) и
++  // прозрачно перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
++  useEffect(() => {
++    if (!isGmMode || !roomServerAvailable) return undefined;
++
++    const ensureGmRooms = () => {
++      if (useRoomStore.getState().status === 'connecting') return;
++      Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
++        const code = record?.code;
++        if (!code) return;
++        const store = useRoomStore.getState();
++        const current = store.rooms[code];
++        if (current && current.joined !== false && current.role === 'gm') return;
++        const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
++        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
++          if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
++            try {
++              await store.createRoom({
++                name: savedTitle,
++                requestedCode: code,
++                ownerToken: record.ownerToken,
++              });
++              await store.joinRoom({ code, name: 'GM', role: 'gm' });
++            } catch {
++              // Сервер временно недоступен — повторим по таймеру / при переподключении.
++            }
+           }
+-        }
++        });
+       });
+-    });
++    };
++
++    ensureGmRooms();
++    const retryTimer = setInterval(ensureGmRooms, 4000);
++    return () => clearInterval(retryTimer);
+   }, [isGmMode, folderRoomRecords, folders, roomServerAvailable, roomStatus]);
+ 
+-  // Игрок переподключает своих персонажей к их комнатам (по связкам).
++  // Игрок автоматически переподключает привязанных персонажей к их комнатам
++  // и публикует актуальные снапшоты без повторного ввода кода комнаты — вне
++  // зависимости от того, в какой пользовательской папке лежит персонаж.
+   useEffect(() => {
+-    if (isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
+-    Object.entries(roomBindings).forEach(([characterId, code]) => {
+-      const store = useRoomStore.getState();
+-      if (!store.rooms[code] || store.rooms[code].joined === false) {
+-        const character = characters.find((item) => item.id === characterId);
+-        store.joinRoom({ code, name: character?.name || '—', role: 'player' }).catch(() => {});
+-      }
+-    });
++    if (roomStatus !== 'online') {
++      publishedRevisionsRef.current = {};
++    }
++  }, [roomStatus]);
++
++  useEffect(() => {
++    if (isGmMode || !roomServerAvailable) return undefined;
++    const entries = Object.entries(roomBindings);
++    if (entries.length === 0) return undefined;
++
++    const syncPlayerRooms = () => {
++      if (useRoomStore.getState().status === 'connecting') return;
++      entries.forEach(([characterId, code]) => {
++        if (!code) return;
++        const store = useRoomStore.getState();
++        const currentRoom = store.rooms[code];
++        const key = `${code}:${characterId}`;
++        const roomJoinedAsPlayer =
++          Boolean(currentRoom && currentRoom.joined !== false && currentRoom.role === 'player');
++        if (!roomJoinedAsPlayer || !publishedRevisionsRef.current[key]) {
++          syncBoundCharacterToRoom(characterId, code)
++            .then((ok) => {
++              if (ok) publishedRevisionsRef.current[key] = Date.now();
++            })
++            .catch(() => {
++              // Комната мастера ещё не поднята — автоматический повтор подхватит её.
++            });
++        }
++      });
++    };
++
++    syncPlayerRooms();
++    const retryTimer = setInterval(syncPlayerRooms, 4000);
++    return () => clearInterval(retryTimer);
+   }, [isGmMode, roomBindings, characters, roomServerAvailable, roomStatus]);
+ 
+   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
+@@ -819,7 +979,11 @@ export default function HomeScreen({ navigation }) {
+   const showHomeAlert = (title, message = '') => showRawAlert({ title, message });
+ 
+   const handleDeleteFolder = async (folder) => {
++    const roomCode = folderRooms[folder.id];
+     const remove = async () => {
++      if (roomCode) {
++        await useRoomStore.getState().leaveRoom({ code: roomCode }).catch(() => {});
++      }
+       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
+       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
+       // следующей синхронизации (но уже без структуры каталогов).
+@@ -831,7 +995,7 @@ export default function HomeScreen({ navigation }) {
+       if (activeFolder?.id === folder.id) setActiveFolder(null);
+       loadList();
+     };
+-    const confirmed = await confirmAlert('folderDelete', { count: folderCounts[folder.id] || 0 });
++    const confirmed = await confirmAlert('folderDelete', { count: roomCode ? 0 : (folderCounts[folder.id] || 0) });
+     if (confirmed) remove();
+   };
+ 
+@@ -849,6 +1013,14 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
++  const handleOpenRoomCharacter = async (roomCard) => {
++    if (!bundledSettingActive || !roomCard?.snapshotPayload) return;
++    const ok = await savesModule.loadCharacterFromRoomSnapshot(roomCard.snapshotPayload);
++    if (ok) {
++      navigation.navigate('CharacterTab');
++    }
++  };
++
+   const handleDelete = async (character) => {
+     // Удаление сквозное: локально И в облаке. Без удаления в облаке персонаж
+     // воскресал при следующей синхронизации — она не отличает «я это удалил»
+@@ -1027,20 +1199,37 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
++  const visibleFolders = filterFoldersForMode(folders, folderRooms, isGmMode);
++  const activeGmRoomCode = isGmMode && activeFolder ? folderRooms[activeFolder.id] || null : null;
++  const gmRoomCharacterCards = activeGmRoomCode
++    ? buildGmRoomCharacterCards(roomRooms[activeGmRoomCode])
++    : [];
++  const displayedCharacters = isGmMode
++    ? (activeGmRoomCode ? gmRoomCharacterCards : [])
++    : characters;
++
++  const getDisplayedFolderCount = (folderId) => {
++    if (isGmMode) {
++      const code = folderRooms[folderId];
++      return code ? buildGmRoomCharacterCards(roomRooms[code]).length : 0;
++    }
++    return folderCounts[folderId] || 0;
++  };
++
+   const allItems = [
+     ...(activeFolder
+       ? []
+       : [
+           // В режиме мастера экран повторяет главный, но «создать/загрузить
+-          // персонажа» не показываем: здесь живут комнаты и копии игроков.
++          // персонажа» не показываем: здесь живут только комнаты и подключённые игроки.
+           ...(isGmMode ? [] : [{ type: 'create' }, { type: 'upload' }]),
+           ...(foldersEnabled ? [{ type: 'createFolder' }] : []),
+         ]),
+     ...(activeFolder
+       ? []
+       : (folderDraftVisible && foldersEnabled ? [{ type: 'folderDraft' }] : [])),
+-    ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
+-    ...characters.map(c => ({ type: 'character', ...c })),
++    ...(activeFolder ? [] : visibleFolders.map((folder) => ({ type: 'folder', ...folder }))),
++    ...displayedCharacters.map((c) => ({ type: 'character', ...c })),
+   ];
+ 
+   const rows = [];
+@@ -1134,8 +1323,8 @@ export default function HomeScreen({ navigation }) {
+         <Text style={styles.title}>{tHomeScreen("title")}</Text>
+         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
+       </View>
+-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
+-      {activeFolder && folderRooms[activeFolder.id] && (
++      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>{!isGmMode && movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
++      {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
+         <View style={styles.folderRoomBar}>
+           <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
+             <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
+@@ -1186,11 +1375,36 @@ export default function HomeScreen({ navigation }) {
+                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
+                 }
+                 if (item.type === 'folder') {
+-                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name={folderRooms[item.id] ? 'server-network' : 'folder-outline'} size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text>{folderRooms[item.id] && <Text style={styles.folderRoomCode}>{formatRoomCodeForDisplay(folderRooms[item.id])}</Text>}<Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
++                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, !isGmMode && movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name={isGmMode ? 'server-network' : 'folder-outline'} size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text>{isGmMode && folderRooms[item.id] && <Text style={styles.folderRoomCode}>{formatRoomCodeForDisplay(folderRooms[item.id])}</Text>}<Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(item.id)}</Text></TouchableOpacity>;
+                 }
+                 if (item.type === 'empty') {
+                   return <EmptyCell key={item.id} id={item.id} />;
+                 }
++                if (isGmMode) {
++                  return (
++                    <CharacterCell
++                      key={item.id}
++                      character={item}
++                      deleteActionPlacement="menu"
++                      onPress={() => handleOpenRoomCharacter(item)}
++                      onDelete={() => {}}
++                      onDownload={() => {}}
++                      onDuplicate={() => {}}
++                      onServer={() => {}}
++                      serverAvailable={false}
++                      serverBound
++                      serverOnline={Boolean(item.playerOnline)}
++                      readOnlyRoomCard
++                      onDragStart={() => {}}
++                      onDragMove={() => {}}
++                      onDragEnd={() => {}}
++                    />
++                  );
++                }
++                const boundCode = roomBindings[item.id];
++                const isBoundOnline = boundCode
++                  ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
++                  : false;
+                 return (
+                   <CharacterCell
+                     key={item.id}
+@@ -1202,7 +1416,8 @@ export default function HomeScreen({ navigation }) {
+                     onDuplicate={() => handleDuplicate(item)}
+                     onServer={() => handleServer(item)}
+                     serverAvailable={roomServerAvailable && !isGmMode}
+-                    serverBound={Boolean(roomBindings[item.id])}
++                    serverBound={Boolean(boundCode)}
++                    serverOnline={isBoundOnline}
+                     onDragStart={handleDragStart}
+                     onDragMove={handleDragMove}
+                     onDragEnd={handleDragEnd}
+@@ -1347,6 +1562,23 @@ export default function HomeScreen({ navigation }) {
+                     <Text style={styles.serverModalText}>
+                       {tHomeScreen('server.connected').replace('{code}', formatRoomCodeForDisplay(serverDialog.boundCode))}
+                     </Text>
++                    <Text
++                      style={[
++                        styles.serverModalText,
++                        {
++                          color: isRoomAvailableWithGm(roomRooms[serverDialog.boundCode], roomStatus)
++                            ? '#15803d'
++                            : '#6b7280',
++                          fontWeight: '600',
++                        },
++                      ]}
++                    >
++                      {tHomeScreen(
++                        isRoomAvailableWithGm(roomRooms[serverDialog.boundCode], roomStatus)
++                          ? 'server.statusOnline'
++                          : 'server.statusOffline',
++                      )}
++                    </Text>
+                     <View style={styles.serverModalActions}>
+                       <TouchableOpacity style={styles.serverModalButton} onPress={handleServerLeave}>
+                         <Text style={styles.serverModalButtonText}>{tHomeScreen('server.disconnect')}</Text>
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3f21d26..3226f8a 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,26 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (456) — отображение подключённых персонажей у админа, изоляция разделов и индикатор комнаты на карточке
++
++Слово владельца:
++1. «Я в разных вкладках открыл админа и юзера. Юзером подключился в комнату админа. Но там сейчас не видно подключившегося персонажа.»
++2. «И персонажи пользователя приложения из секции пользователя не должны отображаться в окне админа, туда могут попасть только через подключение.»
++3. «Если персонажа связали с комнатой он потом автоматом подключится к ней же или надо снова вводить код? На экране персонажей в разделе пользователя на карточке персонажа стоит добавить после подключения к комнате в верхний правый угол значок, как у комнаты (диски в сети). Если админ в сети и комната доступна - зелёный значок, если не в сети бледный, дизайн в стиле кнопки перемещения или трех точек.»
++4. «В разделе юзера комнату сервера не видно, только в интерфейсе админа. При этом пользователь может спокойно перемещать персонажа в папку, привязка не изменится.»
++
++- Исправлено:
++  1. `src/room/roomStore.ts` + `server/roomRegistry.js` + `server/roomServer.js`:
++     - На web `clientId` дополняется `sessionStorage`-идентификатором вкладки (`room_tab_session_id`), а режим `uiMode` изолирован по вкладкам (`positronium_tab_ui_mode`) — открытые рядом в одном браузере вкладки «Админ» и «Пользователь» больше не перетирают друг друга.
++     - `roomStore` хранит `snapshots` подключённых к комнате персонажей (из `ROOM_STATE` и живых `CHAR_PUBLISH`), поддерживает `publishCharacter` / `unpublishCharacter` (удаление при отключении).
++  2. `src/room/roomCharacterSync.ts` + `src/saves/characterSaves.js`:
++     - При подключении к комнате, автопереподключении и каждом сохранении/автосейве привязанный персонаж автоматически публикует актуальный снапшот без повторного ввода кода комнаты.
++     - `loadCharacterFromRoomSnapshot` открывает лист подключённого персонажа у мастера в режиме просмотра (`isSaved: false`, `currentCharacterId: null`), не перезаписывая локальные сейвы пользователя.
++  3. `components/screens/HomeScreen/HomeScreen.js` + `styles/HomeScreen.styles.js`:
++     - Строгая изоляция режимов: в разделе пользователя не показываются серверные комнаты, а в окне админа не показываются локальные персонажи и обычные папки пользователя — только серверные комнаты и подключившиеся к ним персонажи.
++     - Перемещение персонажа в пользовательскую папку никак не затрагивает привязку к комнате.
++     - В правом верхнем углу карточки привязанного персонажа добавлен круглый значок `server-network` (в стиле кнопок перемещения и трёх точек): **зелёный** (`#16a34a`), когда комната доступна и админ в сети, и **бледный** (`#9ca3af`), когда админ/комната не в сети.
++- Приёмочные тесты: `__tests__/room/room-character-sync-456.test.js` (4 теста).
++
+ ## 2026-10-27 (455) — лаконичный отчёт `apply-patch.sh` с явным перечнем установленных патчей
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 76b62d9..f9932d5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,19 @@
+ # Changelog
++---
++## Connected room characters, strict GM/User separation & status badge (patch 456)
++
++Completed live character sync between the User section and GM rooms:
++- Connecting a character to a GM room immediately publishes and displays the
++  character card inside the GM's room (including across two tabs in the same
++  browser) and pushes live updates on save.
++- Strictly separated User and Admin views: local user characters and user
++  folders never appear in the Admin window unless connected to a room, and
++  server rooms appear only in the Admin interface.
++- Room-bound characters reconnect automatically without re-entering the room
++  code, and moving a character into a user folder preserves its room binding.
++- Added a circular top-right `server-network` badge on bound character cards
++  (green when the GM is online and the room is active; pale when offline).
++
+ ---
+ ## Concise patch installer output with explicit patch list (patch 455)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a26cfee..607384f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## Персонажи в комнате мастера, разделение режимов и индикатор связи (патч 456)
++
++Доведена связка между разделом пользователя и комнатой мастера:
++- Подключённый к комнате персонаж сразу отображается карточкой внутри комнаты
++  у администратора (в том числе при работе в двух вкладках одного браузера)
++  и обновляется при сохранениях.
++- Разделы изолированы: локальные персонажи и папки пользователя не попадают
++  в окно администратора без подключения, а серверные комнаты видны только в
++  интерфейсе администратора.
++- Привязанный персонаж переподключается к своей комнате автоматически без
++  повторного ввода кода, а перенос персонажа в пользовательскую папку не
++  влияет на привязку.
++- На карточке привязанного персонажа в правом верхнем углу добавлен круглый
++  значок `server-network` (зелёный, когда мастер в сети и комната доступна;
++  бледный — когда не в сети).
++
+ ---
+ ## Короткий и понятный вывод установщика патчей (патч 455)
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 682d7bc..3600822 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -182,6 +182,8 @@
+     "connect": "Connect",
+     "connecting": "Connecting…",
+     "connected": "Character is in room {code}",
++    "statusOnline": "GM is online — room is active",
++    "statusOffline": "GM is offline — will reconnect automatically",
+     "disconnect": "Disconnect",
+     "close": "Close",
+     "invalidAddress": "This does not look like a room code (e.g. GM-7Q3-K9M).",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index a16c48d..d950864 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -182,6 +182,8 @@
+     "connect": "Подключиться",
+     "connecting": "Подключение…",
+     "connected": "Персонаж в комнате {code}",
++    "statusOnline": "Мастер в сети — комната доступна",
++    "statusOffline": "Мастер не в сети — подключится автоматически",
+     "disconnect": "Отключиться",
+     "close": "Закрыть",
+     "invalidAddress": "Адрес не похож на код комнаты (например, GM-7Q3-K9M).",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6c1cf02..0e5c141 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "455"
++  "baseline": "456"
+ }
+diff --git a/public/version.json b/public/version.json
+index c493809..6d0e263 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "455",
++  "version": "456",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index c137161..0e5659a 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -138,10 +138,22 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, left };
+   };
+ 
+-  /** Последний снапшот персонажа в комнате (LWW по revision). */
+-  const putSnapshot = ({ code, characterId, revision, snapshot, fromClientId, fromName }) => {
++  /** Последний снапшот персонажа в комнате (LWW по revision; snapshot=null/removed удаляет). */
++  const putSnapshot = ({
++    code,
++    characterId,
++    revision,
++    snapshot,
++    fromClientId,
++    fromName,
++    removed = false,
++  }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    if (removed || snapshot === null) {
++      room.lastSnapshots.delete(characterId);
++      return { room, stored: true, removed: true, currentRevision: Number(revision) || 0 };
++    }
+     const previous = room.lastSnapshots.get(characterId);
+     if (previous && Number(revision) < Number(previous.revision)) {
+       return { room, stored: false, currentRevision: previous.revision };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index bdb48e7..4e330d8 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -301,18 +301,21 @@ const attachRoomWebSocketServer = (httpServer, {
+             break;
+           }
+           const member = room.members.get(clientId);
++          const isRemoved = Boolean(payload.removed || payload.snapshot === null);
+           registry.putSnapshot({
+             code: canonical,
+             characterId: payload.characterId,
+             revision: payload.revision,
+-            snapshot: payload.snapshot,
++            snapshot: isRemoved ? null : payload.snapshot,
+             fromClientId: clientId,
+             fromName: member?.name,
++            removed: isRemoved,
+           });
+           broadcastToRoom(room, clientId, MESSAGE.CHAR_PUBLISH, {
+             characterId: payload.characterId,
+             revision: payload.revision,
+-            snapshot: payload.snapshot,
++            snapshot: isRemoved ? null : payload.snapshot,
++            removed: isRemoved,
+             fromClientId: clientId,
+             fromName: member?.name,
+             fromRole: member?.role,
+diff --git a/src/room/roomCharacterSync.ts b/src/room/roomCharacterSync.ts
+new file mode 100644
+index 0000000..60eb5c2
+--- /dev/null
++++ b/src/room/roomCharacterSync.ts
+@@ -0,0 +1,186 @@
++// src/room/roomCharacterSync.ts
++// Публикация и отображение персонажей между разделом пользователя и комнатой
++// мастера (патч 456):
++// - персонаж пользователя отправляется в комнату только через явное подключение
++//   (и далее автоматически при переподключении/редактировании, пока привязка жива);
++// - перемещение персонажа по пользовательским папкам никак не меняет привязку к комнате;
++// - статус «зелёный / бледный» на карточке персонажа определяется наличием активного
++//   соединения с комнатой И присутствием мастера (role === 'gm') в сети этой комнаты.
++
++import { debugLog } from '../debug/falloutDebug';
++import useRoomStore, { type RoomStateEntry } from './roomStore';
++import type { RoomConnectionStatus } from './roomClient';
++import type { RoomSnapshotEntry } from './roomProtocol';
++
++export interface PublishedRoomCharacterPayload {
++  characterId: string;
++  name: string;
++  level: number;
++  originName: string | null;
++  updatedAt: number;
++  avatarDataUrl: string | null;
++  data: unknown;
++}
++
++export interface GmRoomCharacterCardItem {
++  id: string;
++  name: string;
++  level: number;
++  originName: string | null;
++  avatarDataUrl: string | null;
++  updatedAt: number;
++  fromClientId: string;
++  playerOnline: boolean;
++  snapshotPayload: PublishedRoomCharacterPayload;
++}
++
++/**
++ * Зелёный индикатор на карточке персонажа у игрока горит ТОЛЬКО когда:
++ * 1) WebSocket-клиент в сети ('online'),
++ * 2) вход в комнату подтверждён сервером (joined !== false),
++ * 3) в списке участников комнаты сейчас есть мастер (role === 'gm').
++ */
++export const isRoomAvailableWithGm = (
++  room: RoomStateEntry | undefined | null,
++  connectionStatus: RoomConnectionStatus,
++): boolean => {
++  if (connectionStatus !== 'online') return false;
++  if (!room || room.joined === false) return false;
++  if (!Array.isArray(room.members)) return false;
++  return room.members.some((member) => member?.role === 'gm');
++};
++
++/**
++ * Разделяет папки на пользовательские каталоги и серверные комнаты мастера:
++ * - в разделе пользователя видны ТОЛЬКО обычные папки (без штампа комнаты);
++ * - в интерфейсе мастера видны ТОЛЬКО серверные комнаты.
++ */
++export const filterFoldersForMode = <T extends { id: string }>(
++  folders: T[],
++  folderRooms: Record<string, string>,
++  isGmMode: boolean,
++): T[] => (
++  folders.filter((folder) => (isGmMode ? Boolean(folderRooms[folder.id]) : !folderRooms[folder.id]))
++);
++
++/**
++ * Превращает снапшоты комнаты из roomStore в список карточек персонажей
++ * для экрана комнаты в интерфейсе мастера.
++ */
++export const buildGmRoomCharacterCards = (
++  room: RoomStateEntry | undefined | null,
++): GmRoomCharacterCardItem[] => {
++  const map = room?.snapshots || {};
++  const onlineIds = new Set(
++    (room?.members || [])
++      .filter((member) => member?.role === 'player')
++      .map((member) => member.clientId),
++  );
++
++  const items: GmRoomCharacterCardItem[] = [];
++  for (const entry of Object.values(map) as RoomSnapshotEntry[]) {
++    const raw = entry?.snapshot as Partial<PublishedRoomCharacterPayload> | null;
++    if (!raw || typeof raw !== 'object') continue;
++    const id = String(raw.characterId || entry.characterId || '');
++    if (!id) continue;
++    items.push({
++      id,
++      name: String(raw.name || entry.fromName || '—'),
++      level: Number(raw.level) || 1,
++      originName: raw.originName ?? null,
++      avatarDataUrl: raw.avatarDataUrl ?? null,
++      updatedAt: Number(raw.updatedAt || entry.revision) || 0,
++      fromClientId: entry.fromClientId || '',
++      playerOnline: Boolean(entry.fromClientId && onlineIds.has(entry.fromClientId)),
++      snapshotPayload: {
++        characterId: id,
++        name: String(raw.name || entry.fromName || '—'),
++        level: Number(raw.level) || 1,
++        originName: raw.originName ?? null,
++        updatedAt: Number(raw.updatedAt || entry.revision) || 0,
++        avatarDataUrl: raw.avatarDataUrl ?? null,
++        data: raw.data ?? null,
++      },
++    });
++  }
++
++  items.sort((a, b) => (b.updatedAt - a.updatedAt) || a.name.localeCompare(b.name));
++  return items;
++};
++
++/** Собирает полный сетевой снапшот локального персонажа по его id в БД. */
++export const buildLocalCharacterRoomSnapshot = async (
++  characterId: string,
++): Promise<PublishedRoomCharacterPayload | null> => {
++  try {
++    const db = await import('../../db');
++    const row = await (db as any).loadCharacterById(characterId);
++    if (!row) return null;
++    let avatarDataUrl: string | null = null;
++    try {
++      const avatarCache = await import('../../db/avatarCache');
++      const cached = await (avatarCache as any).getAvatarCache(characterId);
++      avatarDataUrl = cached?.data_url || cached?.dataUrl || null;
++    } catch {
++      // Отсутствие аватара не мешает публикации персонажа.
++    }
++    const updatedAt = Number(row.updatedAt ?? row.updated_at) || Date.now();
++    return {
++      characterId: String(row.id),
++      name: String(row.name || '—'),
++      level: Number(row.level) || 1,
++      originName: row.originName ?? row.origin_name ?? null,
++      updatedAt,
++      avatarDataUrl,
++      data: row.data,
++    };
++  } catch (error) {
++    debugLog('room.buildSnapshot:failed', {
++      characterId,
++      message: (error as Error)?.message || String(error),
++    });
++    return null;
++  }
++};
++
++/**
++ * Гарантирует вход игрока в привязанную комнату и публикует актуальный
++ * снапшот персонажа. Безопасно вызывать при подключении, автосейве и реконнекте.
++ */
++export const syncBoundCharacterToRoom = async (
++  characterId: string,
++  code: string,
++): Promise<boolean> => {
++  const snapshot = await buildLocalCharacterRoomSnapshot(characterId);
++  if (!snapshot) return false;
++  const store = useRoomStore.getState();
++  await store.joinRoom({ code, name: snapshot.name, role: 'player' });
++  await store.publishCharacter({
++    code,
++    characterId,
++    revision: Math.max(snapshot.updatedAt, Date.now()),
++    snapshot,
++  });
++  return true;
++};
++
++/**
++ * Если персонаж привязан к комнате и комната уже активна/доступна, пушит
++ * свежий снапшот после локального сохранения (автосейв / ручной сейв).
++ */
++export const pushSavedCharacterToBoundRoomIfAny = async (
++  characterId: string,
++): Promise<void> => {
++  try {
++    const db = await import('../../db');
++    const binding = await (db as any).getCharacterRoomBinding?.(characterId);
++    const code = binding?.code;
++    if (!code) return;
++    await syncBoundCharacterToRoom(characterId, code);
++  } catch (error) {
++    debugLog('room.pushOnSave:skipped', {
++      characterId,
++      message: (error as Error)?.message || String(error),
++    });
++  }
++};
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index a7a1a48..4482d79 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -1,8 +1,7 @@
+ // src/room/roomStore.ts
+ // Стор комнат мастера (zustand, план gm-rooms §3.6): соединение, список
+-// комнат, presence-члены, запросы create/join с сопоставлением по requestId.
+-// Снапшоты персонажей (char.publish) здесь пока только пробрасываются в
+-// подписчиков — применение в БД/стор придёт этапом 3 вместе со штампом сейва.
++// комнат, presence-члены, входящие/исходящие снапшоты подключённых
++// персонажей (char.publish) и запросы create/join с сопоставлением по requestId.
+ 
+ import { create } from 'zustand';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+@@ -16,10 +15,12 @@ import {
+   ROOM_MESSAGE,
+   type RoomEnvelope,
+   type RoomMember,
++  type RoomSnapshotEntry,
+ } from './roomProtocol';
+ import { debugLog } from '../debug/falloutDebug';
+ 
+ const CLIENT_ID_STORAGE_KEY = 'room_client_id';
++const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
+ const REQUEST_TIMEOUT_MS = 10 * 1000;
+ 
+ export interface RoomStateEntry {
+@@ -28,6 +29,7 @@ export interface RoomStateEntry {
+   role: 'gm' | 'player';
+   members: RoomMember[];
+   joined?: boolean;
++  snapshots?: Record<string, RoomSnapshotEntry>;
+ }
+ 
+ interface CreateRoomResult {
+@@ -40,7 +42,7 @@ interface JoinRoomResult {
+   code: string;
+   name: string;
+   members: RoomMember[];
+-  snapshots: unknown[];
++  snapshots: RoomSnapshotEntry[];
+ }
+ 
+ interface RoomStoreState {
+@@ -60,6 +62,16 @@ interface RoomStoreState {
+     role?: 'gm' | 'player';
+   }) => Promise<JoinRoomResult>;
+   leaveRoom: (input: { code: string }) => Promise<void>;
++  publishCharacter: (input: {
++    code: string;
++    characterId: string;
++    revision?: number;
++    snapshot: unknown;
++  }) => Promise<void>;
++  unpublishCharacter: (input: {
++    code: string;
++    characterId: string;
++  }) => Promise<void>;
+ }
+ 
+ // ── Внутреннее состояние соединения (не в стейт-дереве: не для рендера) ──
+@@ -74,19 +86,40 @@ const pendingRequests = new Map<string, {
+ const joiningCodes = new Set<string>();
+ const publishListeners = new Set<(message: RoomEnvelope) => void>();
+ 
+-/** Идентичность устройства (§3.3): uuid в AsyncStorage, создаётся один раз. */
++const getWebTabSessionSuffix = (): string => {
++  if (typeof window === 'undefined') return '';
++  try {
++    const storage = window.sessionStorage;
++    if (!storage) return '';
++    const existing = storage.getItem(TAB_SESSION_STORAGE_KEY);
++    if (existing) return `:${existing}`;
++    const generated = `t-${Math.random().toString(36).slice(2, 10)}`;
++    storage.setItem(TAB_SESSION_STORAGE_KEY, generated);
++    return `:${generated}`;
++  } catch {
++    return '';
++  }
++};
++
++/**
++ * Идентичность подключения (§3.3 + изоляция вкладок 456):
++ * базовый uuid хранится в AsyncStorage, а на web дополняется sessionStorage-суффиксом
++ * вкладки — чтобы открытые в одном браузере вкладки «Админ» и «Пользователь»
++ * не перезаписывали друг друга в списке участников комнаты.
++ */
+ const getRoomClientId = (): Promise<string> => {
+   if (!clientIdPromise) {
+     clientIdPromise = (async () => {
++      const tabSuffix = getWebTabSessionSuffix();
+       try {
+         const stored = await AsyncStorage.getItem(CLIENT_ID_STORAGE_KEY);
+-        if (stored) return stored;
++        if (stored) return `${stored}${tabSuffix}`;
+         const generated = (globalThis as any).crypto?.randomUUID?.()
+           || `c-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+         await AsyncStorage.setItem(CLIENT_ID_STORAGE_KEY, generated);
+-        return generated;
++        return `${generated}${tabSuffix}`;
+       } catch {
+-        return `c-fallback-${Math.random().toString(36).slice(2)}`;
++        return `c-fallback-${Math.random().toString(36).slice(2)}${tabSuffix}`;
+       }
+     })();
+   }
+@@ -95,7 +128,19 @@ const getRoomClientId = (): Promise<string> => {
+ 
+ const makeRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+ 
+-/** Подписка этапа 3+: входящие char.publish (применение в БД — не здесь). */
++const snapshotsArrayToMap = (list: unknown): Record<string, RoomSnapshotEntry> => {
++  const map: Record<string, RoomSnapshotEntry> = {};
++  if (!Array.isArray(list)) return map;
++  for (const raw of list) {
++    if (raw && typeof raw === 'object' && typeof (raw as any).characterId === 'string' && (raw as any).snapshot != null) {
++      const entry = raw as RoomSnapshotEntry;
++      map[entry.characterId] = entry;
++    }
++  }
++  return map;
++};
++
++/** Подписка на входящие char.publish. */
+ export const onRoomCharacterPublish = (listener: (message: RoomEnvelope) => void) => {
+   publishListeners.add(listener);
+   return () => { publishListeners.delete(listener); };
+@@ -149,6 +194,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         return;
+       }
+       case ROOM_MESSAGE.CHAR_PUBLISH: {
++        const code = message.roomCode;
++        const charId = message.payload?.characterId;
++        if (code && typeof charId === 'string') {
++          const current = get().rooms[code];
++          if (current) {
++            const nextSnapshots = { ...(current.snapshots || {}) };
++            if (message.payload?.removed || message.payload?.snapshot == null) {
++              delete nextSnapshots[charId];
++            } else {
++              const incomingRev = Number(message.payload?.revision) || 0;
++              const prevRev = Number(nextSnapshots[charId]?.revision) || 0;
++              if (!nextSnapshots[charId] || incomingRev >= prevRev) {
++                nextSnapshots[charId] = {
++                  characterId: charId,
++                  revision: incomingRev,
++                  snapshot: message.payload.snapshot,
++                  fromClientId: message.payload?.fromClientId || message.clientId || '',
++                  fromName: message.payload?.fromName,
++                };
++              }
++            }
++            set({
++              rooms: {
++                ...get().rooms,
++                [code]: { ...current, snapshots: nextSnapshots },
++              },
++            });
++          }
++        }
+         publishListeners.forEach((listener) => {
+           try { listener(message); } catch (error) {
+             debugLog('room.publishListener:failed', { message: (error as Error)?.message });
+@@ -181,7 +255,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           if (codes.length > 0) {
+             const nextRooms: Record<string, RoomStateEntry> = {};
+             for (const roomCode of codes) {
+-              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false };
++              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false, members: [] };
+             }
+             set({ status, rooms: nextRooms });
+             return;
+@@ -230,10 +304,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       if (ownerToken) payload.ownerToken = ownerToken;
+       const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, payload, null);
+       const { code, ownerToken: issuedToken, name: roomName } = response.payload;
++      const prev = get().rooms[code];
+       set({
+         rooms: {
+           ...get().rooms,
+-          [code]: { code, name: roomName || name, role: 'gm', members: [], joined: false },
++          [code]: {
++            code,
++            name: roomName || name,
++            role: 'gm',
++            members: prev?.members || [],
++            joined: false,
++            snapshots: prev?.snapshots || {},
++          },
+         },
+       });
+       debugLog('room.create:ok', { code });
+@@ -242,14 +324,20 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+ 
+     joinRoom: async ({ code, name, role = 'player' }) => {
+       const existing = get().rooms[code];
+-      if (existing && existing.joined !== false) {
+-        return { code, name: existing.name, members: existing.members, snapshots: [] };
++      if (existing && existing.joined !== false && existing.role === role) {
++        return {
++          code,
++          name: existing.name,
++          members: existing.members,
++          snapshots: Object.values(existing.snapshots || {}),
++        };
+       }
+       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
+       joiningCodes.add(code);
+       try {
+         const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, { code, name, role }, code);
+         const payloadRooms = response.payload;
++        const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+         set({
+           rooms: {
+             ...get().rooms,
+@@ -259,6 +347,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               role,
+               members: payloadRooms.members || [],
+               joined: true,
++              snapshots: snapshotsMap,
+             },
+           },
+         });
+@@ -267,7 +356,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           code,
+           name: payloadRooms.name || code,
+           members: payloadRooms.members || [],
+-          snapshots: payloadRooms.snapshots || [],
++          snapshots: Object.values(snapshotsMap),
+         };
+       } finally {
+         joiningCodes.delete(code);
+@@ -285,6 +374,60 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       delete rest[code];
+       set({ rooms: rest });
+     },
++
++    publishCharacter: async ({ code, characterId, revision, snapshot }) => {
++      const rev = Number.isFinite(revision) ? Number(revision) : Date.now();
++      const readyClient = await ensureClient();
++      readyClient.send(
++        ROOM_MESSAGE.CHAR_PUBLISH,
++        { characterId, revision: rev, snapshot },
++        code,
++      );
++      const current = get().rooms[code];
++      if (current) {
++        set({
++          rooms: {
++            ...get().rooms,
++            [code]: {
++              ...current,
++              snapshots: {
++                ...(current.snapshots || {}),
++                [characterId]: {
++                  characterId,
++                  revision: rev,
++                  snapshot,
++                  fromClientId: 'self',
++                },
++              },
++            },
++          },
++        });
++      }
++    },
++
++    unpublishCharacter: async ({ code, characterId }) => {
++      try {
++        const readyClient = await ensureClient();
++        readyClient.send(
++          ROOM_MESSAGE.CHAR_PUBLISH,
++          { characterId, revision: Date.now(), snapshot: null, removed: true },
++          code,
++        );
++      } catch (error) {
++        debugLog('room.unpublish:sendFailed', { message: (error as Error)?.message });
++      }
++      const current = get().rooms[code];
++      if (current?.snapshots?.[characterId]) {
++        const nextSnapshots = { ...current.snapshots };
++        delete nextSnapshots[characterId];
++        set({
++          rooms: {
++            ...get().rooms,
++            [code]: { ...current, snapshots: nextSnapshots },
++          },
++        });
++      }
++    },
+   };
+ });
+ 
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index c554b09..1de3126 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -371,6 +371,7 @@ export const saveCharacter = async (name) => {
+ 
+     // Облако — фоном: его отказ не влияет на локальное состояние и UI.
+     void syncCharacterToCloudIfEnabledSafe(id);
++    void pushSavedCharacterToRoomSafe(id);
+ 
+     return id;
+   } catch (e) {
+@@ -388,6 +389,18 @@ const syncCharacterToCloudIfEnabledSafe = async (id) => {
+   }
+ };
+ 
++// Комната мастера — фоном: если персонаж привязан к комнате, обновляем его снапшот у админа.
++const pushSavedCharacterToRoomSafe = async (id) => {
++  try {
++    const { isRoomServerConfigured } = await import('../room/roomClient');
++    if (!isRoomServerConfigured()) return;
++    const { pushSavedCharacterToBoundRoomIfAny } = await import('../room/roomCharacterSync');
++    await pushSavedCharacterToBoundRoomIfAny(id);
++  } catch (e) {
++    debugLog('room.pushUnavailable', { message: e?.message });
++  }
++};
++
+ // Последняя записанная сериализация — автосейв не пишет то же самое повторно
+ // (производные пересчёты стора не будят лишних записей).
+ let lastSerializedJson = null;
+@@ -395,198 +408,200 @@ const rememberLastSerialized = (serialized) => {
+   try { lastSerializedJson = JSON.stringify(serialized); } catch (e) { /* no-op */ }
+ };
+ 
++const hydrateStoreFromRow = async (
++  row,
++  {
++    markSaved = true,
++    currentCharacterIdOverride = undefined,
++    allowNightkinMutation = true,
++  } = {},
++) => {
++  if (!row || row.data == null) return false;
++  // Мост канонизации (по образцу патча 225): битые id предметов китов
++  // (фальшивая вода food_purified_water) переименовываются в канонические.
++  // См. domain/kitItemCanonical.js; версия схемы сейва не меняется.
++  const data = canonizeLoadedCharacterItems(deserializeState(row.data));
++  // Автосейв загружаемые данные не перезаписывает: блокируем флагом.
++  useCharacterStore.setState({ isSaved: false });
++
++  const loadedTrait = data.trait || null;
++  const loadedAttributes = clampAttributesToRules(data.attributes, loadedTrait);
++
++  const st = useCharacterStore.getState();
++  useCharacterStore.setState({
++    currentCharacterId: currentCharacterIdOverride !== undefined ? currentCharacterIdOverride : row.id,
++    characterName: row.name,
++    level: data.level ?? row.level ?? 1,
++  });
++  st.setBaseAttributes(loadedAttributes);
++  st.setBaseSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map((sk) => ({ ...sk, value: 0 })));
++  st.setSelectedSkills(data.selectedSkills || []);
++  st.setExtraTaggedSkills(data.extraTaggedSkills || []);
++  st.setForcedSelectedSkills(data.forcedSelectedSkills || []);
++  st.setOrigin(data.origin || null);
++  st.setTrait(loadedTrait);
++  st.setEquipment(data.equipment || null);
++  st.setTraitEffects(data.effects || []); // сейв-ключ effects → traitEffects
++  // activeTimedEffects: массив из сейва уходит в словарь effects стора
++  // через loadFromLegacyData (normalizeEffects), см. ниже.
++  st.setSceneCounter(data.sceneCounter ?? 0);
++  st.setSceneRiskStates(data.sceneRiskStates);
++  // Поля сеттинговых расширений: hydrate расширения сам решает, как
++  // нормализовать своё поле (идемпотентно, без подъёма версии схемы).
++  useCharacterStore.getState().setStateExtensions(hydrateStateExtensionFields(data, {
++    origin: resolveOrigin(data.origin),
++    trait: data.trait || null,
++  }));
++  // Migrate old [null, null] format to dynamic array
++  const rawWeapons = data.equippedWeapons || [];
++  let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((w) => w !== null) : [];
++  // 360: в старых сейвах робо-оружие оседало копией-призраком в equippedWeapons.
++  const ghostCount = migratedWeapons.filter((w) => w?.sourceSlot).length;
++  if (ghostCount > 0) {
++    migratedWeapons = migratedWeapons.filter((w) => !w?.sourceSlot);
++    debugLog('character.load.robotGhostPurged', { count: ghostCount });
++  }
++  const loadedOrigin = resolveOrigin(data.origin);
++  const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
++  if (builtin && !migratedWeapons.some((w) => w?.id === builtin.id)) {
++    migratedWeapons = [builtin, ...migratedWeapons];
++  }
++  useCharacterStore.getState().setEquippedWeapons(migratedWeapons);
++  useCharacterStore.getState().loadRobotState({
++    bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
++    slots: data.equippedRobotSlots ?? {},
++    modules: data.equippedRobotModules ?? [],
++    mk2Installed: data.mk2Installed ?? false,
++  });
++  useCharacterStore.getState().loadPowerArmorState({
++    equippedArmor: data.equippedArmor,
++    equippedPowerArmor: data.equippedPowerArmor,
++    powerArmorRuntime: data.powerArmorRuntime,
++  });
++  useCharacterStore.getState().setCurrency(data.caps ?? 0);
++  useCharacterStore.setState({
++    currentHealth: data.currentHealth ?? 0,
++    radiation: Math.max(0, data.radiation ?? 0),
++    lastDiseaseResistAt: data.lastDiseaseResistAt ?? null,
++    modifiedItems: Object.fromEntries(
++      data.modifiedItems instanceof Map
++        ? data.modifiedItems.entries()
++        : (Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
++    ),
++    availablePerkAttributePoints: data.availablePerkAttributePoints ?? 0,
++    luckPoints: data.luckPoints ?? 0,
++    maxLuckPoints: getLuckPoints(data.attributes || createInitialAttributes(), loadedTrait),
++    attributesSaved: data.attributesSaved ?? false,
++    skillsSaved: data.skillsSaved ?? false,
++    conditions: data.conditions || [],
++    chemDosesLog: (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS),
++    rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
++  });
++  st.setSelectedPerks(data.selectedPerks || []);
++  if (allowNightkinMutation && data.pendingPerkDuplicateNotice) {
++    paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
++  }
++  const perkInspection = inspectSelectedPerkRecords(data.selectedPerks || [], getPerks());
++  const brokenPerkLabels = [
++    ...perkInspection.missingId,
++    ...perkInspection.unknownId,
++  ].map((entry) => entry.label);
++  if (allowNightkinMutation && brokenPerkLabels.length > 0) {
++    paAlert(
++      tPerkAlert('perkMissingIdTitle'),
++      brokenPerkLabels
++        .map((label) => tPerkAlert('perkMissingIdMessage').replace('{perk}', label))
++        .join('\n'),
++    );
++  }
++
++  useCharacterStore.getState().loadFromLegacyData({
++    ...data,
++    attributes: loadedAttributes,
++  });
++
++  const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
++  if (allowNightkinMutation && reconciliation?.shouldNotify && reconciliation.dormant?.length > 0) {
++    const dormantNames = [...new Set(
++      reconciliation.dormant
++        .map((entry) => perkDisplayName(entry.id))
++        .filter(Boolean),
++    )].join(', ');
++    paAlert(
++      tPerkAlert('dormantPerksTitle'),
++      tPerkAlert('dormantPerksMessage').replace('{perks}', dormantNames),
++    );
++  }
++
++  if (allowNightkinMutation && data.nightkinKitPending && data.equipment?.id === 'nightkin') {
++    try {
++      const catalog = getEquipmentCatalog();
++      const kit = catalog?.equipmentKits?.nightkin;
++      if (!kit?.name || !Array.isArray(kit.items)) {
++        throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
++      }
++      const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
++      (resolved.items || []).forEach((item) => {
++        useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
++      });
++      st.setEquipment({ id: 'nightkin', items: resolved.items || [], name: kit.name });
++      data.nightkinKitPending = false;
++    } catch (e) {
++      debugLog('character.load.nightkinKitGrantFailed', { message: e?.message });
++    }
++  }
++
++  useCharacterStore.setState({ isSaved: markSaved });
++  if (markSaved) {
++    rememberLastSerialized(row.data);
++  }
++  return true;
++};
++
+ /**
+  * Загрузить персонажа по id: читает строку БД, прогоняет через миграции/
+-// канонизацию/гидрацию и раскладывает в стор через стор-действия.
++ * канонизацию/гидрацию и раскладывает в стор через стор-действия.
+  * @returns {Promise<boolean>} успех
+  */
+ export const loadCharacter = async (id) => {
+   try {
+     const row = await db.loadCharacterById(id);
+     if (!row) return false;
+-    // Мост канонизации (по образцу патча 225): битые id предметов китов
+-    // (фальшивая вода food_purified_water) переименовываются в канонические.
+-    // См. domain/kitItemCanonical.js; версия схемы сейва не меняется.
+-    const data = canonizeLoadedCharacterItems(deserializeState(row.data));
+-    // Автосейв загружаемые данные не перезаписывает: блокируем флагом.
+-    useCharacterStore.setState({ isSaved: false });
+-
+-    const loadedTrait = data.trait || null;
+-    const loadedAttributes = clampAttributesToRules(data.attributes, loadedTrait);
+-
+-    const st = useCharacterStore.getState();
+-    useCharacterStore.setState({
+-      currentCharacterId: id,
+-      characterName: row.name,
+-      level: data.level ?? 1,
+-    });
+-    st.setBaseAttributes(loadedAttributes);
+-    st.setBaseSkills(migrateSkillsToCanonical(data.skills) || ALL_SKILLS.map((sk) => ({ ...sk, value: 0 })));
+-    st.setSelectedSkills(data.selectedSkills || []);
+-    st.setExtraTaggedSkills(data.extraTaggedSkills || []);
+-    st.setForcedSelectedSkills(data.forcedSelectedSkills || []);
+-    st.setOrigin(data.origin || null);
+-    st.setTrait(loadedTrait);
+-    st.setEquipment(data.equipment || null);
+-    st.setTraitEffects(data.effects || []); // сейв-ключ effects → traitEffects
+-    // activeTimedEffects: массив из сейва уходит в словарь effects стора
+-    // через loadFromLegacyData (normalizeEffects), см. ниже.
+-    st.setSceneCounter(data.sceneCounter ?? 0);
+-    st.setSceneRiskStates(data.sceneRiskStates);
+-    // Поля сеттинговых расширений: hydrate расширения сам решает, как
+-    // нормализовать своё поле (идемпотентно, без подъёма версии схемы).
+-    useCharacterStore.getState().setStateExtensions(hydrateStateExtensionFields(data, {
+-      origin: resolveOrigin(data.origin),
+-      trait: data.trait || null,
+-    }));
+-    // Migrate old [null, null] format to dynamic array
+-    const rawWeapons = data.equippedWeapons || [];
+-    let migratedWeapons = Array.isArray(rawWeapons) ? rawWeapons.filter((w) => w !== null) : [];
+-    // 360 (репорт владельца: «Смешанный конденсатор не снимается»): в старых
+-    // сейвах робо-оружие оседало копией-призраком в equippedWeapons (карточка
+-    // с устаревшими appliedMods). Правда о модах робо-оружия — только слоты
+-    // (robot.slots), призрак при загрузке вычищается: иначе он всплывает
+-    // устаревшим набором модов, который «не снимается».
+-    const ghostCount = migratedWeapons.filter((w) => w?.sourceSlot).length;
+-    if (ghostCount > 0) {
+-      migratedWeapons = migratedWeapons.filter((w) => !w?.sourceSlot);
+-      debugLog('character.load.robotGhostPurged', { count: ghostCount });
+-    }
+-    // Ensure the archetype's built-in unarmed weapon is present on load
+-    // (non-robots get fists; robots get melee via a manipulator, so nothing to inject).
+-    const loadedOrigin = resolveOrigin(data.origin);
+-    const builtin = getBuiltinBaseWeapon({ origin: loadedOrigin, trait: loadedTrait });
+-    if (builtin && !migratedWeapons.some((w) => w?.id === builtin.id)) {
+-      migratedWeapons = [builtin, ...migratedWeapons];
+-    }
+-    useCharacterStore.getState().setEquippedWeapons(migratedWeapons);
+-    // Seed the store's robot body plan first so derived carry-weight resolves
+-    // correctly, then load slots/modules (экшены слайса robot).
+-    useCharacterStore.getState().loadRobotState({
+-      bodyPlan: resolveBodyPlan({ origin: loadedOrigin, trait: loadedTrait }),
+-      slots: data.equippedRobotSlots ?? {},
+-      modules: data.equippedRobotModules ?? [],
+-      mk2Installed: data.mk2Installed ?? false,
+-    });
+-    // Встроенное оружие конечностей (манипуляторы, ладонные орудия) НЕ хранится
+-    // в equippedWeapons: экраны читают его из слотов стора — единый источник.
+-    // Слой брони/СБ из сейва — одним стор-действием; недоодетый диалог выбора
+-    // блока при загрузке всегда сбрасывается.
+-    useCharacterStore.getState().loadPowerArmorState({
+-      equippedArmor: data.equippedArmor,
+-      equippedPowerArmor: data.equippedPowerArmor,
+-      powerArmorRuntime: data.powerArmorRuntime,
+-    });
+-    // Абсолютная установка из сейва: инкрементальные earnCurrency/spendCurrency
+-    // для этого не годятся. Поле сейва — data.caps: формат не переименовываем.
+-    useCharacterStore.getState().setCurrency(data.caps ?? 0);
+-    useCharacterStore.setState({
+-      currentHealth: data.currentHealth ?? 0,
+-      radiation: Math.max(0, data.radiation ?? 0),
+-      lastDiseaseResistAt: data.lastDiseaseResistAt ?? null,
+-      modifiedItems: Object.fromEntries(
+-        data.modifiedItems instanceof Map
+-          ? data.modifiedItems.entries()
+-          : (Array.isArray(data.modifiedItems) ? data.modifiedItems : []),
+-      ),
+-      availablePerkAttributePoints: data.availablePerkAttributePoints ?? 0,
+-      luckPoints: data.luckPoints ?? 0,
+-      // Максимум удачи — производная (атрибуты + трейт), а не хранимое
+-      // значение: считаем его при загрузке, а не читаем из сейва. Иначе это
+-      // второй источник правды (counters-storage.md, правило 1).
+-      maxLuckPoints: getLuckPoints(data.attributes || createInitialAttributes(), loadedTrait),
+-      attributesSaved: data.attributesSaved ?? false,
+-      skillsSaved: data.skillsSaved ?? false,
+-      conditions: data.conditions || [],
+-      chemDosesLog: (data.chemDosesLog || []).filter((d) => Date.now() - d.takenAt < CHEM_DOSE_WINDOW_MS),
+-      // Журнал «одноразовые награды за tagged-навыки выданы» (патч 244:
+-      // паспорт сейва вскрыл рассинхрон — ключ писался мерджем со стором,
+-      // но загрузкой не читался; после сейв→загрузка игра забывала о
+-      // выданных наградах и могла вручить их заново). Старые сейвы без
+-      // ключа дают [] — поведение прежнее.
+-      rewardedSkills: Array.isArray(data.rewardedSkills) ? data.rewardedSkills : [],
+-    });
+-    st.setSelectedPerks(data.selectedPerks || []);
+-    if (data.pendingPerkDuplicateNotice) {
+-      paAlert(tPerkAlert('duplicatePerksFixedTitle'), tPerkAlert('duplicatePerksFixedMessage'));
+-    }
+-    const perkInspection = inspectSelectedPerkRecords(data.selectedPerks || [], getPerks());
+-    const brokenPerkLabels = [
+-      ...perkInspection.missingId,
+-      ...perkInspection.unknownId,
+-    ].map((entry) => entry.label);
+-    if (brokenPerkLabels.length > 0) {
+-      paAlert(
+-        tPerkAlert('perkMissingIdTitle'),
+-        brokenPerkLabels
+-          .map((label) => tPerkAlert('perkMissingIdMessage').replace('{perk}', label))
+-          .join('\n'),
+-      );
+-    }
+-    // carryWeight/meleeBonus/initiative/defense из сейва НЕ читаем: сразу
+-    // после загрузки их перетирает пересчёт derivedStats из стора.
+-
+-    // Task 4.4: Migrate old format data to Zustand Store
+-    // This normalizes attributes, skills, items, and effects into the store
+-    useCharacterStore.getState().loadFromLegacyData({
+-      ...data,
+-      attributes: loadedAttributes,
+-    });
+-
+-    // 412 (публичное приложение): мигратор перков при загрузке. Слово
+-    // владельца: «пусть сам решает» — недоступные по книге перки остаются
+-    // серыми и неработающими, снимаются только неизвестные каталогу id
+-    // (о них — отдельное уведомление perkMissingId выше). Уведомление
+-    // о погасших — один показ на изменение множества (fingerprint в сторе).
+-    const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
+-    if (reconciliation?.shouldNotify && reconciliation.dormant?.length > 0) {
+-      const dormantNames = [...new Set(
+-        reconciliation.dormant
+-          .map((entry) => perkDisplayName(entry.id))
+-          .filter(Boolean),
+-      )].join(', ');
+-      paAlert(
+-        tPerkAlert('dormantPerksTitle'),
+-        tPerkAlert('dormantPerksMessage').replace('{perks}', dormantNames),
+-      );
+-    }
+-
+-    // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
+-    // resolveKitItems асинхронный (rollTable бросает кубики), поэтому
+-    // выдаём здесь, после загрузки. Крышки: старый комплект (100) уже
+-    // в data.caps — оставляем как есть (комплект NIGHTKIN крышек не даёт).
+-    if (data.nightkinKitPending && data.equipment?.id === 'nightkin') {
+-      try {
+-        const catalog = getEquipmentCatalog();
+-        const kit = catalog?.equipmentKits?.nightkin;
+-        if (!kit?.name || !Array.isArray(kit.items)) {
+-          throw new Error('[loadCharacter] Комплект nightkin отсутствует в локализованном каталоге');
+-        }
+-        const resolved = await resolveKitItems({ id: 'nightkin', items: kit.items });
+-        (resolved.items || []).forEach((item) => {
+-          useCharacterStore.getState().addNewItem({ ...item, equipped: false, locked: false });
+-        });
+-        st.setEquipment({ id: 'nightkin', name: kit.name, items: resolved.items || [] });
+-        // снимаем флаг — чтобы не выдавать повторно при следующей загрузке
+-        data.nightkinKitPending = false;
+-      } catch (e) {
+-        debugLog('character.load.nightkinKitGrantFailed', { message: e?.message });
+-      }
+-    }
+-
+-    const saved = !row.renamePending;
+-    useCharacterStore.setState({ isSaved: saved });
+-    // Только что загруженное — «уже записано»: автосейв не перезаписывает сейв
+-    // сразу после загрузки без реальных изменений.
+-    rememberLastSerialized(row.data);
+-
+-    return true;
++    return await hydrateStoreFromRow(row, { markSaved: !row.renamePending });
+   } catch (e) {
+     debugLog('character.load.failed', { message: e?.message });
+     return false;
+   }
+ };
+ 
++/**
++ * Загрузить подключённого к комнате персонажа из сетевого снапшота (режим мастера):
++ * открывает лист без привязки к локальной SQLite пользователя (isSaved=false,
++ * currentCharacterId=null), чтобы просмотр у мастера не затирал сейвы игрока.
++ */
++export const loadCharacterFromRoomSnapshot = async (snapshotPayload) => {
++  try {
++    if (!snapshotPayload || snapshotPayload.data == null) return false;
++    return await hydrateStoreFromRow(
++      {
++        id: snapshotPayload.characterId || null,
++        name: snapshotPayload.name || '—',
++        level: snapshotPayload.level ?? 1,
++        data: snapshotPayload.data,
++        renamePending: true,
++      },
++      {
++        markSaved: false,
++        currentCharacterIdOverride: null,
++        allowNightkinMutation: false,
++      },
++    );
++  } catch (e) {
++    debugLog('character.loadFromRoomSnapshot.failed', { message: e?.message });
++    return false;
++  }
++};
++
+ /** Список сохранённых персонажей (строки БД). */
+ export const getCharactersList = async () => {
+   try {
+@@ -599,6 +614,16 @@ export const getCharactersList = async () => {
+ /** Удалить персонажа по id (облако чистит вызывающий — HomeScreen). */
+ export const deleteCharacter = async (id) => {
+   try {
++    try {
++      const getBinding = db && 'getCharacterRoomBinding' in db ? db.getCharacterRoomBinding : null;
++      const binding = typeof getBinding === 'function' ? await getBinding(id) : null;
++      if (binding?.code) {
++        const { useRoomStore } = await import('../room/roomStore');
++        await useRoomStore.getState().unpublishCharacter({ code: binding.code, characterId: id });
++      }
++    } catch {
++      // Отсутствие таблицы комнат в мок-БД или отказ сети не блокирует локальное удаление.
++    }
+     await db.deleteCharacter(id);
+     return true;
+   } catch (e) {
+@@ -635,9 +660,9 @@ export const startCharacterAutosave = () => {
+           serialized
+         );
+         rememberLastSerialized(serialized);
+-        // Облако — фоном, без await: задержка Google не тормозит следующий
+-        // цикл автосейва (ошибки гасятся внутри, sync.cloudFailed).
++        // Облако и комната мастера — фоном, без await.
+         void syncCharacterToCloudIfEnabledSafe(currentCharacterId);
++        void pushSavedCharacterToRoomSafe(currentCharacterId);
+       } catch (e) {
+         // Автосейв молчит: следующее изменение состояния повторит попытку.
+       }
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 1c68d60..52fd304 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -130,6 +130,9 @@ const styles = StyleSheet.create({
+     shadowOpacity: 0.25,
+     shadowRadius: 2,
+   },
++  deleteButtonShifted: {
++    right: 37,
++  },
+   deleteIcon: { fontSize: 15, lineHeight: 18 },
+   characterActionButton: {
+     position: 'absolute',
+@@ -341,7 +344,7 @@ const styles = StyleSheet.create({
+   folderRoomCode: {
+     marginTop: 3,
+     fontSize: 11,
+-    color: '#7c5c10',
++    color: '#d4af37',
+     fontWeight: '700',
+     letterSpacing: 1,
+     textAlign: 'center',
+@@ -363,8 +366,22 @@ const styles = StyleSheet.create({
+   characterServerBadge: {
+     position: 'absolute',
+     top: 5,
+-    left: 5,
+-    zIndex: 3,
++    right: 5,
++    width: 28,
++    height: 28,
++    borderRadius: 14,
++    backgroundColor: 'white',
++    justifyContent: 'center',
++    alignItems: 'center',
++    zIndex: 15,
++    elevation: 3,
++    shadowColor: '#000',
++    shadowOffset: { width: 0, height: 1 },
++    shadowOpacity: 0.25,
++    shadowRadius: 2,
++  },
++  characterServerBadgeOffline: {
++    opacity: 0.72,
+   },
+   serverModalBackdrop: {
+     flex: 1,

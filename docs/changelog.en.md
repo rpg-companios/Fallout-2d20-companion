@@ -1,5 +1,20 @@
 # Changelog
 ---
+## Connected room characters, strict GM/User separation & status badge (patch 456)
+
+Completed live character sync between the User section and GM rooms:
+- Connecting a character to a GM room immediately publishes and displays the
+  character card inside the GM's room (including across two tabs in the same
+  browser) and pushes live updates on save.
+- Strictly separated User and Admin views: local user characters and user
+  folders never appear in the Admin window unless connected to a room, and
+  server rooms appear only in the Admin interface.
+- Room-bound characters reconnect automatically without re-entering the room
+  code, and moving a character into a user folder preserves its room binding.
+- Added a circular top-right `server-network` badge on bound character cards
+  (green when the GM is online and the room is active; pale when offline).
+
+---
 ## Concise patch installer output with explicit patch list (patch 455)
 
 Trimmed noisy output from `apply-patch.sh`:

@@ -77,10 +77,35 @@ import useAppSettingsStore, {
   selectUiMode,
 } from '../../../src/store/appSettingsStore';
 import * as avatarCache from '../../../db/avatarCache';
-// Комнаты мастера (gm-rooms, этапы 0–2): стор соединения + адреса комнат.
+// Комнаты мастера (gm-rooms, этапы 0–3): стор соединения + адреса комнат + синхронизация.
 import useRoomStore from '../../../src/room/roomStore';
 import { isRoomServerConfigured } from '../../../src/room/roomClient';
 import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
+import {
+  isRoomAvailableWithGm,
+  filterFoldersForMode,
+  buildGmRoomCharacterCards,
+  syncBoundCharacterToRoom,
+} from '../../../src/room/roomCharacterSync';
+
+const TAB_UI_MODE_STORAGE_KEY = 'positronium_tab_ui_mode';
+const readTabUiMode = () => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  try {
+    const val = window.sessionStorage?.getItem(TAB_UI_MODE_STORAGE_KEY);
+    return val === 'gm' || val === 'user' ? val : null;
+  } catch {
+    return null;
+  }
+};
+const writeTabUiMode = (mode) => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage?.setItem(TAB_UI_MODE_STORAGE_KEY, mode);
+  } catch {
+    // sessionStorage может быть недоступен в приватном режиме.
+  }
+};
 
 const getOriginImage = (originName) => {
   if (!originName) return null;
@@ -109,21 +134,27 @@ const CharacterCell = ({
   onServer,
   serverAvailable = false,
   serverBound = false,
+  serverOnline = false,
+  readOnlyRoomCard = false,
   onDragStart,
   onDragMove,
   onDragEnd,
 }) => {
   const originImage = getOriginImage(character.originName);
-  const [customImageUrl, setCustomImageUrl] = useState(null);
+  const [customImageUrl, setCustomImageUrl] = useState(character?.avatarDataUrl || null);
 
-  // Загружаем кастомную картинку при монтировании
+  // Загружаем кастомную картинку при монтировании (или используем пришедшую из снапшота комнаты)
   useEffect(() => {
-    if (character?.id) {
+    if (character?.avatarDataUrl) {
+      setCustomImageUrl(character.avatarDataUrl);
+      return;
+    }
+    if (!readOnlyRoomCard && character?.id) {
       avatarCache.getAvatarCache(character.id).then((cached) => {
         setCustomImageUrl(cached?.data_url || cached?.dataUrl || null);
       });
     }
-  }, [character?.id]);
+  }, [character?.id, character?.avatarDataUrl, readOnlyRoomCard]);
   const actionButtonRef = useRef(null);
   const [actionMenuPosition, setActionMenuPosition] = useState(null);
 
@@ -190,11 +221,40 @@ const CharacterCell = ({
   return (
     <TouchableOpacity style={styles.characterCell} onPress={() => { if (!dragging.current) onPress(); }} activeOpacity={0.8}>
       {serverBound && (
-        <View style={styles.characterServerBadge} pointerEvents="none">
-          <MaterialCommunityIcons name="server-network" size={16} color="#7c5c10" />
+        readOnlyRoomCard ? (
+          <View
+            style={[styles.characterServerBadge, !serverOnline && styles.characterServerBadgeOffline]}
+            pointerEvents="none"
+          >
+            <MaterialCommunityIcons
+              name="server-network"
+              size={17}
+              color={serverOnline ? '#16a34a' : '#9ca3af'}
+            />
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.characterServerBadge, !serverOnline && styles.characterServerBadgeOffline]}
+            onPress={(event) => {
+              event?.stopPropagation?.();
+              onServer?.();
+            }}
+            hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+            accessibilityLabel={tHomeScreen('server.menuItem')}
+          >
+            <MaterialCommunityIcons
+              name="server-network"
+              size={17}
+              color={serverOnline ? '#16a34a' : '#9ca3af'}
+            />
+          </TouchableOpacity>
+        )
+      )}
+      {!readOnlyRoomCard && (
+        <View {...panResponder.panHandlers} style={styles.dragHandle}>
+          <MaterialCommunityIcons name="arrow-all" size={18} color="#111827" />
         </View>
       )}
-      <View {...panResponder.panHandlers} style={styles.dragHandle}><MaterialCommunityIcons name="arrow-all" size={18} color="#111827" /></View>
       <View style={styles.characterImageContainer}>
         {customImageUrl ? (
           <Image source={{ uri: customImageUrl }} style={styles.characterImage} resizeMode="cover" />
@@ -206,20 +266,27 @@ const CharacterCell = ({
           </View>
         )}
       </View>
-      {deleteActionPlacement === 'card' && (
-        <TouchableOpacity style={styles.deleteButton} onPress={(event) => { event?.stopPropagation?.(); onDelete(); }} hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }} accessibilityLabel={tHomeScreen('characterActions.delete')}>
+      {!readOnlyRoomCard && deleteActionPlacement === 'card' && (
+        <TouchableOpacity
+          style={[styles.deleteButton, serverBound && styles.deleteButtonShifted]}
+          onPress={(event) => { event?.stopPropagation?.(); onDelete(); }}
+          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+          accessibilityLabel={tHomeScreen('characterActions.delete')}
+        >
           <Text style={styles.deleteIcon}>🗑</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity
-        ref={actionButtonRef}
-        style={styles.characterActionButton}
-        onPress={openActionMenu}
-        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
-        accessibilityLabel={tHomeScreen('characterActions.openMenu')}
-      >
-        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
-      </TouchableOpacity>
+      {!readOnlyRoomCard && (
+        <TouchableOpacity
+          ref={actionButtonRef}
+          style={styles.characterActionButton}
+          onPress={openActionMenu}
+          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+          accessibilityLabel={tHomeScreen('characterActions.openMenu')}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
+        </TouchableOpacity>
+      )}
       <Text style={styles.characterName} numberOfLines={2}>{character.name}</Text>
       {character.level ? <Text style={styles.characterLevel}>{tHomeScreen("labels.level")} {character.level}</Text> : null}
 
@@ -442,10 +509,13 @@ export default function HomeScreen({ navigation }) {
   const [gameSettingsVisible, setGameSettingsVisible] = useState(false);
   const bundledSettingActive = useSettingPackStore(selectBundledSettingActive);
 
-  // ── Комнаты мастера (gm-rooms, этапы 0–2) ──
-  // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9:
-  // кнопки нет, когда адрес сервера недоступен — пространства нет).
-  const uiMode = useAppSettingsStore(selectUiMode);
+  // ── Комнаты мастера (gm-rooms, этапы 0–3) ──
+  // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9).
+  // На web режим дополнительно изолирован по вкладкам (sessionStorage), чтобы
+  // открытые рядом вкладки «Админ» и «Пользователь» не перетирали друг друга.
+  const storeUiMode = useAppSettingsStore(selectUiMode);
+  const [tabUiMode, setTabUiMode] = useState(() => readTabUiMode());
+  const uiMode = tabUiMode || storeUiMode;
   const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
   const isGmMode = uiMode === 'gm';
   const roomServerAvailable = isRoomServerConfigured();
@@ -460,6 +530,7 @@ export default function HomeScreen({ navigation }) {
   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
   const [copiedCode, setCopiedCode] = useState(null);
+  const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -553,32 +624,15 @@ export default function HomeScreen({ navigation }) {
   const loadList = useCallback(async ({ duplicatedCharacterId, sourceCharacterId } = {}) => {
     setLoading(true);
     try {
-      const savedFolders = await db.getCharacterFolders();
-      const folderLists = await Promise.all(savedFolders.map((folder) => db.getCharactersInFolder(folder.id)));
-      const counts = Object.fromEntries(savedFolders.map((folder, index) => [folder.id, folderLists[index].length]));
-      const visible = activeFolder ? folderLists[savedFolders.findIndex((folder) => folder.id === activeFolder.id)] || [] : await db.getRootCharactersList();
-      visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      if (duplicatedCharacterId && sourceCharacterId) {
-        const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
-        const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
-        if (duplicateIndex >= 0 && sourceIndex >= 0) {
-          const [duplicate] = visible.splice(duplicateIndex, 1);
-          const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
-          visible.splice(currentSourceIndex + 1, 0, duplicate);
-        }
-      }
-      setCharacters(visible);
-      setFolders(savedFolders);
-      setFolderCounts(counts);
-      // Комнаты мастера: штампы папок-комнат и связки персонажей.
-      // Сбой этих таблиц не должен ронять основной список персонажей.
+      let roomMap = {};
       if (roomServerAvailable) {
         try {
           const [roomRows, bindingRows] = await Promise.all([
             db.getFolderRooms(),
             db.getCharacterRoomBindings(),
           ]);
-          setFolderRooms(Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code])));
+          roomMap = Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code]));
+          setFolderRooms(roomMap);
           setFolderRoomRecords(Object.fromEntries(roomRows.map((row) => [
             row.folder_id,
             { code: row.code, ownerToken: row.owner_token },
@@ -588,12 +642,47 @@ export default function HomeScreen({ navigation }) {
           debugLog('room.dbLoad:failed', { message: roomError?.message || String(roomError) });
         }
       }
+
+      const savedFolders = await db.getCharacterFolders();
+      const userOnlyFolders = savedFolders.filter((folder) => !roomMap[folder.id]);
+      const userFolderLists = await Promise.all(
+        userOnlyFolders.map((folder) => db.getCharactersInFolder(folder.id)),
+      );
+      const counts = Object.fromEntries(
+        userOnlyFolders.map((folder, index) => [folder.id, userFolderLists[index].length]),
+      );
+
+      // В режиме мастера локальные персонажи пользователя не отображаются —
+      // туда попадают только персонажи, подключённые к серверной комнате.
+      let visible = [];
+      if (!isGmMode) {
+        if (activeFolder && !roomMap[activeFolder.id]) {
+          const idx = userOnlyFolders.findIndex((folder) => folder.id === activeFolder.id);
+          visible = idx >= 0 ? userFolderLists[idx] || [] : [];
+        } else {
+          visible = await db.getRootCharactersList();
+        }
+        visible.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        if (duplicatedCharacterId && sourceCharacterId) {
+          const duplicateIndex = visible.findIndex((item) => item.id === duplicatedCharacterId);
+          const sourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+          if (duplicateIndex >= 0 && sourceIndex >= 0) {
+            const [duplicate] = visible.splice(duplicateIndex, 1);
+            const currentSourceIndex = visible.findIndex((item) => item.id === sourceCharacterId);
+            visible.splice(currentSourceIndex + 1, 0, duplicate);
+          }
+        }
+      }
+
+      setCharacters(visible);
+      setFolders(savedFolders);
+      setFolderCounts(counts);
     } catch (e) {
       setCharacters([]);
     } finally {
       setLoading(false);
     }
-  }, [getCharactersList, activeFolder, roomServerAvailable]);
+  }, [getCharactersList, activeFolder, roomServerAvailable, isGmMode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -665,6 +754,8 @@ export default function HomeScreen({ navigation }) {
     try {
       await useRoomStore.getState().joinRoom({ code: canonical, name: joining.character.name, role: 'player' });
       await db.setCharacterRoomBinding(joining.character.id, canonical);
+      await syncBoundCharacterToRoom(joining.character.id, canonical);
+      publishedRevisionsRef.current[`${canonical}:${joining.character.id}`] = Date.now();
       setServerDialog(null);
       loadList();
     } catch (error) {
@@ -681,7 +772,17 @@ export default function HomeScreen({ navigation }) {
     if (!serverDialog) return;
     const { character, boundCode } = serverDialog;
     try {
-      await useRoomStore.getState().leaveRoom({ code: boundCode });
+      await useRoomStore.getState().unpublishCharacter({
+        code: boundCode,
+        characterId: character.id,
+      });
+      delete publishedRevisionsRef.current[`${boundCode}:${character.id}`];
+      const otherStillBound = Object.entries(roomBindings).some(
+        ([charId, roomCode]) => charId !== character.id && roomCode === boundCode,
+      );
+      if (!otherStillBound) {
+        await useRoomStore.getState().leaveRoom({ code: boundCode });
+      }
     } catch (error) {
       debugLog('room.leave:failed', { message: error?.message || String(error) });
     }
@@ -691,50 +792,109 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleToggleUiMode = () => {
-    setSettingValue('uiMode', isGmMode ? 'user' : 'gm');
+    const nextMode = isGmMode ? 'user' : 'gm';
+    if (isGmMode) {
+      Object.values(folderRoomRecords).forEach((record) => {
+        if (record?.code) {
+          useRoomStore.getState().leaveRoom({ code: record.code }).catch(() => {});
+        }
+      });
+    }
+    writeTabUiMode(nextMode);
+    setTabUiMode(nextMode);
+    setSettingValue('uiMode', nextMode);
+    setActiveFolder(null);
+    setMovingCharacterId(null);
     setFolderDraftVisible(false);
     setFolderName('');
     setRoomDialog(null);
     setServerDialog(null);
   };
 
-  // Мастер держит свои комнаты открытыми (presence игроков) и прозрачно
-  // перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
+  // При смене режима сбрасываем открытую папку, если она принадлежит другому режиму.
   useEffect(() => {
-    if (!isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
-    Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
-      const code = record?.code;
-      if (!code) return;
-      const store = useRoomStore.getState();
-      if (store.rooms[code] && store.rooms[code].joined !== false) return;
-      const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
-      store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
-        if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
-          try {
-            await store.createRoom({
-              name: savedTitle,
-              requestedCode: code,
-              ownerToken: record.ownerToken,
-            });
-            await store.joinRoom({ code, name: 'GM', role: 'gm' });
-          } catch {
-            // Сервер временно недоступен — повторим при переподключении.
+    if (!activeFolder) return;
+    const isRoomFolder = Boolean(folderRooms[activeFolder.id]);
+    if (isGmMode !== isRoomFolder) {
+      setActiveFolder(null);
+      setMovingCharacterId(null);
+    }
+  }, [activeFolder, folderRooms, isGmMode]);
+
+  // Мастер держит свои комнаты открытыми (presence игроков + приём снапшотов) и
+  // прозрачно перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
+  useEffect(() => {
+    if (!isGmMode || !roomServerAvailable) return undefined;
+
+    const ensureGmRooms = () => {
+      if (useRoomStore.getState().status === 'connecting') return;
+      Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
+        const code = record?.code;
+        if (!code) return;
+        const store = useRoomStore.getState();
+        const current = store.rooms[code];
+        if (current && current.joined !== false && current.role === 'gm') return;
+        const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
+        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
+          if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
+            try {
+              await store.createRoom({
+                name: savedTitle,
+                requestedCode: code,
+                ownerToken: record.ownerToken,
+              });
+              await store.joinRoom({ code, name: 'GM', role: 'gm' });
+            } catch {
+              // Сервер временно недоступен — повторим по таймеру / при переподключении.
+            }
           }
-        }
+        });
       });
-    });
+    };
+
+    ensureGmRooms();
+    const retryTimer = setInterval(ensureGmRooms, 4000);
+    return () => clearInterval(retryTimer);
   }, [isGmMode, folderRoomRecords, folders, roomServerAvailable, roomStatus]);
 
-  // Игрок переподключает своих персонажей к их комнатам (по связкам).
+  // Игрок автоматически переподключает привязанных персонажей к их комнатам
+  // и публикует актуальные снапшоты без повторного ввода кода комнаты — вне
+  // зависимости от того, в какой пользовательской папке лежит персонаж.
   useEffect(() => {
-    if (isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
-    Object.entries(roomBindings).forEach(([characterId, code]) => {
-      const store = useRoomStore.getState();
-      if (!store.rooms[code] || store.rooms[code].joined === false) {
-        const character = characters.find((item) => item.id === characterId);
-        store.joinRoom({ code, name: character?.name || '—', role: 'player' }).catch(() => {});
-      }
-    });
+    if (roomStatus !== 'online') {
+      publishedRevisionsRef.current = {};
+    }
+  }, [roomStatus]);
+
+  useEffect(() => {
+    if (isGmMode || !roomServerAvailable) return undefined;
+    const entries = Object.entries(roomBindings);
+    if (entries.length === 0) return undefined;
+
+    const syncPlayerRooms = () => {
+      if (useRoomStore.getState().status === 'connecting') return;
+      entries.forEach(([characterId, code]) => {
+        if (!code) return;
+        const store = useRoomStore.getState();
+        const currentRoom = store.rooms[code];
+        const key = `${code}:${characterId}`;
+        const roomJoinedAsPlayer =
+          Boolean(currentRoom && currentRoom.joined !== false && currentRoom.role === 'player');
+        if (!roomJoinedAsPlayer || !publishedRevisionsRef.current[key]) {
+          syncBoundCharacterToRoom(characterId, code)
+            .then((ok) => {
+              if (ok) publishedRevisionsRef.current[key] = Date.now();
+            })
+            .catch(() => {
+              // Комната мастера ещё не поднята — автоматический повтор подхватит её.
+            });
+        }
+      });
+    };
+
+    syncPlayerRooms();
+    const retryTimer = setInterval(syncPlayerRooms, 4000);
+    return () => clearInterval(retryTimer);
   }, [isGmMode, roomBindings, characters, roomServerAvailable, roomStatus]);
 
   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
@@ -819,7 +979,11 @@ export default function HomeScreen({ navigation }) {
   const showHomeAlert = (title, message = '') => showRawAlert({ title, message });
 
   const handleDeleteFolder = async (folder) => {
+    const roomCode = folderRooms[folder.id];
     const remove = async () => {
+      if (roomCode) {
+        await useRoomStore.getState().leaveRoom({ code: roomCode }).catch(() => {});
+      }
       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
       // следующей синхронизации (но уже без структуры каталогов).
@@ -831,7 +995,7 @@ export default function HomeScreen({ navigation }) {
       if (activeFolder?.id === folder.id) setActiveFolder(null);
       loadList();
     };
-    const confirmed = await confirmAlert('folderDelete', { count: folderCounts[folder.id] || 0 });
+    const confirmed = await confirmAlert('folderDelete', { count: roomCode ? 0 : (folderCounts[folder.id] || 0) });
     if (confirmed) remove();
   };
 
@@ -844,6 +1008,14 @@ export default function HomeScreen({ navigation }) {
   const handleOpen = async (id) => {
     if (!bundledSettingActive) return;
     const ok = await loadCharacter(id);
+    if (ok) {
+      navigation.navigate('CharacterTab');
+    }
+  };
+
+  const handleOpenRoomCharacter = async (roomCard) => {
+    if (!bundledSettingActive || !roomCard?.snapshotPayload) return;
+    const ok = await savesModule.loadCharacterFromRoomSnapshot(roomCard.snapshotPayload);
     if (ok) {
       navigation.navigate('CharacterTab');
     }
@@ -1027,20 +1199,37 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const visibleFolders = filterFoldersForMode(folders, folderRooms, isGmMode);
+  const activeGmRoomCode = isGmMode && activeFolder ? folderRooms[activeFolder.id] || null : null;
+  const gmRoomCharacterCards = activeGmRoomCode
+    ? buildGmRoomCharacterCards(roomRooms[activeGmRoomCode])
+    : [];
+  const displayedCharacters = isGmMode
+    ? (activeGmRoomCode ? gmRoomCharacterCards : [])
+    : characters;
+
+  const getDisplayedFolderCount = (folderId) => {
+    if (isGmMode) {
+      const code = folderRooms[folderId];
+      return code ? buildGmRoomCharacterCards(roomRooms[code]).length : 0;
+    }
+    return folderCounts[folderId] || 0;
+  };
+
   const allItems = [
     ...(activeFolder
       ? []
       : [
           // В режиме мастера экран повторяет главный, но «создать/загрузить
-          // персонажа» не показываем: здесь живут комнаты и копии игроков.
+          // персонажа» не показываем: здесь живут только комнаты и подключённые игроки.
           ...(isGmMode ? [] : [{ type: 'create' }, { type: 'upload' }]),
           ...(foldersEnabled ? [{ type: 'createFolder' }] : []),
         ]),
     ...(activeFolder
       ? []
       : (folderDraftVisible && foldersEnabled ? [{ type: 'folderDraft' }] : [])),
-    ...(activeFolder ? [] : folders.map((folder) => ({ type: 'folder', ...folder }))),
-    ...characters.map(c => ({ type: 'character', ...c })),
+    ...(activeFolder ? [] : visibleFolders.map((folder) => ({ type: 'folder', ...folder }))),
+    ...displayedCharacters.map((c) => ({ type: 'character', ...c })),
   ];
 
   const rows = [];
@@ -1134,8 +1323,8 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {folderCounts[activeFolder.id] || 0}</Text>{movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
-      {activeFolder && folderRooms[activeFolder.id] && (
+      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>{!isGmMode && movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
+      {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
         <View style={styles.folderRoomBar}>
           <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
             <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
@@ -1186,11 +1375,36 @@ export default function HomeScreen({ navigation }) {
                   return <View key="folder-draft" style={styles.folderDraftCell}><MaterialCommunityIcons name="folder-outline" size={38} color="#5a5a5a" /><TextInput autoFocus value={folderName} onChangeText={setFolderName} placeholder={tHomeScreen('folders.namePlaceholder')} style={styles.folderNameInput} /><View style={styles.folderDraftActions}><TouchableOpacity onPress={handleCreateFolder}><Text>{tHomeScreen('folders.confirm')}</Text></TouchableOpacity><TouchableOpacity onPress={() => { setFolderDraftVisible(false); setFolderName(''); }}><Text>{tHomeScreen('folders.cancel')}</Text></TouchableOpacity></View></View>;
                 }
                 if (item.type === 'folder') {
-                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name={folderRooms[item.id] ? 'server-network' : 'folder-outline'} size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text>{folderRooms[item.id] && <Text style={styles.folderRoomCode}>{formatRoomCodeForDisplay(folderRooms[item.id])}</Text>}<Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {folderCounts[item.id] || 0}</Text></TouchableOpacity>;
+                  return <TouchableOpacity ref={(ref) => { folderRefs.current[item.id] = ref; }} key={item.id} style={[styles.folderCell, !isGmMode && movingCharacterId && styles.folderDropTarget]} onPress={() => { if (!movingCharacterId) setActiveFolder(item); }}><TouchableOpacity style={styles.folderDeleteButton} onPress={(event) => { event?.stopPropagation?.(); handleDeleteFolder(item); }}><Text>×</Text></TouchableOpacity><MaterialCommunityIcons name={isGmMode ? 'server-network' : 'folder-outline'} size={52} color="#d4af37" /><Text style={styles.folderName}>{item.name}</Text>{isGmMode && folderRooms[item.id] && <Text style={styles.folderRoomCode}>{formatRoomCodeForDisplay(folderRooms[item.id])}</Text>}<Text style={styles.folderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(item.id)}</Text></TouchableOpacity>;
                 }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
                 }
+                if (isGmMode) {
+                  return (
+                    <CharacterCell
+                      key={item.id}
+                      character={item}
+                      deleteActionPlacement="menu"
+                      onPress={() => handleOpenRoomCharacter(item)}
+                      onDelete={() => {}}
+                      onDownload={() => {}}
+                      onDuplicate={() => {}}
+                      onServer={() => {}}
+                      serverAvailable={false}
+                      serverBound
+                      serverOnline={Boolean(item.playerOnline)}
+                      readOnlyRoomCard
+                      onDragStart={() => {}}
+                      onDragMove={() => {}}
+                      onDragEnd={() => {}}
+                    />
+                  );
+                }
+                const boundCode = roomBindings[item.id];
+                const isBoundOnline = boundCode
+                  ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
+                  : false;
                 return (
                   <CharacterCell
                     key={item.id}
@@ -1202,7 +1416,8 @@ export default function HomeScreen({ navigation }) {
                     onDuplicate={() => handleDuplicate(item)}
                     onServer={() => handleServer(item)}
                     serverAvailable={roomServerAvailable && !isGmMode}
-                    serverBound={Boolean(roomBindings[item.id])}
+                    serverBound={Boolean(boundCode)}
+                    serverOnline={isBoundOnline}
                     onDragStart={handleDragStart}
                     onDragMove={handleDragMove}
                     onDragEnd={handleDragEnd}
@@ -1346,6 +1561,23 @@ export default function HomeScreen({ navigation }) {
                   <>
                     <Text style={styles.serverModalText}>
                       {tHomeScreen('server.connected').replace('{code}', formatRoomCodeForDisplay(serverDialog.boundCode))}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.serverModalText,
+                        {
+                          color: isRoomAvailableWithGm(roomRooms[serverDialog.boundCode], roomStatus)
+                            ? '#15803d'
+                            : '#6b7280',
+                          fontWeight: '600',
+                        },
+                      ]}
+                    >
+                      {tHomeScreen(
+                        isRoomAvailableWithGm(roomRooms[serverDialog.boundCode], roomStatus)
+                          ? 'server.statusOnline'
+                          : 'server.statusOffline',
+                      )}
                     </Text>
                     <View style={styles.serverModalActions}>
                       <TouchableOpacity style={styles.serverModalButton} onPress={handleServerLeave}>

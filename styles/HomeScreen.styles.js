@@ -130,6 +130,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 2,
   },
+  deleteButtonShifted: {
+    right: 37,
+  },
   deleteIcon: { fontSize: 15, lineHeight: 18 },
   characterActionButton: {
     position: 'absolute',
@@ -341,7 +344,7 @@ const styles = StyleSheet.create({
   folderRoomCode: {
     marginTop: 3,
     fontSize: 11,
-    color: '#7c5c10',
+    color: '#d4af37',
     fontWeight: '700',
     letterSpacing: 1,
     textAlign: 'center',
@@ -363,8 +366,22 @@ const styles = StyleSheet.create({
   characterServerBadge: {
     position: 'absolute',
     top: 5,
-    left: 5,
-    zIndex: 3,
+    right: 5,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+  },
+  characterServerBadgeOffline: {
+    opacity: 0.72,
   },
   serverModalBackdrop: {
     flex: 1,
