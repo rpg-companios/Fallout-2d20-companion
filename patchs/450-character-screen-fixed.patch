@@ -1,0 +1,178 @@
+diff --git a/modules/fallout/screens/CharacterScreen/CharacterScreen.js b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+index ac96d6c..ce33145 100644
+--- a/modules/fallout/screens/CharacterScreen/CharacterScreen.js
++++ b/modules/fallout/screens/CharacterScreen/CharacterScreen.js
+@@ -61,20 +61,73 @@ import styles from '../../styles/CharacterScreen.styles';
+ import { getTimedAttributeModifiers } from "../../../../domain/effects";
+ import { createEmptyEquippedArmor } from "../../../../domain/equippedArmor";
+ import { resolveSkillRewards } from "../../../../domain/skillRewards";
++// 446: отладка аватаров ушла в гейт трассировки (__fallout.on(['avatar']); в проде — тишина.
++// debugLog уже импортирован рядом с FALLOUT_DEBUG_MARKER — дубль прошлой конверсии снят.
+ import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../../src/debug/falloutDebug";
++import useAppSettingsStore, { selectAdminScreenEnabled } from "../../../../src/store/appSettingsStore";
+ import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
+ 
+ // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
+ const BASE_TAGGED_SKILLS = 3; // Максимальное количество основных навыков
+-const ImageSection = ({ origin }) => {
++const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl, imageVersion }) => {
+   const defaultImage = require("../../../../assets/bg1.png");
++  const [customImageUrl, setCustomImageUrl] = useState(null);
++  const [isLoading, setIsLoading] = useState(false);
++
++  // Загружаем кастомную картинку при монтировании или изменении версии
++  useEffect(() => {
++    let isMounted = true;
++
++    if (characterId && getCharacterImageUrl) {
++      setIsLoading(true);
++      getCharacterImageUrl(characterId)
++        .then((url) => {
++          if (isMounted) {
++            setCustomImageUrl(url);
++          }
++        })
++        .catch(console.error)
++        .finally(() => {
++          if (isMounted) {
++            setIsLoading(false);
++          }
++        });
++    }
++
++    return () => { isMounted = false; };
++  }, [characterId, getCharacterImageUrl, imageVersion]);
++
++  const imageSource = customImageUrl
++    ? { uri: customImageUrl }
++    : origin?.image || defaultImage;
++
+   return (
+     <View style={styles.imageSection}>
+       <ImageBackground
+-        source={origin ? origin.image : defaultImage}
++        source={imageSource}
+         style={styles.image}
+-        resizeMode="cover"
+-      />
++        resizeMode="contain"
++      >
++        {/* Иконка редактирования в правом нижнем углу */}
++        {onEditPress && (
++          <TouchableOpacity
++            style={styles.editImageButton}
++            onPress={onEditPress}
++            activeOpacity={0.7}
++          >
++            <MaterialCommunityIcons
++              name="image-edit"
++              size={24}
++              color="rgba(255, 255, 255, 0.7)"
++            />
++          </TouchableOpacity>
++        )}
++        {isLoading && (
++          <View style={styles.imageLoadingOverlay}>
++            <ActivityIndicator size="small" color="#fff" />
++          </View>
++        )}
++      </ImageBackground>
+     </View>
+   );
+ };
+@@ -259,6 +312,53 @@ const LuckPointsRow = ({ luckPoints, maxLuckPoints, onSpend, onRestore }) => {
+ };
+ 
+ export default function CharacterScreen() {
++  // Хук для работы с кастомными изображениями
++  const { pickAndSaveCharacterImage, getCharacterImageUrl, imageVersion, refreshImage } = useCharacterImage();
++  const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
++
++  // Функция для удаления кастомного изображения
++  const handleResetImage = useCallback(async () => {
++    debugLog('avatar.characterScreen', { step: 'handleResetImage: start, characterId:', value: (currentCharacterId) });
++    if (!currentCharacterId) {
++      debugLog('avatar.characterScreen', { step: 'handleResetImage: no characterId' });
++      return;
++    }
++
++    try {
++      debugLog('avatar.characterScreen', { step: 'handleResetImage: deleting from cache' });
++      await avatarCache.deleteAvatarCache(currentCharacterId);
++      
++      // Обновляем версию изображения, чтобы ImageSection перезагрузился
++      // и показал стандартное изображение
++      refreshImage();
++      
++      debugLog('avatar.characterScreen', { step: 'handleResetImage: success' });
++    } catch (error) {
++      debugLog('avatar.error', { step: '[CharacterScreen] handleResetImage: error:', error: String(error?.message ?? error) });
++      showRawAlert({ title: 'Ошибка', message: 'Не удалось удалить изображение' });
++    }
++  }, [currentCharacterId, refreshImage]);
++
++  // Обработчик нажатия на иконку редактирования изображения
++  const handleEditImagePress = useCallback(async () => {
++    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: start' });
++    // Показываем модалку с выбором действия
++    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: calling showCatalogAlert' });
++    const action = await showCatalogAlert('changeCharacterImage');
++    debugLog('avatar.characterScreen', { step: 'handleEditImagePress: showCatalogAlert returned:', value: (action) });
++    
++    if (action === 'change') {
++      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: calling pickAndSaveCharacterImage with ID:', value: (currentCharacterId) });
++      await pickAndSaveCharacterImage(currentCharacterId);
++      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: pickAndSaveCharacterImage completed' });
++    } else if (action === 'reset') {
++      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: resetting to default image' });
++      await handleResetImage();
++      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: reset completed' });
++    } else {
++      debugLog('avatar.characterScreen', { step: 'handleEditImagePress: user cancelled' });
++    }
++  }, [pickAndSaveCharacterImage, currentCharacterId, handleResetImage]);
+ 
+   // Шаг 8б (патч 242): сохранение/сброс — модуль сейвов и стор напрямую.
+   const isSaved = useCharacterStore((s) => s.isSaved);
+@@ -302,6 +402,7 @@ export default function CharacterScreen() {
+ 
+   const debugLocale = useLocale();
+   const moduleLocale = useModuleLocale();
++  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+   const storeAttributes = useCharacterStore((state) => state.attributes);
+   const storeSkills = useCharacterStore((state) => state.skills);
+   // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
+@@ -1184,6 +1285,18 @@ export default function CharacterScreen() {
+             {/* Если имя не сохранено, показываем затемняющий слой */}
+             {!isSaved && <View style={styles.disabledOverlay} />}
+ 
++            {/* Кнопка переключения в GM-режим (админ) — управляется toggle adminScreenEnabled */}
++            {adminScreenEnabled && (
++              <TouchableOpacity
++                style={styles.adminButton}
++                onPress={() => {
++                  showCatalogAlert('admin.mode.notReady');
++                }}
++              >
++                <Text style={styles.adminButtonText}>{tCharacterScreen("buttons.admin")}</Text>
++              </TouchableOpacity>
++            )}
++
+             <PressableRow
+               title={tCharacterScreen("labels.origin")}
+               value={localizedOrigin ? localizedOrigin.name : tCharacterScreen("placeholders.selectNone")}
+@@ -1273,7 +1386,13 @@ export default function CharacterScreen() {
+                 />
+               </View>
+ 
+-              <ImageSection origin={origin} />
++              <ImageSection 
++                origin={origin} 
++                characterId={currentCharacterId}
++                onEditPress={handleEditImagePress}
++                getCharacterImageUrl={getCharacterImageUrl}
++                imageVersion={imageVersion}
++              />
+             </View>
+ 
+             <View style={styles.rightColumn}>
