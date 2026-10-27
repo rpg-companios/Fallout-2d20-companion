@@ -73,11 +73,12 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Навигация: сеть первой (чтобы обновление доезжало сразу), кэш — страховкой.
-// Именно этот путь раньше давал белый экран.
+// Навигация: сеть первой с обходом HTTP-кэша браузера (cache: 'no-cache'),
+// чтобы новая сборка или правка UI в Metro доезжала сразу по обычному F5,
+// а кэш вступал в дело только при реальном отсутствии сети.
 const handleNavigation = async (request) => {
   try {
-    const networkResponse = await fetch(request);
+    const networkResponse = await fetch(new Request(request, { cache: 'no-cache' }));
     if (networkResponse && networkResponse.status === 200) {
       const toCache = networkResponse.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, toCache)).catch(() => undefined);
@@ -93,7 +94,7 @@ const handleNavigation = async (request) => {
 };
 
 const FONT_EXT_RE = /\.(ttf|woff2?|otf)$/i;
-const HASHED_ASSET_RE = /\.[0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+const HASHED_ASSET_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
 
 const isImmutableOrFontRequest = (request, requestUrl) => {
   if (request.destination === 'font') return true;
@@ -159,8 +160,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const isDevBundle =
+    requestUrl.pathname.endsWith('.bundle') || requestUrl.searchParams.get('dev') === 'true';
+
   event.respondWith(
-    fetch(event.request)
+    // Для нехэшированных ресурсов (/version.json, /manifest.json, dev index.bundle)
+    // обходим эвристический HTTP-кэш браузера через cache: 'no-cache'.
+    fetch(new Request(event.request, { cache: 'no-cache' }))
       .then((networkResponse) => {
         const contentType = networkResponse.headers.get('content-type') || '';
         const isScript = event.request.destination === 'script';
@@ -175,15 +181,16 @@ self.addEventListener('fetch', (event) => {
           });
         }
 
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+        if (
+          !networkResponse ||
+          networkResponse.status !== 200 ||
+          networkResponse.type !== 'basic' ||
+          isDevBundle
+        ) {
           return networkResponse;
         }
 
-        // Кэшируем клон, оригинал отдаём как есть: чтение тела до put()
-        // приводит к «Response body is already used».
-        // Скрипты теперь тоже кэшируются — их имена содержат хэш сборки,
-        // поэтому устаревший файл просто перестаёт запрашиваться, а офлайн
-        // становится рабочим.
+        // Кэшируем клон статики (кроме dev-бандла Metro без хэша в имени).
         const toCache = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache)).catch(() => undefined);
         return networkResponse;

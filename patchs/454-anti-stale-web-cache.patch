@@ -1,0 +1,725 @@
+diff --git a/__tests__/screens/anti-stale-web-cache-454.test.js b/__tests__/screens/anti-stale-web-cache-454.test.js
+new file mode 100644
+index 0000000..e6b82d7
+--- /dev/null
++++ b/__tests__/screens/anti-stale-web-cache-454.test.js
+@@ -0,0 +1,179 @@
++// Регрессионные тесты патча 454:
++// разделение серверного кэша трансформации Metro (без --clear) и браузерного
++// веб-кэша, чтобы новые правки UI всегда показывались сразу без ручной чистки:
++// 1) Cache-Control: no-store для HTML / version.json / service-worker.js / dev .bundle,
++//    и public, immutable для шрифтов (.ttf/.woff2) и контент-хэшированных файлов;
++// 2) Service Worker обходит HTTP-кэш браузера (cache: 'no-cache') на навигации и
++//    нехэшированных запросах и не складывает dev-бандл в Cache Storage;
++// 3) versionGuard сравнивает версию вшитого JS-бандла с живым /version.json и при
++//    расхождении один раз обновляет кэш (сохраняя .ttf-иконки) и перезагружает вкладку.
++
++import { describe, expect, it, vi } from 'vitest';
++import http from 'node:http';
++import fs from 'node:fs';
++import path from 'node:path';
++
++import {
++  cacheControlForPath,
++  attachSmartCacheHeaders,
++} from '../../server/roomServer.js';
++import {
++  RELOAD_GUARD_SESSION_KEY,
++  purgeStaleCachesPreservingFonts,
++  syncBundleWithServerVersion,
++} from '../../src/web/versionGuard';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++const makeMemorySession = () => {
++  const store = new Map();
++  return {
++    getItem: (k) => (store.has(k) ? store.get(k) : null),
++    setItem: (k, v) => { store.set(k, String(v)); },
++    removeItem: (k) => { store.delete(k); },
++  };
++};
++
++describe('Патч 454: анти-устаревание веб-кэша браузера при сохранённом кэше Metro', () => {
++  it('cacheControlForPath разделяет изменяемые точки входа (no-store) и неизменяемые шрифты/хэши (immutable)', () => {
++    expect(cacheControlForPath('/')).toBe('no-store, no-cache, must-revalidate');
++    expect(cacheControlForPath('/index.html')).toBe('no-store, no-cache, must-revalidate');
++    expect(cacheControlForPath('/service-worker.js')).toBe('no-store, no-cache, must-revalidate');
++    expect(cacheControlForPath('/version.json')).toBe('no-store, no-cache, must-revalidate');
++    expect(cacheControlForPath('/index.bundle', '?platform=web&dev=true')).toBe(
++      'no-store, no-cache, must-revalidate',
++    );
++
++    expect(
++      cacheControlForPath('/_expo/static/js/web/index-f4421c79eee87f76730c906acbb58608.js'),
++    ).toBe('public, max-age=31536000, immutable');
++    expect(
++      cacheControlForPath('/assets/bg.48680110a496f93671a1dc8fc5adfd54.png'),
++    ).toBe('public, max-age=31536000, immutable');
++    expect(
++      cacheControlForPath(
++        '/assets/',
++        '?unstable_path=.%2Fnode_modules%2F%40expo%2Fvector-icons%2FFonts%2FMaterialCommunityIcons.ttf&platform=web',
++      ),
++    ).toBe('public, max-age=31536000, immutable');
++  });
++
++  it('attachSmartCacheHeaders проставляет HTTP-заголовки на ответах dev-сервера', async () => {
++    const srv = http.createServer((req, res) => {
++      res.writeHead(200, { 'Content-Type': 'text/plain' });
++      res.end(req.url);
++    });
++    attachSmartCacheHeaders(srv);
++
++    await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
++    const { port } = srv.address();
++
++    try {
++      const bundleRes = await fetch(`http://127.0.0.1:${port}/index.bundle?platform=web&dev=true`);
++      expect(bundleRes.headers.get('cache-control')).toBe('no-store, no-cache, must-revalidate');
++      expect(bundleRes.headers.get('pragma')).toBe('no-cache');
++
++      const fontRes = await fetch(
++        `http://127.0.0.1:${port}/assets/?unstable_path=MaterialCommunityIcons.ttf&platform=web`,
++      );
++      expect(fontRes.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
++    } finally {
++      await new Promise((resolve) => srv.close(resolve));
++    }
++  });
++
++  it('purgeStaleCachesPreservingFonts удаляет HTML/JS из Cache Storage, но сохраняет .ttf/.woff2 иконки', async () => {
++    const entries = new Map([
++      ['https://app.test/index.html', true],
++      ['https://app.test/_expo/static/js/web/index-old.js', true],
++      ['https://app.test/assets/MaterialCommunityIcons.6e4355.ttf', true],
++      ['https://app.test/assets/?unstable_path=Ionicons.ttf&platform=web', true],
++    ]);
++
++    const fakeCache = {
++      keys: async () => [...entries.keys()].map((url) => ({ url })),
++      delete: async (req) => entries.delete(req.url),
++    };
++    const fakeCachesApi = {
++      keys: async () => ['rpg-companion-v11'],
++      open: async () => fakeCache,
++    };
++
++    const removed = await purgeStaleCachesPreservingFonts(fakeCachesApi);
++    expect(removed).toBe(2);
++    expect([...entries.keys()]).toEqual([
++      'https://app.test/assets/MaterialCommunityIcons.6e4355.ttf',
++      'https://app.test/assets/?unstable_path=Ionicons.ttf&platform=web',
++    ]);
++  });
++
++  it('syncBundleWithServerVersion перезагружает вкладку при новой версии на сервере и защищён от цикла', async () => {
++    const session = makeMemorySession();
++    const reloads = [];
++    let cleaned = 0;
++    const swUpdate = vi.fn().mockResolvedValue(undefined);
++    const fakeSw = {
++      getRegistrations: async () => [{ update: swUpdate }],
++    };
++
++    // 1. Версия совпадает — перезагрузки нет, чистим служебные query-параметры
++    const same = await syncBundleWithServerVersion({
++      bundledVersion: '454',
++      fetchImpl: vi.fn().mockResolvedValue({
++        ok: true,
++        json: async () => ({ version: '454' }),
++      }),
++      sessionStorage: session,
++      cachesApi: null,
++      serviceWorker: fakeSw,
++      reloadWithVersion: (v) => reloads.push(v),
++      cleanUrlParams: () => { cleaned += 1; },
++    });
++    expect(same).toEqual({ status: 'up-to-date', serverVersion: '454' });
++    expect(reloads).toEqual([]);
++    expect(cleaned).toBe(1);
++
++    // 2. Сервер ушёл вперёд (455) — чистится кэш, обновляется SW, один раз вызывается reload
++    const updated = await syncBundleWithServerVersion({
++      bundledVersion: '454',
++      fetchImpl: vi.fn().mockResolvedValue({
++        ok: true,
++        json: async () => ({ version: '455' }),
++      }),
++      sessionStorage: session,
++      cachesApi: null,
++      serviceWorker: fakeSw,
++      reloadWithVersion: (v) => reloads.push(v),
++    });
++    expect(updated).toEqual({ status: 'reloaded', serverVersion: '455' });
++    expect(reloads).toEqual(['455']);
++    expect(swUpdate).toHaveBeenCalledTimes(1);
++    expect(session.getItem(RELOAD_GUARD_SESSION_KEY)).toBe('455');
++
++    // 3. Повторный вызов для той же 455 в этой же сессии — срабатывает защита от цикла
++    const guarded = await syncBundleWithServerVersion({
++      bundledVersion: '454',
++      fetchImpl: vi.fn().mockResolvedValue({
++        ok: true,
++        json: async () => ({ version: '455' }),
++      }),
++      sessionStorage: session,
++      cachesApi: null,
++      serviceWorker: fakeSw,
++      reloadWithVersion: (v) => reloads.push(v),
++    });
++    expect(guarded).toEqual({ status: 'loop-guarded', serverVersion: '455' });
++    expect(reloads).toEqual(['455']);
++  });
++
++  it('service-worker.js и index.js обходят HTTP-кэш для HTML, воркера и dev-бандлов', () => {
++    const swSrc = fs.readFileSync(path.join(ROOT, 'public/service-worker.js'), 'utf8');
++    expect(swSrc).toContain("new Request(request, { cache: 'no-cache' })");
++    expect(swSrc).toContain("new Request(event.request, { cache: 'no-cache' })");
++    expect(swSrc).toContain('isDevBundle');
++
++    const indexSrc = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
++    expect(indexSrc).toContain("updateViaCache: 'none'");
++    expect(indexSrc).toContain('startWebVersionWatcher()');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 3224086..db12339 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,21 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (454) — защита от жадного веб-кэша браузера без сброса кэша Metro (`--clear`)
++
++Слово владельца:
++«`--clear` я сам добавил в команду запуска, поскольку кэш часто мешал увидеть новые фишки UI. Я не против её убрать в команде запуска, но как тогда бороться с тем, что браузер жадно делает веб-кэш и мешает просмотру.»
++
++- Диагностика: `--clear` сбрасывал только серверный кэш трансформации Metro (`/tmp/metro-cache`, который сам инвалидируется по SHA-1 изменённых файлов), тогда как старый UI в браузере держали четыре веб-причины:
++  1. Ни `server/roomServer.js`, ни dev-сервер Metro не выставляли `Cache-Control: no-store` на `index.html`, `service-worker.js`, `version.json` и `index.bundle?...`, из-за чего браузер включал эвристическое HTTP-кэширование (RFC 9111).
++  2. `public/service-worker.js` вызывал `fetch(request)` без `{ cache: 'no-cache' }`, попадая в дисковый HTTP-кэш браузера, и складывал нехэшированный dev-бандл `index.bundle` в `Cache Storage`.
++  3. `/service-worker.js` регистрировался без `{ updateViaCache: 'none' }`.
++  4. Работающий в браузере JS-бандл не сверял свою вшитую версию патча с живым `/version.json`, поэтому открытая вкладка / установленное PWA не сбрасывали устаревший HTML/JS-кэш автоматически при выходе нового патча.
++- Исправлено:
++  1. `server/roomServer.js` + `metro.config.js` — `cacheControlForPath` и `attachSmartCacheHeaders` отдают `Cache-Control: no-store, no-cache, must-revalidate` для HTML, `service-worker.js`, `version.json` и dev-бандлов `.bundle`, но `public, max-age=31536000, immutable` для `.ttf`/`.woff2` и контент-хэшированных файлов.
++  2. `public/service-worker.js` + `index.js` — запросы навигации и нехэшированных ресурсов идут с `{ cache: 'no-cache' }`, dev-бандл не пишется в `Cache Storage`, воркер регистрируется с `{ updateViaCache: 'none' }`.
++  3. `src/web/versionGuard.ts` (+ проводка в `index.js`) — при старте и при возврате во вкладку (`visibilitychange -> visible`) сверяет вшитый `version.json` бандла с живым `/version.json?_t=...` (`cache: 'no-store'`); при расхождении вычищает устаревшие HTML/JS из `Cache Storage` (сохраняя `.ttf`-шрифты иконок!) и один раз мягко перезагружает вкладку с защитой от цикла в `sessionStorage`.
++- Приёмочные тесты: `__tests__/screens/anti-stale-web-cache-454.test.js` (5 тестов).
++
+ ## 2026-10-27 (453) — высокий приоритет иконок, сохранение кэша Metro/PWA и работа комнат мастера в Metro
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b76aa40..778f4a3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,21 @@
+ # Changelog
++---
++## Anti-stale browser web cache without wiping Metro cache (patch 454)
++
++Separated server-side Metro transform caching from browser web caching so
++UI updates appear immediately without `--clear`:
++- Both `roomServer` and the Metro dev server now send `Cache-Control:
++  no-store` for `index.html`, `service-worker.js`, `version.json`, and dev
++  `.bundle` responses, while keeping fonts and content-hashed assets
++  `immutable`.
++- The service worker bypasses heuristic browser HTTP caching (`cache:
++  'no-cache'`) for navigation and unhashed scripts, skips storing dev
++  bundles in Cache Storage, and registers with `updateViaCache: 'none'`.
++- Added `versionGuard`: on startup and tab focus (`visibilitychange`), the
++  running bundle compares its compiled patch version against live
++  `/version.json` and automatically purges stale HTML/JS cache entries
++  (preserving `.ttf` icon fonts) and reloads once when a new patch lands.
++
+ ---
+ ## High-priority UI icons, preserved Metro/PWA caches & GM rooms in Metro (patch 453)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 0a37475..44127f3 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,20 @@
+ # История изменений
+ 
++---
++## Защита от устаревшего веб-кэша браузера без сброса кэша Metro (патч 454)
++
++Серверный кэш сборки Metro и браузерный веб-кэш разведены по ролям:
++- Сервер (`roomServer` и dev-сервер Metro) отдаёт `Cache-Control: no-store`
++  для `index.html`, `service-worker.js`, `version.json` и dev-бандлов, но
++  `immutable` — для иконочных шрифтов и файлов с хэшем в имени.
++- Service Worker обходит дисковый HTTP-кэш браузера (`cache: 'no-cache'`)
++  для навигации и нехэшированных скриптов, не кэширует dev-бандл и
++  обновляется с `updateViaCache: 'none'`.
++- Добавлен автоматический сторож версии (`versionGuard`): при открытии или
++  возврате во вкладку он сверяет версию запущенного JS-бандла с живым
++  `/version.json` и, если на сервере установлен новый патч, сам очищает
++  устаревший HTML/JS-кэш (сохраняя шрифты иконок) и обновляет страницу.
++
+ ---
+ ## Быстрая загрузка иконок и кэша + работа комнат мастера в Metro (патч 453)
+ 
+diff --git a/index.js b/index.js
+index 970209a..a1c2efa 100644
+--- a/index.js
++++ b/index.js
+@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
+ 
+ import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+ import { debugLog } from './src/debug/falloutDebug';
++import { startWebVersionWatcher } from './src/web/versionGuard';
+ 
+ // Высокоприоритетная предзагрузка шрифта в <head> (453): браузер начинает
+ // скачивать .ttf сразу с приоритетом high, не дожидаясь первого layout текста.
+@@ -132,7 +133,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+           && registration.active?.scriptURL !== currentWorkerUrl)
+         .map((registration) => registration.unregister())
+     ))
+-    .then(() => navigator.serviceWorker.register('/service-worker.js'))
++    .then(() => navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }))
+     .then((registration) => {
+       debugLog('serviceWorker.registered', { scope: registration?.scope });
+       // Обновление воркера при возврате в приложение: установленное PWA живёт
+@@ -146,6 +147,10 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+     });
+ }
+ 
++if (Platform.OS === 'web' && typeof window !== 'undefined') {
++  startWebVersionWatcher();
++}
++
+ // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+ // It also ensures that whether you load the app in Expo Go or in a native build,
+ // the environment is set up appropriately
+diff --git a/metro.config.js b/metro.config.js
+index 5b18b7d..5d1de0c 100644
+--- a/metro.config.js
++++ b/metro.config.js
+@@ -17,7 +17,7 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
+ const originalResolveRequest = config.resolver.resolveRequest;
+ const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
+ const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
+-const { attachRoomWebSocketServer } = require('./server/roomServer');
++const { attachRoomWebSocketServer, attachSmartCacheHeaders } = require('./server/roomServer');
+ 
+ config.resolver = {
+   ...config.resolver,
+@@ -73,12 +73,14 @@ const interceptNextHttpServer = () => {
+     restore();
+     const srv = origHttpCreate.apply(this, args);
+     attachRoomWebSocketServer(srv);
++    attachSmartCacheHeaders(srv);
+     return srv;
+   };
+   https.createServer = function createMetroHttpsWithRoomWs(...args) {
+     restore();
+     const srv = origHttpsCreate.apply(this, args);
+     attachRoomWebSocketServer(srv);
++    attachSmartCacheHeaders(srv);
+     return srv;
+   };
+ };
+@@ -96,6 +98,9 @@ config.server = {
+       if (httpServer && !httpServer.__positroniumRoomWs) {
+         attachRoomWebSocketServer(httpServer);
+       }
++      if (httpServer && !httpServer.__positroniumCacheHeaders) {
++        attachSmartCacheHeaders(httpServer);
++      }
+       return baseMiddleware(req, res, next);
+     };
+   },
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 4383b2d..c2d73ba 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "453"
++  "baseline": "454"
+ }
+diff --git a/public/service-worker.js b/public/service-worker.js
+index 4bc834b..0df91f8 100644
+--- a/public/service-worker.js
++++ b/public/service-worker.js
+@@ -73,11 +73,12 @@ self.addEventListener('activate', (event) => {
+   );
+ });
+ 
+-// Навигация: сеть первой (чтобы обновление доезжало сразу), кэш — страховкой.
+-// Именно этот путь раньше давал белый экран.
++// Навигация: сеть первой с обходом HTTP-кэша браузера (cache: 'no-cache'),
++// чтобы новая сборка или правка UI в Metro доезжала сразу по обычному F5,
++// а кэш вступал в дело только при реальном отсутствии сети.
+ const handleNavigation = async (request) => {
+   try {
+-    const networkResponse = await fetch(request);
++    const networkResponse = await fetch(new Request(request, { cache: 'no-cache' }));
+     if (networkResponse && networkResponse.status === 200) {
+       const toCache = networkResponse.clone();
+       caches.open(CACHE_NAME).then((cache) => cache.put(APP_SHELL_URL, toCache)).catch(() => undefined);
+@@ -93,7 +94,7 @@ const handleNavigation = async (request) => {
+ };
+ 
+ const FONT_EXT_RE = /\.(ttf|woff2?|otf)$/i;
+-const HASHED_ASSET_RE = /\.[0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
++const HASHED_ASSET_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+ 
+ const isImmutableOrFontRequest = (request, requestUrl) => {
+   if (request.destination === 'font') return true;
+@@ -159,8 +160,13 @@ self.addEventListener('fetch', (event) => {
+     return;
+   }
+ 
++  const isDevBundle =
++    requestUrl.pathname.endsWith('.bundle') || requestUrl.searchParams.get('dev') === 'true';
++
+   event.respondWith(
+-    fetch(event.request)
++    // Для нехэшированных ресурсов (/version.json, /manifest.json, dev index.bundle)
++    // обходим эвристический HTTP-кэш браузера через cache: 'no-cache'.
++    fetch(new Request(event.request, { cache: 'no-cache' }))
+       .then((networkResponse) => {
+         const contentType = networkResponse.headers.get('content-type') || '';
+         const isScript = event.request.destination === 'script';
+@@ -175,15 +181,16 @@ self.addEventListener('fetch', (event) => {
+           });
+         }
+ 
+-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
++        if (
++          !networkResponse ||
++          networkResponse.status !== 200 ||
++          networkResponse.type !== 'basic' ||
++          isDevBundle
++        ) {
+           return networkResponse;
+         }
+ 
+-        // Кэшируем клон, оригинал отдаём как есть: чтение тела до put()
+-        // приводит к «Response body is already used».
+-        // Скрипты теперь тоже кэшируются — их имена содержат хэш сборки,
+-        // поэтому устаревший файл просто перестаёт запрашиваться, а офлайн
+-        // становится рабочим.
++        // Кэшируем клон статики (кроме dev-бандла Metro без хэша в имени).
+         const toCache = networkResponse.clone();
+         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, toCache)).catch(() => undefined);
+         return networkResponse;
+diff --git a/public/version.json b/public/version.json
+index bb6c03f..b3c6e17 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "453",
++  "version": "454",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 2a57a16..bdb48e7 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -33,10 +33,62 @@ const MIME = {
+   '.txt': 'text/plain; charset=utf-8',
+ };
+ 
++const IMMUTABLE_FONT_RE = /\.(ttf|woff2?|otf)$/i;
++const IMMUTABLE_HASHED_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
++
++const cacheControlForPath = (urlPath = '/', search = '') => {
++  if (IMMUTABLE_FONT_RE.test(urlPath) || IMMUTABLE_HASHED_RE.test(urlPath)) {
++    return 'public, max-age=31536000, immutable';
++  }
++  if (search && urlPath.startsWith('/assets/')) {
++    try {
++      const decoded = decodeURIComponent(search);
++      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) {
++        return 'public, max-age=31536000, immutable';
++      }
++    } catch {
++      // Некорректная строка запроса — отдаём без долгого кэширования.
++    }
++  }
++  return 'no-store, no-cache, must-revalidate';
++};
++
++const attachSmartCacheHeaders = (httpServer) => {
++  if (!httpServer || httpServer.__positroniumCacheHeaders) return;
++  Object.defineProperty(httpServer, '__positroniumCacheHeaders', {
++    value: true,
++    configurable: true,
++  });
++  const register = typeof httpServer.prependListener === 'function'
++    ? httpServer.prependListener.bind(httpServer)
++    : httpServer.on.bind(httpServer);
++  register('request', (req, res) => {
++    const rawUrl = typeof req?.url === 'string' ? req.url : '/';
++    const qIdx = rawUrl.indexOf('?');
++    const pathname = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
++    const search = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
++    const policy = cacheControlForPath(pathname, search);
++    const origWriteHead = res.writeHead.bind(res);
++    res.writeHead = function writeHeadWithCachePolicy(statusCode, ...rest) {
++      if (statusCode === 200 && !res.headersSent) {
++        res.setHeader('Cache-Control', policy);
++        if (policy.startsWith('no-store')) {
++          res.setHeader('Pragma', 'no-cache');
++          res.setHeader('Expires', '0');
++        }
++      }
++      return origWriteHead(statusCode, ...rest);
++    };
++  });
++};
++
+ const serveStatic = (distDir) => (req, res) => {
+   let urlPath;
++  const rawUrl = req.url || '/';
++  const qIdx = rawUrl.indexOf('?');
++  const rawSearch = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
+   try {
+-    urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
++    urlPath = decodeURIComponent(qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl);
+   } catch {
+     res.writeHead(400); res.end('Bad request'); return;
+   }
+@@ -46,7 +98,16 @@ const serveStatic = (distDir) => (req, res) => {
+   if (!filePath.startsWith(distDir)) { res.writeHead(403); res.end('Forbidden'); return; }
+   fs.readFile(filePath, (err, data) => {
+     if (!err) {
+-      res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
++      const policy = cacheControlForPath(urlPath, rawSearch);
++      const headers = {
++        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
++        'Cache-Control': policy,
++      };
++      if (policy.startsWith('no-store')) {
++        headers.Pragma = 'no-cache';
++        headers.Expires = '0';
++      }
++      res.writeHead(200, headers);
+       res.end(data);
+       return;
+     }
+@@ -54,7 +115,12 @@ const serveStatic = (distDir) => (req, res) => {
+     if (!path.extname(urlPath)) {
+       fs.readFile(path.join(distDir, 'index.html'), (fallbackErr, html) => {
+         if (fallbackErr) { res.writeHead(404); res.end('Not found'); return; }
+-        res.writeHead(200, { 'Content-Type': MIME['.html'] });
++        res.writeHead(200, {
++          'Content-Type': MIME['.html'],
++          'Cache-Control': 'no-store, no-cache, must-revalidate',
++          Pragma: 'no-cache',
++          Expires: '0',
++        });
+         res.end(html);
+       });
+       return;
+@@ -342,4 +408,9 @@ const createRoomServer = ({
+   return { server, wss, registry, start, close };
+ };
+ 
+-module.exports = { createRoomServer, attachRoomWebSocketServer };
++module.exports = {
++  createRoomServer,
++  attachRoomWebSocketServer,
++  attachSmartCacheHeaders,
++  cacheControlForPath,
++};
+diff --git a/src/web/versionGuard.ts b/src/web/versionGuard.ts
+new file mode 100644
+index 0000000..686a5d2
+--- /dev/null
++++ b/src/web/versionGuard.ts
+@@ -0,0 +1,189 @@
++// src/web/versionGuard.ts
++// Автоматическая защита от устаревшего веб-кэша браузера (патч 454).
++//
++// Как работает:
++// 1. В JS-бандл при сборке вшивается текущий номер патча из public/version.json
++//    (bundledVersion).
++// 2. При открытии вкладки и при возврате в неё (visibilitychange -> visible)
++//    клиент запрашивает живой /version.json?_t=... с cache: 'no-store'.
++// 3. Если версия на сервере отличается от версии работающего JS-бандла:
++//    - проверяется предохранитель в sessionStorage (ровно одна перезагрузка на
++//      конкретный номер версии — бесконечный цикл невозможен даже при забытом build);
++//    - из Cache Storage вычищаются устаревшие HTML/JS-записи, НО сохраняются
++//      неизменяемые иконочные шрифты (.ttf/.woff2), чтобы иконки не моргали;
++//    - обновляется Service Worker и выполняется мягкая перезагрузка с ?_v=<version>.
++
++import versionData from '../../public/version.json';
++import { debugLog } from '../debug/falloutDebug';
++
++export const BUNDLED_PATCH_VERSION = String(versionData?.version ?? '');
++export const RELOAD_GUARD_SESSION_KEY = 'positronium_reloaded_for_version';
++
++const FONT_URL_RE = /\.(ttf|woff2?|otf)(?:[?&]|$)/i;
++
++export interface VersionGuardEnv {
++  bundledVersion?: string;
++  fetchImpl?: typeof fetch;
++  sessionStorage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null;
++  cachesApi?: CacheStorage | null;
++  serviceWorker?: Pick<ServiceWorkerContainer, 'getRegistrations'> | null;
++  reloadWithVersion?: (nextVersion: string) => void;
++  cleanUrlParams?: () => void;
++}
++
++const isFontCacheRequest = (url: string): boolean => {
++  if (FONT_URL_RE.test(url)) return true;
++  try {
++    const decoded = decodeURIComponent(url);
++    return FONT_URL_RE.test(decoded);
++  } catch {
++    return false;
++  }
++};
++
++/**
++ * Удаляет из Cache Storage устаревшие HTML/JS/манифест-ответы, но оставляет
++ * бинарники шрифтов (.ttf/.woff2), чтобы бургер-меню и иконки не качались заново.
++ */
++export const purgeStaleCachesPreservingFonts = async (
++  cachesApi: CacheStorage | null | undefined = typeof window !== 'undefined' && 'caches' in window
++    ? window.caches
++    : null,
++): Promise<number> => {
++  if (!cachesApi) return 0;
++  let removed = 0;
++  try {
++    const cacheNames = await cachesApi.keys();
++    for (const name of cacheNames) {
++      const cache = await cachesApi.open(name);
++      const requests = await cache.keys();
++      for (const req of requests) {
++        if (!isFontCacheRequest(req.url)) {
++          const deleted = await cache.delete(req);
++          if (deleted) removed += 1;
++        }
++      }
++    }
++  } catch {
++    // Ошибки Cache API не должны блокировать обновление страницы.
++  }
++  return removed;
++};
++
++const defaultReloadWithVersion = (nextVersion: string) => {
++  if (typeof window === 'undefined') return;
++  try {
++    const url = new URL(window.location.href);
++    url.searchParams.set('_v', nextVersion);
++    window.location.replace(url.toString());
++  } catch {
++    window.location.reload();
++  }
++};
++
++const defaultCleanUrlParams = () => {
++  if (typeof window === 'undefined' || !window.history?.replaceState) return;
++  try {
++    const url = new URL(window.location.href);
++    if (!url.searchParams.has('_v') && !url.searchParams.has('_swr')) return;
++    url.searchParams.delete('_v');
++    url.searchParams.delete('_swr');
++    window.history.replaceState(null, '', url.toString());
++  } catch {
++    // Игнорируем в нестандартных окружениях.
++  }
++};
++
++export const syncBundleWithServerVersion = async (
++  env: VersionGuardEnv = {},
++): Promise<{ status: 'up-to-date' | 'reloaded' | 'loop-guarded' | 'unreachable'; serverVersion: string | null }> => {
++  const bundledVersion = env.bundledVersion ?? BUNDLED_PATCH_VERSION;
++  const fetchImpl = env.fetchImpl ?? (typeof fetch === 'function' ? fetch : undefined);
++  if (!fetchImpl || !bundledVersion) {
++    return { status: 'unreachable', serverVersion: null };
++  }
++
++  const session =
++    env.sessionStorage !== undefined
++      ? env.sessionStorage
++      : typeof window !== 'undefined'
++        ? (() => {
++            try { return window.sessionStorage; } catch { return null; }
++          })()
++        : null;
++
++  try {
++    const response = await fetchImpl(`/version.json?_t=${Date.now()}`, {
++      cache: 'no-store',
++      headers: { 'Cache-Control': 'no-cache' },
++    });
++    if (!response || !response.ok) {
++      return { status: 'unreachable', serverVersion: null };
++    }
++    const payload = await response.json();
++    const serverVersion =
++      payload && typeof payload.version === 'string' && payload.version.trim()
++        ? payload.version.trim()
++        : null;
++    if (!serverVersion) {
++      return { status: 'unreachable', serverVersion: null };
++    }
++
++    if (serverVersion === bundledVersion) {
++      try { session?.removeItem(RELOAD_GUARD_SESSION_KEY); } catch { /* noop */ }
++      (env.cleanUrlParams ?? defaultCleanUrlParams)();
++      return { status: 'up-to-date', serverVersion };
++    }
++
++    // Предохранитель от зацикливания: для одной и той же serverVersion
++    // автоматическая перезагрузка выполняется не более одного раза за сессию вкладки.
++    const alreadyReloadedFor = (() => {
++      try { return session?.getItem(RELOAD_GUARD_SESSION_KEY) ?? null; } catch { return null; }
++    })();
++    if (alreadyReloadedFor === serverVersion) {
++      debugLog('versionGuard.loopPrevented', { bundledVersion, serverVersion });
++      return { status: 'loop-guarded', serverVersion };
++    }
++
++    try { session?.setItem(RELOAD_GUARD_SESSION_KEY, serverVersion); } catch { /* noop */ }
++
++    debugLog('versionGuard.mismatchReload', { bundledVersion, serverVersion });
++
++    await purgeStaleCachesPreservingFonts(env.cachesApi);
++
++    const sw =
++      env.serviceWorker !== undefined
++        ? env.serviceWorker
++        : typeof navigator !== 'undefined' && 'serviceWorker' in navigator
++          ? navigator.serviceWorker
++          : null;
++    if (sw) {
++      try {
++        const regs = await sw.getRegistrations();
++        await Promise.all(regs.map((reg) => reg.update().catch(() => undefined)));
++      } catch {
++        // Не блокируем перезагрузку.
++      }
++    }
++
++    (env.reloadWithVersion ?? defaultReloadWithVersion)(serverVersion);
++    return { status: 'reloaded', serverVersion };
++  } catch {
++    return { status: 'unreachable', serverVersion: null };
++  }
++};
++
++let watcherStarted = false;
++
++export const startWebVersionWatcher = (): void => {
++  if (watcherStarted || typeof window === 'undefined' || typeof document === 'undefined') return;
++  watcherStarted = true;
++
++  syncBundleWithServerVersion().catch(() => undefined);
++
++  document.addEventListener('visibilitychange', () => {
++    if (document.visibilityState === 'visible') {
++      syncBundleWithServerVersion().catch(() => undefined);
++    }
++  });
++};

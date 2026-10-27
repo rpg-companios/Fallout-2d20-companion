@@ -17,7 +17,7 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
 const originalResolveRequest = config.resolver.resolveRequest;
 const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
 const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
-const { attachRoomWebSocketServer } = require('./server/roomServer');
+const { attachRoomWebSocketServer, attachSmartCacheHeaders } = require('./server/roomServer');
 
 config.resolver = {
   ...config.resolver,
@@ -73,12 +73,14 @@ const interceptNextHttpServer = () => {
     restore();
     const srv = origHttpCreate.apply(this, args);
     attachRoomWebSocketServer(srv);
+    attachSmartCacheHeaders(srv);
     return srv;
   };
   https.createServer = function createMetroHttpsWithRoomWs(...args) {
     restore();
     const srv = origHttpsCreate.apply(this, args);
     attachRoomWebSocketServer(srv);
+    attachSmartCacheHeaders(srv);
     return srv;
   };
 };
@@ -95,6 +97,9 @@ config.server = {
       const httpServer = req?.socket?.server;
       if (httpServer && !httpServer.__positroniumRoomWs) {
         attachRoomWebSocketServer(httpServer);
+      }
+      if (httpServer && !httpServer.__positroniumCacheHeaders) {
+        attachSmartCacheHeaders(httpServer);
       }
       return baseMiddleware(req, res, next);
     };

@@ -33,10 +33,62 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+const IMMUTABLE_FONT_RE = /\.(ttf|woff2?|otf)$/i;
+const IMMUTABLE_HASHED_RE = /[-.][0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+
+const cacheControlForPath = (urlPath = '/', search = '') => {
+  if (IMMUTABLE_FONT_RE.test(urlPath) || IMMUTABLE_HASHED_RE.test(urlPath)) {
+    return 'public, max-age=31536000, immutable';
+  }
+  if (search && urlPath.startsWith('/assets/')) {
+    try {
+      const decoded = decodeURIComponent(search);
+      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) {
+        return 'public, max-age=31536000, immutable';
+      }
+    } catch {
+      // Некорректная строка запроса — отдаём без долгого кэширования.
+    }
+  }
+  return 'no-store, no-cache, must-revalidate';
+};
+
+const attachSmartCacheHeaders = (httpServer) => {
+  if (!httpServer || httpServer.__positroniumCacheHeaders) return;
+  Object.defineProperty(httpServer, '__positroniumCacheHeaders', {
+    value: true,
+    configurable: true,
+  });
+  const register = typeof httpServer.prependListener === 'function'
+    ? httpServer.prependListener.bind(httpServer)
+    : httpServer.on.bind(httpServer);
+  register('request', (req, res) => {
+    const rawUrl = typeof req?.url === 'string' ? req.url : '/';
+    const qIdx = rawUrl.indexOf('?');
+    const pathname = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
+    const search = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
+    const policy = cacheControlForPath(pathname, search);
+    const origWriteHead = res.writeHead.bind(res);
+    res.writeHead = function writeHeadWithCachePolicy(statusCode, ...rest) {
+      if (statusCode === 200 && !res.headersSent) {
+        res.setHeader('Cache-Control', policy);
+        if (policy.startsWith('no-store')) {
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      }
+      return origWriteHead(statusCode, ...rest);
+    };
+  });
+};
+
 const serveStatic = (distDir) => (req, res) => {
   let urlPath;
+  const rawUrl = req.url || '/';
+  const qIdx = rawUrl.indexOf('?');
+  const rawSearch = qIdx >= 0 ? rawUrl.slice(qIdx) : '';
   try {
-    urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+    urlPath = decodeURIComponent(qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl);
   } catch {
     res.writeHead(400); res.end('Bad request'); return;
   }
@@ -46,7 +98,16 @@ const serveStatic = (distDir) => (req, res) => {
   if (!filePath.startsWith(distDir)) { res.writeHead(403); res.end('Forbidden'); return; }
   fs.readFile(filePath, (err, data) => {
     if (!err) {
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream' });
+      const policy = cacheControlForPath(urlPath, rawSearch);
+      const headers = {
+        'Content-Type': MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': policy,
+      };
+      if (policy.startsWith('no-store')) {
+        headers.Pragma = 'no-cache';
+        headers.Expires = '0';
+      }
+      res.writeHead(200, headers);
       res.end(data);
       return;
     }
@@ -54,7 +115,12 @@ const serveStatic = (distDir) => (req, res) => {
     if (!path.extname(urlPath)) {
       fs.readFile(path.join(distDir, 'index.html'), (fallbackErr, html) => {
         if (fallbackErr) { res.writeHead(404); res.end('Not found'); return; }
-        res.writeHead(200, { 'Content-Type': MIME['.html'] });
+        res.writeHead(200, {
+          'Content-Type': MIME['.html'],
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        });
         res.end(html);
       });
       return;
@@ -342,4 +408,9 @@ const createRoomServer = ({
   return { server, wss, registry, start, close };
 };
 
-module.exports = { createRoomServer, attachRoomWebSocketServer };
+module.exports = {
+  createRoomServer,
+  attachRoomWebSocketServer,
+  attachSmartCacheHeaders,
+  cacheControlForPath,
+};

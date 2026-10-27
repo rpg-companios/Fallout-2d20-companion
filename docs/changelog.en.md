@@ -1,5 +1,22 @@
 # Changelog
 ---
+## Anti-stale browser web cache without wiping Metro cache (patch 454)
+
+Separated server-side Metro transform caching from browser web caching so
+UI updates appear immediately without `--clear`:
+- Both `roomServer` and the Metro dev server now send `Cache-Control:
+  no-store` for `index.html`, `service-worker.js`, `version.json`, and dev
+  `.bundle` responses, while keeping fonts and content-hashed assets
+  `immutable`.
+- The service worker bypasses heuristic browser HTTP caching (`cache:
+  'no-cache'`) for navigation and unhashed scripts, skips storing dev
+  bundles in Cache Storage, and registers with `updateViaCache: 'none'`.
+- Added `versionGuard`: on startup and tab focus (`visibilitychange`), the
+  running bundle compares its compiled patch version against live
+  `/version.json` and automatically purges stale HTML/JS cache entries
+  (preserving `.ttf` icon fonts) and reloads once when a new patch lands.
+
+---
 ## High-priority UI icons, preserved Metro/PWA caches & GM rooms in Metro (patch 453)
 
 - **Icon loading priority**: core UI icon fonts (`MaterialCommunityIcons`,

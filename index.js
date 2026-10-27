@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 
 import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
 import { debugLog } from './src/debug/falloutDebug';
+import { startWebVersionWatcher } from './src/web/versionGuard';
 
 // Высокоприоритетная предзагрузка шрифта в <head> (453): браузер начинает
 // скачивать .ttf сразу с приоритетом high, не дожидаясь первого layout текста.
@@ -132,7 +133,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
           && registration.active?.scriptURL !== currentWorkerUrl)
         .map((registration) => registration.unregister())
     ))
-    .then(() => navigator.serviceWorker.register('/service-worker.js'))
+    .then(() => navigator.serviceWorker.register('/service-worker.js', { updateViaCache: 'none' }))
     .then((registration) => {
       debugLog('serviceWorker.registered', { scope: registration?.scope });
       // Обновление воркера при возврате в приложение: установленное PWA живёт
@@ -144,6 +145,10 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     .catch((error) => {
       debugLog('serviceWorker.registrationFailed', { error: error?.message || String(error) });
     });
+}
+
+if (Platform.OS === 'web' && typeof window !== 'undefined') {
+  startWebVersionWatcher();
 }
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

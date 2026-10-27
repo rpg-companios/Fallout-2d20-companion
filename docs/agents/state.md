@@ -1,5 +1,21 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (454) — защита от жадного веб-кэша браузера без сброса кэша Metro (`--clear`)
+
+Слово владельца:
+«`--clear` я сам добавил в команду запуска, поскольку кэш часто мешал увидеть новые фишки UI. Я не против её убрать в команде запуска, но как тогда бороться с тем, что браузер жадно делает веб-кэш и мешает просмотру.»
+
+- Диагностика: `--clear` сбрасывал только серверный кэш трансформации Metro (`/tmp/metro-cache`, который сам инвалидируется по SHA-1 изменённых файлов), тогда как старый UI в браузере держали четыре веб-причины:
+  1. Ни `server/roomServer.js`, ни dev-сервер Metro не выставляли `Cache-Control: no-store` на `index.html`, `service-worker.js`, `version.json` и `index.bundle?...`, из-за чего браузер включал эвристическое HTTP-кэширование (RFC 9111).
+  2. `public/service-worker.js` вызывал `fetch(request)` без `{ cache: 'no-cache' }`, попадая в дисковый HTTP-кэш браузера, и складывал нехэшированный dev-бандл `index.bundle` в `Cache Storage`.
+  3. `/service-worker.js` регистрировался без `{ updateViaCache: 'none' }`.
+  4. Работающий в браузере JS-бандл не сверял свою вшитую версию патча с живым `/version.json`, поэтому открытая вкладка / установленное PWA не сбрасывали устаревший HTML/JS-кэш автоматически при выходе нового патча.
+- Исправлено:
+  1. `server/roomServer.js` + `metro.config.js` — `cacheControlForPath` и `attachSmartCacheHeaders` отдают `Cache-Control: no-store, no-cache, must-revalidate` для HTML, `service-worker.js`, `version.json` и dev-бандлов `.bundle`, но `public, max-age=31536000, immutable` для `.ttf`/`.woff2` и контент-хэшированных файлов.
+  2. `public/service-worker.js` + `index.js` — запросы навигации и нехэшированных ресурсов идут с `{ cache: 'no-cache' }`, dev-бандл не пишется в `Cache Storage`, воркер регистрируется с `{ updateViaCache: 'none' }`.
+  3. `src/web/versionGuard.ts` (+ проводка в `index.js`) — при старте и при возврате во вкладку (`visibilitychange -> visible`) сверяет вшитый `version.json` бандла с живым `/version.json?_t=...` (`cache: 'no-store'`); при расхождении вычищает устаревшие HTML/JS из `Cache Storage` (сохраняя `.ttf`-шрифты иконок!) и один раз мягко перезагружает вкладку с защитой от цикла в `sessionStorage`.
+- Приёмочные тесты: `__tests__/screens/anti-stale-web-cache-454.test.js` (5 тестов).
+
 ## 2026-10-27 (453) — высокий приоритет иконок, сохранение кэша Metro/PWA и работа комнат мастера в Metro
 
 Слово владельца:
