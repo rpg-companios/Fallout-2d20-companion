@@ -299,23 +299,10 @@ export const createOrchestrationActions = (set, get) => {
       irradiatedConsumableRadiationImmune = false,
       colaNutDrinkIds,
       colaNutHealMultiplier = 1,
-      oldWorldGourmet = null,
-      // 406: Полевой хирург + Фармацевт + Ghoulish + Bloodsucker.
-      stimpakHpBonus = 0,
-      antiradRadiationBonus = 0,
-      ghoulish = false,
-      bloodPackDrinkIds,
-      bloodPackHealMultiplier = 1,
-      chemDurationMultiplier = 1,
     } = state.perkBonuses || {};
-    // Множители мгновенного лечения перемножаются (кола × пакет крови не
-    // пересекаются, но правило общее — «один мод — один закон всюду»).
-    let hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
+    const hpHealMultiplier = Array.isArray(colaNutDrinkIds) && colaNutDrinkIds.includes(item?.id)
       ? Number(colaNutHealMultiplier) || 1
       : 1;
-    if (Array.isArray(bloodPackDrinkIds) && bloodPackDrinkIds.includes(item?.id)) {
-      hpHealMultiplier *= Number(bloodPackHealMultiplier) || 1;
-    }
     const vitalOptions = {
       currentHealth: state.currentHealth,
       maxHealth: calculateMaxHealth(
@@ -327,10 +314,6 @@ export const createOrchestrationActions = (set, get) => {
       hpHealMultiplier,
       radiationImmune: hasRadiationImmunity({ origin: state.origin, trait: state.trait }),
       skipIrradiatedRadiation: Boolean(irradiatedConsumableRadiationImmune),
-      oldWorldGourmet,
-      stimpakHpBonus,
-      antiradRadiationBonus,
-      ghoulish,
     };
     if (Object.hasOwn(options, 'radiationRequestedAmount')) {
       vitalOptions.radiationRequestedAmount = options.radiationRequestedAmount;
@@ -341,8 +324,7 @@ export const createOrchestrationActions = (set, get) => {
     }
     if (vitalChanges.radiationAmount !== null) {
       // Радиация расходника напрямую меняет счётчик: DR частей тела не участвует.
-      // 408: норма «Гулеподобного» уже в healAmount (и в отчёте) — не дублируем.
-      get().setRadiation(vitalChanges.radiationAfter, { skipGhoulishHeal: true });
+      get().setRadiation(vitalChanges.radiationAfter);
     }
 
     // 2. Timed-эффекты через стор.
@@ -351,14 +333,7 @@ export const createOrchestrationActions = (set, get) => {
     const normalizedCurrent = pruneExpiredTimedEffects(currentLegacy);
     normalizedCurrent.expired.forEach((effect) => store.expireEffect(effect.id));
 
-    // 406: ХИМИК — препараты действуют в два раза дольше (числовая
-    // длительность ×2; «lasting» = 1 сцена → 2). Работает только у химии.
-    const chemItem = item?.itemType === 'chem' || item?.itemType === 'chems';
-    const durationMultiplier = chemItem ? (Number(chemDurationMultiplier) || 1) : 1;
-    const itemForEffects = durationMultiplier > 1
-      ? { ...item, positiveEffectDuration: scaleDuration(item?.positiveEffectDuration, durationMultiplier) }
-      : item;
-    const timedResult = applyConsumableToEffects(itemForEffects, normalizedCurrent.effects);
+    const timedResult = applyConsumableToEffects(item, normalizedCurrent.effects);
     const normalizedResult = pruneExpiredTimedEffects(timedResult.effects);
     syncTimedEffectsToStore(normalizedResult.effects, store);
 

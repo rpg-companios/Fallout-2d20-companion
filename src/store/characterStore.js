@@ -65,16 +65,7 @@ import { denormalizeCharacterState } from './migrations.js';
 import { createInitialPowerArmorState, createPowerArmorActions } from './powerArmorSlice.js';
 import { debugLog } from '../debug/falloutDebug.js';
 import perksData from '../../modules/fallout/data/perks/perks.json';
-// 406: потолок лестниц выживания — флаг «высшая ступень сытости»
-// для «Омолодившегося» (survival.ts — чистый домен, без настроек/UI).
-import { SURVIVAL_LADDER_MAX } from '../../modules/fallout/survival/survival';
-import { selectPerkBonuses, reconcileSelectedPerksWithCatalog } from '../../domain/perks.js';
-// 404: префикс металлической брони для «В сияющих доспехах»;
-// 405: светозащитная оптика (ранг 2 того же перка).
-import {
-  isMetalArmorCatalogId,
-  wearingGlareOpticsInEquippedArmor,
-} from '../../domain/perks/inShiningArmor';
+import { selectPerkBonuses } from '../../domain/perks.js';
 import { applyWeaponWear, repairWeaponDurability } from '../../domain/weaponDurability.js';
 // Идентичность предмета (id/стек-ключ = id + моды + имя варианта) — в
 // domain/itemIdentity.js: стор, миграции и тесты используют одну логику.
@@ -247,23 +238,10 @@ const deriveFromSnapshot = (state, options = {}) => {
     ...(state._characterContext || {}),
     ...options,
   };
-  // 404: «В сияющих доспехах» — металл на теле? Любая надетая деталь
-  // armor_metal_* (префикс металлической брони каталога).
-  const wearingMetalArmor = Object.values(state.equippedArmor || {})
-    .some((slotRow) => {
-      const piece = slotRow?.armor || null;
-      const catalogId = piece?.weaponId || piece?.id || '';
-      return isMetalArmorCatalogId(catalogId);
-    });
-  // 406: «Омолодившийся» — персонаж на высшей ступени сытости?
-  const wellFed = (state.stateExtensions?.survival?.food ?? 0) >= SURVIVAL_LADDER_MAX.food;
   const equipmentState = {
     ...(context.equipmentState || {}),
     isRobot: isRobotCharacter({ origin: state.origin, trait: context.trait }),
     robotSlots: state.robot?.slots || context.equipmentState?.robotSlots || {},
-    wearingMetalArmor,
-    wearingGlareOptics: wearingGlareOpticsInEquippedArmor(state.equippedArmor || {}),
-    wellFed,
   };
   return calculateDerivedStats(
     state.attributes,
@@ -377,8 +355,6 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        */
       currency: 0,
       selectedPerks: [],
-      pendingPerksDormant: [],
-      dormantNoticeFingerprint: null,
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
@@ -411,44 +387,6 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
         set({ selectedPerks: next });
         get().recalculatePerkBonuses();
-      },
-
-      /**
-       * 412 (публичное приложение): мигратор перков при загрузке персонажа.
-       * Слово владельца: «пусть сам решает» — недоступные по книге перки
-       * (уровень/характеристики/робот/«или-или»/ранг сверх книжного) НЕ
-       * снимаются: остаются в списке серыми и НЕ ДЕЙСТВУЮТ (гасит
-       * evaluateSelectedPerkPicks — и бонусы, и гейты рецептов), снова
-       * заработают, когда выполнятся условия, либо игрок заменит их сам.
-       * Снимаются только неизвестные каталогу id (нет имени — нечего
-       * показывать серым). pendingPerksDormant (не персистится) — список
-       * погасших для уведомления; dormantNoticeFingerprint — то же
-       * множество повторно не уведомляет (один показ на изменение).
-       */
-      reconcilePerksAtLoad: () => {
-        const state = get();
-        const result = reconcileSelectedPerksWithCatalog(
-          state.selectedPerks || [],
-          perksData,
-          {
-            attributes: state.attributes,
-            level: state.level,
-            isRobot: isRobotCharacter({ origin: state.origin, trait: state.trait }),
-          },
-        );
-        const dormant = result.inactivePicks;
-        const fingerprint = JSON.stringify(dormant.map((p) => [p.id, p.rank, p.reason]));
-        const shouldNotify = fingerprint !== state.dormantNoticeFingerprint;
-        if (result.changed) {
-          set({ selectedPerks: result.selectedPerks });
-          get().recalculatePerkBonuses();
-          debugLog('perks.reconcileAtLoad.removedUnknown', { removed: result.removed });
-        }
-        set({
-          pendingPerksDormant: dormant,
-          dormantNoticeFingerprint: fingerprint,
-        });
-        return { changed: result.changed, removed: result.removed, dormant, shouldNotify };
       },
 
       markSkillsAsRewarded: (skills = []) => set((state) => ({
@@ -1404,19 +1342,9 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         set({ stateExtensions: dict });
       },
 
-      setStateExtension: (fieldKey, value) => {
-        set((state) => ({
-          stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
-        }));
-        // 406: «Омолодившийся» — +2 Макс. ОЗ на высшей ступени сытости:
-        // движение лестниц выживания меняет производные. Точечный пересчёт
-        // (глобальный каскад по stateExtensions дёргал бы подписчиков
-        // лишний раз на каждом тике — слайс-тест 209 это честно ловит).
-        if (fieldKey === 'survival'
-          && (Number(get().perkBonuses?.rejuvenatedSatedMaxHp) || 0) > 0) {
-          get().recalculateDerivedStats();
-        }
-      },
+      setStateExtension: (fieldKey, value) => set((state) => ({
+        stateExtensions: { ...state.stateExtensions, [fieldKey]: value },
+      })),
 
       /**
        * Комплект снаряжения персонажа: { id, name, weight, price, items,
@@ -1668,34 +1596,15 @@ const useCharacterStore = create(withDerivedCascade(devtools(
           ).current,
         });
       },
-      /**
-       * Установка радиации (значение или функция), нижняя граница 0.
-       * 408: «Гулеподобный» — при ЛЮБОМ подъёме (включая ручное изменение
-       * счётчика) персонаж дополнительно лечит 1 ОЗ за каждые N полученных
-       * единиц (норма по рангу перка: 4/3/2); счётчик растёт как обычно.
-       * options.skipGhoulishHeal — конвейер расходников уже учёл норму в
-       * своём отчёте (resolveConsumableVitalChanges), здесь не дублируем.
-       */
-      setRadiation: (updater, options = {}) => set((state) => {
+      /** Установка радиации (значение или функция), нижняя граница 0. */
+      setRadiation: (updater) => set((state) => {
         const requested = typeof updater === 'function' ? updater(state.radiation) : updater;
-        const next = setCounter(
-          { id: 'radiation', current: state.radiation, max: null, min: 0 },
-          requested,
-        ).current;
-        const ghoulish = state.perkBonuses?.ghoulish;
-        if (!options?.skipGhoulishHeal && ghoulish && next > state.radiation) {
-          const units = Number(ghoulish?.hpPerUnits) || 4;
-          const heal = Math.floor((next - state.radiation) / units);
-          if (heal > 0) {
-            const ceiling = calculateMaxHealth(
-              selectLegacyAttributes({ attributes: state.attributes }),
-              state.level,
-            );
-            const applied = Math.min(heal, Math.max(0, ceiling - state.currentHealth));
-            return { radiation: next, currentHealth: state.currentHealth + applied };
-          }
-        }
-        return { radiation: next };
+        return {
+          radiation: setCounter(
+            { id: 'radiation', current: state.radiation, max: null, min: 0 },
+            requested,
+          ).current,
+        };
       }),
       /**
        * Потеря ТЕКУЩИХ ОЗ от усталости за игровой час (патч 232, решение
@@ -2082,9 +1991,6 @@ const useCharacterStore = create(withDerivedCascade(devtools(
             // Шаг 8в (патч 243): сначала фабрики расширений (эффект
             // провайдера снесён), затем пересчёт производных.
             state.ensureStateExtensionFields?.();
-            // 411: мигратор перков («книга приоритетнее») — до пересчёта,
-            // чтобы производные считались уже по сверенному списку.
-            state.reconcilePerksAtLoad?.();
             state.recalculateAll();
           } catch (error) {
             debugLog('characterStore.rehydrate.recalculateFailed', {

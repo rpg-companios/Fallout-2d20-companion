@@ -202,16 +202,7 @@
     "hpHealed": 4,
     "irradiated": false,
     "effectKey": "itemEffects.drinks.glowingBloodPack",
-    "isAlcohol": false,
-    "positiveEffect": {
-      "damageResistanceModifier": {
-        "radiation": {
-          "op": "+",
-          "value": 5
-        }
-      }
-    },
-    "positiveEffectDuration": "lasting"
+    "isAlcohol": false
   },
   {
     "id": "drink_rum",

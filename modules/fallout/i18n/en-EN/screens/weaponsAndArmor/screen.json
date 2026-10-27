@@ -252,11 +252,7 @@
     "actions": {
       "eat": "Eat",
       "drink": "Drink",
-      "sleep": "Sleep\\Wait"
-    },
-    "mode": {
-      "sleep": "Sleep",
-      "wait": "Wait"
+      "sleep": "Sleep"
     },
     "gain": {
       "food": "Food +{n}",
@@ -272,20 +268,6 @@
       "title": "Drinks",
       "empty": "No drinks in inventory"
     },
-    "hpPerHour": "Each game hour: −{n} HP",
-    "wait": {
-      "confirm": "Wait",
-      "reportTitle": "Wait: {hours} h",
-      "forecastFoodDown": "Hunger: −{n}",
-      "forecastWaterDown": "Thirst: −{n}",
-      "forecastSleepDown": "Sleep: −{n}",
-      "forecastHpLoss": "HP loss: −{n}",
-      "forecastDeath": "The character will die",
-      "reportFoodDown": "Hunger: −{n}",
-      "reportWaterDown": "Thirst: −{n}",
-      "reportSleepDown": "Sleep: −{n}",
-      "reportHpLoss": "HP loss: −{n}",
-      "deathTitle": "Character died"
-    }
+    "hpPerHour": "Each game hour: −{n} HP"
   }
 }

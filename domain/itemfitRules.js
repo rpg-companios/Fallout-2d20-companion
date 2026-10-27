@@ -30,22 +30,9 @@ export function getFitProfile(character) {
   return getFitProfileData()[type] ?? {};
 }
 
-import { AUDIENCE_CHARACTER_TYPES } from '../src/itempack/contract';
-
 /** Полный доступ (слой + статус). */
 export function classifyItemAccess(item, action = ACTIONS.EQUIP, character) {
-  const result = classifyPure(item, action, getFitProfile(character), getCategories());
-  // Аудитория пакетных предметов (прототип P): 'all' пропускаем, иначе
-  // characterType персонажа обязан попасть в разрешённую группу
-  // ('human' покрывает human/ghoul/cyborg). Точечный патч — единственный
-  // заход прототипа в правила движка; остальное — данные.
-  if (result.status !== 'allowed') return result;
-  const audience = item?.audience;
-  if (!audience || audience === 'all') return result;
-  const allowed = Array.isArray(audience) ? audience : [audience];
-  const type = character?.origin?.characterType || 'human';
-  const permitted = allowed.some((a) => (AUDIENCE_CHARACTER_TYPES[a] ?? []).includes(type));
-  return permitted ? result : { status: 'denied', layer: 'audience' };
+  return classifyPure(item, action, getFitProfile(character), getCategories());
 }
 
 /** Бул: разрешено ли действие над предметом. */

@@ -252,11 +252,7 @@
     "actions": {
       "eat": "Поесть",
       "drink": "Пить",
-      "sleep": "Сон\\Ждать"
-    },
-    "mode": {
-      "sleep": "Сон",
-      "wait": "Ожидание"
+      "sleep": "Спать"
     },
     "gain": {
       "food": "Сытость +{n}",
@@ -272,20 +268,6 @@
       "title": "Питьё",
       "empty": "В инвентаре нет напитков"
     },
-    "hpPerHour": "Каждый игровой час: −{n} ОЗ",
-    "wait": {
-      "confirm": "Ждать",
-      "reportTitle": "Ожидание: {hours} ч",
-      "forecastFoodDown": "Голод: −{n}",
-      "forecastWaterDown": "Жажда: −{n}",
-      "forecastSleepDown": "Сон: −{n}",
-      "forecastHpLoss": "Потеря ОЗ: −{n}",
-      "forecastDeath": "Персонаж умрёт",
-      "reportFoodDown": "Голод: −{n}",
-      "reportWaterDown": "Жажда: −{n}",
-      "reportSleepDown": "Сон: −{n}",
-      "reportHpLoss": "Потеря ОЗ: −{n}",
-      "deathTitle": "Персонаж умер"
-    }
+    "hpPerHour": "Каждый игровой час: −{n} ОЗ"
   }
 }

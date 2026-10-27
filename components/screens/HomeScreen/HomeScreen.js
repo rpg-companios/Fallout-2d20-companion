@@ -63,10 +63,14 @@ const GAME_SETTINGS_UI_ENABLED = false;
 // уже 'gm' (переключили раньше), кнопка выхода остаётся — чтобы не
 // запереть пользователя внутри скрытого режима.
 const GM_MODE_UI_ENABLED = false;
+
+// Toggle отображения пространства админа подключён к appSettingsStore:
+// adminScreenEnabled (default: false). Управляется через настройки.
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
 import useAppSettingsStore, {
+  selectAdminScreenEnabled,
   selectCharacterDeleteActionPlacement,
   selectCharacterFoldersEnabled,
   selectPwaInstallDiagnosticsEnabled,
@@ -442,6 +446,7 @@ export default function HomeScreen({ navigation }) {
   // uiMode: 'user' | 'gm' — кнопка «Админ/Пользователь» в шапке (§3.9:
   // кнопки нет, когда адрес сервера недоступен — пространства нет).
   const uiMode = useAppSettingsStore(selectUiMode);
+  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
   const isGmMode = uiMode === 'gm';
   const roomServerAvailable = isRoomServerConfigured();
   const roomRooms = useRoomStore((state) => state.rooms);

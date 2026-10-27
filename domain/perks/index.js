@@ -20,21 +20,6 @@ import { chemResistantPerk } from './chemResistant';
 import { colaNutPerk } from './colaNut';
 import { thirstQuencherPerk } from './thirstQuencher';
 import { pharmaFarmerPerk } from './pharmaFarmer';
-import { oldWorldGourmetPerk } from './oldWorldGourmet';
-import { inShiningArmorPerk } from './inShiningArmor';
-import { loadAndFirePerk } from './loadAndFire';
-import { juryRiggedAmmoPerk } from './juryRiggedAmmo';
-import { fieldSurgeonPerk } from './fieldSurgeon';
-import { pharmacistPerk } from './pharmacist';
-import { powerUserPerk } from './powerUser';
-import { capCollectorPerk } from './capCollector';
-import { naturalResistancePerk } from './naturalResistance';
-import { rejuvenatedPerk } from './rejuvenated';
-import { dromedaryPerk } from './dromedary';
-import { superDuperPerk } from './superDuper';
-import { ghoulishPerk } from './ghoulish';
-import { bloodsuckerPerk } from './bloodsucker';
-import { chemistPerk } from './chemist';
 
 export const perkEffects = {
   [intenseTrainingPerk.id]: intenseTrainingPerk,
@@ -59,21 +44,6 @@ export const perkEffects = {
   [colaNutPerk.id]: colaNutPerk,
   [thirstQuencherPerk.id]: thirstQuencherPerk,
   [pharmaFarmerPerk.id]: pharmaFarmerPerk,
-  [oldWorldGourmetPerk.id]: oldWorldGourmetPerk,
-  [inShiningArmorPerk.id]: inShiningArmorPerk,
-  [loadAndFirePerk.id]: loadAndFirePerk,
-  [juryRiggedAmmoPerk.id]: juryRiggedAmmoPerk,
-  [fieldSurgeonPerk.id]: fieldSurgeonPerk,
-  [pharmacistPerk.id]: pharmacistPerk,
-  [powerUserPerk.id]: powerUserPerk,
-  [capCollectorPerk.id]: capCollectorPerk,
-  [naturalResistancePerk.id]: naturalResistancePerk,
-  [rejuvenatedPerk.id]: rejuvenatedPerk,
-  [dromedaryPerk.id]: dromedaryPerk,
-  [superDuperPerk.id]: superDuperPerk,
-  [ghoulishPerk.id]: ghoulishPerk,
-  [bloodsuckerPerk.id]: bloodsuckerPerk,
-  [chemistPerk.id]: chemistPerk,
 };
 
 export function getPerkEffect(effectId) {

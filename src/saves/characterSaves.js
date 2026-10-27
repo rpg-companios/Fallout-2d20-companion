@@ -24,9 +24,6 @@ import { debugLog } from '../debug/falloutDebug';
 import { showRawAlert } from '../../components/alerts/alertService';
 import ruPerksAndTraitsScreen from '../../modules/fallout/i18n/ru-RU/screens/perksAndTraits/screen.json';
 import enPerksAndTraitsScreen from '../../modules/fallout/i18n/en-EN/screens/perksAndTraits/screen.json';
-// 411: имена перков для уведомления мигратора — по языку интерфейса.
-import ruPerksI18n from '../../modules/fallout/i18n/ru-RU/data/perks/perks.json';
-import enPerksI18n from '../../modules/fallout/i18n/en-EN/data/perks/perks.json';
 import useCharacterStore from '../store/characterStore';
 import {
   denormalizeCharacterState,
@@ -69,16 +66,10 @@ const AUTOSAVE_DEBOUNCE_MS = 500;
 const generateId = () => `char_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 const PERK_ALERTS_DICT = {
-  'ru-RU': ruPerksAndTraitsScreen.alerts || {},
-  'en-EN': enPerksAndTraitsScreen.alerts || {},
+  'ru-RU': ruPerksAndTraitsScreen.alerts,
+  'en-EN': enPerksAndTraitsScreen.alerts,
 };
-// 411: отсутствие ключа больше не роняет загрузку — вернётся сам ключ.
-const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()]?.[key] ?? key;
-const PERK_NAMES_DICT = { 'ru-RU': ruPerksI18n, 'en-EN': enPerksI18n };
-const perkDisplayName = (id) => {
-  const list = PERK_NAMES_DICT[getCurrentLocale()] || [];
-  return list.find((perk) => perk?.id === id)?.name || id;
-};
+const tPerkAlert = (key) => PERK_ALERTS_DICT[getCurrentLocale()][key];
 // Диалоги идут через общий AlertHost — одна React-модалка на вебе и на нативе.
 const paAlert = (title, message = '') => showRawAlert({ title, message });
 
@@ -532,24 +523,6 @@ export const loadCharacter = async (id) => {
       ...data,
       attributes: loadedAttributes,
     });
-
-    // 412 (публичное приложение): мигратор перков при загрузке. Слово
-    // владельца: «пусть сам решает» — недоступные по книге перки остаются
-    // серыми и неработающими, снимаются только неизвестные каталогу id
-    // (о них — отдельное уведомление perkMissingId выше). Уведомление
-    // о погасших — один показ на изменение множества (fingerprint в сторе).
-    const reconciliation = useCharacterStore.getState().reconcilePerksAtLoad?.();
-    if (reconciliation?.shouldNotify && reconciliation.dormant?.length > 0) {
-      const dormantNames = [...new Set(
-        reconciliation.dormant
-          .map((entry) => perkDisplayName(entry.id))
-          .filter(Boolean),
-      )].join(', ');
-      paAlert(
-        tPerkAlert('dormantPerksTitle'),
-        tPerkAlert('dormantPerksMessage').replace('{perks}', dormantNames),
-      );
-    }
 
     // v14: Тень со старым комплектом → выдать предметы NIGHTKIN.
     // resolveKitItems асинхронный (rollTable бросает кубики), поэтому

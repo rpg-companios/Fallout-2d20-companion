@@ -18,10 +18,6 @@ const TSCONFIG_PATH = path.join(ROOT, 'tsconfig.json');
 const EXCLUDED_DIRS = new Set([
   'node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local',
   'public', 'assets', '__tests__', '.expo',
-  // item-forge — ОТДЕЛЬНОЕ приложение (решение владельца 2026-10-19) со своим
-  // tsconfig и своим гейтом `tsc --noEmit` в npm run build внутри папки;
-  // покрытие его .tsx — там, а не в основном include.
-  'item-forge',
 ]);
 const TS_FILE_RE = /\.(ts|tsx)$/;
 

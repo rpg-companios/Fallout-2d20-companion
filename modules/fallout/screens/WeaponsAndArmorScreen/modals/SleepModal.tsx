@@ -7,7 +7,7 @@
 // эффектов на N × 12 сцен (мост контуров, §5) и в пустоши проверяет болезнь
 // по имеющейся механике (событие sleepOnGround).
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import useCharacterStore from '../../../../../src/store/characterStore';
 import { selectLegacyAttributes } from '../../../../../src/store/selectors';
@@ -15,12 +15,10 @@ import { selectLegacyAttributes } from '../../../../../src/store/selectors';
 import { calculateMaxHealth } from '../../../logic/derivedStats';
 import {
     forecastSleep,
-    forecastWait,
     SURVIVAL_RULES,
     type SleepPlace,
     type SurvivalState,
     type RestResult,
-    type WaitResult,
 } from '../../../survival/survival';
 import { useSurvivalState, useSurvivalActions } from '../../../survival/hooks';
 import { diseaseRiskReportLines } from '../../../../../components/screens/InventoryScreen/logic/consumableResultReport';
@@ -95,38 +93,11 @@ const buildForecastLines = (forecast: RestResult, baseMaxHealth: number): Foreca
     return lines;
 };
 
-// Прогноз ожидания (439): траты трёх параметров, потеря ОЗ и
-// предупреждение о смерти — «ОЗ станут меньше 0».
-const buildWaitForecastLines = (forecast: WaitResult, hpBefore: number): ForecastLine[] => {
-    const steps = (ladder: string): number => forecast.events
-        .filter((e) => e.type === 'step' && e.ladder === ladder).length;
-    const lines: ForecastLine[] = [];
-    const foodDown = steps('food');
-    if (foodDown > 0) {
-        lines.push({ key: 'foodDown', text: t('survival.wait.forecastFoodDown').replace('{n}', String(foodDown)), tone: 'negative' });
-    }
-    const waterDown = steps('water');
-    if (waterDown > 0) {
-        lines.push({ key: 'waterDown', text: t('survival.wait.forecastWaterDown').replace('{n}', String(waterDown)), tone: 'negative' });
-    }
-    const sleepDown = steps('sleep');
-    if (sleepDown > 0) {
-        lines.push({ key: 'sleepDown', text: t('survival.wait.forecastSleepDown').replace('{n}', String(sleepDown)), tone: 'negative' });
-    }
-    if (forecast.hpLoss > 0) {
-        lines.push({ key: 'hpLoss', text: t('survival.wait.forecastHpLoss').replace('{n}', String(forecast.hpLoss)), tone: 'negative' });
-    }
-    if (hpBefore - forecast.hpLoss < 0) {
-        lines.push({ key: 'death', text: t('survival.wait.forecastDeath'), tone: 'negative' });
-    }
-    return lines;
-};
-
 const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     useLocale();
     useModuleLocale();
     const survival = useSurvivalState();
-    const { sleepSurvival, waitSurvival } = useSurvivalActions();
+    const { sleepSurvival } = useSurvivalActions();
     // Шаг 8а (патч 241): атрибуты — из стор-словаря (legacy-массив).
     const storeAttributes = useCharacterStore((state) => state.attributes);
     const attributes = useMemo(() => selectLegacyAttributes({ attributes: storeAttributes }), [storeAttributes]);
@@ -135,58 +106,20 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
     const attributesSaved = useCharacterStore((state) => state.attributesSaved);
     const [place, setPlace] = useState<SleepPlace>('bed');
     const [hours, setHours] = useState(8);
-    // 439: режим модалки «Сон\Ждать» — сон или ожидание (по умолчанию сон).
-    const [mode, setMode] = useState<'sleep' | 'wait'>('sleep');
-    useEffect(() => {
-        if (visible) setMode('sleep');
-    }, [visible]);
-    const currentHealth = useCharacterStore((state) => state.currentHealth);
 
     // Базовый максимум ОЗ — формула сеттинга от атрибутов и уровня; строка
     // максимума показывается, когда персонаж собран (как счётчик ОЗ).
     const baseMaxHealth = attributesSaved ? calculateMaxHealth(attributes, level) : 0;
 
-    const forecast = useMemo<RestResult | WaitResult | null>(() => {
+    const forecast = useMemo<RestResult | null>(() => {
         const state = survival as SurvivalState | null;
         if (!state) return null;
-        if (mode === 'wait') return forecastWait(state, { hours });
         return forecastSleep(state, { place, hours });
-    }, [survival, place, hours, mode]);
+    }, [survival, place, hours]);
 
-    const lines = !forecast
-        ? []
-        : mode === 'wait'
-            ? buildWaitForecastLines(forecast as WaitResult, currentHealth)
-            : buildForecastLines(forecast as RestResult, baseMaxHealth);
+    const lines = forecast ? buildForecastLines(forecast, baseMaxHealth) : [];
 
     const handleConfirm = () => {
-        if (mode === 'wait') {
-            const apply = waitSurvival({ hours }) as { ok: boolean; hpLoss?: number; died?: boolean };
-            if (!apply.ok) {
-                onClose();
-                return;
-            }
-            const stepsOf = (ladder: string): number => ((apply as { result?: WaitResult }).result?.events ?? [])
-                .filter((e) => e.type === 'step' && e.ladder === ladder).length;
-            const reportLines: string[] = [];
-            const foodDown = stepsOf('food');
-            if (foodDown > 0) reportLines.push(t('survival.wait.reportFoodDown').replace('{n}', String(foodDown)));
-            const waterDown = stepsOf('water');
-            if (waterDown > 0) reportLines.push(t('survival.wait.reportWaterDown').replace('{n}', String(waterDown)));
-            const sleepDown = stepsOf('sleep');
-            if (sleepDown > 0) reportLines.push(t('survival.wait.reportSleepDown').replace('{n}', String(sleepDown)));
-            if ((apply.hpLoss ?? 0) > 0) reportLines.push(t('survival.wait.reportHpLoss').replace('{n}', String(apply.hpLoss)));
-            // Слово владельца (439): ОЗ стали меньше 0 — алерт «Персонаж умер».
-            showRawAlert({
-                title: apply.died
-                    ? t('survival.wait.deathTitle')
-                    : t('survival.wait.reportTitle').replace('{hours}', String(hours)),
-                message: reportLines.join('\n'),
-                buttons: undefined,
-            });
-            onClose();
-            return;
-        }
         const apply = sleepSurvival({ place, hours }) as {
             ok: boolean;
             reason?: string;
@@ -238,22 +171,6 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
             <View style={styles.overlay}>
                 <View style={styles.content}>
                     <Text style={styles.title}>{t('survival.sleep.title')}</Text>
-                    {/* 439: режим «Сон\Ждать» — сон или ожидание. */}
-                    <View style={styles.placeRow}>
-                        <TouchableOpacity
-                            style={[styles.placeButton, mode === 'sleep' && styles.placeButtonActive]}
-                            onPress={() => setMode('sleep')}
-                        >
-                            <Text style={styles.placeButtonText}>{t('survival.mode.sleep')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.placeButton, mode === 'wait' && styles.placeButtonActive]}
-                            onPress={() => setMode('wait')}
-                        >
-                            <Text style={styles.placeButtonText}>{t('survival.mode.wait')}</Text>
-                        </TouchableOpacity>
-                    </View>
-                    {mode === 'sleep' && (
                     <View style={styles.placeRow}>
                         <TouchableOpacity
                             style={[styles.placeButton, place === 'bed' && styles.placeButtonActive]}
@@ -268,7 +185,6 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
                             <Text style={styles.placeButtonText}>{t('survival.sleep.placeWasteland')}</Text>
                         </TouchableOpacity>
                     </View>
-                    )}
                     <View style={styles.hoursRow}>
                         <TouchableOpacity
                             style={styles.hoursButton}
@@ -284,7 +200,7 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
                             <Text style={styles.hoursButtonText}>+</Text>
                         </TouchableOpacity>
                     </View>
-                    {mode === 'sleep' && place === 'wasteland' ? (
+                    {place === 'wasteland' ? (
                         <Text style={styles.hint}>{t('survival.sleep.wastelandNote')}</Text>
                     ) : null}
                     {forecast ? (
@@ -308,9 +224,7 @@ const SleepModal = ({ visible, onClose }: SleepModalProps) => {
                     ) : null}
                     <View style={styles.buttonRow}>
                         <TouchableOpacity style={[styles.button, styles.confirmButton]} onPress={handleConfirm}>
-                            <Text style={styles.buttonText}>
-                                {mode === 'wait' ? t('survival.wait.confirm') : t('survival.sleep.confirm')}
-                            </Text>
+                            <Text style={styles.buttonText}>{t('survival.sleep.confirm')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={onClose}>
                             <Text style={styles.buttonText}>{t('survival.sleep.cancel')}</Text>

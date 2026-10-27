@@ -238,6 +238,7 @@ export const selectBootScreenEnabled = (state) => state.getSettingValue('bootScr
 export const selectPwaInstallDiagnosticsEnabled = (state) => state.getSettingValue('pwaInstallDiagnostics');
 // Комнаты мастера (gm-rooms): 'user' | 'gm'. Кнопка переключения — в шапке
 // главного экрана и показывается только при доступном сервере комнат.
+export const selectAdminScreenEnabled = (state) => state.getSettingValue('adminScreenEnabled');
 export const selectUiMode = (state) => state.getSettingValue('uiMode');
 export const selectSettingsHydrated = (state) => state.settingsHydrated;
 export const selectLanguage = (state) => state.getSettingValue('language');

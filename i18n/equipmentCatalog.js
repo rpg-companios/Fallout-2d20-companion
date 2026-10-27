@@ -96,7 +96,6 @@ const moduleRobotWeapons = SETTING.data.equipment.robot.weapons;
 
 import { getCurrentModuleLocale } from './locale';
 import { expandTrueItems } from '../domain/packMerge';
-import { buildPackCatalogOverlay } from '../src/itempack/runtime.js';
 
 /**
  * i18n-словари модуля сеттинга, собранные из файлов по категориям.
@@ -334,13 +333,6 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
   const robotArms = limbsOfType('arm').map((arm) => ({ ...arm, isRobotArm: true }));
   const allWeapons = [...weapons, ...robotWeapons];
 
-  // Паки контента (прототип P, 2026-10-19): предметы из установленных
-  // пользовательских паков смешиваются ЗДЕСЬ — единственная точка оверлея
-  // (catalogSource, лавка, лут, инвентарь, окно модов идут через этот
-  // каталог). Имя — по текущей локали; перевода нет — показывается id.
-  const packOverlay = buildPackCatalogOverlay(locale);
-  const allWeaponsWithPacks = [...allWeapons, ...packOverlay.weapons, ...packOverlay.robotWeapons];
-
   // Robot plating and armor: merge data stats with i18n names, add to armorIndex
   const robotPlatingList = mergeById(moduleRobotPlating.plating || [], i18n.robotPlating || [])
     .map((item) => ({ ...item, itemType: 'plating' }));
@@ -463,7 +455,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
 
   return {
     ...i18n,
-    weapons: allWeaponsWithPacks,
+    weapons: allWeapons,
     // armorRaw keyed by categoryKey for ArmorModificationModal allowedModCategories lookup
     armorRaw: moduleArmor,
     armor: { armor: armorGroups },
@@ -473,7 +465,7 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     powerArmorList,
     powerArmorRaw: modulePowerArmor,
     clothes: { clothes: allClothesGroups },
-    ammoTypes: [...mergedAmmo, ...packOverlay.ammoTypes],
+    ammoTypes: mergedAmmo,
     qualities: mergedQualities,
     effects: mergedEffects,
     damageEffects: mergedDamageEffects,
@@ -492,14 +484,14 @@ export const getEquipmentCatalog = (locale = getCurrentModuleLocale()) => {
     // пуле, что и в реестре конечностей (ROBOT_LIMB_CATALOG.weaponMods).
     // Без этого установленный мод молча терялся: урон карточки возвращался
     // к базе, хотя превью модалки и план списания зарядов мод видели.
-    weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods, ...packOverlay.weaponMods],
+    weaponMods: [...mergedWeaponMods, ...mergedRobotWeaponMods],
     robotWeaponMods: mergedRobotWeaponMods,
     robotWeaponModSlots,
     armorMods: mergedArmorMods,
     uniqArmorMods: mergedUniqArmorMods,
-    modsOverrides: { ...moduleWeaponModSlots, ...packOverlay.modsOverrides },
+    modsOverrides: moduleWeaponModSlots,
     armorEffects,
-    robotWeaponsOnly: [...robotWeapons, ...packOverlay.robotWeapons],
+    robotWeaponsOnly: robotWeapons,
     robotArms,
     robotPlating: robotPlatingList,
     robotArmorLayer: robotArmorList,

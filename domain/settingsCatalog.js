@@ -69,6 +69,17 @@ export const ENGINE_SETTINGS = [
     defaultValue: false,
   },
   {
+    // 447: переключатель отображения пространства админа
+    // (экран администратора / GM-режим). По умолчанию выключен.
+    id: 'adminScreenEnabled',
+    type: 'boolean',
+    controlSurface: SETTING_CONTROL_SURFACES.SETTINGS,
+    sectionKey: 'appearance',
+    labelKey: 'settings.adminScreenTitle',
+    descriptionKey: 'settings.adminScreenDescription',
+    defaultValue: false,
+  },
+  {
     id: 'language',
     type: 'select',
     controlSurface: SETTING_CONTROL_SURFACES.CHARACTERS,

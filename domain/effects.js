@@ -287,22 +287,6 @@ export const applyRemoveConditions = (item, conditions = []) => {
     return { conditions: next, removed, requested };
 };
 
-/**
- * 406: множитель длительности положительного эффекта расходника
- * (ХИМИК ×2). 'instant' не трогаем; 'lasting' («до конца сцены») и числа
- * умножаются на N. Неизвестное/пустое возвращается как есть.
- */
-export const scaleDuration = (duration, multiplier = 1) => {
-    const m = Number(multiplier) || 1;
-    if (m <= 1 || duration == null) return duration;
-    if (duration === 'instant') return duration;
-    if (duration === 'lasting') return Math.max(1, Math.round(1 * m));
-    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
-        return Math.max(1, Math.round(duration * m));
-    }
-    return duration;
-};
-
 export const applyConsumableToEffects = (item, currentEffects = []) => {
     const name = toStringSafe(item?.name || item?.Name);
     let nextEffects = [...currentEffects];
@@ -679,16 +663,6 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         hpHealMultiplier = 1,
         radiationImmune = false,
         skipIrradiatedRadiation = false,
-        // 404: Гурман старого мира — preserved-еда: +2 ОЗ и радиация еды на
-        // 1 меньше (до минимума 0). Приходит из perkBonuses (см. перк).
-        oldWorldGourmet = null,
-        // 406: Полевой хирург — стимпак лечит на +3 больше; он же и
-        // Фармацевт складываются в antiradRadiationBonus (Рад-а-вей сильнее).
-        stimpakHpBonus = 0,
-        antiradRadiationBonus = 0,
-        // 408: Гулеподобный (канон) — { hpPerUnits: N }; радиация действует
-        // как обычно, перк добавляет 1 ОЗ за каждые N полученных единиц.
-        ghoulish = null,
     } = options;
     if (
         !Number.isFinite(currentHealth)
@@ -702,47 +676,17 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
     }
 
     const instantHealAmount = getInstantHealAmount(item) * hpHealMultiplier;
-    // 404: гурман — плоская прибавка к лечению preserved-еды (даже если
-    // предмет сам не лечит: «+2 к восстанавливаемым ОЗ» — буквально).
-    const gourmet = oldWorldGourmet && item?.itemType === 'food' && item?.preserved === true
-        ? oldWorldGourmet
-        : null;
-    const stimpakBonus = stimpakHpBonus > 0
-        && String(item?.id || '').startsWith('chem_stimpak')
-        ? stimpakHpBonus
-        : 0;
-    let healBase = instantHealAmount + (gourmet ? Number(gourmet.hpBonus) || 0 : 0) + stimpakBonus;
-    const healAmount = healBase > 0
-        ? Math.max(0, healBase + hpHealBonus)
+    const healAmount = instantHealAmount > 0
+        ? Math.max(0, instantHealAmount + hpHealBonus)
         : 0;
     const healthAfter = healAmount > 0
         ? Math.min(maxHealth, currentHealth + healAmount)
         : currentHealth;
 
     // Строгий порядок: сначала здоровье, затем расчёт и изменение радиации.
-    let requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
+    const requestedRadiationAmount = Object.hasOwn(options, 'radiationRequestedAmount')
         ? options.radiationRequestedAmount
         : resolveConsumableRadiationAmount(item, { radiationImmune, skipIrradiatedRadiation });
-    // 404: гурман — радиация preserved-еды на 1 меньше, но не «в плюс»
-    // (здесь положительное число = радиация прибавляется: 2 → 1, 1 → 0;
-    // отрицательное — предмет СНИМАЕТ радиацию, его не трогаем).
-    if (gourmet && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
-        requestedRadiationAmount = Math.max(0, requestedRadiationAmount - (Number(gourmet.radiationReduction) || 0));
-    }
-    // 406: Рад-а-вей сильнее (Полевой хирург + Фармацевт): снятие глубже.
-    if (antiradRadiationBonus > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount < 0) {
-        requestedRadiationAmount -= antiradRadiationBonus;
-    }
-    // 408: Гулеподобный — радиация применяется как обычно, лечение
-    // добавляется по норме «1 ОЗ за каждые N единиц» от ФАКТИЧЕСКИ
-    // полученных единиц (после гурманской скидки и клампа дном).
-    const ghoulishUnits = ghoulish
-        ? (Number(ghoulish?.hpPerUnits) || 4)
-        : 0;
-    if (ghoulishUnits > 0 && typeof requestedRadiationAmount === 'number' && requestedRadiationAmount > 0) {
-        healBase += Math.floor(requestedRadiationAmount / ghoulishUnits);
-    }
-    const finalHealAmount = healBase > 0 ? Math.max(0, healBase + hpHealBonus) : 0;
     const radiationAfter = requestedRadiationAmount === null
         ? radiation
         : Math.max(0, radiation + requestedRadiationAmount);
@@ -752,17 +696,9 @@ export const resolveConsumableVitalChanges = (item, options = {}) => {
         ? null
         : radiationAfter - radiation;
 
-    // 406: Ghoulish мог добавить лечение после чернового healthAfter —
-    // пересчитываем итоговый максимум здоровья честно.
-    const finalHealthAfter = finalHealAmount !== healAmount
-        ? (finalHealAmount > 0
-            ? Math.min(maxHealth, currentHealth + finalHealAmount)
-            : currentHealth)
-        : healthAfter;
-
     return {
-        healAmount: finalHealAmount,
-        healthAfter: finalHealthAfter,
+        healAmount,
+        healthAfter,
         radiationAmount,
         radiationAfter,
     };

@@ -28,7 +28,7 @@
     "sectionKey": "survival",
     "labelKey": "settings.durabilityTitle",
     "descriptionKey": "settings.durabilityDescription",
-    "defaultValue": true
+    "defaultValue": false
   },
   {
     "id": "weaponDurabilityLossPer10Shots",
@@ -49,7 +49,8 @@
     "sectionKey": "survival",
     "labelKey": "settings.qualityTitle",
     "descriptionKey": "settings.qualityDescription",
-    "defaultValue": false
+    "defaultValue": false,
+    "dependsOn": "weaponDurabilityLossEnabled"
   },
   {
     "id": "unarmedAttackVisible",

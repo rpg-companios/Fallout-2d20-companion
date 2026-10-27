@@ -63,22 +63,9 @@
     "askZeroTitle": "Difficulty cleared by skill",
     "askZeroText": "Roll the dice? Success/Failure rules apply.",
     "askZeroRoll": "Roll dice",
-    "askZeroAuto": "Auto-success",
-    "junkAny": "Junk (any)",
-    "junkRigNote": "Junk ammo: attacks with it get a Complication Range +1.",
-    "superDuperReturned": "Super Duper: Effect on the combat die ({faces}) — returned: {items}",
-    "superDuperNothing": "Super Duper: Effect on the combat die ({faces}) — nothing to return (half rounds to 0)"
+    "askZeroAuto": "Auto-success"
   },
   "attributes": {
     "INT": "Intelligence"
-  },
-  "repair": {
-    "title": "Repair",
-    "success": "The item’s durability has been restored.",
-    "failed": "Repair failed — durability unchanged, materials kept.",
-    "lostMaterials": "Complication (d20 roll: {face}) — one more set of materials was lost.",
-    "donorUsed": "Donor scrapped: materials came from it, difficulty −1.",
-    "complicationResolve": "d20: {face}.",
-    "temporary": "The repair is temporary (Jury Rigging): a complication while using it (19–20) breaks the item again"
   }
 }

@@ -210,37 +210,6 @@ export const ALERTS = {
     confirmKey: 'buttons.continue',
     destructive: true,
   },
-  changeCharacterImage: {
-    scope: 'character',
-    kind: 'choice',
-    titleKey: 'warnings.attentionTitle',
-    messageKey: 'warnings.changeCharacterImageConfirm',
-    buttons: [
-      { key: 'change', labelKey: 'buttons.changeImage', value: 'change' },
-      { key: 'reset', labelKey: 'buttons.resetToDefault', value: 'reset' },
-      { key: 'cancel', labelKey: 'buttons.cancel', value: null, style: 'cancel' },
-    ],
-  },
-  avatarTransparencyLoss: {
-    scope: 'character',
-    kind: 'confirm',
-    titleKey: 'warnings.attentionTitle',
-    messageKey: 'warnings.avatarTransparencyLoss',
-    confirmKey: 'buttons.continue',
-    destructive: false,
-  },
-  avatarTooLarge: {
-    scope: 'character',
-    kind: 'info',
-    titleKey: 'alerts.errorTitle',
-    messageKey: 'errors.avatarTooLarge',
-  },
-  avatarNotSynced: {
-    scope: 'character',
-    kind: 'info',
-    titleKey: 'warnings.attentionTitle',
-    messageKey: 'warnings.avatarNotSynced',
-  },
 
   // --- Настройки ------------------------------------------------------------
 
@@ -251,16 +220,6 @@ export const ALERTS = {
     kind: 'confirm',
     titleKey: 'gameSetting.delete',
     messageTemplate: '{name}',
-    destructive: true,
-  },
-
-  // Удаление пользовательского пака контента (прототип P): полное, без
-  // следов — число следов по сейвам приходит {count}, имя пака — {name}.
-  contentPackDelete: {
-    scope: 'home',
-    kind: 'confirm',
-    titleKey: 'gameSetting.contentPacks.deleteTitle',
-    messageKey: 'gameSetting.contentPacks.deleteBody',
     destructive: true,
   },
 };

@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -10,13 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import useAppSettingsStore from '../../src/store/appSettingsStore';
-// 446: раздел «Собственное снаряжение» — импорт паков контента из Кузницы
-// ушёл в глубь настроек, окно «Игровой сеттинг» скрыто в UI (владелец,
-// 2026-10-25). Окно сеттинга отложено в будущее, установка паков живёт здесь.
-import useContentPackStore, { selectContentPacks } from '../../src/store/contentPackStore';
-import { confirmAlert } from '../alerts/alertService';
 import {
   ENGINE_SETTINGS,
   getSettingsForSurface,
@@ -66,109 +59,6 @@ const tSection = (section) => (
 );
 
 const SETTINGS_SCREEN_SETTINGS = getSettingsForSurface(SETTING_CONTROL_SURFACES.SETTINGS);
-
-// 446: выбор JSON-файла пака контента (как читалось в «Игровом сеттинге» —
-// текст файла, не имя). Только web-сборка; на нативных целях — отмена.
-const pickContentPackJson = () => new Promise((resolve) => {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') {
-    resolve(null);
-    return;
-  }
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.json,application/json';
-  input.onchange = async () => {
-    const file = input.files && input.files[0];
-    if (!file) { resolve(null); return; }
-    try {
-      resolve({ text: await file.text() });
-    } catch {
-      resolve(null);
-    }
-  };
-  input.click();
-});
-
-// Раздел «Собственное снаряжение» (446): установка паков контента из
-// Кузницы предметов + список установленных; удаление — полное (каскад по
-// сейвам), диалог с числом следов (алерт contentPackDelete каталога).
-const OwnEquipmentSection = () => {
-  const contentPacks = useContentPackStore(selectContentPacks);
-  const installPackText = useContentPackStore((state) => state.installPackText);
-  const countPackUsage = useContentPackStore((state) => state.countPackUsage);
-  const deletePack = useContentPackStore((state) => state.deletePack);
-  const [packResult, setPackResult] = useState(null); // { ok, message? , errors? }
-  const pickingRef = useRef(false);
-
-  const handleLoadPack = async () => {
-    if (pickingRef.current) return;
-    pickingRef.current = true;
-    try {
-      const picked = await pickContentPackJson();
-      if (!picked) return;
-      const result = installPackText(picked.text);
-      if (result.ok) {
-        setPackResult({
-          ok: true,
-          message: tHomeScreen('settings.ownEquipment.installedOk', {
-            name: result.pack.manifest.name,
-            w: result.summary.weapons,
-            m: result.summary.weaponMods,
-            a: result.summary.ammo,
-          }),
-        });
-      } else {
-        setPackResult({ ok: false, errors: result.errors });
-      }
-    } finally {
-      pickingRef.current = false;
-    }
-  };
-
-  const confirmDeletePack = async (pack) => {
-    const count = await countPackUsage(pack.manifest.packId);
-    if (await confirmAlert('contentPackDelete', { name: pack.manifest.name, count })) {
-      await deletePack(pack.manifest.packId);
-      setPackResult(null);
-    }
-  };
-
-  return (
-    <View>
-      <Text style={styles.sectionTitle}>{tHomeScreen('settings.ownEquipment.title')}</Text>
-      <Text style={styles.description}>{tHomeScreen('settings.ownEquipment.description')}</Text>
-      {contentPacks.map((pack) => (
-        <View key={pack.manifest.packId} style={[styles.row, styles.settingRow]}>
-          <View style={styles.text}>
-            <Text style={styles.label} numberOfLines={2}>{pack.manifest.name}</Text>
-          </View>
-          <TouchableOpacity style={styles.packDeleteButton} onPress={() => confirmDeletePack(pack)}>
-            <Text style={styles.packDeleteText}>{tHomeScreen('settings.ownEquipment.delete')}</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-      {contentPacks.length === 0 && (
-        <Text style={styles.description}>{tHomeScreen('settings.ownEquipment.empty')}</Text>
-      )}
-      <TouchableOpacity style={styles.packLoad} onPress={handleLoadPack}>
-        <MaterialCommunityIcons name="package-variant-closed" size={22} color="#b8860b" />
-        <Text style={styles.packLoadText}>{tHomeScreen('settings.ownEquipment.load')}</Text>
-      </TouchableOpacity>
-      {packResult?.ok && (
-        <Text style={styles.packOkText}>{packResult.message}</Text>
-      )}
-      {packResult && !packResult.ok && (
-        <View>
-          <Text style={styles.packErrorTitle}>{tHomeScreen('settings.ownEquipment.errorsTitle')}</Text>
-          {packResult.errors.slice(0, 5).map((e, i) => (
-            <Text key={`packErr_${i}`} style={styles.packErrorText}>{`${e.path}: ${e.message}`}</Text>
-          ))}
-        </View>
-      )}
-      <View style={styles.separator} />
-    </View>
-  );
-};
 
 // Число со свободным вводом (флаг freeInput в данных настройки, например
 // курс времени выживания): ввод с клавиатуры + −/+, фиксация при потере
@@ -332,8 +222,6 @@ export default function SettingsModal({ visible, onClose }) {
                 <View style={styles.separator} />
               </View>
             ))}
-            {/* 446: «Собственное снаряжение» — последняя секция настроек. */}
-            <OwnEquipmentSection />
           </ScrollView>
 
           <TouchableOpacity onPress={onClose} style={styles.close}>
@@ -383,19 +271,4 @@ const styles = StyleSheet.create({
   selectText: { fontSize: 13 },
   selectTextColumn: { textAlign: 'center' },
   selectTextActive: { fontWeight: '700' },
-  // «Собственное снаряжение» (446)
-  packLoad: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12,
-    paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8,
-    borderWidth: 1, borderColor: '#c9b458', alignSelf: 'flex-start',
-  },
-  packLoadText: { fontSize: 14, color: '#333', fontWeight: '600' },
-  packDeleteButton: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6,
-    borderWidth: 1, borderColor: '#ccc',
-  },
-  packDeleteText: { fontSize: 13, color: '#555' },
-  packOkText: { marginTop: 10, fontSize: 13, color: '#256b2a' },
-  packErrorTitle: { marginTop: 10, fontSize: 13, fontWeight: '700', color: '#8a1f1f' },
-  packErrorText: { marginTop: 4, fontSize: 12, color: '#8a1f1f', fontFamily: Platform.OS === 'web' ? 'monospace' : undefined },
 });

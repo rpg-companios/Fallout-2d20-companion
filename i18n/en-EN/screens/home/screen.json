@@ -151,7 +151,9 @@
       "installedOk": "Installed: {name} — {w} weapons, {m} mods, {a} ammo",
       "errorsTitle": "Pack failed validation:",
       "delete": "Delete"
-    }
+    },
+    "adminScreenTitle": "Admin screen",
+    "adminScreenDescription": "Show the admin / GM mode screen for testing staged implementation stages. Hidden by default; enable when needed for verification."
   },
   "folders": {
     "create": "Create folder",

@@ -14,8 +14,7 @@ import { debugLog } from '../../../src/debug/falloutDebug';
 import { getSalvageComposition, getScrapMaterials } from '../../../domain/registry';
 import { runSalvage } from '../../../domain/salvageEngine';
 import { isSkillTagged } from '../../../domain/d20Checks';
-import { countActivePerkSelections } from '../../../domain/perks';
-import perksCatalog from '../data/perks/perks.json';
+import { getPerkSelectionCount } from '../../../domain/perks';
 import { getCanonicalItemId } from '../../../domain/itemIdentity';
 import { findCatalogEntry, inferItemType } from '../../../domain/resolveItem';
 import { rollCombatDiceEffects, facesToCombatUnits } from '../../../domain/diceRollsLogic';
@@ -61,7 +60,7 @@ export const isScrapMaterial = (canonical) => {
 // Потолок редкости по «Мусорщику» (общий для обеих веток, патч 263):
 // без перка — только common, ранг 1 — и unusual, ранг 2 — и rare.
 export const scrapperCeiling = (store) => {
-  const rank = countActivePerkSelections(store ?? {}, SALVAGE_RULES.scrapperPerkId, perksCatalog);
+  const rank = getPerkSelectionCount(store.selectedPerks ?? [], SALVAGE_RULES.scrapperPerkId);
   return rank >= SALVAGE_RULES.scrapperRareRank ? 2
     : rank >= SALVAGE_RULES.scrapperUncommonRank ? 1 : 0;
 };
