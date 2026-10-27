@@ -1,5 +1,20 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (452) — устранение краша `fontfaceobserver` и блокировки `.local/share/pnpm` на Replit
+
+Слово владельца (лог запуска на Replit после установки 451):
+`Code: fontfaceobserver.standalone.js (/home/runner/workspace/node_modules/.pnpm/fontfaceobserver@2.3.0/...:5:435) ... setTimeout$argument_0`.
+
+- Диагностика: две связанные причины при веб-старте Expo SDK 54 на Replit (`pnpm`):
+  1. В `metro.config.js` непривязанный паттерн `/\.local\/.*/` в `blockList` задевал не только `<workspace>/.local/`, но и глобальное хранилище `pnpm` на Replit (`/home/runner/.local/share/pnpm/...`), мешая Metro отдавать `.ttf`-шрифты иконок (`@expo/vector-icons`).
+  2. В самом `expo-font` (`FontLoader.web.js`, известный баг Expo `#22954`) синхронный `try { return ExpoFontLoader.loadAsync(...) } catch {}` не перехватывает асинхронный `reject` промиса от `fontfaceobserver` (`Error("<N>ms timeout exceeded")` на `5:435`), хотя правило `@font-face` уже вставлено в `<head>` и браузер сам дорисовывает иконки по мере докачки `.ttf`.
+- Исправлено:
+  1. `src/web/fontfaceobserverShim.ts` (+ `src/web` в `tsconfig.json`) — безопасная веб-замена `fontfaceobserver` через нативный `document.fonts.load` без DOM-замеров `offsetWidth` и без выброса непойманного `timeout exceeded` (при таймауте до 3 с мягко резолвится, оставляя отрисовку вставленному `@font-face`).
+  2. `metro.config.js` — `resolveRequest` перенаправляет `fontfaceobserver` на `src/web/fontfaceobserverShim.ts` для `platform === 'web'`, а `blockList` привязан строго к корню проекта (`<workspace>/.local`, `<workspace>/.kiro`, `<workspace>/.install-backup`), не блокируя `/home/runner/.local/share/pnpm/...`.
+  3. `index.js` — рантайм-страховка поверх `globalThis.expo.modules.ExpoFontLoader.loadAsync` (работает даже при горячей перезагрузке без рестарта Metro).
+  4. `apply-patch.sh` — `deps_check()` учитывает `node_modules/.pnpm` и вызывает `pnpm install`, если среда использует `pnpm`.
+- Приёмочные тесты: `__tests__/screens/web-font-timeout-452.test.js` (6 тестов). 178/178 тест-файлов зелёные, `tsc` 0, в собранном веб-бандле `dist/` строки `ms timeout exceeded` нет.
+
 ## 2026-10-27 (451) — восстановление запуска приложения, целостности дерева и установщика
 
 Слово владельца: «Прошлый агент не смог победить ошибки в приложении, помоги их победить. Оно не запускается».

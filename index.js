@@ -1,9 +1,36 @@
+import 'expo-font';
 import { registerRootComponent } from 'expo';
 import React from 'react';
 import { View, Text } from 'react-native';
 
 import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
 import { debugLog } from './src/debug/falloutDebug';
+
+// Страховка веб-загрузчика шрифтов (452): в expo-font (FontLoader.web.js #22954)
+// синхронный try/catch не перехватывает асинхронный таймаут fontfaceobserver,
+// хотя @font-face уже вставлен в <head>. Гарантируем, что промис не уронит старт.
+const webFontLoader = globalThis?.expo?.modules?.ExpoFontLoader;
+if (webFontLoader && typeof webFontLoader.loadAsync === 'function' && !webFontLoader.__safeWrapped) {
+  const rawLoadAsync = webFontLoader.loadAsync.bind(webFontLoader);
+  webFontLoader.loadAsync = (fontFamilyName, resource) => {
+    try {
+      const result = rawLoadAsync(fontFamilyName, resource);
+      if (result && typeof result.catch === 'function') {
+        return result.catch((err) => {
+          debugLog('font.web.timeoutSwallowed', {
+            fontFamilyName,
+            message: err?.message || String(err),
+          });
+        });
+      }
+      return result;
+    } catch {
+      return Promise.resolve();
+    }
+  };
+  webFontLoader.__safeWrapped = true;
+}
+
 // Глобально: любой <Text> рендерит токен {/CD} как картинку кубика (assets/CD.png).
 setupRichText();
 

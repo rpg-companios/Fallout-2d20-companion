@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Web font timeout & Replit pnpm asset fix (patch 452)
+
+Fixed the web startup crash (`fontfaceobserver.standalone.js: timeout
+exceeded`): anchored `.local` ignore rules in `metro.config.js` to the
+workspace root so Replit's global `pnpm` store serving icon `.ttf`
+fonts is no longer blocked, replaced `fontfaceobserver` on web with a
+non-throwing `document.fonts.load` shim, and added a runtime guard in
+`index.js` so slow font downloads never crash app startup.
+
+---
 ## App boot, character avatars, and installer recovery (patch 451)
 
 Fixed the app startup failure after the broken update: restored the full
