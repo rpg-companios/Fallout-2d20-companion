@@ -54,6 +54,15 @@ import SettingsModal from '../../settings/SettingsModal';
 // погашенные места монтажа. Возврат в UI = GAME_SETTINGS_UI_ENABLED = true.
 import GameSettingsModal from '../../settings/GameSettingsModal';
 const GAME_SETTINGS_UI_ENABLED = false;
+
+// 447: GM-режим («Админ»/админка) — НЕ закончен: вход в него скрыт
+// выключателем, весь код комнат (roomClient/roomStore/эффекты привязок)
+// сохранён для следующего этапа — «сервер состояний», который через
+// интернет сведёт клиента и админа и будет транслировать админу состояние
+// персонажа клиента. Возврат в UI = GM_MODE_UI_ENABLED = true. Если uiMode
+// уже 'gm' (переключили раньше), кнопка выхода остаётся — чтобы не
+// запереть пользователя внутри скрытого режима.
+const GM_MODE_UI_ENABLED = false;
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
@@ -1026,7 +1035,7 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </View>
         <View style={styles.headerCenter}>
-          {roomServerAvailable && (
+          {((GM_MODE_UI_ENABLED || isGmMode) && roomServerAvailable) && (
             <Pressable
               style={[styles.adminButton, isGmMode && styles.adminButtonActive]}
               onPress={handleToggleUiMode}
