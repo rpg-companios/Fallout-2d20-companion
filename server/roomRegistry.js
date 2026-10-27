@@ -138,10 +138,22 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, left };
   };
 
-  /** Последний снапшот персонажа в комнате (LWW по revision). */
-  const putSnapshot = ({ code, characterId, revision, snapshot, fromClientId, fromName }) => {
+  /** Последний снапшот персонажа в комнате (LWW по revision; snapshot=null/removed удаляет). */
+  const putSnapshot = ({
+    code,
+    characterId,
+    revision,
+    snapshot,
+    fromClientId,
+    fromName,
+    removed = false,
+  }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (removed || snapshot === null) {
+      room.lastSnapshots.delete(characterId);
+      return { room, stored: true, removed: true, currentRevision: Number(revision) || 0 };
+    }
     const previous = room.lastSnapshots.get(characterId);
     if (previous && Number(revision) < Number(previous.revision)) {
       return { room, stored: false, currentRevision: previous.revision };

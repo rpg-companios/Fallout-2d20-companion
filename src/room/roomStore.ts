@@ -1,8 +1,7 @@
 // src/room/roomStore.ts
 // Стор комнат мастера (zustand, план gm-rooms §3.6): соединение, список
-// комнат, presence-члены, запросы create/join с сопоставлением по requestId.
-// Снапшоты персонажей (char.publish) здесь пока только пробрасываются в
-// подписчиков — применение в БД/стор придёт этапом 3 вместе со штампом сейва.
+// комнат, presence-члены, входящие/исходящие снапшоты подключённых
+// персонажей (char.publish) и запросы create/join с сопоставлением по requestId.
 
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,10 +15,12 @@ import {
   ROOM_MESSAGE,
   type RoomEnvelope,
   type RoomMember,
+  type RoomSnapshotEntry,
 } from './roomProtocol';
 import { debugLog } from '../debug/falloutDebug';
 
 const CLIENT_ID_STORAGE_KEY = 'room_client_id';
+const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
 const REQUEST_TIMEOUT_MS = 10 * 1000;
 
 export interface RoomStateEntry {
@@ -28,6 +29,7 @@ export interface RoomStateEntry {
   role: 'gm' | 'player';
   members: RoomMember[];
   joined?: boolean;
+  snapshots?: Record<string, RoomSnapshotEntry>;
 }
 
 interface CreateRoomResult {
@@ -40,7 +42,7 @@ interface JoinRoomResult {
   code: string;
   name: string;
   members: RoomMember[];
-  snapshots: unknown[];
+  snapshots: RoomSnapshotEntry[];
 }
 
 interface RoomStoreState {
@@ -60,6 +62,16 @@ interface RoomStoreState {
     role?: 'gm' | 'player';
   }) => Promise<JoinRoomResult>;
   leaveRoom: (input: { code: string }) => Promise<void>;
+  publishCharacter: (input: {
+    code: string;
+    characterId: string;
+    revision?: number;
+    snapshot: unknown;
+  }) => Promise<void>;
+  unpublishCharacter: (input: {
+    code: string;
+    characterId: string;
+  }) => Promise<void>;
 }
 
 // ── Внутреннее состояние соединения (не в стейт-дереве: не для рендера) ──
@@ -74,19 +86,40 @@ const pendingRequests = new Map<string, {
 const joiningCodes = new Set<string>();
 const publishListeners = new Set<(message: RoomEnvelope) => void>();
 
-/** Идентичность устройства (§3.3): uuid в AsyncStorage, создаётся один раз. */
+const getWebTabSessionSuffix = (): string => {
+  if (typeof window === 'undefined') return '';
+  try {
+    const storage = window.sessionStorage;
+    if (!storage) return '';
+    const existing = storage.getItem(TAB_SESSION_STORAGE_KEY);
+    if (existing) return `:${existing}`;
+    const generated = `t-${Math.random().toString(36).slice(2, 10)}`;
+    storage.setItem(TAB_SESSION_STORAGE_KEY, generated);
+    return `:${generated}`;
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * Идентичность подключения (§3.3 + изоляция вкладок 456):
+ * базовый uuid хранится в AsyncStorage, а на web дополняется sessionStorage-суффиксом
+ * вкладки — чтобы открытые в одном браузере вкладки «Админ» и «Пользователь»
+ * не перезаписывали друг друга в списке участников комнаты.
+ */
 const getRoomClientId = (): Promise<string> => {
   if (!clientIdPromise) {
     clientIdPromise = (async () => {
+      const tabSuffix = getWebTabSessionSuffix();
       try {
         const stored = await AsyncStorage.getItem(CLIENT_ID_STORAGE_KEY);
-        if (stored) return stored;
+        if (stored) return `${stored}${tabSuffix}`;
         const generated = (globalThis as any).crypto?.randomUUID?.()
           || `c-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         await AsyncStorage.setItem(CLIENT_ID_STORAGE_KEY, generated);
-        return generated;
+        return `${generated}${tabSuffix}`;
       } catch {
-        return `c-fallback-${Math.random().toString(36).slice(2)}`;
+        return `c-fallback-${Math.random().toString(36).slice(2)}${tabSuffix}`;
       }
     })();
   }
@@ -95,7 +128,19 @@ const getRoomClientId = (): Promise<string> => {
 
 const makeRequestId = () => `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-/** Подписка этапа 3+: входящие char.publish (применение в БД — не здесь). */
+const snapshotsArrayToMap = (list: unknown): Record<string, RoomSnapshotEntry> => {
+  const map: Record<string, RoomSnapshotEntry> = {};
+  if (!Array.isArray(list)) return map;
+  for (const raw of list) {
+    if (raw && typeof raw === 'object' && typeof (raw as any).characterId === 'string' && (raw as any).snapshot != null) {
+      const entry = raw as RoomSnapshotEntry;
+      map[entry.characterId] = entry;
+    }
+  }
+  return map;
+};
+
+/** Подписка на входящие char.publish. */
 export const onRoomCharacterPublish = (listener: (message: RoomEnvelope) => void) => {
   publishListeners.add(listener);
   return () => { publishListeners.delete(listener); };
@@ -149,6 +194,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         return;
       }
       case ROOM_MESSAGE.CHAR_PUBLISH: {
+        const code = message.roomCode;
+        const charId = message.payload?.characterId;
+        if (code && typeof charId === 'string') {
+          const current = get().rooms[code];
+          if (current) {
+            const nextSnapshots = { ...(current.snapshots || {}) };
+            if (message.payload?.removed || message.payload?.snapshot == null) {
+              delete nextSnapshots[charId];
+            } else {
+              const incomingRev = Number(message.payload?.revision) || 0;
+              const prevRev = Number(nextSnapshots[charId]?.revision) || 0;
+              if (!nextSnapshots[charId] || incomingRev >= prevRev) {
+                nextSnapshots[charId] = {
+                  characterId: charId,
+                  revision: incomingRev,
+                  snapshot: message.payload.snapshot,
+                  fromClientId: message.payload?.fromClientId || message.clientId || '',
+                  fromName: message.payload?.fromName,
+                };
+              }
+            }
+            set({
+              rooms: {
+                ...get().rooms,
+                [code]: { ...current, snapshots: nextSnapshots },
+              },
+            });
+          }
+        }
         publishListeners.forEach((listener) => {
           try { listener(message); } catch (error) {
             debugLog('room.publishListener:failed', { message: (error as Error)?.message });
@@ -181,7 +255,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           if (codes.length > 0) {
             const nextRooms: Record<string, RoomStateEntry> = {};
             for (const roomCode of codes) {
-              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false };
+              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false, members: [] };
             }
             set({ status, rooms: nextRooms });
             return;
@@ -230,10 +304,18 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       if (ownerToken) payload.ownerToken = ownerToken;
       const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, payload, null);
       const { code, ownerToken: issuedToken, name: roomName } = response.payload;
+      const prev = get().rooms[code];
       set({
         rooms: {
           ...get().rooms,
-          [code]: { code, name: roomName || name, role: 'gm', members: [], joined: false },
+          [code]: {
+            code,
+            name: roomName || name,
+            role: 'gm',
+            members: prev?.members || [],
+            joined: false,
+            snapshots: prev?.snapshots || {},
+          },
         },
       });
       debugLog('room.create:ok', { code });
@@ -242,14 +324,20 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
 
     joinRoom: async ({ code, name, role = 'player' }) => {
       const existing = get().rooms[code];
-      if (existing && existing.joined !== false) {
-        return { code, name: existing.name, members: existing.members, snapshots: [] };
+      if (existing && existing.joined !== false && existing.role === role) {
+        return {
+          code,
+          name: existing.name,
+          members: existing.members,
+          snapshots: Object.values(existing.snapshots || {}),
+        };
       }
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
       joiningCodes.add(code);
       try {
         const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, { code, name, role }, code);
         const payloadRooms = response.payload;
+        const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
         set({
           rooms: {
             ...get().rooms,
@@ -259,6 +347,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               role,
               members: payloadRooms.members || [],
               joined: true,
+              snapshots: snapshotsMap,
             },
           },
         });
@@ -267,7 +356,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           code,
           name: payloadRooms.name || code,
           members: payloadRooms.members || [],
-          snapshots: payloadRooms.snapshots || [],
+          snapshots: Object.values(snapshotsMap),
         };
       } finally {
         joiningCodes.delete(code);
@@ -284,6 +373,60 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       const rest = { ...get().rooms };
       delete rest[code];
       set({ rooms: rest });
+    },
+
+    publishCharacter: async ({ code, characterId, revision, snapshot }) => {
+      const rev = Number.isFinite(revision) ? Number(revision) : Date.now();
+      const readyClient = await ensureClient();
+      readyClient.send(
+        ROOM_MESSAGE.CHAR_PUBLISH,
+        { characterId, revision: rev, snapshot },
+        code,
+      );
+      const current = get().rooms[code];
+      if (current) {
+        set({
+          rooms: {
+            ...get().rooms,
+            [code]: {
+              ...current,
+              snapshots: {
+                ...(current.snapshots || {}),
+                [characterId]: {
+                  characterId,
+                  revision: rev,
+                  snapshot,
+                  fromClientId: 'self',
+                },
+              },
+            },
+          },
+        });
+      }
+    },
+
+    unpublishCharacter: async ({ code, characterId }) => {
+      try {
+        const readyClient = await ensureClient();
+        readyClient.send(
+          ROOM_MESSAGE.CHAR_PUBLISH,
+          { characterId, revision: Date.now(), snapshot: null, removed: true },
+          code,
+        );
+      } catch (error) {
+        debugLog('room.unpublish:sendFailed', { message: (error as Error)?.message });
+      }
+      const current = get().rooms[code];
+      if (current?.snapshots?.[characterId]) {
+        const nextSnapshots = { ...current.snapshots };
+        delete nextSnapshots[characterId];
+        set({
+          rooms: {
+            ...get().rooms,
+            [code]: { ...current, snapshots: nextSnapshots },
+          },
+        });
+      }
     },
   };
 });
