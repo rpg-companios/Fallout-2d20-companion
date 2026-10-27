@@ -114,12 +114,9 @@ if ! git -C "$ROOT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Загрузка Arena-ветки:"
-echo "  $REMOTE/$ARENA_BRANCH"
-
-# Загружает ветку, но не переключает текущую ветку
-# и не выполняет merge/rebase.
+# Загружает ветку тихо, не переключая текущую ветку и без merge/rebase.
 git -C "$ROOT_DIR" fetch \
+  --quiet \
   --no-tags \
   "$REMOTE" \
   "refs/heads/$ARENA_BRANCH"
@@ -128,8 +125,21 @@ FETCHED_COMMIT="$(
   git -C "$ROOT_DIR" rev-parse FETCH_HEAD
 )"
 
-echo "Загружен коммит: $FETCHED_COMMIT"
-echo
+# Подхватываем свежую версию самого apply-patch.sh из загруженного коммита,
+# чтобы обновления установщика срабатывали в том же запуске.
+if [[ "${APPLY_PATCH_BOOTSTRAPPED:-}" != "1" ]]; then
+  FRESH_SELF="$(mktemp "${TMPDIR:-/tmp}/apply-patch.fresh.XXXXXX.sh")"
+  if git -C "$ROOT_DIR" show "${FETCHED_COMMIT}:apply-patch.sh" > "$FRESH_SELF" 2>/dev/null \
+    && [[ -s "$FRESH_SELF" ]] \
+    && ! cmp -s "$FRESH_SELF" "${BASH_SOURCE[0]}"; then
+    chmod +x -- "$FRESH_SELF"
+    rm -f -- "${APPLY_PATCH_SELF:-}"
+    export APPLY_PATCH_BOOTSTRAPPED=1
+    export APPLY_PATCH_SELF="$FRESH_SELF"
+    exec bash "$FRESH_SELF" "$@"
+  fi
+  rm -f -- "$FRESH_SELF"
+fi
 
 WORKDIR="$(mktemp -d "${TMPDIR:-/tmp}/arena-patches.XXXXXX")"
 
@@ -280,6 +290,13 @@ sync_to_baseline() {
   fi
 }
 
+read_app_version() {
+  sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT_DIR/public/version.json" 2>/dev/null | head -1
+}
+
+PREV_VERSION="$(read_app_version || true)"
+BACKUP_CREATED=""
+
 BASELINE_NUM="$(read_baseline_number || true)"
 BASELINE_NAME=""
 BASELINE_COMMIT=""
@@ -292,10 +309,8 @@ if [[ -n "${BASELINE_NUM:-}" ]]; then
 fi
 
 if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
-  # 431: незакоммиченные правки не останавливают установку. Прежде чем
-  # привести дерево к ключевому патчу, установщик сохраняет их в папку-
-  # архив .install-backup/<дата-время>/ (ничего не удаляет). Полный
-  # проход остался для случаев без отсечки (нет ключевого патча/истории).
+  # 431: незакоммиченные правки не останавливают установку — тихо сохраняем
+  # их в .install-backup/<дата-время>/ на случай отката.
   local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
   backup_dir=""
   if [[ -n "$local_dirty" ]]; then
@@ -316,36 +331,15 @@ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID
       mkdir -p "$backup_dir/$(dirname "$entry")"
       cp -R "$ROOT_DIR/$entry" "$backup_dir/$entry"
     done <<<"$local_dirty"
-    echo "В папке проекта были ваши правки. На всякий случай я сохранил их"
-    echo "в папку: .install-backup/$(basename "$backup_dir") (ничего не удалял)."
-    echo "Там сейчас:"
-    while IFS= read -r line; do
-      entry="${line:3}"
-      if [[ "$entry" == *" -> "* ]]; then entry="${entry%% -> *}"; fi
-      [[ -n "$entry" ]] && printf '  - %s\n' "$entry"
-    done <<<"$local_dirty"
-    echo "Если новая версия не понравится, вернуть всё как было можно одной командой"
-    echo "(из папки проекта):"
-    echo "  cp -R .install-backup/$(basename "$backup_dir")/. ."
-    echo "Если среди сохранённого нет ничего ценного — эту папку можно удалить."
-    echo
+    BACKUP_CREATED="$(basename "$backup_dir")"
   fi
   BASELINE_COMMIT="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$BASELINE_NAME" | head -1)"
   if [[ -n "$BASELINE_COMMIT" ]] && git -C "$ROOT_DIR" cat-file -e "$BASELINE_COMMIT" 2>/dev/null; then
     FAST_MODE=1
-    echo "Привожу папку сразу к состоянию №$BASELINE_NUM — старая цепочка патчей не перебирается."
-    echo
     sync_to_baseline
-    if [[ -n "$backup_dir" ]]; then
-      echo "Подсказка: если платформа пересоберёт проект из git, незакоммиченное вернётся"
-      echo "к прежнему — тогда просто запустите установку ещё раз. Свои правки я сохранил"
-      echo "в архиве выше."
-      echo
-    fi
   else
     echo "Отсечка №$BASELINE_NUM недоступна: коммит ключевого патча не найден в загруженной истории."
     echo "Идёт полный проход по цепочке."
-    echo
   fi
 fi
 
@@ -602,41 +596,76 @@ for name in "${STATE_SCOPE[@]}"; do
   fi
 done
 
-if [[ ${#QUEUE[@]} -eq 0 ]]; then
-  APP_VERSION="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT_DIR/public/version.json" 2>/dev/null | head -1)"
-  echo "Готово: приложение уже обновлено до №$PATCH_ID."
-  if [[ -n "${APP_VERSION:-}" ]]; then
-    echo "Версия приложения: $APP_VERSION (public/version.json)."
-  fi
+# Печатает короткий итоговый отчёт (455): какие именно патчи встали
+# (включая промежуточные при прыжке через отсечку) и напоминание про коммит.
+print_concise_summary() {
+  local app_version pending_commit
+  app_version="$(read_app_version || true)"
+
+  local nums=()
   if [[ "$FAST_MODE" -eq 1 ]]; then
-    echo
-    echo "Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом."
-    echo "Пока не закоммичено, пересборка платформы может вернуть прежние файлы — тогда просто"
-    echo "запустите установку ещё раз. Команда для коммита:"
-    echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
+    if [[ -n "${PREV_VERSION:-}" && "$PREV_VERSION" =~ ^[0-9]+[[:alnum:]]*$ ]] \
+      && number_lt "$PREV_VERSION" "$BASELINE_NUM"; then
+      local n pnum
+      for n in "${ALL_PATCHES[@]}"; do
+        pnum="$(patch_number "$n")"
+        if number_lt "$PREV_VERSION" "$pnum" && number_le "$pnum" "$BASELINE_NUM"; then
+          nums+=("№$pnum")
+        fi
+      done
+    elif [[ "${PREV_VERSION:-}" != "$BASELINE_NUM" && "${PREV_VERSION:-}" != "$PATCH_ID" ]]; then
+      nums+=("№$BASELINE_NUM")
+    fi
   fi
-  echo
+
+  local name
+  for name in "$@"; do
+    [[ -n "$name" ]] && nums+=("№$(patch_number "$name")")
+  done
+
+  if [[ ${#nums[@]} -eq 0 ]]; then
+    echo "✓ Патч №$PATCH_ID уже установлен."
+  elif [[ ${#nums[@]} -eq 1 ]]; then
+    if [[ -n "${PREV_VERSION:-}" && "$PREV_VERSION" != "${app_version:-$PATCH_ID}" ]]; then
+      echo "✓ Установлен патч: ${nums[0]} (версия $PREV_VERSION → ${app_version:-$PATCH_ID})"
+    else
+      echo "✓ Установлен патч: ${nums[0]}"
+    fi
+  else
+    local joined="" item
+    for item in "${nums[@]}"; do
+      joined="${joined:+$joined, }$item"
+    done
+    if [[ -n "${PREV_VERSION:-}" && "$PREV_VERSION" != "${app_version:-$PATCH_ID}" ]]; then
+      echo "✓ Установлены патчи: $joined (версия $PREV_VERSION → ${app_version:-$PATCH_ID})"
+    else
+      echo "✓ Установлены патчи: $joined"
+    fi
+  fi
+
+  if [[ -n "${BACKUP_CREATED:-}" ]]; then
+    echo "  Архив прежних правок: .install-backup/$BACKUP_CREATED (откат: cp -R .install-backup/$BACKUP_CREATED/. .)"
+  fi
+
+  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' || true)"
+  if [[ -n "$pending_commit" ]]; then
+    local commit_label="Патч $PATCH_ID"
+    if [[ ${#nums[@]} -gt 1 ]]; then
+      local first_num="${nums[0]#№}"
+      local last_num="${nums[${#nums[@]} - 1]#№}"
+      commit_label="Патчи ${first_num}–${last_num}"
+    fi
+    echo
+    echo "Не забудьте закоммитить, когда будет удобно:"
+    echo "  git add -A && git commit -m \"$commit_label\""
+  fi
+}
+
+if [[ ${#QUEUE[@]} -eq 0 ]]; then
   json_check || exit 1
   deps_check || exit 1
+  print_concise_summary
   exit 0
-fi
-
-echo "По содержимому дерева стоит: ${#UPFRONT_STANDING[@]} (пропускаются молча)."
-echo
-echo "Очередь (вердикт каждому — при применении): ${#QUEUE[@]}"
-for name in "${QUEUE[@]}"; do
-  printf '  %s\n' "$name"
-done
-echo
-
-# --- незакоммиченные изменения: предупреждение -------------------------------
-
-if [[ "$FAST_MODE" -ne 1 && -n "$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null)" ]]; then
-  echo "ВНИМАНИЕ: в дереве есть незакоммиченные изменения."
-  echo "Смешивать их с применением патчей рискованно. Лучше закоммитить"
-  echo "или сделать stash. Продолжаю, но при неудаче откат сделанного"
-  echo "этим запуском: git checkout -- . && git reset"
-  echo
 fi
 
 # Содержимое нового файла из патча (секция «--- /dev/null / +++ b/путь»):
@@ -669,17 +698,13 @@ DEFERRED=()
 for name in "${QUEUE[@]}"; do
   file="$(extract_patch "$name")"
 
-  printf 'Применение: %s ... ' "$name"
-
   if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>"$WORKDIR/fwd.err"; then
     git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
-    echo "ок"
     APPLIED+=("$name")
     continue
   fi
 
   if check_reverse "$file"; then
-    echo "ок (по проверке уже стоит — дерево не тронуто)"
     STANDING_LATE+=("$name")
     continue
   fi
@@ -706,16 +731,11 @@ for name in "${QUEUE[@]}"; do
   if [[ $leftovers_ok -eq 1 && ${#moved[@]} -gt 0 ]]; then
     if git -C "$ROOT_DIR" apply --check --whitespace=nowarn "$file" 2>/dev/null; then
       git -C "$ROOT_DIR" apply --whitespace=nowarn "$file"
-      echo "ок (остатки отката совпали байт в байт — воссозданы патчем)"
       APPLIED+=("$name")
       apply_done=1
     fi
   fi
   if [[ $apply_done -ne 1 && ${#moved[@]} -gt 0 ]]; then
-    # Вернуть перемещённое на место ВСЕГДА: и когда очередной файл не
-    # совпал (leftovers_ok=0), и когда проверка с перемещённым не прошла.
-    # Раньше возврат был только во второй ветке — частично перемещённые
-    # файлы терялись из дерева (случай с приёмочным тестом тест-сеттинга).
     for p in "${moved[@]}"; do
       [[ -e "$WORKDIR/leftovers/$p" ]] && mv "$WORKDIR/leftovers/$p" "$ROOT_DIR/$p"
     done
@@ -725,7 +745,6 @@ for name in "${QUEUE[@]}"; do
     continue
   fi
 
-  echo "отложен (дерево разошлось — проверю по ходу цепочки)"
   DEFERRED+=("$name")
 done
 
@@ -789,38 +808,9 @@ if [[ ${#DEFERRED[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#UNVALIDATED[@]} -eq 0 ]]; then
-  APP_VERSION="$(sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' "$ROOT_DIR/public/version.json" 2>/dev/null | head -1)"
-  echo
-  echo "Готово: приложение обновлено до №$PATCH_ID."
-  if [[ -n "${APP_VERSION:-}" ]]; then
-    echo "Версия приложения: $APP_VERSION (public/version.json)."
-  fi
-  if [[ ${#APPLIED[@]} -eq 0 ]]; then
-    echo "Содержимое папки точно соответствует №$PATCH_ID."
-  else
-    echo "Применено патчей: ${#APPLIED[@]}"
-    printf '  %s\n' "${APPLIED[@]}"
-  fi
-  if [[ ${#DEFERRED[@]} -gt 0 ]]; then
-    echo
-    echo "Отложено (подтверждено поздними патчами): ${#DEFERRED[@]}"
-    printf '  %s\n' "${DEFERRED[@]}"
-  fi
-  if [[ "$FAST_MODE" -eq 1 ]]; then
-    echo "Патчи до №$BASELINE_NUM по одному не перебирались — их содержимое уже в папке."
-  fi
-  echo
   json_check || exit 1
   deps_check || exit 1
-  echo "Источник: $REMOTE/$ARENA_BRANCH"
-  echo "Коммит:   $FETCHED_COMMIT"
-  if [[ ${#APPLIED[@]} -gt 0 || "$FAST_MODE" -eq 1 ]]; then
-    echo
-    echo "Коммитьте, когда удобно: можно накопить несколько установок и записать одним коммитом."
-    echo "Пока не закоммичено, пересборка платформы может вернуть прежние файлы — тогда просто"
-    echo "запустите установку ещё раз. Команда для коммита:"
-    echo "  git add -A && git commit -m \"Приложение обновлено: цель №$PATCH_ID\""
-  fi
+  print_concise_summary ${APPLIED+"${APPLIED[@]}"}
   exit 0
 fi
 

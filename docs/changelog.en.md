@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Concise patch installer output with explicit patch list (patch 455)
+
+Trimmed noisy output from `apply-patch.sh`:
+- Jumping straight to a newer patch now explicitly lists every included
+  intermediate patch (e.g. `✓ Установлены патчи: №453, №454, №455`).
+- Output now shows only whether patches were installed and a brief commit
+  reminder when uncommitted changes exist.
+- Added automatic self-handoff to the newly fetched `apply-patch.sh` on
+  the same run.
+
+---
 ## Anti-stale browser web cache without wiping Metro cache (patch 454)
 
 Separated server-side Metro transform caching from browser web caching so
