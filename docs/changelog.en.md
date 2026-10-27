@@ -1,5 +1,19 @@
 # Changelog
 ---
+## Instant startup & live boot status screen (patch 457)
+
+Eliminated the multi-minute blank-screen startup delay:
+- The server binds its port immediately and checks a SHA-256 source fingerprint:
+  when sources are unchanged, the prebuilt gzipped bundle (~835 KB) is served in
+  under a second instead of running a full Metro dev compile on every launch.
+- When sources change (e.g. after applying a patch), the browser immediately
+  shows a live dark startup status screen (server pulse, current stage, elapsed
+  timer, and automatic transition when ready, plus an inline pre-React loader in
+  `index.html` so the screen is never blank).
+- Persisted Metro's transform cache inside `.expo/metro-cache` so incremental
+  rebuilds complete in seconds across container restarts.
+
+---
 ## Connected room characters, strict GM/User separation & status badge (patch 456)
 
 Completed live character sync between the User section and GM rooms:

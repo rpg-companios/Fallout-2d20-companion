@@ -266,7 +266,7 @@ describe('Патч 453: комнаты мастера в Metro, честный �
     expect(swSrc).toContain('handleImmutableAsset');
 
     const replitCfg = fs.readFileSync(path.join(ROOT, '.replit'), 'utf8');
-    expect(replitCfg).toContain('env CI=1 npx expo start --web --port 5000');
+    expect(replitCfg).toContain('PORT=5000 node server/start.js');
     expect(replitCfg).not.toContain('--clear');
   });
 });

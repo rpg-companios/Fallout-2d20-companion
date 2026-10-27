@@ -54,12 +54,71 @@
       /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
+        margin: 0;
+        background-color: #121212;
       }
       /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
+      }
+      @keyframes positronium-spin {
+        to { transform: rotate(360deg); }
+      }
+      .positronium-preboot {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #121212;
+        color: #f0e68c;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        padding: 24px;
+        text-align: center;
+      }
+      .positronium-preboot-ring {
+        width: 38px;
+        height: 38px;
+        border: 3px solid rgba(240, 230, 140, 0.2);
+        border-top-color: #f0e68c;
+        border-radius: 50%;
+        animation: positronium-spin 0.9s linear infinite;
+        margin-bottom: 16px;
+      }
+      .positronium-preboot-title {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.6px;
+        margin-bottom: 6px;
+      }
+      .positronium-preboot-sub {
+        font-size: 13px;
+        color: #9ca3af;
+      }
+      .positronium-preboot-err {
+        display: none;
+        margin-top: 14px;
+        max-width: 360px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(220, 38, 38, 0.16);
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        color: #fca5a5;
+        font-size: 12px;
+      }
+      .positronium-preboot-btn {
+        display: none;
+        margin-top: 12px;
+        padding: 9px 18px;
+        border: 0;
+        border-radius: 8px;
+        background: #d4af37;
+        color: #111827;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
       }
     </style>
   </head>
@@ -69,7 +128,40 @@
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
+    <!-- The root element for your Expo app (мгновенный индикатор до старта React, заменяется автоматически при монтировании). -->
+    <div id="root">
+      <div class="positronium-preboot" id="positronium-preboot">
+        <div class="positronium-preboot-ring" id="positronium-preboot-ring"></div>
+        <div class="positronium-preboot-title">Positronium</div>
+        <div class="positronium-preboot-sub" id="positronium-preboot-sub">Загрузка интерфейса…</div>
+        <div class="positronium-preboot-err" id="positronium-preboot-err"></div>
+        <button class="positronium-preboot-btn" id="positronium-preboot-btn" onclick="location.reload()">Обновить страницу</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var t0 = Date.now();
+        var timer = setInterval(function () {
+          var sub = document.getElementById('positronium-preboot-sub');
+          if (!sub) { clearInterval(timer); return; }
+          var sec = Math.floor((Date.now() - t0) / 1000);
+          if (sec >= 2) {
+            sub.textContent = 'Загрузка модулей приложения… ' + sec + ' сек';
+          }
+        }, 1000);
+        window.addEventListener('error', function (ev) {
+          var errBox = document.getElementById('positronium-preboot-err');
+          var btn = document.getElementById('positronium-preboot-btn');
+          var ring = document.getElementById('positronium-preboot-ring');
+          if (!errBox) return;
+          if (ev && ev.target && ev.target.tagName === 'SCRIPT') {
+            if (ring) ring.style.display = 'none';
+            errBox.style.display = 'block';
+            errBox.textContent = 'Не удалось загрузить скрипт приложения. Возможно, сервер перезапускается.';
+            if (btn) btn.style.display = 'inline-block';
+          }
+        }, true);
+      })();
+    </script>
   </body>
 </html>
