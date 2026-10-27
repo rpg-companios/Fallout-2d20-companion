@@ -1,5 +1,17 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (458) — исключение `.kiro`, `.install-backup` / `.installbackup` и `.publish` из сборки, проверок и архивации
+
+Слово владельца:
+«.kiro, .installbackup, .publish, тоже можно не учитывать (если учитываются).»
+
+- Исправлено:
+  1. `metro.config.js`: единый список исключений внутри корня проекта (`IGNORED_WORKSPACE_DIR_NAMES`: `.local`, `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents`, `.expo`, `patchs`, `dist`, `docs`, `item-forge`, `screenshots`, `сеттинги`) применяется и к `resolver.blockList`, и к `watchFolders` — вложенные репозитории публикации в `.publish/` и бэкапы установки больше никогда не сканируются Metro.
+  2. `server/start.js`: `IGNORED_WORKSPACE_DIRS` явно исключает `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents` при расчёте отпечатка исходников.
+  3. `vitest.config.js` + предохранители `settings-boundary.test.js`, `no-js-ts-duplicates.test.js`, `tsconfig-coverage.test.js`: `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents` добавлены в `exclude` / `SKIP_DIRS` / `EXCLUDED_DIRS`, чтобы копии файлов из бэкапов и `.publish/` не попадали в прогон тестов и проверки TS/границ.
+  4. `apply-patch.sh` + `.gitignore`: добавлен `.installbackup/`, а изменения в `.kiro/`, `.publish/` и `.installbackup/` не копируются повторно в `.install-backup/` и не затираются при `sync_to_baseline`.
+- Приёмочные тесты: `__tests__/screens/ignored-workspace-dirs-458.test.js` (3 теста).
+
 ## 2026-10-27 (457) — мгновенный запуск сервера, кэш сборки по отпечатку исходников и живой индикатор старта
 
 Слово владельца:

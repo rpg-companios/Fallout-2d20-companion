@@ -41,5 +41,6 @@ yarn-error.*
 settings/pins.json
 package-lock — копия.json
 
-# архив локальных правок перед установкой (патч 431)
+# архив локальных правок перед установкой (патч 431 / 458)
 .install-backup/
+.installbackup/

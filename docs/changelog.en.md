@@ -1,5 +1,13 @@
 # Changelog
 ---
+## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patch 458)
+
+Excluded `.kiro`, `.install-backup` / `.installbackup`, `.publish`, and `.agents`
+across Metro (`blockList` and `watchFolders`), server source fingerprinting,
+Vitest test discovery, repository guardrail walkers, and `apply-patch.sh`
+backup/baseline sync.
+
+---
 ## Instant startup & live boot status screen (patch 457)
 
 Eliminated the multi-minute blank-screen startup delay:

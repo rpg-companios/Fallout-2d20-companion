@@ -50,6 +50,24 @@ const SOURCE_DIRS = [
   'settings',
 ];
 
+const IGNORED_WORKSPACE_DIRS = new Set([
+  '.local',
+  '.kiro',
+  '.install-backup',
+  '.installbackup',
+  '.publish',
+  '.agents',
+  '.expo',
+  '.git',
+  'node_modules',
+  'patchs',
+  'dist',
+  'docs',
+  'item-forge',
+  'screenshots',
+  'сеттинги',
+]);
+
 const TEXT_EXTENSIONS = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.json', '.html', '.css', '.cjs', '.mjs',
 ]);
@@ -95,7 +113,7 @@ const computeSourceScan = (rootDir) => {
     try { entries = fs.readdirSync(dirPath, { withFileTypes: true }); } catch { return; }
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
+      if (entry.name.startsWith('.') || IGNORED_WORKSPACE_DIRS.has(entry.name)) continue;
       const abs = path.join(dirPath, entry.name);
       const rel = `${relBase}/${entry.name}`;
       if (entry.isDirectory()) walk(abs, rel);
@@ -674,6 +692,7 @@ if (require.main === module) {
 
 module.exports = {
   FINGERPRINT_FILE,
+  IGNORED_WORKSPACE_DIRS,
   computeSourceFingerprint,
   isDistUpToDate,
   renderBootStatusHtml,

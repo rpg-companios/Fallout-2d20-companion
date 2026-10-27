@@ -1,0 +1,412 @@
+diff --git a/.gitignore b/.gitignore
+index aa9f93b..f6f0e8e 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -41,5 +41,6 @@ yarn-error.*
+ settings/pins.json
+ package-lock — копия.json
+ 
+-# архив локальных правок перед установкой (патч 431)
++# архив локальных правок перед установкой (патч 431 / 458)
+ .install-backup/
++.installbackup/
+diff --git a/__tests__/screens/ignored-workspace-dirs-458.test.js b/__tests__/screens/ignored-workspace-dirs-458.test.js
+new file mode 100644
+index 0000000..0d4cb5b
+--- /dev/null
++++ b/__tests__/screens/ignored-workspace-dirs-458.test.js
+@@ -0,0 +1,85 @@
++// Регрессионные тесты патча 458:
++// служебные каталоги .kiro, .install-backup, .installbackup, .publish (и .agents)
++// полностью исключены из обхода Metro (blockList + watchFolders), расчёта
++// отпечатка исходников server/start.js, запуска Vitest и обходчиков-предохранителей.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++
++import metroConfig from '../../metro.config.js';
++import vitestConfig from '../../vitest.config.js';
++import {
++  IGNORED_WORKSPACE_DIRS,
++  computeSourceFingerprint,
++} from '../../server/start.js';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++describe('Патч 458: исключение .kiro, .install-backup/.installbackup и .publish из сборки и проверок', () => {
++  it('Metro blockList блокирует .kiro, .install-backup, .installbackup и .publish внутри проекта, не трогая pnpm', () => {
++    const blockList = metroConfig.resolver.blockList;
++    const isBlocked = (p) => blockList.some((re) => re.test(p));
++
++    expect(isBlocked(path.join(ROOT, '.kiro/specs/test.md'))).toBe(true);
++    expect(isBlocked(path.join(ROOT, '.install-backup/2026-10-27/App.js'))).toBe(true);
++    expect(isBlocked(path.join(ROOT, '.installbackup/2026-10-27/App.js'))).toBe(true);
++    expect(isBlocked(path.join(ROOT, '.publish/ttrpg-engine/package.json'))).toBe(true);
++    expect(isBlocked(path.join(ROOT, '.publish/positronium-game-settings/index.js'))).toBe(true);
++    expect(isBlocked(path.join(ROOT, '.agents/memory/MEMORY.md'))).toBe(true);
++
++    // Глобальный кэш pnpm вне проекта остаётся доступным
++    expect(isBlocked('/home/runner/.local/share/pnpm/expo/index.js')).toBe(false);
++    // Боевые исходники остаются доступными
++    expect(isBlocked(path.join(ROOT, 'App.js'))).toBe(false);
++    expect(isBlocked(path.join(ROOT, 'src/room/roomStore.ts'))).toBe(false);
++  });
++
++  it('отпечаток исходников server/start.js не реагирует на файлы внутри .kiro, .install-backup, .installbackup, .publish', () => {
++    for (const dir of ['.kiro', '.install-backup', '.installbackup', '.publish', '.agents']) {
++      expect(IGNORED_WORKSPACE_DIRS.has(dir)).toBe(true);
++    }
++
++    const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'positronium-458-'));
++    try {
++      fs.mkdirSync(path.join(tmpRoot, 'src'), { recursive: true });
++      fs.writeFileSync(path.join(tmpRoot, 'App.js'), 'export default function App() {}\n', 'utf8');
++      fs.writeFileSync(path.join(tmpRoot, 'src', 'a.js'), 'export const a = 1;\n', 'utf8');
++
++      const fpBefore = computeSourceFingerprint(tmpRoot);
++
++      for (const ignored of ['.kiro', '.install-backup', '.installbackup', '.publish', '.agents']) {
++        const sub = path.join(tmpRoot, ignored, 'nested');
++        fs.mkdirSync(sub, { recursive: true });
++        fs.writeFileSync(path.join(sub, 'App.js'), `// copy in ${ignored}\n`, 'utf8');
++        fs.writeFileSync(path.join(sub, 'extra.ts'), 'export const x: number = 2;\n', 'utf8');
++      }
++
++      const fpAfter = computeSourceFingerprint(tmpRoot);
++      expect(fpAfter).toBe(fpBefore);
++    } finally {
++      fs.rmSync(tmpRoot, { recursive: true, force: true });
++    }
++  });
++
++  it('Vitest и обходчики-предохранители исключают .kiro, .install-backup, .installbackup и .publish', () => {
++    const excludes = vitestConfig?.test?.exclude || [];
++    expect(excludes).toContain('.kiro/**');
++    expect(excludes).toContain('.install-backup/**');
++    expect(excludes).toContain('.installbackup/**');
++    expect(excludes).toContain('.publish/**');
++
++    for (const rel of [
++      '__tests__/settings/settings-boundary.test.js',
++      '__tests__/typescript/no-js-ts-duplicates.test.js',
++      '__tests__/typescript/tsconfig-coverage.test.js',
++    ]) {
++      const src = fs.readFileSync(path.join(ROOT, rel), 'utf8');
++      expect(src).toContain("'.kiro'");
++      expect(src).toContain("'.install-backup'");
++      expect(src).toContain("'.installbackup'");
++      expect(src).toContain("'.publish'");
++    }
++  });
++});
+diff --git a/__tests__/settings/settings-boundary.test.js b/__tests__/settings/settings-boundary.test.js
+index 6d8e744..d041639 100644
+--- a/__tests__/settings/settings-boundary.test.js
++++ b/__tests__/settings/settings-boundary.test.js
+@@ -41,6 +41,8 @@ const DEBT = new Set([
+ const SKIP_DIRS = new Set([
+   'node_modules', '.git', '.expo', 'dist', 'patchs', 'modules', '__tests__',
+   'coverage', 'android', 'ios', 'assets',
++  '.kiro', '.install-backup', '.installbackup', '.publish', '.agents', '.local',
++  'сеттинги', 'item-forge',
+ ]);
+ 
+ /** Импорт внутренности сеттинга: modules/<имя>/(data|i18n)/… в import/require-строке. */
+diff --git a/__tests__/typescript/no-js-ts-duplicates.test.js b/__tests__/typescript/no-js-ts-duplicates.test.js
+index 489ae74..02149a7 100644
+--- a/__tests__/typescript/no-js-ts-duplicates.test.js
++++ b/__tests__/typescript/no-js-ts-duplicates.test.js
+@@ -10,7 +10,10 @@ import fs from 'node:fs';
+ import path from 'node:path';
+ 
+ const ROOT = path.resolve(__dirname, '../..');
+-const EXCLUDED_DIRS = new Set(['node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local', '.expo']);
++const EXCLUDED_DIRS = new Set([
++  'node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local', '.expo',
++  '.install-backup', '.installbackup', '.publish', '.agents', 'item-forge',
++]);
+ // Пары «маскирующих» друг друга расширений: левый выигрывает у правого при дубле.
+ const CONFLICTING_PAIRS = [
+   ['.js', '.ts'],
+diff --git a/__tests__/typescript/tsconfig-coverage.test.js b/__tests__/typescript/tsconfig-coverage.test.js
+index 4886143..a7a9535 100644
+--- a/__tests__/typescript/tsconfig-coverage.test.js
++++ b/__tests__/typescript/tsconfig-coverage.test.js
+@@ -18,6 +18,7 @@ const TSCONFIG_PATH = path.join(ROOT, 'tsconfig.json');
+ const EXCLUDED_DIRS = new Set([
+   'node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local',
+   'public', 'assets', '__tests__', '.expo',
++  '.install-backup', '.installbackup', '.publish', '.agents',
+   // item-forge — ОТДЕЛЬНОЕ приложение (решение владельца 2026-10-19) со своим
+   // tsconfig и своим гейтом `tsc --noEmit` в npm run build внутри папки;
+   // покрытие его .tsx — там, а не в основном include.
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 2c57c8a..664176d 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -278,10 +278,10 @@ read_baseline_number() {
+ # содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
+ # которых в этом состоянии уже нет.
+ sync_to_baseline() {
+-  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
++  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' ':(exclude).kiro' ':(exclude).publish' | tar -x -C "$ROOT_DIR"
+   local baseline_files tracked_files stale
+-  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
+-  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
++  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
++  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
+   stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+   if [[ -n "$stale" ]]; then
+     while IFS= read -r f; do
+@@ -311,7 +311,7 @@ fi
+ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
+   # 431: незакоммиченные правки не останавливают установку — тихо сохраняем
+   # их в .install-backup/<дата-время>/ на случай отката.
+-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
++  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
+   backup_dir=""
+   if [[ -n "$local_dirty" ]]; then
+     backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"
+@@ -647,7 +647,7 @@ print_concise_summary() {
+     echo "  Архив прежних правок: .install-backup/$BACKUP_CREATED (откат: cp -R .install-backup/$BACKUP_CREATED/. .)"
+   fi
+ 
+-  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' || true)"
++  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
+   if [[ -n "$pending_commit" ]]; then
+     local commit_label="Патч $PATCH_ID"
+     if [[ ${#nums[@]} -gt 1 ]]; then
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 1553e77..4519f74 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,17 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (458) — исключение `.kiro`, `.install-backup` / `.installbackup` и `.publish` из сборки, проверок и архивации
++
++Слово владельца:
++«.kiro, .installbackup, .publish, тоже можно не учитывать (если учитываются).»
++
++- Исправлено:
++  1. `metro.config.js`: единый список исключений внутри корня проекта (`IGNORED_WORKSPACE_DIR_NAMES`: `.local`, `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents`, `.expo`, `patchs`, `dist`, `docs`, `item-forge`, `screenshots`, `сеттинги`) применяется и к `resolver.blockList`, и к `watchFolders` — вложенные репозитории публикации в `.publish/` и бэкапы установки больше никогда не сканируются Metro.
++  2. `server/start.js`: `IGNORED_WORKSPACE_DIRS` явно исключает `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents` при расчёте отпечатка исходников.
++  3. `vitest.config.js` + предохранители `settings-boundary.test.js`, `no-js-ts-duplicates.test.js`, `tsconfig-coverage.test.js`: `.kiro`, `.install-backup`, `.installbackup`, `.publish`, `.agents` добавлены в `exclude` / `SKIP_DIRS` / `EXCLUDED_DIRS`, чтобы копии файлов из бэкапов и `.publish/` не попадали в прогон тестов и проверки TS/границ.
++  4. `apply-patch.sh` + `.gitignore`: добавлен `.installbackup/`, а изменения в `.kiro/`, `.publish/` и `.installbackup/` не копируются повторно в `.install-backup/` и не затираются при `sync_to_baseline`.
++- Приёмочные тесты: `__tests__/screens/ignored-workspace-dirs-458.test.js` (3 теста).
++
+ ## 2026-10-27 (457) — мгновенный запуск сервера, кэш сборки по отпечатку исходников и живой индикатор старта
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index f046d25..e59b3c9 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,12 @@
+ # Changelog
++---
++## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patch 458)
++
++Excluded `.kiro`, `.install-backup` / `.installbackup`, `.publish`, and `.agents`
++across Metro (`blockList` and `watchFolders`), server source fingerprinting,
++Vitest test discovery, repository guardrail walkers, and `apply-patch.sh`
++backup/baseline sync.
++
+ ---
+ ## Instant startup & live boot status screen (patch 457)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 16a5c05..0732208 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,13 @@
+ # История изменений
+ 
++---
++## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патч 458)
++
++Служебные каталоги `.kiro`, `.install-backup` / `.installbackup`, `.publish` и
++`.agents` полностью исключены из обхода сборщика Metro (`blockList` и
++`watchFolders`), расчёта отпечатка исходников при старте сервера, запуска
++тестов Vitest, архитектурных проверок и резервного копирования в `apply-patch.sh`.
++
+ ---
+ ## Быстрый старт и живой индикатор запуска (патч 457)
+ 
+diff --git a/metro.config.js b/metro.config.js
+index 7aca9fc..cd999c7 100644
+--- a/metro.config.js
++++ b/metro.config.js
+@@ -4,16 +4,31 @@ const path = require('path');
+ const config = getDefaultConfig(__dirname);
+ 
+ const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+-const workspaceLocalDir = path.resolve(__dirname, '.local');
+-const workspaceKiroDir = path.resolve(__dirname, '.kiro');
+-const workspaceBackupDir = path.resolve(__dirname, '.install-backup');
+-const workspacePatchesDir = path.resolve(__dirname, 'patchs');
+-const workspaceDistDir = path.resolve(__dirname, 'dist');
+-const workspaceDocsDir = path.resolve(__dirname, 'docs');
+-const workspaceItemForgeDir = path.resolve(__dirname, 'item-forge');
+-const workspaceScreenshotsDir = path.resolve(__dirname, 'screenshots');
+ const workspaceExpoDir = path.resolve(__dirname, '.expo');
+ 
++// Служебные и не-рантаймовые каталоги ВНУТРИ корня проекта, которые Metro не
++// должен обходить ни в резолвере (blockList), ни в вотчере (watchFolders).
++// Все пути привязаны строго к __dirname, чтобы не затрагивать глобальное
++// хранилище pnpm (/home/runner/.local/share/pnpm/...).
++const IGNORED_WORKSPACE_DIR_NAMES = [
++  '.local',
++  '.kiro',
++  '.install-backup',
++  '.installbackup',
++  '.publish',
++  '.agents',
++  '.expo',
++  'patchs',
++  'dist',
++  'docs',
++  'item-forge',
++  'screenshots',
++  'сеттинги',
++];
++const ignoredWorkspaceDirs = IGNORED_WORKSPACE_DIR_NAMES.map((name) =>
++  path.resolve(__dirname, name),
++);
++
+ // Храним кэш трансформации Metro внутри .expo/metro-cache (в рабочей папке, а не
+ // в /tmp), чтобы при перезапуске контейнера Replit и после установки патчей
+ // пересобирались только изменённые файлы (секунды вместо минут).
+@@ -45,20 +60,11 @@ config.resolver = {
+   ...config.resolver,
+   unstable_enablePackageExports: true,
+   unstable_conditionNames: ['require', 'react-native', 'default'],
+-  // Блокируем только служебные и не-рантаймовые каталоги ВНУТРИ проекта
+-  // (.local, .kiro, .install-backup, patchs, dist, docs, item-forge, screenshots, .expo),
+-  // не затрагивая глобальное хранилище pnpm (/home/runner/.local/share/pnpm/...).
+   blockList: [
+     ...defaultBlockList,
+-    new RegExp(`^${escapeRegExp(workspaceLocalDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceKiroDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceBackupDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspacePatchesDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceDistDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceDocsDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceItemForgeDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceScreenshotsDir)}[/\\\\].*`),
+-    new RegExp(`^${escapeRegExp(workspaceExpoDir)}[/\\\\].*`),
++    ...ignoredWorkspaceDirs.map(
++      (dirPath) => new RegExp(`^${escapeRegExp(dirPath)}[/\\\\].*`),
++    ),
+   ],
+   resolveRequest(context, moduleName, platform) {
+     if (platform === 'web' && moduleName === 'fontfaceobserver') {
+@@ -138,11 +144,8 @@ config.server = {
+ config.watchFolders = (config.watchFolders || []).filter(
+   (folder) => {
+     const resolved = path.resolve(folder);
+-    return (
+-      resolved !== workspaceLocalDir &&
+-      !resolved.startsWith(`${workspaceLocalDir}${path.sep}`) &&
+-      resolved !== workspaceKiroDir &&
+-      !resolved.startsWith(`${workspaceKiroDir}${path.sep}`)
++    return !ignoredWorkspaceDirs.some(
++      (ignored) => resolved === ignored || resolved.startsWith(`${ignored}${path.sep}`),
+     );
+   }
+ );
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 3490a3b..9258802 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "457"
++  "baseline": "458"
+ }
+diff --git a/public/version.json b/public/version.json
+index 4c40003..f05755c 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "457",
++  "version": "458",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/start.js b/server/start.js
+index 31f51f8..95fcc96 100644
+--- a/server/start.js
++++ b/server/start.js
+@@ -50,6 +50,24 @@ const SOURCE_DIRS = [
+   'settings',
+ ];
+ 
++const IGNORED_WORKSPACE_DIRS = new Set([
++  '.local',
++  '.kiro',
++  '.install-backup',
++  '.installbackup',
++  '.publish',
++  '.agents',
++  '.expo',
++  '.git',
++  'node_modules',
++  'patchs',
++  'dist',
++  'docs',
++  'item-forge',
++  'screenshots',
++  'сеттинги',
++]);
++
+ const TEXT_EXTENSIONS = new Set([
+   '.js', '.jsx', '.ts', '.tsx', '.json', '.html', '.css', '.cjs', '.mjs',
+ ]);
+@@ -95,7 +113,7 @@ const computeSourceScan = (rootDir) => {
+     try { entries = fs.readdirSync(dirPath, { withFileTypes: true }); } catch { return; }
+     entries.sort((a, b) => a.name.localeCompare(b.name));
+     for (const entry of entries) {
+-      if (entry.name.startsWith('.')) continue;
++      if (entry.name.startsWith('.') || IGNORED_WORKSPACE_DIRS.has(entry.name)) continue;
+       const abs = path.join(dirPath, entry.name);
+       const rel = `${relBase}/${entry.name}`;
+       if (entry.isDirectory()) walk(abs, rel);
+@@ -674,6 +692,7 @@ if (require.main === module) {
+ 
+ module.exports = {
+   FINGERPRINT_FILE,
++  IGNORED_WORKSPACE_DIRS,
+   computeSourceFingerprint,
+   isDistUpToDate,
+   renderBootStatusHtml,
+diff --git a/vitest.config.js b/vitest.config.js
+index 49ac171..71b409d 100644
+--- a/vitest.config.js
++++ b/vitest.config.js
+@@ -1,4 +1,4 @@
+-import { defineConfig } from 'vitest/config';
++import { configDefaults, defineConfig } from 'vitest/config';
+ import babel from '@babel/core';
+ import jsxPlugin from '@babel/plugin-transform-react-jsx';
+ 
+@@ -51,5 +51,16 @@ export default defineConfig({
+   test: {
+     environment: 'node',
+     setupFiles: ['./src/store/__test-setup__/asyncStorageMock.js'],
++    exclude: [
++      ...configDefaults.exclude,
++      '.kiro/**',
++      '.install-backup/**',
++      '.installbackup/**',
++      '.publish/**',
++      '.agents/**',
++      '.local/**',
++      '.expo/**',
++      'patchs/**',
++    ],
+   },
+ });
