@@ -1,30 +1,26 @@
 {
-  "version": "460",
-  "release": 3,
+  "version": "461",
+  "release": 4,
   "notes": {
     "ru-RU": [
-      "Перки сверены с книгами: добавлены новые перки с их механиками — Супер Дупер, Омолодившийся, Верблюд, Гулеподобный, Кровосос, Фармацевт, Мощный пользователь и другие; требования перков — как в книге.",
-      "Старые сохранения переносятся сами; перки, недоступные по книге, больше не пропадают — они серые, и приложение объясняет, что не так.",
-      "Ремонт по книге: оружие и броня чинятся тестом Интеллект + Ремонт; сложность зависит от редкости и улучшений, донор её снижает; способы — за материалы, за донора или «Очумелые ручки» (бесплатно, но некачественно).",
-      "Прочность включена по умолчанию; износ оружия и «произвольное качество при крафте» — теперь два самостоятельных пункта настроек.",
-      "На карточках снаряжения показана Редкость.",
-      "Фильтры в окнах добычи и покупки: кнопка-воронка открывает отдельное окно; чекбоксы категорий — Оружие, Броня, Силовая броня, Одежда — показывают только свои параметры; внутри — редкость, урон, скорострельность, дистанция, тип урона, тип оружия, патроны, качества, эффекты, части тела.",
-      "На кнопке фильтра — число активных условий; кнопка «Показать» называет число находок и показывает отсортированный список «Найдено: N»; качества в фильтре — только те, что реально встречаются на оружии.",
-      "Кнопка «Сон\\Ждать»: в модалке сна появился пункт «Ожидание» — время идёт, тратятся все три параметра выживания (Голод, Жажда, Сон) и ничего не восполняется; если ОЗ уйдут ниже нуля — «Персонаж умер».",
-      "Обновление приложения: установка занимает секунды, сообщения понятны, а локальные правки перед установкой сохраняются в архив — их можно вернуть целиком.",
-      "Длинные окна прокруваются правильно: заголовок и кнопки остаются на месте."
+      "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
+      "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
+      "Категория «Самодельное снаряжение»: предметы из загруженных наборов собраны в отдельной категории со своими подразделами по типам оружия, робо-оружию и боеприпасам, а также доступны в лавке и окне модификации оружия.",
+      "Комнаты мастера и «Экран администратора»: при включении опции в Настройках мастер создаёт сетевые комнаты с кодом приглашения и видит внутри комнаты карточки подключённых персонажей с обновлениями при сохранении.",
+      "Подключение к комнате через пункт «Сервер» в меню персонажа: привязанный персонаж переподключается к своей комнате автоматически без повторного ввода кода, а перенос по личным папкам не сбрасывает привязку.",
+      "Значок сети на карточке привязанного персонажа показывает статус связи (зелёный — мастер в сети и комната доступна, бледный — не в сети); личные персонажи и комнаты мастера строго разделены между режимами «Пользователь» и «Админ».",
+      "Быстрый запуск веб-приложения: готовая сжатая сборка открывается за секунды, а во время обновления на экране сразу отображается живой индикатор запуска вместо пустого тёмного окна.",
+      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
-      "Perks checked against the books: new perks with their mechanics — Super Duper, Rejuvenated, Dromedary, Ghoulish, Bloodsucker, Pharmacist, Power User and more; perk requirements follow the book.",
-      "Old saves migrate on their own; perks unavailable by the book no longer vanish — they are greyed out and the app explains why.",
-      "Repair by the book: weapons and armor are fixed with an Intelligence + Repair test; difficulty depends on rarity and mods, a donor lowers it; ways — materials, a donor, or «Jury Rigging» (free, but shoddy).",
-      "Durability is on by default; weapon wear and «random quality when crafting» are now two separate settings.",
-      "Item cards show Rarity.",
-      "Filters in the loot and buy windows: a funnel button opens a separate window; category checkboxes — Weapons, Armor, Power Armor, Clothing — show only their own parameters; inside — rarity, damage, fire rate, distance, damage type, weapon type, ammo, qualities, effects, body parts.",
-      "The filter button shows the number of active conditions; the «Show» button names the number of matches and lists them sorted as «Found: N»; filter qualities are only those actually found on weapons.",
-      "The «Sleep\\Wait» button: the sleep modal gained a «Wait» option — time passes, all three survival parameters (Hunger, Thirst, Sleep) are spent and nothing is replenished; if HP drops below zero — «Character died».",
-      "App updates: installation takes seconds, the messages are clear, and local edits are archived before installing — you can bring them all back.",
-      "Long windows scroll properly: the header and buttons stay in place."
+      "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
+      "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
+      "«Homebrew Equipment» category: items from loaded packs appear in their own category with subsections by weapon type, robot weapons, and ammo, and are available in the shop and weapon modification window.",
+      "Game master rooms and «Admin screen»: when enabled in Settings, the GM can create online rooms with an invite code and view connected character cards inside the room with live updates on save.",
+      "Connecting to a room via «Server» in the character menu: a bound character reconnects to its room automatically without re-entering the code, and moving it between personal folders keeps the binding intact.",
+      "A network badge on a bound character card shows connection status (green when the GM is online and the room is active, dim when offline); personal characters and GM rooms stay strictly separated between «User» and «Admin» modes.",
+      "Fast web app startup: the compressed build opens in seconds, and during an update a live startup indicator appears right away instead of a blank dark screen.",
+      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing."
     ]
   }
 }

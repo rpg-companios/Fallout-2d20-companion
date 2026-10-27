@@ -1,5 +1,18 @@
 # Changelog
 ---
+## Release 4 — «What's new» notes (patch 461)
+
+Owner's word: ship a new release. Raised `release` to **4** in
+`public/version.json` (the «What's new» modal shows the notes once on first
+open after updating) and rewrote paired `ru-RU` / `en-EN` release notes
+covering patches 441–460 in player language: custom character portraits, the
+«Own equipment» Settings section and «Homebrew Equipment» category, GM rooms
+and the «Admin screen» toggle, room connection via «Server» with auto-reconnect
+and card status badge, strict «User» / «Admin» separation, fast web startup
+with a live boot status indicator, high-priority icon loading, and automatic
+browser version refresh.
+
+---
 ## Clean up unused workspace folders and one-off artifacts (patch 460)
 
 Removed unused clutter and leftover artifacts from the repository:
