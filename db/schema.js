@@ -50,4 +50,23 @@ export const CREATE_TABLES = [
     md5 TEXT,
     updated_at INTEGER NOT NULL
   )`,
+
+  // Комнаты мастера (gm-rooms, этапы 0–2): комната = папка со штампом
+  // (код + токен владельца; токен доказывает владение при восстановлении
+  // комнаты после перезапуска сервера — см. docs/architecture/gm-rooms-plan.md §3.3).
+  // CREATE TABLE IF NOT EXISTS идемпотентен: бамп SCHEMA_VERSION не нужен.
+  `CREATE TABLE IF NOT EXISTS folder_rooms (
+    folder_id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    owner_token TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+
+  // Связка «персонаж ↔ комната» на ЭТОМ устройстве (этап 2). Штамп в сейв
+  // и поездка через облако — этап 3 (паспорта полей сейва).
+  `CREATE TABLE IF NOT EXISTS character_room_bindings (
+    character_id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    joined_at INTEGER NOT NULL
+  )`,
 ];

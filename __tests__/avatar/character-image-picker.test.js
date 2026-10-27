@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ImagePicker from 'expo-image-picker';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act } from './testRenderUtils';
 
 // Мокаем модули
 // 446: с фабрикой — пустой vi.mock() делает автомок, который ПОДНИМАЕТ

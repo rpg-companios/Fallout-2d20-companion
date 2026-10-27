@@ -64,8 +64,8 @@ const GAME_SETTINGS_UI_ENABLED = false;
 // запереть пользователя внутри скрытого режима.
 const GM_MODE_UI_ENABLED = false;
 
-// Toggle отображения пространства админа подключён к appSettingsStore:
-// adminScreenEnabled (default: false). Управляется через настройки.
+// 448/451: Toggle отображения пространства админа подключён к appSettingsStore:
+// adminScreenEnabled (default: false). Управляется через окно настроек.
 import useSettingPackStore, {
   selectBundledSettingActive,
 } from '../../../src/store/settingPackStore';
@@ -1040,7 +1040,7 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </View>
         <View style={styles.headerCenter}>
-          {((GM_MODE_UI_ENABLED || isGmMode) && roomServerAvailable) && (
+          {((GM_MODE_UI_ENABLED || adminScreenEnabled || isGmMode) && roomServerAvailable) && (
             <Pressable
               style={[styles.adminButton, isGmMode && styles.adminButtonActive]}
               onPress={handleToggleUiMode}

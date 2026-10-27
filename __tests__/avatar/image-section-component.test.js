@@ -4,7 +4,7 @@
 // Проверяем, что компонент правильно реагирует на изменения props
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act } from './testRenderUtils';
 import React from 'react';
 
 // Мокаем expo/vector-icons

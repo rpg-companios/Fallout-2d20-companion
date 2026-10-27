@@ -1,0 +1,91 @@
+// item-forge/src/theme.ts
+// Палитра приложения (источники: components/settings/GameSettingsModal.js —
+// #111827/#d4af37/#f0e68c; styles/HomeScreen.styles.js — #0a0c10, панели,
+// кнопки). Оформление Кузницы — «в стиле экранов приложения» (решение
+// владельца 2026-10-19). При расхождении с приложением — вопрос владельцу.
+
+export const C = {
+  bg: '#0a0c10',
+  panel: '#111827',
+  panelAlt: '#0d1117',
+  border: '#374151',
+  borderDim: '#26303d',
+  accent: '#d4af37',
+  accentSoft: '#f0e68c',
+  text: '#e5e7eb',
+  textDim: '#9ca3af',
+  danger: '#fca5a5',
+  ok: '#86efac',
+  selected: '#1f2937',
+};
+
+export const css = {
+  page: {
+    background: C.bg,
+    minHeight: '100vh',
+    color: C.text,
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    padding: '16px',
+    boxSizing: 'border-box',
+  } as React.CSSProperties,
+  panel: {
+    background: C.panel,
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 12,
+  } as React.CSSProperties,
+  panelTitle: { color: C.accentSoft, fontSize: 16, fontWeight: 700, marginBottom: 10 },
+  row: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' } as React.CSSProperties,
+  label: { color: C.textDim, fontSize: 12, marginBottom: 4, display: 'block' },
+  input: {
+    background: C.panelAlt,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    color: C.text,
+    padding: '8px 10px',
+    fontSize: 14,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  } as React.CSSProperties,
+  btn: {
+    background: C.selected,
+    border: `1px solid ${C.accent}`,
+    borderRadius: 8,
+    color: C.accentSoft,
+    padding: '8px 14px',
+    fontSize: 14,
+    cursor: 'pointer',
+    fontWeight: 600,
+  } as React.CSSProperties,
+  btnGhost: {
+    background: 'transparent',
+    border: `1px solid ${C.border}`,
+    borderRadius: 8,
+    color: C.textDim,
+    padding: '8px 14px',
+    fontSize: 14,
+    cursor: 'pointer',
+  } as React.CSSProperties,
+  tile: {
+    background: C.panel,
+    border: `1px solid ${C.border}`,
+    borderRadius: 10,
+    padding: '18px 10px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    flex: '1 1 140px',
+    maxWidth: 220,
+  } as React.CSSProperties,
+  tileLocked: { opacity: 0.35, cursor: 'not-allowed' } as React.CSSProperties,
+  chip: (on: boolean): React.CSSProperties => ({
+    background: on ? C.selected : 'transparent',
+    border: `1px solid ${on ? C.accent : C.border}`,
+    borderRadius: 14,
+    color: on ? C.accentSoft : C.textDim,
+    padding: '4px 10px',
+    fontSize: 12,
+    cursor: 'pointer',
+  }),
+};

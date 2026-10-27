@@ -17,6 +17,9 @@ import useSettingPackStore, {
   selectActiveSettingId,
   selectInstalledSettings,
 } from '../../src/store/settingPackStore';
+// 446: установка паков контента из этого окна УДАЛЕНА (окно скрыто в UI —
+// владелец, 2026-10-25); она живёт в Настройках → «Собственное снаряжение»
+// (components/settings/SettingsModal.js; паковый стор там).
 
 const isTrpgName = (name) => typeof name === 'string' && name.toLowerCase().endsWith('.trpg');
 
@@ -135,6 +138,7 @@ export default function GameSettingsModal({ visible, onClose }) {
                 disabled={!pickedFileName}
               />
             </View>
+
           </ScrollView>
           <TouchableOpacity style={styles.close} onPress={onClose}>
             <Text style={styles.closeText}>{tHomeScreen('buttons.ok')}</Text>
@@ -165,6 +169,9 @@ const styles = StyleSheet.create({
   },
   title: { color: '#f0e68c', fontSize: 18, fontWeight: '700', marginBottom: 12 },
   scroll: { flexGrow: 0 },
+  packOkText: { color: '#86efac', marginTop: 8, fontSize: 13 },
+  packErrorTitle: { color: '#fca5a5', marginTop: 8, fontSize: 13, fontWeight: '700' },
+  packErrorText: { color: '#fca5a5', marginTop: 2, fontSize: 12 },
   installedRow: {
     flexDirection: 'row',
     alignItems: 'center',

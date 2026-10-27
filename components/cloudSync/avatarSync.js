@@ -7,23 +7,48 @@
 // Google Drive») — и в будущем при первой загрузке персонажа на устройстве.
 // Автосейв персонажа аватар не трогает.
 //
-// Размещение: appDataFolder/<сеттинг>/avatars/<characterId>.jpg — имя по
-// стабильному id, переименование персонажа аватар не трогает.
+// Размещение: appDataFolder/<сеттинг>/avatars/<characterId>.<ext> — имя по
+// стабильному id, расширение соответствует формату (jpg, png, gif).
 //
 // Архитектура: planAvatarSync — чистая функция (протокол, легко тестировать),
 // syncAvatars — оркестратор с инъекцией зависимостей (Drive-операции поставляет
 // googleDriveSync.js, кэш — db/avatarCache.js). Цикл импортов исключён.
 
+import { getFileExtension } from '../../domain/characterAvatar';
+
 /** Имя подпапки аватаров внутри папки сеттинга. */
 export const AVATARS_FOLDER_NAME = 'avatars';
 
-/** Имя файла аватара в Drive: <characterId>.jpg. */
-export const avatarFileName = (characterId) => `${characterId}.jpg`;
+/** Имя файла аватара в Drive: <characterId>.<ext>. */
+export const avatarFileName = (characterId, mimeType = 'image/jpeg') => {
+  const ext = getFileExtension(mimeType);
+  return `${characterId}.${ext}`;
+};
 
-/** characterId из имени файла аватара или null. */
-export const characterIdFromAvatarFileName = (name) => {
-  const match = String(name || '').match(/^([^\/]+)\.jpg$/i);
-  return match ? match[1] : null;
+/** characterId и mimeType из имени файла аватара или null. */
+export const parseAvatarFileName = (name) => {
+  const match = String(name || '').match(/^([^.]+)\.([^.]+)$/i);
+  if (!match) return null;
+  
+  const characterId = match[1];
+  const ext = match[2].toLowerCase();
+  
+  // Определяем MIME-тип по расширению
+  let mimeType;
+  switch (ext) {
+    case 'jpg':
+    case 'jpeg': mimeType = 'image/jpeg'; break;
+    case 'png': mimeType = 'image/png'; break;
+    case 'gif': mimeType = 'image/gif'; break;
+    case 'webp': mimeType = 'image/webp'; break;
+    case 'bmp': mimeType = 'image/bmp'; break;
+    case 'svg': mimeType = 'image/svg+xml'; break;
+    // 446: чужеродные расширения (json и пр.) — НЕ аватары: возвращаем null,
+    // иначе мусорный файл в папке avatars порождает фантомные записи плана.
+    default: return null;
+  }
+  
+  return { characterId, mimeType, ext };
 };
 
 /**
@@ -45,13 +70,13 @@ export const decideAvatarAction = ({ local, remote }) => {
  * Составить план синка аватаров (чистая функция, протокол из дизайн-дока).
  *
  * @param {object} args
- * @param {Array<{characterId: string, md5?: string|null, updatedAt?: number}>} args.local — строки кэша
+ * @param {Array<{characterId: string, md5?: string|null, updatedAt?: number, mimeType?: string}>} args.local — строки кэша
  * @param {Array<{fileId: string, name: string, md5?: string, modifiedTime?: number}>} args.remote — файлы Drive
  * @param {Iterable<string>} args.existingCharacterIds — id живых персонажей (локальный список)
  * @returns {{
  *   noop: Array<{characterId: string}>,
- *   uploads: Array<{characterId: string}>,
- *   downloads: Array<{characterId: string, fileId: string}>,
+ *   uploads: Array<{characterId: string, mimeType: string}>,
+ *   downloads: Array<{characterId: string, fileId: string, mimeType: string}>,
  *   localDeletes: Array<{characterId: string}>,
  *   remoteDeletes: Array<{characterId: string, fileId: string}>,
  * }}
@@ -61,8 +86,8 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
 
   const remoteByCharacterId = new Map();
   for (const file of remote) {
-    const characterId = characterIdFromAvatarFileName(file.name);
-    if (characterId) remoteByCharacterId.set(characterId, file);
+    const parsed = parseAvatarFileName(file.name);
+    if (parsed) remoteByCharacterId.set(parsed.characterId, { ...file, ...parsed });
   }
   const localByCharacterId = new Map(local.map((row) => [row.characterId, row]));
 
@@ -91,8 +116,8 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
       remote: file ? { md5: file.md5 ?? null, modifiedTime: file.modifiedTime ? new Date(file.modifiedTime).getTime() : 0 } : null,
     });
     if (action === 'noop') noop.push({ characterId });
-    else if (action === 'upload') uploads.push({ characterId, fileId: file ? file.fileId : null });
-    else downloads.push({ characterId, fileId: file.fileId });
+    else if (action === 'upload') uploads.push({ characterId, mimeType: row?.mimeType || row?.mime_type || 'image/jpeg', fileId: file ? file.fileId : null });
+    else downloads.push({ characterId, fileId: file.fileId, mimeType: file?.mimeType || 'image/jpeg' });
   }
 
   return { noop, uploads, downloads, localDeletes, remoteDeletes };
@@ -104,7 +129,7 @@ export function planAvatarSync({ local = [], remote = [], existingCharacterIds =
  * @param {object} args
  * @param {object} args.driveOps — {
  *   listAvatarFiles(token, folderId),
- *   uploadAvatarFile({ token, folderId, fileId, characterId, dataUrl }) → { id, md5Checksum },
+ *   uploadAvatarFile({ token, folderId, fileId, characterId, dataUrl, mimeType }) → { id, md5Checksum },
  *   downloadAvatarFile(token, fileId) → dataUrl (текст),
  *   deleteAvatarFile(token, fileId),
  * }
@@ -140,6 +165,7 @@ export async function syncAvatars({
       characterId: row.character_id ?? row.characterId,
       md5: row.md5 ?? null,
       updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0),
+      mimeType: row.mime_type || row.mimeType || 'image/jpeg',
     })),
     remote: remoteFiles.map((file) => ({
       fileId: file.id ?? file.fileId,
@@ -169,7 +195,7 @@ export async function syncAvatars({
   for (const { fileId } of plan.remoteDeletes) {
     await driveOps.deleteAvatarFile(token, fileId);
   }
-  for (const { characterId, fileId } of plan.uploads) {
+  for (const { characterId, fileId, mimeType } of plan.uploads) {
     const row = await cacheOps.get(characterId);
     if (!row?.data_url && !row?.dataUrl) continue;
     const uploaded = await driveOps.uploadAvatarFile({
@@ -178,18 +204,19 @@ export async function syncAvatars({
       fileId: fileId ?? null,
       characterId,
       dataUrl: row.data_url ?? row.dataUrl,
+      mimeType: mimeType || row.mime_type || row.mimeType || 'image/jpeg',
     });
     if (uploaded?.md5Checksum) {
       await cacheOps.updateMd5(characterId, uploaded.md5Checksum);
     }
   }
-  for (const { characterId, fileId } of plan.downloads) {
+  for (const { characterId, fileId, mimeType } of plan.downloads) {
     const dataUrl = await driveOps.downloadAvatarFile(token, fileId);
     // Чужой файл мог быть «толстым» или не-аватаром: валидируем до кэша.
     if (validateDataUrl ? !validateDataUrl(dataUrl).ok : false) continue;
     const file = remoteFiles.find((f) => (f.id ?? f.fileId) === fileId);
     const modifiedMs = file?.modifiedTime ? new Date(file.modifiedTime).getTime() : Date.now();
-    await cacheOps.setFromRemote(characterId, dataUrl, file?.md5Checksum ?? null, modifiedMs);
+    await cacheOps.setFromRemote(characterId, dataUrl, file?.md5Checksum ?? null, modifiedMs, mimeType);
   }
 
   return {
