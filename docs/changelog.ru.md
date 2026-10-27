@@ -1,7 +1,7 @@
 # История изменений
 
 ---
-## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патч 458)
+## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патчи 458–459)
 
 Служебные каталоги `.kiro`, `.install-backup` / `.installbackup`, `.publish` и
 `.agents` полностью исключены из обхода сборщика Metro (`blockList` и

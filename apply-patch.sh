@@ -278,10 +278,10 @@ read_baseline_number() {
 # содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
 # которых в этом состоянии уже нет.
 sync_to_baseline() {
-  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' ':(exclude).kiro' ':(exclude).publish' | tar -x -C "$ROOT_DIR"
+  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
   local baseline_files tracked_files stale
-  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
-  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
+  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
+  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
   stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
   if [[ -n "$stale" ]]; then
     while IFS= read -r f; do
@@ -311,7 +311,7 @@ fi
 if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
   # 431: незакоммиченные правки не останавливают установку — тихо сохраняем
   # их в .install-backup/<дата-время>/ на случай отката.
-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
+  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
   backup_dir=""
   if [[ -n "$local_dirty" ]]; then
     backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"
@@ -647,7 +647,7 @@ print_concise_summary() {
     echo "  Архив прежних правок: .install-backup/$BACKUP_CREATED (откат: cp -R .install-backup/$BACKUP_CREATED/. .)"
   fi
 
-  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
+  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' || true)"
   if [[ -n "$pending_commit" ]]; then
     local commit_label="Патч $PATCH_ID"
     if [[ ${#nums[@]} -gt 1 ]]; then

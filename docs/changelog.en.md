@@ -1,6 +1,6 @@
 # Changelog
 ---
-## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patch 458)
+## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patches 458–459)
 
 Excluded `.kiro`, `.install-backup` / `.installbackup`, `.publish`, and `.agents`
 across Metro (`blockList` and `watchFolders`), server source fingerprinting,

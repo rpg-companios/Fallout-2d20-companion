@@ -1,0 +1,93 @@
+diff --git a/apply-patch.sh b/apply-patch.sh
+index 664176d..2c57c8a 100755
+--- a/apply-patch.sh
++++ b/apply-patch.sh
+@@ -278,10 +278,10 @@ read_baseline_number() {
+ # содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
+ # которых в этом состоянии уже нет.
+ sync_to_baseline() {
+-  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' ':(exclude).kiro' ':(exclude).publish' | tar -x -C "$ROOT_DIR"
++  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+   local baseline_files tracked_files stale
+-  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
+-  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -vE '^(patchs|\.kiro|\.publish)/' | sort || true)"
++  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
++  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
+   stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+   if [[ -n "$stale" ]]; then
+     while IFS= read -r f; do
+@@ -311,7 +311,7 @@ fi
+ if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
+   # 431: незакоммиченные правки не останавливают установку — тихо сохраняем
+   # их в .install-backup/<дата-время>/ на случай отката.
+-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
++  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
+   backup_dir=""
+   if [[ -n "$local_dirty" ]]; then
+     backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"
+@@ -647,7 +647,7 @@ print_concise_summary() {
+     echo "  Архив прежних правок: .install-backup/$BACKUP_CREATED (откат: cp -R .install-backup/$BACKUP_CREATED/. .)"
+   fi
+ 
+-  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' | grep -vE '^.. (\.installbackup|\.kiro|\.publish)(/|$)' || true)"
++  pending_commit="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? \.install-backup/' || true)"
+   if [[ -n "$pending_commit" ]]; then
+     local commit_label="Патч $PATCH_ID"
+     if [[ ${#nums[@]} -gt 1 ]]; then
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 4519f74..0df3d97 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,6 +1,6 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
+-## 2026-10-27 (458) — исключение `.kiro`, `.install-backup` / `.installbackup` и `.publish` из сборки, проверок и архивации
++## 2026-10-27 (458–459) — исключение `.kiro`, `.install-backup` / `.installbackup` и `.publish` из сборки и проверок (+ совместимость `apply-patch.sh`)
+ 
+ Слово владельца:
+ «.kiro, .installbackup, .publish, тоже можно не учитывать (если учитываются).»
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index e59b3c9..4c657e0 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,6 +1,6 @@
+ # Changelog
+ ---
+-## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patch 458)
++## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patches 458–459)
+ 
+ Excluded `.kiro`, `.install-backup` / `.installbackup`, `.publish`, and `.agents`
+ across Metro (`blockList` and `watchFolders`), server source fingerprinting,
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 0732208..2ccd0f8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,7 +1,7 @@
+ # История изменений
+ 
+ ---
+-## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патч 458)
++## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патчи 458–459)
+ 
+ Служебные каталоги `.kiro`, `.install-backup` / `.installbackup`, `.publish` и
+ `.agents` полностью исключены из обхода сборщика Metro (`blockList` и
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 9258802..6f3157c 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "458"
++  "baseline": "459"
+ }
+diff --git a/public/version.json b/public/version.json
+index f05755c..f43de0f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "458",
++  "version": "459",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
