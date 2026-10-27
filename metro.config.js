@@ -4,15 +4,30 @@ const path = require('path');
 const config = getDefaultConfig(__dirname);
 
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const workspaceLocalDir = path.resolve(__dirname, '.local');
-const workspaceKiroDir = path.resolve(__dirname, '.kiro');
-const workspaceBackupDir = path.resolve(__dirname, '.install-backup');
-const workspacePatchesDir = path.resolve(__dirname, 'patchs');
-const workspaceDistDir = path.resolve(__dirname, 'dist');
-const workspaceDocsDir = path.resolve(__dirname, 'docs');
-const workspaceItemForgeDir = path.resolve(__dirname, 'item-forge');
-const workspaceScreenshotsDir = path.resolve(__dirname, 'screenshots');
 const workspaceExpoDir = path.resolve(__dirname, '.expo');
+
+// Служебные и не-рантаймовые каталоги ВНУТРИ корня проекта, которые Metro не
+// должен обходить ни в резолвере (blockList), ни в вотчере (watchFolders).
+// Все пути привязаны строго к __dirname, чтобы не затрагивать глобальное
+// хранилище pnpm (/home/runner/.local/share/pnpm/...).
+const IGNORED_WORKSPACE_DIR_NAMES = [
+  '.local',
+  '.kiro',
+  '.install-backup',
+  '.installbackup',
+  '.publish',
+  '.agents',
+  '.expo',
+  'patchs',
+  'dist',
+  'docs',
+  'item-forge',
+  'screenshots',
+  'сеттинги',
+];
+const ignoredWorkspaceDirs = IGNORED_WORKSPACE_DIR_NAMES.map((name) =>
+  path.resolve(__dirname, name),
+);
 
 // Храним кэш трансформации Metro внутри .expo/metro-cache (в рабочей папке, а не
 // в /tmp), чтобы при перезапуске контейнера Replit и после установки патчей
@@ -45,20 +60,11 @@ config.resolver = {
   ...config.resolver,
   unstable_enablePackageExports: true,
   unstable_conditionNames: ['require', 'react-native', 'default'],
-  // Блокируем только служебные и не-рантаймовые каталоги ВНУТРИ проекта
-  // (.local, .kiro, .install-backup, patchs, dist, docs, item-forge, screenshots, .expo),
-  // не затрагивая глобальное хранилище pnpm (/home/runner/.local/share/pnpm/...).
   blockList: [
     ...defaultBlockList,
-    new RegExp(`^${escapeRegExp(workspaceLocalDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceKiroDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceBackupDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspacePatchesDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceDistDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceDocsDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceItemForgeDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceScreenshotsDir)}[/\\\\].*`),
-    new RegExp(`^${escapeRegExp(workspaceExpoDir)}[/\\\\].*`),
+    ...ignoredWorkspaceDirs.map(
+      (dirPath) => new RegExp(`^${escapeRegExp(dirPath)}[/\\\\].*`),
+    ),
   ],
   resolveRequest(context, moduleName, platform) {
     if (platform === 'web' && moduleName === 'fontfaceobserver') {
@@ -138,11 +144,8 @@ config.server = {
 config.watchFolders = (config.watchFolders || []).filter(
   (folder) => {
     const resolved = path.resolve(folder);
-    return (
-      resolved !== workspaceLocalDir &&
-      !resolved.startsWith(`${workspaceLocalDir}${path.sep}`) &&
-      resolved !== workspaceKiroDir &&
-      !resolved.startsWith(`${workspaceKiroDir}${path.sep}`)
+    return !ignoredWorkspaceDirs.some(
+      (ignored) => resolved === ignored || resolved.startsWith(`${ignored}${path.sep}`),
     );
   }
 );

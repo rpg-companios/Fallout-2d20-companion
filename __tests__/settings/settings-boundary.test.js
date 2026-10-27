@@ -41,6 +41,8 @@ const DEBT = new Set([
 const SKIP_DIRS = new Set([
   'node_modules', '.git', '.expo', 'dist', 'patchs', 'modules', '__tests__',
   'coverage', 'android', 'ios', 'assets',
+  '.kiro', '.install-backup', '.installbackup', '.publish', '.agents', '.local',
+  'сеттинги', 'item-forge',
 ]);
 
 /** Импорт внутренности сеттинга: modules/<имя>/(data|i18n)/… в import/require-строке. */

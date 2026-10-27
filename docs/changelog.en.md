@@ -1,5 +1,28 @@
 # Changelog
 ---
+## Clean up unused workspace folders and one-off artifacts (patch 460)
+
+Removed unused clutter and leftover artifacts from the repository:
+- orphaned `.publish/` gitlinks (`positronium-game-settings`, `ttrpg-engine`),
+  obsolete `.kiro/` specs, and Replit scratch `.agents/` files (`docs/agents/`
+  remains intact);
+- one-off archives and debug leftovers: `output.txt`, `fallout 2char.zip`,
+  `positronium-boot.zip`, `screenshots/`, legacy `run-avatar-tests.js`,
+  assertion-less `__probe-fields.test.js`, and superseded `public/pwa-icon*.svg`
+  / `pwa-icon.placeholder.json` placeholders;
+- hardened `apply-patch.sh` to cleanly remove orphaned gitlink directories even
+  when nested `.git` checkouts exist on disk and to preserve CLI arguments across
+  self-updates.
+
+---
+## Exclude `.kiro`, `.installbackup`, and `.publish` workspace folders (patches 458–459)
+
+Excluded `.kiro`, `.install-backup` / `.installbackup`, `.publish`, and `.agents`
+across Metro (`blockList` and `watchFolders`), server source fingerprinting,
+Vitest test discovery, repository guardrail walkers, and `apply-patch.sh`
+backup/baseline sync.
+
+---
 ## Instant startup & live boot status screen (patch 457)
 
 Eliminated the multi-minute blank-screen startup delay:

@@ -68,6 +68,7 @@ usage() {
 USAGE
 }
 
+ORIG_ARGS=("$@")
 MODE="chain"
 PATCH_ID=""
 
@@ -98,7 +99,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$MODE" != "status" && -z "$PATCH_ID" ]]; then
+if [[ "$MODE" != "status" && -z "$PATCH_ID" && "${APPLY_PATCH_BOOTSTRAPPED:-}" != "1" ]]; then
   usage
   exit 2
 fi
@@ -136,7 +137,7 @@ if [[ "${APPLY_PATCH_BOOTSTRAPPED:-}" != "1" ]]; then
     rm -f -- "${APPLY_PATCH_SELF:-}"
     export APPLY_PATCH_BOOTSTRAPPED=1
     export APPLY_PATCH_SELF="$FRESH_SELF"
-    exec bash "$FRESH_SELF" "$@"
+    exec bash "$FRESH_SELF" "${ORIG_ARGS[@]}"
   fi
   rm -f -- "$FRESH_SELF"
 fi
@@ -234,6 +235,12 @@ patch_state() {
 
 # --- поиск целевого патча ----------------------------------------------------
 
+# Мост совместимости при самообновлении со старых копий apply-patch.sh (455–459),
+# где цикл shift очищал "$@" перед exec "$FRESH_SELF" "$@".
+if [[ "$MODE" != "status" && -z "$PATCH_ID" && "${APPLY_PATCH_BOOTSTRAPPED:-}" == "1" ]]; then
+  PATCH_ID="$(patch_number "${ALL_PATCHES[${#ALL_PATCHES[@]}-1]}")"
+fi
+
 TARGET=""
 for name in "${ALL_PATCHES[@]}"; do
   if [[ "$(patch_number "$name")" == "$PATCH_ID" ]]; then
@@ -279,13 +286,22 @@ read_baseline_number() {
 # которых в этом состоянии уже нет.
 sync_to_baseline() {
   git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
-  local baseline_files tracked_files stale
+  local baseline_files tracked_files stale parent_dir
   baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
   tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
   stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
   if [[ -n "$stale" ]]; then
     while IFS= read -r f; do
-      [[ -n "$f" ]] && git -C "$ROOT_DIR" rm -q -f -- "$f"
+      [[ -z "$f" || "$f" == "." || "$f" == "/" ]] && continue
+      if ! git -C "$ROOT_DIR" rm -q -f -- "$f" 2>/dev/null; then
+        git -C "$ROOT_DIR" rm -q -f --cached -- "$f" 2>/dev/null || true
+      fi
+      rm -rf -- "$ROOT_DIR/$f"
+      parent_dir="$(dirname "$f")"
+      while [[ "$parent_dir" != "." && "$parent_dir" != "/" && -d "$ROOT_DIR/$parent_dir" ]]; do
+        rmdir "$ROOT_DIR/$parent_dir" 2>/dev/null || break
+        parent_dir="$(dirname "$parent_dir")"
+      done
     done <<<"$stale"
   fi
 }
@@ -311,7 +327,7 @@ fi
 if [[ "$MODE" != "status" && -n "${BASELINE_NUM:-}" ]] && ! number_lt "$PATCH_ID" "$BASELINE_NUM"; then
   # 431: незакоммиченные правки не останавливают установку — тихо сохраняем
   # их в .install-backup/<дата-время>/ на случай отката.
-  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' || true)"
+  local_dirty="$(git -C "$ROOT_DIR" status --porcelain 2>/dev/null | grep -vE '^\?\? apply-patch\.sh$' | grep -vE '^\?\? \.install-backup/' | grep -vE '^\?\? \.installbackup/' | grep -vE '^.. \.publish(/|$)' || true)"
   backup_dir=""
   if [[ -n "$local_dirty" ]]; then
     backup_dir="$ROOT_DIR/.install-backup/$(date +%Y-%m-%d-%H%M%S)"

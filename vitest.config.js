@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import babel from '@babel/core';
 import jsxPlugin from '@babel/plugin-transform-react-jsx';
 
@@ -51,5 +51,16 @@ export default defineConfig({
   test: {
     environment: 'node',
     setupFiles: ['./src/store/__test-setup__/asyncStorageMock.js'],
+    exclude: [
+      ...configDefaults.exclude,
+      '.kiro/**',
+      '.install-backup/**',
+      '.installbackup/**',
+      '.publish/**',
+      '.agents/**',
+      '.local/**',
+      '.expo/**',
+      'patchs/**',
+    ],
   },
 });

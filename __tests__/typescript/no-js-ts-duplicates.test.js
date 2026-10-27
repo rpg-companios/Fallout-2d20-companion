@@ -10,7 +10,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const EXCLUDED_DIRS = new Set(['node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local', '.expo']);
+const EXCLUDED_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'patchs', 'сеттинги', '.kiro', '.local', '.expo',
+  '.install-backup', '.installbackup', '.publish', '.agents', 'item-forge',
+]);
 // Пары «маскирующих» друг друга расширений: левый выигрывает у правого при дубле.
 const CONFLICTING_PAIRS = [
   ['.js', '.ts'],
