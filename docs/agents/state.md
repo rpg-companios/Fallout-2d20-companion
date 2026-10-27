@@ -1,5 +1,17 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (462) — разблокировка публикации на Replit (обновление `shell-quote` и CVE-зависимостей в `overrides` / `package-lock.json`)
+
+Слово владельца (лог публикации на Replit):
+`npm error 403 Forbidden - GET http://package-firewall.replit.internal/npm/shell-quote/-/shell-quote-1.10.0.tgz - Blocked by Security Policy (Reason: Critical CVE)`.
+
+- Диагностика: в `package-lock.json` транзитивно стоял `shell-quote@1.10.0` (единственная критическая уязвимость `critical: 1` в графе — инъекция команд в `quote()` в версиях `1.8.4–1.10.0`), из-за чего прокси `package-firewall.replit.internal` (Socket Security Policy) отдавал `403` на этапе сборки публикации.
+- Исправлено:
+  1. `package.json`: добавлены `overrides` (и `pnpm.overrides`) для `shell-quote` (`^1.12.0`) и сопутствующих патчевых CVE-зависимостей (`compression` `^1.8.2`, `node-forge` `^1.4.2`, `js-yaml` `^4.3.2`, `fast-uri` `^3.1.9`, `source-map-js` `^1.2.2`, `vite` `^8.2.4`).
+  2. `package-lock.json`: пересобран и проверен через `npm ci` (`critical: 0`, `shell-quote` -> `1.12.0`, `brace-expansion` -> `1.1.21` / `5.0.12`).
+  3. `public/version.json` (`version: "462"`, `release: 4` сохранён) и `patchs/baseline.json` (`"462"`).
+- Приёмочные тесты: `__tests__/installer/security-overrides-462.test.js` (2 теста).
+
 ## 2026-10-27 (461) — Релиз 4: заметки «Что нового» (`release: 4`)
 
 Слово владельца:
