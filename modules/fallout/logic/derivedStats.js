@@ -245,6 +245,18 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
     stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
   }
 
+  // 406: «Омолодившийся» — на высшей ступени сытости Макс. ОЗ +2
+  // (флаг wellFed считает стор из состояния выживания).
+  const rejuvenatedHp = Number(perkBonuses.rejuvenatedSatedMaxHp) || 0;
+  if (rejuvenatedHp > 0 && equipmentState.wellFed) {
+    stats.maxHealth.modifiers.push({
+      source: 'perks.rejuvenated',
+      value: rejuvenatedHp,
+      operation: '+',
+    });
+    stats.maxHealth.total = calculateAttributeTotal(stats.maxHealth);
+  }
+
   // carryWeightBonus (strongBack)
   const carryFromPerks = Number(perkBonuses.carryWeightBonus) || 0;
   if (carryFromPerks !== 0 && !equipmentState.isRobot) {
@@ -269,6 +281,28 @@ export const calculateDerivedStats = (attributes, effects, trait, level = 1, equ
       stats.damageResistance[type].total = calculateAttributeTotal(stats.damageResistance[type]);
     }
   });
+
+  // 404: В сияющих доспехах (ранг 1+) — в металлической брони СУ энергия +2.
+  // Ношение металлической брони считает store (wearingMetalArmor, детали
+  // armor_metal_*), сюда приходит готовым флагом equipmentState.
+  const shiningRank = Number(perkBonuses.inShiningArmorRank) || 0;
+  if (shiningRank > 0 && equipmentState.wearingMetalArmor) {
+    stats.damageResistance.energy.modifiers.push({
+      source: 'perks.inShiningArmor',
+      value: 2,
+      operation: '+',
+    });
+    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
+  }
+  // 405: ранг 2 — светозащитная оптика (Щиток сварщика) даёт ещё +1.
+  if (shiningRank >= 2 && equipmentState.wearingGlareOptics) {
+    stats.damageResistance.energy.modifiers.push({
+      source: 'perks.inShiningArmor.optics',
+      value: 1,
+      operation: '+',
+    });
+    stats.damageResistance.energy.total = calculateAttributeTotal(stats.damageResistance.energy);
+  }
 
   return stats;
 };

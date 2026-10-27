@@ -1,22 +1,12 @@
 # Состояние работы — читается ПЕРВЫМ
 
-## 2026-10-27 (448) — Toggle «Экран администратора» в настройках (первый этап)
+## 2026-10-27 (451) — восстановление запуска приложения, целостности дерева и установщика
 
-- Переключатель `adminScreenEnabled` подключён к `appSettingsStore`
-  (`ENGINE_SETTINGS`, `SETTINGS` surface, `default: false`). Toggle
-  отображается в окне настроек; включение через UI, не ручная правка кода.
-- `HomeScreen.js`: удалён хардкод `ADMIN_SCREEN_UI_ENABLED`; теперь
-  `adminScreenEnabled` читается из store (`useAppSettingsStore`).
-- Контракт «Сервер состояний» (`docs/architecture/gm-server-plan.md`) обновлён
-  до v1.5: две сущности админа (просмотр `readonly` + экраны админа
-  «Погода» / «Столкновения и повреждения» / «Добыча и торговля»),
-  конфликт данных (приоритет игрока), хранение (`AsyncStorage` + Drive),
-  доступ оффлайн.
-- Патч 448 (`patchs/448-first-stage-admin-toggle.patch`): код toggle +
-  каталог настроек + i18n (en/ru) + документация. `patchs/baseline.json` → `"448"`.
-- Следующий этап (по слову владельца): создание комнат (`roomServer` /
-  `roomClient`), подключение в комнату, просмотр персонажа в комнате
-  и сохранение снапшотов.
+Слово владельца: «Прошлый агент не смог победить ошибки в приложении, помоги их победить. Оно не запускается».
+
+- Диагностика: (1) коммит `d244911` в `main` откатил половину дерева к эре 402 (из-за битого родителя `10ff3e9` в `arena/01a0e86f`), удалив `domain/useCharacterImage.js`, `expo-image-picker` и `ws` из `package.json`, оставив в `CharacterScreen.js` битый импорт `../../../../domain/useCharacterImage` и закоммитив `.install-backup/`; (2) старый `apply-patch.sh` в `d244911` имел условие `! number_le "$PATCH_ID" "$BASELINE_NUM"` и пропускал отсечку при `PATCH_ID == BASELINE_NUM`; (3) верхушка `arena/01a0e86f` (`904bdce`, патч 450) вдобавок потеряла 6 импортов в `CharacterScreen.js` (`useCallback`, `Image`, `ActivityIndicator`, `MaterialCommunityIcons`, `useCharacterImage`, `avatarCache`), добавила сломанную кнопку `adminButton` (`admin.mode.notReady` / `styles.adminButton`), оставила неиспользуемый `import { Alert } from 'react-native'` в `domain/useCharacterImage.js` и сломала тесты аватаров импортом отсутствующего `@testing-library/react-hooks`.
+- Исправлено: (1) дерево восстановлено на базе здорового состояния `93abb4f` (447) без `.install-backup/`, возвращены `expo-image-picker` и `ws`; (2) в `CharacterScreen.js` сохранены все импорты, убрана сломанная кнопка админки, в `ImageSection` починен сброс при смене персонажа и лог переведён в `debugLog('avatar.error', ...)`; (3) в `domain/useCharacterImage.js` убран мёртвый импорт `react-native`; (4) аккуратно перенесён тумблер Настроек `adminScreenEnabled` (`defaultValue: false`) для шапки `HomeScreen` + план `docs/architecture/gm-server-plan.md`; (5) в `server/roomServer.js` добавлен обработчик `ws.on('error', () => {})` против падения процесса при кадрах > `MAX_MESSAGE_BYTES`; (6) `apply-patch.sh` переключён на `arena/c1c60b87-fallout-2d20-companion`, дополнен `deps_check()` (автодоустановка пропавших пакетов из `package.json` при развёрнутом `node_modules`), `baseline.json` и `public/version.json` подняты до `451`.
+- Приёмочные тесты: `__tests__/screens/character-screen-boot-451.test.js` (5 тестов, включая AST-проверку необъявленных идентификаторов через `@babel/traverse` и проверку выживания `roomServer` на сверхбольшом WS-кадре) + все 8 сьютов `__tests__/avatar/*` переведены на локальный `testRenderUtils.js` (`react-test-renderer`). 177/177 тест-файлов зелёные, `tsc` 0 ошибок, веб-сборка `expo export --platform web` и сервер `server/index.js` проверены вживую.
 
 ## 2026-10-26 (447) — «Админ» скрыт; админке нужен «сервер состояний» (отложено)
 

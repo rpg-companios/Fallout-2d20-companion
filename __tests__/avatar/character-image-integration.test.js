@@ -4,7 +4,7 @@
 // Проверяем полный user flow: выбор изображения → сохранение → обновление UI
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act, renderHook } from './testRenderUtils';
 import React from 'react';
 
 // Мокаем expo-image-picker

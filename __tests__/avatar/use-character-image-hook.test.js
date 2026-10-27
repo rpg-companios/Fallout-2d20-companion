@@ -4,7 +4,7 @@
 // Проверяем взаимодействие между функциями хука и изменение состояния
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act } from './testRenderUtils';
 
 // Мокаем expo-image-picker
 vi.mock('expo-image-picker', () => ({
@@ -211,19 +211,25 @@ describe('useCharacterImage hook', () => {
         assets: [mockAsset],
       });
 
+      let resolveSave;
+      avatarCache.setAvatarCache.mockImplementationOnce(
+        () => new Promise((resolve) => { resolveSave = resolve; }),
+      );
+
       const { result } = renderHook(() => useCharacterImage());
 
-      // Act - start picking
-      let resolvePick;
-      const pickPromise = act(async () => {
-        const promise = result.current.pickAndSaveCharacterImage('test-char-1');
-        // Wait a bit to check isLoading
+      // Act - start picking and pause while saving to cache
+      let pickPromise;
+      await act(async () => {
+        pickPromise = result.current.pickAndSaveCharacterImage('test-char-1');
         await new Promise(r => setTimeout(r, 0));
-        expect(result.current.isLoading).toBe(true);
-        return promise;
       });
+      expect(result.current.isLoading).toBe(true);
 
-      await pickPromise;
+      await act(async () => {
+        resolveSave();
+        await pickPromise;
+      });
       expect(result.current.isLoading).toBe(false);
     });
 

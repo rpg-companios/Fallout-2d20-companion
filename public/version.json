@@ -1,30 +1,30 @@
 {
-  "version": "402",
-  "release": 2,
+  "version": "451",
+  "release": 3,
   "notes": {
     "ru-RU": [
-      "Крафт улучшений: рецепты появились у всех модов оружия и у модов брони; кнопка «Создать» — прямо из окна установки модов, отчёт о крафте — там же.",
-      "Честные правила книги: при сложности 0 игра спрашивает, бросать ли кубики; провал — «нет успеха + осложнение»; сверх-успех всегда даёт очки действий.",
-      "Улучшения оружия получили настоящие имена вместо номеров (mod_043 → «Бета-волновой тюнер»); дубли слиты; у каждого оружия — полный набор улучшений, включая ближний бой.",
-      "Моды — вещи, а не абстракции: мод из сумки вставляется в оружие и снимается обратно в общую пачку; продаёшь оружие — моды уходят вместе с ним; правила едины для оружия, брони и одежды.",
-      "При загрузке персонажа моды сверяются со слотами сами: ничего не теряется и никогда не удваивается, старые сохранения чинятся при первом же открытии.",
-      "Улучшения роботов по тем же правилам: лазеры Штурмотрона, энергоячейка вместо термоядерного магазина, снятие улучшений с Головного лазера.",
-      "Новое снаряжение: Посох Атома и Шахтёрский перфоратор.",
-      "В окне выбора предметов — характеристики прямо в строке: урон, скорострельность, дальность, боеприпасы, эффекты, качества, вес и цена.",
-      "В окне улучшений написано, что делает каждое улучшение; установленный мод виден на карточке оружия.",
-      "Установка приложения (PWA) починена: браузеру возвращён его родной диалог установки; если браузер ставить не умеет — приложение подскажет путь и покажет диагностику установки (включается в настройках)."
+      "Перки сверены с книгами: добавлены новые перки с их механиками — Супер Дупер, Омолодившийся, Верблюд, Гулеподобный, Кровосос, Фармацевт, Мощный пользователь и другие; требования перков — как в книге.",
+      "Старые сохранения переносятся сами; перки, недоступные по книге, больше не пропадают — они серые, и приложение объясняет, что не так.",
+      "Ремонт по книге: оружие и броня чинятся тестом Интеллект + Ремонт; сложность зависит от редкости и улучшений, донор её снижает; способы — за материалы, за донора или «Очумелые ручки» (бесплатно, но некачественно).",
+      "Прочность включена по умолчанию; износ оружия и «произвольное качество при крафте» — теперь два самостоятельных пункта настроек.",
+      "На карточках снаряжения показана Редкость.",
+      "Фильтры в окнах добычи и покупки: кнопка-воронка открывает отдельное окно; чекбоксы категорий — Оружие, Броня, Силовая броня, Одежда — показывают только свои параметры; внутри — редкость, урон, скорострельность, дистанция, тип урона, тип оружия, патроны, качества, эффекты, части тела.",
+      "На кнопке фильтра — число активных условий; кнопка «Показать» называет число находок и показывает отсортированный список «Найдено: N»; качества в фильтре — только те, что реально встречаются на оружии.",
+      "Кнопка «Сон\\Ждать»: в модалке сна появился пункт «Ожидание» — время идёт, тратятся все три параметра выживания (Голод, Жажда, Сон) и ничего не восполняется; если ОЗ уйдут ниже нуля — «Персонаж умер».",
+      "Обновление приложения: установка занимает секунды, сообщения понятны, а локальные правки перед установкой сохраняются в архив — их можно вернуть целиком.",
+      "Длинные окна прокруваются правильно: заголовок и кнопки остаются на месте."
     ],
     "en-EN": [
-      "Mod crafting: recipes added for every weapon mod and armor mod; a «Craft» button right in the mod-install window, with the crafting report in the same place.",
-      "Honest book rules: at difficulty 0 the game asks whether to roll; failure means «no success + complication»; great success always grants action points.",
-      "Weapon mods got real names instead of numbers (mod_043 → «Beta Wave Tuner»); duplicates merged; every weapon now has its full mod list, including melee.",
-      "Mods are things, not abstractions: a mod from the bag is installed into a weapon and removed back into the shared stack; sell a weapon — its mods go with it; the same rules for weapons, armor and clothing.",
-      "On every character load, mods are reconciled with slots: nothing is lost and nothing ever doubles; old saves repair themselves on first open.",
-      "Robot mods follow the same rules: the Assaultron lasers, an energy cell instead of the fusion magazine, removing mods from the Head Laser.",
-      "New gear: the Atom's Staff and the Miner's Jackhammer.",
-      "The item picker shows stats right in the row: damage, fire rate, range, ammo, effects, qualities, weight and cost.",
-      "The mod window explains what each mod does; an installed mod is visible on the weapon card.",
-      "App installation (PWA) is fixed: the browser got its native install prompt back; if a browser cannot install, the app suggests the way and shows install diagnostics (a toggle in settings)."
+      "Perks checked against the books: new perks with their mechanics — Super Duper, Rejuvenated, Dromedary, Ghoulish, Bloodsucker, Pharmacist, Power User and more; perk requirements follow the book.",
+      "Old saves migrate on their own; perks unavailable by the book no longer vanish — they are greyed out and the app explains why.",
+      "Repair by the book: weapons and armor are fixed with an Intelligence + Repair test; difficulty depends on rarity and mods, a donor lowers it; ways — materials, a donor, or «Jury Rigging» (free, but shoddy).",
+      "Durability is on by default; weapon wear and «random quality when crafting» are now two separate settings.",
+      "Item cards show Rarity.",
+      "Filters in the loot and buy windows: a funnel button opens a separate window; category checkboxes — Weapons, Armor, Power Armor, Clothing — show only their own parameters; inside — rarity, damage, fire rate, distance, damage type, weapon type, ammo, qualities, effects, body parts.",
+      "The filter button shows the number of active conditions; the «Show» button names the number of matches and lists them sorted as «Found: N»; filter qualities are only those actually found on weapons.",
+      "The «Sleep\\Wait» button: the sleep modal gained a «Wait» option — time passes, all three survival parameters (Hunger, Thirst, Sleep) are spent and nothing is replenished; if HP drops below zero — «Character died».",
+      "App updates: installation takes seconds, the messages are clear, and local edits are archived before installing — you can bring them all back.",
+      "Long windows scroll properly: the header and buttons stay in place."
     ]
   }
 }

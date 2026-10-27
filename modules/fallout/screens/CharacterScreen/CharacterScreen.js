@@ -69,7 +69,6 @@ import { resolveSkillRewards } from "../../../../domain/skillRewards";
 // 446: отладка аватаров ушла в гейт трассировки (__fallout.on(['avatar']); в проде — тишина.
 // debugLog уже импортирован рядом с FALLOUT_DEBUG_MARKER — дубль прошлой конверсии снят.
 import { debugLog, FALLOUT_DEBUG_MARKER } from "../../../../src/debug/falloutDebug";
-import useAppSettingsStore, { selectAdminScreenEnabled } from "../../../../src/store/appSettingsStore";
 import { getEquipmentCatalog } from "../../../../i18n/equipmentCatalog";
 
 // Определяем константу BASE_TAGGED_SKILLS для исправления ReferenceError
@@ -91,12 +90,15 @@ const ImageSection = ({ origin, characterId, onEditPress, getCharacterImageUrl, 
             setCustomImageUrl(url);
           }
         })
-        .catch(console.error)
+        .catch((err) => debugLog('avatar.error', { step: 'ImageSection load error', error: String(err?.message ?? err) }))
         .finally(() => {
           if (isMounted) {
             setIsLoading(false);
           }
         });
+    } else {
+      setCustomImageUrl(null);
+      setIsLoading(false);
     }
 
     return () => { isMounted = false; };
@@ -407,7 +409,6 @@ export default function CharacterScreen() {
 
   const debugLocale = useLocale();
   const moduleLocale = useModuleLocale();
-  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
   const storeAttributes = useCharacterStore((state) => state.attributes);
   const storeSkills = useCharacterStore((state) => state.skills);
   // Надетое оружие — Шаг 3 миграции: экран пишет список напрямую в стор
@@ -1289,18 +1290,6 @@ export default function CharacterScreen() {
 
             {/* Если имя не сохранено, показываем затемняющий слой */}
             {!isSaved && <View style={styles.disabledOverlay} />}
-
-            {/* Кнопка переключения в GM-режим (админ) — управляется toggle adminScreenEnabled */}
-            {adminScreenEnabled && (
-              <TouchableOpacity
-                style={styles.adminButton}
-                onPress={() => {
-                  showCatalogAlert('admin.mode.notReady');
-                }}
-              >
-                <Text style={styles.adminButtonText}>{tCharacterScreen("buttons.admin")}</Text>
-              </TouchableOpacity>
-            )}
 
             <PressableRow
               title={tCharacterScreen("labels.origin")}

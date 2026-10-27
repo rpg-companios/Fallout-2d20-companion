@@ -112,6 +112,7 @@ const createRoomServer = ({
   wss.on('connection', (ws) => {
     // ws.meta = { clientId, rooms: Set<string> } — заполняется по мере join/create.
     ws.meta = { clientId: null, rooms: new Set() };
+    ws.on('error', () => { /* защита процесса от битых/слишком крупных фреймов */ });
 
     ws.on('message', (raw) => {
       let msg;

@@ -3,6 +3,8 @@ import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvo
 import { showRawAlert } from '../../../alerts/alertService';
 import { formatInventoryText, tInventory } from '../logic/inventoryI18n';
 import { useLocale } from '../../../../i18n/locale';
+// 406: КОЛЛЕКЦИОНЕР КРЫШЕК — покупки на 10% дешевле (предзаполнение цены).
+import useCharacterStore from '../../../../src/store/characterStore';
 
 const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
   useLocale();
@@ -12,7 +14,12 @@ const BuyItemModal = ({ visible, onClose, item, caps, onConfirmBuy }) => {
   useEffect(() => {
     if (!item) return;
     setQuantity('1');
-    setPricePerItem(String(item.cost ?? item.price ?? 0));
+    const baseCost = Number(item.cost ?? item.price ?? 0);
+    // 406: с «Коллекционером крышек» цена при открытии уже со скидкой 10%
+    // (торговая формулировка книги «можете уменьшить цену на 10%»).
+    const discount = Number(useCharacterStore.getState().perkBonuses?.capCollectorDiscountPercent) || 0;
+    const price = discount > 0 ? Math.round(baseCost * (1 - Math.min(100, discount) / 100)) : baseCost;
+    setPricePerItem(String(price));
   }, [item]);
 
   const changeQuantity = (delta) => {

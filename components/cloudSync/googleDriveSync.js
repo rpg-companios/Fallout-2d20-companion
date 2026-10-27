@@ -282,19 +282,25 @@ const listAvatarFiles = async (token, avatarsFolderId) => {
 };
 
 // Контент файла — data URL текстом (масштабируется теми же лимитами, что и
-// локальный кэш; multipart как у сейвов, но MIME image/jpeg).
-const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl }) => {
-  const metadata = fileId ? null : { name: avatarFileName(characterId), parents: [folderId], mimeType: 'image/jpeg' };
+// локальный кэш; multipart как у сейвов, но MIME может быть image/jpeg, image/png, image/gif).
+const uploadAvatarFile = async ({ token, folderId, fileId, characterId, dataUrl, mimeType = 'image/jpeg' }) => {
+  const fileName = avatarFileName(characterId, mimeType);
+  const metadata = fileId ? null : { name: fileName, parents: [folderId], mimeType };
   const delimiter = '-------fallout2d20avatar';
+  
+  // Извлекаем base64 из data URL
+  const base64Match = dataUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+  const base64Data = base64Match ? base64Match[1] : dataUrl;
+  
   const multipartBody = [
     `--${delimiter}`,
     'Content-Type: application/json; charset=UTF-8',
     '',
     JSON.stringify(metadata || {}),
     `--${delimiter}`,
-    'Content-Type: image/jpeg',
+    `Content-Type: ${mimeType}`,
     '',
-    dataUrl,
+    base64Data,
     `--${delimiter}--`,
   ].join('\r\n');
 
@@ -337,6 +343,69 @@ const syncAvatarsInSession = async (token, moduleFolderId) => {
     ensureFolder: () => getAvatarsFolderId(token, moduleFolderId),
     validateDataUrl: validateAvatarDataUrl,
   });
+};
+
+/**
+ * Загрузить один аватар в Google Drive.
+ * Используется для автосинхронизации при изменении картинки персонажа.
+ */
+export const syncCharacterAvatarToCloud = async (characterId) => {
+  if (!ensureWeb()) {
+    // На нативных платформах облачная синхронизация не поддерживается
+    return;
+  }
+
+  try {
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const avatarsFolderId = await getAvatarsFolderId(token, moduleFolderId);
+    
+    // Получаем аватар из кэша
+    const avatarRow = await avatarCache.getAvatarCache(characterId);
+    if (!avatarRow?.data_url && !avatarRow?.dataUrl) {
+      debugLog('sync.avatar:notFound', { characterId });
+      return;
+    }
+
+    const dataUrl = avatarRow.data_url || avatarRow.dataUrl;
+    
+    // Проверяем валидность
+    const validation = validateAvatarDataUrl(dataUrl);
+    if (!validation.ok) {
+      debugLog('sync.avatar:invalid', { characterId, reason: validation.reason });
+      return;
+    }
+
+    // Определяем MIME-тип из кэша
+    const mimeType = avatarRow.mime_type || avatarRow.mimeType || 'image/jpeg';
+    
+    // Проверяем, есть ли уже файл в Drive (ищем по characterId с любым расширением)
+    const avatarFiles = await listAvatarFiles(token, avatarsFolderId);
+    const existingFile = avatarFiles.find((f) => {
+      const parsed = parseAvatarFileName(f.name);
+      return parsed?.characterId === characterId;
+    });
+
+    // Загружаем или обновляем
+    const result = await uploadAvatarFile({
+      token,
+      folderId: avatarsFolderId,
+      fileId: existingFile?.id || null,
+      characterId,
+      dataUrl,
+      mimeType,
+    });
+
+    // Обновляем md5 в кэше
+    if (result?.md5Checksum) {
+      await avatarCache.updateAvatarCacheMd5(characterId, result.md5Checksum);
+    }
+
+    debugLog('sync.avatar:uploaded', { characterId, fileId: result?.id });
+  } catch (e) {
+    debugLog('sync.avatar:failed', { characterId, message: e?.message });
+    throw e;
+  }
 };
 
 export const isCloudSyncConfigured = async () => (await AsyncStorage.getItem(SYNC_KEY)) === '1';

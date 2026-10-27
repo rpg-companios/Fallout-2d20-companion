@@ -25,10 +25,10 @@ describe('447: кнопка «Админ» (GM-режим) скрыта выкл
     expect(src).toContain('Возврат в UI = GM_MODE_UI_ENABLED = true.');
   });
 
-  it('кнопка в шапке не рисуется без флага, а выход из GM — остаётся', () => {
+  it('кнопка в шапке не рисуется без флага/настройки, а выход из GM — остаётся', () => {
     const src = readFileSync(HOME_SCREEN, 'utf8');
-    // рендер: (GM_MODE_UI_ENABLED || isGmMode) && roomServerAvailable
-    expect(src).toMatch(/\(\(GM_MODE_UI_ENABLED \|\| isGmMode\) && roomServerAvailable\) && \(/);
+    // 447 + 448/451: рендер по константе, настройке adminScreenEnabled (default false) или выходу из GM
+    expect(src).toMatch(/\(\(GM_MODE_UI_ENABLED \|\| adminScreenEnabled \|\| isGmMode\) && roomServerAvailable\) && \(/);
     // сам JSX кнопки админа сохранён (не удалён, только погашен)
     expect(src).toContain('styles.adminButton');
     expect(src).toContain('handleToggleUiMode');

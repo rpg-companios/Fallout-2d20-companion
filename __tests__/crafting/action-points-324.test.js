@@ -21,6 +21,16 @@ import {
 import { craftRecipe, settleCraftTime } from '../../modules/fallout/crafting/operations';
 
 const state = () => useCharacterStore.getState();
+// 412: персонаж в тестах отвечает книжным требованиям выданных перков
+// (недоступные по книге ранги теперь честно гасятся мигратором 412).
+const grantBookProfile = (level, attrs = {}) => {
+  const base = { STR: 5, PER: 5, END: 5, CHA: 5, INT: 5, AGI: 5, LCK: 5, ...attrs };
+  useCharacterStore.setState({
+    level,
+    attributes: Object.fromEntries(Object.entries(base).map(([k, v]) => [k, { total: v }])),
+  });
+};
+
 
 beforeEach(() => {
   state().resetCharacterStore();
@@ -42,6 +52,7 @@ const seedStack = (itemId, quantity) => {
 
 const takeAmmo = (rolls) => {
   seedStack('item_common_materials', 2);
+  grantBookProfile(2, { INT: 7 });
   useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
   let i = 0;
   return craftRecipe('ammo_38', { rollD20: () => rolls[Math.min(i++, rolls.length - 1)] }, { deferTime: true });
@@ -59,7 +70,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
   });
 
   it('успех со сложностью 1 и 2 успехами даёт +1 ОД (пример владельца)', () => {
-    // ИНТ 4 + навык 0 = цель 4: броски 3, 4 — два успеха; сложность 1−0 = 1.
+    // ИНТ 7 (книжный Патронщик, 412) + навык 0 = цель 7: броски 3, 4 — два успеха; сложность 1−0 = 1.
     const result = takeAmmo([3, 4]);
     expect(result.done).toBe(true);
     expect(result.check.difficulty).toBe(1);
@@ -77,7 +88,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
   });
 
   it('провал ОД не приносит', () => {
-    // цель 4: броски 19, 18 — ноль успехов, провал
+    // цель 7: броски 19, 18 — ноль успехов, провал
     const result = takeAmmo([19, 18]);
     expect(result.done).toBe(false);
     expect(result.stage).toBe('check');
@@ -88,6 +99,8 @@ describe('Общий пул ОД (324): 6, пополнение проверка
   it('автоуспех (сложность 0) — броска не было, ОД нет', () => {
     seedStack('item_common_materials', 2);
     useCharacterStore.setState({
+      level: 2,
+      attributes: { STR: { total: 5 }, INT: { total: 7 } },
       selectedPerks: [{ perkId: 'ammosmith', index: 0 }],
       skills: { ...state().skills, REPAIR: { base: 2, total: 2 } }, // сложность 1−2 → 0
     });
@@ -101,6 +114,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
   it('трата 2 ОД требует пула: хватило — время вдвое, не хватило — полное', () => {
     spendActionPoints(4); // пул 2
     seedStack('item_common_materials', 2);
+    grantBookProfile(2, { INT: 7 });
     useCharacterStore.setState({ selectedPerks: [{ perkId: 'ammosmith', index: 0 }] });
 
     // проверка: 2 успеха при сложности 1 → сама приносит +1 (пул 3)
@@ -116,7 +130,7 @@ describe('Общий пул ОД (324): 6, пополнение проверка
 
     // пул 1 < 2: проверка без прибыли (1 успех = сложности) не пополняет —
     // трата невозможна, время полное
-    const lean = takeAmmo([4, 5]);
+    const lean = takeAmmo([2, 8]); // при цели 7 ровно один успех (2 — да, 8 — нет)
     expect(lean.done).toBe(true);
     expect(lean.apEarned.gained).toBe(0);
     expect(lean.apEarned.pool).toBe(1);

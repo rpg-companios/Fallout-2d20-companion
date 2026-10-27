@@ -4,10 +4,14 @@
 // задел патча 193; UI нет). Правила — docs/premium-and-avatar-design.md §1.2.
 
 import { describe, it, expect } from 'vitest';
+// 446: протокол 445-мэйда — файлы аватаров несут реальное расширение
+// по MIME (image/png → <id>.png; image/unknown → .jpg по закону
+// getFileExtension), парсер имён — parseAvatarFileName (объект
+// {characterId, mimeType, ext}), записи плана несут mimeType.
 import {
   AVATARS_FOLDER_NAME,
   avatarFileName,
-  characterIdFromAvatarFileName,
+  parseAvatarFileName,
   decideAvatarAction,
   planAvatarSync,
   syncAvatars,
@@ -22,11 +26,12 @@ const makeRemote = (characterId, { fileId = 'f1', md5 = null, modifiedTime = 100
 });
 
 describe('avatar sync: имена файлов', () => {
-  it('папка называется avatars, файл — <characterId>.jpg', () => {
+  it('папка называется avatars, файл — <characterId>.jpg (по умолчанию jpeg)', () => {
     expect(AVATARS_FOLDER_NAME).toBe('avatars');
     expect(avatarFileName('char_abc')).toBe('char_abc.jpg');
-    expect(characterIdFromAvatarFileName('char_abc.jpg')).toBe('char_abc');
-    expect(characterIdFromAvatarFileName('что-то-не-то.json')).toBeNull();
+    expect(avatarFileName('char_abc', 'image/png')).toBe('char_abc.png');
+    expect(parseAvatarFileName('char_abc.jpg')).toEqual({ characterId: 'char_abc', mimeType: 'image/jpeg', ext: 'jpg' });
+    expect(parseAvatarFileName('что-то-не-то.json')).toBeNull();
   });
 });
 
@@ -62,7 +67,7 @@ describe('avatar sync: план синка', () => {
       remote: [],
       existingCharacterIds: ['c1'],
     });
-    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: null }]);
+    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: null, mimeType: 'image/jpeg' }]);
     expect(plan.downloads).toEqual([]);
   });
 
@@ -72,7 +77,7 @@ describe('avatar sync: план синка', () => {
       remote: [makeRemote('c1', { fileId: 'f9' })],
       existingCharacterIds: ['c1'],
     });
-    expect(plan.downloads).toEqual([{ characterId: 'c1', fileId: 'f9' }]);
+    expect(plan.downloads).toEqual([{ characterId: 'c1', fileId: 'f9', mimeType: 'image/jpeg' }]);
     expect(plan.uploads).toEqual([]);
   });
 
@@ -93,7 +98,7 @@ describe('avatar sync: план синка', () => {
       remote: [makeRemote('c1', { fileId: 'f7', md5: 'remote', modifiedTime: 1000 })],
       existingCharacterIds: ['c1'],
     });
-    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: 'f7' }]);
+    expect(plan.uploads).toEqual([{ characterId: 'c1', fileId: 'f7', mimeType: 'image/jpeg' }]);
   });
 
   it('осиротевшие копии: персонажа нет — убрать и локально, и в облаке', () => {
@@ -218,7 +223,10 @@ describe('avatar sync: оркестратор', () => {
     const driveWithBig = {
       ...driveOps,
       listAvatarFiles: async () => [{ id: 'f4', name: 'c1.jpg', md5Checksum: 'big', modifiedTime: '2026-09-06T00:00:00.000Z' }],
-      downloadAvatarFile: async () => `data:image/jpeg;base64,${'A'.repeat(500000)}`,
+      // 446: лимит аватара — 5 МБ (445-мэйд): «толстым» стало >5 МБ
+      // (старый 500000-символьный файл ≈375 КБ валид — в кэш он ПРАВИЛЬНО
+      // попадал; тест по-настоящему проверяет только превышение лимита).
+      downloadAvatarFile: async () => `data:image/jpeg;base64,${'A'.repeat(7 * 1024 * 1024)}`,
     };
     const cache = makeCache([{ character_id: 'other', data_url: 'data:image/jpeg;base64,QUJD', md5: 'm', updated_at: 1 }]);
     const stats = await syncAvatars({
