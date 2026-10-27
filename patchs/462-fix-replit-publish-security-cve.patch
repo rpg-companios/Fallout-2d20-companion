@@ -1,0 +1,641 @@
+diff --git a/__tests__/installer/security-overrides-462.test.js b/__tests__/installer/security-overrides-462.test.js
+new file mode 100644
+index 0000000..23c368b
+--- /dev/null
++++ b/__tests__/installer/security-overrides-462.test.js
+@@ -0,0 +1,44 @@
++// Регрессионный тест патча 462:
++// Replit Socket Security Policy блокирует скачивание shell-quote@1.10.0
++// (403 Forbidden: Critical CVE в диапазоне 1.8.4–1.10.0) при публикации.
++// Проверяем, что overrides в package.json и все записи в package-lock.json
++// закреплены на исправленной версии >= 1.12.0.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++const parseSemver = (v) => String(v).replace(/^[^0-9]*/, '').split('.').map((n) => Number(n) || 0);
++const isAtLeast = (actual, min) => {
++  const [aMaj, aMin, aPat] = parseSemver(actual);
++  const [mMaj, mMin, mPat] = parseSemver(min);
++  if (aMaj !== mMaj) return aMaj > mMaj;
++  if (aMin !== mMin) return aMin > mMin;
++  return aPat >= mPat;
++};
++
++describe('Патч 462: защита от блокировки Replit Socket Security (shell-quote CVE)', () => {
++  it('package.json задаёт overrides для shell-quote >= 1.12.0 и патчевых CVE-зависимостей', () => {
++    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
++    expect(pkg.overrides?.['shell-quote']).toBeDefined();
++    expect(isAtLeast(pkg.overrides['shell-quote'], '1.12.0')).toBe(true);
++    expect(pkg.pnpm?.overrides?.['shell-quote']).toBeDefined();
++    expect(isAtLeast(pkg.pnpm.overrides['shell-quote'], '1.12.0')).toBe(true);
++  });
++
++  it('package-lock.json не содержит заблокированного shell-quote 1.8.4–1.10.0', () => {
++    const rawLock = fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8');
++    expect(rawLock).not.toContain('shell-quote-1.10.0.tgz');
++
++    const lock = JSON.parse(rawLock);
++    const shellQuoteEntries = Object.entries(lock.packages || {}).filter(([k]) =>
++      k.endsWith('node_modules/shell-quote'),
++    );
++    expect(shellQuoteEntries.length).toBeGreaterThan(0);
++    for (const [pkgPath, meta] of shellQuoteEntries) {
++      expect(isAtLeast(meta.version, '1.12.0'), `${pkgPath} = ${meta.version}`).toBe(true);
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 50be3aa..07ef35e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,17 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (462) — разблокировка публикации на Replit (обновление `shell-quote` и CVE-зависимостей в `overrides` / `package-lock.json`)
++
++Слово владельца (лог публикации на Replit):
++`npm error 403 Forbidden - GET http://package-firewall.replit.internal/npm/shell-quote/-/shell-quote-1.10.0.tgz - Blocked by Security Policy (Reason: Critical CVE)`.
++
++- Диагностика: в `package-lock.json` транзитивно стоял `shell-quote@1.10.0` (единственная критическая уязвимость `critical: 1` в графе — инъекция команд в `quote()` в версиях `1.8.4–1.10.0`), из-за чего прокси `package-firewall.replit.internal` (Socket Security Policy) отдавал `403` на этапе сборки публикации.
++- Исправлено:
++  1. `package.json`: добавлены `overrides` (и `pnpm.overrides`) для `shell-quote` (`^1.12.0`) и сопутствующих патчевых CVE-зависимостей (`compression` `^1.8.2`, `node-forge` `^1.4.2`, `js-yaml` `^4.3.2`, `fast-uri` `^3.1.9`, `source-map-js` `^1.2.2`, `vite` `^8.2.4`).
++  2. `package-lock.json`: пересобран и проверен через `npm ci` (`critical: 0`, `shell-quote` -> `1.12.0`, `brace-expansion` -> `1.1.21` / `5.0.12`).
++  3. `public/version.json` (`version: "462"`, `release: 4` сохранён) и `patchs/baseline.json` (`"462"`).
++- Приёмочные тесты: `__tests__/installer/security-overrides-462.test.js` (2 теста).
++
+ ## 2026-10-27 (461) — Релиз 4: заметки «Что нового» (`release: 4`)
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 4d94f3b..afba3b3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Fix Replit publish package firewall block (patch 462)
++
++Resolved the `403 Forbidden` error from Replit's Socket Security Policy on
++`shell-quote@1.10.0` during deployment: added `overrides` (and `pnpm.overrides`)
++in `package.json` and updated `package-lock.json` to patched releases
++(`shell-quote@1.12.0`, `compression@1.8.2`, `node-forge@1.4.2`,
++`js-yaml@4.3.2`, `fast-uri@3.1.9`, `source-map-js@1.2.2`, `vite@8.2.8`,
++`brace-expansion@1.1.21`/`5.0.12` — `0` critical CVEs).
++
+ ---
+ ## Release 4 — «What's new» notes (patch 461)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 97765b0..ef9316f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Исправление блокировки пакетов при публикации на Replit (патч 462)
++
++Устранена ошибка `403 Forbidden` от фильтра безопасности Replit (Socket Security
++Policy) на пакете `shell-quote@1.10.0` при публикации: в `package.json`
++добавлены `overrides` (и `pnpm.overrides`), а `package-lock.json` обновлён до
++безопасных патчевых версий (`shell-quote@1.12.0`, `compression@1.8.2`,
++`node-forge@1.4.2`, `js-yaml@4.3.2`, `fast-uri@3.1.9`, `source-map-js@1.2.2`,
++`vite@8.2.8`, `brace-expansion@1.1.21`/`5.0.12` — `0` критических CVE).
++
+ ---
+ ## Релиз 4 — заметки «Что нового» (патч 461)
+ 
+diff --git a/package-lock.json b/package-lock.json
+index 1df20d2..c343a35 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1843,13 +1843,13 @@
+       }
+     },
+     "node_modules/@oxc-project/types": {
+-      "version": "0.143.0",
+-      "resolved": "https://registry.npmjs.org/@oxc-project/types/-/types-0.143.0.tgz",
+-      "integrity": "sha512-u6JZdLBTLotrNC9Vd6vPssINdzcCzleKAH6EJKImQb7GtYvX5keN2dxkoK44stCc4tffE6QQRtZTXVSzsLUlWA==",
++      "version": "0.155.0",
++      "resolved": "https://registry.npmjs.org/@oxc-project/types/-/types-0.155.0.tgz",
++      "integrity": "sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==",
+       "dev": true,
+       "license": "MIT",
+       "funding": {
+-        "url": "https://github.com/sponsors/Boshen"
++        "url": "https://github.com/sponsors/oxc-project"
+       }
+     },
+     "node_modules/@react-native-async-storage/async-storage": {
+@@ -2165,10 +2165,27 @@
+         "nanoid": "^3.3.11"
+       }
+     },
++    "node_modules/@rolldown/binding-android-arm-eabi": {
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm-eabi/-/binding-android-arm-eabi-1.2.15.tgz",
++      "integrity": "sha512-aLcgK9gIJ3YRvrrtfSBbRa27F5WrpiTaPulnFpsHPxpUHgFlSgnU4854MHwoRGEBhfRJDWCS2WQ7lIjskE9Olw==",
++      "cpu": [
++        "arm"
++      ],
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "os": [
++        "android"
++      ],
++      "engines": {
++        "node": "^20.19.0 || >=22.12.0"
++      }
++    },
+     "node_modules/@rolldown/binding-android-arm64": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm64/-/binding-android-arm64-1.2.3.tgz",
+-      "integrity": "sha512-zrJtHDcaZJ1Fp7xf4hNl+7seH9Cn/N5TwLYkhgXREtBwAd/jaqW3uqeHxpDugJLVICWg4eW44kOQEGJ1r6jCGw==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-android-arm64/-/binding-android-arm64-1.2.15.tgz",
++      "integrity": "sha512-xD7DdZCrbThKuxNg7ooQmvp07ys4J/pnSEMTG3/OdOWl6daC67m/Q4fL78sRHMxTH/N4fGUbYhcPM0MF5WFHkg==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2183,9 +2200,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-darwin-arm64": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.2.3.tgz",
+-      "integrity": "sha512-ieIiibVCp0tX7TLu2cafoNPv8wJyYi01ekXpbf8q2j7F4rGAhhXb/eQh7ge9DRBY78GwmRQtvjZDux7EDbA8kA==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-arm64/-/binding-darwin-arm64-1.2.15.tgz",
++      "integrity": "sha512-m2WuQ6r0B4OTYxyPpNLtXaMRbRDUbG8YQV2Q3KTdSSK8Th6KHCnC8jVCJt8bvYeSB5WivkkNbc85mKadaSdOxA==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2200,9 +2217,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-darwin-x64": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-x64/-/binding-darwin-x64-1.2.3.tgz",
+-      "integrity": "sha512-Zh9tCon19eDXJoihx0rqKhMUlMYqzwj3aPsSuHmI4RWZh62dWUL+DJN4C5YQya5TcQBJU/Fe8+rY0jhXTQITqA==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-darwin-x64/-/binding-darwin-x64-1.2.15.tgz",
++      "integrity": "sha512-5RtnsHM36nodM9WbMy+zip0LGS/G+y5wro5RHrpOlr4ac24+1zSi9kiV2MP1myZeZ/ifEHfulQcWjnAXzc2C2A==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2217,9 +2234,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-freebsd-x64": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-freebsd-x64/-/binding-freebsd-x64-1.2.3.tgz",
+-      "integrity": "sha512-nGbJWewA1wrXXZiQhjAT5rhibGfns5ZNkDVqxsO6zJ3f3YvpoDNNmGMSbbhLuXKjNScaBJVOAboztAWVespQMg==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-freebsd-x64/-/binding-freebsd-x64-1.2.15.tgz",
++      "integrity": "sha512-g3l09pyFqhu+135JKkbkwiKGQmwU5hUMUPJ4VdBADvuqR8d33L6H578rh8m7rtxbdp+VmX/+nzI7nvhSZlzpUQ==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2234,9 +2251,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-arm-gnueabihf": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm-gnueabihf/-/binding-linux-arm-gnueabihf-1.2.3.tgz",
+-      "integrity": "sha512-QNniJr5Kml0kDEB98jiDOJjXNroxIIi0IXIbdYzY26Xt1pVbeP62+KnoIZLwirOymX/0jDk/2gI/bNUv7A7OIw==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm-gnueabihf/-/binding-linux-arm-gnueabihf-1.2.15.tgz",
++      "integrity": "sha512-nIe3VugI97nGQtspPxDqA4sXMUpeiocKIP/CqpY/u/vgbT+alX+cVxu1C/oVBPKg4feNTmYovE91v4DgXvXNwQ==",
+       "cpu": [
+         "arm"
+       ],
+@@ -2251,9 +2268,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-arm64-gnu": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-gnu/-/binding-linux-arm64-gnu-1.2.3.tgz",
+-      "integrity": "sha512-TkqEAcmmvH3I/q4114NB4RVt6241Dao48pF45uLcFGrwAaIn0iITgTAKP/dLjbN0R4buJjGb91+UHSoFmpgIWw==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-gnu/-/binding-linux-arm64-gnu-1.2.15.tgz",
++      "integrity": "sha512-iTBjXx+B5QSvgI89lJfmqh4wTh8NabR1YZIIN3hNx4zSG0EVfVqkOvLulNpG4251pbd6/IAmZ/LefVk1Y4rPhw==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2268,9 +2285,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-arm64-musl": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-musl/-/binding-linux-arm64-musl-1.2.3.tgz",
+-      "integrity": "sha512-NHqjnxpsndf4MPymxteFAWHHfkTL8HjWh1KB7z23ofZ6QO2euONuxDXjat69dKZRALnGypg8k8SsK8vZJoXv1Q==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-arm64-musl/-/binding-linux-arm64-musl-1.2.15.tgz",
++      "integrity": "sha512-uN26XOnVR7rqQupG3V9oAG2EGGatWjcJHOeDOHUFCh4TBWmP2tHTFoVN13aYbwfm0aHqJAEmcwhAu6sooIjfqQ==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2285,9 +2302,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-ppc64-gnu": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-ppc64-gnu/-/binding-linux-ppc64-gnu-1.2.3.tgz",
+-      "integrity": "sha512-6tbrbwfz5GB9DQ4Jwo6hy9v+vR31xZlvzZ6n5Xut6Hhx5PvrA9q/HsK8KMaYQp063iqZGXwNvZtYNLD7EM/x0w==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-ppc64-gnu/-/binding-linux-ppc64-gnu-1.2.15.tgz",
++      "integrity": "sha512-9nWkcdd+H+XhaA3fQIwpHnKIrfx/PQ6rO0pivr78Og07tXlUlctBBJoEYLPfhTmCR/QxEVdn6uPjHV5SymPhdw==",
+       "cpu": [
+         "ppc64"
+       ],
+@@ -2302,9 +2319,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-s390x-gnu": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-s390x-gnu/-/binding-linux-s390x-gnu-1.2.3.tgz",
+-      "integrity": "sha512-oyuXxXmoZHjXC917IAPFAAv4wWAa0cM9afk8nx1+9/jNNOX1uPf8yDA6p7G0RypOfw/X0PQt5IfoquY1um+zSg==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-s390x-gnu/-/binding-linux-s390x-gnu-1.2.15.tgz",
++      "integrity": "sha512-Ggh0ciFjLwIusLSLz7LZYEaGdxOAUJXI+Qu5JCbhPJJHEt8vP+IjRATTJheiJsdzzTYgUiHUiw3X1Ea3ZpMBdA==",
+       "cpu": [
+         "s390x"
+       ],
+@@ -2319,9 +2336,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-x64-gnu": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-gnu/-/binding-linux-x64-gnu-1.2.3.tgz",
+-      "integrity": "sha512-TytMwF2KVGqP2tgd0I1OY0PAv78dZRAYcF5ssDzjM34SUXCED3uXvSd5+lHoC0bTD6eEdFz7LdQNCO1y0oVk9w==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-gnu/-/binding-linux-x64-gnu-1.2.15.tgz",
++      "integrity": "sha512-FHg60rS6DBePAYZ9X9F67x+JObFdmgn6tupA1C/a3B+CufFmTD4mX+e8M75tCiAO3foR/6xwVBI0KQiI7sn/rw==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2336,9 +2353,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-linux-x64-musl": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-musl/-/binding-linux-x64-musl-1.2.3.tgz",
+-      "integrity": "sha512-/E9m3qstrJFVPoULV25mVQblSNExY2+kBsYe4sy0Tn0yOOgJ8wZbZt3KnRbF/XeU2Gl1STKUQnDNTqhIE5MD4A==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-linux-x64-musl/-/binding-linux-x64-musl-1.2.15.tgz",
++      "integrity": "sha512-/cvV/7v5VGz/moiz0XKRj2dE8DzsKyhIu1KpOvJGPjRywg3yscON889UGvAe8zfiJLHup7VLjBduoGWi3HusWQ==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2353,9 +2370,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-openharmony-arm64": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-openharmony-arm64/-/binding-openharmony-arm64-1.2.3.tgz",
+-      "integrity": "sha512-Kr0OcsoQI816i6HOl3vFHpd1K0eZyh76zgfj4c1nTyaTsd5r2Mj1lwM4R90y/qaCfmTn9eHy0SKwi98eitRxug==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-openharmony-arm64/-/binding-openharmony-arm64-1.2.15.tgz",
++      "integrity": "sha512-MyzC5Hrv/sm+Z7TSGKP/j8001RO2xQm1zOpCNVL4j0cY/VhBZviludA2YFQ7i4lH6ZAXxQm0lcMdBzM+99mE7w==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2370,9 +2387,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-win32-arm64-msvc": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-arm64-msvc/-/binding-win32-arm64-msvc-1.2.3.tgz",
+-      "integrity": "sha512-hOtMwTqnME+/gJcH/PCZ0wn0zPUjiWOgkHpxbSJpfGKMezHltx1S7/k1SitzVa7Ww2cqrDDaFbZEhcJZO8o+Jw==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-arm64-msvc/-/binding-win32-arm64-msvc-1.2.15.tgz",
++      "integrity": "sha512-+PgYiS+AH5omy6L45ZLxybasauJaj3M8buoT83D+nzPmCayXlxUV9hydhciCKVyIg0B/v0BtXPDE1uGqNwCPpg==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -2387,9 +2404,9 @@
+       }
+     },
+     "node_modules/@rolldown/binding-win32-x64-msvc": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-x64-msvc/-/binding-win32-x64-msvc-1.2.3.tgz",
+-      "integrity": "sha512-ekcqMMkI2PlhYnfzQnB/cEdYUVVJViWvoUyLrbzgDoi3Snfc1mVBwdnc306ufA5ejy8JSPjT2RlW1nQSjW7efg==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/@rolldown/binding-win32-x64-msvc/-/binding-win32-x64-msvc-1.2.15.tgz",
++      "integrity": "sha512-HFZd2QNQYn1JbIi+Hpd7H+r/lkWxcfIu28nirZ6eCn2LafuvmExMlb/P96Sfx5tf7pPArw39IdhmCF8vmV+NhQ==",
+       "cpu": [
+         "x64"
+       ],
+@@ -3133,9 +3150,9 @@
+       }
+     },
+     "node_modules/brace-expansion": {
+-      "version": "5.0.9",
+-      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.9.tgz",
+-      "integrity": "sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==",
++      "version": "5.0.12",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.12.tgz",
++      "integrity": "sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==",
+       "license": "MIT",
+       "dependencies": {
+         "balanced-match": "^4.0.2"
+@@ -3529,14 +3546,15 @@
+       }
+     },
+     "node_modules/compression": {
+-      "version": "1.8.1",
+-      "resolved": "https://registry.npmjs.org/compression/-/compression-1.8.1.tgz",
+-      "integrity": "sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==",
++      "version": "1.8.2",
++      "resolved": "https://registry.npmjs.org/compression/-/compression-1.8.2.tgz",
++      "integrity": "sha512-o8vI5RE5A6EVVOd9o41jKp41aJom+QTEO/Bx8MYNjexMo/Bv2WOjUfZr+aL0WnYSgymUy6zeguqLTsIhV0gMvQ==",
+       "license": "MIT",
+       "dependencies": {
+         "bytes": "3.1.2",
+         "compressible": "~2.0.18",
+         "debug": "2.6.9",
++        "destroy": "1.2.0",
+         "negotiator": "~0.6.4",
+         "on-headers": "~1.1.0",
+         "safe-buffer": "5.2.1",
+@@ -3544,6 +3562,10 @@
+       },
+       "engines": {
+         "node": ">= 0.8.0"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
+       }
+     },
+     "node_modules/compression/node_modules/debug": {
+@@ -4216,9 +4238,9 @@
+       "license": "MIT"
+     },
+     "node_modules/fast-uri": {
+-      "version": "3.1.5",
+-      "resolved": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.5.tgz",
+-      "integrity": "sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw==",
++      "version": "3.1.9",
++      "resolved": "https://registry.npmjs.org/fast-uri/-/fast-uri-3.1.9.tgz",
++      "integrity": "sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==",
+       "dev": true,
+       "funding": [
+         {
+@@ -4856,9 +4878,9 @@
+       "license": "MIT"
+     },
+     "node_modules/js-yaml": {
+-      "version": "4.3.1",
+-      "resolved": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.1.tgz",
+-      "integrity": "sha512-CY6crGq313MX8GkwvB7tzgp99vjQxY1++5y10/BKN/GUfHqWaOGQMNZkBvqSzsZKWk/ijwHlWzzkLulsGHhjWQ==",
++      "version": "4.3.2",
++      "resolved": "https://registry.npmjs.org/js-yaml/-/js-yaml-4.3.2.tgz",
++      "integrity": "sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==",
+       "funding": [
+         {
+           "type": "github",
+@@ -5885,9 +5907,9 @@
+       "license": "MIT"
+     },
+     "node_modules/nanoid": {
+-      "version": "3.3.18",
+-      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.18.tgz",
+-      "integrity": "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==",
++      "version": "3.3.20",
++      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.20.tgz",
++      "integrity": "sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==",
+       "funding": [
+         {
+           "type": "github",
+@@ -5932,9 +5954,9 @@
+       }
+     },
+     "node_modules/node-forge": {
+-      "version": "1.4.0",
+-      "resolved": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.0.tgz",
+-      "integrity": "sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==",
++      "version": "1.4.2",
++      "resolved": "https://registry.npmjs.org/node-forge/-/node-forge-1.4.2.tgz",
++      "integrity": "sha512-rRtAR5XLJ8gCKd9du4qrKAsgCG1ObGP4gLeNJMa4vYSeq4bmBMOJk5IHkrviBV0q7uoAJlVd8HEQYQSVUb4FGQ==",
+       "license": "(BSD-3-Clause OR GPL-2.0)",
+       "engines": {
+         "node": ">= 6.13.0"
+@@ -6287,9 +6309,9 @@
+       "license": "ISC"
+     },
+     "node_modules/picomatch": {
+-      "version": "4.0.5",
+-      "resolved": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.5.tgz",
+-      "integrity": "sha512-RvwwcruNjI1ncT5xRakeyS9Lf8lcItv34KD+aif+VH9kduAyfYBipGh12274xtenIPZ119/R9BdTBa8gAwSh0A==",
++      "version": "4.0.7",
++      "resolved": "https://registry.npmjs.org/picomatch/-/picomatch-4.0.7.tgz",
++      "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=12"
+@@ -6331,9 +6353,9 @@
+       }
+     },
+     "node_modules/postcss": {
+-      "version": "8.5.26",
+-      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.26.tgz",
+-      "integrity": "sha512-u82N74LFzG8ca+dD8puPnplTXoGH4fTPpVGuIbt36G3qvNlkvfD0lEAZSxaly3KX8TS/L1A1gsCEmvKmBcVbkQ==",
++      "version": "8.5.32",
++      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.32.tgz",
++      "integrity": "sha512-LJlKCCAUFKOuZxipUdYw1NzIITEsPcgyOG9LkvRJvuKj/bRzbuRY0ARXvL0pWGpsZvn8jku+LMep2eU0seHp8g==",
+       "funding": [
+         {
+           "type": "opencollective",
+@@ -6350,9 +6372,9 @@
+       ],
+       "license": "MIT",
+       "dependencies": {
+-        "nanoid": "^3.3.17",
++        "nanoid": "^3.3.20",
+         "picocolors": "^1.1.1",
+-        "source-map-js": "^1.2.1"
++        "source-map-js": "^1.2.2"
+       },
+       "engines": {
+         "node": "^10 || ^12 || >=14"
+@@ -7123,13 +7145,13 @@
+       }
+     },
+     "node_modules/rolldown": {
+-      "version": "1.2.3",
+-      "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.2.3.tgz",
+-      "integrity": "sha512-rn9wpmxplLf7NLNyCk9FyWh3FM43DbY8jOzCdEPzH7uflhTftRbCEpqi6Ly2osgoU8OwObtmavMbWLaWy4LX7A==",
++      "version": "1.2.15",
++      "resolved": "https://registry.npmjs.org/rolldown/-/rolldown-1.2.15.tgz",
++      "integrity": "sha512-6odND+fel5zVw3I4Yc2e69gvguDnX0CAAGiNDZSq4ik5WUcaLrkD2GLuog0XcODbor31hZ5ayEMgVDno+KPV5g==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+-        "@oxc-project/types": "=0.143.0",
++        "@oxc-project/types": "=0.155.0",
+         "@rolldown/pluginutils": "^1.0.0"
+       },
+       "bin": {
+@@ -7139,20 +7161,21 @@
+         "node": "^20.19.0 || >=22.12.0"
+       },
+       "optionalDependencies": {
+-        "@rolldown/binding-android-arm64": "1.2.3",
+-        "@rolldown/binding-darwin-arm64": "1.2.3",
+-        "@rolldown/binding-darwin-x64": "1.2.3",
+-        "@rolldown/binding-freebsd-x64": "1.2.3",
+-        "@rolldown/binding-linux-arm-gnueabihf": "1.2.3",
+-        "@rolldown/binding-linux-arm64-gnu": "1.2.3",
+-        "@rolldown/binding-linux-arm64-musl": "1.2.3",
+-        "@rolldown/binding-linux-ppc64-gnu": "1.2.3",
+-        "@rolldown/binding-linux-s390x-gnu": "1.2.3",
+-        "@rolldown/binding-linux-x64-gnu": "1.2.3",
+-        "@rolldown/binding-linux-x64-musl": "1.2.3",
+-        "@rolldown/binding-openharmony-arm64": "1.2.3",
+-        "@rolldown/binding-win32-arm64-msvc": "1.2.3",
+-        "@rolldown/binding-win32-x64-msvc": "1.2.3"
++        "@rolldown/binding-android-arm-eabi": "1.2.15",
++        "@rolldown/binding-android-arm64": "1.2.15",
++        "@rolldown/binding-darwin-arm64": "1.2.15",
++        "@rolldown/binding-darwin-x64": "1.2.15",
++        "@rolldown/binding-freebsd-x64": "1.2.15",
++        "@rolldown/binding-linux-arm-gnueabihf": "1.2.15",
++        "@rolldown/binding-linux-arm64-gnu": "1.2.15",
++        "@rolldown/binding-linux-arm64-musl": "1.2.15",
++        "@rolldown/binding-linux-ppc64-gnu": "1.2.15",
++        "@rolldown/binding-linux-s390x-gnu": "1.2.15",
++        "@rolldown/binding-linux-x64-gnu": "1.2.15",
++        "@rolldown/binding-linux-x64-musl": "1.2.15",
++        "@rolldown/binding-openharmony-arm64": "1.2.15",
++        "@rolldown/binding-win32-arm64-msvc": "1.2.15",
++        "@rolldown/binding-win32-x64-msvc": "1.2.15"
+       }
+     },
+     "node_modules/safe-buffer": {
+@@ -7348,9 +7371,9 @@
+       "license": "MIT"
+     },
+     "node_modules/serve-handler/node_modules/brace-expansion": {
+-      "version": "1.1.18",
+-      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.18.tgz",
+-      "integrity": "sha512-Edep/X9fGqVNmzKBVsDYIOtD+z1tuezV70LBjdCst9Tqu76lsnvRiZ6oTic1n+/BIwX6QDGAO94PN4N2SADvtw==",
++      "version": "1.1.21",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.21.tgz",
++      "integrity": "sha512-9zeA+KLZNNzglF2TPKRQEDyx6Yby7daAkuy8MiPzpXPsYDWi/DRM8jmwUDxokQjYqBpv5DgPiwD4h4ZZSy1Ujw==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+@@ -7475,9 +7498,9 @@
+       }
+     },
+     "node_modules/shell-quote": {
+-      "version": "1.10.0",
+-      "resolved": "https://registry.npmjs.org/shell-quote/-/shell-quote-1.10.0.tgz",
+-      "integrity": "sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==",
++      "version": "1.12.0",
++      "resolved": "https://registry.npmjs.org/shell-quote/-/shell-quote-1.12.0.tgz",
++      "integrity": "sha512-PcByqNyT/38F2kDNi006HAMRJaULuBzq/FOsw3qdZvX/GA9W/jamDaRskgHjubHiftXK5sIFxLNkvrXUwcof6Q==",
+       "license": "MIT",
+       "engines": {
+         "node": ">= 0.4"
+@@ -7556,9 +7579,9 @@
+       }
+     },
+     "node_modules/source-map-js": {
+-      "version": "1.2.1",
+-      "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.1.tgz",
+-      "integrity": "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==",
++      "version": "1.2.2",
++      "resolved": "https://registry.npmjs.org/source-map-js/-/source-map-js-1.2.2.tgz",
++      "integrity": "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==",
+       "license": "BSD-3-Clause",
+       "engines": {
+         "node": ">=0.10.0"
+@@ -8118,16 +8141,16 @@
+       }
+     },
+     "node_modules/vite": {
+-      "version": "8.2.1",
+-      "resolved": "https://registry.npmjs.org/vite/-/vite-8.2.1.tgz",
+-      "integrity": "sha512-EU/eS7BH3XROHh2YnBefjM6DBKA6ZeMZEYQbj7NLWg5wHYlhB8B/Mayd5XsgWq+NFYccDOTemRpdETWR6Ka/lw==",
++      "version": "8.3.5",
++      "resolved": "https://registry.npmjs.org/vite/-/vite-8.3.5.tgz",
++      "integrity": "sha512-z1YpjieJ9g0ebTmQpLBv/oq9E3F9EIlOe+7LahW8SrE3LTiG3udBRUXQOlYXP9b+IC2q2phHeVxj9xGlw34OEQ==",
+       "dev": true,
+       "license": "MIT",
+       "dependencies": {
+         "lightningcss": "^1.33.0",
+-        "picomatch": "^4.0.5",
+-        "postcss": "^8.5.25",
+-        "rolldown": "~1.2.1",
++        "picomatch": "^4.0.7",
++        "postcss": "^8.5.30",
++        "rolldown": "~1.2.14",
+         "tinyglobby": "^0.2.17"
+       },
+       "bin": {
+@@ -8144,7 +8167,7 @@
+       },
+       "peerDependencies": {
+         "@types/node": "^20.19.0 || >=22.12.0",
+-        "@vitejs/devtools": "^0.4.0",
++        "@vitejs/devtools": "^0.7.1 || ^0.8.0",
+         "esbuild": "^0.27.0 || ^0.28.0",
+         "jiti": ">=1.21.0",
+         "less": "^4.0.0",
+diff --git a/package.json b/package.json
+index 447cb98..60b09f8 100644
+--- a/package.json
++++ b/package.json
+@@ -51,5 +51,25 @@
+     "typescript": "~6.0.3",
+     "vitest": "^4.1.5"
+   },
++  "overrides": {
++    "shell-quote": "^1.12.0",
++    "compression": "^1.8.2",
++    "node-forge": "^1.4.2",
++    "js-yaml": "^4.3.2",
++    "fast-uri": "^3.1.9",
++    "source-map-js": "^1.2.2",
++    "vite": "^8.2.4"
++  },
++  "pnpm": {
++    "overrides": {
++      "shell-quote": "^1.12.0",
++      "compression": "^1.8.2",
++      "node-forge": "^1.4.2",
++      "js-yaml": "^4.3.2",
++      "fast-uri": "^3.1.9",
++      "source-map-js": "^1.2.2",
++      "vite": "^8.2.4"
++    }
++  },
+   "private": true
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 9600e52..152e634 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "461"
++  "baseline": "462"
+ }
+diff --git a/public/version.json b/public/version.json
+index 96ee09b..93d8619 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "461",
++  "version": "462",
+   "release": 4,
+   "notes": {
+     "ru-RU": [

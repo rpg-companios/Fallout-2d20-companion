@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Fix Replit publish package firewall block (patch 462)
+
+Resolved the `403 Forbidden` error from Replit's Socket Security Policy on
+`shell-quote@1.10.0` during deployment: added `overrides` (and `pnpm.overrides`)
+in `package.json` and updated `package-lock.json` to patched releases
+(`shell-quote@1.12.0`, `compression@1.8.2`, `node-forge@1.4.2`,
+`js-yaml@4.3.2`, `fast-uri@3.1.9`, `source-map-js@1.2.2`, `vite@8.2.8`,
+`brace-expansion@1.1.21`/`5.0.12` — `0` critical CVEs).
+
+---
 ## Release 4 — «What's new» notes (patch 461)
 
 Owner's word: ship a new release. Raised `release` to **4** in
