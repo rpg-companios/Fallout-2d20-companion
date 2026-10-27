@@ -125,6 +125,12 @@ export const ALERTS = {
     titleKey: 'title',
     messageKey: 'upload.unsupported',
   },
+  roomCreateFailed: {
+    scope: 'home',
+    kind: 'info',
+    titleKey: 'room.createFailedTitle',
+    messageKey: 'room.createFailed',
+  },
 
   // --- Инвентарь ------------------------------------------------------------
 

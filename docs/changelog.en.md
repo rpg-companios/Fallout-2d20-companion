@@ -1,5 +1,23 @@
 # Changelog
 ---
+## High-priority UI icons, preserved Metro/PWA caches & GM rooms in Metro (patch 453)
+
+- **Icon loading priority**: core UI icon fonts (`MaterialCommunityIcons`,
+  `Ionicons`, `FontAwesome5Free-Brand`) are now preloaded immediately at
+  startup with `<link rel="preload" as="font" fetchpriority="high">` and
+  `font-display: swap`, while the web `@expo/vector-icons` entry drops 12
+  unused icon families (-14 unused `.ttf` files).
+- **Startup speed & caching**: removed `--clear` from `.replit` so Metro
+  retains its transform cache across restarts, and taught the service worker
+  to serve fonts and content-hashed build assets cache-first without wiping
+  existing caches.
+- **Admin room creation**: attached the `/ws` room WebSocket relay directly
+  to Metro's HTTP(S) dev server (`expo start --web`), ensured the GM joins
+  newly created rooms and transparently rebinds saved rooms after a server
+  restart, and fixed the contradictory failure dialog title (`Room creation
+  failed` instead of `Room created`).
+
+---
 ## Web font timeout & Replit pnpm asset fix (patch 452)
 
 Fixed the web startup crash (`fontfaceobserver.standalone.js: timeout

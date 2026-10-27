@@ -1,5 +1,22 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (453) — высокий приоритет иконок, сохранение кэша Metro/PWA и работа комнат мастера в Metro
+
+Слово владельца:
+1) «Долго грузятся иконоки в бургер меню, трёх точек и т.п Им бы приоритет повыше.»
+2) «И приложение стало очень медленно грузится, возможно из-за удаления кэша.»
+3) «При попытке создания комнаты в админ режиме: **Комната создана** — Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз. (Противоречие заголовка и сообщения об ошибке и комната не создаётся).»
+
+- Диагностика:
+  1. Иконки (`MaterialCommunityIcons` 1.3 МБ, `Ionicons` 390 КБ, `FontAwesome5_Brands` 134 КБ) запрашивались лениво только при первом монтировании `<Icon>` (а `FontAwesome5` — только в момент клика по бургер-меню!), без `<link rel="preload" fetchpriority="high">`, плюс штатный пакет `@expo/vector-icons` (`IconsLazy.js`) жадно тянул в веб-бандл все 15 семейств иконок (40 лишних модулей, ~200+ КБ карт глифов и 14 неиспользуемых `.ttf`), а `service-worker.js` ходил в сеть за `.ttf` на каждый запуск.
+  2. В `.replit` стоял флаг `--clear` (`npx expo start --clear --web --port 5000`), из-за чего при каждом перезапуске сервера на Replit кэш трансформации Metro полностью удалялся и все ~1150 модулей пересобирались с нуля.
+  3. При запуске через `expo start --web` работал только HTTP-сервер Metro без WebSocket-эндпоинта `/ws` из `server/roomServer.js` (а слушатель `upgrade` в `@expo/cli/runServer-fork` вызывал `socket.destroy()` для всех путей кроме `/hot`), поэтому `createRoom` валился по таймауту. Вдобавок в `HomeScreen.js:622` в блоке `catch` стоял ошибочный заголовок `tHomeScreen('room.createdTitle')` («Комната создана»), а после успешного `createRoom` мастер не отправлял `ROOM_JOIN` на сервер (так как `rooms[code]` уже лежал в `roomStore`).
+- Исправлено:
+  1. `index.js` + `src/web/vectorIconsWeb.js` + `metro.config.js` — на T=0 мс предзагружаются шрифты `MaterialCommunityIcons`, `Ionicons` и `FontAwesome5Free-Brand` с инъекцией `<link rel="preload" as="font" fetchpriority="high" crossorigin="anonymous">` и `font-display: swap`; на вебе `@expo/vector-icons` резолвится в узкую точку входа `src/web/vectorIconsWeb.js` (-40 модулей, -14 неиспользуемых `.ttf`).
+  2. `.replit` + `public/service-worker.js` — из `.replit` убран `--clear` (кэш Metro сохраняется между перезапусками); в `service-worker.js` для шрифтов (`.ttf`/`.woff2`) и неизменяемых файлов сборки с контент-хэшем включён мгновенный `cache-first` без удаления существующего `CACHE_NAME`.
+  3. `server/roomServer.js` + `metro.config.js` + `src/room/roomStore.ts` + `HomeScreen.js` + `components/alerts/catalog.js` + `i18n/*/screens/home/screen.json` — вынесен `attachRoomWebSocketServer(httpServer)` и подключён прямо к HTTP(S)-серверу Metro на этапе `enhanceMiddleware` (проверено вживую на `npx expo start --web`); мастер сразу делает `joinRoom` после `createRoom`, автоматически восстанавливает комнаты тем же кодом и `ownerToken` после рестарта сервера (`ROOM_NOT_FOUND` -> `createRoom({ requestedCode, ownerToken })`), а ошибка создания комнаты выводится через каталожный алерт `roomCreateFailed` с честным заголовком «Ошибка создания комнаты» / «Room creation failed».
+- Приёмочные тесты: `__tests__/room/room-metro-and-icons-453.test.js` (4 теста).
+
 ## 2026-10-27 (452) — устранение краша `fontfaceobserver` и блокировки `.local/share/pnpm` на Replit
 
 Слово владельца (лог запуска на Replit после установки 451):

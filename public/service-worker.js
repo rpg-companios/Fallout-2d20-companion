@@ -92,6 +92,47 @@ const handleNavigation = async (request) => {
   }
 };
 
+const FONT_EXT_RE = /\.(ttf|woff2?|otf)$/i;
+const HASHED_ASSET_RE = /\.[0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
+
+const isImmutableOrFontRequest = (request, requestUrl) => {
+  if (request.destination === 'font') return true;
+  if (FONT_EXT_RE.test(requestUrl.pathname)) return true;
+  if (HASHED_ASSET_RE.test(requestUrl.pathname)) return true;
+  if (requestUrl.pathname.startsWith('/assets/') && requestUrl.search) {
+    try {
+      const decoded = decodeURIComponent(requestUrl.search);
+      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) return true;
+    } catch (_) {
+      // Некорректный query — оставляем стандартную сетевую ветку.
+    }
+  }
+  return false;
+};
+
+// Иконочные шрифты (.ttf/.woff2) и файлы сборки с контент-хэшем неизменяемы:
+// отдаём их мгновенно из Cache Storage (cache-first), не гоняя мегабайты по сети
+// на каждый запуск. При обновлении сборки хэш в имени файла меняется сам.
+const handleImmutableAsset = async (request) => {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  const networkResponse = await fetch(request);
+  const contentType = networkResponse.headers.get('content-type') || '';
+  if (request.destination === 'script' && contentType.includes('text/html')) {
+    return new Response('', {
+      status: 503,
+      statusText: 'JavaScript asset unavailable',
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }
+  if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+    const toCache = networkResponse.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, toCache)).catch(() => undefined);
+  }
+  return networkResponse;
+};
+
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const requestUrl = new URL(event.request.url);
@@ -99,6 +140,22 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
     event.respondWith(handleNavigation(event.request));
+    return;
+  }
+
+  if (isImmutableOrFontRequest(event.request, requestUrl)) {
+    event.respondWith(
+      handleImmutableAsset(event.request).catch(() => {
+        if (event.request.destination === 'script') {
+          return new Response('', {
+            status: 503,
+            statusText: 'Offline',
+            headers: { 'Content-Type': 'text/plain' },
+          });
+        }
+        return Response.error();
+      })
+    );
     return;
   }
 

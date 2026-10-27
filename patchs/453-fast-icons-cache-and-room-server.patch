@@ -1,0 +1,1019 @@
+diff --git a/.replit b/.replit
+index a4c0e88..4047885 100644
+--- a/.replit
++++ b/.replit
+@@ -36,7 +36,7 @@ author = "agent"
+ 
+ [[workflows.workflow.tasks]]
+ task = "shell.exec"
+-args = "env CI=1 npx expo start --clear --web --port 5000"
++args = "env CI=1 npx expo start --web --port 5000"
+ 
+ [workflows.workflow.metadata]
+ outputType = "webview"
+diff --git a/__tests__/room/room-metro-and-icons-453.test.js b/__tests__/room/room-metro-and-icons-453.test.js
+new file mode 100644
+index 0000000..ffeb066
+--- /dev/null
++++ b/__tests__/room/room-metro-and-icons-453.test.js
+@@ -0,0 +1,272 @@
++// Регрессионные тесты патча 453:
++// 1) WebSocket-сервер комнат (/ws) подключается прямо к HTTP-серверу Metro
++//    через enhanceMiddleware и не обрывается слушателем upgrade в @expo/cli;
++// 2) Ошибка создания комнаты показывает заголовок ошибки (roomCreateFailed),
++//    а не «Комната создана»;
++// 3) После createRoom мастер реально входит в комнату (ROOM_JOIN), а после
++//    обрыва связи или перезапуска сервера комнаты переподключаются с ownerToken;
++// 4) Иконочные шрифты предзагружаются с fetchpriority="high" и узкой веб-точкой
++//    входа @expo/vector-icons, а .replit не сбрасывает кэш Metro (--clear).
++
++import { describe, expect, it } from 'vitest';
++import http from 'node:http';
++import fs from 'node:fs';
++import path from 'node:path';
++import WebSocket, { WebSocketServer } from 'ws';
++
++import metroConfig from '../../metro.config.js';
++import { MESSAGE, PROTOCOL_VERSION } from '../../server/protocol.js';
++import { ALERTS } from '../../components/alerts/catalog.js';
++import ruHome from '../../i18n/ru-RU/screens/home/screen.json';
++import enHome from '../../i18n/en-EN/screens/home/screen.json';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++describe('Патч 453: комнаты мастера в Metro, честный алерт ошибки и быстрые иконки/кэш', () => {
++  it('Metro enhanceMiddleware поднимает /ws поверх сервера с чужим upgrade-слушателем (/hot)', async () => {
++    const enhanced = metroConfig.server.enhanceMiddleware((_req, res) => {
++      res.writeHead(200, { 'Content-Type': 'text/plain' });
++      res.end('metro-ok');
++    }, {});
++
++    const httpServer = http.createServer((req, res) => enhanced(req, res, () => {}));
++    const hotWss = new WebSocketServer({ noServer: true });
++    let hotConnected = false;
++    hotWss.on('connection', (ws) => {
++      hotConnected = true;
++      ws.send('hmr-ready');
++    });
++
++    await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
++    const { port } = httpServer.address();
++
++    // Имитация @expo/cli runServer-fork: слушатель upgrade добавляется ПОСЛЕ listen()
++    // и уничтожает все сокеты, кроме /hot.
++    httpServer.on('upgrade', (request, socket, head) => {
++      const { pathname } = new URL(request.url, 'http://localhost');
++      if (pathname === '/hot') {
++        hotWss.handleUpgrade(request, socket, head, (ws) => {
++          hotWss.emit('connection', ws, request);
++        });
++      } else {
++        socket.destroy();
++      }
++    });
++
++    try {
++      // Первый HTTP-запрос (как открытие index.html в браузере) прикрепляет /ws.
++      const res = await fetch(`http://127.0.0.1:${port}/`);
++      expect(await res.text()).toBe('metro-ok');
++      expect(httpServer.__positroniumRoomWs).toBeTruthy();
++
++      // Проверяем, что /ws создаёт комнату и синхронизирует участников.
++      const gmWs = new WebSocket(`ws://127.0.0.1:${port}/ws`);
++      await new Promise((resolve, reject) => {
++        gmWs.once('open', resolve);
++        gmWs.once('error', reject);
++      });
++
++      const waitMsg = (ws, predicate) =>
++        new Promise((resolve, reject) => {
++          const timer = setTimeout(() => reject(new Error('ws timeout')), 3000);
++          const onMsg = (raw) => {
++            const parsed = JSON.parse(raw.toString());
++            if (predicate(parsed)) {
++              clearTimeout(timer);
++              ws.off('message', onMsg);
++              resolve(parsed);
++            }
++          };
++          ws.on('message', onMsg);
++        });
++
++      const createdPromise = waitMsg(gmWs, (m) => m.type === MESSAGE.ROOM_CREATED);
++      gmWs.send(JSON.stringify({
++        v: PROTOCOL_VERSION,
++        type: MESSAGE.ROOM_CREATE,
++        roomCode: null,
++        clientId: 'gm-metro',
++        ts: Date.now(),
++        payload: { name: 'Кампания Мохаве', requestId: 'req-create-1' },
++      }));
++      const created = await createdPromise;
++      expect(created.payload.code).toMatch(/^GM-[A-Z2-9]{6}$/);
++
++      const gmStatePromise = waitMsg(gmWs, (m) => m.type === MESSAGE.ROOM_STATE);
++      gmWs.send(JSON.stringify({
++        v: PROTOCOL_VERSION,
++        type: MESSAGE.ROOM_JOIN,
++        roomCode: created.payload.code,
++        clientId: 'gm-metro',
++        ts: Date.now(),
++        payload: { code: created.payload.code, name: 'GM', role: 'gm', requestId: 'req-join-gm' },
++      }));
++      await gmStatePromise;
++
++      const memberBroadcastPromise = waitMsg(
++        gmWs,
++        (m) => m.type === MESSAGE.ROOM_MEMBER && m.payload.members.some((x) => x.name === 'Курьер'),
++      );
++
++      const playerWs = new WebSocket(`ws://127.0.0.1:${port}/ws`);
++      await new Promise((resolve, reject) => {
++        playerWs.once('open', resolve);
++        playerWs.once('error', reject);
++      });
++      playerWs.send(JSON.stringify({
++        v: PROTOCOL_VERSION,
++        type: MESSAGE.ROOM_JOIN,
++        roomCode: created.payload.code,
++        clientId: 'player-metro',
++        ts: Date.now(),
++        payload: { code: created.payload.code, name: 'Курьер', role: 'player', requestId: 'req-join-p' },
++      }));
++
++      const memberBroadcast = await memberBroadcastPromise;
++      expect(memberBroadcast.payload.members.map((m) => m.name).sort()).toEqual(['GM', 'Курьер']);
++
++      // Проверяем, что штатный HMR-сокет Metro (/hot) продолжает работать.
++      const hotClient = new WebSocket(`ws://127.0.0.1:${port}/hot`);
++      const hotGreeting = await new Promise((resolve, reject) => {
++        hotClient.once('message', (data) => resolve(data.toString()));
++        hotClient.once('error', reject);
++      });
++      expect(hotConnected).toBe(true);
++      expect(hotGreeting).toBe('hmr-ready');
++
++      gmWs.close();
++      playerWs.close();
++      hotClient.close();
++    } finally {
++      hotWss.close();
++      await httpServer.__positroniumRoomWs?.closeWs();
++      await new Promise((resolve) => httpServer.close(resolve));
++    }
++  });
++
++  it('ошибка создания комнаты использует заголовок ошибки (roomCreateFailed), а не «Комната создана»', () => {
++    expect(ALERTS.roomCreateFailed).toEqual({
++      scope: 'home',
++      kind: 'info',
++      titleKey: 'room.createFailedTitle',
++      messageKey: 'room.createFailed',
++    });
++    expect(ruHome.room.createFailedTitle).toBe('Ошибка создания комнаты');
++    expect(ruHome.room.createFailedTitle).not.toBe(ruHome.room.createdTitle);
++    expect(enHome.room.createFailedTitle).toBe('Room creation failed');
++    expect(enHome.room.createFailedTitle).not.toBe(enHome.room.createdTitle);
++
++    const homeSrc = fs.readFileSync(
++      path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'),
++      'utf8',
++    );
++    expect(homeSrc).toContain("showCatalogAlert('roomCreateFailed')");
++    expect(homeSrc).not.toContain("showHomeAlert(tHomeScreen('room.createdTitle'), tHomeScreen('room.createFailed'))");
++  });
++
++  it('roomStore позволяет joinRoom сразу после createRoom и перепривязку после offline', async () => {
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = 'ws://test.invalid/ws';
++    const sent = [];
++    let handlers = null;
++    const mockClient = {
++      send(type, payload, roomCode) {
++        sent.push({ type, payload, roomCode });
++      },
++      close() {},
++      getStatus: () => 'online',
++    };
++
++    const storeModule = await import('../../src/room/roomStore');
++    const { ROOM_MESSAGE } = await import('../../src/room/roomProtocol');
++    storeModule.resetRoomClientForTests();
++    storeModule.setRoomClientFactoryForTests(({ onStatus, onMessage }) => {
++      handlers = { onStatus, onMessage };
++      return mockClient;
++    });
++    const useRoomStore = storeModule.default;
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++    await useRoomStore.getState().connect();
++
++    // 1. Создание комнаты (с поддержкой requestedCode + ownerToken)
++    const createPromise = useRoomStore.getState().createRoom({
++      name: 'Стол',
++      requestedCode: 'GM-7Q3K9M',
++      ownerToken: 'tok-restore',
++    });
++    await new Promise((r) => setTimeout(r, 0));
++    const createMsg = sent.find((m) => m.type === ROOM_MESSAGE.ROOM_CREATE);
++    expect(createMsg.payload).toMatchObject({
++      name: 'Стол',
++      requestedCode: 'GM-7Q3K9M',
++      ownerToken: 'tok-restore',
++    });
++    handlers.onMessage({
++      type: ROOM_MESSAGE.ROOM_CREATED,
++      roomCode: 'GM-7Q3K9M',
++      payload: {
++        code: 'GM-7Q3K9M',
++        name: 'Стол',
++        ownerToken: 'tok-restore',
++        requestId: createMsg.payload.requestId,
++      },
++    });
++    await createPromise;
++    expect(useRoomStore.getState().rooms['GM-7Q3K9M'].joined).toBe(false);
++
++    // 2. Вход мастера сразу после createRoom реально отправляет ROOM_JOIN
++    const joinPromise = useRoomStore.getState().joinRoom({
++      code: 'GM-7Q3K9M',
++      name: 'GM',
++      role: 'gm',
++    });
++    await new Promise((r) => setTimeout(r, 0));
++    const joinMsg = sent.find((m) => m.type === ROOM_MESSAGE.ROOM_JOIN);
++    expect(joinMsg).toBeTruthy();
++    handlers.onMessage({
++      type: ROOM_MESSAGE.ROOM_STATE,
++      roomCode: 'GM-7Q3K9M',
++      payload: {
++        code: 'GM-7Q3K9M',
++        name: 'Стол',
++        members: [{ clientId: 'gm', name: 'GM', role: 'gm' }],
++        snapshots: [],
++        requestId: joinMsg.payload.requestId,
++      },
++    });
++    await joinPromise;
++    expect(useRoomStore.getState().rooms['GM-7Q3K9M'].joined).toBe(true);
++
++    // 3. Обрыв соединения сбрасывает joined -> false для последующего перевхода
++    handlers.onStatus('offline');
++    expect(useRoomStore.getState().rooms['GM-7Q3K9M'].joined).toBe(false);
++  });
++
++  it('веб-иконки предзагружаются с высоким приоритетом, а кэш Metro и шрифтов сохранён', () => {
++    const resolvedIcons = metroConfig.resolver.resolveRequest(
++      {
++        originModulePath: path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'),
++        resolveRequest: () => ({ type: 'empty' }),
++      },
++      '@expo/vector-icons',
++      'web',
++    );
++    expect(resolvedIcons).toEqual({
++      type: 'sourceFile',
++      filePath: path.join(ROOT, 'src/web/vectorIconsWeb.js'),
++    });
++
++    const indexSrc = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8');
++    expect(indexSrc).toContain("link.setAttribute('fetchpriority', 'high')");
++    expect(indexSrc).toContain('MaterialCommunityIcons?.font');
++    expect(indexSrc).toContain('Ionicons?.font');
++    expect(indexSrc).toContain('FontAwesome5Free-Brand');
++
++    const swSrc = fs.readFileSync(path.join(ROOT, 'public/service-worker.js'), 'utf8');
++    expect(swSrc).toContain('isImmutableOrFontRequest');
++    expect(swSrc).toContain('handleImmutableAsset');
++
++    const replitCfg = fs.readFileSync(path.join(ROOT, '.replit'), 'utf8');
++    expect(replitCfg).toContain('env CI=1 npx expo start --web --port 5000');
++    expect(replitCfg).not.toContain('--clear');
++  });
++});
+diff --git a/components/alerts/catalog.js b/components/alerts/catalog.js
+index 3533815..8cca5b6 100644
+--- a/components/alerts/catalog.js
++++ b/components/alerts/catalog.js
+@@ -125,6 +125,12 @@ export const ALERTS = {
+     titleKey: 'title',
+     messageKey: 'upload.unsupported',
+   },
++  roomCreateFailed: {
++    scope: 'home',
++    kind: 'info',
++    titleKey: 'room.createFailedTitle',
++    messageKey: 'room.createFailed',
++  },
+ 
+   // --- Инвентарь ------------------------------------------------------------
+ 
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index 924004f..87eb5f6 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -450,10 +450,12 @@ export default function HomeScreen({ navigation }) {
+   const isGmMode = uiMode === 'gm';
+   const roomServerAvailable = isRoomServerConfigured();
+   const roomRooms = useRoomStore((state) => state.rooms);
++  const roomStatus = useRoomStore((state) => state.status);
+   // В режиме мастера папки = комнаты и доступны всегда (настройка
+   // «каталоги персонажей» на них не распространяется).
+   const foldersEnabled = isGmMode || characterFoldersEnabled;
+   const [folderRooms, setFolderRooms] = useState({}); // folderId -> code
++  const [folderRoomRecords, setFolderRoomRecords] = useState({}); // folderId -> { code, ownerToken }
+   const [roomBindings, setRoomBindings] = useState({}); // characterId -> code
+   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
+   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
+@@ -577,6 +579,10 @@ export default function HomeScreen({ navigation }) {
+             db.getCharacterRoomBindings(),
+           ]);
+           setFolderRooms(Object.fromEntries(roomRows.map((row) => [row.folder_id, row.code])));
++          setFolderRoomRecords(Object.fromEntries(roomRows.map((row) => [
++            row.folder_id,
++            { code: row.code, ownerToken: row.owner_token },
++          ])));
+           setRoomBindings(Object.fromEntries(bindingRows.map((row) => [row.character_id, row.code])));
+         } catch (roomError) {
+           debugLog('room.dbLoad:failed', { message: roomError?.message || String(roomError) });
+@@ -610,6 +616,7 @@ export default function HomeScreen({ navigation }) {
+     // при сбое сети папку не создаём — сироты «папка без комнаты» не нужны.
+     try {
+       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
+       const folder = await db.createCharacterFolder(name);
+       await db.upsertFolderRoom(folder.id, code, ownerToken);
+       setFolderName('');
+@@ -619,7 +626,7 @@ export default function HomeScreen({ navigation }) {
+     } catch (error) {
+       debugLog('room.create:failed', { message: error?.message || String(error) });
+       setFolderDraftVisible(false);
+-      showHomeAlert(tHomeScreen('room.createdTitle'), tHomeScreen('room.createFailed'));
++      showCatalogAlert('roomCreateFailed');
+     }
+   };
+ 
+@@ -691,28 +698,44 @@ export default function HomeScreen({ navigation }) {
+     setServerDialog(null);
+   };
+ 
+-  // Мастер держит свои комнаты открытыми (presence игроков).
++  // Мастер держит свои комнаты открытыми (presence игроков) и прозрачно
++  // перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
+   useEffect(() => {
+-    if (!isGmMode || !roomServerAvailable) return;
+-    Object.values(folderRooms).forEach((code) => {
++    if (!isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
++    Object.entries(folderRoomRecords).forEach(([folderId, record]) => {
++      const code = record?.code;
++      if (!code) return;
+       const store = useRoomStore.getState();
+-      if (!store.rooms[code]) {
+-        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
+-      }
++      if (store.rooms[code] && store.rooms[code].joined !== false) return;
++      const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
++      store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
++        if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
++          try {
++            await store.createRoom({
++              name: savedTitle,
++              requestedCode: code,
++              ownerToken: record.ownerToken,
++            });
++            await store.joinRoom({ code, name: 'GM', role: 'gm' });
++          } catch {
++            // Сервер временно недоступен — повторим при переподключении.
++          }
++        }
++      });
+     });
+-  }, [isGmMode, folderRooms, roomServerAvailable]);
++  }, [isGmMode, folderRoomRecords, folders, roomServerAvailable, roomStatus]);
+ 
+   // Игрок переподключает своих персонажей к их комнатам (по связкам).
+   useEffect(() => {
+-    if (isGmMode || !roomServerAvailable) return;
++    if (isGmMode || !roomServerAvailable || roomStatus === 'connecting') return;
+     Object.entries(roomBindings).forEach(([characterId, code]) => {
+       const store = useRoomStore.getState();
+-      if (!store.rooms[code]) {
++      if (!store.rooms[code] || store.rooms[code].joined === false) {
+         const character = characters.find((item) => item.id === characterId);
+         store.joinRoom({ code, name: character?.name || '—', role: 'player' }).catch(() => {});
+       }
+     });
+-  }, [isGmMode, roomBindings, characters, roomServerAvailable]);
++  }, [isGmMode, roomBindings, characters, roomServerAvailable, roomStatus]);
+ 
+   const handleMoveToFolder = async (folderId, characterId = movingCharacterId) => {
+     if (!characterId) return;
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 380a08f..3224086 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,22 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (453) — высокий приоритет иконок, сохранение кэша Metro/PWA и работа комнат мастера в Metro
++
++Слово владельца:
++1) «Долго грузятся иконоки в бургер меню, трёх точек и т.п Им бы приоритет повыше.»
++2) «И приложение стало очень медленно грузится, возможно из-за удаления кэша.»
++3) «При попытке создания комнаты в админ режиме: **Комната создана** — Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз. (Противоречие заголовка и сообщения об ошибке и комната не создаётся).»
++
++- Диагностика:
++  1. Иконки (`MaterialCommunityIcons` 1.3 МБ, `Ionicons` 390 КБ, `FontAwesome5_Brands` 134 КБ) запрашивались лениво только при первом монтировании `<Icon>` (а `FontAwesome5` — только в момент клика по бургер-меню!), без `<link rel="preload" fetchpriority="high">`, плюс штатный пакет `@expo/vector-icons` (`IconsLazy.js`) жадно тянул в веб-бандл все 15 семейств иконок (40 лишних модулей, ~200+ КБ карт глифов и 14 неиспользуемых `.ttf`), а `service-worker.js` ходил в сеть за `.ttf` на каждый запуск.
++  2. В `.replit` стоял флаг `--clear` (`npx expo start --clear --web --port 5000`), из-за чего при каждом перезапуске сервера на Replit кэш трансформации Metro полностью удалялся и все ~1150 модулей пересобирались с нуля.
++  3. При запуске через `expo start --web` работал только HTTP-сервер Metro без WebSocket-эндпоинта `/ws` из `server/roomServer.js` (а слушатель `upgrade` в `@expo/cli/runServer-fork` вызывал `socket.destroy()` для всех путей кроме `/hot`), поэтому `createRoom` валился по таймауту. Вдобавок в `HomeScreen.js:622` в блоке `catch` стоял ошибочный заголовок `tHomeScreen('room.createdTitle')` («Комната создана»), а после успешного `createRoom` мастер не отправлял `ROOM_JOIN` на сервер (так как `rooms[code]` уже лежал в `roomStore`).
++- Исправлено:
++  1. `index.js` + `src/web/vectorIconsWeb.js` + `metro.config.js` — на T=0 мс предзагружаются шрифты `MaterialCommunityIcons`, `Ionicons` и `FontAwesome5Free-Brand` с инъекцией `<link rel="preload" as="font" fetchpriority="high" crossorigin="anonymous">` и `font-display: swap`; на вебе `@expo/vector-icons` резолвится в узкую точку входа `src/web/vectorIconsWeb.js` (-40 модулей, -14 неиспользуемых `.ttf`).
++  2. `.replit` + `public/service-worker.js` — из `.replit` убран `--clear` (кэш Metro сохраняется между перезапусками); в `service-worker.js` для шрифтов (`.ttf`/`.woff2`) и неизменяемых файлов сборки с контент-хэшем включён мгновенный `cache-first` без удаления существующего `CACHE_NAME`.
++  3. `server/roomServer.js` + `metro.config.js` + `src/room/roomStore.ts` + `HomeScreen.js` + `components/alerts/catalog.js` + `i18n/*/screens/home/screen.json` — вынесен `attachRoomWebSocketServer(httpServer)` и подключён прямо к HTTP(S)-серверу Metro на этапе `enhanceMiddleware` (проверено вживую на `npx expo start --web`); мастер сразу делает `joinRoom` после `createRoom`, автоматически восстанавливает комнаты тем же кодом и `ownerToken` после рестарта сервера (`ROOM_NOT_FOUND` -> `createRoom({ requestedCode, ownerToken })`), а ошибка создания комнаты выводится через каталожный алерт `roomCreateFailed` с честным заголовком «Ошибка создания комнаты» / «Room creation failed».
++- Приёмочные тесты: `__tests__/room/room-metro-and-icons-453.test.js` (4 теста).
++
+ ## 2026-10-27 (452) — устранение краша `fontfaceobserver` и блокировки `.local/share/pnpm` на Replit
+ 
+ Слово владельца (лог запуска на Replit после установки 451):
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index c997467..b76aa40 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,22 @@
+ # Changelog
++---
++## High-priority UI icons, preserved Metro/PWA caches & GM rooms in Metro (patch 453)
++
++- **Icon loading priority**: core UI icon fonts (`MaterialCommunityIcons`,
++  `Ionicons`, `FontAwesome5Free-Brand`) are now preloaded immediately at
++  startup with `<link rel="preload" as="font" fetchpriority="high">` and
++  `font-display: swap`, while the web `@expo/vector-icons` entry drops 12
++  unused icon families (-14 unused `.ttf` files).
++- **Startup speed & caching**: removed `--clear` from `.replit` so Metro
++  retains its transform cache across restarts, and taught the service worker
++  to serve fonts and content-hashed build assets cache-first without wiping
++  existing caches.
++- **Admin room creation**: attached the `/ws` room WebSocket relay directly
++  to Metro's HTTP(S) dev server (`expo start --web`), ensured the GM joins
++  newly created rooms and transparently rebinds saved rooms after a server
++  restart, and fixed the contradictory failure dialog title (`Room creation
++  failed` instead of `Room created`).
++
+ ---
+ ## Web font timeout & Replit pnpm asset fix (patch 452)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 9418a43..0a37475 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,22 @@
+ # История изменений
+ 
++---
++## Быстрая загрузка иконок и кэша + работа комнат мастера в Metro (патч 453)
++
++- **Приоритет иконок**: шрифты бургер-меню, кнопки «три точки», карточек и
++  вкладок (`MaterialCommunityIcons`, `Ionicons`, `FontAwesome5Free-Brand`)
++  теперь предзагружаются в самом начале старта с сетевым приоритетом
++  `fetchpriority="high"` и `font-display: swap`, а веб-точка входа
++  `@expo/vector-icons` очищена от 12 неиспользуемых наборов шрифтов.
++- **Скорость старта и кэш**: из запуска Replit убран принудительный сброс
++  кэша `--clear` на каждый старт, а сервис-воркер отдаёт закэшированные
++  шрифты и хэшированные файлы сборки мгновенно из локального кэша.
++- **Комнаты в режиме администратора**: WebSocket-релей комнат (`/ws`)
++  подключён прямо к dev-серверу Metro (`expo start --web`), мастер сразу
++  входит в созданную комнату и автоматически перепривязывает свои комнаты
++  после перезапуска сервера, а при сбое сети выводится корректный заголовок
++  «Ошибка создания комнаты» вместо «Комната создана».
++
+ ---
+ ## Защита загрузки веб-шрифтов и иконок на Replit / pnpm (патч 452)
+ 
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 216e359..682d7bc 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -193,6 +193,7 @@
+   "room": {
+     "createFolder": "Create\nroom",
+     "createdTitle": "Room created",
++    "createFailedTitle": "Room creation failed",
+     "codeTitle": "Room address",
+     "copy": "Copy",
+     "copied": "Copied",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index 030bfd5..a16c48d 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -193,6 +193,7 @@
+   "room": {
+     "createFolder": "Создать\nкомнату",
+     "createdTitle": "Комната создана",
++    "createFailedTitle": "Ошибка создания комнаты",
+     "codeTitle": "Адрес комнаты",
+     "copy": "Копировать",
+     "copied": "Скопировано",
+diff --git a/index.js b/index.js
+index 7b962ab..970209a 100644
+--- a/index.js
++++ b/index.js
+@@ -1,20 +1,57 @@
+ import 'expo-font';
++import * as Font from 'expo-font';
+ import { registerRootComponent } from 'expo';
+ import React from 'react';
+-import { View, Text } from 'react-native';
++import { Platform, View, Text } from 'react-native';
++import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ 
+ import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+ import { debugLog } from './src/debug/falloutDebug';
+ 
+-// Страховка веб-загрузчика шрифтов (452): в expo-font (FontLoader.web.js #22954)
+-// синхронный try/catch не перехватывает асинхронный таймаут fontfaceobserver,
+-// хотя @font-face уже вставлен в <head>. Гарантируем, что промис не уронит старт.
++// Высокоприоритетная предзагрузка шрифта в <head> (453): браузер начинает
++// скачивать .ttf сразу с приоритетом high, не дожидаясь первого layout текста.
++const preloadedFontUris = new Set();
++const injectHighPriorityFontPreload = (uri) => {
++  if (typeof document === 'undefined' || !document.head || typeof uri !== 'string' || !uri) return;
++  if (preloadedFontUris.has(uri)) return;
++  preloadedFontUris.add(uri);
++  try {
++    const link = document.createElement('link');
++    link.rel = 'preload';
++    link.as = 'font';
++    link.type = 'font/ttf';
++    link.crossOrigin = 'anonymous';
++    link.setAttribute('fetchpriority', 'high');
++    link.href = uri;
++    document.head.appendChild(link);
++  } catch {
++    // Среда без полноценного DOM — пропускаем без сбоя.
++  }
++};
++
++// Страховка веб-загрузчика шрифтов (452/453):
++// 1) перехватываем асинхронный таймаут fontfaceobserver (#22954 в expo-font);
++// 2) поднимаем сетевой приоритет .ttf через <link rel="preload" fetchpriority="high">
++//    и задаём font-display: swap, чтобы глифы рисовались сразу по готовности.
+ const webFontLoader = globalThis?.expo?.modules?.ExpoFontLoader;
+ if (webFontLoader && typeof webFontLoader.loadAsync === 'function' && !webFontLoader.__safeWrapped) {
+   const rawLoadAsync = webFontLoader.loadAsync.bind(webFontLoader);
+   webFontLoader.loadAsync = (fontFamilyName, resource) => {
+     try {
+-      const result = rawLoadAsync(fontFamilyName, resource);
++      const normalizedResource =
++        resource && typeof resource === 'object'
++          ? {
++              ...resource,
++              display:
++                resource.display && resource.display !== 'auto'
++                  ? resource.display
++                  : 'swap',
++            }
++          : resource;
++      if (normalizedResource && typeof normalizedResource === 'object' && normalizedResource.uri) {
++        injectHighPriorityFontPreload(normalizedResource.uri);
++      }
++      const result = rawLoadAsync(fontFamilyName, normalizedResource);
+       if (result && typeof result.catch === 'function') {
+         return result.catch((err) => {
+           debugLog('font.web.timeoutSwallowed', {
+@@ -31,6 +68,22 @@ if (webFontLoader && typeof webFontLoader.loadAsync === 'function' && !webFontLo
+   webFontLoader.__safeWrapped = true;
+ }
+ 
++// Ранняя предзагрузка основных иконочных шрифтов UI (453): запускаем скачивание
++// и вставку @font-face на T=0 мс (параллельно с инициализацией БД и стора),
++// чтобы бургер-меню, «три точки», нижние вкладки и пункты меню открывались сразу.
++if (Platform.OS === 'web' && typeof document !== 'undefined') {
++  const priorityIconFonts = {
++    ...(MaterialCommunityIcons?.font || {}),
++    ...(Ionicons?.font || {}),
++    ...(FontAwesome5?.font?.['FontAwesome5Free-Brand']
++      ? { 'FontAwesome5Free-Brand': FontAwesome5.font['FontAwesome5Free-Brand'] }
++      : {}),
++  };
++  if (Object.keys(priorityIconFonts).length > 0) {
++    Font.loadAsync(priorityIconFonts).catch(() => {});
++  }
++}
++
+ // Глобально: любой <Text> рендерит токен {/CD} как картинку кубика (assets/CD.png).
+ setupRichText();
+ 
+diff --git a/metro.config.js b/metro.config.js
+index 745bc7b..5b18b7d 100644
+--- a/metro.config.js
++++ b/metro.config.js
+@@ -16,6 +16,8 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
+ 
+ const originalResolveRequest = config.resolver.resolveRequest;
+ const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
++const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
++const { attachRoomWebSocketServer } = require('./server/roomServer');
+ 
+ config.resolver = {
+   ...config.resolver,
+@@ -36,6 +38,16 @@ config.resolver = {
+         filePath: fontObserverShimPath,
+       };
+     }
++    if (
++      platform === 'web' &&
++      moduleName === '@expo/vector-icons' &&
++      context.originModulePath !== vectorIconsWebPath
++    ) {
++      return {
++        type: 'sourceFile',
++        filePath: vectorIconsWebPath,
++      };
++    }
+     if (typeof originalResolveRequest === 'function') {
+       return originalResolveRequest(context, moduleName, platform);
+     }
+@@ -43,6 +55,52 @@ config.resolver = {
+   },
+ };
+ 
++// Подключаем WebSocket-релей комнат (/ws) прямо к HTTP(S)-серверу Metro,
++// чтобы создание и вход в комнаты мастера работали и при запуске через
++// `expo start --web` (например, в dev-режиме Replit), сразу с момента старта порта
++// (даже если уже открытая вкладка переподключается по WebSocket без нового HTTP GET).
++const http = require('node:http');
++const https = require('node:https');
++
++const interceptNextHttpServer = () => {
++  const origHttpCreate = http.createServer;
++  const origHttpsCreate = https.createServer;
++  const restore = () => {
++    http.createServer = origHttpCreate;
++    https.createServer = origHttpsCreate;
++  };
++  http.createServer = function createMetroHttpWithRoomWs(...args) {
++    restore();
++    const srv = origHttpCreate.apply(this, args);
++    attachRoomWebSocketServer(srv);
++    return srv;
++  };
++  https.createServer = function createMetroHttpsWithRoomWs(...args) {
++    restore();
++    const srv = origHttpsCreate.apply(this, args);
++    attachRoomWebSocketServer(srv);
++    return srv;
++  };
++};
++
++const prevEnhanceMiddleware = config.server?.enhanceMiddleware;
++config.server = {
++  ...config.server,
++  enhanceMiddleware(metroMiddleware, metroServer) {
++    interceptNextHttpServer();
++    const baseMiddleware = typeof prevEnhanceMiddleware === 'function'
++      ? prevEnhanceMiddleware(metroMiddleware, metroServer)
++      : metroMiddleware;
++    return (req, res, next) => {
++      const httpServer = req?.socket?.server;
++      if (httpServer && !httpServer.__positroniumRoomWs) {
++        attachRoomWebSocketServer(httpServer);
++      }
++      return baseMiddleware(req, res, next);
++    };
++  },
++};
++
+ config.watchFolders = (config.watchFolders || []).filter(
+   (folder) => {
+     const resolved = path.resolve(folder);
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 7a4103b..4383b2d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "452"
++  "baseline": "453"
+ }
+diff --git a/public/service-worker.js b/public/service-worker.js
+index 794cc13..4bc834b 100644
+--- a/public/service-worker.js
++++ b/public/service-worker.js
+@@ -92,6 +92,47 @@ const handleNavigation = async (request) => {
+   }
+ };
+ 
++const FONT_EXT_RE = /\.(ttf|woff2?|otf)$/i;
++const HASHED_ASSET_RE = /\.[0-9a-f]{20,}\.(js|css|png|jpg|jpeg|webp|gif|svg|ico|ttf|woff2?|otf)$/i;
++
++const isImmutableOrFontRequest = (request, requestUrl) => {
++  if (request.destination === 'font') return true;
++  if (FONT_EXT_RE.test(requestUrl.pathname)) return true;
++  if (HASHED_ASSET_RE.test(requestUrl.pathname)) return true;
++  if (requestUrl.pathname.startsWith('/assets/') && requestUrl.search) {
++    try {
++      const decoded = decodeURIComponent(requestUrl.search);
++      if (/\.(ttf|woff2?|otf)(?:&|$)/i.test(decoded)) return true;
++    } catch (_) {
++      // Некорректный query — оставляем стандартную сетевую ветку.
++    }
++  }
++  return false;
++};
++
++// Иконочные шрифты (.ttf/.woff2) и файлы сборки с контент-хэшем неизменяемы:
++// отдаём их мгновенно из Cache Storage (cache-first), не гоняя мегабайты по сети
++// на каждый запуск. При обновлении сборки хэш в имени файла меняется сам.
++const handleImmutableAsset = async (request) => {
++  const cached = await caches.match(request);
++  if (cached) return cached;
++
++  const networkResponse = await fetch(request);
++  const contentType = networkResponse.headers.get('content-type') || '';
++  if (request.destination === 'script' && contentType.includes('text/html')) {
++    return new Response('', {
++      status: 503,
++      statusText: 'JavaScript asset unavailable',
++      headers: { 'Content-Type': 'text/plain' },
++    });
++  }
++  if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
++    const toCache = networkResponse.clone();
++    caches.open(CACHE_NAME).then((cache) => cache.put(request, toCache)).catch(() => undefined);
++  }
++  return networkResponse;
++};
++
+ self.addEventListener('fetch', (event) => {
+   if (event.request.method !== 'GET') return;
+   const requestUrl = new URL(event.request.url);
+@@ -102,6 +143,22 @@ self.addEventListener('fetch', (event) => {
+     return;
+   }
+ 
++  if (isImmutableOrFontRequest(event.request, requestUrl)) {
++    event.respondWith(
++      handleImmutableAsset(event.request).catch(() => {
++        if (event.request.destination === 'script') {
++          return new Response('', {
++            status: 503,
++            statusText: 'Offline',
++            headers: { 'Content-Type': 'text/plain' },
++          });
++        }
++        return Response.error();
++      })
++    );
++    return;
++  }
++
+   event.respondWith(
+     fetch(event.request)
+       .then((networkResponse) => {
+diff --git a/public/version.json b/public/version.json
+index 185a8f6..bb6c03f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "452",
++  "version": "453",
+   "release": 3,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 47104ca..2a57a16 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -63,13 +63,13 @@ const serveStatic = (distDir) => (req, res) => {
+   });
+ };
+ 
+-const createRoomServer = ({
+-  port = 5000,
+-  host = '0.0.0.0',
+-  distDir = path.join(__dirname, '..', 'dist'),
++const attachRoomWebSocketServer = (httpServer, {
+   registry = createRoomRegistry(),
+ } = {}) => {
+-  const server = http.createServer(serveStatic(distDir));
++  if (httpServer.__positroniumRoomWs) {
++    return httpServer.__positroniumRoomWs;
++  }
++
+   const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
+ 
+   const sendEnvelope = (ws, type, payload = {}, roomCode = null, clientId = null) => {
+@@ -101,13 +101,45 @@ const createRoomServer = ({
+     }
+   };
+ 
+-  server.on('upgrade', (req, socket, head) => {
+-    if (!req.url.startsWith('/ws')) { socket.destroy(); return; }
++  const handleUpgrade = (req, socket, head) => {
+     wss.handleUpgrade(req, socket, head, (ws) => {
+       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+       wss.emit('connection', ws, req);
+     });
+-  });
++  };
++
++  const isRoomWsUpgrade = (req) => {
++    if (typeof req?.url !== 'string') return false;
++    try {
++      const { pathname } = new URL(req.url, 'http://localhost');
++      return pathname === '/ws';
++    } catch {
++      const clean = req.url.split('?')[0];
++      return clean === '/ws';
++    }
++  };
++
++  // Node.js http.Server вызывает ветку upgrade ТОЛЬКО когда listenerCount('upgrade') > 0
++  // (иначе запрос с заголовком Upgrade уходит в обычный request -> 404).
++  // При этом в Metro (@expo/cli runServer-fork) штатный слушатель upgrade
++  // вызывает socket.destroy() для всех путей кроме /hot. Поэтому:
++  // 1) держим собственный слушатель 'upgrade', чтобы ветка upgrade всегда была активна;
++  // 2) перехватываем emit('upgrade', ...) для /ws ДО сторонних слушателей Metro.
++  const fallbackUpgradeListener = (_req, socket) => {
++    if (httpServer.listenerCount('upgrade') <= 1) {
++      socket?.destroy?.();
++    }
++  };
++  httpServer.on('upgrade', fallbackUpgradeListener);
++
++  const rawEmit = httpServer.emit.bind(httpServer);
++  httpServer.emit = function emitWithRoomWs(event, req, socket, head, ...rest) {
++    if (event === 'upgrade' && isRoomWsUpgrade(req)) {
++      handleUpgrade(req, socket, head);
++      return true;
++    }
++    return rawEmit(event, req, socket, head, ...rest);
++  };
+ 
+   wss.on('connection', (ws) => {
+     // ws.meta = { clientId, rooms: Set<string> } — заполняется по мере join/create.
+@@ -269,19 +301,45 @@ const createRoomServer = ({
+   const sweepTimer = setInterval(() => registry.sweep(), 5 * 60 * 1000);
+   if (sweepTimer.unref) sweepTimer.unref();
+ 
++  let closed = false;
++  const closeWs = () => new Promise((resolve) => {
++    if (closed) { resolve(); return; }
++    closed = true;
++    clearInterval(sweepTimer);
++    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
++    wss.close(() => resolve());
++  });
++
++  httpServer.once('close', () => { closeWs(); });
++
++  const attached = { wss, registry, handleUpgrade, closeWs };
++  Object.defineProperty(httpServer, '__positroniumRoomWs', {
++    value: attached,
++    configurable: true,
++  });
++  return attached;
++};
++
++const createRoomServer = ({
++  port = 5000,
++  host = '0.0.0.0',
++  distDir = path.join(__dirname, '..', 'dist'),
++  registry = createRoomRegistry(),
++} = {}) => {
++  const server = http.createServer(serveStatic(distDir));
++  const { wss, closeWs } = attachRoomWebSocketServer(server, { registry });
++
+   const start = () => new Promise((resolve, reject) => {
+     server.once('error', reject);
+     server.listen(port, host, () => resolve(server.address()));
+   });
+ 
+   const close = () => new Promise((resolve) => {
+-    clearInterval(sweepTimer);
+-    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
+-    wss.close(() => server.close(() => resolve()));
++    closeWs().then(() => server.close(() => resolve()));
+     // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
+   });
+ 
+   return { server, wss, registry, start, close };
+ };
+ 
+-module.exports = { createRoomServer };
++module.exports = { createRoomServer, attachRoomWebSocketServer };
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 7939844..a7a1a48 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -27,6 +27,7 @@ export interface RoomStateEntry {
+   name: string;
+   role: 'gm' | 'player';
+   members: RoomMember[];
++  joined?: boolean;
+ }
+ 
+ interface CreateRoomResult {
+@@ -47,7 +48,12 @@ interface RoomStoreState {
+   rooms: Record<string, RoomStateEntry>;
+   lastError: string | null;
+   connect: () => Promise<void>;
+-  createRoom: (input: { name: string; prefix?: string }) => Promise<CreateRoomResult>;
++  createRoom: (input: {
++    name: string;
++    prefix?: string;
++    requestedCode?: string;
++    ownerToken?: string;
++  }) => Promise<CreateRoomResult>;
+   joinRoom: (input: {
+     code: string;
+     name: string;
+@@ -168,7 +174,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     client = factory({
+       url,
+       clientId,
+-      onStatus: (status: RoomConnectionStatus) => set({ status }),
++      onStatus: (status: RoomConnectionStatus) => {
++        if (status === 'offline') {
++          const currentRooms = get().rooms;
++          const codes = Object.keys(currentRooms);
++          if (codes.length > 0) {
++            const nextRooms: Record<string, RoomStateEntry> = {};
++            for (const roomCode of codes) {
++              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false };
++            }
++            set({ status, rooms: nextRooms });
++            return;
++          }
++        }
++        set({ status });
++      },
+       onMessage: handleMessage,
+     });
+     return client;
+@@ -204,22 +224,27 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       return connectPromise;
+     },
+ 
+-    createRoom: async ({ name, prefix }) => {
+-      const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, { name, prefix }, null);
+-      const { code, ownerToken, name: roomName } = response.payload;
++    createRoom: async ({ name, prefix, requestedCode, ownerToken }) => {
++      const payload: Record<string, unknown> = { name, prefix };
++      if (requestedCode) payload.requestedCode = requestedCode;
++      if (ownerToken) payload.ownerToken = ownerToken;
++      const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, payload, null);
++      const { code, ownerToken: issuedToken, name: roomName } = response.payload;
+       set({
+         rooms: {
+           ...get().rooms,
+-          [code]: { code, name: roomName || name, role: 'gm', members: [] },
++          [code]: { code, name: roomName || name, role: 'gm', members: [], joined: false },
+         },
+       });
+       debugLog('room.create:ok', { code });
+-      return { code, name: roomName || name, ownerToken };
++      return { code, name: roomName || name, ownerToken: issuedToken };
+     },
+ 
+     joinRoom: async ({ code, name, role = 'player' }) => {
+       const existing = get().rooms[code];
+-      if (existing) return { code, name: existing.name, members: existing.members, snapshots: [] };
++      if (existing && existing.joined !== false) {
++        return { code, name: existing.name, members: existing.members, snapshots: [] };
++      }
+       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
+       joiningCodes.add(code);
+       try {
+@@ -233,6 +258,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               name: payloadRooms.name || code,
+               role,
+               members: payloadRooms.members || [],
++              joined: true,
+             },
+           },
+         });
+diff --git a/src/web/vectorIconsWeb.js b/src/web/vectorIconsWeb.js
+new file mode 100644
+index 0000000..bc785a4
+--- /dev/null
++++ b/src/web/vectorIconsWeb.js
+@@ -0,0 +1,19 @@
++// Узкая веб-точка входа для @expo/vector-icons (патч 453).
++//
++// Штатный пакет @expo/vector-icons в IconsLazy.js делает жадный require()
++// всех 15 семейств иконок (AntDesign, Entypo, FontAwesome6, MaterialIcons и др.),
++// затягивая в веб-бандл лишние карты глифов (~300+ КБ JS) и 14 неиспользуемых
++// .ttf-файлов, конкурирующих за канал и сборку Metro.
++//
++// Приложение реально использует только три набора:
++//   - MaterialCommunityIcons (бургер-меню, три точки, карточки, инвентарь, настройки)
++//   - Ionicons (нижняя панель вкладок)
++//   - FontAwesome5 (иконки Google Drive и Telegram в бургер-меню)
++
++export { default as Ionicons } from '@expo/vector-icons/build/Ionicons';
++export { default as MaterialCommunityIcons } from '@expo/vector-icons/build/MaterialCommunityIcons';
++export { default as FontAwesome5, FA5Style } from '@expo/vector-icons/build/FontAwesome5';
++export { default as createIconSet } from '@expo/vector-icons/build/createIconSet';
++export { default as createIconSetFromFontello } from '@expo/vector-icons/build/createIconSetFromFontello';
++export { default as createIconSetFromIcoMoon } from '@expo/vector-icons/build/createIconSetFromIcoMoon';
++export { default as createMultiStyleIconSet } from '@expo/vector-icons/build/createMultiStyleIconSet';

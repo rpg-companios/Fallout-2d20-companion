@@ -27,6 +27,7 @@ export interface RoomStateEntry {
   name: string;
   role: 'gm' | 'player';
   members: RoomMember[];
+  joined?: boolean;
 }
 
 interface CreateRoomResult {
@@ -47,7 +48,12 @@ interface RoomStoreState {
   rooms: Record<string, RoomStateEntry>;
   lastError: string | null;
   connect: () => Promise<void>;
-  createRoom: (input: { name: string; prefix?: string }) => Promise<CreateRoomResult>;
+  createRoom: (input: {
+    name: string;
+    prefix?: string;
+    requestedCode?: string;
+    ownerToken?: string;
+  }) => Promise<CreateRoomResult>;
   joinRoom: (input: {
     code: string;
     name: string;
@@ -168,7 +174,21 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     client = factory({
       url,
       clientId,
-      onStatus: (status: RoomConnectionStatus) => set({ status }),
+      onStatus: (status: RoomConnectionStatus) => {
+        if (status === 'offline') {
+          const currentRooms = get().rooms;
+          const codes = Object.keys(currentRooms);
+          if (codes.length > 0) {
+            const nextRooms: Record<string, RoomStateEntry> = {};
+            for (const roomCode of codes) {
+              nextRooms[roomCode] = { ...currentRooms[roomCode], joined: false };
+            }
+            set({ status, rooms: nextRooms });
+            return;
+          }
+        }
+        set({ status });
+      },
       onMessage: handleMessage,
     });
     return client;
@@ -204,22 +224,27 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       return connectPromise;
     },
 
-    createRoom: async ({ name, prefix }) => {
-      const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, { name, prefix }, null);
-      const { code, ownerToken, name: roomName } = response.payload;
+    createRoom: async ({ name, prefix, requestedCode, ownerToken }) => {
+      const payload: Record<string, unknown> = { name, prefix };
+      if (requestedCode) payload.requestedCode = requestedCode;
+      if (ownerToken) payload.ownerToken = ownerToken;
+      const response = await sendRequest(ROOM_MESSAGE.ROOM_CREATE, payload, null);
+      const { code, ownerToken: issuedToken, name: roomName } = response.payload;
       set({
         rooms: {
           ...get().rooms,
-          [code]: { code, name: roomName || name, role: 'gm', members: [] },
+          [code]: { code, name: roomName || name, role: 'gm', members: [], joined: false },
         },
       });
       debugLog('room.create:ok', { code });
-      return { code, name: roomName || name, ownerToken };
+      return { code, name: roomName || name, ownerToken: issuedToken };
     },
 
     joinRoom: async ({ code, name, role = 'player' }) => {
       const existing = get().rooms[code];
-      if (existing) return { code, name: existing.name, members: existing.members, snapshots: [] };
+      if (existing && existing.joined !== false) {
+        return { code, name: existing.name, members: existing.members, snapshots: [] };
+      }
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
       joiningCodes.add(code);
       try {
@@ -233,6 +258,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               name: payloadRooms.name || code,
               role,
               members: payloadRooms.members || [],
+              joined: true,
             },
           },
         });

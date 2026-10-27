@@ -63,13 +63,13 @@ const serveStatic = (distDir) => (req, res) => {
   });
 };
 
-const createRoomServer = ({
-  port = 5000,
-  host = '0.0.0.0',
-  distDir = path.join(__dirname, '..', 'dist'),
+const attachRoomWebSocketServer = (httpServer, {
   registry = createRoomRegistry(),
 } = {}) => {
-  const server = http.createServer(serveStatic(distDir));
+  if (httpServer.__positroniumRoomWs) {
+    return httpServer.__positroniumRoomWs;
+  }
+
   const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
 
   const sendEnvelope = (ws, type, payload = {}, roomCode = null, clientId = null) => {
@@ -101,13 +101,45 @@ const createRoomServer = ({
     }
   };
 
-  server.on('upgrade', (req, socket, head) => {
-    if (!req.url.startsWith('/ws')) { socket.destroy(); return; }
+  const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
       wss.emit('connection', ws, req);
     });
-  });
+  };
+
+  const isRoomWsUpgrade = (req) => {
+    if (typeof req?.url !== 'string') return false;
+    try {
+      const { pathname } = new URL(req.url, 'http://localhost');
+      return pathname === '/ws';
+    } catch {
+      const clean = req.url.split('?')[0];
+      return clean === '/ws';
+    }
+  };
+
+  // Node.js http.Server вызывает ветку upgrade ТОЛЬКО когда listenerCount('upgrade') > 0
+  // (иначе запрос с заголовком Upgrade уходит в обычный request -> 404).
+  // При этом в Metro (@expo/cli runServer-fork) штатный слушатель upgrade
+  // вызывает socket.destroy() для всех путей кроме /hot. Поэтому:
+  // 1) держим собственный слушатель 'upgrade', чтобы ветка upgrade всегда была активна;
+  // 2) перехватываем emit('upgrade', ...) для /ws ДО сторонних слушателей Metro.
+  const fallbackUpgradeListener = (_req, socket) => {
+    if (httpServer.listenerCount('upgrade') <= 1) {
+      socket?.destroy?.();
+    }
+  };
+  httpServer.on('upgrade', fallbackUpgradeListener);
+
+  const rawEmit = httpServer.emit.bind(httpServer);
+  httpServer.emit = function emitWithRoomWs(event, req, socket, head, ...rest) {
+    if (event === 'upgrade' && isRoomWsUpgrade(req)) {
+      handleUpgrade(req, socket, head);
+      return true;
+    }
+    return rawEmit(event, req, socket, head, ...rest);
+  };
 
   wss.on('connection', (ws) => {
     // ws.meta = { clientId, rooms: Set<string> } — заполняется по мере join/create.
@@ -269,19 +301,45 @@ const createRoomServer = ({
   const sweepTimer = setInterval(() => registry.sweep(), 5 * 60 * 1000);
   if (sweepTimer.unref) sweepTimer.unref();
 
+  let closed = false;
+  const closeWs = () => new Promise((resolve) => {
+    if (closed) { resolve(); return; }
+    closed = true;
+    clearInterval(sweepTimer);
+    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
+    wss.close(() => resolve());
+  });
+
+  httpServer.once('close', () => { closeWs(); });
+
+  const attached = { wss, registry, handleUpgrade, closeWs };
+  Object.defineProperty(httpServer, '__positroniumRoomWs', {
+    value: attached,
+    configurable: true,
+  });
+  return attached;
+};
+
+const createRoomServer = ({
+  port = 5000,
+  host = '0.0.0.0',
+  distDir = path.join(__dirname, '..', 'dist'),
+  registry = createRoomRegistry(),
+} = {}) => {
+  const server = http.createServer(serveStatic(distDir));
+  const { wss, closeWs } = attachRoomWebSocketServer(server, { registry });
+
   const start = () => new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => resolve(server.address()));
   });
 
   const close = () => new Promise((resolve) => {
-    clearInterval(sweepTimer);
-    for (const client of wss.clients) { try { client.terminate(); } catch { /* уже мёртв */ } }
-    wss.close(() => server.close(() => resolve()));
+    closeWs().then(() => server.close(() => resolve()));
     // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
   });
 
   return { server, wss, registry, start, close };
 };
 
-module.exports = { createRoomServer };
+module.exports = { createRoomServer, attachRoomWebSocketServer };

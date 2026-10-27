@@ -16,6 +16,8 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
 
 const originalResolveRequest = config.resolver.resolveRequest;
 const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
+const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
+const { attachRoomWebSocketServer } = require('./server/roomServer');
 
 config.resolver = {
   ...config.resolver,
@@ -36,10 +38,66 @@ config.resolver = {
         filePath: fontObserverShimPath,
       };
     }
+    if (
+      platform === 'web' &&
+      moduleName === '@expo/vector-icons' &&
+      context.originModulePath !== vectorIconsWebPath
+    ) {
+      return {
+        type: 'sourceFile',
+        filePath: vectorIconsWebPath,
+      };
+    }
     if (typeof originalResolveRequest === 'function') {
       return originalResolveRequest(context, moduleName, platform);
     }
     return context.resolveRequest(context, moduleName, platform);
+  },
+};
+
+// Подключаем WebSocket-релей комнат (/ws) прямо к HTTP(S)-серверу Metro,
+// чтобы создание и вход в комнаты мастера работали и при запуске через
+// `expo start --web` (например, в dev-режиме Replit), сразу с момента старта порта
+// (даже если уже открытая вкладка переподключается по WebSocket без нового HTTP GET).
+const http = require('node:http');
+const https = require('node:https');
+
+const interceptNextHttpServer = () => {
+  const origHttpCreate = http.createServer;
+  const origHttpsCreate = https.createServer;
+  const restore = () => {
+    http.createServer = origHttpCreate;
+    https.createServer = origHttpsCreate;
+  };
+  http.createServer = function createMetroHttpWithRoomWs(...args) {
+    restore();
+    const srv = origHttpCreate.apply(this, args);
+    attachRoomWebSocketServer(srv);
+    return srv;
+  };
+  https.createServer = function createMetroHttpsWithRoomWs(...args) {
+    restore();
+    const srv = origHttpsCreate.apply(this, args);
+    attachRoomWebSocketServer(srv);
+    return srv;
+  };
+};
+
+const prevEnhanceMiddleware = config.server?.enhanceMiddleware;
+config.server = {
+  ...config.server,
+  enhanceMiddleware(metroMiddleware, metroServer) {
+    interceptNextHttpServer();
+    const baseMiddleware = typeof prevEnhanceMiddleware === 'function'
+      ? prevEnhanceMiddleware(metroMiddleware, metroServer)
+      : metroMiddleware;
+    return (req, res, next) => {
+      const httpServer = req?.socket?.server;
+      if (httpServer && !httpServer.__positroniumRoomWs) {
+        attachRoomWebSocketServer(httpServer);
+      }
+      return baseMiddleware(req, res, next);
+    };
   },
 };
 
