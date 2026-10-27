@@ -1,5 +1,18 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (460) — уборка неиспользуемых папок и разовых артефактов из репозитория
+
+Слово владельца:
+«можешь прибрать в проекте, что не используется (по типу .publish, .kiro и т.п) можно удалить.»
+
+- Удалено из репозитория:
+  1. `.publish/` — осиротевшие `160000` gitlink-ссылки (`.publish/positronium-game-settings`, `.publish/ttrpg-engine`), оставшиеся от прежней выгрузки разделённых репозиториев.
+  2. `.kiro/` — 32 устаревших черновика спецификаций Kiro IDE (`.kiro/specs/**`).
+  3. `.agents/` — служебная черновая память агента Replit (`.agents/agent_assets_metadata.toml`, `.agents/memory/*`; рабочая документация в `docs/agents/` сохранена).
+  4. Разовые корневые архивы, дампы и отладочные хвосты: `output.txt`, `fallout 2char.zip`, `positronium-boot.zip`, `screenshots/pwa-hydration-recovery.jpg`, устаревший скрипт `run-avatar-tests.js` (с актуализацией `__tests__/avatar/README.md`), отладочный дамп без проверок `__tests__/equipment/__probe-fields.test.js`, а также текстовые заглушки иконок `public/pwa-icon.placeholder.json` и `public/pwa-icon*.svg` (заменённые в патче 320 на рабочие `pwa-icon-192.png` и `pwa-icon.png`).
+  5. `apply-patch.sh`: безопасное снятие осиротевших `160000` gitlink-каталогов в `sync_to_baseline` (даже если на диске внутри `.publish/*` лежит локальный `.git`), сохранение исходных аргументов `ORIG_ARGS` при самообновлении и мост совместимости для обновления со старых копий установщика (`455`–`459`). Исключения в `.gitignore` и конфигах сборщика/тестов сохранены на случай локальных копий.
+- Приёмочные тесты: `__tests__/installer/cleanup-gitlinks-460.test.js` (2 теста).
+
 ## 2026-10-27 (458–459) — исключение `.kiro`, `.install-backup` / `.installbackup` и `.publish` из сборки и проверок (+ совместимость `apply-patch.sh`)
 
 Слово владельца:

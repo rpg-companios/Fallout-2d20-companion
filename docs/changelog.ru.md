@@ -1,6 +1,20 @@
 # История изменений
 
 ---
+## Уборка неиспользуемых папок и разовых артефактов (патч 460)
+
+Из репозитория удалены неиспользуемые служебные каталоги и разовые файлы:
+- осиротевшие ссылки `.publish/` (`positronium-game-settings`, `ttrpg-engine`),
+  черновики `.kiro/` и служебный каталог `.agents/` (документация `docs/agents/`
+  сохранена);
+- разовые архивы и отладочные файлы в корне и подпапках: `output.txt`,
+  `fallout 2char.zip`, `positronium-boot.zip`, `screenshots/`, устаревший
+  `run-avatar-tests.js`, пробник `__probe-fields.test.js` и старые заглушки
+  `public/pwa-icon*.svg` / `pwa-icon.placeholder.json`;
+- в `apply-patch.sh` добавлена корректная зачистка осиротевших gitlink-папок при
+  обновлении и сохранение аргументов запуска при самообновлении скрипта.
+
+---
 ## Исключение служебных папок `.kiro`, `.installbackup`, `.publish` (патчи 458–459)
 
 Служебные каталоги `.kiro`, `.install-backup` / `.installbackup`, `.publish` и
