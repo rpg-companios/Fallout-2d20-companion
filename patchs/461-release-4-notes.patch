@@ -1,0 +1,240 @@
+diff --git a/__tests__/screens/release-3-notes-440.test.js b/__tests__/screens/release-3-notes-440.test.js
+index 5b800b8..881cf7f 100644
+--- a/__tests__/screens/release-3-notes-440.test.js
++++ b/__tests__/screens/release-3-notes-440.test.js
+@@ -1,14 +1,13 @@
+-// ПРИЁМОЧНЫЙ (патч 440): релиз 3 объявлен владельцем («Теперь делаем
+-// описание релиза. ЧТо изменилось от прошлой версии»). Покрывает патчи
+-// 402–439. Заметки — на языке игрока (без номеров патчей и служебных
+-// слов), парные ru/en, не дублируют релизы 1–2, окно «Что нового»
+-// покажет их один раз (release 3 > 2).
++// ПРИЁМОЧНЫЙ (патч 440): релиз 3 объявлен владельцем. По образцу
++// release-2-notes-401.test.js: конкретный номер текущего релиза и его
++// темы закрепляет защёлка старшего релиза (release-4-notes-461), здесь —
++// законы языка, парности и недублирования релиза 2.
+ import { describe, expect, it } from 'vitest';
+ import notes from '../../public/version.json';
+ 
+-describe('патч 440: релиз 3 — заметки «Что нового»', () => {
+-  it('релиз поднят до 3; версия — номер последнего патча; заметки парные', () => {
+-    expect(notes.release).toBe(3);
++describe('патч 440: заметки релиза — законы языка и парности (461: релиз уже 4)', () => {
++  it('релиз только растёт; версия — номер последнего патча; заметки парные', () => {
++    expect(notes.release).toBeGreaterThanOrEqual(3);
+     expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
+     expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
+     expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
+@@ -18,24 +17,12 @@ describe('патч 440: релиз 3 — заметки «Что нового»'
+     for (const list of [notes.notes['ru-RU'], notes.notes['en-EN']]) {
+       for (const line of list) {
+         expect(line).not.toMatch(/патч|patch \d/i);
+-        // «мост» только как жаргон «мост контуров», не внутри «самостоятельных»
++        // «мост» только как жаргон «мост контур», не внутри «самостоятельных»
+         expect(line).not.toMatch(/агент|baseline|мост контур|bridge|отсечк/i);
+       }
+     }
+   });
+ 
+-  it('главные темы релиза 3 присутствуют', () => {
+-    const ru = notes.notes['ru-RU'].join(' ');
+-    expect(ru).toContain('Перки');
+-    expect(ru).toContain('Ремонт');
+-    expect(ru).toContain('Редкость');
+-    expect(ru).toContain('воронка');
+-    expect(ru).toContain('Найдено: N');
+-    expect(ru).toContain('Сон\\Ждать');
+-    expect(ru).toContain('Ожидание');
+-    expect(ru).toContain('Персонаж умер');
+-  });
+-
+   it('не дублирует релиз 2 (его темы ушли вместе с его заметками)', () => {
+     const ru = notes.notes['ru-RU'].join(' ');
+     expect(ru).not.toContain('Бета-волновой тюнер');
+diff --git a/__tests__/screens/release-4-notes-461.test.js b/__tests__/screens/release-4-notes-461.test.js
+new file mode 100644
+index 0000000..afe83b8
+--- /dev/null
++++ b/__tests__/screens/release-4-notes-461.test.js
+@@ -0,0 +1,55 @@
++// ПРИЁМОЧНЫЙ (патч 461): релиз 4 объявлен владельцем («давай новый релиз
++// сделаем и на этом пока всё»). Покрывает патчи 441–460. Заметки — на языке
++// игрока (без номеров патчей и внутренней кухни), парные ru/en, опираются на
++// реальные названия разделов из словарей, не дублируют релиз 3, окно «Что
++// нового» покажет их один раз (release 4 > 3).
++import { describe, expect, it } from 'vitest';
++import notes from '../../public/version.json';
++
++describe('патч 461: релиз 4 — заметки «Что нового»', () => {
++  it('релиз поднят до 4; версия — номер последнего патча; заметки парные', () => {
++    expect(notes.release).toBe(4);
++    expect(String(notes.version)).toMatch(/^\d+[a-z]?$/);
++    expect(notes.notes['ru-RU'].length).toBe(notes.notes['en-EN'].length);
++    expect(notes.notes['ru-RU'].length).toBeGreaterThanOrEqual(8);
++  });
++
++  it('язык игрока: без номеров патчей и внутренней технической кухни', () => {
++    for (const list of [notes.notes['ru-RU'], notes.notes['en-EN']]) {
++      for (const line of list) {
++        expect(line).not.toMatch(/патч|patch \d/i);
++        expect(line).not.toMatch(/агент|baseline|мост контур|bridge|отсечк|metro|vitest|gitlink|kiro/i);
++      }
++    }
++  });
++
++  it('главные темы релиза 4 присутствуют с каноническими названиями из словарей', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    const en = notes.notes['en-EN'].join(' ');
++
++    expect(ru).toContain('портрет персонажа');
++    expect(ru).toContain('Собственное снаряжение');
++    expect(ru).toContain('Самодельное снаряжение');
++    expect(ru).toContain('Экран администратора');
++    expect(ru).toContain('Сервер');
++    expect(ru).toContain('Пользователь');
++    expect(ru).toContain('Админ');
++    expect(ru).toContain('живой индикатор запуска');
++
++    expect(en).toContain('Custom character portrait');
++    expect(en).toContain('Own equipment');
++    expect(en).toContain('Homebrew Equipment');
++    expect(en).toContain('Admin screen');
++    expect(en).toContain('Server');
++    expect(en).toContain('User');
++    expect(en).toContain('Admin');
++  });
++
++  it('не дублирует релиз 3 (его темы ушли вместе с его заметками)', () => {
++    const ru = notes.notes['ru-RU'].join(' ');
++    expect(ru).not.toContain('Супер Дупер');
++    expect(ru).not.toContain('Очумелые ручки');
++    expect(ru).not.toContain('Персонаж умер');
++    expect(ru).not.toContain('Найдено: N');
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index ac887db..50be3aa 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,15 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (461) — Релиз 4: заметки «Что нового» (`release: 4`)
++
++Слово владельца:
++«давай новый релиз сделаем и на этом пока всё.»
++
++- Сдано:
++  1. `public/version.json`: `release` поднят с `3` до `4`, `version` — `"461"`, парные заметки `notes` (`ru-RU` и `en-EN` по 8 пунктов) переписаны под изменения серии 441–460 на языке игрока без номеров патчей и внутренней технической кухни: свой портрет персонажа, раздел «Собственное снаряжение» в Настройках и категория «Самодельное снаряжение», комнаты мастера и «Экран администратора», подключение через «Сервер» с автопереподключением и сохранением привязки при переносе по папкам, индикатор сети на карточке и разделение «Пользователь» / «Админ», быстрый старт с живым индикатором запуска, приоритет иконок и автоматическое подхватывание обновлений без сброса кэша.
++  2. `patchs/baseline.json` поднят до `"461"`.
++  3. Защёлки: `__tests__/screens/release-4-notes-461.test.js` (4 теста: `release === 4`, парность, язык игрока, канонические названия из словарей, не дублирует релиз 3), а `__tests__/screens/release-3-notes-440.test.js` переведена на `release >= 3` по образцу `release-2-notes-401.test.js`.
++
+ ## 2026-10-27 (460) — уборка неиспользуемых папок и разовых артефактов из репозитория
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 90af44b..4d94f3b 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,17 @@
+ # Changelog
++---
++## Release 4 — «What's new» notes (patch 461)
++
++Owner's word: ship a new release. Raised `release` to **4** in
++`public/version.json` (the «What's new» modal shows the notes once on first
++open after updating) and rewrote paired `ru-RU` / `en-EN` release notes
++covering patches 441–460 in player language: custom character portraits, the
++«Own equipment» Settings section and «Homebrew Equipment» category, GM rooms
++and the «Admin screen» toggle, room connection via «Server» with auto-reconnect
++and card status badge, strict «User» / «Admin» separation, fast web startup
++with a live boot status indicator, high-priority icon loading, and automatic
++browser version refresh.
++
+ ---
+ ## Clean up unused workspace folders and one-off artifacts (patch 460)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c2db792..97765b0 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,18 @@
+ # История изменений
+ 
++---
++## Релиз 4 — заметки «Что нового» (патч 461)
++
++Слово владельца: «давай новый релиз сделаем и на этом пока всё». В
++`public/version.json` номер релиза поднят до **4** (окно «Что нового» покажет
++заметки один раз при первом открытии после обновления), а заметки (`ru-RU` /
++`en-EN`) переписаны под патчи 441–460 на языке игрока: свой портрет персонажа,
++раздел «Собственное снаряжение» в Настройках и категория «Самодельное
++снаряжение», комнаты мастера и «Экран администратора», подключение через
++«Сервер» с автопереподключением и индикатором связи на карточке, разделение
++режимов «Пользователь» и «Админ», быстрый запуск с живым индикатором старта,
++высокий приоритет иконок и автоматическое обновление версии в браузере.
++
+ ---
+ ## Уборка неиспользуемых папок и разовых артефактов (патч 460)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 76d39b5..9600e52 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "460"
++  "baseline": "461"
+ }
+diff --git a/public/version.json b/public/version.json
+index 2d95572..96ee09b 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,30 +1,26 @@
+ {
+-  "version": "460",
+-  "release": 3,
++  "version": "461",
++  "release": 4,
+   "notes": {
+     "ru-RU": [
+-      "Перки сверены с книгами: добавлены новые перки с их механиками — Супер Дупер, Омолодившийся, Верблюд, Гулеподобный, Кровосос, Фармацевт, Мощный пользователь и другие; требования перков — как в книге.",
+-      "Старые сохранения переносятся сами; перки, недоступные по книге, больше не пропадают — они серые, и приложение объясняет, что не так.",
+-      "Ремонт по книге: оружие и броня чинятся тестом Интеллект + Ремонт; сложность зависит от редкости и улучшений, донор её снижает; способы — за материалы, за донора или «Очумелые ручки» (бесплатно, но некачественно).",
+-      "Прочность включена по умолчанию; износ оружия и «произвольное качество при крафте» — теперь два самостоятельных пункта настроек.",
+-      "На карточках снаряжения показана Редкость.",
+-      "Фильтры в окнах добычи и покупки: кнопка-воронка открывает отдельное окно; чекбоксы категорий — Оружие, Броня, Силовая броня, Одежда — показывают только свои параметры; внутри — редкость, урон, скорострельность, дистанция, тип урона, тип оружия, патроны, качества, эффекты, части тела.",
+-      "На кнопке фильтра — число активных условий; кнопка «Показать» называет число находок и показывает отсортированный список «Найдено: N»; качества в фильтре — только те, что реально встречаются на оружии.",
+-      "Кнопка «Сон\\Ждать»: в модалке сна появился пункт «Ожидание» — время идёт, тратятся все три параметра выживания (Голод, Жажда, Сон) и ничего не восполняется; если ОЗ уйдут ниже нуля — «Персонаж умер».",
+-      "Обновление приложения: установка занимает секунды, сообщения понятны, а локальные правки перед установкой сохраняются в архив — их можно вернуть целиком.",
+-      "Длинные окна прокруваются правильно: заголовок и кнопки остаются на месте."
++      "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
++      "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
++      "Категория «Самодельное снаряжение»: предметы из загруженных наборов собраны в отдельной категории со своими подразделами по типам оружия, робо-оружию и боеприпасам, а также доступны в лавке и окне модификации оружия.",
++      "Комнаты мастера и «Экран администратора»: при включении опции в Настройках мастер создаёт сетевые комнаты с кодом приглашения и видит внутри комнаты карточки подключённых персонажей с обновлениями при сохранении.",
++      "Подключение к комнате через пункт «Сервер» в меню персонажа: привязанный персонаж переподключается к своей комнате автоматически без повторного ввода кода, а перенос по личным папкам не сбрасывает привязку.",
++      "Значок сети на карточке привязанного персонажа показывает статус связи (зелёный — мастер в сети и комната доступна, бледный — не в сети); личные персонажи и комнаты мастера строго разделены между режимами «Пользователь» и «Админ».",
++      "Быстрый запуск веб-приложения: готовая сжатая сборка открывается за секунды, а во время обновления на экране сразу отображается живой индикатор запуска вместо пустого тёмного окна.",
++      "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
+-      "Perks checked against the books: new perks with their mechanics — Super Duper, Rejuvenated, Dromedary, Ghoulish, Bloodsucker, Pharmacist, Power User and more; perk requirements follow the book.",
+-      "Old saves migrate on their own; perks unavailable by the book no longer vanish — they are greyed out and the app explains why.",
+-      "Repair by the book: weapons and armor are fixed with an Intelligence + Repair test; difficulty depends on rarity and mods, a donor lowers it; ways — materials, a donor, or «Jury Rigging» (free, but shoddy).",
+-      "Durability is on by default; weapon wear and «random quality when crafting» are now two separate settings.",
+-      "Item cards show Rarity.",
+-      "Filters in the loot and buy windows: a funnel button opens a separate window; category checkboxes — Weapons, Armor, Power Armor, Clothing — show only their own parameters; inside — rarity, damage, fire rate, distance, damage type, weapon type, ammo, qualities, effects, body parts.",
+-      "The filter button shows the number of active conditions; the «Show» button names the number of matches and lists them sorted as «Found: N»; filter qualities are only those actually found on weapons.",
+-      "The «Sleep\\Wait» button: the sleep modal gained a «Wait» option — time passes, all three survival parameters (Hunger, Thirst, Sleep) are spent and nothing is replenished; if HP drops below zero — «Character died».",
+-      "App updates: installation takes seconds, the messages are clear, and local edits are archived before installing — you can bring them all back.",
+-      "Long windows scroll properly: the header and buttons stay in place."
++      "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
++      "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
++      "«Homebrew Equipment» category: items from loaded packs appear in their own category with subsections by weapon type, robot weapons, and ammo, and are available in the shop and weapon modification window.",
++      "Game master rooms and «Admin screen»: when enabled in Settings, the GM can create online rooms with an invite code and view connected character cards inside the room with live updates on save.",
++      "Connecting to a room via «Server» in the character menu: a bound character reconnects to its room automatically without re-entering the code, and moving it between personal folders keeps the binding intact.",
++      "A network badge on a bound character card shows connection status (green when the GM is online and the room is active, dim when offline); personal characters and GM rooms stay strictly separated between «User» and «Admin» modes.",
++      "Fast web app startup: the compressed build opens in seconds, and during an update a live startup indicator appears right away instead of a blank dark screen.",
++      "Menu, tab, and card icons load with high priority without delays, and when a new version ships the browser picks up the update automatically without manual cache clearing."
+     ]
+   }
+ }
