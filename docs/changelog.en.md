@@ -1,5 +1,14 @@
 # Changelog
 ---
+## Restore updated ghoul origin portrait and preserve owner commits in `apply-patch.sh` (patch 464)
+
+Restored the updated `ghoul` origin portrait (`modules/fallout/assets/origins/ghoul.png`
+from owner commit `39bb559`, which had been overwritten by baseline extraction
+during patch 462) and hardened `sync_to_baseline` in `apply-patch.sh` so files
+unchanged in Arena between the previous and target patch — as well as extra
+files committed by the owner — are preserved instead of overwritten or removed.
+
+---
 ## Fix `expo export` web build and `ws@7` compatibility on Windows (patch 463)
 
 Fixed `TypeError: WebSocketServer is not a constructor` when building for web on
