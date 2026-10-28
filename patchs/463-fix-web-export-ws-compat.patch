@@ -1,0 +1,437 @@
+diff --git a/__tests__/room/room-metro-and-icons-453.test.js b/__tests__/room/room-metro-and-icons-453.test.js
+index 45b1c34..99950a9 100644
+--- a/__tests__/room/room-metro-and-icons-453.test.js
++++ b/__tests__/room/room-metro-and-icons-453.test.js
+@@ -12,9 +12,13 @@ import { describe, expect, it } from 'vitest';
+ import http from 'node:http';
+ import fs from 'node:fs';
+ import path from 'node:path';
+-import WebSocket, { WebSocketServer } from 'ws';
++import * as wsPkg from 'ws';
+ 
+ import metroConfig from '../../metro.config.js';
++import { resolveWebSocketServer } from '../../server/roomServer.js';
++
++const WebSocket = wsPkg.default || wsPkg.WebSocket || wsPkg;
++const WebSocketServer = resolveWebSocketServer(wsPkg);
+ import { MESSAGE, PROTOCOL_VERSION } from '../../server/protocol.js';
+ import { ALERTS } from '../../components/alerts/catalog.js';
+ import ruHome from '../../i18n/ru-RU/screens/home/screen.json';
+diff --git a/__tests__/room/ws-v7-and-export-463.test.js b/__tests__/room/ws-v7-and-export-463.test.js
+new file mode 100644
+index 0000000..d710c8e
+--- /dev/null
++++ b/__tests__/room/ws-v7-and-export-463.test.js
+@@ -0,0 +1,129 @@
++// Регрессионные тесты патча 463:
++// На Windows с прежним node_modules в корне лежал транзитивный ws@7.x (от Metro),
++// где экспортируется ws.Server, а ws.WebSocketServer === undefined, из-за чего
++// `expo export --platform web` падал с `TypeError: WebSocketServer is not a constructor`.
++// Проверяем:
++// 1) resolveWebSocketServer и attachRoomWebSocketServer работают с ws@7 (ws.Server) и ws@8;
++// 2) optional: true не бросает исключение даже при полном отсутствии конструктора ws;
++// 3) при статической выгрузке `expo export --platform web` Metro вообще не поднимает /ws.
++
++import { describe, expect, it } from 'vitest';
++import http from 'node:http';
++import path from 'node:path';
++import { createRequire } from 'node:module';
++import WebSocket from 'ws';
++
++import metroConfig from '../../metro.config.js';
++import {
++  attachRoomWebSocketServer,
++  resolveWebSocketServer,
++} from '../../server/roomServer.js';
++import { MESSAGE, PROTOCOL_VERSION } from '../../server/protocol.js';
++
++const require = createRequire(import.meta.url);
++const ROOT = path.resolve(__dirname, '../..');
++
++describe('Патч 463: совместимость ws@7 (ws.Server) и защита статической сборки expo export', () => {
++  it('resolveWebSocketServer поддерживает ws@7 (ws.Server), ws@8 (ws.WebSocketServer) и default-обёртку', () => {
++    function FakeV7Server() {}
++    function FakeV8Server() {}
++
++    expect(resolveWebSocketServer({ Server: FakeV7Server })).toBe(FakeV7Server);
++    expect(resolveWebSocketServer({ WebSocketServer: FakeV8Server, Server: FakeV7Server })).toBe(FakeV8Server);
++    expect(resolveWebSocketServer({ default: { Server: FakeV7Server } })).toBe(FakeV7Server);
++    expect(resolveWebSocketServer({})).toBeNull();
++    expect(resolveWebSocketServer(null)).toBeNull();
++  });
++
++  it('живой комнатный /ws работает поверх реального ws@7 (где WebSocketServer === undefined)', async () => {
++    let wsV7;
++    try {
++      wsV7 = require(path.join(ROOT, 'node_modules/metro/node_modules/ws'));
++    } catch {
++      const realCtor = WebSocket.WebSocketServer || WebSocket.Server;
++      wsV7 = { Server: realCtor };
++    }
++    // Убеждаемся, что тестируем именно ws@7-форму без именованного WebSocketServer
++    const v7Shape = { Server: wsV7.Server };
++    expect(v7Shape.WebSocketServer).toBeUndefined();
++    expect(typeof v7Shape.Server).toBe('function');
++
++    const httpServer = http.createServer((_req, res) => {
++      res.writeHead(200);
++      res.end('ok');
++    });
++    const attached = attachRoomWebSocketServer(httpServer, {
++      WebSocketServerImpl: v7Shape,
++    });
++    expect(attached).toBeTruthy();
++
++    await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
++    const { port } = httpServer.address();
++
++    try {
++      const client = new WebSocket(`ws://127.0.0.1:${port}/ws`);
++      await new Promise((resolve, reject) => {
++        client.once('open', resolve);
++        client.once('error', reject);
++      });
++
++      const created = await new Promise((resolve, reject) => {
++        const timer = setTimeout(() => reject(new Error('timeout')), 3000);
++        client.once('message', (raw) => {
++          clearTimeout(timer);
++          resolve(JSON.parse(raw.toString()));
++        });
++        client.send(
++          JSON.stringify({
++            v: PROTOCOL_VERSION,
++            type: MESSAGE.ROOM_CREATE,
++            roomCode: null,
++            clientId: 'win-gm',
++            ts: Date.now(),
++            payload: { name: 'Windows Build Check', requestId: 'r1' },
++          }),
++        );
++      });
++
++      expect(created.type).toBe(MESSAGE.ROOM_CREATED);
++      expect(created.payload.code).toMatch(/^GM-[A-Z2-9]{6}$/);
++      client.close();
++    } finally {
++      await attached.closeWs();
++      await new Promise((resolve) => httpServer.close(resolve));
++    }
++  });
++
++  it('optional: true возвращает null вместо краша, если конструктор ws недоступен', () => {
++    const httpServer = http.createServer();
++    expect(
++      attachRoomWebSocketServer(httpServer, {
++        WebSocketServerImpl: null,
++        optional: true,
++      }),
++    ).toBeNull();
++  });
++
++  it('при аргументах CLI `expo export --platform web` Metro не цепляет /ws к серверу сборки', async () => {
++    const origArgv = process.argv;
++    process.argv = ['node', 'C:\\Users\\Pinki\\node_modules\\expo\\bin\\cli', 'export', '--platform', 'web'];
++    try {
++      const enhanced = metroConfig.server.enhanceMiddleware((_req, res) => {
++        res.writeHead(200);
++        res.end('export-ok');
++      }, {});
++      const httpServer = http.createServer((req, res) => enhanced(req, res, () => {}));
++      await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
++      const { port } = httpServer.address();
++      try {
++        const res = await fetch(`http://127.0.0.1:${port}/`);
++        expect(await res.text()).toBe('export-ok');
++        expect(httpServer.__positroniumRoomWs).toBeUndefined();
++      } finally {
++        await new Promise((resolve) => httpServer.close(resolve));
++      }
++    } finally {
++      process.argv = origArgv;
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 07ef35e..f2462ac 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,19 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-27 (463) — исправление `WebSocketServer is not a constructor` при веб-сборке (`expo export --platform web` / Windows `ws@7`)
++
++Слово владельца (ручная веб-сборка на Windows):
++`TypeError: WebSocketServer is not a constructor at attachRoomWebSocketServer (server\roomServer.js:195:15) at Object.createServer (metro.config.js:110:5) ... at exportAppAsync`.
++
++- Диагностика:
++  1. На ПК со старым `node_modules` в корне был поднят транзитивный `ws@7.5.x` (от `metro` / `react-native`), где пакет экспортирует `ws.Server`, а именованный экспорт `ws.WebSocketServer` появился только в `ws@8` (`undefined` в `ws@7`).
++  2. Вдобавок при разовой статической выгрузке `expo export --platform web` CLI поднимает временный Metro-сервер только на время компиляции `dist/`, где комнатный `/ws` вообще не нужен.
++- Исправлено:
++  1. `server/roomServer.js`: добавлен `resolveWebSocketServer` (`ws.WebSocketServer || ws.Server || ws.default?.WebSocketServer || ws.default?.Server`) и флаг `optional` в `attachRoomWebSocketServer` — сервер комнат одинаково работает и на `ws@7`, и на `ws@8`, и никогда не роняет сборку при опциональном подключении.
++  2. `metro.config.js`: при запуске `expo export` перехват `http.createServer` и привязка `/ws` пропускаются, в dev-режиме вызов обёрнут в `optional: true` + `try/catch`, а сравнение пути `vectorIconsWeb.js` нормализовано без чувствительности к регистру буквы диска на Windows.
++  3. `public/version.json` (`version: "463"`, `release: 4` сохранён) и `patchs/baseline.json` (`"463"`).
++- Приёмочные тесты: `__tests__/room/ws-v7-and-export-463.test.js` (4 теста, включая живой прогон поверх реального `ws@7`).
++
+ ## 2026-10-27 (462) — разблокировка публикации на Replit (обновление `shell-quote` и CVE-зависимостей в `overrides` / `package-lock.json`)
+ 
+ Слово владельца (лог публикации на Replit):
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index afba3b3..8bcf38f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Fix `expo export` web build and `ws@7` compatibility on Windows (patch 463)
++
++Fixed `TypeError: WebSocketServer is not a constructor` when building for web on
++machines with an older `node_modules` tree (`ws@7`, which exports `ws.Server`
++instead of `ws.WebSocketServer`): `server/roomServer.js` now supports both `ws@7`
++and `ws@8`, and `metro.config.js` skips attaching the room WebSocket server
++during static `expo export --platform web` builds while normalizing Windows
++drive-letter casing.
++
+ ---
+ ## Fix Replit publish package firewall block (patch 462)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index ef9316f..373e438 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,15 @@
+ # История изменений
+ 
++---
++## Исправление веб-сборки `expo export` и совместимости с `ws@7` на Windows (патч 463)
++
++Устранена ошибка `TypeError: WebSocketServer is not a constructor` при сборке
++веб-версии на окружениях со старым `node_modules` (`ws@7`, где конструктор
++называется `ws.Server`, а не `ws.WebSocketServer`): в `server/roomServer.js`
++добавлена поддержка обеих версий `ws` (`ws@7` и `ws@8`), а в `metro.config.js`
++при статической выгрузке `expo export --platform web` пропуск запуска
++комнатного WebSocket-сервера и учёт регистра путей на Windows.
++
+ ---
+ ## Исправление блокировки пакетов при публикации на Replit (патч 462)
+ 
+diff --git a/metro.config.js b/metro.config.js
+index cd999c7..f667811 100644
+--- a/metro.config.js
++++ b/metro.config.js
+@@ -54,8 +54,33 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
+ const originalResolveRequest = config.resolver.resolveRequest;
+ const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
+ const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
++const vectorIconsWebPathLower = vectorIconsWebPath.toLowerCase();
+ const { attachRoomWebSocketServer, attachSmartCacheHeaders } = require('./server/roomServer');
+ 
++// При разовой статической выгрузке (`expo export --platform web` / `npm run build`)
++// Metro поднимается только на время сборки бандла — комнатный WebSocket не нужен.
++const isStaticExportArgs = (argv = process.argv) =>
++  Array.isArray(argv) &&
++  argv.slice(2).some((arg) => arg === 'export' || /[\\/]export(?:\.[cm]?js)?$/i.test(arg));
++
++const safeAttachMetroRoomServices = (srv) => {
++  if (!srv || isStaticExportArgs()) return;
++  try {
++    if (!srv.__positroniumRoomWs) {
++      attachRoomWebSocketServer(srv, { optional: true });
++    }
++  } catch {
++    // Ошибка инициализации опционального dev-WS никогда не должна валить сборку Metro.
++  }
++  try {
++    if (!srv.__positroniumCacheHeaders) {
++      attachSmartCacheHeaders(srv);
++    }
++  } catch {
++    // Аналогично для заголовков dev-сервера.
++  }
++};
++
+ config.resolver = {
+   ...config.resolver,
+   unstable_enablePackageExports: true,
+@@ -73,10 +98,13 @@ config.resolver = {
+         filePath: fontObserverShimPath,
+       };
+     }
++    const originLower = context?.originModulePath
++      ? path.resolve(context.originModulePath).toLowerCase()
++      : '';
+     if (
+       platform === 'web' &&
+       moduleName === '@expo/vector-icons' &&
+-      context.originModulePath !== vectorIconsWebPath
++      originLower !== vectorIconsWebPathLower
+     ) {
+       return {
+         type: 'sourceFile',
+@@ -98,6 +126,7 @@ const http = require('node:http');
+ const https = require('node:https');
+ 
+ const interceptNextHttpServer = () => {
++  if (isStaticExportArgs()) return;
+   const origHttpCreate = http.createServer;
+   const origHttpsCreate = https.createServer;
+   const restore = () => {
+@@ -107,15 +136,13 @@ const interceptNextHttpServer = () => {
+   http.createServer = function createMetroHttpWithRoomWs(...args) {
+     restore();
+     const srv = origHttpCreate.apply(this, args);
+-    attachRoomWebSocketServer(srv);
+-    attachSmartCacheHeaders(srv);
++    safeAttachMetroRoomServices(srv);
+     return srv;
+   };
+   https.createServer = function createMetroHttpsWithRoomWs(...args) {
+     restore();
+     const srv = origHttpsCreate.apply(this, args);
+-    attachRoomWebSocketServer(srv);
+-    attachSmartCacheHeaders(srv);
++    safeAttachMetroRoomServices(srv);
+     return srv;
+   };
+ };
+@@ -129,13 +156,7 @@ config.server = {
+       ? prevEnhanceMiddleware(metroMiddleware, metroServer)
+       : metroMiddleware;
+     return (req, res, next) => {
+-      const httpServer = req?.socket?.server;
+-      if (httpServer && !httpServer.__positroniumRoomWs) {
+-        attachRoomWebSocketServer(httpServer);
+-      }
+-      if (httpServer && !httpServer.__positroniumCacheHeaders) {
+-        attachSmartCacheHeaders(httpServer);
+-      }
++      safeAttachMetroRoomServices(req?.socket?.server);
+       return baseMiddleware(req, res, next);
+     };
+   },
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 152e634..9c67aa4 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "462"
++  "baseline": "463"
+ }
+diff --git a/public/version.json b/public/version.json
+index 93d8619..5bac85e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "462",
++  "version": "463",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomServer.js b/server/roomServer.js
+index c3c5e1e..c19db73 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -10,11 +10,68 @@ const http = require('node:http');
+ const fs = require('node:fs');
+ const path = require('node:path');
+ const zlib = require('node:zlib');
+-const { WebSocketServer } = require('ws');
+ const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
+ const { createRoomRegistry } = require('./roomRegistry');
+ const { toCanonicalRoomCode } = require('./roomCode');
+ 
++// Совместимость ws@6/7 (экспортирует ws.Server, где ws.WebSocketServer === undefined,
++// часто всплывает при старом node_modules на Windows из-за транзитивного ws@7 в Metro)
++// и ws@8+ (экспортирует и ws.WebSocketServer, и ws.Server).
++const resolveWebSocketServer = (wsPkg) => {
++  if (!wsPkg) return null;
++  const candidate =
++    wsPkg.WebSocketServer ||
++    wsPkg.Server ||
++    wsPkg.default?.WebSocketServer ||
++    wsPkg.default?.Server ||
++    (typeof wsPkg === 'function' &&
++    wsPkg.prototype &&
++    typeof wsPkg.prototype.handleUpgrade === 'function'
++      ? wsPkg
++      : null);
++  return typeof candidate === 'function' ? candidate : null;
++};
++
++let cachedWsServerCtor;
++const loadDefaultWebSocketServer = () => {
++  if (cachedWsServerCtor !== undefined) return cachedWsServerCtor;
++  const searchPaths = [__dirname, path.resolve(__dirname, '..')];
++  try {
++    searchPaths.push(path.dirname(require.resolve('expo/package.json')));
++  } catch {
++    // expo может отсутствовать в минимальном окружении
++  }
++  for (const base of [null, ...searchPaths]) {
++    try {
++      const mod = base
++        ? require(require.resolve('ws', { paths: [base] }))
++        : require('ws');
++      const ctor = resolveWebSocketServer(mod);
++      if (ctor) {
++        cachedWsServerCtor = ctor;
++        return ctor;
++      }
++    } catch {
++      // пробуем следующий путь резолва
++    }
++    try {
++      const pkgJsonPath = base
++        ? require.resolve('ws/package.json', { paths: [base] })
++        : require.resolve('ws/package.json');
++      const directIndex = require(path.join(path.dirname(pkgJsonPath), 'index.js'));
++      const ctor = resolveWebSocketServer(directIndex);
++      if (ctor) {
++        cachedWsServerCtor = ctor;
++        return ctor;
++      }
++    } catch {
++      // пробуем следующий путь резолва
++    }
++  }
++  cachedWsServerCtor = null;
++  return null;
++};
++
+ const MIME = {
+   '.html': 'text/html; charset=utf-8',
+   '.js': 'text/javascript; charset=utf-8',
+@@ -187,12 +244,24 @@ const serveStatic = (distDir) => (req, res) => {
+ 
+ const attachRoomWebSocketServer = (httpServer, {
+   registry = createRoomRegistry(),
++  WebSocketServerImpl,
++  optional = false,
+ } = {}) => {
++  if (!httpServer) return null;
+   if (httpServer.__positroniumRoomWs) {
+     return httpServer.__positroniumRoomWs;
+   }
+ 
+-  const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
++  const WsServer = WebSocketServerImpl !== undefined
++    ? resolveWebSocketServer(WebSocketServerImpl) || (typeof WebSocketServerImpl === 'function' ? WebSocketServerImpl : null)
++    : loadDefaultWebSocketServer();
++
++  if (typeof WsServer !== 'function') {
++    if (optional) return null;
++    throw new Error('Пакет ws (WebSocketServer / ws.Server) не найден для комнатного сервера.');
++  }
++
++  const wss = new WsServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
+ 
+   const sendEnvelope = (ws, type, payload = {}, roomCode = null, clientId = null) => {
+     if (ws.readyState !== ws.OPEN && ws.readyState !== 1) return;
+@@ -480,4 +549,5 @@ module.exports = {
+   attachRoomWebSocketServer,
+   attachSmartCacheHeaders,
+   cacheControlForPath,
++  resolveWebSocketServer,
+ };

@@ -54,7 +54,32 @@ const defaultBlockList = Array.isArray(config.resolver.blockList)
 const originalResolveRequest = config.resolver.resolveRequest;
 const fontObserverShimPath = path.resolve(__dirname, 'src/web/fontfaceobserverShim.ts');
 const vectorIconsWebPath = path.resolve(__dirname, 'src/web/vectorIconsWeb.js');
+const vectorIconsWebPathLower = vectorIconsWebPath.toLowerCase();
 const { attachRoomWebSocketServer, attachSmartCacheHeaders } = require('./server/roomServer');
+
+// При разовой статической выгрузке (`expo export --platform web` / `npm run build`)
+// Metro поднимается только на время сборки бандла — комнатный WebSocket не нужен.
+const isStaticExportArgs = (argv = process.argv) =>
+  Array.isArray(argv) &&
+  argv.slice(2).some((arg) => arg === 'export' || /[\\/]export(?:\.[cm]?js)?$/i.test(arg));
+
+const safeAttachMetroRoomServices = (srv) => {
+  if (!srv || isStaticExportArgs()) return;
+  try {
+    if (!srv.__positroniumRoomWs) {
+      attachRoomWebSocketServer(srv, { optional: true });
+    }
+  } catch {
+    // Ошибка инициализации опционального dev-WS никогда не должна валить сборку Metro.
+  }
+  try {
+    if (!srv.__positroniumCacheHeaders) {
+      attachSmartCacheHeaders(srv);
+    }
+  } catch {
+    // Аналогично для заголовков dev-сервера.
+  }
+};
 
 config.resolver = {
   ...config.resolver,
@@ -73,10 +98,13 @@ config.resolver = {
         filePath: fontObserverShimPath,
       };
     }
+    const originLower = context?.originModulePath
+      ? path.resolve(context.originModulePath).toLowerCase()
+      : '';
     if (
       platform === 'web' &&
       moduleName === '@expo/vector-icons' &&
-      context.originModulePath !== vectorIconsWebPath
+      originLower !== vectorIconsWebPathLower
     ) {
       return {
         type: 'sourceFile',
@@ -98,6 +126,7 @@ const http = require('node:http');
 const https = require('node:https');
 
 const interceptNextHttpServer = () => {
+  if (isStaticExportArgs()) return;
   const origHttpCreate = http.createServer;
   const origHttpsCreate = https.createServer;
   const restore = () => {
@@ -107,15 +136,13 @@ const interceptNextHttpServer = () => {
   http.createServer = function createMetroHttpWithRoomWs(...args) {
     restore();
     const srv = origHttpCreate.apply(this, args);
-    attachRoomWebSocketServer(srv);
-    attachSmartCacheHeaders(srv);
+    safeAttachMetroRoomServices(srv);
     return srv;
   };
   https.createServer = function createMetroHttpsWithRoomWs(...args) {
     restore();
     const srv = origHttpsCreate.apply(this, args);
-    attachRoomWebSocketServer(srv);
-    attachSmartCacheHeaders(srv);
+    safeAttachMetroRoomServices(srv);
     return srv;
   };
 };
@@ -129,13 +156,7 @@ config.server = {
       ? prevEnhanceMiddleware(metroMiddleware, metroServer)
       : metroMiddleware;
     return (req, res, next) => {
-      const httpServer = req?.socket?.server;
-      if (httpServer && !httpServer.__positroniumRoomWs) {
-        attachRoomWebSocketServer(httpServer);
-      }
-      if (httpServer && !httpServer.__positroniumCacheHeaders) {
-        attachSmartCacheHeaders(httpServer);
-      }
+      safeAttachMetroRoomServices(req?.socket?.server);
       return baseMiddleware(req, res, next);
     };
   },

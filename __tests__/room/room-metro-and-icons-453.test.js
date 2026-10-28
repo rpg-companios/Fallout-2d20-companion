@@ -12,9 +12,13 @@ import { describe, expect, it } from 'vitest';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import WebSocket, { WebSocketServer } from 'ws';
+import * as wsPkg from 'ws';
 
 import metroConfig from '../../metro.config.js';
+import { resolveWebSocketServer } from '../../server/roomServer.js';
+
+const WebSocket = wsPkg.default || wsPkg.WebSocket || wsPkg;
+const WebSocketServer = resolveWebSocketServer(wsPkg);
 import { MESSAGE, PROTOCOL_VERSION } from '../../server/protocol.js';
 import { ALERTS } from '../../components/alerts/catalog.js';
 import ruHome from '../../i18n/ru-RU/screens/home/screen.json';

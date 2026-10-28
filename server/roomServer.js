@@ -10,10 +10,67 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { WebSocketServer } = require('ws');
 const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
 const { createRoomRegistry } = require('./roomRegistry');
 const { toCanonicalRoomCode } = require('./roomCode');
+
+// Совместимость ws@6/7 (экспортирует ws.Server, где ws.WebSocketServer === undefined,
+// часто всплывает при старом node_modules на Windows из-за транзитивного ws@7 в Metro)
+// и ws@8+ (экспортирует и ws.WebSocketServer, и ws.Server).
+const resolveWebSocketServer = (wsPkg) => {
+  if (!wsPkg) return null;
+  const candidate =
+    wsPkg.WebSocketServer ||
+    wsPkg.Server ||
+    wsPkg.default?.WebSocketServer ||
+    wsPkg.default?.Server ||
+    (typeof wsPkg === 'function' &&
+    wsPkg.prototype &&
+    typeof wsPkg.prototype.handleUpgrade === 'function'
+      ? wsPkg
+      : null);
+  return typeof candidate === 'function' ? candidate : null;
+};
+
+let cachedWsServerCtor;
+const loadDefaultWebSocketServer = () => {
+  if (cachedWsServerCtor !== undefined) return cachedWsServerCtor;
+  const searchPaths = [__dirname, path.resolve(__dirname, '..')];
+  try {
+    searchPaths.push(path.dirname(require.resolve('expo/package.json')));
+  } catch {
+    // expo может отсутствовать в минимальном окружении
+  }
+  for (const base of [null, ...searchPaths]) {
+    try {
+      const mod = base
+        ? require(require.resolve('ws', { paths: [base] }))
+        : require('ws');
+      const ctor = resolveWebSocketServer(mod);
+      if (ctor) {
+        cachedWsServerCtor = ctor;
+        return ctor;
+      }
+    } catch {
+      // пробуем следующий путь резолва
+    }
+    try {
+      const pkgJsonPath = base
+        ? require.resolve('ws/package.json', { paths: [base] })
+        : require.resolve('ws/package.json');
+      const directIndex = require(path.join(path.dirname(pkgJsonPath), 'index.js'));
+      const ctor = resolveWebSocketServer(directIndex);
+      if (ctor) {
+        cachedWsServerCtor = ctor;
+        return ctor;
+      }
+    } catch {
+      // пробуем следующий путь резолва
+    }
+  }
+  cachedWsServerCtor = null;
+  return null;
+};
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -187,12 +244,24 @@ const serveStatic = (distDir) => (req, res) => {
 
 const attachRoomWebSocketServer = (httpServer, {
   registry = createRoomRegistry(),
+  WebSocketServerImpl,
+  optional = false,
 } = {}) => {
+  if (!httpServer) return null;
   if (httpServer.__positroniumRoomWs) {
     return httpServer.__positroniumRoomWs;
   }
 
-  const wss = new WebSocketServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
+  const WsServer = WebSocketServerImpl !== undefined
+    ? resolveWebSocketServer(WebSocketServerImpl) || (typeof WebSocketServerImpl === 'function' ? WebSocketServerImpl : null)
+    : loadDefaultWebSocketServer();
+
+  if (typeof WsServer !== 'function') {
+    if (optional) return null;
+    throw new Error('Пакет ws (WebSocketServer / ws.Server) не найден для комнатного сервера.');
+  }
+
+  const wss = new WsServer({ noServer: true, maxPayload: LIMITS.MAX_MESSAGE_BYTES });
 
   const sendEnvelope = (ws, type, payload = {}, roomCode = null, clientId = null) => {
     if (ws.readyState !== ws.OPEN && ws.readyState !== 1) return;
@@ -480,4 +549,5 @@ module.exports = {
   attachRoomWebSocketServer,
   attachSmartCacheHeaders,
   cacheControlForPath,
+  resolveWebSocketServer,
 };
