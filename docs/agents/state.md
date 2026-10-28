@@ -1,5 +1,19 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-27 (463) — исправление `WebSocketServer is not a constructor` при веб-сборке (`expo export --platform web` / Windows `ws@7`)
+
+Слово владельца (ручная веб-сборка на Windows):
+`TypeError: WebSocketServer is not a constructor at attachRoomWebSocketServer (server\roomServer.js:195:15) at Object.createServer (metro.config.js:110:5) ... at exportAppAsync`.
+
+- Диагностика:
+  1. На ПК со старым `node_modules` в корне был поднят транзитивный `ws@7.5.x` (от `metro` / `react-native`), где пакет экспортирует `ws.Server`, а именованный экспорт `ws.WebSocketServer` появился только в `ws@8` (`undefined` в `ws@7`).
+  2. Вдобавок при разовой статической выгрузке `expo export --platform web` CLI поднимает временный Metro-сервер только на время компиляции `dist/`, где комнатный `/ws` вообще не нужен.
+- Исправлено:
+  1. `server/roomServer.js`: добавлен `resolveWebSocketServer` (`ws.WebSocketServer || ws.Server || ws.default?.WebSocketServer || ws.default?.Server`) и флаг `optional` в `attachRoomWebSocketServer` — сервер комнат одинаково работает и на `ws@7`, и на `ws@8`, и никогда не роняет сборку при опциональном подключении.
+  2. `metro.config.js`: при запуске `expo export` перехват `http.createServer` и привязка `/ws` пропускаются, в dev-режиме вызов обёрнут в `optional: true` + `try/catch`, а сравнение пути `vectorIconsWeb.js` нормализовано без чувствительности к регистру буквы диска на Windows.
+  3. `public/version.json` (`version: "463"`, `release: 4` сохранён) и `patchs/baseline.json` (`"463"`).
+- Приёмочные тесты: `__tests__/room/ws-v7-and-export-463.test.js` (4 теста, включая живой прогон поверх реального `ws@7`).
+
 ## 2026-10-27 (462) — разблокировка публикации на Replit (обновление `shell-quote` и CVE-зависимостей в `overrides` / `package-lock.json`)
 
 Слово владельца (лог публикации на Replit):

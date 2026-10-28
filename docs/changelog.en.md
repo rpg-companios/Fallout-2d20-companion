@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Fix `expo export` web build and `ws@7` compatibility on Windows (patch 463)
+
+Fixed `TypeError: WebSocketServer is not a constructor` when building for web on
+machines with an older `node_modules` tree (`ws@7`, which exports `ws.Server`
+instead of `ws.WebSocketServer`): `server/roomServer.js` now supports both `ws@7`
+and `ws@8`, and `metro.config.js` skips attaching the room WebSocket server
+during static `expo export --platform web` builds while normalizing Windows
+drive-letter casing.
+
+---
 ## Fix Replit publish package firewall block (patch 462)
 
 Resolved the `403 Forbidden` error from Replit's Socket Security Policy on

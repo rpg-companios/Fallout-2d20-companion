@@ -1,6 +1,16 @@
 # История изменений
 
 ---
+## Исправление веб-сборки `expo export` и совместимости с `ws@7` на Windows (патч 463)
+
+Устранена ошибка `TypeError: WebSocketServer is not a constructor` при сборке
+веб-версии на окружениях со старым `node_modules` (`ws@7`, где конструктор
+называется `ws.Server`, а не `ws.WebSocketServer`): в `server/roomServer.js`
+добавлена поддержка обеих версий `ws` (`ws@7` и `ws@8`), а в `metro.config.js`
+при статической выгрузке `expo export --platform web` пропуск запуска
+комнатного WebSocket-сервера и учёт регистра путей на Windows.
+
+---
 ## Исправление блокировки пакетов при публикации на Replit (патч 462)
 
 Устранена ошибка `403 Forbidden` от фильтра безопасности Replit (Socket Security
