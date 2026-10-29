@@ -69,4 +69,16 @@ export const CREATE_TABLES = [
     code TEXT NOT NULL,
     joined_at INTEGER NOT NULL
   )`,
+
+  // Контейнеры добычи и торговцы Мастера (патч 468, «Добыча/Торговля»).
+  // CREATE TABLE IF NOT EXISTS идемпотентен: бамп SCHEMA_VERSION не нужен.
+  `CREATE TABLE IF NOT EXISTS gm_containers (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    room_code TEXT NOT NULL,
+    data TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 ];

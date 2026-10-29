@@ -3,10 +3,13 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
+import { normalizeContainerEntity } from '../../domain/lootTrade';
 import { getActiveModuleId } from '../../domain/moduleLocale';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
 import { validateAvatarDataUrl } from '../../domain/characterAvatar';
 import * as avatarCache from '../../db/avatarCache';
+
+const GM_CONTAINERS_FOLDER_NAME = 'gm_containers';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
@@ -235,6 +238,140 @@ const makeRemoteFilename = (character) => {
   const safeName = sanitizeFileName(character?.name || 'character')
     .replace(/\.rpgc$/i, '');
   return `${character.id}__${safeName}.json`;
+};
+
+const makeRemoteGmContainerFilename = (container) => {
+  const safeName = sanitizeFileName(container?.name || 'container')
+    .replace(/\.rpgc$/i, '');
+  return `${container.id}__${safeName}.json`;
+};
+
+const findGmContainersFolderId = async (token, moduleFolderId) => {
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${GM_CONTAINERS_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
+  );
+  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
+  const listData = await listResp.json();
+  return listData.files?.[0]?.id ?? null;
+};
+
+const getGmContainersFolderId = async (token, moduleFolderId) => {
+  const existingId = await findGmContainersFolderId(token, moduleFolderId);
+  if (existingId) return existingId;
+
+  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: GM_CONTAINERS_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [moduleFolderId],
+    }),
+  });
+  const created = await createResp.json();
+  if (!created.id) {
+    throw new Error('Не удалось создать подпапку gm_containers в appDataFolder');
+  }
+  return created.id;
+};
+
+const parseGmContainerCloudPayload = (rawText) => {
+  try {
+    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+    const body = parsed?.container && typeof parsed.container === 'object'
+      ? parsed.container
+      : parsed;
+    if (!body || typeof body !== 'object' || !body.id || !body.name) {
+      return { error: 'INVALID_CONTAINER' };
+    }
+    return { container: normalizeContainerEntity(body) };
+  } catch {
+    return { error: 'INVALID_JSON' };
+  }
+};
+
+const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+  const localContainers = typeof db.getGmContainersList === 'function'
+    ? await db.getGmContainersList()
+    : [];
+  const existingFolderId = await findGmContainersFolderId(token, moduleFolderId);
+  if (!existingFolderId && localContainers.length === 0) {
+    return { uploaded: 0, downloaded: 0 };
+  }
+
+  const gmFolderId = existingFolderId || await getGmContainersFolderId(token, moduleFolderId);
+  const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
+  const remoteById = new Map();
+  for (const file of remoteFiles) {
+    const maybeId = (file.name || '').split('__')[0];
+    if (maybeId) remoteById.set(maybeId, file);
+  }
+
+  const outdatedLocals = [];
+  const uploads = [];
+
+  for (const container of localContainers) {
+    const remote = remoteById.get(container.id);
+    const localUpdated = Number(container.updatedAt || 0);
+    const remoteUpdated = remote?.modifiedTime ? new Date(remote.modifiedTime).getTime() : 0;
+    if (remote && remoteUpdated > localUpdated + 1000) {
+      outdatedLocals.push({ container, remote });
+    } else {
+      uploads.push({ container, remote });
+    }
+  }
+
+  let downloadedCount = 0;
+  const localIds = new Set(localContainers.map((c) => c.id));
+  const newRemoteFiles = remoteFiles.filter((file) => {
+    const maybeId = (file.name || '').split('__')[0];
+    return maybeId && !localIds.has(maybeId);
+  });
+
+  for (const file of newRemoteFiles) {
+    const raw = await downloadRemoteCharacter(token, file.id);
+    const parsed = parseGmContainerCloudPayload(raw);
+    if (parsed.error || !parsed.container) continue;
+    await db.saveGmContainer(parsed.container, { preserveUpdatedAt: true });
+    downloadedCount += 1;
+  }
+
+  if (outdatedLocals.length > 0) {
+    const shouldDownload = typeof confirmDownload === 'function'
+      ? await confirmDownload(outdatedLocals)
+      : true;
+    if (shouldDownload) {
+      for (const { remote } of outdatedLocals) {
+        const raw = await downloadRemoteCharacter(token, remote.id);
+        const parsed = parseGmContainerCloudPayload(raw);
+        if (parsed.error || !parsed.container) continue;
+        await db.saveGmContainer(parsed.container, { preserveUpdatedAt: true });
+        downloadedCount += 1;
+      }
+    } else {
+      uploads.push(...outdatedLocals);
+    }
+  }
+
+  for (const { container, remote } of uploads) {
+    const fresh = await db.getGmContainerById(container.id);
+    if (!fresh) continue;
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_container',
+      exportedAt: Date.now(),
+      container: fresh,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmContainerFilename(fresh),
+      payload,
+    });
+  }
+
+  return { uploaded: uploads.length, downloaded: downloadedCount };
 };
 
 // ─── Аватары персонажей (задел премиум-фичи, патч 193; UI нет) ───────────────
@@ -513,6 +650,19 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
 
   await setCloudSyncConfigured(true);
 
+  // Контейнеры и торговцы Мастера («Добыча/Торговля», патч 468): двусторонняя
+  // синхронизация в подпапке appDataFolder/<сеттинг>/gm_containers/.
+  let gmUploaded = 0;
+  let gmDownloaded = 0;
+  try {
+    const gmStats = await syncGmContainersInSession(token, folderId, { confirmDownload });
+    gmUploaded = gmStats.uploaded || 0;
+    gmDownloaded = gmStats.downloaded || 0;
+    debugLog('sync.gmContainers:done', gmStats);
+  } catch (e) {
+    debugLog('sync.gmContainers:failed', { message: e?.message });
+  }
+
   // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
   // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
   try {
@@ -523,8 +673,10 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   }
 
   report('done');
-  debugLog('sync.all:done', { uploaded: uploads.length, downloaded: downloadedCount });
-  return { uploaded: uploads.length, downloaded: downloadedCount };
+  const totalUploaded = uploads.length + gmUploaded;
+  const totalDownloaded = downloadedCount + gmDownloaded;
+  debugLog('sync.all:done', { uploaded: totalUploaded, downloaded: totalDownloaded });
+  return { uploaded: totalUploaded, downloaded: totalDownloaded };
 };
 
 // Удаление персонажа в облаке. Вызывается ТОЛЬКО после явного подтверждения
@@ -607,5 +759,69 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
     debugLog('sync.auto:done', { characterId });
   } catch (e) {
     debugLog('sync.cloudFailed', { characterId, message: e?.message || String(e) });
+  }
+};
+
+// Фоновая выгрузка контейнера/торговца Мастера в Google Drive (если облако уже включено).
+export const syncGmContainerToCloudIfEnabled = async (containerId) => {
+  if (!ensureWeb() || !containerId) return;
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return;
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmFolderId = await getGmContainersFolderId(token, moduleFolderId);
+    const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${containerId}__`));
+    const container = await db.getGmContainerById(containerId);
+    if (!container) return;
+
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_container',
+      exportedAt: Date.now(),
+      container,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmContainerFilename(container),
+      payload,
+    });
+    debugLog('sync.gmContainer.auto:done', { containerId });
+  } catch (e) {
+    debugLog('sync.gmContainer.auto:failed', { containerId, message: e?.message || String(e) });
+  }
+};
+
+// Удаление контейнера/торговца Мастера из Google Drive при локальном удалении.
+export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
+  if (!ensureWeb() || !containerId) return { removed: false, reason: 'not-web' };
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return { removed: false, reason: 'not-configured' };
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmFolderId = await findGmContainersFolderId(token, moduleFolderId);
+    if (!gmFolderId) return { removed: false, reason: 'absent' };
+
+    const remoteFiles = await listRemoteCharacterFiles(token, gmFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${containerId}__`));
+    if (!remote) return { removed: false, reason: 'absent' };
+
+    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
+    debugLog('sync.gmContainer.delete:done', { containerId, fileId: remote.id });
+    return { removed: true };
+  } catch (e) {
+    const message = e?.message || String(e);
+    debugLog('sync.gmContainer.delete:failed', { containerId, message });
+    return { removed: false, reason: 'error', message };
   }
 };

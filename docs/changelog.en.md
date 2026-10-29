@@ -1,5 +1,19 @@
 # Changelog
 ---
+## New GM «Loot/Trade» screen, Google Drive container sync, and live room loot & two-pane merchant sessions (patch 468)
+
+Added the «Loot/Trade» bottom tab in Admin mode alongside «Campaigns», featuring
+a 3-column grid for creating Loot Containers (chest) and Merchants (money bag)
+stored locally and synced to Google Drive (`appDataFolder/<moduleId>/gm_containers/`).
+Implemented catalog item picking with immediate `pcs` / `CD` / `d20` roll-on-save
+quantities, additive specialization markups (`item markup + merchant markup`),
+positive buyback depreciation `%` (default `50`), atomic shared-room or
+character-targeted sessions, live GM `%` and caps adjustments during active
+trades, automatic search perks and «Cap Collector» modifiers, and a two-pane
+staged-buffer barter modal rendering offered items in grey italics with merchant
+cap-shortfall confirmation.
+
+---
 ## Fix Node.js version resolution in `deploy-netangels.sh` on NetAngels (patch 467)
 
 Fixed `etc/environment/PATH` prepending `/usr/bin` (with legacy system

@@ -9,6 +9,12 @@
 const crypto = require('node:crypto');
 const { ERROR_CODE, LIMITS } = require('./protocol');
 const { generateRoomCode, sanitizePrefix } = require('./roomCode');
+const {
+  normalizeActiveSession,
+  applySessionUpdate,
+  applyAtomicLootTake,
+  applyAtomicTradeCommit,
+} = require('./lootTradeSession');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
 
@@ -38,6 +44,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     ownerToken,
     members: new Map(), // clientId -> { clientId, name, role, ws }
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+    activeSession: null, // открытый контейнер добычи или торговец
     createdAt: now(),
     emptySince: null,
   });
@@ -55,6 +62,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromClientId: entry.fromClientId,
       fromName: entry.fromName,
     })),
+    activeSession: room.activeSession || null,
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -171,6 +179,61 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return room ? roomSnapshot(room) : null;
   };
 
+  /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
+  const openSession = ({ code, clientId, session }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const normalized = normalizeActiveSession(session, now());
+    if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+    room.activeSession = normalized;
+    return { room, session: normalized };
+  };
+
+  /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
+  const updateSession = ({ code, clientId, payload }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const result = applySessionUpdate(room.activeSession, payload, now());
+    if (result.error) return result;
+    room.activeSession = result.session;
+    return { room, session: result.session };
+  };
+
+  /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
+  const closeSession = ({ code, clientId, sessionId = null }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const previous = room.activeSession;
+    if (sessionId && previous && previous.sessionId !== String(sessionId)) {
+      return { room, session: previous };
+    }
+    room.activeSession = null;
+    return { room, session: null, closedSession: previous };
+  };
+
+  /** Атомарное взятие предметов игроком из контейнера добычи. */
+  const lootTake = ({ code, clientId, payload }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const result = applyAtomicLootTake(room.activeSession, payload, now());
+    if (result.error) return result;
+    room.activeSession = result.session;
+    return { room, granted: result.granted, session: result.session };
+  };
+
+  /** Атомарная бартерная сделка игрока с торговцем. */
+  const tradeCommit = ({ code, clientId, payload }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const result = applyAtomicTradeCommit(room.activeSession, payload, now());
+    if (result.error) return result;
+    room.activeSession = result.session;
+    return { room, committed: result.committed, session: result.session };
+  };
+
   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
   const sweep = () => {
     const removed = [];
@@ -187,7 +250,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   };
 
   return {
-    createRoom, joinRoom, leaveRoom, putSnapshot, isOwner, getRoom, getState, sweep,
+    createRoom,
+    joinRoom,
+    leaveRoom,
+    putSnapshot,
+    isOwner,
+    getRoom,
+    getState,
+    openSession,
+    updateSession,
+    closeSession,
+    lootTake,
+    tradeCommit,
+    sweep,
     _rooms: rooms, // диагностика/тесты
   };
 };

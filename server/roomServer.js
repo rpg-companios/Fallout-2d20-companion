@@ -477,6 +477,146 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        case MESSAGE.SESSION_OPEN: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.openSession({
+            code: canonical,
+            clientId,
+            session: payload.session,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_UPDATE_RATES: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.updateSession({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_CLOSE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.closeSession({
+            code: canonical,
+            clientId,
+            sessionId: payload.sessionId || null,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          const closePayload = {
+            session: result.session,
+            closedContainerId: result.closedSession?.containerId || null,
+            closedSession: result.closedSession || null,
+          };
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            ...closePayload,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, closePayload);
+          break;
+        }
+
+        case MESSAGE.SESSION_LOOT_TAKE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.lootTake({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendEnvelope(ws, MESSAGE.ERROR, {
+              code: result.error,
+              requestId: payload.requestId || null,
+              session: result.session || null,
+            }, canonical, clientId);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
+            granted: result.granted,
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_TRADE_COMMIT: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.tradeCommit({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendEnvelope(ws, MESSAGE.ERROR, {
+              code: result.error,
+              merchantCaps: result.merchantCaps,
+              owedCaps: result.owedCaps,
+              session: result.session || null,
+              requestId: payload.requestId || null,
+            }, canonical, clientId);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_TRADE_COMMIT, {
+            committed: result.committed,
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
         default:
           sendError(ws, clientId, ERROR_CODE.UNKNOWN_TYPE, payload.requestId || null, roomCode || null);
       }

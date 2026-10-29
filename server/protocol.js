@@ -21,6 +21,13 @@ const MESSAGE = Object.freeze({
   CHAR_PUBLISH: 'char.publish',
   CHAR_FOCUS: 'char.focus',
   GM_DIRECTIVE: 'gm.directive',
+  // Выдача контейнеров добычи и торговли Мастером (патч 468):
+  SESSION_OPEN: 'session.open',
+  SESSION_STATE: 'session.state',
+  SESSION_UPDATE_RATES: 'session.updateRates',
+  SESSION_CLOSE: 'session.close',
+  SESSION_LOOT_TAKE: 'session.lootTake',
+  SESSION_TRADE_COMMIT: 'session.tradeCommit',
   ERROR: 'error',
 });
 
@@ -33,6 +40,11 @@ const ERROR_CODE = Object.freeze({
   NOT_ROOM_OWNER: 'NOT_ROOM_OWNER',
   BAD_MESSAGE: 'BAD_MESSAGE',
   UNKNOWN_TYPE: 'UNKNOWN_TYPE',
+  SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+  SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
+  TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+  TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+  TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
 });
 
 const LIMITS = Object.freeze({

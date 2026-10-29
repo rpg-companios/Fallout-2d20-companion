@@ -79,6 +79,7 @@ import useAppSettingsStore, {
 import * as avatarCache from '../../../db/avatarCache';
 // Комнаты мастера (gm-rooms, этапы 0–3): стор соединения + адреса комнат + синхронизация.
 import useRoomStore from '../../../src/room/roomStore';
+import useUiModeStore from '../../../src/room/uiModeStore';
 import { isRoomServerConfigured } from '../../../src/room/roomClient';
 import { toCanonicalRoomCode, formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 import {
@@ -514,7 +515,8 @@ export default function HomeScreen({ navigation }) {
   // На web режим дополнительно изолирован по вкладкам (sessionStorage), чтобы
   // открытые рядом вкладки «Админ» и «Пользователь» не перетирали друг друга.
   const storeUiMode = useAppSettingsStore(selectUiMode);
-  const [tabUiMode, setTabUiMode] = useState(() => readTabUiMode());
+  const tabUiMode = useUiModeStore((state) => state.tabUiMode);
+  const setSharedTabUiMode = useUiModeStore((state) => state.setTabUiMode);
   const uiMode = tabUiMode || storeUiMode;
   const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
   const isGmMode = uiMode === 'gm';
@@ -686,6 +688,7 @@ export default function HomeScreen({ navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      useUiModeStore.getState().setGmInspectingCharacter(false);
       loadList();
     }, [loadList])
   );
@@ -801,7 +804,7 @@ export default function HomeScreen({ navigation }) {
       });
     }
     writeTabUiMode(nextMode);
-    setTabUiMode(nextMode);
+    setSharedTabUiMode(nextMode);
     setSettingValue('uiMode', nextMode);
     setActiveFolder(null);
     setMovingCharacterId(null);
@@ -1017,7 +1020,10 @@ export default function HomeScreen({ navigation }) {
     if (!bundledSettingActive || !roomCard?.snapshotPayload) return;
     const ok = await savesModule.loadCharacterFromRoomSnapshot(roomCard.snapshotPayload);
     if (ok) {
-      navigation.navigate('CharacterTab');
+      useUiModeStore.getState().setGmInspectingCharacter(true);
+      setTimeout(() => {
+        navigation.navigate('CharacterTab');
+      }, 0);
     }
   };
 
