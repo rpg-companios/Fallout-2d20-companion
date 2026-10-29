@@ -66,6 +66,7 @@ export default function PlayerLootTradeOverlay() {
 
   const rooms = useRoomStore((s) => s.rooms);
   const roomStatus = useRoomStore((s) => s.status);
+  const myClientId = useRoomStore((s) => s.clientId);
 
   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
   const storeItems = useCharacterStore((s) => s.items);
@@ -74,12 +75,19 @@ export default function PlayerLootTradeOverlay() {
 
   const [bindings, setBindings] = useState([]); // [{ characterId, code, name }]
   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
+  const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
 
   // Буферы обмена с торговцем
   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
   const [sellBuffer, setSellBuffer] = useState({}); // { [playerItemId]: qty }
+
+  const markSessionClosedLocally = useCallback((sessionId) => {
+    if (!sessionId) return;
+    setClosedSessionIds((prev) => (prev[sessionId] ? prev : { ...prev, [sessionId]: true }));
+    setMinimizedSessionId((prev) => (prev === sessionId ? null : prev));
+  }, []);
 
   const refreshBindings = useCallback(async () => {
     if (isGmMode) return;
@@ -122,6 +130,14 @@ export default function PlayerLootTradeOverlay() {
       const room = rooms[bind.code];
       const session = room?.activeSession;
       if (!session) continue;
+      if (closedSessionIds[session.sessionId]) continue;
+      if (
+        myClientId
+        && Array.isArray(session.closedByClientIds)
+        && session.closedByClientIds.includes(myClientId)
+      ) {
+        continue;
+      }
       if (session.targetType === 'room' || session.targetCharacterId === bind.characterId) {
         return {
           roomCode: bind.code,
@@ -133,7 +149,7 @@ export default function PlayerLootTradeOverlay() {
       }
     }
     return null;
-  }, [isGmMode, bindings, rooms, currentCharacterId]);
+  }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
 
   const activeSession = matchedContext?.session || null;
 
@@ -261,26 +277,87 @@ export default function PlayerLootTradeOverlay() {
   // ── Обработчики КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────────
 
   const handleTakeLoot = async (takes) => {
-    if (busy || !takes.length) return;
+    if (busy || !takes.length || !activeSession || !matchedContext) return;
+    const targetSessionId = activeSession.sessionId;
+    const targetRoomCode = matchedContext.roomCode;
+    const targetCharacterId = matchedContext.characterId;
     setBusy(true);
     try {
-      const { granted } = await useRoomStore.getState().takeFromLootSession({
-        code: matchedContext.roomCode,
-        sessionId: activeSession.sessionId,
-        characterId: matchedContext.characterId,
-        takes,
-      });
+      const { granted, session: updatedSession, closedReason } =
+        await useRoomStore.getState().takeFromLootSession({
+          code: targetRoomCode,
+          sessionId: targetSessionId,
+          characterId: targetCharacterId,
+          takes,
+        });
       if (granted?.length) {
         grantLootEntriesToCharacter(granted);
         setTimeout(() => {
-          void pushSavedCharacterToBoundRoomIfAny(matchedContext.characterId);
+          void pushSavedCharacterToBoundRoomIfAny(targetCharacterId);
         }, 650);
+      }
+
+      const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
+      const emptiedByThisTake =
+        Boolean(granted?.length)
+        && Array.isArray(updatedSession?.items)
+        && updatedSession.items.length === 0;
+
+      if (sessionClosedOnServer || emptiedByThisTake) {
+        markSessionClosedLocally(targetSessionId);
+        if (
+          updatedSession
+          && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
+        ) {
+          void useRoomStore.getState().playerCloseRoomSession({
+            code: targetRoomCode,
+            sessionId: targetSessionId,
+          }).catch(() => {});
+        }
       }
     } catch (error) {
       debugLog('playerOverlay.lootTake:failed', { message: error?.message });
     } finally {
       setBusy(false);
     }
+  };
+
+  const performPlayerLootClose = async () => {
+    if (!activeSession || !matchedContext) return;
+    const targetSessionId = activeSession.sessionId;
+    const targetRoomCode = matchedContext.roomCode;
+    markSessionClosedLocally(targetSessionId);
+    try {
+      await useRoomStore.getState().playerCloseRoomSession({
+        code: targetRoomCode,
+        sessionId: targetSessionId,
+      });
+    } catch (error) {
+      debugLog('playerOverlay.playerClose:failed', { message: error?.message });
+    }
+  };
+
+  const handleCloseLootPress = () => {
+    if (busy || !activeSession) return;
+    const remainingCount = Array.isArray(activeSession.items) ? activeSession.items.length : 0;
+    if (remainingCount > 0) {
+      showRawAlert({
+        title: tLootTrade('player.closeLootConfirmTitle'),
+        message: tLootTrade('player.closeLootConfirmMessage'),
+        buttons: [
+          { text: tLootTrade('form.cancel'), style: 'cancel' },
+          {
+            text: tLootTrade('player.close'),
+            style: 'destructive',
+            onPress: () => {
+              void performPlayerLootClose();
+            },
+          },
+        ],
+      });
+      return;
+    }
+    void performPlayerLootClose();
   };
 
   // ── Обработчики ТОРГОВЦА (буфер обмена) ───────────────────────────────────
@@ -420,12 +497,22 @@ export default function PlayerLootTradeOverlay() {
                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
                 <Text style={styles.modalTitle}>{activeSession.name}</Text>
               </View>
-              <TouchableOpacity
-                style={styles.minimizeBtn}
-                onPress={() => setMinimizedSessionId(activeSession.sessionId)}
-              >
-                <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
-              </TouchableOpacity>
+              <View style={styles.headerActionsRow}>
+                <TouchableOpacity
+                  style={styles.minimizeBtn}
+                  disabled={busy}
+                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+                >
+                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.closeContainerBtn, busy && styles.disabledBtn]}
+                  disabled={busy}
+                  onPress={handleCloseLootPress}
+                >
+                  <Text style={styles.closeContainerBtnText}>{tLootTrade('player.close')}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {Boolean(activeSession.description) && (
@@ -973,6 +1060,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
+  headerActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   minimizeBtn: {
     paddingHorizontal: 13,
     paddingVertical: 7,
@@ -985,6 +1077,19 @@ const styles = StyleSheet.create({
     color: '#e5e5e5',
     fontSize: 12,
     fontWeight: '600',
+  },
+  closeContainerBtn: {
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#e57373',
+    backgroundColor: '#4a1f1f',
+  },
+  closeContainerBtnText: {
+    color: '#f5bcbc',
+    fontSize: 12,
+    fontWeight: '700',
   },
   modalDesc: {
     color: '#cccccc',

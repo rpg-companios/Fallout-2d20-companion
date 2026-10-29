@@ -1,0 +1,1143 @@
+diff --git a/__tests__/lootTrade/loot-close-and-viewers-470.test.js b/__tests__/lootTrade/loot-close-and-viewers-470.test.js
+new file mode 100644
+index 0000000..20dfc6a
+--- /dev/null
++++ b/__tests__/lootTrade/loot-close-and-viewers-470.test.js
+@@ -0,0 +1,436 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++const alertCalls = [];
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: (opts) => {
++    alertCalls.push(opts);
++  },
++  showAlert: vi.fn(),
++  showConfirm: vi.fn(),
++  showPrompt: vi.fn(),
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteCharacterFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncGmContainerToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteGmContainerFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncAllCharactersWithCloud: vi.fn().mockResolvedValue({ uploaded: 0, downloaded: 0 }),
++  openCloudFolderInDrive: vi.fn().mockResolvedValue(undefined),
++}));
++
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import * as db from '../../db';
++import {
++  resetPromptedEmptySessionsForTests,
++  startGmSessionPersistence,
++} from '../../src/lootTrade/gmSessionPersistence';
++import { setCurrentLocale } from '../../i18n/locale';
++import { tLootTrade } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
++
++const repoRoot = path.resolve(__dirname, '../..');
++
++const makeWaitMsg = () => (box, pred, timeoutMs = 4000) => new Promise((resolve, reject) => {
++  const started = Date.now();
++  const timer = setInterval(() => {
++    const idx = box.findIndex(pred);
++    if (idx >= 0) {
++      const [hit] = box.splice(idx, 1);
++      clearInterval(timer);
++      resolve(hit);
++      return;
++    }
++    if (Date.now() - started > timeoutMs) {
++      clearInterval(timer);
++      reject(new Error('timeout waiting WS message'));
++    }
++  }, 12);
++});
++
++describe('Патч 470 — кнопка «Закрыть» рядом со «Свернуть», закрытие пустого контейнера и сохранение подключения для других игроков', () => {
++  beforeEach(async () => {
++    setCurrentLocale('ru-RU');
++    alertCalls.length = 0;
++    resetPromptedEmptySessionsForTests();
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++    await db.initDatabase();
++  });
++
++  it('если в комнате несколько игроков: забравший всё закрывается сразу, а у второго игрока подключение остаётся до его «Закрыть» (без подтверждения на пустом)', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const waitMsg = makeWaitMsg();
++
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++    const stopPersistence = startGmSessionPersistence();
++
++    const p1Box = [];
++    const p2Box = [];
++    const p1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-one:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p1Box.push(m),
++    });
++    const p2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-two:tab2',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p2Box.push(m),
++    });
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Лагерь рейдеров' });
++      const code = created.code;
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++      p1.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 1', role: 'player', requestId: 'j1' }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'j1');
++
++      p2.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 2', role: 'player', requestId: 'j2' }, code);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'j2');
++
++      const savedLoot = await db.saveGmContainer({
++        id: 'cnt_multi_viewer_empty',
++        kind: 'loot',
++        name: 'Сундук рейдеров',
++        roomCode: code,
++        roomName: 'Лагерь рейдеров',
++        items: [
++          { entryId: 'e1', itemId: 'chem_stimpak', itemType: 'chems', name: 'Стимулятор', quantity: 2, cost: 40, weight: 0 },
++        ],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: savedLoot.id,
++          kind: 'loot',
++          name: savedLoot.name,
++          targetType: 'room',
++          items: savedLoot.items,
++        },
++      });
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++
++      // Игрок 1 забирает всё из сундука:
++      // для Игрока 1 он помечается закрытым (closedByClientIds включает player-one:tab1),
++      // но т.к. Игрок 2 всё ещё смотрит в сундук — сессия остаётся активной для Игрока 2!
++      p1.send(ROOM_MESSAGE.SESSION_LOOT_TAKE, {
++        code,
++        sessionId: opened.sessionId,
++        characterId: 'char_p1',
++        takes: [{ entryId: 'e1', quantity: 2 }],
++        requestId: 'take-all-p1',
++      }, code);
++
++      const takeRes = await waitMsg(
++        p1Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-all-p1',
++      );
++      expect(takeRes.payload.granted).toHaveLength(1);
++      expect(takeRes.payload.session).not.toBeNull();
++      expect(takeRes.payload.session.items).toEqual([]);
++      expect(takeRes.payload.session.closedByClientIds).toContain('player-one:tab1');
++      expect(takeRes.payload.session.closedByClientIds).not.toContain('player-two:tab2');
++
++      // Игрок 2 получает обновлённое состояние пустого контейнера — его подключение не оборвано
++      const p2Update = await waitMsg(
++        p2Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && Array.isArray(m.payload?.session?.items) && m.payload.session.items.length === 0,
++      );
++      expect(p2Update.payload.session.sessionId).toBe(opened.sessionId);
++      expect(alertCalls).toHaveLength(0);
++
++      // Теперь Игрок 2 нажимает «Закрыть» на пустом контейнере — раздача сразу глушится целиком
++      p2.send(ROOM_MESSAGE.SESSION_PLAYER_CLOSE, {
++        code,
++        sessionId: opened.sessionId,
++        requestId: 'close-p2',
++      }, code);
++
++      const closeRes = await waitMsg(
++        p2Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.requestId === 'close-p2',
++      );
++      expect(closeRes.payload.session).toBeNull();
++      expect(closeRes.payload.closedReason).toBe('loot_emptied');
++
++      await new Promise((r) => setTimeout(r, 80));
++      expect(useRoomStore.getState().rooms[code]?.activeSession).toBeNull();
++      expect(alertCalls).toHaveLength(1);
++      expect(alertCalls[0].title).toBe('Контейнер пуст. Хотите удалить?');
++    } finally {
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      stopPersistence();
++      p1.close();
++      p2.close();
++      await app.close();
++    }
++  });
++
++  it('при непустом контейнере закрытие первым игроком сохраняет раздачу второму, а закрытие последним глушит раздачу с сохранением остатка у Мастера', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const waitMsg = makeWaitMsg();
++
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++    const stopPersistence = startGmSessionPersistence();
++
++    const p1Box = [];
++    const p2Box = [];
++    const p1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'partial-p1:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p1Box.push(m),
++    });
++    const p2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'partial-p2:tab2',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p2Box.push(m),
++    });
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Убежище 81' });
++      const code = created.code;
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++      p1.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 1', role: 'player', requestId: 'jp1' }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'jp1');
++
++      p2.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 2', role: 'player', requestId: 'jp2' }, code);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'jp2');
++
++      const savedLoot = await db.saveGmContainer({
++        id: 'cnt_partial_close',
++        kind: 'loot',
++        name: 'Шкафчик охраны',
++        roomCode: code,
++        roomName: 'Убежище 81',
++        items: [
++          { entryId: 'e1', itemId: 'ammo_10mm', itemType: 'ammo', name: 'Патрон 10 мм', quantity: 14, cost: 2, weight: 0 },
++          { entryId: 'e2', itemId: 'chem_radaway', itemType: 'chems', name: 'Антирадин', quantity: 1, cost: 80, weight: 0 },
++        ],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: savedLoot.id,
++          kind: 'loot',
++          name: savedLoot.name,
++          targetType: 'room',
++          items: savedLoot.items,
++        },
++      });
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++
++      // Игрок 1 забрал только патроны (остался Антирадин) и подтвердил «Закрыть»
++      p1.send(ROOM_MESSAGE.SESSION_LOOT_TAKE, {
++        code,
++        sessionId: opened.sessionId,
++        characterId: 'char_p1',
++        takes: [{ entryId: 'e1', quantity: 14 }],
++        requestId: 'take-ammo',
++      }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-ammo');
++
++      p1.send(ROOM_MESSAGE.SESSION_PLAYER_CLOSE, {
++        code,
++        sessionId: opened.sessionId,
++        requestId: 'close-p1-partial',
++      }, code);
++      const p1Close = await waitMsg(
++        p1Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.requestId === 'close-p1-partial',
++      );
++      // Игрок 2 ещё открыт -> сессия жива, но Игрок 1 записан в closedByClientIds
++      expect(p1Close.payload.session).not.toBeNull();
++      expect(p1Close.payload.session.closedByClientIds).toContain('partial-p1:tab1');
++      expect(p1Close.payload.session.items).toHaveLength(1);
++      expect(p1Close.payload.session.items[0].itemId).toBe('chem_radaway');
++
++      // Игрок 2 тоже решает не брать Антирадин и закрывает контейнер
++      p2.send(ROOM_MESSAGE.SESSION_PLAYER_CLOSE, {
++        code,
++        sessionId: opened.sessionId,
++        requestId: 'close-p2-partial',
++      }, code);
++      const p2Close = await waitMsg(
++        p2Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.requestId === 'close-p2-partial',
++      );
++      expect(p2Close.payload.session).toBeNull();
++      expect(p2Close.payload.closedReason).toBe('player_closed');
++
++      await new Promise((r) => setTimeout(r, 80));
++      expect(useRoomStore.getState().rooms[code]?.activeSession).toBeNull();
++
++      // Остаток (1 Антирадин) сохранён у Мастера, запрос на удаление пустого НЕ выскакивал
++      const storedAfter = await db.getGmContainerById(savedLoot.id);
++      expect(storedAfter.items).toHaveLength(1);
++      expect(storedAfter.items[0].itemId).toBe('chem_radaway');
++      expect(alertCalls).toHaveLength(0);
++    } finally {
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      stopPersistence();
++      p1.close();
++      p2.close();
++      await app.close();
++    }
++  });
++
++  it('если последний просматривающий игрок закрывает вкладку (disconnect), опустевшая/закрытая остальными раздача автоматически завершается', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const waitMsg = makeWaitMsg();
++
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++    const stopPersistence = startGmSessionPersistence();
++
++    const p1Box = [];
++    const p2Box = [];
++    const p1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'disc-p1:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p1Box.push(m),
++    });
++    const p2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'disc-p2:tab2',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p2Box.push(m),
++    });
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Конкорд' });
++      const code = created.code;
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++      p1.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 1', role: 'player', requestId: 'jd1' }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'jd1');
++
++      p2.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок 2', role: 'player', requestId: 'jd2' }, code);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'jd2');
++
++      const savedLoot = await db.saveGmContainer({
++        id: 'cnt_disconnect_cleanup',
++        kind: 'loot',
++        name: 'Сумка курьера',
++        roomCode: code,
++        roomName: 'Конкорд',
++        items: [{ entryId: 'e1', itemId: 'caps', itemType: 'caps', name: 'Крышки', quantity: 50, cost: 1, weight: 0 }],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: savedLoot.id,
++          kind: 'loot',
++          name: savedLoot.name,
++          targetType: 'room',
++          items: savedLoot.items,
++        },
++      });
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++
++      // Игрок 1 забирает все 50 крышек
++      p1.send(ROOM_MESSAGE.SESSION_LOOT_TAKE, {
++        code,
++        sessionId: opened.sessionId,
++        characterId: 'char_p1',
++        takes: [{ entryId: 'e1', quantity: 50 }],
++        requestId: 'take-caps',
++      }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-caps');
++
++      // Игрок 2 закрывает вкладку (отключается от комнаты) -> раздача автоматически гасится
++      p2.close();
++      await new Promise((r) => setTimeout(r, 100));
++
++      expect(useRoomStore.getState().rooms[code]?.activeSession).toBeNull();
++      expect(alertCalls).toHaveLength(1);
++      expect(alertCalls[0].title).toBe('Контейнер пуст. Хотите удалить?');
++    } finally {
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      stopPersistence();
++      p1.close();
++      p2.close();
++      await app.close();
++    }
++  });
++
++  it('в UI контейнера игрока рядом с кнопкой «Свернуть» размещена кнопка «Закрыть» с проверкой «Вы не всё забрали, уверены, что хотите закрыть?»', () => {
++    setCurrentLocale('ru-RU');
++    expect(tLootTrade('player.minimize')).toBe('Свернуть');
++    expect(tLootTrade('player.close')).toBe('Закрыть');
++    expect(tLootTrade('player.closeLootConfirmMessage')).toBe(
++      'Вы не всё забрали, уверены, что хотите закрыть?',
++    );
++
++    const overlaySrc = fs.readFileSync(
++      path.join(repoRoot, 'components/lootTrade/PlayerLootTradeOverlay.js'),
++      'utf8',
++    );
++    expect(overlaySrc).toContain('headerActionsRow');
++    expect(overlaySrc).toContain("tLootTrade('player.minimize')");
++    expect(overlaySrc).toContain("tLootTrade('player.close')");
++    expect(overlaySrc).toContain("tLootTrade('player.closeLootConfirmMessage')");
++    expect(overlaySrc).toContain('handleCloseLootPress');
++    expect(overlaySrc).toContain('markSessionClosedLocally');
++    expect(overlaySrc).toContain('closedByClientIds');
++  });
++});
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 1050d53..3282131 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -66,6 +66,7 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const rooms = useRoomStore((s) => s.rooms);
+   const roomStatus = useRoomStore((s) => s.status);
++  const myClientId = useRoomStore((s) => s.clientId);
+ 
+   const currentCharacterId = useCharacterStore((s) => s.currentCharacterId);
+   const storeItems = useCharacterStore((s) => s.items);
+@@ -74,6 +75,7 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const [bindings, setBindings] = useState([]); // [{ characterId, code, name }]
+   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
++  const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
+   const [busy, setBusy] = useState(false);
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+ 
+@@ -81,6 +83,12 @@ export default function PlayerLootTradeOverlay() {
+   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
+   const [sellBuffer, setSellBuffer] = useState({}); // { [playerItemId]: qty }
+ 
++  const markSessionClosedLocally = useCallback((sessionId) => {
++    if (!sessionId) return;
++    setClosedSessionIds((prev) => (prev[sessionId] ? prev : { ...prev, [sessionId]: true }));
++    setMinimizedSessionId((prev) => (prev === sessionId ? null : prev));
++  }, []);
++
+   const refreshBindings = useCallback(async () => {
+     if (isGmMode) return;
+     try {
+@@ -122,6 +130,14 @@ export default function PlayerLootTradeOverlay() {
+       const room = rooms[bind.code];
+       const session = room?.activeSession;
+       if (!session) continue;
++      if (closedSessionIds[session.sessionId]) continue;
++      if (
++        myClientId
++        && Array.isArray(session.closedByClientIds)
++        && session.closedByClientIds.includes(myClientId)
++      ) {
++        continue;
++      }
+       if (session.targetType === 'room' || session.targetCharacterId === bind.characterId) {
+         return {
+           roomCode: bind.code,
+@@ -133,7 +149,7 @@ export default function PlayerLootTradeOverlay() {
+       }
+     }
+     return null;
+-  }, [isGmMode, bindings, rooms, currentCharacterId]);
++  }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+ 
+   const activeSession = matchedContext?.session || null;
+ 
+@@ -261,21 +277,44 @@ export default function PlayerLootTradeOverlay() {
+   // ── Обработчики КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────────
+ 
+   const handleTakeLoot = async (takes) => {
+-    if (busy || !takes.length) return;
++    if (busy || !takes.length || !activeSession || !matchedContext) return;
++    const targetSessionId = activeSession.sessionId;
++    const targetRoomCode = matchedContext.roomCode;
++    const targetCharacterId = matchedContext.characterId;
+     setBusy(true);
+     try {
+-      const { granted } = await useRoomStore.getState().takeFromLootSession({
+-        code: matchedContext.roomCode,
+-        sessionId: activeSession.sessionId,
+-        characterId: matchedContext.characterId,
+-        takes,
+-      });
++      const { granted, session: updatedSession, closedReason } =
++        await useRoomStore.getState().takeFromLootSession({
++          code: targetRoomCode,
++          sessionId: targetSessionId,
++          characterId: targetCharacterId,
++          takes,
++        });
+       if (granted?.length) {
+         grantLootEntriesToCharacter(granted);
+         setTimeout(() => {
+-          void pushSavedCharacterToBoundRoomIfAny(matchedContext.characterId);
++          void pushSavedCharacterToBoundRoomIfAny(targetCharacterId);
+         }, 650);
+       }
++
++      const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
++      const emptiedByThisTake =
++        Boolean(granted?.length)
++        && Array.isArray(updatedSession?.items)
++        && updatedSession.items.length === 0;
++
++      if (sessionClosedOnServer || emptiedByThisTake) {
++        markSessionClosedLocally(targetSessionId);
++        if (
++          updatedSession
++          && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
++        ) {
++          void useRoomStore.getState().playerCloseRoomSession({
++            code: targetRoomCode,
++            sessionId: targetSessionId,
++          }).catch(() => {});
++        }
++      }
+     } catch (error) {
+       debugLog('playerOverlay.lootTake:failed', { message: error?.message });
+     } finally {
+@@ -283,6 +322,44 @@ export default function PlayerLootTradeOverlay() {
+     }
+   };
+ 
++  const performPlayerLootClose = async () => {
++    if (!activeSession || !matchedContext) return;
++    const targetSessionId = activeSession.sessionId;
++    const targetRoomCode = matchedContext.roomCode;
++    markSessionClosedLocally(targetSessionId);
++    try {
++      await useRoomStore.getState().playerCloseRoomSession({
++        code: targetRoomCode,
++        sessionId: targetSessionId,
++      });
++    } catch (error) {
++      debugLog('playerOverlay.playerClose:failed', { message: error?.message });
++    }
++  };
++
++  const handleCloseLootPress = () => {
++    if (busy || !activeSession) return;
++    const remainingCount = Array.isArray(activeSession.items) ? activeSession.items.length : 0;
++    if (remainingCount > 0) {
++      showRawAlert({
++        title: tLootTrade('player.closeLootConfirmTitle'),
++        message: tLootTrade('player.closeLootConfirmMessage'),
++        buttons: [
++          { text: tLootTrade('form.cancel'), style: 'cancel' },
++          {
++            text: tLootTrade('player.close'),
++            style: 'destructive',
++            onPress: () => {
++              void performPlayerLootClose();
++            },
++          },
++        ],
++      });
++      return;
++    }
++    void performPlayerLootClose();
++  };
++
+   // ── Обработчики ТОРГОВЦА (буфер обмена) ───────────────────────────────────
+ 
+   const addToBuyBuffer = (entry, delta) => {
+@@ -420,12 +497,22 @@ export default function PlayerLootTradeOverlay() {
+                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
+                 <Text style={styles.modalTitle}>{activeSession.name}</Text>
+               </View>
+-              <TouchableOpacity
+-                style={styles.minimizeBtn}
+-                onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+-              >
+-                <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+-              </TouchableOpacity>
++              <View style={styles.headerActionsRow}>
++                <TouchableOpacity
++                  style={styles.minimizeBtn}
++                  disabled={busy}
++                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
++                >
++                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
++                </TouchableOpacity>
++                <TouchableOpacity
++                  style={[styles.closeContainerBtn, busy && styles.disabledBtn]}
++                  disabled={busy}
++                  onPress={handleCloseLootPress}
++                >
++                  <Text style={styles.closeContainerBtnText}>{tLootTrade('player.close')}</Text>
++                </TouchableOpacity>
++              </View>
+             </View>
+ 
+             {Boolean(activeSession.description) && (
+@@ -973,6 +1060,11 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+     flexShrink: 1,
+   },
++  headerActionsRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++  },
+   minimizeBtn: {
+     paddingHorizontal: 13,
+     paddingVertical: 7,
+@@ -986,6 +1078,19 @@ const styles = StyleSheet.create({
+     fontSize: 12,
+     fontWeight: '600',
+   },
++  closeContainerBtn: {
++    paddingHorizontal: 13,
++    paddingVertical: 7,
++    borderRadius: 6,
++    borderWidth: 1,
++    borderColor: '#e57373',
++    backgroundColor: '#4a1f1f',
++  },
++  closeContainerBtnText: {
++    color: '#f5bcbc',
++    fontSize: 12,
++    fontWeight: '700',
++  },
+   modalDesc: {
+     color: '#cccccc',
+     fontSize: 13,
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 0c2ad0c..042e885 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -130,6 +130,9 @@
+     "minimizedMerchant": "💰 Merchant: {name}",
+     "openForBoundChar": "Open for «{charName}»",
+     "minimize": "Minimize",
++    "close": "Close",
++    "closeLootConfirmTitle": "Close container?",
++    "closeLootConfirmMessage": "You haven't taken everything. Are you sure you want to close it?",
+     "lootEmpty": "Container is empty — everything has been taken.",
+     "takeOne": "Take 1",
+     "takeAllRow": "All ({qty})",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 62becaf..d5ee6b8 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -130,6 +130,9 @@
+     "minimizedMerchant": "💰 Торговец: {name}",
+     "openForBoundChar": "Открыть для «{charName}»",
+     "minimize": "Свернуть",
++    "close": "Закрыть",
++    "closeLootConfirmTitle": "Закрыть контейнер?",
++    "closeLootConfirmMessage": "Вы не всё забрали, уверены, что хотите закрыть?",
+     "lootEmpty": "Контейнер пуст — всё уже разобрали.",
+     "takeOne": "Взять 1",
+     "takeAllRow": "Все ({qty})",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index af43678..1f819f8 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "469"
++  "baseline": "470"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3bbed77..34c1e42 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "469",
++  "version": "470",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 37ea1c5..c74c6e8 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -119,6 +119,9 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+   const items = Array.isArray(raw.items)
+     ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
+     : [];
++  const closedByClientIds = Array.isArray(raw.closedByClientIds)
++    ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
++    : [];
+ 
+   return {
+     sessionId: String(raw.sessionId || `ses_${now}_${Math.random().toString(36).slice(2, 8)}`),
+@@ -136,6 +139,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+       : 50,
+     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+     items,
++    closedByClientIds,
+     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
+     openedAt: Number(raw.openedAt) || now,
+     updatedAt: now,
+@@ -216,6 +220,9 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+     ...session,
+     characterOverrides: { ...(session.characterOverrides || {}) },
+     items: session.items.map((item) => ({ ...item })),
++    closedByClientIds: Array.isArray(session.closedByClientIds)
++      ? [...session.closedByClientIds]
++      : [],
+     revision: session.revision + 1,
+     updatedAt: now,
+   };
+@@ -320,6 +327,9 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+   const nextSession = {
+     ...session,
+     items: remaining,
++    closedByClientIds: Array.isArray(session.closedByClientIds)
++      ? [...session.closedByClientIds]
++      : [],
+     revision: session.revision + 1,
+     updatedAt: now,
+   };
+diff --git a/server/protocol.js b/server/protocol.js
+index 6d612ef..f85ec36 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -26,6 +26,7 @@ const MESSAGE = Object.freeze({
+   SESSION_STATE: 'session.state',
+   SESSION_UPDATE_RATES: 'session.updateRates',
+   SESSION_CLOSE: 'session.close',
++  SESSION_PLAYER_CLOSE: 'session.playerClose',
+   SESSION_LOOT_TAKE: 'session.lootTake',
+   SESSION_TRADE_COMMIT: 'session.tradeCommit',
+   ERROR: 'error',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index d4449c7..c875532 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -138,12 +138,47 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, state: roomSnapshot(room) };
+   };
+ 
++  /**
++   * Проверяет, остались ли в комнате другие подключённые игроки, у которых
++   * ещё открыт данный контейнер добычи (не считая Мастера и уже закрывших).
++   */
++  const hasRemainingActiveLootViewers = (room, session, closedSet) => {
++    if (!room || !session || session.kind !== 'loot') return false;
++    if (session.targetType === 'character') return false;
++    for (const member of room.members.values()) {
++      if (!member || member.role !== 'player') continue;
++      if (member.clientId === room.ownerClientId) continue;
++      if (closedSet.has(member.clientId)) continue;
++      return true;
++    }
++    return false;
++  };
++
+   const leaveRoom = ({ code, clientId }) => {
+     const room = rooms.get(code);
+-    if (!room) return { room: null, left: false };
++    if (!room) return { room: null, left: false, closedSession: null, closedReason: null };
+     const left = room.members.delete(clientId);
+     if (room.members.size === 0) room.emptySince = now();
+-    return { room, left };
++
++    let closedSession = null;
++    let closedReason = null;
++    const current = room.activeSession;
++    if (left && current && current.kind === 'loot') {
++      const closedSet = new Set(current.closedByClientIds || []);
++      const hadPreviousCloseOrEmpty = closedSet.size > 0 || current.items.length === 0;
++      if (hadPreviousCloseOrEmpty && !hasRemainingActiveLootViewers(room, current, closedSet)) {
++        closedSession = {
++          ...current,
++          closedByClientIds: [...closedSet],
++          revision: current.revision + 1,
++          updatedAt: now(),
++        };
++        closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
++        room.activeSession = null;
++      }
++    }
++
++    return { room, left, closedSession, closedReason };
+   };
+ 
+   /** Последний снапшот персонажа в комнате (LWW по revision; snapshot=null/removed удаляет). */
+@@ -214,6 +249,58 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, session: null, closedSession: previous };
+   };
+ 
++  /**
++   * Закрытие контейнера добычи по инициативе игрока.
++   * Если другие игроки комнаты ещё просматривают контейнер — подключение для них
++   * сохраняется, а закрывший игрок отмечается в closedByClientIds.
++   * Если больше никто из игроков в контейнер не смотрит — раздача глушится целиком.
++   */
++  const playerCloseSession = ({ code, clientId, sessionId = null }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const current = room.activeSession;
++    if (!current) {
++      return { room, session: null, closedSession: null, closedReason: null };
++    }
++    if (sessionId && current.sessionId !== String(sessionId)) {
++      return { room, session: current, closedSession: null, closedReason: null };
++    }
++
++    const closedSet = new Set(current.closedByClientIds || []);
++    closedSet.add(clientId);
++
++    if (current.kind === 'loot' && !hasRemainingActiveLootViewers(room, current, closedSet)) {
++      const closedSession = {
++        ...current,
++        closedByClientIds: [...closedSet],
++        revision: current.revision + 1,
++        updatedAt: now(),
++      };
++      const closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
++      room.activeSession = null;
++      return {
++        room,
++        session: null,
++        closedSession,
++        closedReason,
++      };
++    }
++
++    const nextSession = {
++      ...current,
++      closedByClientIds: [...closedSet],
++      revision: current.revision + 1,
++      updatedAt: now(),
++    };
++    room.activeSession = nextSession;
++    return {
++      room,
++      session: nextSession,
++      closedSession: null,
++      closedReason: null,
++    };
++  };
++
+   /** Атомарное взятие предметов игроком из контейнера добычи. */
+   const lootTake = ({ code, clientId, payload }) => {
+     const room = rooms.get(code);
+@@ -223,21 +310,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const result = applyAtomicLootTake(room.activeSession, payload, now());
+     if (result.error) return result;
+ 
+-    // Если из контейнера добычи забрали весь лут — автоматически закрываем контейнер и раздачу.
+-    const autoClosed = Boolean(
++    // Если из контейнера добычи забрали весь лут — закрываем его у забравшего игрока,
++    // а если других активных игроков-зрителей нет — сразу глушим всю раздачу.
++    const emptiedByTake = Boolean(
+       result.session
+       && result.session.kind === 'loot'
+       && result.session.items.length === 0
+       && (hadItemsBefore || result.granted.length > 0),
+     );
+-    if (autoClosed) {
+-      room.activeSession = null;
++    if (emptiedByTake) {
++      const closedSet = new Set(result.session.closedByClientIds || []);
++      closedSet.add(clientId);
++      if (!hasRemainingActiveLootViewers(room, result.session, closedSet)) {
++        const closedSession = {
++          ...result.session,
++          closedByClientIds: [...closedSet],
++        };
++        room.activeSession = null;
++        return {
++          room,
++          granted: result.granted,
++          session: null,
++          closedSession,
++          autoClosedReason: 'loot_emptied',
++        };
++      }
++      const updatedSession = {
++        ...result.session,
++        closedByClientIds: [...closedSet],
++      };
++      room.activeSession = updatedSession;
+       return {
+         room,
+         granted: result.granted,
+-        session: null,
+-        closedSession: result.session,
+-        autoClosedReason: 'loot_emptied',
++        session: updatedSession,
+       };
+     }
+ 
+@@ -281,6 +387,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     openSession,
+     updateSession,
+     closeSession,
++    playerCloseSession,
+     lootTake,
+     tradeCommit,
+     sweep,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 6a5a40d..1033154 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -412,9 +412,19 @@ const attachRoomWebSocketServer = (httpServer, {
+         case MESSAGE.ROOM_LEAVE: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) break;
+-          const { room, left } = registry.leaveRoom({ code: canonical, clientId });
++          const { room, left, closedSession, closedReason } = registry.leaveRoom({ code: canonical, clientId });
+           ws.meta.rooms.delete(canonical);
+-          if (left && room) broadcastMembers(room, clientId);
++          if (left && room) {
++            broadcastMembers(room, clientId);
++            if (closedSession) {
++              broadcastToRoom(room, clientId, MESSAGE.SESSION_STATE, {
++                session: null,
++                closedContainerId: closedSession.containerId || null,
++                closedSession,
++                closedReason: closedReason || null,
++              });
++            }
++          }
+           break;
+         }
+ 
+@@ -555,6 +565,40 @@ const attachRoomWebSocketServer = (httpServer, {
+           break;
+         }
+ 
++        case MESSAGE.SESSION_PLAYER_CLOSE: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.playerCloseSession({
++            code: canonical,
++            clientId,
++            sessionId: payload.sessionId || null,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          const closeMeta = result.closedSession
++            ? {
++                closedContainerId: result.closedSession.containerId || null,
++                closedSession: result.closedSession,
++                closedReason: result.closedReason || null,
++              }
++            : {};
++          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
++            session: result.session,
++            ...closeMeta,
++            requestId: payload.requestId || null,
++          }, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
++            session: result.session,
++            ...closeMeta,
++          });
++          break;
++        }
++
+         case MESSAGE.SESSION_LOOT_TAKE: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) {
+@@ -634,8 +678,21 @@ const attachRoomWebSocketServer = (httpServer, {
+     ws.on('close', () => {
+       if (!ws.meta.clientId) return;
+       for (const code of ws.meta.rooms) {
+-        const { room, left } = registry.leaveRoom({ code, clientId: ws.meta.clientId });
+-        if (left && room) broadcastMembers(room, ws.meta.clientId);
++        const { room, left, closedSession, closedReason } = registry.leaveRoom({
++          code,
++          clientId: ws.meta.clientId,
++        });
++        if (left && room) {
++          broadcastMembers(room, ws.meta.clientId);
++          if (closedSession) {
++            broadcastToRoom(room, ws.meta.clientId, MESSAGE.SESSION_STATE, {
++              session: null,
++              closedContainerId: closedSession.containerId || null,
++              closedSession,
++              closedReason: closedReason || null,
++            });
++          }
++        }
+       }
+       ws.meta.rooms.clear();
+     });
+@@ -686,8 +743,12 @@ const createRoomServer = ({
+   });
+ 
+   const close = () => new Promise((resolve) => {
+-    closeWs().then(() => server.close(() => resolve()));
+-    // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
++    closeWs().then(() => {
++      if (typeof server.closeAllConnections === 'function') {
++        server.closeAllConnections();
++      }
++      server.close(() => resolve());
++    });
+   });
+ 
+   return { server, wss, registry, start, close };
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index f79792a..59a2ab5 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -22,6 +22,7 @@ export const ROOM_MESSAGE = {
+   SESSION_STATE: 'session.state',
+   SESSION_UPDATE_RATES: 'session.updateRates',
+   SESSION_CLOSE: 'session.close',
++  SESSION_PLAYER_CLOSE: 'session.playerClose',
+   SESSION_LOOT_TAKE: 'session.lootTake',
+   SESSION_TRADE_COMMIT: 'session.tradeCommit',
+   ERROR: 'error',
+@@ -72,6 +73,7 @@ export interface ActiveLootTradeSession {
+     buyDepreciationPercent?: number;
+   }>;
+   items: ActiveLootTradeItem[];
++  closedByClientIds?: string[];
+   revision: number;
+   openedAt: number;
+   updatedAt: number;
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index b49aa8b..2920ffb 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -50,6 +50,7 @@ interface JoinRoomResult {
+ 
+ interface RoomStoreState {
+   status: RoomConnectionStatus;
++  clientId: string | null;
+   rooms: Record<string, RoomStateEntry>;
+   lastError: string | null;
+   connect: () => Promise<void>;
+@@ -96,6 +97,13 @@ interface RoomStoreState {
+     code: string;
+     sessionId?: string | null;
+   }) => Promise<void>;
++  playerCloseRoomSession: (input: {
++    code: string;
++    sessionId?: string | null;
++  }) => Promise<{
++    session: ActiveLootTradeSession | null;
++    closedReason?: string | null;
++  }>;
+   takeFromLootSession: (input: {
+     code: string;
+     sessionId: string;
+@@ -207,6 +215,7 @@ export const resetRoomClientForTests = () => {
+   client = null; connectPromise = null; clientIdPromise = null;
+   pendingRequests.forEach(({ timer, reject }) => { clearTimeout(timer); reject(new Error('RESET')); });
+   pendingRequests.clear();
++  try { useRoomStore.setState({ clientId: null }); } catch { /* до инициализации */ }
+ };
+ 
+ export const useRoomStore = create<RoomStoreState>((set, get) => {
+@@ -332,6 +341,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     if (!url) throw new Error('ROOM_SERVER_NOT_CONFIGURED');
+     if (client) return client;
+     const clientId = await getRoomClientId();
++    if (get().clientId !== clientId) {
++      set({ clientId });
++    }
+     const factory = clientFactory || ((input: any) => createRoomClient({
+       url: input.url,
+       clientId: input.clientId,
+@@ -381,6 +393,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+ 
+   return {
+     status: 'offline',
++    clientId: null,
+     rooms: {},
+     lastError: null,
+ 
+@@ -553,6 +566,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       );
+     },
+ 
++    playerCloseRoomSession: async ({ code, sessionId = null }) => {
++      try {
++        const response = await sendRequest(
++          ROOM_MESSAGE.SESSION_PLAYER_CLOSE,
++          { code, sessionId },
++          code,
++        );
++        return {
++          session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
++          closedReason: response.payload?.closedReason || null,
++        };
++      } catch (error) {
++        const errCode = (error as any)?.code || (error as Error)?.message;
++        if (errCode === 'UNKNOWN_TYPE') {
++          const current = get().rooms[code];
++          if (current && (!sessionId || current.activeSession?.sessionId === sessionId)) {
++            set({
++              rooms: {
++                ...get().rooms,
++                [code]: { ...current, activeSession: null },
++              },
++            });
++          }
++          return { session: null, closedReason: null };
++        }
++        throw error;
++      }
++    },
++
+     takeFromLootSession: async ({ code, sessionId, characterId, takes }) => {
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_LOOT_TAKE,

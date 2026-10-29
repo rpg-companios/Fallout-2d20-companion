@@ -138,12 +138,47 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, state: roomSnapshot(room) };
   };
 
+  /**
+   * Проверяет, остались ли в комнате другие подключённые игроки, у которых
+   * ещё открыт данный контейнер добычи (не считая Мастера и уже закрывших).
+   */
+  const hasRemainingActiveLootViewers = (room, session, closedSet) => {
+    if (!room || !session || session.kind !== 'loot') return false;
+    if (session.targetType === 'character') return false;
+    for (const member of room.members.values()) {
+      if (!member || member.role !== 'player') continue;
+      if (member.clientId === room.ownerClientId) continue;
+      if (closedSet.has(member.clientId)) continue;
+      return true;
+    }
+    return false;
+  };
+
   const leaveRoom = ({ code, clientId }) => {
     const room = rooms.get(code);
-    if (!room) return { room: null, left: false };
+    if (!room) return { room: null, left: false, closedSession: null, closedReason: null };
     const left = room.members.delete(clientId);
     if (room.members.size === 0) room.emptySince = now();
-    return { room, left };
+
+    let closedSession = null;
+    let closedReason = null;
+    const current = room.activeSession;
+    if (left && current && current.kind === 'loot') {
+      const closedSet = new Set(current.closedByClientIds || []);
+      const hadPreviousCloseOrEmpty = closedSet.size > 0 || current.items.length === 0;
+      if (hadPreviousCloseOrEmpty && !hasRemainingActiveLootViewers(room, current, closedSet)) {
+        closedSession = {
+          ...current,
+          closedByClientIds: [...closedSet],
+          revision: current.revision + 1,
+          updatedAt: now(),
+        };
+        closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
+        room.activeSession = null;
+      }
+    }
+
+    return { room, left, closedSession, closedReason };
   };
 
   /** Последний снапшот персонажа в комнате (LWW по revision; snapshot=null/removed удаляет). */
@@ -214,6 +249,58 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, session: null, closedSession: previous };
   };
 
+  /**
+   * Закрытие контейнера добычи по инициативе игрока.
+   * Если другие игроки комнаты ещё просматривают контейнер — подключение для них
+   * сохраняется, а закрывший игрок отмечается в closedByClientIds.
+   * Если больше никто из игроков в контейнер не смотрит — раздача глушится целиком.
+   */
+  const playerCloseSession = ({ code, clientId, sessionId = null }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const current = room.activeSession;
+    if (!current) {
+      return { room, session: null, closedSession: null, closedReason: null };
+    }
+    if (sessionId && current.sessionId !== String(sessionId)) {
+      return { room, session: current, closedSession: null, closedReason: null };
+    }
+
+    const closedSet = new Set(current.closedByClientIds || []);
+    closedSet.add(clientId);
+
+    if (current.kind === 'loot' && !hasRemainingActiveLootViewers(room, current, closedSet)) {
+      const closedSession = {
+        ...current,
+        closedByClientIds: [...closedSet],
+        revision: current.revision + 1,
+        updatedAt: now(),
+      };
+      const closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
+      room.activeSession = null;
+      return {
+        room,
+        session: null,
+        closedSession,
+        closedReason,
+      };
+    }
+
+    const nextSession = {
+      ...current,
+      closedByClientIds: [...closedSet],
+      revision: current.revision + 1,
+      updatedAt: now(),
+    };
+    room.activeSession = nextSession;
+    return {
+      room,
+      session: nextSession,
+      closedSession: null,
+      closedReason: null,
+    };
+  };
+
   /** Атомарное взятие предметов игроком из контейнера добычи. */
   const lootTake = ({ code, clientId, payload }) => {
     const room = rooms.get(code);
@@ -223,21 +310,40 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const result = applyAtomicLootTake(room.activeSession, payload, now());
     if (result.error) return result;
 
-    // Если из контейнера добычи забрали весь лут — автоматически закрываем контейнер и раздачу.
-    const autoClosed = Boolean(
+    // Если из контейнера добычи забрали весь лут — закрываем его у забравшего игрока,
+    // а если других активных игроков-зрителей нет — сразу глушим всю раздачу.
+    const emptiedByTake = Boolean(
       result.session
       && result.session.kind === 'loot'
       && result.session.items.length === 0
       && (hadItemsBefore || result.granted.length > 0),
     );
-    if (autoClosed) {
-      room.activeSession = null;
+    if (emptiedByTake) {
+      const closedSet = new Set(result.session.closedByClientIds || []);
+      closedSet.add(clientId);
+      if (!hasRemainingActiveLootViewers(room, result.session, closedSet)) {
+        const closedSession = {
+          ...result.session,
+          closedByClientIds: [...closedSet],
+        };
+        room.activeSession = null;
+        return {
+          room,
+          granted: result.granted,
+          session: null,
+          closedSession,
+          autoClosedReason: 'loot_emptied',
+        };
+      }
+      const updatedSession = {
+        ...result.session,
+        closedByClientIds: [...closedSet],
+      };
+      room.activeSession = updatedSession;
       return {
         room,
         granted: result.granted,
-        session: null,
-        closedSession: result.session,
-        autoClosedReason: 'loot_emptied',
+        session: updatedSession,
       };
     }
 
@@ -281,6 +387,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     openSession,
     updateSession,
     closeSession,
+    playerCloseSession,
     lootTake,
     tradeCommit,
     sweep,

@@ -26,6 +26,7 @@ const MESSAGE = Object.freeze({
   SESSION_STATE: 'session.state',
   SESSION_UPDATE_RATES: 'session.updateRates',
   SESSION_CLOSE: 'session.close',
+  SESSION_PLAYER_CLOSE: 'session.playerClose',
   SESSION_LOOT_TAKE: 'session.lootTake',
   SESSION_TRADE_COMMIT: 'session.tradeCommit',
   ERROR: 'error',

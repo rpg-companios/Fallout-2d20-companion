@@ -50,6 +50,7 @@ interface JoinRoomResult {
 
 interface RoomStoreState {
   status: RoomConnectionStatus;
+  clientId: string | null;
   rooms: Record<string, RoomStateEntry>;
   lastError: string | null;
   connect: () => Promise<void>;
@@ -96,6 +97,13 @@ interface RoomStoreState {
     code: string;
     sessionId?: string | null;
   }) => Promise<void>;
+  playerCloseRoomSession: (input: {
+    code: string;
+    sessionId?: string | null;
+  }) => Promise<{
+    session: ActiveLootTradeSession | null;
+    closedReason?: string | null;
+  }>;
   takeFromLootSession: (input: {
     code: string;
     sessionId: string;
@@ -207,6 +215,7 @@ export const resetRoomClientForTests = () => {
   client = null; connectPromise = null; clientIdPromise = null;
   pendingRequests.forEach(({ timer, reject }) => { clearTimeout(timer); reject(new Error('RESET')); });
   pendingRequests.clear();
+  try { useRoomStore.setState({ clientId: null }); } catch { /* до инициализации */ }
 };
 
 export const useRoomStore = create<RoomStoreState>((set, get) => {
@@ -332,6 +341,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     if (!url) throw new Error('ROOM_SERVER_NOT_CONFIGURED');
     if (client) return client;
     const clientId = await getRoomClientId();
+    if (get().clientId !== clientId) {
+      set({ clientId });
+    }
     const factory = clientFactory || ((input: any) => createRoomClient({
       url: input.url,
       clientId: input.clientId,
@@ -381,6 +393,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
 
   return {
     status: 'offline',
+    clientId: null,
     rooms: {},
     lastError: null,
 
@@ -551,6 +564,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         { code, sessionId },
         code,
       );
+    },
+
+    playerCloseRoomSession: async ({ code, sessionId = null }) => {
+      try {
+        const response = await sendRequest(
+          ROOM_MESSAGE.SESSION_PLAYER_CLOSE,
+          { code, sessionId },
+          code,
+        );
+        return {
+          session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
+          closedReason: response.payload?.closedReason || null,
+        };
+      } catch (error) {
+        const errCode = (error as any)?.code || (error as Error)?.message;
+        if (errCode === 'UNKNOWN_TYPE') {
+          const current = get().rooms[code];
+          if (current && (!sessionId || current.activeSession?.sessionId === sessionId)) {
+            set({
+              rooms: {
+                ...get().rooms,
+                [code]: { ...current, activeSession: null },
+              },
+            });
+          }
+          return { session: null, closedReason: null };
+        }
+        throw error;
+      }
     },
 
     takeFromLootSession: async ({ code, sessionId, characterId, takes }) => {

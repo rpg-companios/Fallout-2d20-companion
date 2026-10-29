@@ -119,6 +119,9 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
   const items = Array.isArray(raw.items)
     ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
     : [];
+  const closedByClientIds = Array.isArray(raw.closedByClientIds)
+    ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
+    : [];
 
   return {
     sessionId: String(raw.sessionId || `ses_${now}_${Math.random().toString(36).slice(2, 8)}`),
@@ -136,6 +139,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
     items,
+    closedByClientIds,
     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
     openedAt: Number(raw.openedAt) || now,
     updatedAt: now,
@@ -216,6 +220,9 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
     ...session,
     characterOverrides: { ...(session.characterOverrides || {}) },
     items: session.items.map((item) => ({ ...item })),
+    closedByClientIds: Array.isArray(session.closedByClientIds)
+      ? [...session.closedByClientIds]
+      : [],
     revision: session.revision + 1,
     updatedAt: now,
   };
@@ -320,6 +327,9 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
   const nextSession = {
     ...session,
     items: remaining,
+    closedByClientIds: Array.isArray(session.closedByClientIds)
+      ? [...session.closedByClientIds]
+      : [],
     revision: session.revision + 1,
     updatedAt: now,
   };

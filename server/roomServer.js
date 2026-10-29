@@ -412,9 +412,19 @@ const attachRoomWebSocketServer = (httpServer, {
         case MESSAGE.ROOM_LEAVE: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) break;
-          const { room, left } = registry.leaveRoom({ code: canonical, clientId });
+          const { room, left, closedSession, closedReason } = registry.leaveRoom({ code: canonical, clientId });
           ws.meta.rooms.delete(canonical);
-          if (left && room) broadcastMembers(room, clientId);
+          if (left && room) {
+            broadcastMembers(room, clientId);
+            if (closedSession) {
+              broadcastToRoom(room, clientId, MESSAGE.SESSION_STATE, {
+                session: null,
+                closedContainerId: closedSession.containerId || null,
+                closedSession,
+                closedReason: closedReason || null,
+              });
+            }
+          }
           break;
         }
 
@@ -555,6 +565,40 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        case MESSAGE.SESSION_PLAYER_CLOSE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.playerCloseSession({
+            code: canonical,
+            clientId,
+            sessionId: payload.sessionId || null,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          const closeMeta = result.closedSession
+            ? {
+                closedContainerId: result.closedSession.containerId || null,
+                closedSession: result.closedSession,
+                closedReason: result.closedReason || null,
+              }
+            : {};
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            ...closeMeta,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            ...closeMeta,
+          });
+          break;
+        }
+
         case MESSAGE.SESSION_LOOT_TAKE: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) {
@@ -634,8 +678,21 @@ const attachRoomWebSocketServer = (httpServer, {
     ws.on('close', () => {
       if (!ws.meta.clientId) return;
       for (const code of ws.meta.rooms) {
-        const { room, left } = registry.leaveRoom({ code, clientId: ws.meta.clientId });
-        if (left && room) broadcastMembers(room, ws.meta.clientId);
+        const { room, left, closedSession, closedReason } = registry.leaveRoom({
+          code,
+          clientId: ws.meta.clientId,
+        });
+        if (left && room) {
+          broadcastMembers(room, ws.meta.clientId);
+          if (closedSession) {
+            broadcastToRoom(room, ws.meta.clientId, MESSAGE.SESSION_STATE, {
+              session: null,
+              closedContainerId: closedSession.containerId || null,
+              closedSession,
+              closedReason: closedReason || null,
+            });
+          }
+        }
       }
       ws.meta.rooms.clear();
     });
@@ -686,8 +743,12 @@ const createRoomServer = ({
   });
 
   const close = () => new Promise((resolve) => {
-    closeWs().then(() => server.close(() => resolve()));
-    // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
+    closeWs().then(() => {
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+      server.close(() => resolve());
+    });
   });
 
   return { server, wss, registry, start, close };

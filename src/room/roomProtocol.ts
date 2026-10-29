@@ -22,6 +22,7 @@ export const ROOM_MESSAGE = {
   SESSION_STATE: 'session.state',
   SESSION_UPDATE_RATES: 'session.updateRates',
   SESSION_CLOSE: 'session.close',
+  SESSION_PLAYER_CLOSE: 'session.playerClose',
   SESSION_LOOT_TAKE: 'session.lootTake',
   SESSION_TRADE_COMMIT: 'session.tradeCommit',
   ERROR: 'error',
@@ -72,6 +73,7 @@ export interface ActiveLootTradeSession {
     buyDepreciationPercent?: number;
   }>;
   items: ActiveLootTradeItem[];
+  closedByClientIds?: string[];
   revision: number;
   openedAt: number;
   updatedAt: number;
