@@ -18,6 +18,13 @@ export const ROOM_MESSAGE = {
   CHAR_PUBLISH: 'char.publish',
   CHAR_FOCUS: 'char.focus',
   GM_DIRECTIVE: 'gm.directive',
+  SESSION_OPEN: 'session.open',
+  SESSION_STATE: 'session.state',
+  SESSION_UPDATE_RATES: 'session.updateRates',
+  SESSION_CLOSE: 'session.close',
+  SESSION_PLAYER_CLOSE: 'session.playerClose',
+  SESSION_LOOT_TAKE: 'session.lootTake',
+  SESSION_TRADE_COMMIT: 'session.tradeCommit',
   ERROR: 'error',
 } as const;
 
@@ -30,7 +37,47 @@ export const ROOM_ERROR = {
   NOT_ROOM_OWNER: 'NOT_ROOM_OWNER',
   BAD_MESSAGE: 'BAD_MESSAGE',
   UNKNOWN_TYPE: 'UNKNOWN_TYPE',
+  SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+  SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
+  TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+  TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+  TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
 } as const;
+
+export interface ActiveLootTradeItem {
+  entryId: string;
+  itemId: string;
+  itemType: string;
+  name: string;
+  cost: number;
+  weight: number;
+  quantity: number;
+  markupPercent: number;
+  itemSnapshot?: Record<string, unknown> | null;
+}
+
+export interface ActiveLootTradeSession {
+  sessionId: string;
+  containerId: string;
+  kind: 'loot' | 'merchant';
+  name: string;
+  description: string;
+  targetType: 'room' | 'character';
+  targetCharacterId: string | null;
+  targetCharacterName?: string | null;
+  caps: number;
+  saleMarkupPercent: number;
+  buyDepreciationPercent: number;
+  characterOverrides: Record<string, {
+    saleMarkupPercent?: number;
+    buyDepreciationPercent?: number;
+  }>;
+  items: ActiveLootTradeItem[];
+  closedByClientIds?: string[];
+  revision: number;
+  openedAt: number;
+  updatedAt: number;
+}
 
 export interface RoomEnvelope {
   v: number;

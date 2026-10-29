@@ -412,9 +412,19 @@ const attachRoomWebSocketServer = (httpServer, {
         case MESSAGE.ROOM_LEAVE: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) break;
-          const { room, left } = registry.leaveRoom({ code: canonical, clientId });
+          const { room, left, closedSession, closedReason } = registry.leaveRoom({ code: canonical, clientId });
           ws.meta.rooms.delete(canonical);
-          if (left && room) broadcastMembers(room, clientId);
+          if (left && room) {
+            broadcastMembers(room, clientId);
+            if (closedSession) {
+              broadcastToRoom(room, clientId, MESSAGE.SESSION_STATE, {
+                session: null,
+                closedContainerId: closedSession.containerId || null,
+                closedSession,
+                closedReason: closedReason || null,
+              });
+            }
+          }
           break;
         }
 
@@ -477,6 +487,189 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        case MESSAGE.SESSION_OPEN: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.openSession({
+            code: canonical,
+            clientId,
+            session: payload.session,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_UPDATE_RATES: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.updateSession({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_CLOSE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.closeSession({
+            code: canonical,
+            clientId,
+            sessionId: payload.sessionId || null,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          const closePayload = {
+            session: result.session,
+            closedContainerId: result.closedSession?.containerId || null,
+            closedSession: result.closedSession || null,
+          };
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            ...closePayload,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, closePayload);
+          break;
+        }
+
+        case MESSAGE.SESSION_PLAYER_CLOSE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.playerCloseSession({
+            code: canonical,
+            clientId,
+            sessionId: payload.sessionId || null,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          const closeMeta = result.closedSession
+            ? {
+                closedContainerId: result.closedSession.containerId || null,
+                closedSession: result.closedSession,
+                closedReason: result.closedReason || null,
+              }
+            : {};
+          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            ...closeMeta,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            ...closeMeta,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_LOOT_TAKE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.lootTake({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendEnvelope(ws, MESSAGE.ERROR, {
+              code: result.error,
+              requestId: payload.requestId || null,
+              session: result.session || null,
+            }, canonical, clientId);
+            break;
+          }
+          const closeMeta = result.closedSession
+            ? {
+                closedContainerId: result.closedSession.containerId || null,
+                closedSession: result.closedSession,
+                closedReason: result.autoClosedReason || null,
+              }
+            : {};
+          sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
+            granted: result.granted,
+            session: result.session,
+            ...closeMeta,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+            session: result.session,
+            ...closeMeta,
+          });
+          break;
+        }
+
+        case MESSAGE.SESSION_TRADE_COMMIT: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.tradeCommit({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendEnvelope(ws, MESSAGE.ERROR, {
+              code: result.error,
+              merchantCaps: result.merchantCaps,
+              owedCaps: result.owedCaps,
+              session: result.session || null,
+              requestId: payload.requestId || null,
+            }, canonical, clientId);
+            break;
+          }
+          sendEnvelope(ws, MESSAGE.SESSION_TRADE_COMMIT, {
+            committed: result.committed,
+            session: result.session,
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
+          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+            session: result.session,
+          });
+          break;
+        }
+
         default:
           sendError(ws, clientId, ERROR_CODE.UNKNOWN_TYPE, payload.requestId || null, roomCode || null);
       }
@@ -485,8 +678,21 @@ const attachRoomWebSocketServer = (httpServer, {
     ws.on('close', () => {
       if (!ws.meta.clientId) return;
       for (const code of ws.meta.rooms) {
-        const { room, left } = registry.leaveRoom({ code, clientId: ws.meta.clientId });
-        if (left && room) broadcastMembers(room, ws.meta.clientId);
+        const { room, left, closedSession, closedReason } = registry.leaveRoom({
+          code,
+          clientId: ws.meta.clientId,
+        });
+        if (left && room) {
+          broadcastMembers(room, ws.meta.clientId);
+          if (closedSession) {
+            broadcastToRoom(room, ws.meta.clientId, MESSAGE.SESSION_STATE, {
+              session: null,
+              closedContainerId: closedSession.containerId || null,
+              closedSession,
+              closedReason: closedReason || null,
+            });
+          }
+        }
       }
       ws.meta.rooms.clear();
     });
@@ -537,8 +743,12 @@ const createRoomServer = ({
   });
 
   const close = () => new Promise((resolve) => {
-    closeWs().then(() => server.close(() => resolve()));
-    // server.close ждёт висящие keep-alive сокеты — у нас их нет (ws terminate).
+    closeWs().then(() => {
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
+      server.close(() => resolve());
+    });
   });
 
   return { server, wss, registry, start, close };

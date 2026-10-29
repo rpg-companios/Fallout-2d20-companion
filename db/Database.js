@@ -10,6 +10,10 @@ import {
   stampFolderOnSaveData,
 } from '../domain/characterFolders';
 import {
+  normalizeContainerEntity,
+  duplicateContainerEntity,
+} from '../domain/lootTrade';
+import {
   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
   catalogGetAmmoTypes, catalogGetAmmoById,
@@ -425,4 +429,68 @@ export async function getCharacterRoomBinding(characterId) {
 
 export async function getCharacterRoomBindings() {
   return getAll('SELECT character_id, code FROM character_room_bindings');
+}
+
+// ─── Контейнеры добычи и торговцы Мастера (патч 468) ────────────────────────
+
+const rowToGmContainer = (row) => {
+  if (!row) return null;
+  let parsed = {};
+  try {
+    parsed = typeof row.data === 'string' ? JSON.parse(row.data) : (row.data || {});
+  } catch {
+    parsed = {};
+  }
+  return normalizeContainerEntity({
+    ...parsed,
+    id: row.id || parsed.id,
+    kind: row.kind || parsed.kind,
+    name: row.name || parsed.name,
+    roomCode: row.room_code || parsed.roomCode,
+    createdAt: Number(row.created_at) || Number(parsed.createdAt) || Date.now(),
+    updatedAt: Number(row.updated_at) || Number(parsed.updatedAt) || Date.now(),
+  });
+};
+
+export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
+  const now = Date.now();
+  const existing = rawContainer?.id
+    ? await getFirst('SELECT created_at, updated_at FROM gm_containers WHERE id = ?', [rawContainer.id])
+    : null;
+  const createdAt = Number(existing?.created_at) || Number(rawContainer?.createdAt) || now;
+  const updatedAt = preserveUpdatedAt && Number(rawContainer?.updatedAt) > 0
+    ? Number(rawContainer.updatedAt)
+    : now;
+  const normalized = normalizeContainerEntity({ ...rawContainer, createdAt, updatedAt }, now);
+  await runQuery(
+    'INSERT OR REPLACE INTO gm_containers (id, kind, name, room_code, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [normalized.id, normalized.kind, normalized.name, normalized.roomCode, JSON.stringify(normalized), normalized.createdAt, normalized.updatedAt],
+  );
+  return normalized;
+}
+
+export async function getGmContainerById(id) {
+  const row = await getFirst('SELECT * FROM gm_containers WHERE id = ?', [id]);
+  return rowToGmContainer(row);
+}
+
+export async function getGmContainersList() {
+  const rows = await getAll('SELECT * FROM gm_containers ORDER BY created_at DESC');
+  return rows.map(rowToGmContainer).filter(Boolean);
+}
+
+export async function deleteGmContainer(id) {
+  await runQuery('DELETE FROM gm_containers WHERE id = ?', [id]);
+}
+
+export async function duplicateGmContainer(id, copySuffix = 'копия') {
+  const source = await getGmContainerById(id);
+  if (!source) throw new Error(`GM container not found: ${id}`);
+  const all = await getGmContainersList();
+  const duplicate = duplicateContainerEntity(source, {
+    existingNames: all.map((item) => item.name),
+    copySuffix,
+    now: Date.now(),
+  });
+  return saveGmContainer(duplicate);
 }

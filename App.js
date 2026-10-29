@@ -29,10 +29,14 @@ import useCharacterStore from './src/store/characterStore';
 import { debugLog } from './src/debug/falloutDebug';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
+import LootTradeScreen from './components/screens/LootTradeScreen/LootTradeScreen';
 import CharacterScreen from './modules/fallout/screens/CharacterScreen/CharacterScreen';
 import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
 import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
+import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
+import useUiModeStore from './src/room/uiModeStore';
 // Side-effect: сеттинг регистрирует расширение состояния (поле сейва
 // survival + миграцию v22→v23) в реестре движка ДО монтирования
 // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
@@ -44,6 +48,7 @@ import PositroniumBootScreen from './components/boot/PositroniumBootScreen';
 import useAppSettingsStore, {
   selectBootScreenEnabled,
   selectSettingsHydrated,
+  selectUiMode,
 } from './src/store/appSettingsStore';
 import useSettingPackStore, {
   selectActiveSettingId,
@@ -55,6 +60,7 @@ const Tab = createMaterialTopTabNavigator();
 const APP_BRAND = 'Positronium';
 const TAB_ROUTES = {
   HOME: 'HomeTab',
+  LOOT_TRADE: 'LootTradeTab',
   CHARACTER: 'CharacterTab',
   EQUIPMENT: 'EquipmentTab',
   INVENTORY: 'InventoryTab',
@@ -71,6 +77,10 @@ function App() {
   const [bootEnabledForLaunch, setBootEnabledForLaunch] = useState(null);
   const bootScreenEnabled = useAppSettingsStore(selectBootScreenEnabled);
   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
+  const storeUiMode = useAppSettingsStore(selectUiMode);
+  const tabUiMode = useUiModeStore((s) => s.tabUiMode);
+  const gmInspectingCharacter = useUiModeStore((s) => s.gmInspectingCharacter);
+  const isGmMode = (tabUiMode || storeUiMode) === 'gm';
   const locale = useLocale();
   useModuleLocale();
   const activeSettingId = useSettingPackStore(selectActiveSettingId);
@@ -81,6 +91,7 @@ function App() {
   // сразу при загрузке стора и приводило к крэшу "Cannot update a component
   // (CharacterScreen) while rendering a different component (CharacterProvider)".
   const moduleTabsActive = activeSettingId != null;
+  const characterSheetTabsActive = moduleTabsActive && (!isGmMode || gmInspectingCharacter);
 
   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
   // даже если версия @react-navigation/native не поддерживает documentTitle.
@@ -137,6 +148,12 @@ function App() {
     if (!dbReady || !characterStoreReady) return undefined;
     return startCharacterAutosave();
   }, [dbReady, characterStoreReady]);
+
+  // Фоновое сохранение изменений контейнеров/торговцев Мастера во время выдачи в комнату.
+  useEffect(() => {
+    if (!dbReady) return undefined;
+    return startGmSessionPersistence();
+  }, [dbReady]);
 
   // Шаг 8в (патч 243): таймер расхода блока силовой брони (§5.3/§5.4) —
   // бывший эффект CharacterProvider. Тикает только пока приложение открыто
@@ -214,7 +231,11 @@ function App() {
                       tabBarIcon: ({ focused, color }) => {
                         let iconName;
                         if (route.name === TAB_ROUTES.HOME) {
-                          iconName = focused ? 'people' : 'people-outline';
+                          iconName = isGmMode
+                            ? (focused ? 'albums' : 'albums-outline')
+                            : (focused ? 'people' : 'people-outline');
+                        } else if (route.name === TAB_ROUTES.LOOT_TRADE) {
+                          iconName = focused ? 'cube' : 'cube-outline';
                         } else if (route.name === TAB_ROUTES.CHARACTER) {
                           iconName = focused ? 'person' : 'person-outline';
                         } else if (route.name === TAB_ROUTES.EQUIPMENT) {
@@ -244,11 +265,26 @@ function App() {
                       component={HomeScreen}
                       options={{
                         tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.home')}</Text>
+                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
+                            {isGmMode ? tApp('tabs.gmCampaigns') : tApp('tabs.home')}
+                          </Text>
                         ),
                       }}
                     />
-                    {moduleTabsActive ? (
+                    {isGmMode ? (
+                      <Tab.Screen
+                        name={TAB_ROUTES.LOOT_TRADE}
+                        component={LootTradeScreen}
+                        options={{
+                          tabBarLabel: ({ focused, color }) => (
+                            <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
+                              {tApp('tabs.gmLootTrade')}
+                            </Text>
+                          ),
+                        }}
+                      />
+                    ) : null}
+                    {characterSheetTabsActive ? (
                       <>
                         <Tab.Screen
                           name={TAB_ROUTES.CHARACTER}
@@ -295,6 +331,7 @@ function App() {
           </NavigationContainer>
           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
           <FusionCoreChoiceModal />
+          <PlayerLootTradeOverlay />
           <AlertHost />
           <UpdateNoticeModal />
           <SurvivalClock />

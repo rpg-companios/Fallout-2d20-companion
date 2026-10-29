@@ -13,6 +13,7 @@ import {
 } from './roomClient';
 import {
   ROOM_MESSAGE,
+  type ActiveLootTradeSession,
   type RoomEnvelope,
   type RoomMember,
   type RoomSnapshotEntry,
@@ -30,6 +31,7 @@ export interface RoomStateEntry {
   members: RoomMember[];
   joined?: boolean;
   snapshots?: Record<string, RoomSnapshotEntry>;
+  activeSession?: ActiveLootTradeSession | null;
 }
 
 interface CreateRoomResult {
@@ -43,10 +45,12 @@ interface JoinRoomResult {
   name: string;
   members: RoomMember[];
   snapshots: RoomSnapshotEntry[];
+  activeSession?: ActiveLootTradeSession | null;
 }
 
 interface RoomStoreState {
   status: RoomConnectionStatus;
+  clientId: string | null;
   rooms: Record<string, RoomStateEntry>;
   lastError: string | null;
   connect: () => Promise<void>;
@@ -72,6 +76,54 @@ interface RoomStoreState {
     code: string;
     characterId: string;
   }) => Promise<void>;
+  openRoomSession: (input: {
+    code: string;
+    session: Record<string, unknown>;
+  }) => Promise<ActiveLootTradeSession>;
+  updateRoomSessionRates: (input: {
+    code: string;
+    sessionId?: string;
+    targetCharacterId?: string | null;
+    resetCharacterOverride?: boolean;
+    resetAllCharacterOverrides?: boolean;
+    saleMarkupPercent?: number;
+    buyDepreciationPercent?: number;
+    caps?: number;
+    items?: unknown[];
+    name?: string;
+    description?: string;
+  }) => Promise<ActiveLootTradeSession>;
+  closeRoomSession: (input: {
+    code: string;
+    sessionId?: string | null;
+  }) => Promise<void>;
+  playerCloseRoomSession: (input: {
+    code: string;
+    sessionId?: string | null;
+  }) => Promise<{
+    session: ActiveLootTradeSession | null;
+    closedReason?: string | null;
+  }>;
+  takeFromLootSession: (input: {
+    code: string;
+    sessionId: string;
+    characterId: string;
+    takes: Array<{ entryId: string; quantity: number }>;
+  }) => Promise<{
+    granted: any[];
+    session: ActiveLootTradeSession | null;
+    closedReason?: string | null;
+  }>;
+  commitMerchantTrade: (input: {
+    code: string;
+    sessionId: string;
+    characterId: string;
+    perkCapCollectorPercent?: number;
+    playerCapsAvailable: number;
+    acceptCapShortfall?: boolean;
+    buyItems: Array<{ entryId: string; quantity: number }>;
+    sellItems: Array<Record<string, unknown>>;
+  }) => Promise<{ committed: any; session: ActiveLootTradeSession }>;
 }
 
 // ── Внутреннее состояние соединения (не в стейт-дереве: не для рендера) ──
@@ -85,6 +137,7 @@ const pendingRequests = new Map<string, {
 }>();
 const joiningCodes = new Set<string>();
 const publishListeners = new Set<(message: RoomEnvelope) => void>();
+const sessionListeners = new Set<(message: RoomEnvelope) => void>();
 
 const getWebTabSessionSuffix = (): string => {
   if (typeof window === 'undefined') return '';
@@ -146,6 +199,12 @@ export const onRoomCharacterPublish = (listener: (message: RoomEnvelope) => void
   return () => { publishListeners.delete(listener); };
 };
 
+/** Подписка на обновления выданной добычи / торговли (session.state). */
+export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) => {
+  sessionListeners.add(listener);
+  return () => { sessionListeners.delete(listener); };
+};
+
 /** Точка подмены клиента для тестов (мок-транспорт вместо настоящего ws). */
 let clientFactory: ((input: { url: string; clientId: string; onStatus: any; onMessage: any }) => RoomClient) | null = null;
 export const setRoomClientFactoryForTests = (
@@ -156,21 +215,60 @@ export const resetRoomClientForTests = () => {
   client = null; connectPromise = null; clientIdPromise = null;
   pendingRequests.forEach(({ timer, reject }) => { clearTimeout(timer); reject(new Error('RESET')); });
   pendingRequests.clear();
+  try { useRoomStore.setState({ clientId: null }); } catch { /* до инициализации */ }
 };
 
 export const useRoomStore = create<RoomStoreState>((set, get) => {
+  const applySessionEnvelopeToStore = (message: RoomEnvelope) => {
+    const code = message.roomCode;
+    if (!code || !message.payload || !('session' in message.payload)) return;
+    const current = get().rooms[code];
+    if (current) {
+      set({
+        rooms: {
+          ...get().rooms,
+          [code]: {
+            ...current,
+            activeSession: (message.payload.session as ActiveLootTradeSession | null) ?? null,
+          },
+        },
+      });
+    }
+    sessionListeners.forEach((listener) => {
+      try { listener(message); } catch (error) {
+        debugLog('room.sessionListener:failed', { message: (error as Error)?.message });
+      }
+    });
+  };
+
   const handleMessage = (message: RoomEnvelope) => {
     const requestId = message?.payload?.requestId;
     if (message.type === ROOM_MESSAGE.ERROR) {
+      if (message?.payload && 'session' in message.payload && message.payload.session !== undefined) {
+        applySessionEnvelopeToStore(message);
+      }
       if (requestId && pendingRequests.has(requestId)) {
         const pending = pendingRequests.get(requestId)!;
         pendingRequests.delete(requestId);
         clearTimeout(pending.timer);
-        pending.reject(new Error(message.payload.code || 'ROOM_ERROR'));
+        const err = new Error(message.payload.code || 'ROOM_ERROR') as Error & {
+          code?: string;
+          payload?: any;
+        };
+        err.code = message.payload.code || 'ROOM_ERROR';
+        err.payload = message.payload;
+        pending.reject(err);
         return;
       }
       set({ lastError: message?.payload?.code || 'ROOM_ERROR' });
       return;
+    }
+    if (
+      message.type === ROOM_MESSAGE.SESSION_STATE
+      || message.type === ROOM_MESSAGE.SESSION_LOOT_TAKE
+      || message.type === ROOM_MESSAGE.SESSION_TRADE_COMMIT
+    ) {
+      applySessionEnvelopeToStore(message);
     }
     if (requestId && pendingRequests.has(requestId)) {
       const pending = pendingRequests.get(requestId)!;
@@ -180,6 +278,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       return;
     }
     switch (message.type) {
+      case ROOM_MESSAGE.SESSION_STATE: {
+        // Уже обработано выше через applySessionEnvelopeToStore.
+        return;
+      }
       case ROOM_MESSAGE.ROOM_MEMBER: {
         const code = message.roomCode;
         if (!code) return;
@@ -239,6 +341,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     if (!url) throw new Error('ROOM_SERVER_NOT_CONFIGURED');
     if (client) return client;
     const clientId = await getRoomClientId();
+    if (get().clientId !== clientId) {
+      set({ clientId });
+    }
     const factory = clientFactory || ((input: any) => createRoomClient({
       url: input.url,
       clientId: input.clientId,
@@ -288,6 +393,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
 
   return {
     status: 'offline',
+    clientId: null,
     rooms: {},
     lastError: null,
 
@@ -315,6 +421,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             members: prev?.members || [],
             joined: false,
             snapshots: prev?.snapshots || {},
+            activeSession: prev?.activeSession ?? null,
           },
         },
       });
@@ -330,6 +437,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           name: existing.name,
           members: existing.members,
           snapshots: Object.values(existing.snapshots || {}),
+          activeSession: existing.activeSession ?? null,
         };
       }
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
@@ -338,6 +446,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, { code, name, role }, code);
         const payloadRooms = response.payload;
         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+        const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
         set({
           rooms: {
             ...get().rooms,
@@ -348,6 +457,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               members: payloadRooms.members || [],
               joined: true,
               snapshots: snapshotsMap,
+              activeSession,
             },
           },
         });
@@ -357,6 +467,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           name: payloadRooms.name || code,
           members: payloadRooms.members || [],
           snapshots: Object.values(snapshotsMap),
+          activeSession,
         };
       } finally {
         joiningCodes.delete(code);
@@ -427,6 +538,104 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           },
         });
       }
+    },
+
+    openRoomSession: async ({ code, session }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.SESSION_OPEN,
+        { code, session },
+        code,
+      );
+      return response.payload?.session as ActiveLootTradeSession;
+    },
+
+    updateRoomSessionRates: async ({ code, ...rest }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.SESSION_UPDATE_RATES,
+        { code, ...rest },
+        code,
+      );
+      return response.payload?.session as ActiveLootTradeSession;
+    },
+
+    closeRoomSession: async ({ code, sessionId = null }) => {
+      await sendRequest(
+        ROOM_MESSAGE.SESSION_CLOSE,
+        { code, sessionId },
+        code,
+      );
+    },
+
+    playerCloseRoomSession: async ({ code, sessionId = null }) => {
+      try {
+        const response = await sendRequest(
+          ROOM_MESSAGE.SESSION_PLAYER_CLOSE,
+          { code, sessionId },
+          code,
+        );
+        return {
+          session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
+          closedReason: response.payload?.closedReason || null,
+        };
+      } catch (error) {
+        const errCode = (error as any)?.code || (error as Error)?.message;
+        if (errCode === 'UNKNOWN_TYPE') {
+          const current = get().rooms[code];
+          if (current && (!sessionId || current.activeSession?.sessionId === sessionId)) {
+            set({
+              rooms: {
+                ...get().rooms,
+                [code]: { ...current, activeSession: null },
+              },
+            });
+          }
+          return { session: null, closedReason: null };
+        }
+        throw error;
+      }
+    },
+
+    takeFromLootSession: async ({ code, sessionId, characterId, takes }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.SESSION_LOOT_TAKE,
+        { code, sessionId, characterId, takes },
+        code,
+      );
+      return {
+        granted: response.payload?.granted || [],
+        session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
+        closedReason: response.payload?.closedReason || null,
+      };
+    },
+
+    commitMerchantTrade: async ({
+      code,
+      sessionId,
+      characterId,
+      perkCapCollectorPercent = 0,
+      playerCapsAvailable,
+      acceptCapShortfall = false,
+      buyItems,
+      sellItems,
+    }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.SESSION_TRADE_COMMIT,
+        {
+          code,
+          sessionId,
+          characterId,
+          perkCapCollectorPercent,
+          playerCapsAvailable,
+          acceptCapShortfall,
+          buyItems,
+          sellItems,
+        },
+        code,
+      );
+      return {
+        committed: response.payload?.committed,
+        session: response.payload?.session as ActiveLootTradeSession,
+      };
     },
   };
 });
