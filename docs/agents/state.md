@@ -1,5 +1,21 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-29 (466) — скрипт автоматической сборки и деплоя на NetAngels (`deploy-netangels.sh` для `positronium-engine.na4u.ru`)
+
+Слово владельца:
+«Давай сделает так. Добавь скрипт для сборки приложения, а я через shell на новом positronium-engine.na4u.ru через консоль заберу и запущу скрипт, который сам всё расположет, как надо.»
+
+- Реализовано:
+  1. `deploy-netangels.sh` (исполняемый скрипт в корне проекта + `npm run deploy:netangels` в `package.json`):
+     - сам определяет каталог сайта NetAngels (`~/positronium-engine.na4u.ru`), подхватывает виртуальное окружение Node.js из `etc/environment/PATH`, проверяет тип сайта (отклоняет статический `(html)` с понятной подсказкой) и направляет `TMPDIR` в `<сайт>/tmp`;
+     - клонирует или обновляет репозиторий в `<сайт>/repo` (не засоряя `app/` и `www/`), при необходимости автоматически подтягивает актуальный патч через `apply-patch.sh`;
+     - устанавливает пакеты сборки с принудительным `--include=dev` (`NPM_CONFIG_PRODUCTION=false NODE_ENV=development`, чтобы не пропускался `@babel/core` из-за `NODE_ENV=production` в контейнере NetAngels) и собирает `dist/` с безопасными лимитами (`--max-old-space-size=1536`, `--max-workers=2`);
+     - раскладывает собранную статику в `<сайт>/www/` с сохранением `.well-known`, `google*.html`, `yandex_*.html` и прав чтения для Nginx;
+     - раскладывает лёгкий сервер комнат в `<сайт>/app/` (`server/`, минимальный `package.json`, пакет `ws` и `hello.js` с `require('./server/index.js')` — работает из коробки со стандартным `APP_PATH=.../app/hello.js` без ручной правки панели);
+     - сохраняет копию `deploy-netangels.sh` в корне сайта для будущих обновлений одной командой, вызывает `touch reload` и проверяет живой ответ `http://$APP_IP:$APP_PORT/__boot-status` + WebSocket `PRESENCE_PING`/`PRESENCE_PONG` на `/ws`.
+  2. `public/version.json` (`version: "466"`, `release: 4` сохранён) и `patchs/baseline.json` (`"466"`).
+- Приёмочные тесты: `__tests__/room/deploy-netangels-466.test.js`.
+
 ## 2026-10-28 (465) — поддержка окружения NetAngels (`na4u.ru`: `APP_IP`, `APP_PORT`, `../www`, лёгкий прод-деплой `server/`)
 
 Слово владельца (контейнер `na4u.ru`, `etc/environment`):

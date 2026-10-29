@@ -25,6 +25,7 @@ const WebSocket = wsPkg.default || wsPkg.WebSocket || wsPkg;
 describe('Патч 465: поддержка окружения NetAngels (APP_IP, APP_PORT, ../www)', () => {
   it('resolveListenPort и resolveListenHost читают APP_PORT и APP_IP при отсутствии PORT и HOST', () => {
     expect(resolveListenPort({ APP_PORT: '58982' })).toBe(58982);
+    expect(resolveListenPort({ PORT: '', APP_PORT: '58982' })).toBe(58982);
     expect(resolveListenPort({ PORT: '5000', APP_PORT: '58982' })).toBe(5000);
     expect(resolveListenPort({})).toBe(5000);
 

@@ -492,7 +492,7 @@ const defaultRunExportBuild = ({ rootDir, stagingDir, onProgress }) => new Promi
 });
 
 const resolveListenPort = (env = process.env) => {
-  const raw = env.PORT ?? env.APP_PORT;
+  const raw = env.PORT !== undefined && env.PORT !== '' ? env.PORT : env.APP_PORT;
   if (raw !== undefined && raw !== '') {
     const parsed = Number(raw);
     if (Number.isFinite(parsed) && parsed >= 0) return parsed;
