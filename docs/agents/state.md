@@ -1,5 +1,17 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-28 (465) — поддержка окружения NetAngels (`na4u.ru`: `APP_IP`, `APP_PORT`, `../www`, лёгкий прод-деплой `server/`)
+
+Слово владельца (контейнер `na4u.ru`, `etc/environment`):
+`APP_IP=127.0.4.28`, `APP_PORT=58982`, `APP_PATH=/home/.../app/`, `NODE_ENV=production`, статика в соседней папке `/www/`, на Replit — бесплатный `Static`-деплой.
+
+- Исправлено в `server/start.js`:
+  1. `resolveListenPort` и `resolveListenHost`: сервер автоматически подхватывает `APP_PORT` и `APP_IP` (переменные NetAngels), если не заданы `PORT` / `HOST`.
+  2. `resolveDefaultDistDir`: если внутри `APP_PATH` нет `./dist/index.html`, сервер автоматически находит собранную статику в соседнем `../www` (или `./www`, либо `DIST_DIR`).
+  3. `resolveDefaultAutoBuild` и `readPublicVersion`: при лёгком серверном деплое без исходников `App.js` (только `server/` + пакет `ws` в `app/` и готовая сборка в `../www/`) или при `NODE_ENV=production` с готовой статикой сервер не пытается запускать `expo export`, читает версию из `../www/version.json` и сразу поднимает HTTP + WebSocket `/ws`.
+  4. `public/version.json` (`version: "465"`, `release: 4` сохранён) и `patchs/baseline.json` (`"465"`).
+- Приёмочные тесты: `__tests__/room/netangels-env-465.test.js`.
+
 ## 2026-10-28 (464) — восстановление нового аватара `ghoul.png` из коммита `39bb559` и защита коммитов владельца от перезаписи в `apply-patch.sh`
 
 Слово владельца:

@@ -1,0 +1,350 @@
+diff --git a/__tests__/room/netangels-env-465.test.js b/__tests__/room/netangels-env-465.test.js
+new file mode 100644
+index 0000000..3b69705
+--- /dev/null
++++ b/__tests__/room/netangels-env-465.test.js
+@@ -0,0 +1,109 @@
++// Регрессионные тесты патча 465:
++// поддержка окружения NetAngels (`na4u.ru`):
++// 1) автоподхват `APP_PORT` / `APP_IP`, если `PORT` / `HOST` не заданы;
++// 2) автопоиск готовой статики в соседней папке `../www` (структура `app/` + `www/`);
++// 3) лёгкий прод-запуск в `app/` без `App.js` и без вызова `expo export`:
++//    раздаёт статику из `../www` и создаёт комнаты по WebSocket `/ws`.
++
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import os from 'node:os';
++import path from 'node:path';
++import * as wsPkg from 'ws';
++
++import {
++  resolveListenPort,
++  resolveListenHost,
++  resolveDefaultDistDir,
++  resolveDefaultAutoBuild,
++  createManagedAppServer,
++} from '../../server/start.js';
++import { MESSAGE, PROTOCOL_VERSION } from '../../server/protocol.js';
++
++const WebSocket = wsPkg.default || wsPkg.WebSocket || wsPkg;
++
++describe('Патч 465: поддержка окружения NetAngels (APP_IP, APP_PORT, ../www)', () => {
++  it('resolveListenPort и resolveListenHost читают APP_PORT и APP_IP при отсутствии PORT и HOST', () => {
++    expect(resolveListenPort({ APP_PORT: '58982' })).toBe(58982);
++    expect(resolveListenPort({ PORT: '5000', APP_PORT: '58982' })).toBe(5000);
++    expect(resolveListenPort({})).toBe(5000);
++
++    expect(resolveListenHost({ APP_IP: '127.0.4.28' })).toBe('127.0.4.28');
++    expect(resolveListenHost({ HOST: '0.0.0.0', APP_IP: '127.0.4.28' })).toBe('0.0.0.0');
++    expect(resolveListenHost({})).toBe('0.0.0.0');
++  });
++
++  it('лёгкий деплой в app/ без исходников раздаёт ../www и поднимает живой /ws без запуска сборщика', async () => {
++    const siteRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'na4u-465-'));
++    const appDir = path.join(siteRoot, 'app');
++    const wwwDir = path.join(siteRoot, 'www');
++    fs.mkdirSync(appDir, { recursive: true });
++    fs.mkdirSync(path.join(wwwDir, '_expo/static/js/web'), { recursive: true });
++    fs.writeFileSync(path.join(wwwDir, '_expo/static/js/web/index-abc.js'), 'console.log(1);\n');
++    fs.writeFileSync(path.join(wwwDir, 'version.json'), JSON.stringify({ version: '465' }));
++    fs.writeFileSync(
++      path.join(wwwDir, 'index.html'),
++      '<!DOCTYPE html><html><body>NA4U-READY<script src="/_expo/static/js/web/index-abc.js"></script></body></html>',
++    );
++
++    expect(resolveDefaultDistDir(appDir, {})).toBe(wwwDir);
++    expect(resolveDefaultAutoBuild(appDir, wwwDir, { NODE_ENV: 'production' })).toBe(false);
++
++    let exportCalled = 0;
++    const srv = createManagedAppServer({
++      port: 0,
++      host: '127.0.0.1',
++      rootDir: appDir,
++      runExportBuild: async () => {
++        exportCalled += 1;
++      },
++    });
++
++    try {
++      const { port } = await srv.start();
++      expect(exportCalled).toBe(0);
++      expect(srv.getBootStatus().version).toBe('465');
++
++      const res = await fetch(`http://127.0.0.1:${port}/`);
++      expect(res.status).toBe(200);
++      expect(await res.text()).toContain('NA4U-READY');
++
++      // Проверяем создание комнаты по WebSocket /ws
++      const created = await new Promise((resolve, reject) => {
++        const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`);
++        const timer = setTimeout(() => {
++          ws.close();
++          reject(new Error('WS timeout'));
++        }, 5000);
++        ws.on('open', () => {
++          ws.send(JSON.stringify({
++            v: PROTOCOL_VERSION,
++            type: MESSAGE.ROOM_CREATE,
++            roomCode: null,
++            clientId: 'gm-na4u-465',
++            ts: Date.now(),
++            payload: { name: 'NA4U Room', prefix: 'VT', requestId: 'r-465' },
++          }));
++        });
++        ws.on('message', (raw) => {
++          const msg = JSON.parse(String(raw));
++          if (msg.payload?.requestId === 'r-465') {
++            clearTimeout(timer);
++            ws.close();
++            resolve(msg);
++          }
++        });
++        ws.on('error', (err) => {
++          clearTimeout(timer);
++          reject(err);
++        });
++      });
++
++      expect(created.type).toBe(MESSAGE.ROOM_CREATED);
++      expect(created.roomCode).toMatch(/^VT-/);
++    } finally {
++      await srv.close();
++      fs.rmSync(siteRoot, { recursive: true, force: true });
++    }
++  });
++});
+diff --git a/docs/agents/state.md b/docs/agents/state.md
+index 788d4b4..d86b28e 100644
+--- a/docs/agents/state.md
++++ b/docs/agents/state.md
+@@ -1,5 +1,17 @@
+ # Состояние работы — читается ПЕРВЫМ
+ 
++## 2026-10-28 (465) — поддержка окружения NetAngels (`na4u.ru`: `APP_IP`, `APP_PORT`, `../www`, лёгкий прод-деплой `server/`)
++
++Слово владельца (контейнер `na4u.ru`, `etc/environment`):
++`APP_IP=127.0.4.28`, `APP_PORT=58982`, `APP_PATH=/home/.../app/`, `NODE_ENV=production`, статика в соседней папке `/www/`, на Replit — бесплатный `Static`-деплой.
++
++- Исправлено в `server/start.js`:
++  1. `resolveListenPort` и `resolveListenHost`: сервер автоматически подхватывает `APP_PORT` и `APP_IP` (переменные NetAngels), если не заданы `PORT` / `HOST`.
++  2. `resolveDefaultDistDir`: если внутри `APP_PATH` нет `./dist/index.html`, сервер автоматически находит собранную статику в соседнем `../www` (или `./www`, либо `DIST_DIR`).
++  3. `resolveDefaultAutoBuild` и `readPublicVersion`: при лёгком серверном деплое без исходников `App.js` (только `server/` + пакет `ws` в `app/` и готовая сборка в `../www/`) или при `NODE_ENV=production` с готовой статикой сервер не пытается запускать `expo export`, читает версию из `../www/version.json` и сразу поднимает HTTP + WebSocket `/ws`.
++  4. `public/version.json` (`version: "465"`, `release: 4` сохранён) и `patchs/baseline.json` (`"465"`).
++- Приёмочные тесты: `__tests__/room/netangels-env-465.test.js`.
++
+ ## 2026-10-28 (464) — восстановление нового аватара `ghoul.png` из коммита `39bb559` и защита коммитов владельца от перезаписи в `apply-patch.sh`
+ 
+ Слово владельца:
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0c9c7d7..bfe8d23 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,12 @@
+ # Changelog
++---
++## Support NetAngels / `na4u.ru` environment in room server startup (patch 465)
++
++Updated `server/start.js` to automatically pick up NetAngels hosting variables
++(`APP_PORT`, `APP_IP`), locate prebuilt web assets in sibling `../www` (when
++running from `app/` alongside `www/`), and skip Metro auto-builds on lightweight
++production deployments without source files (`server/` + `ws` only).
++
+ ---
+ ## Restore updated ghoul origin portrait and preserve owner commits in `apply-patch.sh` (patch 464)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 6c9c514..3892d0a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,14 @@
+ # История изменений
+ 
++---
++## Поддержка запуска комнатного сервера в окружении NetAngels / `na4u.ru` (патч 465)
++
++В `server/start.js` добавлено автоматическое чтение переменных окружения
++хостинга NetAngels (`APP_PORT`, `APP_IP`), автопоиск готовой веб-сборки в
++соседнем каталоге `../www` (при размещении серверной части в `app/`, а статики в
++`www/`) и отключение автосборки Metro в лёгком серверном окружении без
++исходников `App.js` (достаточно папки `server/` и пакета `ws`).
++
+ ---
+ ## Восстановление обновлённого портрета гуля (`ghoul.png`) и сохранение коммитов владельца в `apply-patch.sh` (патч 464)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 4c2efc9..0860b35 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "464"
++  "baseline": "465"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3e34b69..b68f018 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "464",
++  "version": "465",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/start.js b/server/start.js
+index 95fcc96..b923b2a 100644
+--- a/server/start.js
++++ b/server/start.js
+@@ -72,13 +72,20 @@ const TEXT_EXTENSIONS = new Set([
+   '.js', '.jsx', '.ts', '.tsx', '.json', '.html', '.css', '.cjs', '.mjs',
+ ]);
+ 
+-const readPublicVersion = (rootDir) => {
+-  try {
+-    const raw = JSON.parse(fs.readFileSync(path.join(rootDir, 'public', 'version.json'), 'utf8'));
+-    return raw?.version ? String(raw.version) : '';
+-  } catch {
+-    return '';
++const readPublicVersion = (rootDir, distDir = null) => {
++  const candidates = [
++    path.join(rootDir, 'public', 'version.json'),
++    ...(distDir ? [path.join(distDir, 'version.json')] : []),
++  ];
++  for (const file of candidates) {
++    try {
++      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
++      if (raw?.version) return String(raw.version);
++    } catch {
++      // пробуем следующий путь
++    }
+   }
++  return '';
+ };
+ 
+ const computeSourceScan = (rootDir) => {
+@@ -484,14 +491,53 @@ const defaultRunExportBuild = ({ rootDir, stagingDir, onProgress }) => new Promi
+   });
+ });
+ 
++const resolveListenPort = (env = process.env) => {
++  const raw = env.PORT ?? env.APP_PORT;
++  if (raw !== undefined && raw !== '') {
++    const parsed = Number(raw);
++    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
++  }
++  return 5000;
++};
++
++const resolveListenHost = (env = process.env) => (
++  env.HOST || env.APP_IP || '0.0.0.0'
++);
++
++const resolveDefaultDistDir = (rootDir, env = process.env) => {
++  if (env.DIST_DIR) return path.resolve(rootDir, env.DIST_DIR);
++  const candidates = [
++    path.join(rootDir, 'dist'),
++    path.resolve(rootDir, '..', 'www'),
++    path.join(rootDir, 'www'),
++  ];
++  for (const candidate of candidates) {
++    if (fs.existsSync(path.join(candidate, 'index.html'))) {
++      return candidate;
++    }
++  }
++  return path.join(rootDir, 'dist');
++};
++
++const resolveDefaultAutoBuild = (rootDir, distDir, env = process.env) => {
++  if (env.SKIP_AUTO_BUILD === '1') return false;
++  if (!fs.existsSync(path.join(rootDir, 'App.js'))) return false;
++  if (env.NODE_ENV === 'production' && hasValidDistFiles(distDir, '')) return false;
++  return true;
++};
++
+ const createManagedAppServer = ({
+-  port = Number(process.env.PORT || 5000),
+-  host = process.env.HOST || '0.0.0.0',
++  port = resolveListenPort(),
++  host = resolveListenHost(),
+   rootDir = path.join(__dirname, '..'),
+-  distDir = path.join(rootDir, 'dist'),
+-  autoBuild = process.env.SKIP_AUTO_BUILD !== '1',
++  distDir,
++  autoBuild,
+   runExportBuild = defaultRunExportBuild,
+ } = {}) => {
++  const resolvedDistDir = distDir || resolveDefaultDistDir(rootDir);
++  const resolvedAutoBuild = autoBuild !== undefined
++    ? autoBuild
++    : resolveDefaultAutoBuild(rootDir, resolvedDistDir);
+   const expoCacheRoot = path.join(rootDir, '.expo');
+   let activeFingerprint = null;
+   let lastCheckAt = 0;
+@@ -499,7 +545,7 @@ const createManagedAppServer = ({
+ 
+   const status = {
+     state: 'ready',
+-    version: readPublicVersion(rootDir),
++    version: readPublicVersion(rootDir, resolvedDistDir),
+     startedAt: 0,
+     stage: 'Готово',
+     detail: '',
+@@ -518,7 +564,7 @@ const createManagedAppServer = ({
+   const startBuild = (targetFingerprint) => {
+     if (buildPromise) return buildPromise;
+     status.state = 'building';
+-    status.version = readPublicVersion(rootDir);
++    status.version = readPublicVersion(rootDir, resolvedDistDir);
+     status.startedAt = Date.now();
+     status.stage = 'Сборка веб-интерфейса Positronium…';
+     status.detail = 'Запуск сборщика Metro…';
+@@ -554,10 +600,10 @@ const createManagedAppServer = ({
+       .then(() => {
+         const finalFingerprint = computeSourceFingerprint(rootDir) || targetFingerprint;
+         fs.writeFileSync(path.join(stagingDir, FINGERPRINT_FILE), `${finalFingerprint}\n`, 'utf8');
+-        swapDirectoryAtomic(stagingDir, distDir, expoCacheRoot);
++        swapDirectoryAtomic(stagingDir, resolvedDistDir, expoCacheRoot);
+         activeFingerprint = finalFingerprint;
+         lastCheckAt = Date.now();
+-        status.version = readPublicVersion(rootDir);
++        status.version = readPublicVersion(rootDir, resolvedDistDir);
+         status.state = 'ready';
+         status.stage = 'Готово';
+         status.detail = '';
+@@ -582,14 +628,14 @@ const createManagedAppServer = ({
+   };
+ 
+   const ensureUpToDate = (forceCheck = false) => {
+-    if (!autoBuild || status.state === 'building') return;
++    if (!resolvedAutoBuild || status.state === 'building') return;
+     const now = Date.now();
+     if (!forceCheck && now - lastCheckAt < 2000 && activeFingerprint) return;
+     lastCheckAt = now;
+-    const check = isDistUpToDate(rootDir, distDir);
++    const check = isDistUpToDate(rootDir, resolvedDistDir);
+     if (check.upToDate) {
+       activeFingerprint = check.fingerprint;
+-      status.version = readPublicVersion(rootDir);
++      status.version = readPublicVersion(rootDir, resolvedDistDir);
+       if (status.state !== 'ready') {
+         status.state = 'ready';
+         status.error = null;
+@@ -656,7 +702,7 @@ const createManagedAppServer = ({
+   const roomApp = createRoomServer({
+     port,
+     host,
+-    distDir,
++    distDir: resolvedDistDir,
+     beforeStatic,
+   });
+ 
+@@ -696,5 +742,9 @@ module.exports = {
+   computeSourceFingerprint,
+   isDistUpToDate,
+   renderBootStatusHtml,
++  resolveListenPort,
++  resolveListenHost,
++  resolveDefaultDistDir,
++  resolveDefaultAutoBuild,
+   createManagedAppServer,
+ };
