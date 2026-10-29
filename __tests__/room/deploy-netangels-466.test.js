@@ -261,4 +261,65 @@ describe('Патч 466: deploy-netangels.sh — автоматическая с�
     expect(secondDeploy.status).toBe(0);
     expect(secondDeploy.stdout).toContain('WebSocket /ws: OK');
   }, 25000);
+
+  it('Патч 467: игнорирует системный node v10.24.0 из etc/environment/PATH и выбирает современный Node.js >= 18', () => {
+    const sandbox = makeTempDir('na4u-node10-467-');
+    const siteDir = path.join(sandbox, 'positronium-engine.na4u.ru');
+    const envDir = path.join(siteDir, 'etc', 'environment');
+    const repoDir = path.join(siteDir, 'repo');
+    const legacyBinDir = path.join(sandbox, 'legacy-usr-bin');
+    const optSearchRoot = path.join(sandbox, 'opt-runtimes');
+    const modernOptBin = path.join(optSearchRoot, 'nodejs', process.versions.node, 'bin');
+
+    fs.mkdirSync(envDir, { recursive: true });
+    fs.mkdirSync(path.join(siteDir, 'app'), { recursive: true });
+    fs.mkdirSync(path.join(siteDir, 'www'), { recursive: true });
+    fs.mkdirSync(legacyBinDir, { recursive: true });
+    fs.mkdirSync(modernOptBin, { recursive: true });
+
+    // Подставной системный node v10.24.0 (как /usr/bin/node на h33.netangels.ru)
+    const fakeNode10 = path.join(legacyBinDir, 'node');
+    fs.writeFileSync(fakeNode10, '#!/usr/bin/env bash\necho "v10.24.0"\nexit 0\n', { mode: 0o755 });
+
+    // Реальный современный node/npm в каталоге типа /opt/nodejs/<ver>/bin
+    const realNodeDir = path.dirname(process.execPath);
+    fs.symlinkSync(process.execPath, path.join(modernOptBin, 'node'));
+    if (fs.existsSync(path.join(realNodeDir, 'npm'))) {
+      fs.symlinkSync(path.join(realNodeDir, 'npm'), path.join(modernOptBin, 'npm'));
+    }
+
+    fs.writeFileSync(path.join(envDir, 'PATH'), `${legacyBinDir}:/usr/bin:/bin\n`);
+    fs.writeFileSync(path.join(envDir, 'PROMPT_SUFFIX'), `(node.js v${process.versions.node})\n`);
+
+    fs.mkdirSync(path.join(repoDir, 'dist'), { recursive: true });
+    fs.mkdirSync(path.join(repoDir, 'node_modules'), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, 'App.js'), '// entry\n');
+    fs.copyFileSync(path.join(REPO_ROOT, 'package.json'), path.join(repoDir, 'package.json'));
+    fs.copyFileSync(DEPLOY_SCRIPT, path.join(repoDir, 'deploy-netangels.sh'));
+    fs.cpSync(path.join(REPO_ROOT, 'server'), path.join(repoDir, 'server'), { recursive: true });
+    fs.cpSync(path.join(REPO_ROOT, 'node_modules', 'ws'), path.join(repoDir, 'node_modules', 'ws'), {
+      recursive: true,
+    });
+    fs.writeFileSync(path.join(repoDir, 'dist', 'index.html'), '<!doctype html><html><body>467</body></html>');
+    fs.writeFileSync(path.join(repoDir, 'dist', 'version.json'), JSON.stringify({ version: '467', release: 4 }));
+
+    // Даже когда legacyBinDir (v10.24.0) стоит ПЕРВЫМ и в PATH шелла, и в etc/environment/PATH —
+    // скрипт находит современный Node.js по PROMPT_SUFFIX / каталогам рантайма и успешно деплоит!
+    const res = spawnSync(
+      'bash',
+      [path.join(repoDir, 'deploy-netangels.sh'), '--skip-pull', '--skip-build', '--no-healthcheck'],
+      {
+        cwd: siteDir,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${legacyBinDir}:/usr/local/bin:/usr/bin:/bin`,
+          POSITRONIUM_NODE_SEARCH_ROOT: optSearchRoot,
+        },
+      },
+    );
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain(`Node v${process.versions.node}`);
+    expect(res.stderr).not.toContain('v10.24.0');
+  });
 });
