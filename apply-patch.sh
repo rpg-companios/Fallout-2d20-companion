@@ -281,15 +281,86 @@ read_baseline_number() {
   sed -nE 's/.*"baseline"[[:space:]]*:[[:space:]]*"?([0-9]+[[:alnum:]]*)"?.*/\1/p' <<<"$raw" | head -1
 }
 
+resolve_patch_commit() {
+  local num="$1" pname=""
+  [[ -z "$num" ]] && return 1
+  for name in "${ALL_PATCHES[@]}"; do
+    [[ "$(patch_number "$name")" == "$num" ]] && pname="$name"
+  done
+  [[ -n "$pname" ]] || return 1
+  local sha
+  sha="$(git -C "$ROOT_DIR" log "$FETCHED_COMMIT" --diff-filter=A --format=%H -1 -- "patchs/$pname" 2>/dev/null | head -1 || true)"
+  [[ -n "$sha" ]] && git -C "$ROOT_DIR" cat-file -e "$sha" 2>/dev/null || return 1
+  printf '%s' "$sha"
+}
+
 # Приводит рабочее дерево к состоянию ключевого патча: распаковывает его
 # содержимое (кроме каталога патчей) и убирает отслеживаемые файлы,
-# которых в этом состоянии уже нет.
+# которых в этом состоянии уже нет. Если известна предыдущая версия в истории
+# ветки (PREV_VERSION), бережёт собственные коммиты владельца на файлах,
+# которые сама Arena между PREV_VERSION и BASELINE_NUM не меняла (464).
 sync_to_baseline() {
-  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
-  local baseline_files tracked_files stale parent_dir
-  baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
-  tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
-  stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+  local prev_commit preserve_dir plan_file kind f parent_dir
+  local baseline_files tracked_files stale
+  prev_commit="$(resolve_patch_commit "${PREV_VERSION:-}" || true)"
+
+  if [[ -n "$prev_commit" ]]; then
+    preserve_dir="$WORKDIR/owner-preserve"
+    plan_file="$WORKDIR/sync-plan.tsv"
+    mkdir -p "$preserve_dir"
+    {
+      git -c core.quotePath=false -C "$ROOT_DIR" ls-tree -r "$prev_commit" | sed $'s/^/PREV\t/'
+      git -c core.quotePath=false -C "$ROOT_DIR" ls-tree -r "$BASELINE_COMMIT" | sed $'s/^/BASE\t/'
+      git -c core.quotePath=false -C "$ROOT_DIR" ls-files -s | sed $'s/^/IDX\t/'
+    } | awk -F'\t' '
+      $1 == "PREV" {
+        split($2, a, " ")
+        prev_oid[$3] = a[3]
+        in_prev[$3] = 1
+        next
+      }
+      $1 == "BASE" {
+        split($2, a, " ")
+        base_oid[$3] = a[3]
+        in_base[$3] = 1
+        next
+      }
+      $1 == "IDX" {
+        p = $3
+        if (p ~ /^patchs\//) next
+        split($2, a, " ")
+        mode = a[1]
+        oid = a[2]
+        if ((p in in_prev) && (p in in_base) && prev_oid[p] == base_oid[p] && oid != base_oid[p] && mode != "160000") {
+          print "PRESERVE\t" p
+        } else if (!(p in in_base) && ((p in in_prev) || mode == "160000")) {
+          print "STALE\t" p
+        }
+      }
+    ' > "$plan_file"
+
+    while IFS=$'\t' read -r kind f; do
+      [[ "$kind" == "PRESERVE" && -n "$f" && -f "$ROOT_DIR/$f" ]] || continue
+      mkdir -p "$preserve_dir/$(dirname "$f")"
+      cp -p "$ROOT_DIR/$f" "$preserve_dir/$f"
+    done < "$plan_file"
+
+    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+
+    while IFS=$'\t' read -r kind f; do
+      [[ "$kind" == "PRESERVE" && -n "$f" && -f "$preserve_dir/$f" ]] || continue
+      mkdir -p "$ROOT_DIR/$(dirname "$f")"
+      cp -p "$preserve_dir/$f" "$ROOT_DIR/$f"
+    done < "$plan_file"
+
+    stale="$(awk -F'\t' '$1 == "STALE" { print $2 }' "$plan_file" || true)"
+  else
+    git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- . ':(exclude)patchs' | tar -x -C "$ROOT_DIR"
+    baseline_files="$(git -C "$ROOT_DIR" ls-tree -r --name-only "$BASELINE_COMMIT" | grep -v '^patchs/' | sort || true)"
+    tracked_files="$(git -C "$ROOT_DIR" ls-files | grep -v '^patchs/' | sort || true)"
+    stale="$(comm -23 <(printf '%s\n' "$tracked_files") <(printf '%s\n' "$baseline_files") | grep -v '^$' || true)"
+  fi
+
   if [[ -n "$stale" ]]; then
     while IFS= read -r f; do
       [[ -z "$f" || "$f" == "." || "$f" == "/" ]] && continue
