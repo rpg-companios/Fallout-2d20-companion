@@ -13,6 +13,9 @@ import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
 import {
   QUANTITY_UNIT,
+  isAmmoItem,
+  getAmmoFoundSpec,
+  formatAmmoFoundFormula,
   computeMerchantSellPriceToPlayer,
   normalizeSaleMarkupPercent,
 } from '../../../../domain/lootTrade';
@@ -27,16 +30,29 @@ const ContainerItemConfigModal = ({
   onClose,
 }) => {
   useLocale();
+  const ammoMode = isAmmoItem(item);
+  const ammoSpec = ammoMode ? getAmmoFoundSpec(item) : null;
+
   const [count, setCount] = useState('1');
   const [unit, setUnit] = useState(QUANTITY_UNIT.PCS);
   const [markupPercent, setMarkupPercent] = useState('0');
+  const [packsTouched, setPacksTouched] = useState(false);
 
   useEffect(() => {
     if (!visible || !item) return;
-    setCount(String(item.quantity && isEditing ? item.quantity : 1));
-    setUnit(QUANTITY_UNIT.PCS);
+    if (isAmmoItem(item)) {
+      setCount('1');
+      setUnit(QUANTITY_UNIT.PACKS);
+      // В контейнере добычи единственное действие в редактировании — перебросить пачками;
+      // у торговца по умолчанию сохраняем текущий остаток, если Мастер меняет только % наценки.
+      setPacksTouched(!isEditing || !isMerchant);
+    } else {
+      setCount(String(item.quantity && isEditing ? item.quantity : 1));
+      setUnit(QUANTITY_UNIT.PCS);
+      setPacksTouched(false);
+    }
     setMarkupPercent(String(item.markupPercent ?? 0));
-  }, [visible, item, isEditing]);
+  }, [visible, item, isEditing, isMerchant]);
 
   if (!item) return null;
 
@@ -44,6 +60,12 @@ const ContainerItemConfigModal = ({
     const cur = parseInt(count, 10) || 1;
     const next = Math.max(1, cur + delta);
     setCount(String(next));
+    if (ammoMode) setPacksTouched(true);
+  };
+
+  const handleChangeCount = (val) => {
+    setCount(val);
+    if (ammoMode) setPacksTouched(true);
   };
 
   const stepMarkup = (delta) => {
@@ -52,6 +74,7 @@ const ContainerItemConfigModal = ({
     setMarkupPercent(String(next));
   };
 
+  const numericCount = Math.max(1, parseInt(count, 10) || 1);
   const baseCost = Math.max(0, Number(item.cost ?? item.price ?? 0) || 0);
   const parsedMarkup = normalizeSaleMarkupPercent(markupPercent, 0);
   const previewPrice = computeMerchantSellPriceToPlayer(
@@ -59,8 +82,33 @@ const ContainerItemConfigModal = ({
     { saleMarkupPercent: merchantSaleMarkupPercent, capCollectorPercent: 0 },
   );
 
+  const singlePackFormula = ammoSpec ? formatAmmoFoundFormula(ammoSpec) : '';
+  const totalPackFormula = ammoSpec
+    ? formatAmmoFoundFormula({
+        base: numericCount * ammoSpec.base,
+        cd: numericCount * ammoSpec.cd,
+      })
+    : '';
+
   const handleConfirm = () => {
-    const numericCount = Math.max(1, parseInt(count, 10) || 1);
+    if (ammoMode) {
+      if (isEditing && isMerchant && !packsTouched && item.quantity > 0) {
+        onSave({
+          count: item.quantity,
+          unit: QUANTITY_UNIT.PCS,
+          keepExistingQuantity: true,
+          markupPercent: parsedMarkup,
+        });
+        return;
+      }
+      onSave({
+        count: numericCount,
+        unit: QUANTITY_UNIT.PACKS,
+        markupPercent: isMerchant ? parsedMarkup : 0,
+      });
+      return;
+    }
+
     onSave({
       count: numericCount,
       unit,
@@ -80,45 +128,99 @@ const ContainerItemConfigModal = ({
           </Text>
           <Text style={styles.title}>{item.name}</Text>
 
-          <Text style={styles.label}>{tLootTrade('itemConfig.quantityLabel')}</Text>
-          <View style={styles.counterRow}>
-            <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
-              <Text style={styles.circleBtnText}>−</Text>
-            </TouchableOpacity>
-            <TextInput
-              style={styles.countInput}
-              value={count}
-              onChangeText={setCount}
-              keyboardType="number-pad"
-            />
-            <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
-              <Text style={styles.circleBtnText}>+</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.label}>{tLootTrade('itemConfig.unitLabel')}</Text>
-          <View style={styles.unitRow}>
-            {[
-              [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
-              [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
-              [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
-            ].map(([uKey, uLabel]) => (
-              <TouchableOpacity
-                key={uKey}
-                style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
-                onPress={() => setUnit(uKey)}
-              >
-                <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
-                  {uLabel}
+          {ammoMode ? (
+            <>
+              {isEditing && item.quantity > 0 && (
+                <Text style={styles.currentStockText}>
+                  {formatLootTrade(tLootTrade('itemConfig.packsEditCurrentStock'), {
+                    qty: item.quantity,
+                  })}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {unit === QUANTITY_UNIT.CD && (
-            <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
-          )}
-          {unit === QUANTITY_UNIT.D20 && (
-            <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
+              )}
+
+              <Text style={styles.label}>{tLootTrade('itemConfig.packsLabel')}</Text>
+              <View style={styles.counterRow}>
+                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
+                  <Text style={styles.circleBtnText}>−</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.countInput}
+                  value={count}
+                  onChangeText={handleChangeCount}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
+                  <Text style={styles.circleBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.packFormulaPill}>
+                <Text style={styles.packFormulaText}>
+                  {formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+                    formula: singlePackFormula,
+                  })}
+                </Text>
+              </View>
+
+              {(!isEditing || packsTouched) ? (
+                <Text style={styles.hint}>
+                  {ammoSpec?.cd > 0
+                    ? formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
+                        packs: numericCount,
+                        formula: totalPackFormula,
+                      })
+                    : formatLootTrade(tLootTrade('itemConfig.packsFixedHint'), {
+                        packs: numericCount,
+                        total: numericCount * Math.max(1, ammoSpec?.base || 1),
+                      })}
+                </Text>
+              ) : (
+                <Text style={styles.hint}>{tLootTrade('itemConfig.packsEditKeepHint')}</Text>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={styles.label}>{tLootTrade('itemConfig.quantityLabel')}</Text>
+              <View style={styles.counterRow}>
+                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
+                  <Text style={styles.circleBtnText}>−</Text>
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.countInput}
+                  value={count}
+                  onChangeText={handleChangeCount}
+                  keyboardType="number-pad"
+                />
+                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
+                  <Text style={styles.circleBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.label}>{tLootTrade('itemConfig.unitLabel')}</Text>
+              <View style={styles.unitRow}>
+                {[
+                  [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
+                  [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
+                  [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
+                ].map(([uKey, uLabel]) => (
+                  <TouchableOpacity
+                    key={uKey}
+                    style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
+                    onPress={() => setUnit(uKey)}
+                  >
+                    <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
+                      {uLabel}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {unit === QUANTITY_UNIT.CD && (
+                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
+              )}
+              {unit === QUANTITY_UNIT.D20 && (
+                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
+              )}
+            </>
           )}
 
           {isMerchant && item.itemType !== 'caps' && (
@@ -162,10 +264,10 @@ const ContainerItemConfigModal = ({
 
           <View style={styles.footer}>
             <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleConfirm}>
-              <Text style={styles.actionBtnText}>{tLootTrade('itemConfig.save')}</Text>
+              <Text style={styles.saveBtnText}>{tLootTrade('itemConfig.save')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, styles.cancelBtn]} onPress={onClose}>
-              <Text style={styles.actionBtnText}>{tLootTrade('itemConfig.cancel')}</Text>
+              <Text style={styles.cancelBtnText}>{tLootTrade('itemConfig.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -177,23 +279,23 @@ const ContainerItemConfigModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.68)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   card: {
     width: '100%',
     maxWidth: 460,
-    backgroundColor: '#111827',
+    backgroundColor: '#1f1f1f',
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    padding: 20,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    padding: 22,
     alignItems: 'center',
   },
   subtitle: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
@@ -206,8 +308,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 12,
   },
+  currentStockText: {
+    color: '#d4d4d4',
+    fontSize: 12,
+    marginBottom: 4,
+  },
   label: {
-    color: '#e5e7eb',
+    color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 8,
@@ -224,26 +331,41 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#374151',
+    backgroundColor: '#2e2e2e',
     borderWidth: 1,
-    borderColor: '#6b7280',
+    borderColor: '#666666',
     justifyContent: 'center',
     alignItems: 'center',
   },
   circleBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 22,
     fontWeight: '700',
   },
   countInput: {
     width: 110,
     height: 42,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2a2a2a',
     borderWidth: 1,
-    borderColor: '#9ca3af',
+    borderColor: '#777777',
     borderRadius: 8,
-    color: '#fff',
+    color: '#f5f5f5',
     fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  packFormulaPill: {
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#2d2a1e',
+    borderWidth: 1,
+    borderColor: '#d4af37',
+  },
+  packFormulaText: {
+    color: '#f0e68c',
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -256,62 +378,63 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#6b7280',
-    backgroundColor: '#1f2937',
+    borderColor: '#5a5a5a',
+    backgroundColor: '#2a2a2a',
   },
   unitBtnActive: {
     backgroundColor: '#f0e68c',
-    borderColor: '#f0e68c',
+    borderColor: '#d4af37',
   },
   unitBtnText: {
-    color: '#e5e7eb',
+    color: '#e0e0e0',
     fontSize: 14,
     fontWeight: '700',
   },
   unitBtnTextActive: {
-    color: '#111827',
+    color: '#1a1a1a',
   },
   hint: {
-    color: '#9ca3af',
+    color: '#b0b0b0',
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 5,
+    marginTop: 6,
+    lineHeight: 16,
   },
   markupSection: {
     width: '100%',
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: '#3d3d3d',
     alignItems: 'center',
   },
   smallStepBtn: {
-    backgroundColor: '#374151',
+    backgroundColor: '#2e2e2e',
     paddingHorizontal: 8,
     paddingVertical: 7,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#6b7280',
+    borderColor: '#666666',
   },
   smallStepText: {
-    color: '#fff',
+    color: '#e8e8e8',
     fontSize: 12,
     fontWeight: '700',
   },
   markupInput: {
     width: 78,
     height: 38,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2a2a2a',
     borderWidth: 1,
-    borderColor: '#9ca3af',
+    borderColor: '#777777',
     borderRadius: 8,
-    color: '#fff',
+    color: '#f5f5f5',
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
   },
   previewPrice: {
-    color: '#86efac',
+    color: '#f0e68c',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 6,
@@ -325,16 +448,28 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
   },
-  saveBtn: { backgroundColor: '#2e7d32' },
-  cancelBtn: { backgroundColor: '#b91c1c' },
-  actionBtnText: {
-    color: '#fff',
+  saveBtn: {
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
+  },
+  saveBtnText: {
+    color: '#f0e68c',
     fontSize: 15,
     fontWeight: '700',
+  },
+  cancelBtn: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#777777',
+  },
+  cancelBtnText: {
+    color: '#d4d4d4',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

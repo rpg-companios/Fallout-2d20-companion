@@ -4,13 +4,24 @@
 // остаток предметов и касса торговца сразу сохраняются в локальную БД Мастера
 // и фоном отправляются в Google Drive — даже если Мастер в этот момент смотрит
 // другую вкладку («Список кампаний» или лист персонажа).
+// Если из контейнера добычи забрали весь лут — раздача закрывается автоматически,
+// а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
 
 import * as db from '../../db';
 import useRoomStore, { onRoomSessionState } from '../room/roomStore';
-import { syncGmContainerToCloudIfEnabled } from '../../components/cloudSync/googleDriveSync';
+import {
+  syncGmContainerToCloudIfEnabled,
+  deleteGmContainerFromCloudIfEnabled,
+} from '../../components/cloudSync/googleDriveSync';
+import { showRawAlert } from '../../components/alerts/alertService';
+import {
+  tLootTrade,
+  formatLootTrade,
+} from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
 import { debugLog } from '../debug/falloutDebug';
 
 const gmContainerSyncListeners = new Set();
+const promptedEmptySessionIds = new Set();
 
 export const subscribeGmContainerUpdates = (listener) => {
   gmContainerSyncListeners.add(listener);
@@ -25,6 +36,10 @@ export const notifyGmContainerUpdated = (containerId) => {
   });
 };
 
+export const resetPromptedEmptySessionsForTests = () => {
+  promptedEmptySessionIds.clear();
+};
+
 export const startGmSessionPersistence = () => {
   return onRoomSessionState(async (envelope) => {
     try {
@@ -33,6 +48,7 @@ export const startGmSessionPersistence = () => {
       const room = useRoomStore.getState().rooms[code];
       if (!room || room.role !== 'gm') return;
 
+      const closedReason = envelope?.payload?.closedReason || null;
       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
       if (!session?.containerId) return;
 
@@ -55,6 +71,44 @@ export const startGmSessionPersistence = () => {
 
       await db.saveGmContainer(nextContainer);
       notifyGmContainerUpdated(existing.id);
+
+      const promptKey = String(session.sessionId || `${code}:${existing.id}:${session.revision || 0}`);
+      if (
+        closedReason === 'loot_emptied'
+        && existing.kind === 'loot'
+        && !promptedEmptySessionIds.has(promptKey)
+      ) {
+        promptedEmptySessionIds.add(promptKey);
+        void syncGmContainerToCloudIfEnabled(existing.id);
+        showRawAlert({
+          title: tLootTrade('detail.emptyLootPromptTitle'),
+          message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
+            name: existing.name,
+          }),
+          buttons: [
+            { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
+            {
+              text: tLootTrade('card.delete'),
+              style: 'destructive',
+              onPress: () => {
+                void (async () => {
+                  try {
+                    await deleteGmContainerFromCloudIfEnabled(existing.id);
+                    await db.deleteGmContainer(existing.id);
+                    notifyGmContainerUpdated(existing.id);
+                  } catch (err) {
+                    debugLog('gm.sessionPersistence.deleteEmpty:failed', {
+                      message: err?.message || String(err),
+                    });
+                  }
+                })();
+              },
+            },
+          ],
+        });
+        return;
+      }
+
       void syncGmContainerToCloudIfEnabled(existing.id);
     } catch (error) {
       debugLog('gm.sessionPersistence:failed', {

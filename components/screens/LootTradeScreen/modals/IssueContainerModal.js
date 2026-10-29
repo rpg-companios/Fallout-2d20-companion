@@ -129,10 +129,10 @@ const IssueContainerModal = ({
               disabled={!canSubmit}
               onPress={handleConfirm}
             >
-              <Text style={styles.btnText}>{tLootTrade('issueModal.confirm')}</Text>
+              <Text style={styles.confirmBtnText}>{tLootTrade('issueModal.confirm')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
-              <Text style={styles.btnText}>{tLootTrade('issueModal.cancel')}</Text>
+              <Text style={styles.cancelBtnText}>{tLootTrade('issueModal.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -144,20 +144,20 @@ const IssueContainerModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.68)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   card: {
     width: '100%',
     maxWidth: 460,
     maxHeight: '86%',
-    backgroundColor: '#111827',
+    backgroundColor: '#1f1f1f',
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    padding: 20,
   },
   title: {
     color: '#f0e68c',
@@ -166,29 +166,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   roomSub: {
-    color: '#d1d5db',
+    color: '#cccccc',
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   sectionTitle: {
-    color: '#e5e7eb',
+    color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 8,
   },
   optionCard: {
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#1f2937',
+    borderColor: '#555555',
+    backgroundColor: '#2a2a2a',
     borderRadius: 8,
-    padding: 11,
+    padding: 12,
     marginBottom: 8,
   },
   optionCardActive: {
     borderColor: '#f0e68c',
-    backgroundColor: '#292524',
+    backgroundColor: '#333120',
   },
   optionRow: {
     flexDirection: 'row',
@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   optionTitle: {
-    color: '#f9fafb',
+    color: '#f2f2f2',
     fontSize: 14,
     fontWeight: '700',
   },
   optionHint: {
-    color: '#9ca3af',
+    color: '#a8a8a8',
     fontSize: 11,
     marginTop: 4,
     marginLeft: 28,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   emptyChars: {
-    color: '#fca5a5',
+    color: '#e57373',
     fontSize: 12,
     textAlign: 'center',
     paddingVertical: 10,
@@ -225,24 +225,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#374151',
-    backgroundColor: '#1f2937',
+    borderColor: '#4d4d4d',
+    backgroundColor: '#2a2a2a',
     marginBottom: 6,
   },
   charRowActive: {
     borderColor: '#f0e68c',
-    backgroundColor: 'rgba(212,175,55,0.2)',
+    backgroundColor: '#363320',
   },
   dot: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
   },
-  dotOnline: { backgroundColor: '#22c55e' },
-  dotOffline: { backgroundColor: '#6b7280' },
+  dotOnline: { backgroundColor: '#d4af37' },
+  dotOffline: { backgroundColor: '#777777' },
   charName: {
     flex: 1,
-    color: '#e5e7eb',
+    color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -251,28 +251,40 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   charStatus: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 11,
   },
   footer: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
+    marginTop: 16,
   },
   btn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
   },
-  confirmBtn: { backgroundColor: '#15803d' },
-  cancelBtn: { backgroundColor: '#b91c1c' },
-  btnDisabled: { opacity: 0.45 },
-  btnText: {
-    color: '#fff',
+  confirmBtn: {
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
+  },
+  confirmBtnText: {
+    color: '#f0e68c',
     fontSize: 15,
     fontWeight: '700',
   },
+  cancelBtn: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#777777',
+  },
+  cancelBtnText: {
+    color: '#d4d4d4',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  btnDisabled: { opacity: 0.45 },
 });
 
 export default IssueContainerModal;

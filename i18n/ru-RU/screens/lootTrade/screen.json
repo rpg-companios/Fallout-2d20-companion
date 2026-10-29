@@ -57,10 +57,14 @@
     "editItem": "Изм.",
     "removeItem": "✕",
     "rollNotice": "Бросок {dice} {unit}: выпало {total} шт.",
+    "packsRollNotice": "Пачки ({packs} × [{formula}]): выпало {total} шт.",
     "rollZeroNotice": "Бросок {dice} {unit}: выпало 0 — предмет не добавлен.",
     "capsRollNotice": "Касса по броску {dice} {unit}: {total} кр.",
     "deleteConfirmTitle": "Удалить карточку?",
-    "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке."
+    "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке.",
+    "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
+    "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
+    "emptyLootKeep": "Оставить"
   },
   "catalog": {
     "titleLoot": "Добавить в контейнер",
@@ -75,6 +79,12 @@
     "titleAdd": "Настройка позиции",
     "titleEdit": "Изменить позицию",
     "quantityLabel": "Количество",
+    "packsLabel": "Количество пачек",
+    "packFormulaBadge": "В 1 пачке: {formula}",
+    "packsTotalRollHint": "Будет брошено за {packs} пач.: {formula}",
+    "packsFixedHint": "Фиксированная выдача за {packs} пач.: {total} шт.",
+    "packsEditCurrentStock": "Сейчас в наличии: {qty} шт.",
+    "packsEditKeepHint": "Измените число пачек, чтобы перебросить запас (иначе сохранится текущее количество).",
     "unitLabel": "Единица измерения",
     "unitPcs": "шт.",
     "unitCd": "CD",

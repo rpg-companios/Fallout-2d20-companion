@@ -116,6 +116,7 @@ describe('Патч 468 — локальная БД gm_containers, облачна
 
   it('все новые модули экрана «Добыча/Торговля» и модалки игрока не имеют необъявленных идентификаторов', () => {
     const newFiles = [
+      'domain/ammoFoundTable.js',
       'domain/lootTrade.js',
       'src/lootTrade/grantCharacterItems.js',
       'src/lootTrade/gmSessionPersistence.js',

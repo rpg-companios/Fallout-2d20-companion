@@ -13,10 +13,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory, formatInventoryText } from '../../InventoryScreen/logic/inventoryI18n';
-import { tLootTrade } from '../logic/lootTradeI18n';
+import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
-import addStyles from '../../../../styles/AddItemModal.styles';
 import { describeItemBasics } from '../../../../domain/itemBasics';
+import {
+  isAmmoItem,
+  getAmmoFoundSpec,
+  formatAmmoFoundFormula,
+} from '../../../../domain/lootTrade';
 import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal';
 import {
   buildEquipmentFilterOptions,
@@ -356,26 +360,32 @@ const ContainerCatalogModal = ({
       );
       return (
         <TouchableOpacity
-          style={addStyles.itemContainer}
+          style={localStyles.itemContainer}
           onPress={() => setCurrentPath([...currentPath, item])}
         >
-          <Text style={addStyles.itemName}>{item}</Text>
-          <Text style={addStyles.itemType}>{CATEGORY_ICONS[iconKey] || '📁'}</Text>
+          <Text style={localStyles.itemName}>{item}</Text>
+          <Text style={localStyles.itemType}>{CATEGORY_ICONS[iconKey] || '📁'}</Text>
         </TouchableOpacity>
       );
     }
 
-    const basicsLine = item.__isLooseCaps
+    const baseBasics = item.__isLooseCaps
       ? tLootTrade('catalog.looseCapsSub')
       : describeItemBasics(item, moduleLocale);
+    const ammoPackNote = !item.__isLooseCaps && isAmmoItem(item)
+      ? formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+          formula: formatAmmoFoundFormula(getAmmoFoundSpec(item)),
+        })
+      : '';
+    const basicsLine = [ammoPackNote, baseBasics].filter(Boolean).join(' • ');
 
     return (
-      <View style={[addStyles.itemContainer, localStyles.itemRowWithBtn]}>
+      <View style={[localStyles.itemContainer, localStyles.itemRowWithBtn]}>
         <View style={localStyles.itemInfoCol}>
-          <Text style={addStyles.itemName}>
+          <Text style={localStyles.itemName}>
             {item.__isLooseCaps ? `💰 ${item.name}` : item.name}
           </Text>
-          {Boolean(basicsLine) && <Text style={addStyles.itemBasics}>{basicsLine}</Text>}
+          {Boolean(basicsLine) && <Text style={localStyles.itemBasics}>{basicsLine}</Text>}
         </View>
         <TouchableOpacity
           style={localStyles.chooseBtn}
@@ -389,9 +399,9 @@ const ContainerCatalogModal = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={addStyles.modalContainer}>
-        <SafeAreaView style={addStyles.modalContent}>
-          <Text style={addStyles.title}>
+      <View style={localStyles.modalContainer}>
+        <SafeAreaView style={localStyles.modalContent}>
+          <Text style={localStyles.title}>
             {currentPath.length > 0 && !searchTerm && !filterActive
               ? currentPath[currentPath.length - 1]
               : (filterActive
@@ -407,46 +417,47 @@ const ContainerCatalogModal = ({
 
           {currentPath.length > 0 && !searchTerm && !filterActive && (
             <TouchableOpacity
-              style={addStyles.backButton}
+              style={localStyles.backButton}
               onPress={() => setCurrentPath(currentPath.slice(0, -1))}
             >
-              <Text style={addStyles.backButtonText}>{tLootTrade('catalog.back')}</Text>
+              <Text style={localStyles.backButtonText}>{tLootTrade('catalog.back')}</Text>
             </TouchableOpacity>
           )}
 
-          <View style={addStyles.filterToolbar}>
+          <View style={localStyles.filterToolbar}>
             <TextInput
-              style={[addStyles.searchInput, addStyles.searchInputInToolbar]}
+              style={localStyles.searchInput}
               placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
+              placeholderTextColor="#8c8c8c"
               value={searchTerm}
               onChangeText={setSearchTerm}
             />
             <TouchableOpacity
-              style={addStyles.filterToggle}
+              style={localStyles.filterToggle}
               onPress={() => setFilterOpen((prev) => !prev)}
             >
-              <MaterialCommunityIcons name="filter" style={addStyles.filterIcon} />
+              <MaterialCommunityIcons name="filter" style={localStyles.filterIcon} />
               {activeFilterCount > 0 && (
-                <View style={addStyles.filterBadge}>
-                  <Text style={addStyles.filterBadgeText}>{activeFilterCount}</Text>
+                <View style={localStyles.filterBadge}>
+                  <Text style={localStyles.filterBadgeText}>{activeFilterCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
           </View>
 
-          <View style={addStyles.listDivider} />
+          <View style={localStyles.listDivider} />
 
           <FlatList
             data={listEntries}
             renderItem={renderEntry}
             keyExtractor={(item, index) => `${typeof item === 'object' ? (item.id || item.name) : item}-${index}`}
             ListEmptyComponent={
-              <Text style={addStyles.emptyText}>{tInventory('modals.addItemModal.emptyCategory')}</Text>
+              <Text style={localStyles.emptyText}>{tInventory('modals.addItemModal.emptyCategory')}</Text>
             }
           />
 
-          <TouchableOpacity style={addStyles.closeButton} onPress={onClose}>
-            <Text style={addStyles.closeButtonText}>{tLootTrade('catalog.close')}</Text>
+          <TouchableOpacity style={localStyles.closeButton} onPress={onClose}>
+            <Text style={localStyles.closeButtonText}>{tLootTrade('catalog.close')}</Text>
           </TouchableOpacity>
 
           <EquipmentFilterModal
@@ -478,6 +489,114 @@ const ContainerCatalogModal = ({
 };
 
 const localStyles = StyleSheet.create({
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+    paddingHorizontal: 18,
+    paddingVertical: 24,
+  },
+  modalContent: {
+    width: '92%',
+    maxWidth: 680,
+    height: '84%',
+    backgroundColor: '#1f1f1f',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#f0e68c',
+    marginBottom: 12,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+  },
+  backButtonText: {
+    color: '#f0e68c',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterToolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    backgroundColor: '#2a2a2a',
+    color: '#f0f0f0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 14,
+  },
+  filterToggle: {
+    width: 40,
+    height: 40,
+    marginLeft: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#666666',
+    backgroundColor: '#2e2e2e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterIcon: {
+    fontSize: 20,
+    color: '#f0e68c',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: '#d4af37',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1,
+    borderColor: '#1f1f1f',
+  },
+  filterBadgeText: {
+    color: '#1a1a1a',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  listDivider: {
+    height: 1,
+    backgroundColor: '#3d3d3d',
+    marginVertical: 6,
+  },
+  itemContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   itemRowWithBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -487,31 +606,67 @@ const localStyles = StyleSheet.create({
   itemInfoCol: {
     flex: 1,
   },
+  itemName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#ededed',
+    paddingRight: 8,
+  },
+  itemType: {
+    fontSize: 15,
+    color: '#d4af37',
+  },
+  itemBasics: {
+    fontSize: 12,
+    color: '#a8a8a8',
+    marginTop: 2,
+  },
+  emptyText: {
+    textAlign: 'center',
+    marginVertical: 24,
+    color: '#9e9e9e',
+  },
   chooseBtn: {
-    backgroundColor: '#2e7d32',
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 6,
   },
   chooseBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 13,
     fontWeight: '700',
   },
   feedbackBanner: {
-    backgroundColor: '#ecfdf5',
+    backgroundColor: '#2d2a1e',
     borderWidth: 1,
-    borderColor: '#10b981',
+    borderColor: '#d4af37',
     borderRadius: 6,
     paddingVertical: 6,
     paddingHorizontal: 10,
     marginBottom: 8,
   },
   feedbackText: {
-    color: '#065f46',
+    color: '#f0e68c',
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  closeButton: {
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#777777',
+    paddingVertical: 11,
+    borderRadius: 8,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#e0e0e0',
+    fontWeight: '700',
+    fontSize: 15,
   },
 });
 

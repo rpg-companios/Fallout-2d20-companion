@@ -8,6 +8,19 @@
 // - дублирование контейнеров и слияние одинаковых позиций.
 
 import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
+import {
+  AMMO_FOUND_BY_ID,
+  isAmmoItem,
+  getAmmoFoundSpec,
+  formatAmmoFoundFormula,
+} from './ammoFoundTable';
+
+export {
+  AMMO_FOUND_BY_ID,
+  isAmmoItem,
+  getAmmoFoundSpec,
+  formatAmmoFoundFormula,
+};
 
 export const CONTAINER_KIND = Object.freeze({
   LOOT: 'loot',
@@ -18,6 +31,7 @@ export const QUANTITY_UNIT = Object.freeze({
   PCS: 'pcs',
   CD: 'cd',
   D20: 'd20',
+  PACKS: 'packs',
 });
 
 export const DEFAULT_MERCHANT_CAPS = 200;
@@ -53,17 +67,22 @@ export const normalizeCapsAmount = (value, fallback = 0) =>
 
 /**
  * Немедленное вычисление количества при сохранении позиции или кассы торговца:
- * - 'pcs' (шт.) — точное число;
- * - 'cd'  (CD)  — бросок N боевых костей Fallout 2d20 (0..2 за кость);
- * - 'd20' (d20) — бросок Nd20.
+ * - 'pcs'   (шт.)   — точное число;
+ * - 'cd'    (CD)    — бросок N боевых костей Fallout 2d20 (0..2 за кость);
+ * - 'd20'   (d20)   — сумма N бросков d20 (Nd20);
+ * - 'packs' (пачки) — выдача патронов пачками по таблице нахождения (base + cd за пачку).
  */
 export const resolveQuantitySpec = (
-  { count = 1, unit = QUANTITY_UNIT.PCS, allowZeroPcs = false } = {},
+  { count = 1, unit = QUANTITY_UNIT.PCS, item = null, allowZeroPcs = false } = {},
   deps = {},
 ) => {
-  const normalizedUnit = [QUANTITY_UNIT.PCS, QUANTITY_UNIT.CD, QUANTITY_UNIT.D20].includes(unit)
-    ? unit
-    : QUANTITY_UNIT.PCS;
+  const validUnits = [
+    QUANTITY_UNIT.PCS,
+    QUANTITY_UNIT.CD,
+    QUANTITY_UNIT.D20,
+    QUANTITY_UNIT.PACKS,
+  ];
+  const normalizedUnit = validUnits.includes(unit) ? unit : QUANTITY_UNIT.PCS;
   const parsedCount = Math.floor(Number(count));
 
   if (normalizedUnit === QUANTITY_UNIT.PCS) {
@@ -76,6 +95,40 @@ export const resolveQuantitySpec = (
       diceCount: 0,
       rolls: [],
       effects: 0,
+    };
+  }
+
+  if (normalizedUnit === QUANTITY_UNIT.PACKS) {
+    const packCount = Number.isFinite(parsedCount) && parsedCount >= 1
+      ? Math.min(100, parsedCount)
+      : 1;
+    const spec = getAmmoFoundSpec(item);
+    const baseTotal = packCount * spec.base;
+    const diceCount = packCount * spec.cd;
+    let cdTotal = 0;
+    let rolls = [];
+    let effects = 0;
+
+    if (diceCount > 0) {
+      const rollCd = deps.rollCombatDice || rollMultipleCombatDice;
+      const res = rollCd(diceCount);
+      cdTotal = Math.max(0, Math.floor(Number(res?.total) || 0));
+      rolls = Array.isArray(res?.rolls) ? res.rolls : [];
+      effects = Math.max(0, Math.floor(Number(res?.effects) || 0));
+    }
+
+    const total = Math.max(1, baseTotal + cdTotal);
+    return {
+      quantity: total,
+      rolled: true,
+      unit: QUANTITY_UNIT.PACKS,
+      packCount,
+      packSpec: spec,
+      formula: formatAmmoFoundFormula(spec),
+      totalFormula: formatAmmoFoundFormula({ base: baseTotal, cd: diceCount }),
+      diceCount,
+      rolls,
+      effects,
     };
   }
 
@@ -95,15 +148,43 @@ export const resolveQuantitySpec = (
     };
   }
 
-  const rollD20 = deps.rollD20 || ((n) => rollCustomDice(`${n}d20`));
-  const res = rollD20(diceCount);
-  const total = Math.max(1, Math.floor(Number(res?.total) || diceCount));
+  // Бросок Nd20: поддерживаем как инъекцию deps.rollD20 (число либо { total, rolls }),
+  // так и поштучный бросок N костей d20 с честным суммированием всех выпавших граней.
+  if (typeof deps.rollD20 === 'function') {
+    const res = deps.rollD20(diceCount);
+    const numericRes = typeof res === 'number' ? res : Number(res?.total);
+    const rolls = Array.isArray(res?.rolls) ? res.rolls : [];
+    const rollsSum = rolls.length > 0
+      ? rolls.reduce((acc, v) => acc + (Number(v) || 0), 0)
+      : diceCount;
+    const total = Math.max(
+      diceCount,
+      Math.floor(Number.isFinite(numericRes) && numericRes > 0 ? numericRes : rollsSum),
+    );
+    return {
+      quantity: total,
+      rolled: true,
+      unit: QUANTITY_UNIT.D20,
+      diceCount,
+      rolls,
+      effects: 0,
+    };
+  }
+
+  const rollSingleD20 = deps.rollSingleD20 || (() => Number(rollCustomDice('1d20')) || 1);
+  const rolls = [];
+  let sum = 0;
+  for (let i = 0; i < diceCount; i += 1) {
+    const face = clampNumber(Math.floor(Number(rollSingleD20(i)) || 1), 1, 20, 1);
+    rolls.push(face);
+    sum += face;
+  }
   return {
-    quantity: total,
+    quantity: sum,
     rolled: true,
     unit: QUANTITY_UNIT.D20,
     diceCount,
-    rolls: Array.isArray(res?.rolls) ? res.rolls : [],
+    rolls,
     effects: 0,
   };
 };

@@ -101,7 +101,11 @@ interface RoomStoreState {
     sessionId: string;
     characterId: string;
     takes: Array<{ entryId: string; quantity: number }>;
-  }) => Promise<{ granted: any[]; session: ActiveLootTradeSession }>;
+  }) => Promise<{
+    granted: any[];
+    session: ActiveLootTradeSession | null;
+    closedReason?: string | null;
+  }>;
   commitMerchantTrade: (input: {
     code: string;
     sessionId: string;
@@ -557,7 +561,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       );
       return {
         granted: response.payload?.granted || [],
-        session: response.payload?.session as ActiveLootTradeSession,
+        session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
+        closedReason: response.payload?.closedReason || null,
       };
     },
 

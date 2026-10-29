@@ -413,9 +413,9 @@ export default function PlayerLootTradeOverlay() {
         animationType="slide"
         onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={styles.lootModalBackdrop}>
           <SafeAreaView style={styles.lootModalCard}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
               <View style={styles.modalTitleRow}>
                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
                 <Text style={styles.modalTitle}>{activeSession.name}</Text>
@@ -429,10 +429,15 @@ export default function PlayerLootTradeOverlay() {
             </View>
 
             {Boolean(activeSession.description) && (
-              <Text style={styles.modalDesc}>{activeSession.description}</Text>
+              <Text style={[styles.modalDesc, styles.lootDescSpacing]}>
+                {activeSession.description}
+              </Text>
             )}
 
-            <ScrollView style={styles.lootScroll}>
+            <ScrollView
+              style={styles.lootScroll}
+              contentContainerStyle={styles.lootScrollContent}
+            >
               {items.length === 0 ? (
                 <Text style={styles.emptyText}>{tLootTrade('player.lootEmpty')}</Text>
               ) : (
@@ -462,7 +467,7 @@ export default function PlayerLootTradeOverlay() {
                             disabled={busy}
                             onPress={() => handleTakeLoot([{ entryId: entry.entryId, quantity: 1 }])}
                           >
-                            <Text style={styles.takeBtnText}>{tLootTrade('player.takeOne')}</Text>
+                            <Text style={styles.takeOneBtnText}>{tLootTrade('player.takeOne')}</Text>
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity
@@ -470,7 +475,7 @@ export default function PlayerLootTradeOverlay() {
                           disabled={busy}
                           onPress={() => handleTakeLoot([{ entryId: entry.entryId, quantity: entry.quantity }])}
                         >
-                          <Text style={styles.takeBtnText}>
+                          <Text style={styles.takeAllRowBtnText}>
                             {entry.quantity > 1 && !isCaps
                               ? formatLootTrade(tLootTrade('player.takeAllRow'), { qty: entry.quantity })
                               : tLootTrade('player.takeOne')}
@@ -886,12 +891,12 @@ const styles = StyleSheet.create({
     zIndex: 90,
   },
   floatingPill: {
-    backgroundColor: '#111827',
-    borderWidth: 2,
-    borderColor: '#d4af37',
+    backgroundColor: '#1f1f1f',
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
     borderRadius: 24,
-    paddingVertical: 9,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
@@ -904,144 +909,180 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   floatingPillAction: {
-    color: '#86efac',
+    color: '#d4af37',
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
   },
-  modalBackdrop: {
+  lootModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.68)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.68)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 20,
   },
   lootModalCard: {
     width: '100%',
-    maxWidth: 560,
-    maxHeight: '88%',
-    backgroundColor: '#111827',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    padding: 16,
+    maxWidth: 540,
+    maxHeight: '82%',
+    backgroundColor: '#1f1f1f',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    paddingHorizontal: 24,
+    paddingVertical: 22,
   },
   merchantModalCard: {
     width: '100%',
     maxWidth: 1040,
-    height: '92%',
-    backgroundColor: '#111827',
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    padding: 12,
+    height: '90%',
+    backgroundColor: '#1f1f1f',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 10,
+  },
+  lootHeaderSpacing: {
+    marginBottom: 8,
   },
   modalTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flex: 1,
   },
   modalTitle: {
     color: '#f0e68c',
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     flexShrink: 1,
   },
   minimizeBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#6b7280',
-    backgroundColor: '#1f2937',
+    borderColor: '#777777',
+    backgroundColor: '#2a2a2a',
   },
   minimizeBtnText: {
-    color: '#e5e7eb',
+    color: '#e5e5e5',
     fontSize: 12,
     fontWeight: '600',
   },
   modalDesc: {
-    color: '#d1d5db',
-    fontSize: 12,
+    color: '#cccccc',
+    fontSize: 13,
     fontStyle: 'italic',
     marginTop: 4,
+    lineHeight: 18,
+  },
+  lootDescSpacing: {
+    marginTop: 2,
+    marginBottom: 6,
   },
   lootScroll: {
     marginTop: 10,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
+    marginBottom: 4,
     maxHeight: 420,
   },
+  lootScrollContent: {
+    paddingVertical: 4,
+    gap: 10,
+  },
   emptyText: {
-    color: '#6b7280',
+    color: '#a3a3a3',
     fontSize: 13,
     textAlign: 'center',
-    paddingVertical: 26,
-    paddingHorizontal: 12,
+    paddingVertical: 28,
+    paddingHorizontal: 16,
   },
   lootRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#484848',
+    backgroundColor: '#2a2a2a',
+    gap: 12,
   },
   lootRowInfo: {
     flex: 1,
     paddingRight: 8,
   },
   lootRowTitle: {
-    color: '#111827',
-    fontSize: 14,
+    color: '#f0f0f0',
+    fontSize: 15,
     fontWeight: '700',
   },
   lootRowSub: {
-    color: '#6b7280',
-    fontSize: 11,
-    marginTop: 2,
+    color: '#b0b0b0',
+    fontSize: 12,
+    marginTop: 3,
   },
   lootRowBtns: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   takeOneBtn: {
-    backgroundColor: '#374151',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor: '#777777',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 6,
+  },
+  takeOneBtnText: {
+    color: '#e8e8e8',
+    fontSize: 12,
+    fontWeight: '700',
   },
   takeAllRowBtn: {
-    backgroundColor: '#15803d',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
     borderRadius: 6,
   },
-  takeBtnText: {
-    color: '#fff',
+  takeAllRowBtnText: {
+    color: '#f0e68c',
     fontSize: 12,
     fontWeight: '700',
   },
   lootFooter: {
-    marginTop: 12,
+    marginTop: 18,
+    paddingTop: 4,
   },
   primaryActionBtn: {
-    backgroundColor: '#2e7d32',
-    paddingVertical: 12,
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
+    paddingVertical: 13,
     borderRadius: 8,
     alignItems: 'center',
   },
   primaryActionBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -1055,23 +1096,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 10,
-    marginTop: 6,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
-    backgroundColor: '#1f2937',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
     borderRadius: 6,
   },
   ratesStripText: {
-    color: '#e5e7eb',
+    color: '#e5e5e5',
     fontSize: 12,
   },
   personalBadgeText: {
-    color: '#fde68a',
+    color: '#f0e68c',
     fontSize: 11,
     fontWeight: '700',
   },
   perkBadgeText: {
-    color: '#86efac',
+    color: '#d4af37',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1086,22 +1129,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#1f2937',
+    borderColor: '#5a5a5a',
+    backgroundColor: '#2a2a2a',
     alignItems: 'center',
   },
   mobileTabBtnActive: {
     backgroundColor: '#f0e68c',
-    borderColor: '#f0e68c',
+    borderColor: '#d4af37',
   },
   mobileTabText: {
-    color: '#d1d5db',
+    color: '#d4d4d4',
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
   mobileTabTextActive: {
-    color: '#111827',
+    color: '#1a1a1a',
   },
   twoPanesContainer: {
     flex: 1,
@@ -1111,19 +1154,19 @@ const styles = StyleSheet.create({
   },
   pane: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#242424',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#9ca3af',
+    borderColor: '#5a5a5a',
     overflow: 'hidden',
   },
   paneHalf: {
     width: '50%',
   },
   paneHeader: {
-    backgroundColor: '#1f2937',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    backgroundColor: '#2d2a1e',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1136,7 +1179,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   paneHeaderCaps: {
-    color: '#fde68a',
+    color: '#f0e68c',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1144,14 +1187,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bufferBox: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#1b1b1b',
     borderBottomWidth: 2,
-    borderBottomColor: '#d1d5db',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderBottomColor: '#4d4d4d',
+    paddingVertical: 7,
+    paddingHorizontal: 11,
   },
   bufferHeader: {
-    color: '#6b7280',
+    color: '#a3a3a3',
     fontSize: 11,
     fontStyle: 'italic',
     marginBottom: 4,
@@ -1162,23 +1205,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: '#333333',
   },
   bufferItalicText: {
     flex: 1,
-    color: '#6b7280',
+    color: '#9e9e9e',
     fontStyle: 'italic',
     fontSize: 13,
     paddingRight: 8,
   },
   bufferClearAllBtn: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor: '#666666',
   },
   bufferClearAllText: {
-    color: '#4b5563',
+    color: '#d4d4d4',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1186,64 +1231,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderBottomColor: '#363636',
+    backgroundColor: '#2a2a2a',
   },
   tradeRowInfo: {
     flex: 1,
     paddingRight: 8,
   },
   tradeRowName: {
-    color: '#111827',
+    color: '#f0f0f0',
     fontSize: 13,
     fontWeight: '700',
   },
   tradeRowBasics: {
-    color: '#6b7280',
+    color: '#a8a8a8',
     fontSize: 11,
     marginTop: 1,
   },
   tradeRowPrice: {
-    color: '#047857',
+    color: '#f0e68c',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
   },
   tradeRowPriceBuy: {
-    color: '#b45309',
+    color: '#d4af37',
     fontSize: 12,
     fontWeight: '700',
     marginTop: 2,
   },
   tradeRowBtns: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 6,
   },
   miniMoveBtn: {
-    backgroundColor: '#374151',
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 5,
   },
   miniMoveAllBtn: {
-    backgroundColor: '#4b5563',
+    backgroundColor: '#333333',
+    borderWidth: 1,
+    borderColor: '#777777',
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 5,
   },
   miniMoveBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 11,
     fontWeight: '700',
   },
   barterFooter: {
-    marginTop: 8,
-    paddingTop: 8,
+    marginTop: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: '#444444',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1255,22 +1304,22 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   barterBalanceText: {
-    color: '#f9fafb',
+    color: '#f2f2f2',
     fontSize: 14,
     fontWeight: '700',
   },
   barterReceiveText: {
-    color: '#86efac',
+    color: '#f0e68c',
     fontSize: 14,
     fontWeight: '700',
   },
   barterErrorText: {
-    color: '#fca5a5',
+    color: '#e57373',
     fontSize: 12,
     fontWeight: '700',
   },
   barterWarnText: {
-    color: '#fde68a',
+    color: '#d4af37',
     fontSize: 11,
     marginTop: 2,
   },
@@ -1280,13 +1329,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clearBufBtn: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#374151',
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#777777',
   },
   clearBufBtnText: {
-    color: '#e5e7eb',
+    color: '#e0e0e0',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1294,10 +1345,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#15803d',
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
   },
   commitTradeBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 14,
     fontWeight: '700',
   },

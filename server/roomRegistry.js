@@ -218,8 +218,29 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
   const lootTake = ({ code, clientId, payload }) => {
     const room = rooms.get(code);
     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const hadItemsBefore = Array.isArray(room.activeSession?.items)
+      && room.activeSession.items.length > 0;
     const result = applyAtomicLootTake(room.activeSession, payload, now());
     if (result.error) return result;
+
+    // Если из контейнера добычи забрали весь лут — автоматически закрываем контейнер и раздачу.
+    const autoClosed = Boolean(
+      result.session
+      && result.session.kind === 'loot'
+      && result.session.items.length === 0
+      && (hadItemsBefore || result.granted.length > 0),
+    );
+    if (autoClosed) {
+      room.activeSession = null;
+      return {
+        room,
+        granted: result.granted,
+        session: null,
+        closedSession: result.session,
+        autoClosedReason: 'loot_emptied',
+      };
+    }
+
     room.activeSession = result.session;
     return { room, granted: result.granted, session: result.session };
   };

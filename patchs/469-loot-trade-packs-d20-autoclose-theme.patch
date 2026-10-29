@@ -1,0 +1,3318 @@
+diff --git a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+index 437571d..b3ea421 100644
+--- a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
++++ b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+@@ -116,6 +116,7 @@ describe('Патч 468 — локальная БД gm_containers, облачна
+ 
+   it('все новые модули экрана «Добыча/Торговля» и модалки игрока не имеют необъявленных идентификаторов', () => {
+     const newFiles = [
++      'domain/ammoFoundTable.js',
+       'domain/lootTrade.js',
+       'src/lootTrade/grantCharacterItems.js',
+       'src/lootTrade/gmSessionPersistence.js',
+diff --git a/__tests__/lootTrade/loot-trade-refinements-469.test.js b/__tests__/lootTrade/loot-trade-refinements-469.test.js
+new file mode 100644
+index 0000000..31f8f04
+--- /dev/null
++++ b/__tests__/lootTrade/loot-trade-refinements-469.test.js
+@@ -0,0 +1,314 @@
++import fs from 'fs';
++import path from 'path';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++const alertCalls = [];
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web', select: (obj) => obj?.web ?? obj?.default },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: vi.fn((cfg) => {
++    alertCalls.push(cfg);
++  }),
++  showCatalogAlert: vi.fn(),
++}));
++
++const cloudDeleteMock = vi.fn().mockResolvedValue({ ok: true });
++const cloudSyncMock = vi.fn().mockResolvedValue({ ok: true });
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteCharacterFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncGmContainerToCloudIfEnabled: (...args) => cloudSyncMock(...args),
++  deleteGmContainerFromCloudIfEnabled: (...args) => cloudDeleteMock(...args),
++  syncAllCharactersWithCloud: vi.fn().mockResolvedValue({ uploaded: 0, downloaded: 0 }),
++  openCloudFolderInDrive: vi.fn().mockResolvedValue(undefined),
++}));
++
++import {
++  QUANTITY_UNIT,
++  AMMO_FOUND_BY_ID,
++  isAmmoItem,
++  getAmmoFoundSpec,
++  formatAmmoFoundFormula,
++  resolveQuantitySpec,
++} from '../../domain/lootTrade';
++import * as db from '../../db';
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import useRoomStore, {
++  setRoomClientFactoryForTests,
++  resetRoomClientForTests,
++} from '../../src/room/roomStore';
++import { setCurrentLocale } from '../../i18n/locale';
++import {
++  startGmSessionPersistence,
++  resetPromptedEmptySessionsForTests,
++} from '../../src/lootTrade/gmSessionPersistence';
++
++const repoRoot = path.resolve(__dirname, '../..');
++
++describe('Патч 469 — доработки «Добычи/Торговли» (3d20, пачки патронов, автозакрытие пустого лута, серый+жёлтый стиль)', () => {
++  beforeEach(async () => {
++    setCurrentLocale('ru-RU');
++    alertCalls.length = 0;
++    cloudDeleteMock.mockClear();
++    cloudSyncMock.mockClear();
++    resetPromptedEmptySessionsForTests();
++    resetRoomClientForTests();
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++    if (typeof localStorage !== 'undefined') localStorage.clear();
++    await db.initDatabase();
++  });
++
++  it('бросок 3d20 возвращает честную сумму 3 костей d20 (а не число кубов 3) для крышек и предметов', () => {
++    const seq = [14, 7, 19];
++    const deterministic = resolveQuantitySpec(
++      { count: 3, unit: QUANTITY_UNIT.D20 },
++      { rollSingleD20: (idx) => seq[idx] },
++    );
++    expect(deterministic.rolled).toBe(true);
++    expect(deterministic.unit).toBe('d20');
++    expect(deterministic.diceCount).toBe(3);
++    expect(deterministic.rolls).toEqual([14, 7, 19]);
++    expect(deterministic.quantity).toBe(40);
++
++    // Проверяем реальный генератор без моков на 40 прогонах 3d20:
++    // все значения в диапазоне 3..60 и не залипают на константе 3!
++    const realTotals = [];
++    for (let i = 0; i < 40; i += 1) {
++      const r = resolveQuantitySpec({ count: 3, unit: QUANTITY_UNIT.D20 });
++      expect(r.rolls).toHaveLength(3);
++      expect(r.quantity).toBe(r.rolls.reduce((s, x) => s + x, 0));
++      expect(r.quantity).toBeGreaterThanOrEqual(3);
++      expect(r.quantity).toBeLessThanOrEqual(60);
++      realTotals.push(r.quantity);
++    }
++    expect(realTotals.some((val) => val > 3)).toBe(true);
++  });
++
++  it('таблица нахождения патронов 1-в-1 совпадает с docs/reference-data/ammo-found-table.json и покрывает все патроны модуля', () => {
++    const refTable = JSON.parse(
++      fs.readFileSync(path.join(repoRoot, 'docs/reference-data/ammo-found-table.json'), 'utf8'),
++    );
++    for (const row of refTable) {
++      expect(AMMO_FOUND_BY_ID[row.id]).toEqual({
++        base: row.found.base,
++        cd: row.found.cd,
++      });
++    }
++
++    const catalogAmmo = JSON.parse(
++      fs.readFileSync(path.join(repoRoot, 'modules/fallout/data/equipment/ammo.json'), 'utf8'),
++    );
++    for (const ammo of catalogAmmo) {
++      expect(isAmmoItem({ ...ammo, itemType: 'ammo' })).toBe(true);
++      const spec = getAmmoFoundSpec(ammo);
++      expect(spec.base).toBeGreaterThanOrEqual(1);
++      expect(spec.cd).toBeGreaterThanOrEqual(0);
++    }
++
++    // 1 пачка .308 = 6 + 3 CD; за 3 пачки = 18 + 9 CD
++    const roll308 = resolveQuantitySpec(
++      {
++        count: 3,
++        unit: QUANTITY_UNIT.PACKS,
++        item: { id: 'ammo_308', itemType: 'ammo' },
++      },
++      {
++        rollCombatDice: (n) => {
++          expect(n).toBe(9);
++          return { total: 11, rolls: [1, 2, 1, 0, 2, 1, 2, 1, 1], effects: 3 };
++        },
++      },
++    );
++    expect(roll308.packCount).toBe(3);
++    expect(roll308.formula).toBe('6 + 3 CD');
++    expect(roll308.totalFormula).toBe('18 + 9 CD');
++    expect(roll308.quantity).toBe(29); // 18 + 11
++
++    // Ядерный блок (1 без кубов): 2 пачки = ровно 2 шт.
++    const rollCore = resolveQuantitySpec({
++      count: 2,
++      unit: QUANTITY_UNIT.PACKS,
++      item: { id: 'ammo_fusion_core', itemType: 'ammo' },
++    });
++    expect(formatAmmoFoundFormula(getAmmoFoundSpec('ammo_fusion_core'))).toBe('1');
++    expect(rollCore.quantity).toBe(2);
++  });
++
++  it('когда забирают последний предмет из контейнера добычи — раздача и модалка закрываются, а Мастер получает вопрос «Контейнер пуст. Хотите удалить?»', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    // Подключаем GM через useRoomStore + фоновую службу сохранения Мастера
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      url: wsUrl,
++      clientId: 'gm-empty-test:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: input.onStatus,
++      onMessage: input.onMessage,
++    }));
++    const stopPersistence = startGmSessionPersistence();
++
++    const playerBox = [];
++    const playerWs = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-empty-test:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => playerBox.push(m),
++    });
++
++    const waitPlayerMsg = (pred, timeoutMs = 4000) => new Promise((resolve, reject) => {
++      const started = Date.now();
++      const t = setInterval(() => {
++        const idx = playerBox.findIndex(pred);
++        if (idx >= 0) {
++          const [hit] = playerBox.splice(idx, 1);
++          clearInterval(t);
++          resolve(hit);
++          return;
++        }
++        if (Date.now() - started > timeoutMs) {
++          clearInterval(t);
++          reject(new Error('timeout waiting player msg'));
++        }
++      }, 12);
++    });
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Кампания Пустоши' });
++      const code = created.code;
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++      playerWs.send('room.join', { code, name: 'Выживший', role: 'player', requestId: 'jp1' }, code);
++      await waitPlayerMsg((m) => m.type === 'room.state' && m.payload?.requestId === 'jp1');
++
++      const savedLoot = await db.saveGmContainer({
++        id: 'cnt_test_auto_close',
++        kind: 'loot',
++        name: 'Ящик с припасами',
++        roomCode: code,
++        roomName: 'Кампания Пустоши',
++        items: [
++          { entryId: 'e1', itemId: 'chem_stimpak', itemType: 'chems', name: 'Стимулятор', quantity: 2, cost: 40, weight: 0 },
++        ],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: savedLoot.id,
++          kind: 'loot',
++          name: savedLoot.name,
++          targetType: 'room',
++          items: savedLoot.items,
++        },
++      });
++      await waitPlayerMsg((m) => m.type === 'session.state' && m.payload?.session?.sessionId === opened.sessionId);
++
++      // 1) Игрок берёт только 1 из 2 стимуляторов — контейнер НЕ пуст, раздача продолжается
++      playerWs.send(ROOM_MESSAGE.SESSION_LOOT_TAKE, {
++        code,
++        sessionId: opened.sessionId,
++        characterId: 'char_1',
++        takes: [{ entryId: 'e1', quantity: 1 }],
++        requestId: 'take-partial',
++      }, code);
++      const partialRes = await waitPlayerMsg((m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-partial');
++      expect(partialRes.payload.session?.items).toHaveLength(1);
++      expect(partialRes.payload.session?.items[0].quantity).toBe(1);
++      expect(alertCalls).toHaveLength(0);
++
++      // 2) Игрок забирает последний стимулятор — сессия автоматически закрывается (session: null)!
++      playerWs.send(ROOM_MESSAGE.SESSION_LOOT_TAKE, {
++        code,
++        sessionId: opened.sessionId,
++        characterId: 'char_1',
++        takes: [{ entryId: 'e1', quantity: 1 }],
++        requestId: 'take-final',
++      }, code);
++      const finalRes = await waitPlayerMsg((m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-final');
++      expect(finalRes.payload.granted).toHaveLength(1);
++      expect(finalRes.payload.session).toBeNull();
++      expect(finalRes.payload.closedReason).toBe('loot_emptied');
++
++      // Ждём обработки фоновым слушателем Мастера
++      await new Promise((r) => setTimeout(r, 80));
++
++      expect(useRoomStore.getState().rooms[code]?.activeSession).toBeNull();
++      const updatedInDb = await db.getGmContainerById(savedLoot.id);
++      expect(updatedInDb.items).toEqual([]);
++
++      // Мастеру показан вопрос «Контейнер пуст. Хотите удалить?»
++      expect(alertCalls).toHaveLength(1);
++      expect(alertCalls[0].title).toBe('Контейнер пуст. Хотите удалить?');
++
++      // Нажимаем «Удалить» в модальном окне Мастера
++      const deleteBtn = alertCalls[0].buttons.find((b) => b.style === 'destructive');
++      expect(deleteBtn).toBeTruthy();
++      deleteBtn.onPress();
++      await new Promise((r) => setTimeout(r, 60));
++
++      expect(await db.getGmContainerById(savedLoot.id)).toBeNull();
++      expect(cloudDeleteMock).toHaveBeenCalledWith(savedLoot.id);
++    } finally {
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      stopPersistence();
++      playerWs.close();
++      await app.close();
++    }
++  });
++
++  it('все модалки «Добычи/Торговли» используют серо-жёлтую палитру приложения, а модалка лута игрока имеет увеличенные отступы и воздух', () => {
++    const modalFiles = [
++      'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
++      'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js',
++      'components/screens/LootTradeScreen/modals/ContainerCatalogModal.js',
++      'components/screens/LootTradeScreen/modals/IssueContainerModal.js',
++      'components/lootTrade/PlayerLootTradeOverlay.js',
++    ];
++
++    for (const relPath of modalFiles) {
++      const src = fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
++      expect(src).toContain('#1f1f1f');
++      expect(src).toContain('#f0e68c');
++      // Никаких сине-сланцевых и ярко-зелёных цветов в новых модалках
++      expect(src).not.toContain('#111827');
++      expect(src).not.toContain('#1f2937');
++      expect(src).not.toContain('#2e7d32');
++      expect(src).not.toContain('#15803d');
++    }
++
++    // Модалка настройки предмета использует режим пачек для патронов без выбора шт./CD/d20
++    const itemConfigSrc = fs.readFileSync(
++      path.join(repoRoot, 'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js'),
++      'utf8',
++    );
++    expect(itemConfigSrc).toContain('QUANTITY_UNIT.PACKS');
++    expect(itemConfigSrc).toContain('itemConfig.packsLabel');
++    expect(itemConfigSrc).toContain('itemConfig.packFormulaBadge');
++
++    // У модалки лута игрока просторные внешние отступы по краям и внутренний воздух
++    const overlaySrc = fs.readFileSync(
++      path.join(repoRoot, 'components/lootTrade/PlayerLootTradeOverlay.js'),
++      'utf8',
++    );
++    expect(overlaySrc).toContain('lootModalBackdrop');
++    expect(overlaySrc).toContain('paddingHorizontal: 28');
++    expect(overlaySrc).toContain('paddingVertical: 36');
++    expect(overlaySrc).toContain('paddingHorizontal: 24');
++    expect(overlaySrc).toContain('paddingVertical: 22');
++  });
++});
+diff --git a/__tests__/lootTrade/loot-trade-room-session-468.test.js b/__tests__/lootTrade/loot-trade-room-session-468.test.js
+index 79ace60..5c89e69 100644
+--- a/__tests__/lootTrade/loot-trade-room-session-468.test.js
++++ b/__tests__/lootTrade/loot-trade-room-session-468.test.js
+@@ -157,25 +157,28 @@ describe('Патч 468 — живой WS-сервер сессий Добычи
+         code,
+       );
+ 
+-      const res1 = await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload.requestId === 'take-p1');
+-      const res2 = await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload.requestId === 'take-p2');
++      const res1 = await waitMsg(
++        p1Box,
++        (m) => (m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE || m.type === ROOM_MESSAGE.ERROR)
++          && m.payload.requestId === 'take-p1',
++      );
++      const res2 = await waitMsg(
++        p2Box,
++        (m) => (m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE || m.type === ROOM_MESSAGE.ERROR)
++          && m.payload.requestId === 'take-p2',
++      );
+ 
+-      const totalStimsGranted = [
++      const combinedGranted = [
+         ...(res1.payload.granted || []),
+         ...(res2.payload.granted || []),
+-      ]
++      ];
++      const totalStimsGranted = combinedGranted
+         .filter((g) => g.itemId === 'chem_stimpak')
+         .reduce((s, g) => s + g.quantity, 0);
+ 
+       // Атомарность пула: суммарно выдано ровно 3 стимулятора, никакого дублирования!
+       expect(totalStimsGranted).toBe(3);
+ 
+-      // Начисляем в стор того игрока, который успел забрать добычу, с активным перком «Фармацевт» (pharmaFarmer):
+-      // бонус перка начисляется ПОВЕРХ базового содержимого контейнера.
+-      const winnerGranted = (res1.payload.granted || []).length > 0
+-        ? res1.payload.granted
+-        : res2.payload.granted;
+-
+       useCharacterStore.getState().resetCharacterStore();
+       useCharacterStore.setState({
+         currency: 10,
+@@ -191,7 +194,7 @@ describe('Патч 468 — живой WS-сервер сессий Добычи
+         },
+       });
+ 
+-      const grantedSummary = grantLootEntriesToCharacter(winnerGranted);
++      const grantedSummary = grantLootEntriesToCharacter(combinedGranted);
+       expect(grantedSummary.addedCaps).toBe(25);
+       expect(useCharacterStore.getState().currency).toBe(35);
+       expect(grantedSummary.bonusMessages.length).toBe(1);
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 275ce22..1050d53 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -413,9 +413,9 @@ export default function PlayerLootTradeOverlay() {
+         animationType="slide"
+         onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+       >
+-        <View style={styles.modalBackdrop}>
++        <View style={styles.lootModalBackdrop}>
+           <SafeAreaView style={styles.lootModalCard}>
+-            <View style={styles.modalHeader}>
++            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+               <View style={styles.modalTitleRow}>
+                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
+                 <Text style={styles.modalTitle}>{activeSession.name}</Text>
+@@ -429,10 +429,15 @@ export default function PlayerLootTradeOverlay() {
+             </View>
+ 
+             {Boolean(activeSession.description) && (
+-              <Text style={styles.modalDesc}>{activeSession.description}</Text>
++              <Text style={[styles.modalDesc, styles.lootDescSpacing]}>
++                {activeSession.description}
++              </Text>
+             )}
+ 
+-            <ScrollView style={styles.lootScroll}>
++            <ScrollView
++              style={styles.lootScroll}
++              contentContainerStyle={styles.lootScrollContent}
++            >
+               {items.length === 0 ? (
+                 <Text style={styles.emptyText}>{tLootTrade('player.lootEmpty')}</Text>
+               ) : (
+@@ -462,7 +467,7 @@ export default function PlayerLootTradeOverlay() {
+                             disabled={busy}
+                             onPress={() => handleTakeLoot([{ entryId: entry.entryId, quantity: 1 }])}
+                           >
+-                            <Text style={styles.takeBtnText}>{tLootTrade('player.takeOne')}</Text>
++                            <Text style={styles.takeOneBtnText}>{tLootTrade('player.takeOne')}</Text>
+                           </TouchableOpacity>
+                         )}
+                         <TouchableOpacity
+@@ -470,7 +475,7 @@ export default function PlayerLootTradeOverlay() {
+                           disabled={busy}
+                           onPress={() => handleTakeLoot([{ entryId: entry.entryId, quantity: entry.quantity }])}
+                         >
+-                          <Text style={styles.takeBtnText}>
++                          <Text style={styles.takeAllRowBtnText}>
+                             {entry.quantity > 1 && !isCaps
+                               ? formatLootTrade(tLootTrade('player.takeAllRow'), { qty: entry.quantity })
+                               : tLootTrade('player.takeOne')}
+@@ -886,12 +891,12 @@ const styles = StyleSheet.create({
+     zIndex: 90,
+   },
+   floatingPill: {
+-    backgroundColor: '#111827',
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
++    backgroundColor: '#1f1f1f',
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
+     borderRadius: 24,
+-    paddingVertical: 9,
+-    paddingHorizontal: 16,
++    paddingVertical: 10,
++    paddingHorizontal: 18,
+     elevation: 8,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 3 },
+@@ -904,144 +909,180 @@ const styles = StyleSheet.create({
+     fontSize: 13,
+   },
+   floatingPillAction: {
+-    color: '#86efac',
++    color: '#d4af37',
+     fontSize: 11,
+     fontWeight: '600',
+     marginTop: 2,
+   },
++  lootModalBackdrop: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.68)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    paddingHorizontal: 28,
++    paddingVertical: 36,
++  },
+   modalBackdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.72)',
++    backgroundColor: 'rgba(0,0,0,0.68)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 10,
++    paddingHorizontal: 18,
++    paddingVertical: 20,
+   },
+   lootModalCard: {
+     width: '100%',
+-    maxWidth: 560,
+-    maxHeight: '88%',
+-    backgroundColor: '#111827',
+-    borderRadius: 12,
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
+-    padding: 16,
++    maxWidth: 540,
++    maxHeight: '82%',
++    backgroundColor: '#1f1f1f',
++    borderRadius: 14,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 24,
++    paddingVertical: 22,
+   },
+   merchantModalCard: {
+     width: '100%',
+     maxWidth: 1040,
+-    height: '92%',
+-    backgroundColor: '#111827',
+-    borderRadius: 12,
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
+-    padding: 12,
++    height: '90%',
++    backgroundColor: '#1f1f1f',
++    borderRadius: 14,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 16,
++    paddingVertical: 14,
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    gap: 8,
++    gap: 10,
++  },
++  lootHeaderSpacing: {
++    marginBottom: 8,
+   },
+   modalTitleRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+-    gap: 8,
++    gap: 10,
+     flex: 1,
+   },
+   modalTitle: {
+     color: '#f0e68c',
+-    fontSize: 18,
++    fontSize: 19,
+     fontWeight: '700',
+     flexShrink: 1,
+   },
+   minimizeBtn: {
+-    paddingHorizontal: 12,
+-    paddingVertical: 6,
++    paddingHorizontal: 13,
++    paddingVertical: 7,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
+-    backgroundColor: '#1f2937',
++    borderColor: '#777777',
++    backgroundColor: '#2a2a2a',
+   },
+   minimizeBtnText: {
+-    color: '#e5e7eb',
++    color: '#e5e5e5',
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   modalDesc: {
+-    color: '#d1d5db',
+-    fontSize: 12,
++    color: '#cccccc',
++    fontSize: 13,
+     fontStyle: 'italic',
+     marginTop: 4,
++    lineHeight: 18,
++  },
++  lootDescSpacing: {
++    marginTop: 2,
++    marginBottom: 6,
+   },
+   lootScroll: {
+     marginTop: 10,
+-    backgroundColor: '#f9fafb',
+-    borderRadius: 8,
++    marginBottom: 4,
+     maxHeight: 420,
+   },
++  lootScrollContent: {
++    paddingVertical: 4,
++    gap: 10,
++  },
+   emptyText: {
+-    color: '#6b7280',
++    color: '#a3a3a3',
+     fontSize: 13,
+     textAlign: 'center',
+-    paddingVertical: 26,
+-    paddingHorizontal: 12,
++    paddingVertical: 28,
++    paddingHorizontal: 16,
+   },
+   lootRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    paddingVertical: 10,
+-    paddingHorizontal: 12,
+-    borderBottomWidth: 1,
+-    borderBottomColor: '#e5e7eb',
+-    backgroundColor: '#fff',
++    paddingVertical: 13,
++    paddingHorizontal: 16,
++    borderRadius: 8,
++    borderWidth: 1,
++    borderColor: '#484848',
++    backgroundColor: '#2a2a2a',
++    gap: 12,
+   },
+   lootRowInfo: {
+     flex: 1,
+     paddingRight: 8,
+   },
+   lootRowTitle: {
+-    color: '#111827',
+-    fontSize: 14,
++    color: '#f0f0f0',
++    fontSize: 15,
+     fontWeight: '700',
+   },
+   lootRowSub: {
+-    color: '#6b7280',
+-    fontSize: 11,
+-    marginTop: 2,
++    color: '#b0b0b0',
++    fontSize: 12,
++    marginTop: 3,
+   },
+   lootRowBtns: {
+     flexDirection: 'row',
+-    gap: 6,
++    gap: 8,
+   },
+   takeOneBtn: {
+-    backgroundColor: '#374151',
+-    paddingHorizontal: 10,
+-    paddingVertical: 7,
++    backgroundColor: '#333333',
++    borderWidth: 1,
++    borderColor: '#777777',
++    paddingHorizontal: 12,
++    paddingVertical: 8,
+     borderRadius: 6,
+   },
++  takeOneBtnText: {
++    color: '#e8e8e8',
++    fontSize: 12,
++    fontWeight: '700',
++  },
+   takeAllRowBtn: {
+-    backgroundColor: '#15803d',
+-    paddingHorizontal: 12,
+-    paddingVertical: 7,
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 13,
++    paddingVertical: 8,
+     borderRadius: 6,
+   },
+-  takeBtnText: {
+-    color: '#fff',
++  takeAllRowBtnText: {
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   lootFooter: {
+-    marginTop: 12,
++    marginTop: 18,
++    paddingTop: 4,
+   },
+   primaryActionBtn: {
+-    backgroundColor: '#2e7d32',
+-    paddingVertical: 12,
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    paddingVertical: 13,
+     borderRadius: 8,
+     alignItems: 'center',
+   },
+   primaryActionBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
+@@ -1055,23 +1096,25 @@ const styles = StyleSheet.create({
+     flexWrap: 'wrap',
+     alignItems: 'center',
+     gap: 10,
+-    marginTop: 6,
+-    paddingVertical: 5,
+-    paddingHorizontal: 8,
+-    backgroundColor: '#1f2937',
++    marginTop: 8,
++    paddingVertical: 6,
++    paddingHorizontal: 10,
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#4a4a4a',
+     borderRadius: 6,
+   },
+   ratesStripText: {
+-    color: '#e5e7eb',
++    color: '#e5e5e5',
+     fontSize: 12,
+   },
+   personalBadgeText: {
+-    color: '#fde68a',
++    color: '#f0e68c',
+     fontSize: 11,
+     fontWeight: '700',
+   },
+   perkBadgeText: {
+-    color: '#86efac',
++    color: '#d4af37',
+     fontSize: 11,
+     fontWeight: '700',
+   },
+@@ -1086,22 +1129,22 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 6,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#1f2937',
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2a2a2a',
+     alignItems: 'center',
+   },
+   mobileTabBtnActive: {
+     backgroundColor: '#f0e68c',
+-    borderColor: '#f0e68c',
++    borderColor: '#d4af37',
+   },
+   mobileTabText: {
+-    color: '#d1d5db',
++    color: '#d4d4d4',
+     fontSize: 12,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   mobileTabTextActive: {
+-    color: '#111827',
++    color: '#1a1a1a',
+   },
+   twoPanesContainer: {
+     flex: 1,
+@@ -1111,19 +1154,19 @@ const styles = StyleSheet.create({
+   },
+   pane: {
+     flex: 1,
+-    backgroundColor: '#f9fafb',
++    backgroundColor: '#242424',
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
++    borderColor: '#5a5a5a',
+     overflow: 'hidden',
+   },
+   paneHalf: {
+     width: '50%',
+   },
+   paneHeader: {
+-    backgroundColor: '#1f2937',
+-    paddingVertical: 8,
+-    paddingHorizontal: 10,
++    backgroundColor: '#2d2a1e',
++    paddingVertical: 9,
++    paddingHorizontal: 12,
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+@@ -1136,7 +1179,7 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+   },
+   paneHeaderCaps: {
+-    color: '#fde68a',
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+   },
+@@ -1144,14 +1187,14 @@ const styles = StyleSheet.create({
+     flex: 1,
+   },
+   bufferBox: {
+-    backgroundColor: '#f3f4f6',
++    backgroundColor: '#1b1b1b',
+     borderBottomWidth: 2,
+-    borderBottomColor: '#d1d5db',
+-    paddingVertical: 6,
+-    paddingHorizontal: 10,
++    borderBottomColor: '#4d4d4d',
++    paddingVertical: 7,
++    paddingHorizontal: 11,
+   },
+   bufferHeader: {
+-    color: '#6b7280',
++    color: '#a3a3a3',
+     fontSize: 11,
+     fontStyle: 'italic',
+     marginBottom: 4,
+@@ -1162,23 +1205,25 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingVertical: 6,
+     borderTopWidth: 1,
+-    borderTopColor: '#e5e7eb',
++    borderTopColor: '#333333',
+   },
+   bufferItalicText: {
+     flex: 1,
+-    color: '#6b7280',
++    color: '#9e9e9e',
+     fontStyle: 'italic',
+     fontSize: 13,
+     paddingRight: 8,
+   },
+   bufferClearAllBtn: {
+-    paddingHorizontal: 7,
++    paddingHorizontal: 8,
+     paddingVertical: 3,
+     borderRadius: 4,
+-    backgroundColor: '#e5e7eb',
++    backgroundColor: '#333333',
++    borderWidth: 1,
++    borderColor: '#666666',
+   },
+   bufferClearAllText: {
+-    color: '#4b5563',
++    color: '#d4d4d4',
+     fontSize: 11,
+     fontWeight: '700',
+   },
+@@ -1186,64 +1231,68 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    paddingVertical: 8,
+-    paddingHorizontal: 10,
++    paddingVertical: 9,
++    paddingHorizontal: 11,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#e5e7eb',
+-    backgroundColor: '#fff',
++    borderBottomColor: '#363636',
++    backgroundColor: '#2a2a2a',
+   },
+   tradeRowInfo: {
+     flex: 1,
+     paddingRight: 8,
+   },
+   tradeRowName: {
+-    color: '#111827',
++    color: '#f0f0f0',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   tradeRowBasics: {
+-    color: '#6b7280',
++    color: '#a8a8a8',
+     fontSize: 11,
+     marginTop: 1,
+   },
+   tradeRowPrice: {
+-    color: '#047857',
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+     marginTop: 2,
+   },
+   tradeRowPriceBuy: {
+-    color: '#b45309',
++    color: '#d4af37',
+     fontSize: 12,
+     fontWeight: '700',
+     marginTop: 2,
+   },
+   tradeRowBtns: {
+     flexDirection: 'row',
+-    gap: 5,
++    gap: 6,
+   },
+   miniMoveBtn: {
+-    backgroundColor: '#374151',
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
+     paddingHorizontal: 9,
+     paddingVertical: 6,
+     borderRadius: 5,
+   },
+   miniMoveAllBtn: {
+-    backgroundColor: '#4b5563',
++    backgroundColor: '#333333',
++    borderWidth: 1,
++    borderColor: '#777777',
+     paddingHorizontal: 9,
+     paddingVertical: 6,
+     borderRadius: 5,
+   },
+   miniMoveBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 11,
+     fontWeight: '700',
+   },
+   barterFooter: {
+-    marginTop: 8,
+-    paddingTop: 8,
++    marginTop: 10,
++    paddingTop: 10,
+     borderTopWidth: 1,
+-    borderTopColor: '#374151',
++    borderTopColor: '#444444',
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+@@ -1255,22 +1304,22 @@ const styles = StyleSheet.create({
+     minWidth: 200,
+   },
+   barterBalanceText: {
+-    color: '#f9fafb',
++    color: '#f2f2f2',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   barterReceiveText: {
+-    color: '#86efac',
++    color: '#f0e68c',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   barterErrorText: {
+-    color: '#fca5a5',
++    color: '#e57373',
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   barterWarnText: {
+-    color: '#fde68a',
++    color: '#d4af37',
+     fontSize: 11,
+     marginTop: 2,
+   },
+@@ -1280,13 +1329,15 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   clearBufBtn: {
+-    paddingHorizontal: 12,
++    paddingHorizontal: 13,
+     paddingVertical: 10,
+     borderRadius: 8,
+-    backgroundColor: '#374151',
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#777777',
+   },
+   clearBufBtnText: {
+-    color: '#e5e7eb',
++    color: '#e0e0e0',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+@@ -1294,10 +1345,12 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 18,
+     paddingVertical: 10,
+     borderRadius: 8,
+-    backgroundColor: '#15803d',
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
+   },
+   commitTradeBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 276e478..5245840 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -165,7 +165,7 @@ const ContainerCardCell = ({
+         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+         accessibilityLabel={tLootTrade('card.openMenu')}
+       >
+-        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
++        <MaterialCommunityIcons name="dots-vertical" size={20} color="#555555" />
+       </TouchableOpacity>
+ 
+       <Modal
+@@ -184,7 +184,7 @@ const ContainerCardCell = ({
+                 <MaterialCommunityIcons
+                   name={isLive ? 'close-octagon-outline' : 'broadcast'}
+                   size={19}
+-                  color={isLive ? '#b91c1c' : '#15803d'}
++                  color={isLive ? '#e57373' : '#f0e68c'}
+                 />
+                 <Text style={styles.actionMenuText}>
+                   {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
+@@ -195,7 +195,7 @@ const ContainerCardCell = ({
+                 style={styles.actionMenuItem}
+                 onPress={() => runMenuAction(onDuplicate)}
+               >
+-                <MaterialCommunityIcons name="content-copy" size={19} color="#111827" />
++                <MaterialCommunityIcons name="content-copy" size={19} color="#d4af37" />
+                 <Text style={styles.actionMenuText}>{tLootTrade('card.duplicate')}</Text>
+               </TouchableOpacity>
+ 
+@@ -203,7 +203,7 @@ const ContainerCardCell = ({
+                 style={styles.actionMenuItem}
+                 onPress={() => runMenuAction(onEdit)}
+               >
+-                <MaterialCommunityIcons name="pencil-outline" size={19} color="#111827" />
++                <MaterialCommunityIcons name="pencil-outline" size={19} color="#d4af37" />
+                 <Text style={styles.actionMenuText}>{tLootTrade('card.edit')}</Text>
+               </TouchableOpacity>
+ 
+@@ -211,7 +211,7 @@ const ContainerCardCell = ({
+                 style={styles.actionMenuItem}
+                 onPress={() => runMenuAction(onDelete)}
+               >
+-                <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
++                <MaterialCommunityIcons name="delete-outline" size={19} color="#e57373" />
+                 <Text style={[styles.actionMenuText, styles.actionMenuDeleteText]}>
+                   {tLootTrade('card.delete')}
+                 </Text>
+@@ -300,6 +300,12 @@ export default function LootTradeScreen() {
+     [containers, activeContainerId],
+   );
+ 
++  useEffect(() => {
++    if (!loading && activeContainerId && !containers.some((c) => c.id === activeContainerId)) {
++      setActiveContainerId(null);
++    }
++  }, [loading, activeContainerId, containers]);
++
+   const getActiveSessionForContainer = useCallback((cnt) => {
+     if (!cnt?.roomCode) return null;
+     const active = roomRooms[cnt.roomCode]?.activeSession;
+@@ -491,11 +497,28 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  const formatRollBannerForItem = (itemName, roll) => {
++    if (roll.unit === 'packs') {
++      return `${itemName}: ${formatLootTrade(tLootTrade('detail.packsRollNotice'), {
++        packs: roll.packCount || 1,
++        formula: roll.formula || '',
++        total: roll.quantity,
++      })}`;
++    }
++    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
++    return `${itemName}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
++      dice: roll.diceCount,
++      unit: unitLabel,
++      total: roll.quantity,
++    })}`;
++  };
++
+   const handleAddCatalogItem = async (pickedItem, spec) => {
+     if (!activeContainer) return;
+     const roll = resolveQuantitySpec({
+       count: spec.count,
+       unit: spec.unit,
++      item: pickedItem,
+       allowZeroPcs: false,
+     });
+ 
+@@ -537,11 +560,7 @@ export default function LootTradeScreen() {
+     });
+ 
+     const msg = roll.rolled
+-      ? `${pickedItem.name}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
+-          dice: roll.diceCount,
+-          unit: unitLabel,
+-          total: roll.quantity,
+-        })}`
++      ? formatRollBannerForItem(pickedItem.name, roll)
+       : `✓ ${pickedItem.name} ×${roll.quantity}`;
+     setCatalogFeedback(msg);
+     if (roll.rolled) showTimedBanner(msg);
+@@ -566,15 +585,23 @@ export default function LootTradeScreen() {
+ 
+   const handleSaveEditedRow = async (spec) => {
+     if (!activeContainer || !editingEntry) return;
+-    const roll = resolveQuantitySpec({
+-      count: spec.count,
+-      unit: spec.unit,
+-      allowZeroPcs: false,
+-    });
++    const targetEntry = editingEntry;
++    const roll = spec.keepExistingQuantity
++      ? {
++          quantity: targetEntry.quantity,
++          rolled: false,
++          unit: 'pcs',
++        }
++      : resolveQuantitySpec({
++          count: spec.count,
++          unit: spec.unit,
++          item: targetEntry,
++          allowZeroPcs: false,
++        });
+     const nextItems = roll.quantity <= 0
+-      ? activeContainer.items.filter((it) => it.entryId !== editingEntry.entryId)
++      ? activeContainer.items.filter((it) => it.entryId !== targetEntry.entryId)
+       : activeContainer.items.map((it) => (
+-          it.entryId === editingEntry.entryId
++          it.entryId === targetEntry.entryId
+             ? {
+                 ...it,
+                 quantity: roll.quantity,
+@@ -586,6 +613,9 @@ export default function LootTradeScreen() {
+         ));
+     setEditingEntry(null);
+     await persistAndSyncContainer({ ...activeContainer, items: nextItems });
++    if (roll.rolled && roll.quantity > 0) {
++      showTimedBanner(formatRollBannerForItem(targetEntry.name, roll));
++    }
+   };
+ 
+   const applyLiveMerchantRates = async ({
+diff --git a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+index 6daf5c5..c39d6e7 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+@@ -13,10 +13,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+ import { tInventory, formatInventoryText } from '../../InventoryScreen/logic/inventoryI18n';
+-import { tLootTrade } from '../logic/lootTradeI18n';
++import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import { useLocale, useModuleLocale } from '../../../../i18n/locale';
+-import addStyles from '../../../../styles/AddItemModal.styles';
+ import { describeItemBasics } from '../../../../domain/itemBasics';
++import {
++  isAmmoItem,
++  getAmmoFoundSpec,
++  formatAmmoFoundFormula,
++} from '../../../../domain/lootTrade';
+ import EquipmentFilterModal from '../../../../modules/fallout/screens/InventoryScreen/modals/EquipmentFilterModal';
+ import {
+   buildEquipmentFilterOptions,
+@@ -356,26 +360,32 @@ const ContainerCatalogModal = ({
+       );
+       return (
+         <TouchableOpacity
+-          style={addStyles.itemContainer}
++          style={localStyles.itemContainer}
+           onPress={() => setCurrentPath([...currentPath, item])}
+         >
+-          <Text style={addStyles.itemName}>{item}</Text>
+-          <Text style={addStyles.itemType}>{CATEGORY_ICONS[iconKey] || '📁'}</Text>
++          <Text style={localStyles.itemName}>{item}</Text>
++          <Text style={localStyles.itemType}>{CATEGORY_ICONS[iconKey] || '📁'}</Text>
+         </TouchableOpacity>
+       );
+     }
+ 
+-    const basicsLine = item.__isLooseCaps
++    const baseBasics = item.__isLooseCaps
+       ? tLootTrade('catalog.looseCapsSub')
+       : describeItemBasics(item, moduleLocale);
++    const ammoPackNote = !item.__isLooseCaps && isAmmoItem(item)
++      ? formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
++          formula: formatAmmoFoundFormula(getAmmoFoundSpec(item)),
++        })
++      : '';
++    const basicsLine = [ammoPackNote, baseBasics].filter(Boolean).join(' • ');
+ 
+     return (
+-      <View style={[addStyles.itemContainer, localStyles.itemRowWithBtn]}>
++      <View style={[localStyles.itemContainer, localStyles.itemRowWithBtn]}>
+         <View style={localStyles.itemInfoCol}>
+-          <Text style={addStyles.itemName}>
++          <Text style={localStyles.itemName}>
+             {item.__isLooseCaps ? `💰 ${item.name}` : item.name}
+           </Text>
+-          {Boolean(basicsLine) && <Text style={addStyles.itemBasics}>{basicsLine}</Text>}
++          {Boolean(basicsLine) && <Text style={localStyles.itemBasics}>{basicsLine}</Text>}
+         </View>
+         <TouchableOpacity
+           style={localStyles.chooseBtn}
+@@ -389,9 +399,9 @@ const ContainerCatalogModal = ({
+ 
+   return (
+     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+-      <View style={addStyles.modalContainer}>
+-        <SafeAreaView style={addStyles.modalContent}>
+-          <Text style={addStyles.title}>
++      <View style={localStyles.modalContainer}>
++        <SafeAreaView style={localStyles.modalContent}>
++          <Text style={localStyles.title}>
+             {currentPath.length > 0 && !searchTerm && !filterActive
+               ? currentPath[currentPath.length - 1]
+               : (filterActive
+@@ -407,46 +417,47 @@ const ContainerCatalogModal = ({
+ 
+           {currentPath.length > 0 && !searchTerm && !filterActive && (
+             <TouchableOpacity
+-              style={addStyles.backButton}
++              style={localStyles.backButton}
+               onPress={() => setCurrentPath(currentPath.slice(0, -1))}
+             >
+-              <Text style={addStyles.backButtonText}>{tLootTrade('catalog.back')}</Text>
++              <Text style={localStyles.backButtonText}>{tLootTrade('catalog.back')}</Text>
+             </TouchableOpacity>
+           )}
+ 
+-          <View style={addStyles.filterToolbar}>
++          <View style={localStyles.filterToolbar}>
+             <TextInput
+-              style={[addStyles.searchInput, addStyles.searchInputInToolbar]}
++              style={localStyles.searchInput}
+               placeholder={tInventory('modals.addItemModal.searchPlaceholder')}
++              placeholderTextColor="#8c8c8c"
+               value={searchTerm}
+               onChangeText={setSearchTerm}
+             />
+             <TouchableOpacity
+-              style={addStyles.filterToggle}
++              style={localStyles.filterToggle}
+               onPress={() => setFilterOpen((prev) => !prev)}
+             >
+-              <MaterialCommunityIcons name="filter" style={addStyles.filterIcon} />
++              <MaterialCommunityIcons name="filter" style={localStyles.filterIcon} />
+               {activeFilterCount > 0 && (
+-                <View style={addStyles.filterBadge}>
+-                  <Text style={addStyles.filterBadgeText}>{activeFilterCount}</Text>
++                <View style={localStyles.filterBadge}>
++                  <Text style={localStyles.filterBadgeText}>{activeFilterCount}</Text>
+                 </View>
+               )}
+             </TouchableOpacity>
+           </View>
+ 
+-          <View style={addStyles.listDivider} />
++          <View style={localStyles.listDivider} />
+ 
+           <FlatList
+             data={listEntries}
+             renderItem={renderEntry}
+             keyExtractor={(item, index) => `${typeof item === 'object' ? (item.id || item.name) : item}-${index}`}
+             ListEmptyComponent={
+-              <Text style={addStyles.emptyText}>{tInventory('modals.addItemModal.emptyCategory')}</Text>
++              <Text style={localStyles.emptyText}>{tInventory('modals.addItemModal.emptyCategory')}</Text>
+             }
+           />
+ 
+-          <TouchableOpacity style={addStyles.closeButton} onPress={onClose}>
+-            <Text style={addStyles.closeButtonText}>{tLootTrade('catalog.close')}</Text>
++          <TouchableOpacity style={localStyles.closeButton} onPress={onClose}>
++            <Text style={localStyles.closeButtonText}>{tLootTrade('catalog.close')}</Text>
+           </TouchableOpacity>
+ 
+           <EquipmentFilterModal
+@@ -478,6 +489,114 @@ const ContainerCatalogModal = ({
+ };
+ 
+ const localStyles = StyleSheet.create({
++  modalContainer: {
++    flex: 1,
++    justifyContent: 'center',
++    alignItems: 'center',
++    backgroundColor: 'rgba(0, 0, 0, 0.68)',
++    paddingHorizontal: 18,
++    paddingVertical: 24,
++  },
++  modalContent: {
++    width: '92%',
++    maxWidth: 680,
++    height: '84%',
++    backgroundColor: '#1f1f1f',
++    borderRadius: 12,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingVertical: 18,
++    paddingHorizontal: 20,
++  },
++  title: {
++    fontSize: 20,
++    fontWeight: '700',
++    color: '#f0e68c',
++    marginBottom: 12,
++    textAlign: 'center',
++    paddingHorizontal: 8,
++  },
++  backButton: {
++    alignSelf: 'flex-start',
++    marginBottom: 8,
++    paddingVertical: 4,
++    paddingHorizontal: 10,
++    borderRadius: 6,
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++  },
++  backButtonText: {
++    color: '#f0e68c',
++    fontSize: 13,
++    fontWeight: '600',
++  },
++  filterToolbar: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginBottom: 8,
++  },
++  searchInput: {
++    flex: 1,
++    minWidth: 0,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2a2a2a',
++    color: '#f0f0f0',
++    borderRadius: 8,
++    paddingHorizontal: 12,
++    paddingVertical: 9,
++    fontSize: 14,
++  },
++  filterToggle: {
++    width: 40,
++    height: 40,
++    marginLeft: 8,
++    borderRadius: 8,
++    borderWidth: 1,
++    borderColor: '#666666',
++    backgroundColor: '#2e2e2e',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  filterIcon: {
++    fontSize: 20,
++    color: '#f0e68c',
++  },
++  filterBadge: {
++    position: 'absolute',
++    top: -5,
++    right: -5,
++    minWidth: 17,
++    height: 17,
++    borderRadius: 9,
++    backgroundColor: '#d4af37',
++    alignItems: 'center',
++    justifyContent: 'center',
++    paddingHorizontal: 3,
++    borderWidth: 1,
++    borderColor: '#1f1f1f',
++  },
++  filterBadgeText: {
++    color: '#1a1a1a',
++    fontSize: 10,
++    fontWeight: '800',
++  },
++  listDivider: {
++    height: 1,
++    backgroundColor: '#3d3d3d',
++    marginVertical: 6,
++  },
++  itemContainer: {
++    paddingVertical: 12,
++    paddingHorizontal: 6,
++    borderBottomWidth: 1,
++    borderBottomColor: '#333333',
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    justifyContent: 'space-between',
++    alignItems: 'center',
++  },
+   itemRowWithBtn: {
+     flexDirection: 'row',
+     alignItems: 'center',
+@@ -487,32 +606,68 @@ const localStyles = StyleSheet.create({
+   itemInfoCol: {
+     flex: 1,
+   },
++  itemName: {
++    fontSize: 15,
++    fontWeight: '600',
++    color: '#ededed',
++    paddingRight: 8,
++  },
++  itemType: {
++    fontSize: 15,
++    color: '#d4af37',
++  },
++  itemBasics: {
++    fontSize: 12,
++    color: '#a8a8a8',
++    marginTop: 2,
++  },
++  emptyText: {
++    textAlign: 'center',
++    marginVertical: 24,
++    color: '#9e9e9e',
++  },
+   chooseBtn: {
+-    backgroundColor: '#2e7d32',
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
+     paddingHorizontal: 14,
+     paddingVertical: 8,
+     borderRadius: 6,
+   },
+   chooseBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   feedbackBanner: {
+-    backgroundColor: '#ecfdf5',
++    backgroundColor: '#2d2a1e',
+     borderWidth: 1,
+-    borderColor: '#10b981',
++    borderColor: '#d4af37',
+     borderRadius: 6,
+     paddingVertical: 6,
+     paddingHorizontal: 10,
+     marginBottom: 8,
+   },
+   feedbackText: {
+-    color: '#065f46',
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
++  closeButton: {
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#777777',
++    paddingVertical: 11,
++    borderRadius: 8,
++    marginTop: 12,
++    alignItems: 'center',
++  },
++  closeButtonText: {
++    color: '#e0e0e0',
++    fontWeight: '700',
++    fontSize: 15,
++  },
+ });
+ 
+ export default ContainerCatalogModal;
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 03bdaa7..3939c01 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -133,7 +133,7 @@ const ContainerFormModal = ({
+               value={name}
+               onChangeText={setName}
+               placeholder={tLootTrade('form.namePlaceholder')}
+-              placeholderTextColor="#9ca3af"
++              placeholderTextColor="#8c8c8c"
+             />
+ 
+             <Text style={styles.label}>{tLootTrade('form.roomLabel')}</Text>
+@@ -167,7 +167,7 @@ const ContainerFormModal = ({
+               value={description}
+               onChangeText={setDescription}
+               placeholder={tLootTrade('form.descriptionPlaceholder')}
+-              placeholderTextColor="#9ca3af"
++              placeholderTextColor="#8c8c8c"
+               multiline
+             />
+ 
+@@ -236,10 +236,10 @@ const ContainerFormModal = ({
+ 
+           <View style={styles.footer}>
+             <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
+-              <Text style={styles.btnText}>{tLootTrade('form.save')}</Text>
++              <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
+-              <Text style={styles.btnText}>{tLootTrade('form.cancel')}</Text>
++              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
+             </TouchableOpacity>
+           </View>
+         </View>
+@@ -254,17 +254,17 @@ const styles = StyleSheet.create({
+     backgroundColor: 'rgba(0,0,0,0.68)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 16,
++    padding: 20,
+   },
+   card: {
+     width: '100%',
+     maxWidth: 520,
+     maxHeight: '90%',
+-    backgroundColor: '#111827',
++    backgroundColor: '#1f1f1f',
+     borderRadius: 12,
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
+-    padding: 18,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    padding: 20,
+   },
+   title: {
+     color: '#f0e68c',
+@@ -276,20 +276,20 @@ const styles = StyleSheet.create({
+   scroll: { flexGrow: 0 },
+   scrollContent: { paddingBottom: 8 },
+   label: {
+-    color: '#e5e7eb',
++    color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 10,
+     marginBottom: 5,
+   },
+   input: {
+-    backgroundColor: '#1f2937',
++    backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+-    borderColor: '#4b5563',
++    borderColor: '#5a5a5a',
+     borderRadius: 8,
+     paddingHorizontal: 12,
+     paddingVertical: 9,
+-    color: '#f9fafb',
++    color: '#f2f2f2',
+     fontSize: 14,
+   },
+   multilineInput: {
+@@ -297,12 +297,12 @@ const styles = StyleSheet.create({
+     textAlignVertical: 'top',
+   },
+   warnText: {
+-    color: '#fca5a5',
++    color: '#e57373',
+     fontSize: 12,
+     paddingVertical: 6,
+   },
+   hintText: {
+-    color: '#9ca3af',
++    color: '#a3a3a3',
+     fontSize: 11,
+     marginTop: 3,
+     lineHeight: 15,
+@@ -317,24 +317,24 @@ const styles = StyleSheet.create({
+     paddingVertical: 7,
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
+-    backgroundColor: '#1f2937',
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2a2a2a',
+   },
+   roomChipActive: {
+-    backgroundColor: '#d4af37',
+-    borderColor: '#f0e68c',
++    backgroundColor: '#f0e68c',
++    borderColor: '#d4af37',
+   },
+   roomChipName: {
+-    color: '#f9fafb',
++    color: '#f0f0f0',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   roomChipCode: {
+-    color: '#9ca3af',
++    color: '#a3a3a3',
+     fontSize: 11,
+   },
+   roomChipTextActive: {
+-    color: '#111827',
++    color: '#1a1a1a',
+   },
+   counterRow: {
+     flexDirection: 'row',
+@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
+     marginVertical: 4,
+   },
+   stepBtn: {
+-    backgroundColor: '#374151',
++    backgroundColor: '#2e2e2e',
+     minWidth: 38,
+     height: 38,
+     borderRadius: 8,
+@@ -352,22 +352,22 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     paddingHorizontal: 8,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
++    borderColor: '#666666',
+   },
+   stepBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
+   counterInput: {
+-    backgroundColor: '#1f2937',
++    backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
++    borderColor: '#777777',
+     borderRadius: 8,
+     width: 96,
+     height: 38,
+     textAlign: 'center',
+-    color: '#fff',
++    color: '#f5f5f5',
+     fontSize: 16,
+     fontWeight: '700',
+   },
+@@ -382,39 +382,51 @@ const styles = StyleSheet.create({
+     paddingVertical: 6,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
+-    backgroundColor: '#1f2937',
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2a2a2a',
+   },
+   unitSegActive: {
+     backgroundColor: '#f0e68c',
+-    borderColor: '#f0e68c',
++    borderColor: '#d4af37',
+   },
+   unitSegText: {
+-    color: '#d1d5db',
++    color: '#dcdcdc',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   unitSegTextActive: {
+-    color: '#111827',
++    color: '#1a1a1a',
+   },
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+-    marginTop: 16,
++    marginTop: 18,
+   },
+   btn: {
+     flex: 1,
+-    paddingVertical: 12,
++    paddingVertical: 11,
+     borderRadius: 8,
+     alignItems: 'center',
++    borderWidth: 1,
++  },
++  saveBtn: {
++    backgroundColor: '#3a3a1e',
++    borderColor: '#f0e68c',
+   },
+-  saveBtn: { backgroundColor: '#2e7d32' },
+-  cancelBtn: { backgroundColor: '#b91c1c' },
+-  btnText: {
+-    color: '#fff',
++  saveBtnText: {
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
++  cancelBtn: {
++    backgroundColor: '#2a2a2a',
++    borderColor: '#777777',
++  },
++  cancelBtnText: {
++    color: '#d4d4d4',
++    fontSize: 15,
++    fontWeight: '600',
++  },
+ });
+ 
+ export default ContainerFormModal;
+diff --git a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+index 677bbdb..994a4c7 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+@@ -13,6 +13,9 @@ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import {
+   QUANTITY_UNIT,
++  isAmmoItem,
++  getAmmoFoundSpec,
++  formatAmmoFoundFormula,
+   computeMerchantSellPriceToPlayer,
+   normalizeSaleMarkupPercent,
+ } from '../../../../domain/lootTrade';
+@@ -27,16 +30,29 @@ const ContainerItemConfigModal = ({
+   onClose,
+ }) => {
+   useLocale();
++  const ammoMode = isAmmoItem(item);
++  const ammoSpec = ammoMode ? getAmmoFoundSpec(item) : null;
++
+   const [count, setCount] = useState('1');
+   const [unit, setUnit] = useState(QUANTITY_UNIT.PCS);
+   const [markupPercent, setMarkupPercent] = useState('0');
++  const [packsTouched, setPacksTouched] = useState(false);
+ 
+   useEffect(() => {
+     if (!visible || !item) return;
+-    setCount(String(item.quantity && isEditing ? item.quantity : 1));
+-    setUnit(QUANTITY_UNIT.PCS);
++    if (isAmmoItem(item)) {
++      setCount('1');
++      setUnit(QUANTITY_UNIT.PACKS);
++      // В контейнере добычи единственное действие в редактировании — перебросить пачками;
++      // у торговца по умолчанию сохраняем текущий остаток, если Мастер меняет только % наценки.
++      setPacksTouched(!isEditing || !isMerchant);
++    } else {
++      setCount(String(item.quantity && isEditing ? item.quantity : 1));
++      setUnit(QUANTITY_UNIT.PCS);
++      setPacksTouched(false);
++    }
+     setMarkupPercent(String(item.markupPercent ?? 0));
+-  }, [visible, item, isEditing]);
++  }, [visible, item, isEditing, isMerchant]);
+ 
+   if (!item) return null;
+ 
+@@ -44,6 +60,12 @@ const ContainerItemConfigModal = ({
+     const cur = parseInt(count, 10) || 1;
+     const next = Math.max(1, cur + delta);
+     setCount(String(next));
++    if (ammoMode) setPacksTouched(true);
++  };
++
++  const handleChangeCount = (val) => {
++    setCount(val);
++    if (ammoMode) setPacksTouched(true);
+   };
+ 
+   const stepMarkup = (delta) => {
+@@ -52,6 +74,7 @@ const ContainerItemConfigModal = ({
+     setMarkupPercent(String(next));
+   };
+ 
++  const numericCount = Math.max(1, parseInt(count, 10) || 1);
+   const baseCost = Math.max(0, Number(item.cost ?? item.price ?? 0) || 0);
+   const parsedMarkup = normalizeSaleMarkupPercent(markupPercent, 0);
+   const previewPrice = computeMerchantSellPriceToPlayer(
+@@ -59,8 +82,33 @@ const ContainerItemConfigModal = ({
+     { saleMarkupPercent: merchantSaleMarkupPercent, capCollectorPercent: 0 },
+   );
+ 
++  const singlePackFormula = ammoSpec ? formatAmmoFoundFormula(ammoSpec) : '';
++  const totalPackFormula = ammoSpec
++    ? formatAmmoFoundFormula({
++        base: numericCount * ammoSpec.base,
++        cd: numericCount * ammoSpec.cd,
++      })
++    : '';
++
+   const handleConfirm = () => {
+-    const numericCount = Math.max(1, parseInt(count, 10) || 1);
++    if (ammoMode) {
++      if (isEditing && isMerchant && !packsTouched && item.quantity > 0) {
++        onSave({
++          count: item.quantity,
++          unit: QUANTITY_UNIT.PCS,
++          keepExistingQuantity: true,
++          markupPercent: parsedMarkup,
++        });
++        return;
++      }
++      onSave({
++        count: numericCount,
++        unit: QUANTITY_UNIT.PACKS,
++        markupPercent: isMerchant ? parsedMarkup : 0,
++      });
++      return;
++    }
++
+     onSave({
+       count: numericCount,
+       unit,
+@@ -80,45 +128,99 @@ const ContainerItemConfigModal = ({
+           </Text>
+           <Text style={styles.title}>{item.name}</Text>
+ 
+-          <Text style={styles.label}>{tLootTrade('itemConfig.quantityLabel')}</Text>
+-          <View style={styles.counterRow}>
+-            <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
+-              <Text style={styles.circleBtnText}>−</Text>
+-            </TouchableOpacity>
+-            <TextInput
+-              style={styles.countInput}
+-              value={count}
+-              onChangeText={setCount}
+-              keyboardType="number-pad"
+-            />
+-            <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
+-              <Text style={styles.circleBtnText}>+</Text>
+-            </TouchableOpacity>
+-          </View>
++          {ammoMode ? (
++            <>
++              {isEditing && item.quantity > 0 && (
++                <Text style={styles.currentStockText}>
++                  {formatLootTrade(tLootTrade('itemConfig.packsEditCurrentStock'), {
++                    qty: item.quantity,
++                  })}
++                </Text>
++              )}
+ 
+-          <Text style={styles.label}>{tLootTrade('itemConfig.unitLabel')}</Text>
+-          <View style={styles.unitRow}>
+-            {[
+-              [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
+-              [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
+-              [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
+-            ].map(([uKey, uLabel]) => (
+-              <TouchableOpacity
+-                key={uKey}
+-                style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
+-                onPress={() => setUnit(uKey)}
+-              >
+-                <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
+-                  {uLabel}
++              <Text style={styles.label}>{tLootTrade('itemConfig.packsLabel')}</Text>
++              <View style={styles.counterRow}>
++                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
++                  <Text style={styles.circleBtnText}>−</Text>
++                </TouchableOpacity>
++                <TextInput
++                  style={styles.countInput}
++                  value={count}
++                  onChangeText={handleChangeCount}
++                  keyboardType="number-pad"
++                />
++                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
++                  <Text style={styles.circleBtnText}>+</Text>
++                </TouchableOpacity>
++              </View>
++
++              <View style={styles.packFormulaPill}>
++                <Text style={styles.packFormulaText}>
++                  {formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
++                    formula: singlePackFormula,
++                  })}
+                 </Text>
+-              </TouchableOpacity>
+-            ))}
+-          </View>
+-          {unit === QUANTITY_UNIT.CD && (
+-            <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
+-          )}
+-          {unit === QUANTITY_UNIT.D20 && (
+-            <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
++              </View>
++
++              {(!isEditing || packsTouched) ? (
++                <Text style={styles.hint}>
++                  {ammoSpec?.cd > 0
++                    ? formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
++                        packs: numericCount,
++                        formula: totalPackFormula,
++                      })
++                    : formatLootTrade(tLootTrade('itemConfig.packsFixedHint'), {
++                        packs: numericCount,
++                        total: numericCount * Math.max(1, ammoSpec?.base || 1),
++                      })}
++                </Text>
++              ) : (
++                <Text style={styles.hint}>{tLootTrade('itemConfig.packsEditKeepHint')}</Text>
++              )}
++            </>
++          ) : (
++            <>
++              <Text style={styles.label}>{tLootTrade('itemConfig.quantityLabel')}</Text>
++              <View style={styles.counterRow}>
++                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(-1)}>
++                  <Text style={styles.circleBtnText}>−</Text>
++                </TouchableOpacity>
++                <TextInput
++                  style={styles.countInput}
++                  value={count}
++                  onChangeText={handleChangeCount}
++                  keyboardType="number-pad"
++                />
++                <TouchableOpacity style={styles.circleBtn} onPress={() => stepCount(1)}>
++                  <Text style={styles.circleBtnText}>+</Text>
++                </TouchableOpacity>
++              </View>
++
++              <Text style={styles.label}>{tLootTrade('itemConfig.unitLabel')}</Text>
++              <View style={styles.unitRow}>
++                {[
++                  [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
++                  [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
++                  [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
++                ].map(([uKey, uLabel]) => (
++                  <TouchableOpacity
++                    key={uKey}
++                    style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
++                    onPress={() => setUnit(uKey)}
++                  >
++                    <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
++                      {uLabel}
++                    </Text>
++                  </TouchableOpacity>
++                ))}
++              </View>
++              {unit === QUANTITY_UNIT.CD && (
++                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
++              )}
++              {unit === QUANTITY_UNIT.D20 && (
++                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
++              )}
++            </>
+           )}
+ 
+           {isMerchant && item.itemType !== 'caps' && (
+@@ -162,10 +264,10 @@ const ContainerItemConfigModal = ({
+ 
+           <View style={styles.footer}>
+             <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={handleConfirm}>
+-              <Text style={styles.actionBtnText}>{tLootTrade('itemConfig.save')}</Text>
++              <Text style={styles.saveBtnText}>{tLootTrade('itemConfig.save')}</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={[styles.actionBtn, styles.cancelBtn]} onPress={onClose}>
+-              <Text style={styles.actionBtnText}>{tLootTrade('itemConfig.cancel')}</Text>
++              <Text style={styles.cancelBtnText}>{tLootTrade('itemConfig.cancel')}</Text>
+             </TouchableOpacity>
+           </View>
+         </View>
+@@ -177,23 +279,23 @@ const ContainerItemConfigModal = ({
+ const styles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.72)',
++    backgroundColor: 'rgba(0,0,0,0.68)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 16,
++    padding: 20,
+   },
+   card: {
+     width: '100%',
+     maxWidth: 460,
+-    backgroundColor: '#111827',
++    backgroundColor: '#1f1f1f',
+     borderRadius: 12,
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
+-    padding: 20,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    padding: 22,
+     alignItems: 'center',
+   },
+   subtitle: {
+-    color: '#9ca3af',
++    color: '#a3a3a3',
+     fontSize: 12,
+     textTransform: 'uppercase',
+     letterSpacing: 0.6,
+@@ -206,8 +308,13 @@ const styles = StyleSheet.create({
+     marginTop: 4,
+     marginBottom: 12,
+   },
++  currentStockText: {
++    color: '#d4d4d4',
++    fontSize: 12,
++    marginBottom: 4,
++  },
+   label: {
+-    color: '#e5e7eb',
++    color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 8,
+@@ -224,29 +331,44 @@ const styles = StyleSheet.create({
+     width: 42,
+     height: 42,
+     borderRadius: 21,
+-    backgroundColor: '#374151',
++    backgroundColor: '#2e2e2e',
+     borderWidth: 1,
+-    borderColor: '#6b7280',
++    borderColor: '#666666',
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+   circleBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 22,
+     fontWeight: '700',
+   },
+   countInput: {
+     width: 110,
+     height: 42,
+-    backgroundColor: '#1f2937',
++    backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
++    borderColor: '#777777',
+     borderRadius: 8,
+-    color: '#fff',
++    color: '#f5f5f5',
+     fontSize: 22,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
++  packFormulaPill: {
++    marginTop: 10,
++    paddingHorizontal: 14,
++    paddingVertical: 6,
++    borderRadius: 8,
++    backgroundColor: '#2d2a1e',
++    borderWidth: 1,
++    borderColor: '#d4af37',
++  },
++  packFormulaText: {
++    color: '#f0e68c',
++    fontSize: 14,
++    fontWeight: '700',
++    textAlign: 'center',
++  },
+   unitRow: {
+     flexDirection: 'row',
+     gap: 10,
+@@ -256,62 +378,63 @@ const styles = StyleSheet.create({
+     paddingVertical: 8,
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
+-    backgroundColor: '#1f2937',
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2a2a2a',
+   },
+   unitBtnActive: {
+     backgroundColor: '#f0e68c',
+-    borderColor: '#f0e68c',
++    borderColor: '#d4af37',
+   },
+   unitBtnText: {
+-    color: '#e5e7eb',
++    color: '#e0e0e0',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   unitBtnTextActive: {
+-    color: '#111827',
++    color: '#1a1a1a',
+   },
+   hint: {
+-    color: '#9ca3af',
++    color: '#b0b0b0',
+     fontSize: 11,
+     textAlign: 'center',
+-    marginTop: 5,
++    marginTop: 6,
++    lineHeight: 16,
+   },
+   markupSection: {
+     width: '100%',
+-    marginTop: 8,
+-    paddingTop: 8,
++    marginTop: 12,
++    paddingTop: 10,
+     borderTopWidth: 1,
+-    borderTopColor: '#374151',
++    borderTopColor: '#3d3d3d',
+     alignItems: 'center',
+   },
+   smallStepBtn: {
+-    backgroundColor: '#374151',
++    backgroundColor: '#2e2e2e',
+     paddingHorizontal: 8,
+     paddingVertical: 7,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
++    borderColor: '#666666',
+   },
+   smallStepText: {
+-    color: '#fff',
++    color: '#e8e8e8',
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   markupInput: {
+     width: 78,
+     height: 38,
+-    backgroundColor: '#1f2937',
++    backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
++    borderColor: '#777777',
+     borderRadius: 8,
+-    color: '#fff',
++    color: '#f5f5f5',
+     fontSize: 16,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   previewPrice: {
+-    color: '#86efac',
++    color: '#f0e68c',
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 6,
+@@ -325,17 +448,29 @@ const styles = StyleSheet.create({
+   },
+   actionBtn: {
+     flex: 1,
+-    paddingVertical: 12,
++    paddingVertical: 11,
+     borderRadius: 8,
+     alignItems: 'center',
++    borderWidth: 1,
++  },
++  saveBtn: {
++    backgroundColor: '#3a3a1e',
++    borderColor: '#f0e68c',
+   },
+-  saveBtn: { backgroundColor: '#2e7d32' },
+-  cancelBtn: { backgroundColor: '#b91c1c' },
+-  actionBtnText: {
+-    color: '#fff',
++  saveBtnText: {
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
++  cancelBtn: {
++    backgroundColor: '#2a2a2a',
++    borderColor: '#777777',
++  },
++  cancelBtnText: {
++    color: '#d4d4d4',
++    fontSize: 15,
++    fontWeight: '600',
++  },
+ });
+ 
+ export default ContainerItemConfigModal;
+diff --git a/components/screens/LootTradeScreen/modals/IssueContainerModal.js b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+index e05606d..5fa20d4 100644
+--- a/components/screens/LootTradeScreen/modals/IssueContainerModal.js
++++ b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+@@ -129,10 +129,10 @@ const IssueContainerModal = ({
+               disabled={!canSubmit}
+               onPress={handleConfirm}
+             >
+-              <Text style={styles.btnText}>{tLootTrade('issueModal.confirm')}</Text>
++              <Text style={styles.confirmBtnText}>{tLootTrade('issueModal.confirm')}</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
+-              <Text style={styles.btnText}>{tLootTrade('issueModal.cancel')}</Text>
++              <Text style={styles.cancelBtnText}>{tLootTrade('issueModal.cancel')}</Text>
+             </TouchableOpacity>
+           </View>
+         </View>
+@@ -144,20 +144,20 @@ const IssueContainerModal = ({
+ const styles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.7)',
++    backgroundColor: 'rgba(0,0,0,0.68)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 16,
++    padding: 20,
+   },
+   card: {
+     width: '100%',
+     maxWidth: 460,
+     maxHeight: '86%',
+-    backgroundColor: '#111827',
++    backgroundColor: '#1f1f1f',
+     borderRadius: 12,
+-    borderWidth: 2,
+-    borderColor: '#d4af37',
+-    padding: 18,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    padding: 20,
+   },
+   title: {
+     color: '#f0e68c',
+@@ -166,29 +166,29 @@ const styles = StyleSheet.create({
+     textAlign: 'center',
+   },
+   roomSub: {
+-    color: '#d1d5db',
++    color: '#cccccc',
+     fontSize: 12,
+     textAlign: 'center',
+     marginTop: 4,
+-    marginBottom: 12,
++    marginBottom: 14,
+   },
+   sectionTitle: {
+-    color: '#e5e7eb',
++    color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+     marginBottom: 8,
+   },
+   optionCard: {
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#1f2937',
++    borderColor: '#555555',
++    backgroundColor: '#2a2a2a',
+     borderRadius: 8,
+-    padding: 11,
++    padding: 12,
+     marginBottom: 8,
+   },
+   optionCardActive: {
+     borderColor: '#f0e68c',
+-    backgroundColor: '#292524',
++    backgroundColor: '#333120',
+   },
+   optionRow: {
+     flexDirection: 'row',
+@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   optionTitle: {
+-    color: '#f9fafb',
++    color: '#f2f2f2',
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   optionHint: {
+-    color: '#9ca3af',
++    color: '#a8a8a8',
+     fontSize: 11,
+     marginTop: 4,
+     marginLeft: 28,
+@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
+     marginBottom: 4,
+   },
+   emptyChars: {
+-    color: '#fca5a5',
++    color: '#e57373',
+     fontSize: 12,
+     textAlign: 'center',
+     paddingVertical: 10,
+@@ -225,24 +225,24 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 12,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#374151',
+-    backgroundColor: '#1f2937',
++    borderColor: '#4d4d4d',
++    backgroundColor: '#2a2a2a',
+     marginBottom: 6,
+   },
+   charRowActive: {
+     borderColor: '#f0e68c',
+-    backgroundColor: 'rgba(212,175,55,0.2)',
++    backgroundColor: '#363320',
+   },
+   dot: {
+     width: 9,
+     height: 9,
+     borderRadius: 4.5,
+   },
+-  dotOnline: { backgroundColor: '#22c55e' },
+-  dotOffline: { backgroundColor: '#6b7280' },
++  dotOnline: { backgroundColor: '#d4af37' },
++  dotOffline: { backgroundColor: '#777777' },
+   charName: {
+     flex: 1,
+-    color: '#e5e7eb',
++    color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '600',
+   },
+@@ -251,28 +251,40 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+   },
+   charStatus: {
+-    color: '#9ca3af',
++    color: '#a3a3a3',
+     fontSize: 11,
+   },
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+-    marginTop: 14,
++    marginTop: 16,
+   },
+   btn: {
+     flex: 1,
+-    paddingVertical: 12,
++    paddingVertical: 11,
+     borderRadius: 8,
+     alignItems: 'center',
++    borderWidth: 1,
+   },
+-  confirmBtn: { backgroundColor: '#15803d' },
+-  cancelBtn: { backgroundColor: '#b91c1c' },
+-  btnDisabled: { opacity: 0.45 },
+-  btnText: {
+-    color: '#fff',
++  confirmBtn: {
++    backgroundColor: '#3a3a1e',
++    borderColor: '#f0e68c',
++  },
++  confirmBtnText: {
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
++  cancelBtn: {
++    backgroundColor: '#2a2a2a',
++    borderColor: '#777777',
++  },
++  cancelBtnText: {
++    color: '#d4d4d4',
++    fontSize: 15,
++    fontWeight: '600',
++  },
++  btnDisabled: { opacity: 0.45 },
+ });
+ 
+ export default IssueContainerModal;
+diff --git a/domain/ammoFoundTable.js b/domain/ammoFoundTable.js
+new file mode 100644
+index 0000000..8b8d262
+--- /dev/null
++++ b/domain/ammoFoundTable.js
+@@ -0,0 +1,114 @@
++// domain/ammoFoundTable.js
++// Таблица нахождения боеприпасов «пачками» (Ammunition Found) из Fallout 2d20.
++// Синхронизирована 1-в-1 с docs/reference-data/ammo-found-table.json (42 базовых типа)
++// + 9 химических шприцов инъектора (по 1 шт., согласно modules/fallout/data/recipes/ammo.json)
++// + резервный расчёт по редкости для пользовательских паков снаряжения.
++
++export const AMMO_FOUND_BY_ID = Object.freeze({
++  // Базовые и дополненные типы из docs/reference-data/ammo-found-table.json
++  ammo_38: Object.freeze({ base: 10, cd: 5 }),
++  ammo_10mm: Object.freeze({ base: 8, cd: 4 }),
++  ammo_308: Object.freeze({ base: 6, cd: 3 }),
++  ammo_flare: Object.freeze({ base: 2, cd: 1 }),
++  ammo_shotgun_shell: Object.freeze({ base: 6, cd: 3 }),
++  ammo_45: Object.freeze({ base: 8, cd: 4 }),
++  ammo_flamer_fuel: Object.freeze({ base: 12, cd: 6 }),
++  ammo_energy_cell: Object.freeze({ base: 14, cd: 7 }),
++  ammo_gamma_round: Object.freeze({ base: 4, cd: 2 }),
++  ammo_railway_spike: Object.freeze({ base: 6, cd: 3 }),
++  ammo_syringe: Object.freeze({ base: 4, cd: 2 }),
++  ammo_44_magnum: Object.freeze({ base: 4, cd: 2 }),
++  ammo_50_cal: Object.freeze({ base: 4, cd: 2 }),
++  ammo_5_56mm: Object.freeze({ base: 8, cd: 4 }),
++  ammo_5mm: Object.freeze({ base: 12, cd: 6 }),
++  ammo_fusion_core: Object.freeze({ base: 1, cd: 0 }),
++  ammo_missile: Object.freeze({ base: 2, cd: 1 }),
++  ammo_plasma_cartridge: Object.freeze({ base: 10, cd: 5 }),
++  ammo_2mm_ec: Object.freeze({ base: 6, cd: 3 }),
++  ammo_mini_nuke: Object.freeze({ base: 1, cd: 1 }),
++  ammo_357_magnum: Object.freeze({ base: 6, cd: 3 }),
++  ammo_12_7mm: Object.freeze({ base: 6, cd: 3 }),
++  ammo_9mm: Object.freeze({ base: 10, cd: 5 }),
++  ammo_50_ball: Object.freeze({ base: 4, cd: 2 }),
++  ammo_25mm_grenade: Object.freeze({ base: 2, cd: 1 }),
++  ammo_40mm_grenade: Object.freeze({ base: 2, cd: 1 }),
++  ammo_alien_power_cell: Object.freeze({ base: 4, cd: 2 }),
++  ammo_alien_power_module: Object.freeze({ base: 3, cd: 1 }),
++  ammo_arrow: Object.freeze({ base: 6, cd: 4 }),
++  ammo_bolt: Object.freeze({ base: 4, cd: 4 }),
++  ammo_plasma_cartridge_alien: Object.freeze({ base: 1, cd: 0 }),
++  ammo_cryo_cell: Object.freeze({ base: 12, cd: 6 }),
++  ammo_acid_concentrate: Object.freeze({ base: 12, cd: 6 }),
++  ammo_harpoon: Object.freeze({ base: 4, cd: 2 }),
++  ammo_cannonball: Object.freeze({ base: 2, cd: 1 }),
++  ammo_tranq_dart: Object.freeze({ base: 4, cd: 2 }),
++  ammo_syringe_bloodpack: Object.freeze({ base: 4, cd: 2 }),
++  ammo_tear_gas: Object.freeze({ base: 2, cd: 1 }),
++  ammo_gas_grenade: Object.freeze({ base: 2, cd: 1 }),
++  ammo_grappling_hook: Object.freeze({ base: 1, cd: 1 }),
++  ammo_homemade: Object.freeze({ base: 10, cd: 5 }),
++  ammo_anything: Object.freeze({ base: 12, cd: 6 }),
++
++  // Специальные химические шприцы инъектора (штучные расходники)
++  ammo_syringe_berserk: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_bleed_out: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_bloatfly_larva: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_endangerol: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_lock_joint: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_mind_cloud: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_pax: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_radscorpion_venom: Object.freeze({ base: 1, cd: 0 }),
++  ammo_syringe_yellow_belly: Object.freeze({ base: 1, cd: 0 }),
++});
++
++const FALLBACK_BY_RARITY = Object.freeze({
++  0: Object.freeze({ base: 10, cd: 5 }),
++  1: Object.freeze({ base: 6, cd: 3 }),
++  2: Object.freeze({ base: 6, cd: 3 }),
++  3: Object.freeze({ base: 4, cd: 2 }),
++});
++
++const DEFAULT_AMMO_FOUND = Object.freeze({ base: 2, cd: 1 });
++
++export const isAmmoItem = (item) => {
++  if (!item || typeof item !== 'object') return false;
++  if (item.itemType === 'ammo') return true;
++  if (item.itemSnapshot?.itemType === 'ammo') return true;
++  const rawId = String(item.itemId || item.id || '');
++  return rawId.startsWith('ammo_');
++};
++
++export const getAmmoFoundSpec = (itemOrId) => {
++  if (itemOrId && typeof itemOrId === 'object') {
++    const customFound = itemOrId.found || itemOrId.itemSnapshot?.found;
++    if (customFound && typeof customFound === 'object') {
++      const base = Math.max(0, Math.floor(Number(customFound.base) || 0));
++      const cd = Math.max(0, Math.floor(Number(customFound.cd) || 0));
++      if (base > 0 || cd > 0) return { base, cd };
++    }
++    const id = String(itemOrId.itemId || itemOrId.id || '').trim();
++    if (id && AMMO_FOUND_BY_ID[id]) {
++      return { ...AMMO_FOUND_BY_ID[id] };
++    }
++    const rarity = Number(itemOrId.rarity ?? itemOrId.itemSnapshot?.rarity);
++    if (Number.isFinite(rarity) && rarity >= 0) {
++      const bucket = FALLBACK_BY_RARITY[Math.floor(rarity)] || DEFAULT_AMMO_FOUND;
++      return { ...bucket };
++    }
++    return { base: 6, cd: 3 };
++  }
++
++  const id = String(itemOrId || '').trim();
++  if (id && AMMO_FOUND_BY_ID[id]) {
++    return { ...AMMO_FOUND_BY_ID[id] };
++  }
++  return { base: 6, cd: 3 };
++};
++
++export const formatAmmoFoundFormula = (spec) => {
++  const base = Math.max(0, Math.floor(Number(spec?.base) || 0));
++  const cd = Math.max(0, Math.floor(Number(spec?.cd) || 0));
++  if (cd <= 0) return `${Math.max(1, base)}`;
++  if (base <= 0) return `${cd} CD`;
++  return `${base} + ${cd} CD`;
++};
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 2a02dac..07de36a 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -8,6 +8,19 @@
+ // - дублирование контейнеров и слияние одинаковых позиций.
+ 
+ import { rollMultipleCombatDice, rollCustomDice } from './diceRollsLogic';
++import {
++  AMMO_FOUND_BY_ID,
++  isAmmoItem,
++  getAmmoFoundSpec,
++  formatAmmoFoundFormula,
++} from './ammoFoundTable';
++
++export {
++  AMMO_FOUND_BY_ID,
++  isAmmoItem,
++  getAmmoFoundSpec,
++  formatAmmoFoundFormula,
++};
+ 
+ export const CONTAINER_KIND = Object.freeze({
+   LOOT: 'loot',
+@@ -18,6 +31,7 @@ export const QUANTITY_UNIT = Object.freeze({
+   PCS: 'pcs',
+   CD: 'cd',
+   D20: 'd20',
++  PACKS: 'packs',
+ });
+ 
+ export const DEFAULT_MERCHANT_CAPS = 200;
+@@ -53,17 +67,22 @@ export const normalizeCapsAmount = (value, fallback = 0) =>
+ 
+ /**
+  * Немедленное вычисление количества при сохранении позиции или кассы торговца:
+- * - 'pcs' (шт.) — точное число;
+- * - 'cd'  (CD)  — бросок N боевых костей Fallout 2d20 (0..2 за кость);
+- * - 'd20' (d20) — бросок Nd20.
++ * - 'pcs'   (шт.)   — точное число;
++ * - 'cd'    (CD)    — бросок N боевых костей Fallout 2d20 (0..2 за кость);
++ * - 'd20'   (d20)   — сумма N бросков d20 (Nd20);
++ * - 'packs' (пачки) — выдача патронов пачками по таблице нахождения (base + cd за пачку).
+  */
+ export const resolveQuantitySpec = (
+-  { count = 1, unit = QUANTITY_UNIT.PCS, allowZeroPcs = false } = {},
++  { count = 1, unit = QUANTITY_UNIT.PCS, item = null, allowZeroPcs = false } = {},
+   deps = {},
+ ) => {
+-  const normalizedUnit = [QUANTITY_UNIT.PCS, QUANTITY_UNIT.CD, QUANTITY_UNIT.D20].includes(unit)
+-    ? unit
+-    : QUANTITY_UNIT.PCS;
++  const validUnits = [
++    QUANTITY_UNIT.PCS,
++    QUANTITY_UNIT.CD,
++    QUANTITY_UNIT.D20,
++    QUANTITY_UNIT.PACKS,
++  ];
++  const normalizedUnit = validUnits.includes(unit) ? unit : QUANTITY_UNIT.PCS;
+   const parsedCount = Math.floor(Number(count));
+ 
+   if (normalizedUnit === QUANTITY_UNIT.PCS) {
+@@ -79,6 +98,40 @@ export const resolveQuantitySpec = (
+     };
+   }
+ 
++  if (normalizedUnit === QUANTITY_UNIT.PACKS) {
++    const packCount = Number.isFinite(parsedCount) && parsedCount >= 1
++      ? Math.min(100, parsedCount)
++      : 1;
++    const spec = getAmmoFoundSpec(item);
++    const baseTotal = packCount * spec.base;
++    const diceCount = packCount * spec.cd;
++    let cdTotal = 0;
++    let rolls = [];
++    let effects = 0;
++
++    if (diceCount > 0) {
++      const rollCd = deps.rollCombatDice || rollMultipleCombatDice;
++      const res = rollCd(diceCount);
++      cdTotal = Math.max(0, Math.floor(Number(res?.total) || 0));
++      rolls = Array.isArray(res?.rolls) ? res.rolls : [];
++      effects = Math.max(0, Math.floor(Number(res?.effects) || 0));
++    }
++
++    const total = Math.max(1, baseTotal + cdTotal);
++    return {
++      quantity: total,
++      rolled: true,
++      unit: QUANTITY_UNIT.PACKS,
++      packCount,
++      packSpec: spec,
++      formula: formatAmmoFoundFormula(spec),
++      totalFormula: formatAmmoFoundFormula({ base: baseTotal, cd: diceCount }),
++      diceCount,
++      rolls,
++      effects,
++    };
++  }
++
+   const diceCount = Number.isFinite(parsedCount) && parsedCount >= 1 ? Math.min(100, parsedCount) : 1;
+ 
+   if (normalizedUnit === QUANTITY_UNIT.CD) {
+@@ -95,15 +148,43 @@ export const resolveQuantitySpec = (
+     };
+   }
+ 
+-  const rollD20 = deps.rollD20 || ((n) => rollCustomDice(`${n}d20`));
+-  const res = rollD20(diceCount);
+-  const total = Math.max(1, Math.floor(Number(res?.total) || diceCount));
++  // Бросок Nd20: поддерживаем как инъекцию deps.rollD20 (число либо { total, rolls }),
++  // так и поштучный бросок N костей d20 с честным суммированием всех выпавших граней.
++  if (typeof deps.rollD20 === 'function') {
++    const res = deps.rollD20(diceCount);
++    const numericRes = typeof res === 'number' ? res : Number(res?.total);
++    const rolls = Array.isArray(res?.rolls) ? res.rolls : [];
++    const rollsSum = rolls.length > 0
++      ? rolls.reduce((acc, v) => acc + (Number(v) || 0), 0)
++      : diceCount;
++    const total = Math.max(
++      diceCount,
++      Math.floor(Number.isFinite(numericRes) && numericRes > 0 ? numericRes : rollsSum),
++    );
++    return {
++      quantity: total,
++      rolled: true,
++      unit: QUANTITY_UNIT.D20,
++      diceCount,
++      rolls,
++      effects: 0,
++    };
++  }
++
++  const rollSingleD20 = deps.rollSingleD20 || (() => Number(rollCustomDice('1d20')) || 1);
++  const rolls = [];
++  let sum = 0;
++  for (let i = 0; i < diceCount; i += 1) {
++    const face = clampNumber(Math.floor(Number(rollSingleD20(i)) || 1), 1, 20, 1);
++    rolls.push(face);
++    sum += face;
++  }
+   return {
+-    quantity: total,
++    quantity: sum,
+     rolled: true,
+     unit: QUANTITY_UNIT.D20,
+     diceCount,
+-    rolls: Array.isArray(res?.rolls) ? res.rolls : [],
++    rolls,
+     effects: 0,
+   };
+ };
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 3a23b8b..0c2ad0c 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -57,10 +57,14 @@
+     "editItem": "Edit",
+     "removeItem": "✕",
+     "rollNotice": "Rolled {dice} {unit}: {total} pcs.",
++    "packsRollNotice": "Packs ({packs} × [{formula}]): {total} pcs.",
+     "rollZeroNotice": "Rolled {dice} {unit}: 0 — item was not added.",
+     "capsRollNotice": "Rolled cash {dice} {unit}: {total} caps.",
+     "deleteConfirmTitle": "Delete card?",
+-    "deleteConfirmMessage": "«{name}» will be deleted locally and from the cloud."
++    "deleteConfirmMessage": "«{name}» will be deleted locally and from the cloud.",
++    "emptyLootPromptTitle": "Container is empty. Delete it?",
++    "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
++    "emptyLootKeep": "Keep"
+   },
+   "catalog": {
+     "titleLoot": "Add to Container",
+@@ -75,6 +79,12 @@
+     "titleAdd": "Configure Item",
+     "titleEdit": "Edit Item",
+     "quantityLabel": "Quantity",
++    "packsLabel": "Number of packs",
++    "packFormulaBadge": "1 pack: {formula}",
++    "packsTotalRollHint": "Roll for {packs} packs: {formula}",
++    "packsFixedHint": "Fixed yield for {packs} packs: {total} pcs.",
++    "packsEditCurrentStock": "Currently in stock: {qty} pcs.",
++    "packsEditKeepHint": "Adjust pack count to re-roll stock (otherwise current quantity is kept).",
+     "unitLabel": "Unit",
+     "unitPcs": "pcs",
+     "unitCd": "CD",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index e92cbfe..62becaf 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -57,10 +57,14 @@
+     "editItem": "Изм.",
+     "removeItem": "✕",
+     "rollNotice": "Бросок {dice} {unit}: выпало {total} шт.",
++    "packsRollNotice": "Пачки ({packs} × [{formula}]): выпало {total} шт.",
+     "rollZeroNotice": "Бросок {dice} {unit}: выпало 0 — предмет не добавлен.",
+     "capsRollNotice": "Касса по броску {dice} {unit}: {total} кр.",
+     "deleteConfirmTitle": "Удалить карточку?",
+-    "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке."
++    "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке.",
++    "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
++    "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
++    "emptyLootKeep": "Оставить"
+   },
+   "catalog": {
+     "titleLoot": "Добавить в контейнер",
+@@ -75,6 +79,12 @@
+     "titleAdd": "Настройка позиции",
+     "titleEdit": "Изменить позицию",
+     "quantityLabel": "Количество",
++    "packsLabel": "Количество пачек",
++    "packFormulaBadge": "В 1 пачке: {formula}",
++    "packsTotalRollHint": "Будет брошено за {packs} пач.: {formula}",
++    "packsFixedHint": "Фиксированная выдача за {packs} пач.: {total} шт.",
++    "packsEditCurrentStock": "Сейчас в наличии: {qty} шт.",
++    "packsEditKeepHint": "Измените число пачек, чтобы перебросить запас (иначе сохранится текущее количество).",
+     "unitLabel": "Единица измерения",
+     "unitPcs": "шт.",
+     "unitCd": "CD",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 24e3662..af43678 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "468"
++  "baseline": "469"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3919b92..3bbed77 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "468",
++  "version": "469",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index ab6f92a..d4449c7 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -218,8 +218,29 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+   const lootTake = ({ code, clientId, payload }) => {
+     const room = rooms.get(code);
+     if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const hadItemsBefore = Array.isArray(room.activeSession?.items)
++      && room.activeSession.items.length > 0;
+     const result = applyAtomicLootTake(room.activeSession, payload, now());
+     if (result.error) return result;
++
++    // Если из контейнера добычи забрали весь лут — автоматически закрываем контейнер и раздачу.
++    const autoClosed = Boolean(
++      result.session
++      && result.session.kind === 'loot'
++      && result.session.items.length === 0
++      && (hadItemsBefore || result.granted.length > 0),
++    );
++    if (autoClosed) {
++      room.activeSession = null;
++      return {
++        room,
++        granted: result.granted,
++        session: null,
++        closedSession: result.session,
++        autoClosedReason: 'loot_emptied',
++      };
++    }
++
+     room.activeSession = result.session;
+     return { room, granted: result.granted, session: result.session };
+   };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 588b50d..6a5a40d 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -574,13 +574,22 @@ const attachRoomWebSocketServer = (httpServer, {
+             }, canonical, clientId);
+             break;
+           }
++          const closeMeta = result.closedSession
++            ? {
++                closedContainerId: result.closedSession.containerId || null,
++                closedSession: result.closedSession,
++                closedReason: result.autoClosedReason || null,
++              }
++            : {};
+           sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
+             granted: result.granted,
+             session: result.session,
++            ...closeMeta,
+             requestId: payload.requestId || null,
+           }, canonical, clientId);
+           broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+             session: result.session,
++            ...closeMeta,
+           });
+           break;
+         }
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index dc91a12..ea0059a 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -4,13 +4,24 @@
+ // остаток предметов и касса торговца сразу сохраняются в локальную БД Мастера
+ // и фоном отправляются в Google Drive — даже если Мастер в этот момент смотрит
+ // другую вкладку («Список кампаний» или лист персонажа).
++// Если из контейнера добычи забрали весь лут — раздача закрывается автоматически,
++// а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
+ 
+ import * as db from '../../db';
+ import useRoomStore, { onRoomSessionState } from '../room/roomStore';
+-import { syncGmContainerToCloudIfEnabled } from '../../components/cloudSync/googleDriveSync';
++import {
++  syncGmContainerToCloudIfEnabled,
++  deleteGmContainerFromCloudIfEnabled,
++} from '../../components/cloudSync/googleDriveSync';
++import { showRawAlert } from '../../components/alerts/alertService';
++import {
++  tLootTrade,
++  formatLootTrade,
++} from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
+ import { debugLog } from '../debug/falloutDebug';
+ 
+ const gmContainerSyncListeners = new Set();
++const promptedEmptySessionIds = new Set();
+ 
+ export const subscribeGmContainerUpdates = (listener) => {
+   gmContainerSyncListeners.add(listener);
+@@ -25,6 +36,10 @@ export const notifyGmContainerUpdated = (containerId) => {
+   });
+ };
+ 
++export const resetPromptedEmptySessionsForTests = () => {
++  promptedEmptySessionIds.clear();
++};
++
+ export const startGmSessionPersistence = () => {
+   return onRoomSessionState(async (envelope) => {
+     try {
+@@ -33,6 +48,7 @@ export const startGmSessionPersistence = () => {
+       const room = useRoomStore.getState().rooms[code];
+       if (!room || room.role !== 'gm') return;
+ 
++      const closedReason = envelope?.payload?.closedReason || null;
+       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
+       if (!session?.containerId) return;
+ 
+@@ -55,6 +71,44 @@ export const startGmSessionPersistence = () => {
+ 
+       await db.saveGmContainer(nextContainer);
+       notifyGmContainerUpdated(existing.id);
++
++      const promptKey = String(session.sessionId || `${code}:${existing.id}:${session.revision || 0}`);
++      if (
++        closedReason === 'loot_emptied'
++        && existing.kind === 'loot'
++        && !promptedEmptySessionIds.has(promptKey)
++      ) {
++        promptedEmptySessionIds.add(promptKey);
++        void syncGmContainerToCloudIfEnabled(existing.id);
++        showRawAlert({
++          title: tLootTrade('detail.emptyLootPromptTitle'),
++          message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
++            name: existing.name,
++          }),
++          buttons: [
++            { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
++            {
++              text: tLootTrade('card.delete'),
++              style: 'destructive',
++              onPress: () => {
++                void (async () => {
++                  try {
++                    await deleteGmContainerFromCloudIfEnabled(existing.id);
++                    await db.deleteGmContainer(existing.id);
++                    notifyGmContainerUpdated(existing.id);
++                  } catch (err) {
++                    debugLog('gm.sessionPersistence.deleteEmpty:failed', {
++                      message: err?.message || String(err),
++                    });
++                  }
++                })();
++              },
++            },
++          ],
++        });
++        return;
++      }
++
+       void syncGmContainerToCloudIfEnabled(existing.id);
+     } catch (error) {
+       debugLog('gm.sessionPersistence:failed', {
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index c31ae8e..b49aa8b 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -101,7 +101,11 @@ interface RoomStoreState {
+     sessionId: string;
+     characterId: string;
+     takes: Array<{ entryId: string; quantity: number }>;
+-  }) => Promise<{ granted: any[]; session: ActiveLootTradeSession }>;
++  }) => Promise<{
++    granted: any[];
++    session: ActiveLootTradeSession | null;
++    closedReason?: string | null;
++  }>;
+   commitMerchantTrade: (input: {
+     code: string;
+     sessionId: string;
+@@ -557,7 +561,8 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       );
+       return {
+         granted: response.payload?.granted || [],
+-        session: response.payload?.session as ActiveLootTradeSession,
++        session: (response.payload?.session as ActiveLootTradeSession | null) ?? null,
++        closedReason: response.payload?.closedReason || null,
+       };
+     },
+ 
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index 3864e3b..cc8dd45 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -18,8 +18,8 @@ const styles = StyleSheet.create({
+     height: 38,
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
+-    backgroundColor: 'rgba(17,24,39,0.85)',
++    borderColor: '#666666',
++    backgroundColor: 'rgba(31,31,31,0.9)',
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
+     letterSpacing: 1,
+   },
+   subtitle: {
+-    color: '#ccc',
++    color: '#cccccc',
+     fontSize: 12,
+     textAlign: 'center',
+     marginTop: 2,
+@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
+   },
+   createLabel: {
+     fontSize: 12,
+-    color: '#374151',
++    color: '#333333',
+     fontWeight: '600',
+     textAlign: 'center',
+     marginTop: 8,
+@@ -104,11 +104,11 @@ const styles = StyleSheet.create({
+   },
+   cardCellActive: {
+     borderWidth: 2,
+-    borderColor: '#16a34a',
++    borderColor: '#d4af37',
+   },
+   cardHero: {
+     height: '42%',
+-    backgroundColor: '#1f2937',
++    backgroundColor: '#242424',
+     justifyContent: 'center',
+     alignItems: 'center',
+     paddingHorizontal: 6,
+@@ -116,19 +116,19 @@ const styles = StyleSheet.create({
+     borderBottomColor: '#d4af37',
+   },
+   cardHeroMerchant: {
+-    backgroundColor: '#292524',
++    backgroundColor: '#2d2a1e',
+   },
+   cardLiveBadge: {
+     position: 'absolute',
+     top: 5,
+     left: 5,
+-    backgroundColor: '#16a34a',
++    backgroundColor: '#d4af37',
+     paddingHorizontal: 6,
+     paddingVertical: 2,
+     borderRadius: 6,
+   },
+   cardLiveBadgeText: {
+-    color: '#fff',
++    color: '#1a1a1a',
+     fontSize: 9,
+     fontWeight: '800',
+     letterSpacing: 0.5,
+@@ -157,17 +157,17 @@ const styles = StyleSheet.create({
+   cardTitle: {
+     fontSize: 12,
+     fontWeight: '700',
+-    color: '#111827',
++    color: '#1f1f1f',
+   },
+   cardDesc: {
+     fontSize: 10,
+-    color: '#4b5563',
++    color: '#555555',
+     marginTop: 2,
+     lineHeight: 13,
+   },
+   cardMeta: {
+     fontSize: 10,
+-    color: '#1f2937',
++    color: '#2b2b2b',
+     fontWeight: '600',
+     marginTop: 4,
+   },
+@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
+     width: 28,
+     height: 28,
+     borderRadius: 14,
+-    backgroundColor: '#fff',
++    backgroundColor: '#ffffff',
+     justifyContent: 'center',
+     alignItems: 'center',
+     zIndex: 10,
+@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
+     shadowOpacity: 0.25,
+     shadowRadius: 2,
+     borderWidth: 1,
+-    borderColor: '#d1d5db',
++    borderColor: '#cccccc',
+   },
+   menuBackdrop: {
+     flex: 1,
+@@ -196,16 +196,16 @@ const styles = StyleSheet.create({
+   },
+   actionMenu: {
+     position: 'absolute',
+-    width: 220,
++    width: 224,
+     paddingVertical: 6,
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
+-    backgroundColor: '#fff',
++    borderColor: '#f0e68c',
++    backgroundColor: '#1f1f1f',
+     elevation: 12,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 4 },
+-    shadowOpacity: 0.28,
++    shadowOpacity: 0.35,
+     shadowRadius: 8,
+   },
+   actionMenuItem: {
+@@ -216,8 +216,8 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 14,
+     paddingVertical: 9,
+   },
+-  actionMenuText: { flex: 1, color: '#111827', fontSize: 14 },
+-  actionMenuDeleteText: { color: '#b91c1c' },
++  actionMenuText: { flex: 1, color: '#e8e8e8', fontSize: 14 },
++  actionMenuDeleteText: { color: '#e57373' },
+ 
+   // Детальный экран контейнера / торговца
+   detailWrapper: {
+@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
+     paddingTop: 10,
+   },
+   detailHeaderCard: {
+-    backgroundColor: 'rgba(17,24,39,0.92)',
++    backgroundColor: 'rgba(31,31,31,0.95)',
+     borderWidth: 1,
+     borderColor: '#d4af37',
+     borderRadius: 8,
+@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   backLink: {
+-    color: '#93c5fd',
++    color: '#f0e68c',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+@@ -258,19 +258,19 @@ const styles = StyleSheet.create({
+     paddingVertical: 6,
+     borderRadius: 6,
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
+-    backgroundColor: '#374151',
++    borderColor: '#777777',
++    backgroundColor: '#2e2e2e',
+   },
+   issueHeaderBtn: {
+-    borderColor: '#16a34a',
+-    backgroundColor: '#15803d',
++    borderColor: '#f0e68c',
++    backgroundColor: '#3a3a1e',
+   },
+   stopIssueHeaderBtn: {
+-    borderColor: '#dc2626',
+-    backgroundColor: '#b91c1c',
++    borderColor: '#e57373',
++    backgroundColor: '#4a1f1f',
+   },
+   smallHeaderBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+   },
+@@ -287,12 +287,12 @@ const styles = StyleSheet.create({
+     flex: 1,
+   },
+   detailRoomText: {
+-    color: '#d1d5db',
++    color: '#cccccc',
+     fontSize: 12,
+     marginTop: 3,
+   },
+   detailDescText: {
+-    color: '#e5e7eb',
++    color: '#e0e0e0',
+     fontSize: 12,
+     marginTop: 4,
+     fontStyle: 'italic',
+@@ -304,16 +304,16 @@ const styles = StyleSheet.create({
+     marginTop: 6,
+   },
+   detailRateBadge: {
+-    color: '#fde68a',
++    color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '600',
+   },
+ 
+   // Панель живого управления открытой сессией
+   livePanel: {
+-    backgroundColor: 'rgba(20, 83, 45, 0.92)',
++    backgroundColor: 'rgba(43, 40, 26, 0.95)',
+     borderWidth: 1,
+-    borderColor: '#22c55e',
++    borderColor: '#f0e68c',
+     borderRadius: 8,
+     padding: 10,
+     marginBottom: 10,
+@@ -326,16 +326,16 @@ const styles = StyleSheet.create({
+     gap: 6,
+   },
+   livePanelTitle: {
+-    color: '#dcfce7',
++    color: '#f0e68c',
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   livePanelTarget: {
+-    color: '#bbf7d0',
++    color: '#e5e5e5',
+     fontSize: 12,
+   },
+   liveScopeLabel: {
+-    color: '#e5e7eb',
++    color: '#d4d4d4',
+     fontSize: 11,
+     marginTop: 8,
+     marginBottom: 4,
+@@ -351,20 +351,20 @@ const styles = StyleSheet.create({
+     paddingVertical: 5,
+     borderRadius: 14,
+     borderWidth: 1,
+-    borderColor: '#86efac',
+-    backgroundColor: 'rgba(0,0,0,0.28)',
++    borderColor: '#888888',
++    backgroundColor: '#262626',
+   },
+   scopeChipActive: {
+     backgroundColor: '#f0e68c',
+-    borderColor: '#f0e68c',
++    borderColor: '#d4af37',
+   },
+   scopeChipText: {
+-    color: '#ecfdf5',
++    color: '#e5e5e5',
+     fontSize: 11,
+     fontWeight: '600',
+   },
+   scopeChipTextActive: {
+-    color: '#111827',
++    color: '#1a1a1a',
+     fontWeight: '700',
+   },
+   liveControlsGrid: {
+@@ -374,13 +374,15 @@ const styles = StyleSheet.create({
+     alignItems: 'flex-end',
+   },
+   liveControlBox: {
+-    backgroundColor: 'rgba(0,0,0,0.35)',
++    backgroundColor: 'rgba(0,0,0,0.38)',
+     borderRadius: 6,
+     padding: 7,
+     minWidth: 150,
++    borderWidth: 1,
++    borderColor: '#4d4d4d',
+   },
+   liveControlLabel: {
+-    color: '#d1fae5',
++    color: '#f0e68c',
+     fontSize: 11,
+     marginBottom: 4,
+   },
+@@ -390,21 +392,21 @@ const styles = StyleSheet.create({
+     gap: 4,
+   },
+   liveStepBtn: {
+-    backgroundColor: '#374151',
++    backgroundColor: '#333333',
+     paddingHorizontal: 7,
+     paddingVertical: 5,
+     borderRadius: 4,
+     borderWidth: 1,
+-    borderColor: '#6b7280',
++    borderColor: '#666666',
+   },
+   liveStepBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 11,
+     fontWeight: '700',
+   },
+   liveStepInput: {
+-    backgroundColor: '#fff',
+-    color: '#111827',
++    backgroundColor: '#222222',
++    color: '#f5f5f5',
+     fontWeight: '700',
+     fontSize: 13,
+     textAlign: 'center',
+@@ -412,6 +414,8 @@ const styles = StyleSheet.create({
+     paddingVertical: 3,
+     paddingHorizontal: 4,
+     borderRadius: 4,
++    borderWidth: 1,
++    borderColor: '#777777',
+   },
+   liveApplyBtn: {
+     backgroundColor: '#d4af37',
+@@ -422,31 +426,31 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+   },
+   liveApplyBtnText: {
+-    color: '#111827',
++    color: '#1a1a1a',
+     fontWeight: '800',
+     fontSize: 12,
+   },
+ 
+   // Уведомление о броске костей
+   rollBanner: {
+-    backgroundColor: '#1e3a8a',
++    backgroundColor: '#2d2a1e',
+     borderWidth: 1,
+-    borderColor: '#60a5fa',
++    borderColor: '#f0e68c',
+     borderRadius: 6,
+     paddingVertical: 7,
+     paddingHorizontal: 10,
+     marginBottom: 8,
+   },
+   rollBannerText: {
+-    color: '#eff6ff',
++    color: '#f0e68c',
+     fontSize: 12,
+-    fontWeight: '600',
++    fontWeight: '700',
+     textAlign: 'center',
+   },
+ 
+   // Кнопка + и список предметов в стиле Инвентаря
+   addItemPrimaryBtn: {
+-    backgroundColor: '#2e7d32',
++    backgroundColor: '#3a3a1e',
+     borderRadius: 8,
+     paddingVertical: 11,
+     paddingHorizontal: 16,
+@@ -454,24 +458,24 @@ const styles = StyleSheet.create({
+     justifyContent: 'center',
+     marginBottom: 10,
+     borderWidth: 1,
+-    borderColor: '#4caf50',
++    borderColor: '#f0e68c',
+   },
+   addItemPrimaryBtnText: {
+-    color: '#fff',
++    color: '#f0e68c',
+     fontSize: 15,
+     fontWeight: '700',
+   },
+   itemsListContainer: {
+     flex: 1,
+-    backgroundColor: 'rgba(255,255,255,0.94)',
++    backgroundColor: 'rgba(255,255,255,0.95)',
+     borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: '#9ca3af',
++    borderColor: '#888888',
+     overflow: 'hidden',
+     marginBottom: 12,
+   },
+   emptyListText: {
+-    color: '#6b7280',
++    color: '#666666',
+     fontSize: 14,
+     textAlign: 'center',
+     paddingVertical: 32,
+@@ -484,8 +488,8 @@ const styles = StyleSheet.create({
+     paddingVertical: 9,
+     paddingHorizontal: 12,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#e5e7eb',
+-    backgroundColor: '#fff',
++    borderBottomColor: '#e0e0e0',
++    backgroundColor: '#ffffff',
+   },
+   itemRowMain: {
+     flex: 1,
+@@ -502,7 +506,7 @@ const styles = StyleSheet.create({
+   itemRowName: {
+     fontSize: 14,
+     fontWeight: '700',
+-    color: '#111827',
++    color: '#1f1f1f',
+     flexShrink: 1,
+   },
+   itemRowSub: {
+@@ -513,11 +517,11 @@ const styles = StyleSheet.create({
+   },
+   itemRowSubText: {
+     fontSize: 12,
+-    color: '#4b5563',
++    color: '#555555',
+   },
+   itemRowPriceHighlight: {
+     fontSize: 12,
+-    color: '#15803d',
++    color: '#7c5c10',
+     fontWeight: '700',
+   },
+   itemRowControls: {
+@@ -529,18 +533,21 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 8,
+     paddingVertical: 5,
+     borderRadius: 5,
+-    backgroundColor: '#e5e7eb',
++    backgroundColor: '#e5e5e5',
++    borderWidth: 1,
++    borderColor: '#bdbdbd',
+   },
+   itemRowSmallBtnText: {
+     fontSize: 12,
+     fontWeight: '700',
+-    color: '#1f2937',
++    color: '#222222',
+   },
+   itemRowDeleteBtn: {
+-    backgroundColor: '#fee2e2',
++    backgroundColor: '#f5dede',
++    borderColor: '#d99a9a',
+   },
+   itemRowDeleteBtnText: {
+-    color: '#b91c1c',
++    color: '#9e2a2a',
+     fontWeight: '700',
+     fontSize: 12,
+   },

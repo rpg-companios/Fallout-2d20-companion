@@ -574,13 +574,22 @@ const attachRoomWebSocketServer = (httpServer, {
             }, canonical, clientId);
             break;
           }
+          const closeMeta = result.closedSession
+            ? {
+                closedContainerId: result.closedSession.containerId || null,
+                closedSession: result.closedSession,
+                closedReason: result.autoClosedReason || null,
+              }
+            : {};
           sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
             granted: result.granted,
             session: result.session,
+            ...closeMeta,
             requestId: payload.requestId || null,
           }, canonical, clientId);
           broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
             session: result.session,
+            ...closeMeta,
           });
           break;
         }

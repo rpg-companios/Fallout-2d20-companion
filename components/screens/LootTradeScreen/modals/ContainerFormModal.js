@@ -133,7 +133,7 @@ const ContainerFormModal = ({
               value={name}
               onChangeText={setName}
               placeholder={tLootTrade('form.namePlaceholder')}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#8c8c8c"
             />
 
             <Text style={styles.label}>{tLootTrade('form.roomLabel')}</Text>
@@ -167,7 +167,7 @@ const ContainerFormModal = ({
               value={description}
               onChangeText={setDescription}
               placeholder={tLootTrade('form.descriptionPlaceholder')}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor="#8c8c8c"
               multiline
             />
 
@@ -236,10 +236,10 @@ const ContainerFormModal = ({
 
           <View style={styles.footer}>
             <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
-              <Text style={styles.btnText}>{tLootTrade('form.save')}</Text>
+              <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
-              <Text style={styles.btnText}>{tLootTrade('form.cancel')}</Text>
+              <Text style={styles.cancelBtnText}>{tLootTrade('form.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -254,17 +254,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.68)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   card: {
     width: '100%',
     maxWidth: 520,
     maxHeight: '90%',
-    backgroundColor: '#111827',
+    backgroundColor: '#1f1f1f',
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d4af37',
-    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#f0e68c',
+    padding: 20,
   },
   title: {
     color: '#f0e68c',
@@ -276,20 +276,20 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 8 },
   label: {
-    color: '#e5e7eb',
+    color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '700',
     marginTop: 10,
     marginBottom: 5,
   },
   input: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2a2a2a',
     borderWidth: 1,
-    borderColor: '#4b5563',
+    borderColor: '#5a5a5a',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 9,
-    color: '#f9fafb',
+    color: '#f2f2f2',
     fontSize: 14,
   },
   multilineInput: {
@@ -297,12 +297,12 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   warnText: {
-    color: '#fca5a5',
+    color: '#e57373',
     fontSize: 12,
     paddingVertical: 6,
   },
   hintText: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 11,
     marginTop: 3,
     lineHeight: 15,
@@ -317,24 +317,24 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#6b7280',
-    backgroundColor: '#1f2937',
+    borderColor: '#5a5a5a',
+    backgroundColor: '#2a2a2a',
   },
   roomChipActive: {
-    backgroundColor: '#d4af37',
-    borderColor: '#f0e68c',
+    backgroundColor: '#f0e68c',
+    borderColor: '#d4af37',
   },
   roomChipName: {
-    color: '#f9fafb',
+    color: '#f0f0f0',
     fontSize: 13,
     fontWeight: '700',
   },
   roomChipCode: {
-    color: '#9ca3af',
+    color: '#a3a3a3',
     fontSize: 11,
   },
   roomChipTextActive: {
-    color: '#111827',
+    color: '#1a1a1a',
   },
   counterRow: {
     flexDirection: 'row',
@@ -344,7 +344,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   stepBtn: {
-    backgroundColor: '#374151',
+    backgroundColor: '#2e2e2e',
     minWidth: 38,
     height: 38,
     borderRadius: 8,
@@ -352,22 +352,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#6b7280',
+    borderColor: '#666666',
   },
   stepBtnText: {
-    color: '#fff',
+    color: '#f0e68c',
     fontSize: 15,
     fontWeight: '700',
   },
   counterInput: {
-    backgroundColor: '#1f2937',
+    backgroundColor: '#2a2a2a',
     borderWidth: 1,
-    borderColor: '#9ca3af',
+    borderColor: '#777777',
     borderRadius: 8,
     width: 96,
     height: 38,
     textAlign: 'center',
-    color: '#fff',
+    color: '#f5f5f5',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -382,38 +382,50 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#6b7280',
-    backgroundColor: '#1f2937',
+    borderColor: '#5a5a5a',
+    backgroundColor: '#2a2a2a',
   },
   unitSegActive: {
     backgroundColor: '#f0e68c',
-    borderColor: '#f0e68c',
+    borderColor: '#d4af37',
   },
   unitSegText: {
-    color: '#d1d5db',
+    color: '#dcdcdc',
     fontSize: 13,
     fontWeight: '700',
   },
   unitSegTextActive: {
-    color: '#111827',
+    color: '#1a1a1a',
   },
   footer: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 16,
+    marginTop: 18,
   },
   btn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
   },
-  saveBtn: { backgroundColor: '#2e7d32' },
-  cancelBtn: { backgroundColor: '#b91c1c' },
-  btnText: {
-    color: '#fff',
+  saveBtn: {
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
+  },
+  saveBtnText: {
+    color: '#f0e68c',
     fontSize: 15,
     fontWeight: '700',
+  },
+  cancelBtn: {
+    backgroundColor: '#2a2a2a',
+    borderColor: '#777777',
+  },
+  cancelBtnText: {
+    color: '#d4d4d4',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

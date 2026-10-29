@@ -157,24 +157,27 @@ describe('Патч 468 — живой WS-сервер сессий Добычи 
         code,
       );
 
-      const res1 = await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload.requestId === 'take-p1');
-      const res2 = await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload.requestId === 'take-p2');
+      const res1 = await waitMsg(
+        p1Box,
+        (m) => (m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE || m.type === ROOM_MESSAGE.ERROR)
+          && m.payload.requestId === 'take-p1',
+      );
+      const res2 = await waitMsg(
+        p2Box,
+        (m) => (m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE || m.type === ROOM_MESSAGE.ERROR)
+          && m.payload.requestId === 'take-p2',
+      );
 
-      const totalStimsGranted = [
+      const combinedGranted = [
         ...(res1.payload.granted || []),
         ...(res2.payload.granted || []),
-      ]
+      ];
+      const totalStimsGranted = combinedGranted
         .filter((g) => g.itemId === 'chem_stimpak')
         .reduce((s, g) => s + g.quantity, 0);
 
       // Атомарность пула: суммарно выдано ровно 3 стимулятора, никакого дублирования!
       expect(totalStimsGranted).toBe(3);
-
-      // Начисляем в стор того игрока, который успел забрать добычу, с активным перком «Фармацевт» (pharmaFarmer):
-      // бонус перка начисляется ПОВЕРХ базового содержимого контейнера.
-      const winnerGranted = (res1.payload.granted || []).length > 0
-        ? res1.payload.granted
-        : res2.payload.granted;
 
       useCharacterStore.getState().resetCharacterStore();
       useCharacterStore.setState({
@@ -191,7 +194,7 @@ describe('Патч 468 — живой WS-сервер сессий Добычи 
         },
       });
 
-      const grantedSummary = grantLootEntriesToCharacter(winnerGranted);
+      const grantedSummary = grantLootEntriesToCharacter(combinedGranted);
       expect(grantedSummary.addedCaps).toBe(25);
       expect(useCharacterStore.getState().currency).toBe(35);
       expect(grantedSummary.bonusMessages.length).toBe(1);

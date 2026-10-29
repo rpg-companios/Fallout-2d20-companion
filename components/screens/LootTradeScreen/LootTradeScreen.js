@@ -165,7 +165,7 @@ const ContainerCardCell = ({
         hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
         accessibilityLabel={tLootTrade('card.openMenu')}
       >
-        <MaterialCommunityIcons name="dots-vertical" size={20} color="#4b5563" />
+        <MaterialCommunityIcons name="dots-vertical" size={20} color="#555555" />
       </TouchableOpacity>
 
       <Modal
@@ -184,7 +184,7 @@ const ContainerCardCell = ({
                 <MaterialCommunityIcons
                   name={isLive ? 'close-octagon-outline' : 'broadcast'}
                   size={19}
-                  color={isLive ? '#b91c1c' : '#15803d'}
+                  color={isLive ? '#e57373' : '#f0e68c'}
                 />
                 <Text style={styles.actionMenuText}>
                   {tLootTrade(isLive ? 'card.closeIssue' : 'card.issue')}
@@ -195,7 +195,7 @@ const ContainerCardCell = ({
                 style={styles.actionMenuItem}
                 onPress={() => runMenuAction(onDuplicate)}
               >
-                <MaterialCommunityIcons name="content-copy" size={19} color="#111827" />
+                <MaterialCommunityIcons name="content-copy" size={19} color="#d4af37" />
                 <Text style={styles.actionMenuText}>{tLootTrade('card.duplicate')}</Text>
               </TouchableOpacity>
 
@@ -203,7 +203,7 @@ const ContainerCardCell = ({
                 style={styles.actionMenuItem}
                 onPress={() => runMenuAction(onEdit)}
               >
-                <MaterialCommunityIcons name="pencil-outline" size={19} color="#111827" />
+                <MaterialCommunityIcons name="pencil-outline" size={19} color="#d4af37" />
                 <Text style={styles.actionMenuText}>{tLootTrade('card.edit')}</Text>
               </TouchableOpacity>
 
@@ -211,7 +211,7 @@ const ContainerCardCell = ({
                 style={styles.actionMenuItem}
                 onPress={() => runMenuAction(onDelete)}
               >
-                <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
+                <MaterialCommunityIcons name="delete-outline" size={19} color="#e57373" />
                 <Text style={[styles.actionMenuText, styles.actionMenuDeleteText]}>
                   {tLootTrade('card.delete')}
                 </Text>
@@ -299,6 +299,12 @@ export default function LootTradeScreen() {
     () => containers.find((c) => c.id === activeContainerId) || null,
     [containers, activeContainerId],
   );
+
+  useEffect(() => {
+    if (!loading && activeContainerId && !containers.some((c) => c.id === activeContainerId)) {
+      setActiveContainerId(null);
+    }
+  }, [loading, activeContainerId, containers]);
 
   const getActiveSessionForContainer = useCallback((cnt) => {
     if (!cnt?.roomCode) return null;
@@ -491,11 +497,28 @@ export default function LootTradeScreen() {
     }
   };
 
+  const formatRollBannerForItem = (itemName, roll) => {
+    if (roll.unit === 'packs') {
+      return `${itemName}: ${formatLootTrade(tLootTrade('detail.packsRollNotice'), {
+        packs: roll.packCount || 1,
+        formula: roll.formula || '',
+        total: roll.quantity,
+      })}`;
+    }
+    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
+    return `${itemName}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
+      dice: roll.diceCount,
+      unit: unitLabel,
+      total: roll.quantity,
+    })}`;
+  };
+
   const handleAddCatalogItem = async (pickedItem, spec) => {
     if (!activeContainer) return;
     const roll = resolveQuantitySpec({
       count: spec.count,
       unit: spec.unit,
+      item: pickedItem,
       allowZeroPcs: false,
     });
 
@@ -537,11 +560,7 @@ export default function LootTradeScreen() {
     });
 
     const msg = roll.rolled
-      ? `${pickedItem.name}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
-          dice: roll.diceCount,
-          unit: unitLabel,
-          total: roll.quantity,
-        })}`
+      ? formatRollBannerForItem(pickedItem.name, roll)
       : `✓ ${pickedItem.name} ×${roll.quantity}`;
     setCatalogFeedback(msg);
     if (roll.rolled) showTimedBanner(msg);
@@ -566,15 +585,23 @@ export default function LootTradeScreen() {
 
   const handleSaveEditedRow = async (spec) => {
     if (!activeContainer || !editingEntry) return;
-    const roll = resolveQuantitySpec({
-      count: spec.count,
-      unit: spec.unit,
-      allowZeroPcs: false,
-    });
+    const targetEntry = editingEntry;
+    const roll = spec.keepExistingQuantity
+      ? {
+          quantity: targetEntry.quantity,
+          rolled: false,
+          unit: 'pcs',
+        }
+      : resolveQuantitySpec({
+          count: spec.count,
+          unit: spec.unit,
+          item: targetEntry,
+          allowZeroPcs: false,
+        });
     const nextItems = roll.quantity <= 0
-      ? activeContainer.items.filter((it) => it.entryId !== editingEntry.entryId)
+      ? activeContainer.items.filter((it) => it.entryId !== targetEntry.entryId)
       : activeContainer.items.map((it) => (
-          it.entryId === editingEntry.entryId
+          it.entryId === targetEntry.entryId
             ? {
                 ...it,
                 quantity: roll.quantity,
@@ -586,6 +613,9 @@ export default function LootTradeScreen() {
         ));
     setEditingEntry(null);
     await persistAndSyncContainer({ ...activeContainer, items: nextItems });
+    if (roll.rolled && roll.quantity > 0) {
+      showTimedBanner(formatRollBannerForItem(targetEntry.name, roll));
+    }
   };
 
   const applyLiveMerchantRates = async ({
