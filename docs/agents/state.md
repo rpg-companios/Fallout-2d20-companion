@@ -1,5 +1,17 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-29 (467) — исправление приоритета `PATH` в `deploy-netangels.sh` (системный `node v10.24.0` больше не перекрывает виртуальный Node.js NetAngels)
+
+Слово владельца (консоль `c54016@h33:~/positronium-engine.na4u.ru`):
+при активном `(node.js v26.13.0)` / `(node.js v22.23.4)` запуск `./deploy-netangels.sh` выдавал `✗ Обнаружена слишком старая версия Node.js (v10.24.0)`.
+
+- Диагностика:
+  `etc/environment/PATH` на контейнерах NetAngels содержит системный `/usr/bin` (где лежит базовый Debian `node v10.24.0`). В патче 466 строка `export PATH="$site_env_path:$PATH"` ставила `etc/environment/PATH` **перед** `$PATH` шелла, из-за чего `/usr/bin/node` (`v10.24.0`) затенял виртуальный `Node.js v22.23.4`.
+- Исправлено в `deploy-netangels.sh`:
+  1. Добавлена функция `resolve_modern_node_bin`: сканирует локальные `bin`-каталоги сайта, текущий `$PATH`, `etc/environment/*`, стандартные каталоги рантаймов (`/opt`, `/usr/local`, `/usr/lib`, `~/.nvm`) с приоритетом версии из `PROMPT_SUFFIX` (например `v22.23.4`) и при необходимости опрашивает интерактивный шелл (`PROMPT_COMMAND` / `alias` / `type`), отсеивая старый системный `node < 18` (`v10.24.0`) и ставя каталог современного `node >= 18` в самое начало `PATH`.
+  2. Минимальный автопатч в `deploy-netangels.sh` обновлён до `467`, `public/version.json` (`"467"`, `release: 4`) и `patchs/baseline.json` (`"467"`).
+- Приёмочные тесты: `__tests__/room/deploy-netangels-466.test.js` (добавлена регрессия с подставным `v10.24.0` в `etc/environment/PATH` и в начале `PATH`).
+
 ## 2026-10-29 (466) — скрипт автоматической сборки и деплоя на NetAngels (`deploy-netangels.sh` для `positronium-engine.na4u.ru`)
 
 Слово владельца:

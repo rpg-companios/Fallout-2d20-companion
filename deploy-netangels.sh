@@ -92,6 +92,125 @@ resolve_abs_dir() {
   )
 }
 
+resolve_modern_node_bin() {
+  local site_dir="$1"
+  local site_env_path="$2"
+  local prompt_suffix="$3"
+
+  local wanted_ver=""
+  if [[ "$prompt_suffix" =~ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+    wanted_ver="${BASH_REMATCH[1]}"
+  fi
+
+  local candidates=()
+  local d
+
+  for d in "$site_dir/bin" "$site_dir/env/bin" "$site_dir/.env/bin" "$site_dir/node/bin"; do
+    [[ -d "$d" ]] && candidates+=("$d")
+  done
+
+  local ifs_save="$IFS"
+  IFS=':'
+  for d in $PATH; do
+    [[ -n "$d" && -d "$d" ]] && candidates+=("$d")
+  done
+  for d in $site_env_path; do
+    [[ -n "$d" && -d "$d" ]] && candidates+=("$d")
+  done
+  IFS="$ifs_save"
+
+  local search_roots=("/opt" "/usr/local" "/usr/lib" "/usr/share")
+  if [[ -d "$HOME/.nvm/versions" ]]; then
+    search_roots=("$HOME/.nvm/versions" "${search_roots[@]}")
+  fi
+  if [[ -n "${POSITRONIUM_NODE_SEARCH_ROOT:-}" && -d "${POSITRONIUM_NODE_SEARCH_ROOT}" ]]; then
+    search_roots=("${POSITRONIUM_NODE_SEARCH_ROOT}" "${search_roots[@]}")
+  fi
+
+  # Также проверяем любые пути с /bin внутри etc/environment/* сайта
+  if [[ -d "$site_dir/etc/environment" ]]; then
+    local env_f env_val
+    for env_f in "$site_dir/etc/environment"/*; do
+      [[ -f "$env_f" ]] || continue
+      env_val="$(tr -d '\r\n' < "$env_f" 2>/dev/null || true)"
+      IFS=':'
+      for d in $env_val; do
+        [[ -n "$d" && -d "$d" ]] && candidates+=("$d")
+      done
+      IFS="$ifs_save"
+    done
+  fi
+
+  shopt -s nullglob
+  local root_dir
+  if [[ -n "$wanted_ver" ]]; then
+    for root_dir in "${search_roots[@]}"; do
+      for d in \
+        "$root_dir"/*node*/"$wanted_ver"/bin \
+        "$root_dir"/*node*/"v$wanted_ver"/bin \
+        "$root_dir"/*node*"$wanted_ver"*/bin \
+        "$root_dir"/alt/alt-nodejs*/root/usr/bin; do
+        [[ -d "$d" ]] && candidates+=("$d")
+      done
+    done
+  fi
+  for root_dir in "${search_roots[@]}"; do
+    for d in \
+      "$root_dir"/*node*/v2*/bin \
+      "$root_dir"/*node*/2*/bin \
+      "$root_dir"/*node*2*/bin \
+      "$root_dir"/alt/alt-nodejs2*/root/usr/bin; do
+      [[ -d "$d" ]] && candidates+=("$d")
+    done
+  done
+  shopt -u nullglob
+
+  local fallback_dir=""
+  local ver major
+  for d in "${candidates[@]}"; do
+    [[ -x "$d/node" ]] || continue
+    ver="$("$d/node" -v 2>/dev/null || true)"
+    ver="${ver#v}"
+    [[ "$ver" =~ ^([0-9]+)\. ]] || continue
+    major="${BASH_REMATCH[1]}"
+    [[ "$major" -ge 18 ]] || continue
+    if [[ -n "$wanted_ver" && "$ver" == "$wanted_ver" ]]; then
+      printf '%s\n' "$d"
+      return 0
+    fi
+    if [[ -z "$fallback_dir" ]]; then
+      fallback_dir="$d"
+    fi
+  done
+
+  if [[ -n "$fallback_dir" ]]; then
+    printf '%s\n' "$fallback_dir"
+    return 0
+  fi
+
+  # Резерв на случай, если окружение Node.js в NetAngels подключено через PROMPT_COMMAND / alias / функцию в интерактивном bashrc.
+  local probe_out probe_line resolved_bin
+  probe_out="$(
+    bash -ic "cd -- \"$site_dir\" >/dev/null 2>&1; if [[ -n \"\${PROMPT_COMMAND:-}\" ]]; then eval \"\$PROMPT_COMMAND\" >/dev/null 2>&1 || true; fi; alias node 2>/dev/null || true; declare -f node 2>/dev/null || true; type -a -P node 2>/dev/null || true" </dev/null 2>/dev/null || true
+  )"
+  while IFS= read -r probe_line; do
+    if [[ "$probe_line" =~ (/[^\'\"[:space:]]+/node) ]]; then
+      resolved_bin="${BASH_REMATCH[1]}"
+      d="$(dirname -- "$resolved_bin")"
+      if [[ -x "$d/node" ]]; then
+        ver="$("$d/node" -v 2>/dev/null || true)"
+        ver="${ver#v}"
+        if [[ "$ver" =~ ^([0-9]+)\. ]] && [[ "${BASH_REMATCH[1]}" -ge 18 ]]; then
+          printf '%s\n' "$d"
+          return 0
+        fi
+      fi
+    fi
+  done <<< "$probe_out"
+
+  return 1
+}
+
 main() {
   local site_arg=""
   local branch="${POSITRONIUM_BRANCH:-main}"
@@ -204,16 +323,10 @@ main() {
   export TMPDIR="$site_dir/tmp"
 
   # 2. Активируем виртуальное окружение Node.js сайта NetAngels.
-  local site_env_path
+  # Важно: etc/environment/PATH в контейнере содержит системный /usr/bin (где лежит старый
+  # системный node v10.24.0), поэтому НЕ ставим его впереди активного виртуального Node.js!
+  local site_env_path prompt_suffix
   site_env_path="$(read_env_file "$site_dir/etc/environment/PATH")"
-  if [[ -n "$site_env_path" ]]; then
-    export PATH="$site_env_path:$PATH"
-  fi
-  if [[ -d "$site_dir/bin" ]]; then
-    export PATH="$site_dir/bin:$PATH"
-  fi
-
-  local prompt_suffix
   prompt_suffix="$(read_env_file "$site_dir/etc/environment/PROMPT_SUFFIX")"
   if [[ "$prompt_suffix" == "(html)" ]]; then
     echo "✗ Сайт $(basename -- "$site_dir") создан с типом «Статический HTML» ($prompt_suffix)." >&2
@@ -221,6 +334,17 @@ main() {
     echo "  Создайте сайт с конфигурацией «Node.js • PostgreSQL» (или «Node.js • MySQL») в панели NetAngels." >&2
     exit 1
   fi
+
+  local modern_node_bin=""
+  if modern_node_bin="$(resolve_modern_node_bin "$site_dir" "$site_env_path" "$prompt_suffix")"; then
+    export PATH="${modern_node_bin}:${PATH}${site_env_path:+:${site_env_path}}"
+  elif [[ -n "$site_env_path" ]]; then
+    export PATH="${PATH}:${site_env_path}"
+  fi
+  if [[ -d "$site_dir/bin" ]]; then
+    export PATH="${PATH}:$site_dir/bin"
+  fi
+  hash -r 2>/dev/null || true
 
   if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
     echo "✗ Не найдены команды node / npm в окружении сайта $site_dir." >&2
@@ -273,12 +397,18 @@ main() {
 
   repo_dir="$(resolve_abs_dir "$repo_dir")"
 
-  # Если запрошен конкретный патч или в ветке ещё нет скрипта/поддержки NetAngels (патч 466+),
+  # Если запрошен конкретный патч или в ветке ещё нет актуального скрипта NetAngels (патч 467+),
   # автоматически подтягиваем свежий патч через apply-patch.sh.
+  local min_netangels_patch="467"
   local effective_patch="$target_patch"
   if [[ -z "$effective_patch" && "$skip_pull" -eq 0 && -f "$repo_dir/apply-patch.sh" ]]; then
-    if [[ ! -f "$repo_dir/deploy-netangels.sh" ]] || ! grep -q 'APP_PORT' "$repo_dir/server/start.js" 2>/dev/null; then
-      effective_patch="466"
+    local repo_ver
+    repo_ver="$(
+      node -p "try { parseInt(JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).version, 10) || 0 } catch { 0 }" \
+        "$repo_dir/public/version.json" 2>/dev/null || echo 0
+    )"
+    if [[ "$repo_ver" -lt "$min_netangels_patch" ]]; then
+      effective_patch="$min_netangels_patch"
     fi
   fi
   if [[ -n "$effective_patch" ]]; then

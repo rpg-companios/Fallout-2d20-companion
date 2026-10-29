@@ -1,5 +1,14 @@
 # Changelog
 ---
+## Fix Node.js version resolution in `deploy-netangels.sh` on NetAngels (patch 467)
+
+Fixed `etc/environment/PATH` prepending `/usr/bin` (with legacy system
+`node v10.24.0`) ahead of NetAngels' virtual Node.js runtime: `deploy-netangels.sh`
+now locates the modern `node >= 18` binary directory (preferring the exact
+version from `PROMPT_SUFFIX`, e.g. `v22.23.4`) and places it at the front of
+`PATH`.
+
+---
 ## Automated NetAngels / `na4u.ru` build and deployment script (`deploy-netangels.sh`, patch 466)
 
 Added executable `deploy-netangels.sh` (`npm run deploy:netangels`) for
