@@ -7,6 +7,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "expo export --platform web",
+    "deploy:netangels": "bash ./deploy-netangels.sh",
     "serve": "npx serve -s dist -l 5000",
     "serve:app": "node server/index.js",
     "test": "vitest run",

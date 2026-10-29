@@ -1,5 +1,33 @@
 # Состояние работы — читается ПЕРВЫМ
 
+## 2026-10-29 (466) — скрипт автоматической сборки и деплоя на NetAngels (`deploy-netangels.sh` для `positronium-engine.na4u.ru`)
+
+Слово владельца:
+«Давай сделает так. Добавь скрипт для сборки приложения, а я через shell на новом positronium-engine.na4u.ru через консоль заберу и запущу скрипт, который сам всё расположет, как надо.»
+
+- Реализовано:
+  1. `deploy-netangels.sh` (исполняемый скрипт в корне проекта + `npm run deploy:netangels` в `package.json`):
+     - сам определяет каталог сайта NetAngels (`~/positronium-engine.na4u.ru`), подхватывает виртуальное окружение Node.js из `etc/environment/PATH`, проверяет тип сайта (отклоняет статический `(html)` с понятной подсказкой) и направляет `TMPDIR` в `<сайт>/tmp`;
+     - клонирует или обновляет репозиторий в `<сайт>/repo` (не засоряя `app/` и `www/`), при необходимости автоматически подтягивает актуальный патч через `apply-patch.sh`;
+     - устанавливает пакеты сборки с принудительным `--include=dev` (`NPM_CONFIG_PRODUCTION=false NODE_ENV=development`, чтобы не пропускался `@babel/core` из-за `NODE_ENV=production` в контейнере NetAngels) и собирает `dist/` с безопасными лимитами (`--max-old-space-size=1536`, `--max-workers=2`);
+     - раскладывает собранную статику в `<сайт>/www/` с сохранением `.well-known`, `google*.html`, `yandex_*.html` и прав чтения для Nginx;
+     - раскладывает лёгкий сервер комнат в `<сайт>/app/` (`server/`, минимальный `package.json`, пакет `ws` и `hello.js` с `require('./server/index.js')` — работает из коробки со стандартным `APP_PATH=.../app/hello.js` без ручной правки панели);
+     - сохраняет копию `deploy-netangels.sh` в корне сайта для будущих обновлений одной командой, вызывает `touch reload` и проверяет живой ответ `http://$APP_IP:$APP_PORT/__boot-status` + WebSocket `PRESENCE_PING`/`PRESENCE_PONG` на `/ws`.
+  2. `public/version.json` (`version: "466"`, `release: 4` сохранён) и `patchs/baseline.json` (`"466"`).
+- Приёмочные тесты: `__tests__/room/deploy-netangels-466.test.js`.
+
+## 2026-10-28 (465) — поддержка окружения NetAngels (`na4u.ru`: `APP_IP`, `APP_PORT`, `../www`, лёгкий прод-деплой `server/`)
+
+Слово владельца (контейнер `na4u.ru`, `etc/environment`):
+`APP_IP=127.0.4.28`, `APP_PORT=58982`, `APP_PATH=/home/.../app/`, `NODE_ENV=production`, статика в соседней папке `/www/`, на Replit — бесплатный `Static`-деплой.
+
+- Исправлено в `server/start.js`:
+  1. `resolveListenPort` и `resolveListenHost`: сервер автоматически подхватывает `APP_PORT` и `APP_IP` (переменные NetAngels), если не заданы `PORT` / `HOST`.
+  2. `resolveDefaultDistDir`: если внутри `APP_PATH` нет `./dist/index.html`, сервер автоматически находит собранную статику в соседнем `../www` (или `./www`, либо `DIST_DIR`).
+  3. `resolveDefaultAutoBuild` и `readPublicVersion`: при лёгком серверном деплое без исходников `App.js` (только `server/` + пакет `ws` в `app/` и готовая сборка в `../www/`) или при `NODE_ENV=production` с готовой статикой сервер не пытается запускать `expo export`, читает версию из `../www/version.json` и сразу поднимает HTTP + WebSocket `/ws`.
+  4. `public/version.json` (`version: "465"`, `release: 4` сохранён) и `patchs/baseline.json` (`"465"`).
+- Приёмочные тесты: `__tests__/room/netangels-env-465.test.js`.
+
 ## 2026-10-28 (464) — восстановление нового аватара `ghoul.png` из коммита `39bb559` и защита коммитов владельца от перезаписи в `apply-patch.sh`
 
 Слово владельца:

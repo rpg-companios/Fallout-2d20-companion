@@ -1,5 +1,24 @@
 # Changelog
 ---
+## Automated NetAngels / `na4u.ru` build and deployment script (`deploy-netangels.sh`, patch 466)
+
+Added executable `deploy-netangels.sh` (`npm run deploy:netangels`) for
+one-command SSH deployment on NetAngels cloud hosting: activates the site's
+Node.js virtual environment, clones or updates sources in `<site>/repo`, builds
+`dist/` within container memory limits, deploys static files to `www/` (keeping
+`.well-known` and `google*.html`/`yandex_*.html` verification files) and the
+lightweight room server to `app/` (`server/`, `package.json`, `hello.js`, `ws`),
+triggers `touch reload`, and verifies live HTTP + WebSocket `/ws` readiness.
+
+---
+## Support NetAngels / `na4u.ru` environment in room server startup (patch 465)
+
+Updated `server/start.js` to automatically pick up NetAngels hosting variables
+(`APP_PORT`, `APP_IP`), locate prebuilt web assets in sibling `../www` (when
+running from `app/` alongside `www/`), and skip Metro auto-builds on lightweight
+production deployments without source files (`server/` + `ws` only).
+
+---
 ## Restore updated ghoul origin portrait and preserve owner commits in `apply-patch.sh` (patch 464)
 
 Restored the updated `ghoul` origin portrait (`modules/fallout/assets/origins/ghoul.png`

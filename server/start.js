@@ -72,13 +72,20 @@ const TEXT_EXTENSIONS = new Set([
   '.js', '.jsx', '.ts', '.tsx', '.json', '.html', '.css', '.cjs', '.mjs',
 ]);
 
-const readPublicVersion = (rootDir) => {
-  try {
-    const raw = JSON.parse(fs.readFileSync(path.join(rootDir, 'public', 'version.json'), 'utf8'));
-    return raw?.version ? String(raw.version) : '';
-  } catch {
-    return '';
+const readPublicVersion = (rootDir, distDir = null) => {
+  const candidates = [
+    path.join(rootDir, 'public', 'version.json'),
+    ...(distDir ? [path.join(distDir, 'version.json')] : []),
+  ];
+  for (const file of candidates) {
+    try {
+      const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (raw?.version) return String(raw.version);
+    } catch {
+      // пробуем следующий путь
+    }
   }
+  return '';
 };
 
 const computeSourceScan = (rootDir) => {
@@ -484,14 +491,53 @@ const defaultRunExportBuild = ({ rootDir, stagingDir, onProgress }) => new Promi
   });
 });
 
+const resolveListenPort = (env = process.env) => {
+  const raw = env.PORT !== undefined && env.PORT !== '' ? env.PORT : env.APP_PORT;
+  if (raw !== undefined && raw !== '') {
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  }
+  return 5000;
+};
+
+const resolveListenHost = (env = process.env) => (
+  env.HOST || env.APP_IP || '0.0.0.0'
+);
+
+const resolveDefaultDistDir = (rootDir, env = process.env) => {
+  if (env.DIST_DIR) return path.resolve(rootDir, env.DIST_DIR);
+  const candidates = [
+    path.join(rootDir, 'dist'),
+    path.resolve(rootDir, '..', 'www'),
+    path.join(rootDir, 'www'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, 'index.html'))) {
+      return candidate;
+    }
+  }
+  return path.join(rootDir, 'dist');
+};
+
+const resolveDefaultAutoBuild = (rootDir, distDir, env = process.env) => {
+  if (env.SKIP_AUTO_BUILD === '1') return false;
+  if (!fs.existsSync(path.join(rootDir, 'App.js'))) return false;
+  if (env.NODE_ENV === 'production' && hasValidDistFiles(distDir, '')) return false;
+  return true;
+};
+
 const createManagedAppServer = ({
-  port = Number(process.env.PORT || 5000),
-  host = process.env.HOST || '0.0.0.0',
+  port = resolveListenPort(),
+  host = resolveListenHost(),
   rootDir = path.join(__dirname, '..'),
-  distDir = path.join(rootDir, 'dist'),
-  autoBuild = process.env.SKIP_AUTO_BUILD !== '1',
+  distDir,
+  autoBuild,
   runExportBuild = defaultRunExportBuild,
 } = {}) => {
+  const resolvedDistDir = distDir || resolveDefaultDistDir(rootDir);
+  const resolvedAutoBuild = autoBuild !== undefined
+    ? autoBuild
+    : resolveDefaultAutoBuild(rootDir, resolvedDistDir);
   const expoCacheRoot = path.join(rootDir, '.expo');
   let activeFingerprint = null;
   let lastCheckAt = 0;
@@ -499,7 +545,7 @@ const createManagedAppServer = ({
 
   const status = {
     state: 'ready',
-    version: readPublicVersion(rootDir),
+    version: readPublicVersion(rootDir, resolvedDistDir),
     startedAt: 0,
     stage: 'Готово',
     detail: '',
@@ -518,7 +564,7 @@ const createManagedAppServer = ({
   const startBuild = (targetFingerprint) => {
     if (buildPromise) return buildPromise;
     status.state = 'building';
-    status.version = readPublicVersion(rootDir);
+    status.version = readPublicVersion(rootDir, resolvedDistDir);
     status.startedAt = Date.now();
     status.stage = 'Сборка веб-интерфейса Positronium…';
     status.detail = 'Запуск сборщика Metro…';
@@ -554,10 +600,10 @@ const createManagedAppServer = ({
       .then(() => {
         const finalFingerprint = computeSourceFingerprint(rootDir) || targetFingerprint;
         fs.writeFileSync(path.join(stagingDir, FINGERPRINT_FILE), `${finalFingerprint}\n`, 'utf8');
-        swapDirectoryAtomic(stagingDir, distDir, expoCacheRoot);
+        swapDirectoryAtomic(stagingDir, resolvedDistDir, expoCacheRoot);
         activeFingerprint = finalFingerprint;
         lastCheckAt = Date.now();
-        status.version = readPublicVersion(rootDir);
+        status.version = readPublicVersion(rootDir, resolvedDistDir);
         status.state = 'ready';
         status.stage = 'Готово';
         status.detail = '';
@@ -582,14 +628,14 @@ const createManagedAppServer = ({
   };
 
   const ensureUpToDate = (forceCheck = false) => {
-    if (!autoBuild || status.state === 'building') return;
+    if (!resolvedAutoBuild || status.state === 'building') return;
     const now = Date.now();
     if (!forceCheck && now - lastCheckAt < 2000 && activeFingerprint) return;
     lastCheckAt = now;
-    const check = isDistUpToDate(rootDir, distDir);
+    const check = isDistUpToDate(rootDir, resolvedDistDir);
     if (check.upToDate) {
       activeFingerprint = check.fingerprint;
-      status.version = readPublicVersion(rootDir);
+      status.version = readPublicVersion(rootDir, resolvedDistDir);
       if (status.state !== 'ready') {
         status.state = 'ready';
         status.error = null;
@@ -656,7 +702,7 @@ const createManagedAppServer = ({
   const roomApp = createRoomServer({
     port,
     host,
-    distDir,
+    distDir: resolvedDistDir,
     beforeStatic,
   });
 
@@ -696,5 +742,9 @@ module.exports = {
   computeSourceFingerprint,
   isDistUpToDate,
   renderBootStatusHtml,
+  resolveListenPort,
+  resolveListenHost,
+  resolveDefaultDistDir,
+  resolveDefaultAutoBuild,
   createManagedAppServer,
 };
