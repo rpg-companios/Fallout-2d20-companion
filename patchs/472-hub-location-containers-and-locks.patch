@@ -1,0 +1,3830 @@
+diff --git a/__tests__/lootTrade/hub-containers-472.test.js b/__tests__/lootTrade/hub-containers-472.test.js
+new file mode 100644
+index 0000000..39de4f3
+--- /dev/null
++++ b/__tests__/lootTrade/hub-containers-472.test.js
+@@ -0,0 +1,457 @@
++import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
++import fs from 'fs';
++import path from 'path';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++  Alert: { alert: vi.fn() },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++const alertSpies = vi.hoisted(() => ({
++  calls: [],
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: (opts) => {
++    alertSpies.calls.push(opts);
++  },
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn(() => Promise.resolve()),
++  deleteGmContainerFromCloudIfEnabled: vi.fn(() => Promise.resolve()),
++}));
++
++import * as db from '../../db/Database.web.js';
++import {
++  CONTAINER_KIND,
++  buildHubSessionNodes,
++  duplicateContainerEntity,
++  normalizeContainerEntity,
++} from '../../domain/lootTrade';
++import { createRoomServer } from '../../server/roomServer.js';
++import { ERROR_CODE, MESSAGE } from '../../server/protocol.js';
++import { ROOM_ERROR, ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import { createRoomClient } from '../../src/room/roomClient';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import {
++  resetPromptedEmptySessionsForTests,
++  startGmSessionPersistence,
++} from '../../src/lootTrade/gmSessionPersistence';
++import { setCurrentLocale } from '../../i18n/locale';
++
++const waitFor = async (predicate, timeoutMs = 4000) => {
++  const started = Date.now();
++  while (Date.now() - started < timeoutMs) {
++    const val = await predicate();
++    if (val) return val;
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('Timed out waiting for condition');
++};
++
++describe('Patch 472 — Location / Hub containers (nested merchants & loot + live locks)', () => {
++  let app = null;
++  let wsUrl = '';
++  let stopPersistence = null;
++
++  beforeEach(async () => {
++    setCurrentLocale('ru-RU');
++    alertSpies.calls.length = 0;
++    resetPromptedEmptySessionsForTests();
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++    await db.initDatabase();
++    const existing = await db.getGmContainersList();
++    for (const c of existing) {
++      await db.deleteGmContainer(c.id);
++    }
++
++    app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const started = await app.start();
++    wsUrl = `ws://127.0.0.1:${started.port}/ws`;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++    stopPersistence = startGmSessionPersistence();
++  });
++
++  afterEach(async () => {
++    if (stopPersistence) {
++      stopPersistence();
++      stopPersistence = null;
++    }
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    if (app) {
++      await app.close();
++      app = null;
++    }
++  });
++
++  it('normalizes hub entities, clones links on duplicate, and enforces 1-level nesting', () => {
++    expect(ERROR_CODE.CONTAINER_LOCKED).toBe('CONTAINER_LOCKED');
++    expect(ROOM_ERROR.CONTAINER_LOCKED).toBe('CONTAINER_LOCKED');
++
++    const lootCard = normalizeContainerEntity({
++      id: 'loot-1',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Ящик с припасами',
++      roomCode: 'AAA111',
++      items: [{ entryId: 'e1', itemId: 'stimpak', itemType: 'chem', name: 'Стимулятор', quantity: 2, cost: 50 }],
++    });
++    const merchantCard = normalizeContainerEntity({
++      id: 'merch-1',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Торговец оружием',
++      roomCode: 'AAA111',
++      caps: 250,
++      saleMarkupPercent: 15,
++      buyDepreciationPercent: 50,
++      items: [{ entryId: 'e2', itemId: 'pistol_10mm', itemType: 'weapon', name: '10-мм пистолет', quantity: 1, cost: 50 }],
++    });
++    const nestedHubAttempt = normalizeContainerEntity({
++      id: 'hub-nested',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Другая локация',
++      roomCode: 'AAA111',
++      links: [{ containerId: 'loot-1', locked: false }],
++    });
++
++    const hub = normalizeContainerEntity({
++      id: 'hub-main',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Рынок Даймонд-Сити',
++      roomCode: 'AAA111',
++      items: [{ entryId: 'ignored', name: 'Не должно быть в hub', quantity: 1 }],
++      links: [
++        { containerId: 'merch-1', locked: false },
++        { containerId: 'loot-1', locked: true, lockLabel: 'Сложность взлома: 2' },
++        { containerId: 'hub-nested', locked: false },
++        { containerId: 'merch-1', locked: true }, // дубликат отбрасывается
++      ],
++    });
++
++    expect(hub.kind).toBe('hub');
++    expect(hub.items).toEqual([]);
++    expect(hub.links).toHaveLength(3);
++
++    const nodes = buildHubSessionNodes(hub, [lootCard, merchantCard, nestedHubAttempt, hub]);
++    // Вложенность строго 1 уровень: hub-nested отфильтрован
++    expect(nodes.map((n) => n.containerId)).toEqual(['merch-1', 'loot-1']);
++    expect(nodes[0].caps).toBe(250);
++    expect(nodes[1].locked).toBe(true);
++    expect(nodes[1].lockLabel).toBe('Сложность взлома: 2');
++
++    const copy = duplicateContainerEntity(hub, 'копия');
++    expect(copy.id).not.toBe(hub.id);
++    expect(copy.kind).toBe('hub');
++    expect(copy.links).toEqual(hub.links);
++  });
++
++  it('sanitizes locked hub nodes over WS, blocks locked loot/trade, persists multi-player trades to child cards, keeps hub open until GM closes, and unlocks live', async () => {
++    // 1. Создаём комнату Мастером через стор (подписан gmSessionPersistence)
++    const created = await useRoomStore.getState().createRoom({ name: 'Diamond City' });
++    const code = created.code;
++    await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++    const weaponShop = await db.saveGmContainer({
++      id: 'shop-weapons',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Оружейник Артуро',
++      roomCode: code,
++      caps: 300,
++      saleMarkupPercent: 10,
++      buyDepreciationPercent: 50,
++      items: [
++        {
++          entryId: 'w-10mm',
++          itemId: 'pistol_10mm',
++          itemType: 'weapon',
++          name: '10-мм пистолет',
++          quantity: 3,
++          cost: 50,
++          markupPercent: 0,
++        },
++      ],
++    });
++
++    const chemShop = await db.saveGmContainer({
++      id: 'shop-chems',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Лавка Соломона',
++      roomCode: code,
++      caps: 180,
++      saleMarkupPercent: 0,
++      buyDepreciationPercent: 50,
++      items: [
++        {
++          entryId: 'c-stim',
++          itemId: 'stimpak',
++          itemType: 'chem',
++          name: 'Стимулятор',
++          quantity: 4,
++          cost: 40,
++          markupPercent: 0,
++        },
++      ],
++    });
++
++    const lockedSafe = await db.saveGmContainer({
++      id: 'safe-locked',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Сейф в подсобке',
++      roomCode: code,
++      items: [
++        {
++          entryId: 's-caps',
++          itemId: 'caps',
++          itemType: 'caps',
++          name: 'Крышки',
++          quantity: 75,
++          cost: 1,
++        },
++      ],
++    });
++
++    const hub = await db.saveGmContainer({
++      id: 'hub-dc-market',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Рынок Даймонд-Сити',
++      roomCode: code,
++      links: [
++        { containerId: weaponShop.id, locked: false, lockLabel: '' },
++        { containerId: chemShop.id, locked: false, lockLabel: '' },
++        { containerId: lockedSafe.id, locked: true, lockLabel: 'Взлом сложность 2' },
++      ],
++    });
++
++    // Подключаем двух игроков
++    const p1Inbox = [];
++    const p2Inbox = [];
++    const player1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-hub-1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p1Inbox.push(m),
++    });
++    const player2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-hub-2',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p2Inbox.push(m),
++    });
++
++    try {
++      await waitFor(() => player1.getStatus() === 'online' && player2.getStatus() === 'online');
++      player1.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Sole Survivor', role: 'player', requestId: 'j1' }, code);
++      player2.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Piper', role: 'player', requestId: 'j2' }, code);
++      await waitFor(() => (
++        p1Inbox.some((m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'j1')
++        && p2Inbox.some((m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'j2')
++      ));
++
++      // 2. Мастер выдаёт Локацию на всю комнату
++      const allCards = await db.getGmContainersList();
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: hub.id,
++          kind: CONTAINER_KIND.HUB,
++          name: hub.name,
++          targetType: 'room',
++          nodes: buildHubSessionNodes(hub, allCards),
++        },
++      });
++      expect(opened.kind).toBe('hub');
++      // Мастер видит содержимое запертого сейфа
++      const gmSafeNode = opened.nodes.find((n) => n.containerId === lockedSafe.id);
++      expect(gmSafeNode.locked).toBe(true);
++      expect(gmSafeNode.items).toHaveLength(1);
++
++      // Игрок получает запертый сейф со скрытым содержимым (items: [])
++      const p1OpenMsg = await waitFor(() => (
++        p1Inbox.find((m) => m.type === MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId)
++      ));
++      const p1SafeNode = p1OpenMsg.payload.session.nodes.find((n) => n.containerId === lockedSafe.id);
++      expect(p1SafeNode.locked).toBe(true);
++      expect(p1SafeNode.lockLabel).toBe('Взлом сложность 2');
++      expect(p1SafeNode.items).toEqual([]);
++      expect(p1SafeNode.hasItemsHint).toBe(true);
++
++      // 3. Попытка игрока забрать предмет из запертого сейфа отклоняется сервером
++      p1Inbox.length = 0;
++      player1.send(
++        ROOM_MESSAGE.SESSION_LOOT_TAKE,
++        {
++          sessionId: opened.sessionId,
++          nodeContainerId: lockedSafe.id,
++          characterId: 'char-p1',
++          takes: [{ entryId: 's-caps', quantity: 75 }],
++        },
++        code,
++      );
++      const lockErr = await waitFor(() => p1Inbox.find((m) => m.type === MESSAGE.ERROR));
++      expect(lockErr.payload.code).toBe(ERROR_CODE.CONTAINER_LOCKED);
++
++      // 4. Параллельная торговля разных игроков с разными торговцами внутри одной Локации
++      p1Inbox.length = 0;
++      p2Inbox.length = 0;
++      player1.send(
++        ROOM_MESSAGE.SESSION_TRADE_COMMIT,
++        {
++          requestId: 'trade-p1',
++          sessionId: opened.sessionId,
++          nodeContainerId: weaponShop.id,
++          characterId: 'char-p1',
++          playerCapsAvailable: 200,
++          buyItems: [{ entryId: 'w-10mm', quantity: 1 }], // 50 * 1.10 = 55 caps
++          sellItems: [],
++        },
++        code,
++      );
++      player2.send(
++        ROOM_MESSAGE.SESSION_TRADE_COMMIT,
++        {
++          requestId: 'trade-p2',
++          sessionId: opened.sessionId,
++          nodeContainerId: chemShop.id,
++          characterId: 'char-p2',
++          playerCapsAvailable: 200,
++          buyItems: [{ entryId: 'c-stim', quantity: 2 }], // 2 * 40 = 80 caps
++          sellItems: [],
++        },
++        code,
++      );
++
++      await waitFor(() => (
++        p1Inbox.some((m) => m.type === MESSAGE.SESSION_TRADE_COMMIT && m.payload?.requestId === 'trade-p1')
++        && p2Inbox.some((m) => m.type === MESSAGE.SESSION_TRADE_COMMIT && m.payload?.requestId === 'trade-p2')
++      ));
++
++      // Проверяем, что изменения сохранились в БД на каждую карточку торговца по отдельности
++      await waitFor(async () => {
++        const savedArturo = await db.getGmContainerById(weaponShop.id);
++        const savedSolomon = await db.getGmContainerById(chemShop.id);
++        return savedArturo?.caps === 355 && savedSolomon?.caps === 260;
++      });
++      const savedArturo = await db.getGmContainerById(weaponShop.id);
++      const savedSolomon = await db.getGmContainerById(chemShop.id);
++      expect(savedArturo.items[0].quantity).toBe(2);
++      expect(savedSolomon.items[0].quantity).toBe(2);
++
++      // 5. Игрок не может закрыть саму Локацию через session.playerClose (закрывает только Мастер)
++      p1Inbox.length = 0;
++      player1.send(
++        ROOM_MESSAGE.SESSION_PLAYER_CLOSE,
++        { requestId: 'p1-close', sessionId: opened.sessionId },
++        code,
++      );
++      const closeAttempt = await waitFor(() => (
++        p1Inbox.find((m) => m.type === MESSAGE.SESSION_STATE && m.payload?.requestId === 'p1-close')
++      ));
++      expect(closeAttempt.payload.session).toBeTruthy();
++      expect(closeAttempt.payload.session.sessionId).toBe(opened.sessionId);
++      expect(useRoomStore.getState().rooms[code]?.activeSession?.sessionId).toBe(opened.sessionId);
++
++      // 6. Мастер вживую открывает замок на «Сейфе в подсобке»
++      p1Inbox.length = 0;
++      await useRoomStore.getState().updateRoomSessionRates({
++        code,
++        sessionId: opened.sessionId,
++        nodeContainerId: lockedSafe.id,
++        locked: false,
++      });
++
++      const unlockBroadcast = await waitFor(() => (
++        p1Inbox.find((m) => m.type === MESSAGE.SESSION_STATE && m.payload?.session)
++      ));
++      const unlockedSafeForP1 = unlockBroadcast.payload.session.nodes.find(
++        (n) => n.containerId === lockedSafe.id,
++      );
++      expect(unlockedSafeForP1.locked).toBe(false);
++      expect(unlockedSafeForP1.items).toHaveLength(1);
++      expect(unlockedSafeForP1.items[0].quantity).toBe(75);
++
++      // 7. Игрок забирает всё из открытого сейфа: сейф пустеет, Мастер получает вопрос об удалении,
++      // но сама Локация остаётся открытой для игроков!
++      p1Inbox.length = 0;
++      player1.send(
++        ROOM_MESSAGE.SESSION_LOOT_TAKE,
++        {
++          requestId: 'loot-safe',
++          sessionId: opened.sessionId,
++          nodeContainerId: lockedSafe.id,
++          characterId: 'char-p1',
++          takes: [{ entryId: 's-caps', quantity: 75 }],
++        },
++        code,
++      );
++      const lootDone = await waitFor(() => (
++        p1Inbox.find((m) => m.type === MESSAGE.SESSION_STATE && m.payload?.emptiedNodeContainerId === lockedSafe.id)
++      ));
++      expect(lootDone.payload.emptiedNodeContainerId).toBe(lockedSafe.id);
++      expect(lootDone.payload.session.sessionId).toBe(opened.sessionId); // Локация всё ещё открыта!
++
++      await waitFor(async () => {
++        const freshSafe = await db.getGmContainerById(lockedSafe.id);
++        return freshSafe?.items?.length === 0 && alertSpies.calls.length > 0;
++      });
++
++      // 8. Только когда Мастер закрывает выдачу Локации — она пропадает у игроков
++      p1Inbox.length = 0;
++      await useRoomStore.getState().closeRoomSession({ code, sessionId: opened.sessionId });
++      const gmClosed = await waitFor(() => (
++        p1Inbox.find((m) => m.type === MESSAGE.SESSION_STATE && m.payload?.closedSession)
++      ));
++      expect(gmClosed.payload.closedSession.sessionId).toBe(opened.sessionId);
++      expect(useRoomStore.getState().rooms[code]?.activeSession).toBeNull();
++    } finally {
++      player1.close();
++      player2.close();
++    }
++  });
++
++  it('keeps outer Hub window without a player Close button while preserving child Close/Back controls and icon tokens', () => {
++    const overlaySrc = fs.readFileSync(
++      path.resolve(__dirname, '../../components/lootTrade/PlayerLootTradeOverlay.js'),
++      'utf8',
++    );
++    expect(overlaySrc).toContain('isHubSession && !viewTarget');
++    expect(overlaySrc).toContain("tLootTrade('player.backToLocation')");
++    expect(overlaySrc).toContain("tLootTrade('player.hubMasterClosesHint')");
++
++    // Вырезаем JSX внешнего окна Локации и убеждаемся, что там НЕТ кнопки closeContainerBtn
++    const hubBlockStart = overlaySrc.indexOf('if (isHubSession && !viewTarget)');
++    const hubBlockEnd = overlaySrc.indexOf('const returnToHubList');
++    expect(hubBlockStart).toBeGreaterThan(0);
++    expect(hubBlockEnd).toBeGreaterThan(hubBlockStart);
++    const outerHubJsx = overlaySrc.slice(hubBlockStart, hubBlockEnd);
++    expect(outerHubJsx).toContain("tLootTrade('player.minimize')");
++    expect(outerHubJsx).not.toContain('closeContainerBtn');
++
++    // Проверяем локализации ru/en
++    const ruJson = fs.readFileSync(
++      path.resolve(__dirname, '../../i18n/ru-RU/screens/lootTrade/screen.json'),
++      'utf8',
++    );
++    const enJson = fs.readFileSync(
++      path.resolve(__dirname, '../../i18n/en-EN/screens/lootTrade/screen.json'),
++      'utf8',
++    );
++    expect(ruJson).not.toMatch(/крыш|кр\./i);
++    expect(JSON.parse(ruJson).actions.createHub).toContain('локацию');
++    expect(JSON.parse(enJson).actions.createHub).toContain('Location');
++  });
++});
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index c1ed79f..44b0194 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -76,6 +76,7 @@ export default function PlayerLootTradeOverlay() {
+   const [bindings, setBindings] = useState([]); // [{ characterId, code, name }]
+   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
+   const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
++  const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
+   const [busy, setBusy] = useState(false);
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+ 
+@@ -152,22 +153,45 @@ export default function PlayerLootTradeOverlay() {
+   }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+ 
+   const activeSession = matchedContext?.session || null;
++  const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
++
++  const selectedHubNode = useMemo(() => {
++    if (!isHubSession || !selectedHubNodeId) return null;
++    const found = (activeSession?.nodes || []).find(
++      (n) => n.containerId === selectedHubNodeId && !n.locked,
++    );
++    return found || null;
++  }, [isHubSession, activeSession?.nodes, selectedHubNodeId]);
++
++  // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
++  const viewTarget = isHubSession ? selectedHubNode : activeSession;
++  const isInsideHub = Boolean(isHubSession && selectedHubNode);
+ 
+   // При открытии новой сессии очищаем старый буфер и разворачиваем модалку
+   useEffect(() => {
+     setBuyBuffer({});
+     setSellBuffer({});
++    setSelectedHubNodeId(null);
+     setMinimizedSessionId(null);
+     setMobileTab('merchant');
+   }, [activeSession?.sessionId]);
+ 
++  // Если Мастер вживую запер или удалил открытый игроком узел в Локации — возвращаем в список Локации
++  useEffect(() => {
++    if (isHubSession && selectedHubNodeId && !selectedHubNode) {
++      setSelectedHubNodeId(null);
++      setBuyBuffer({});
++      setSellBuffer({});
++    }
++  }, [isHubSession, selectedHubNodeId, selectedHubNode]);
++
+   // Автоподрезка буфера покупки, если остаток в лавке уменьшился (купил другой игрок)
+   useEffect(() => {
+-    if (!activeSession || activeSession.kind !== CONTAINER_KIND.MERCHANT) return;
++    if (!viewTarget || viewTarget.kind !== CONTAINER_KIND.MERCHANT) return;
+     setBuyBuffer((prev) => {
+       let changed = false;
+       const next = {};
+-      const byId = Object.fromEntries((activeSession.items || []).map((it) => [it.entryId, it]));
++      const byId = Object.fromEntries((viewTarget.items || []).map((it) => [it.entryId, it]));
+       for (const [entryId, qty] of Object.entries(prev)) {
+         const avail = Math.max(0, Math.floor(Number(byId[entryId]?.quantity) || 0));
+         const clamped = Math.min(qty, avail);
+@@ -176,26 +200,26 @@ export default function PlayerLootTradeOverlay() {
+       }
+       return changed ? next : prev;
+     });
+-  }, [activeSession?.revision]);
++  }, [activeSession?.revision, viewTarget?.containerId]);
+ 
+   const sellablePlayerItems = useMemo(() => {
+-    if (!matchedContext?.isCharacterLoaded || activeSession?.kind !== CONTAINER_KIND.MERCHANT) {
++    if (!matchedContext?.isCharacterLoaded || viewTarget?.kind !== CONTAINER_KIND.MERCHANT) {
+       return [];
+     }
+     return getSellablePlayerInventoryItems(storeItems, moduleLocale);
+-  }, [matchedContext?.isCharacterLoaded, activeSession?.kind, storeItems, moduleLocale]);
++  }, [matchedContext?.isCharacterLoaded, viewTarget?.kind, storeItems, moduleLocale]);
+ 
+   const capCollectorPercent = Number(perkBonuses?.capCollectorDiscountPercent) || 0;
+ 
+   const effectiveRates = useMemo(
+-    () => getEffectiveMerchantRates(activeSession, matchedContext?.characterId),
+-    [activeSession, matchedContext?.characterId],
++    () => getEffectiveMerchantRates(viewTarget, matchedContext?.characterId),
++    [viewTarget, matchedContext?.characterId],
+   );
+ 
+   const barterSummary = useMemo(() => {
+-    if (!activeSession || activeSession.kind !== CONTAINER_KIND.MERCHANT) return null;
++    if (!viewTarget || viewTarget.kind !== CONTAINER_KIND.MERCHANT) return null;
+     return computeBarterSummary({
+-      merchantItems: activeSession.items || [],
++      merchantItems: viewTarget.items || [],
+       playerItems: sellablePlayerItems,
+       buyBuffer,
+       sellBuffer,
+@@ -203,11 +227,11 @@ export default function PlayerLootTradeOverlay() {
+       buyDepreciationPercent: effectiveRates.buyDepreciationPercent,
+       capCollectorPercent,
+       playerCaps,
+-      merchantCaps: activeSession.caps || 0,
++      merchantCaps: viewTarget.caps || 0,
+       resolvePlayerItemCatalogCost: (pItem) => pItem.cost,
+     });
+   }, [
+-    activeSession,
++    viewTarget,
+     sellablePlayerItems,
+     buyBuffer,
+     sellBuffer,
+@@ -219,6 +243,11 @@ export default function PlayerLootTradeOverlay() {
+   if (isGmMode || !matchedContext || !activeSession) return null;
+ 
+   const isMinimized = minimizedSessionId === activeSession.sessionId;
++  const minimizedTitleKey = activeSession.kind === CONTAINER_KIND.HUB
++    ? 'player.minimizedHub'
++    : (activeSession.kind === CONTAINER_KIND.MERCHANT
++      ? 'player.minimizedMerchant'
++      : 'player.minimizedLoot');
+ 
+   // Если привязанный персонаж ещё не открыт (например, игрок стоит в Менеджере персонажей) —
+   // показываем компактную кнопку быстрого открытия этого персонажа и окна выдачи.
+@@ -233,14 +262,7 @@ export default function PlayerLootTradeOverlay() {
+           }}
+         >
+           <Text style={styles.floatingPillTitle}>
+-            {formatLootTrade(
+-              tLootTrade(
+-                activeSession.kind === CONTAINER_KIND.MERCHANT
+-                  ? 'player.minimizedMerchant'
+-                  : 'player.minimizedLoot',
+-              ),
+-              { name: activeSession.name },
+-            )}
++            {formatLootTrade(tLootTrade(minimizedTitleKey), { name: activeSession.name })}
+           </Text>
+           <Text style={styles.floatingPillAction}>
+             {formatLootTrade(tLootTrade('player.openForBoundChar'), {
+@@ -260,27 +282,159 @@ export default function PlayerLootTradeOverlay() {
+           onPress={() => setMinimizedSessionId(null)}
+         >
+           <Text style={styles.floatingPillTitle}>
+-            {formatLootTrade(
+-              tLootTrade(
+-                activeSession.kind === CONTAINER_KIND.MERCHANT
+-                  ? 'player.minimizedMerchant'
+-                  : 'player.minimizedLoot',
+-              ),
+-              { name: activeSession.name },
+-            )}
++            {formatLootTrade(tLootTrade(minimizedTitleKey), { name: activeSession.name })}
+           </Text>
+         </TouchableOpacity>
+       </View>
+     );
+   }
+ 
++  // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
++  if (isHubSession && !viewTarget) {
++    const hubNodes = activeSession.nodes || [];
++    return (
++      <Modal
++        visible
++        transparent
++        animationType="slide"
++        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
++      >
++        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
++          <View style={styles.lootModalCard}>
++            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
++              <View style={styles.modalTitleRow}>
++                <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
++                <Text style={styles.modalTitle}>{activeSession.name}</Text>
++              </View>
++              <View style={styles.headerActionsRow}>
++                {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
++                <TouchableOpacity
++                  style={styles.minimizeBtn}
++                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
++                >
++                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
++                </TouchableOpacity>
++              </View>
++            </View>
++
++            {Boolean(activeSession.description) && (
++              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
++                {activeSession.description}
++              </IconText>
++            )}
++
++            <ScrollView
++              style={styles.lootScroll}
++              contentContainerStyle={styles.lootScrollContent}
++            >
++              {hubNodes.length === 0 ? (
++                <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
++              ) : (
++                hubNodes.map((node) => {
++                  const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
++                  const nodeLocked = Boolean(node.locked);
++                  const piecesCount = (node.items || []).reduce(
++                    (sum, entry) => sum + (Number(entry.quantity) || 0),
++                    0,
++                  );
++
++                  return (
++                    <View
++                      key={node.containerId}
++                      style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
++                    >
++                      <View style={styles.lootRowInfo}>
++                        <View style={styles.hubNodeTitleRow}>
++                          <MaterialCommunityIcons
++                            name={nodeLocked ? 'lock' : (nodeIsMerch ? 'sack' : 'treasure-chest')}
++                            size={19}
++                            color={nodeLocked ? '#e57373' : '#f0e68c'}
++                          />
++                          <Text style={[
++                            styles.lootRowTitle,
++                            nodeLocked && styles.hubNodeTitleLocked,
++                          ]}>
++                            {node.name}
++                          </Text>
++                        </View>
++
++                        {Boolean(node.description) && (
++                          <IconText style={styles.lootRowSub}>{node.description}</IconText>
++                        )}
++
++                        {nodeLocked ? (
++                          <Text style={styles.hubLockedHintText}>
++                            {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
++                          </Text>
++                        ) : nodeIsMerch ? (
++                          <IconText style={styles.hubUnlockedMetaText}>
++                            {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
++                          </IconText>
++                        ) : (
++                          <Text style={styles.hubUnlockedMetaText}>
++                            {piecesCount > 0
++                              ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
++                              : tLootTrade('player.hubNodeEmptyLoot')}
++                          </Text>
++                        )}
++                      </View>
++
++                      <View style={styles.lootRowBtns}>
++                        {nodeLocked ? (
++                          <View style={styles.hubLockedBadge}>
++                            <Text style={styles.hubLockedBadgeText}>
++                              {tLootTrade('player.hubNodeLockedBadge')}
++                            </Text>
++                          </View>
++                        ) : (
++                          <TouchableOpacity
++                            style={styles.takeAllRowBtn}
++                            onPress={() => {
++                              setBuyBuffer({});
++                              setSellBuffer({});
++                              setMobileTab('merchant');
++                              setSelectedHubNodeId(node.containerId);
++                            }}
++                          >
++                            <Text style={styles.takeAllRowBtnText}>
++                              {tLootTrade(
++                                nodeIsMerch
++                                  ? 'player.hubNodeOpenMerchant'
++                                  : 'player.hubNodeOpenLoot',
++                              )}
++                            </Text>
++                          </TouchableOpacity>
++                        )}
++                      </View>
++                    </View>
++                  );
++                })
++              )}
++            </ScrollView>
++
++            <Text style={styles.hubMasterClosesHint}>
++              {tLootTrade('player.hubMasterClosesHint')}
++            </Text>
++          </View>
++        </View>
++      </Modal>
++    );
++  }
++
+   // ── Обработчики КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────────
+ 
++  const returnToHubList = () => {
++    setSelectedHubNodeId(null);
++    setBuyBuffer({});
++    setSellBuffer({});
++  };
++
+   const handleTakeLoot = async (takes) => {
+-    if (busy || !takes.length || !activeSession || !matchedContext) return;
++    if (busy || !takes.length || !activeSession || !viewTarget || !matchedContext) return;
+     const targetSessionId = activeSession.sessionId;
+     const targetRoomCode = matchedContext.roomCode;
+     const targetCharacterId = matchedContext.characterId;
++    const nodeContainerId = isInsideHub ? viewTarget.containerId : null;
+     setBusy(true);
+     try {
+       const { granted, session: updatedSession, closedReason } =
+@@ -289,6 +443,7 @@ export default function PlayerLootTradeOverlay() {
+           sessionId: targetSessionId,
+           characterId: targetCharacterId,
+           takes,
++          nodeContainerId,
+         });
+       if (granted?.length) {
+         grantLootEntriesToCharacter(granted);
+@@ -297,26 +452,41 @@ export default function PlayerLootTradeOverlay() {
+         }, 650);
+       }
+ 
+-      const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
+-      const emptiedByThisTake =
+-        Boolean(granted?.length)
+-        && Array.isArray(updatedSession?.items)
+-        && updatedSession.items.length === 0;
+-
+-      if (sessionClosedOnServer || emptiedByThisTake) {
+-        markSessionClosedLocally(targetSessionId);
+-        if (
+-          updatedSession
+-          && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
+-        ) {
+-          void useRoomStore.getState().playerCloseRoomSession({
+-            code: targetRoomCode,
+-            sessionId: targetSessionId,
+-          }).catch(() => {});
++      if (isInsideHub) {
++        const updatedNode = (updatedSession?.nodes || []).find(
++          (n) => n.containerId === nodeContainerId,
++        );
++        if (!updatedNode || (updatedNode.items || []).length === 0) {
++          returnToHubList();
++        }
++      } else {
++        const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
++        const emptiedByThisTake =
++          Boolean(granted?.length)
++          && Array.isArray(updatedSession?.items)
++          && updatedSession.items.length === 0;
++
++        if (sessionClosedOnServer || emptiedByThisTake) {
++          markSessionClosedLocally(targetSessionId);
++          if (
++            updatedSession
++            && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
++          ) {
++            void useRoomStore.getState().playerCloseRoomSession({
++              code: targetRoomCode,
++              sessionId: targetSessionId,
++            }).catch(() => {});
++          }
+         }
+       }
+     } catch (error) {
+-      debugLog('playerOverlay.lootTake:failed', { message: error?.message });
++      const code = error?.code || error?.message;
++      if (code === 'CONTAINER_LOCKED') {
++        showRawAlert({ title: tLootTrade('player.containerLockedError') });
++        if (isInsideHub) returnToHubList();
++      } else {
++        debugLog('playerOverlay.lootTake:failed', { message: error?.message });
++      }
+     } finally {
+       setBusy(false);
+     }
+@@ -324,6 +494,10 @@ export default function PlayerLootTradeOverlay() {
+ 
+   const performPlayerSessionClose = async () => {
+     if (!activeSession || !matchedContext) return;
++    if (isInsideHub) {
++      returnToHubList();
++      return;
++    }
+     const targetSessionId = activeSession.sessionId;
+     const targetRoomCode = matchedContext.roomCode;
+     markSessionClosedLocally(targetSessionId);
+@@ -340,8 +514,12 @@ export default function PlayerLootTradeOverlay() {
+   };
+ 
+   const handleCloseLootPress = () => {
+-    if (busy || !activeSession) return;
+-    const remainingCount = Array.isArray(activeSession.items) ? activeSession.items.length : 0;
++    if (busy || !viewTarget) return;
++    if (isInsideHub) {
++      returnToHubList();
++      return;
++    }
++    const remainingCount = Array.isArray(viewTarget.items) ? viewTarget.items.length : 0;
+     if (remainingCount > 0) {
+       showRawAlert({
+         title: tLootTrade('player.closeLootConfirmTitle'),
+@@ -363,7 +541,7 @@ export default function PlayerLootTradeOverlay() {
+   };
+ 
+   const handleCloseMerchantPress = () => {
+-    if (busy || !activeSession) return;
++    if (busy || !viewTarget) return;
+     if (barterSummary?.hasItems) {
+       showRawAlert({
+         title: tLootTrade('player.closeMerchantConfirmTitle'),
+@@ -426,14 +604,14 @@ export default function PlayerLootTradeOverlay() {
+           title: tLootTrade('player.shortfallConfirmTitle'),
+           message: formatLootTrade(tLootTrade('player.shortfallConfirmMessage'), {
+             need: barterSummary.merchantOwes,
+-            have: activeSession.caps || 0,
++            have: viewTarget.caps || 0,
+             shortfall: barterSummary.merchantCapShortfall,
+           }),
+           buttons: [
+             { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve(false) },
+             {
+               text: formatLootTrade(tLootTrade('player.shortfallAccept'), {
+-                have: activeSession.caps || 0,
++                have: viewTarget.caps || 0,
+               }),
+               onPress: () => resolve(true),
+             },
+@@ -470,6 +648,7 @@ export default function PlayerLootTradeOverlay() {
+         acceptCapShortfall,
+         buyItems,
+         sellItems,
++        nodeContainerId: isInsideHub ? viewTarget.containerId : null,
+       });
+ 
+       if (committed) {
+@@ -482,10 +661,13 @@ export default function PlayerLootTradeOverlay() {
+       }
+     } catch (error) {
+       const code = error?.code || error?.message;
+-      if (code === 'TRADE_STOCK_CHANGED') {
++      if (code === 'CONTAINER_LOCKED') {
++        showRawAlert({ title: tLootTrade('player.containerLockedError') });
++        if (isInsideHub) returnToHubList();
++      } else if (code === 'TRADE_STOCK_CHANGED') {
+         showRawAlert({ title: tLootTrade('player.stockChangedError') });
+       } else if (code === 'TRADE_NOT_ENOUGH_MERCHANT_CAPS') {
+-        const have = Number(error?.payload?.merchantCaps ?? activeSession.caps ?? 0);
++        const have = Number(error?.payload?.merchantCaps ?? viewTarget.caps ?? 0);
+         const need = Number(error?.payload?.owedCaps ?? 0);
+         showRawAlert({
+           title: tLootTrade('player.shortfallConfirmTitle'),
+@@ -503,23 +685,34 @@ export default function PlayerLootTradeOverlay() {
+     }
+   };
+ 
+-  // ── Рендер модалки КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────
++  // ── Рендер модалки КОНТЕЙНЕРА ДОБЫЧИ (отдельного или внутри Локации) ──────
+ 
+-  if (activeSession.kind === CONTAINER_KIND.LOOT) {
+-    const items = activeSession.items || [];
++  if (viewTarget.kind === CONTAINER_KIND.LOOT) {
++    const items = viewTarget.items || [];
+     return (
+       <Modal
+         visible
+         transparent
+         animationType="slide"
+-        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
++        onRequestClose={() => (isInsideHub ? handleCloseLootPress() : setMinimizedSessionId(activeSession.sessionId))}
+       >
+         <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+           <View style={styles.lootModalCard}>
++            {isInsideHub && (
++              <TouchableOpacity
++                style={styles.backToLocationBtn}
++                disabled={busy}
++                onPress={handleCloseLootPress}
++              >
++                <Text style={styles.backToLocationBtnText}>
++                  {`${tLootTrade('player.backToLocation')} (${activeSession.name})`}
++                </Text>
++              </TouchableOpacity>
++            )}
+             <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+               <View style={styles.modalTitleRow}>
+                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
+-                <Text style={styles.modalTitle}>{activeSession.name}</Text>
++                <Text style={styles.modalTitle}>{viewTarget.name}</Text>
+               </View>
+               <View style={styles.headerActionsRow}>
+                 <TouchableOpacity
+@@ -539,9 +732,9 @@ export default function PlayerLootTradeOverlay() {
+               </View>
+             </View>
+ 
+-            {Boolean(activeSession.description) && (
++            {Boolean(viewTarget.description) && (
+               <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+-                {activeSession.description}
++                {viewTarget.description}
+               </IconText>
+             )}
+ 
+@@ -721,13 +914,13 @@ export default function PlayerLootTradeOverlay() {
+   );
+ 
+   const renderMerchantPane = () => {
+-    const merchantStock = activeSession.items || [];
++    const merchantStock = viewTarget.items || [];
+     return (
+       <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
+         <View style={styles.paneHeader}>
+           <Text style={styles.paneHeaderTitle}>{tLootTrade('player.merchantInventoryTab')}</Text>
+           <IconText style={styles.paneHeaderCaps}>
+-            {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: activeSession.caps || 0 })}
++            {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: viewTarget.caps || 0 })}
+           </IconText>
+         </View>
+ 
+@@ -841,15 +1034,26 @@ export default function PlayerLootTradeOverlay() {
+       visible
+       transparent
+       animationType="slide"
+-      onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
++      onRequestClose={() => (isInsideHub ? handleCloseMerchantPress() : setMinimizedSessionId(activeSession.sessionId))}
+     >
+       <View style={[styles.modalBackdrop, isWideLayout && styles.backdropWide]}>
+         <View style={styles.merchantModalCard}>
++          {isInsideHub && (
++            <TouchableOpacity
++              style={styles.backToLocationBtn}
++              disabled={busy}
++              onPress={handleCloseMerchantPress}
++            >
++              <Text style={styles.backToLocationBtnText}>
++                {`${tLootTrade('player.backToLocation')} (${activeSession.name})`}
++              </Text>
++            </TouchableOpacity>
++          )}
+           {/* Шапка торговца */}
+           <View style={styles.modalHeader}>
+             <View style={styles.modalTitleRow}>
+               <MaterialCommunityIcons name="sack" size={23} color="#f0e68c" />
+-              <Text style={styles.modalTitle}>{activeSession.name}</Text>
++              <Text style={styles.modalTitle}>{viewTarget.name}</Text>
+             </View>
+             <View style={styles.headerActionsRow}>
+               <TouchableOpacity
+@@ -869,8 +1073,8 @@ export default function PlayerLootTradeOverlay() {
+             </View>
+           </View>
+ 
+-          {Boolean(activeSession.description) && (
+-            <IconText style={styles.modalDesc}>{activeSession.description}</IconText>
++          {Boolean(viewTarget.description) && (
++            <IconText style={styles.modalDesc}>{viewTarget.description}</IconText>
+           )}
+ 
+           {/* На узком экране телефона — компактный переключатель двух панелей */}
+@@ -897,7 +1101,7 @@ export default function PlayerLootTradeOverlay() {
+                   styles.mobileTabText,
+                   mobileTab === 'merchant' && styles.mobileTabTextActive,
+                 ]}>
+-                  {`${tLootTrade('player.merchantInventoryTab')} (${activeSession.caps || 0} {CAP})${
++                  {`${tLootTrade('player.merchantInventoryTab')} (${viewTarget.caps || 0} {CAP})${
+                     barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''
+                   }`}
+                 </IconText>
+@@ -954,7 +1158,7 @@ export default function PlayerLootTradeOverlay() {
+                 {barterSummary.merchantCapShortfall > 0 && (
+                   <IconText style={styles.barterWarnText}>
+                     {formatLootTrade(tLootTrade('player.merchantShortfallWarn'), {
+-                      have: activeSession.caps || 0,
++                      have: viewTarget.caps || 0,
+                       need: barterSummary.merchantOwes,
+                       shortfall: barterSummary.merchantCapShortfall,
+                     })}
+@@ -1460,4 +1664,63 @@ const styles = StyleSheet.create({
+     fontSize: 14,
+     fontWeight: '700',
+   },
++  backToLocationBtn: {
++    alignSelf: 'flex-start',
++    marginBottom: 8,
++    paddingHorizontal: 10,
++    paddingVertical: 5,
++    borderRadius: 5,
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#666666',
++  },
++  backToLocationBtnText: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  hubNodeRowLocked: {
++    opacity: 0.78,
++    borderColor: '#5c3434',
++    backgroundColor: '#251e1e',
++  },
++  hubNodeTitleRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++  },
++  hubNodeTitleLocked: {
++    color: '#d8baba',
++  },
++  hubLockedHintText: {
++    color: '#e59898',
++    fontSize: 12,
++    fontStyle: 'italic',
++    marginTop: 3,
++  },
++  hubUnlockedMetaText: {
++    color: '#c9c19c',
++    fontSize: 12,
++    marginTop: 3,
++  },
++  hubLockedBadge: {
++    paddingHorizontal: 10,
++    paddingVertical: 6,
++    borderRadius: 5,
++    backgroundColor: '#3f1e1e',
++    borderWidth: 1,
++    borderColor: '#b55b5b',
++  },
++  hubLockedBadgeText: {
++    color: '#f5bcbc',
++    fontSize: 11,
++    fontWeight: '700',
++  },
++  hubMasterClosesHint: {
++    color: '#9a9a9a',
++    fontSize: 11,
++    fontStyle: 'italic',
++    textAlign: 'center',
++    marginTop: 8,
++  },
+ });
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 2561754..94ef705 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -30,6 +30,7 @@ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
+ import {
+   CONTAINER_KIND,
+   addOrMergeContainerItem,
++  buildHubSessionNodes,
+   computeMerchantSellPriceToPlayer,
+   getEffectiveMerchantRates,
+   normalizeBuyDepreciationPercent,
+@@ -59,6 +60,7 @@ import ContainerFormModal from './modals/ContainerFormModal';
+ import ContainerCatalogModal from './modals/ContainerCatalogModal';
+ import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
+ import IssueContainerModal from './modals/IssueContainerModal';
++import HubChildPickerModal from './modals/HubChildPickerModal';
+ 
+ const NUM_COLS = 3;
+ const MENU_WIDTH = 220;
+@@ -97,6 +99,7 @@ const ContainerCardCell = ({
+   onDelete,
+ }) => {
+   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
++  const isHub = container.kind === CONTAINER_KIND.HUB;
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
+ 
+@@ -119,6 +122,11 @@ const ContainerCardCell = ({
+   };
+ 
+   const totalPieces = (container.items || []).reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
++  const hubLinksCount = (container.links || []).length;
++  const hubLockedCount = (container.links || []).filter((l) => l.locked).length;
++  const heroIconName = isHub
++    ? 'map-marker-multiple'
++    : (isMerchant ? 'sack' : 'treasure-chest');
+ 
+   return (
+     <TouchableOpacity
+@@ -126,14 +134,18 @@ const ContainerCardCell = ({
+       onPress={onOpen}
+       activeOpacity={0.82}
+     >
+-      <View style={[styles.cardHero, isMerchant && styles.cardHeroMerchant]}>
++      <View style={[
++        styles.cardHero,
++        isMerchant && styles.cardHeroMerchant,
++        isHub && styles.cardHeroHub,
++      ]}>
+         {isLive && (
+           <View style={styles.cardLiveBadge}>
+             <Text style={styles.cardLiveBadgeText}>{tLootTrade('card.activeBadge')}</Text>
+           </View>
+         )}
+         <MaterialCommunityIcons
+-          name={isMerchant ? 'sack' : 'treasure-chest'}
++          name={heroIconName}
+           size={34}
+           color="#f0e68c"
+         />
+@@ -149,13 +161,28 @@ const ContainerCardCell = ({
+         {Boolean(container.description) && (
+           <Text style={styles.cardDesc} numberOfLines={2}>{container.description}</Text>
+         )}
+-        <Text style={styles.cardMeta} numberOfLines={1}>
+-          {formatLootTrade(tLootTrade('card.itemsCount'), { count: totalPieces })}
+-        </Text>
+-        {isMerchant && (
+-          <IconText style={styles.cardMeta} numberOfLines={1}>
+-            {formatLootTrade(tLootTrade('card.capsCount'), { caps: container.caps })}
+-          </IconText>
++        {isHub ? (
++          <>
++            <Text style={styles.cardMeta} numberOfLines={1}>
++              {formatLootTrade(tLootTrade('card.hubNodesCount'), { count: hubLinksCount })}
++            </Text>
++            {hubLockedCount > 0 && (
++              <Text style={styles.cardMeta} numberOfLines={1}>
++                {formatLootTrade(tLootTrade('card.hubLockedCount'), { count: hubLockedCount })}
++              </Text>
++            )}
++          </>
++        ) : (
++          <>
++            <Text style={styles.cardMeta} numberOfLines={1}>
++              {formatLootTrade(tLootTrade('card.itemsCount'), { count: totalPieces })}
++            </Text>
++            {isMerchant && (
++              <IconText style={styles.cardMeta} numberOfLines={1}>
++                {formatLootTrade(tLootTrade('card.capsCount'), { caps: container.caps })}
++              </IconText>
++            )}
++          </>
+         )}
+       </View>
+ 
+@@ -242,13 +269,16 @@ export default function LootTradeScreen() {
+   const [catalogOpen, setCatalogOpen] = useState(false);
+   const [catalogFeedback, setCatalogFeedback] = useState('');
+   const [editingEntry, setEditingEntry] = useState(null);
++  const [hubPickerOpen, setHubPickerOpen] = useState(false);
++  const [returnHubId, setReturnHubId] = useState(null);
+   const [issueTargetContainer, setIssueTargetContainer] = useState(null);
+   const [issueBusy, setIssueBusy] = useState(false);
+   const [rollBanner, setRollBanner] = useState('');
+   const [syncingCloud, setSyncingCloud] = useState(false);
+ 
+-  // Живая подкрутка процентов торговца Мастером (п. 5)
++  // Живая подкрутка процентов торговца Мастером (п. 5 + торговцы внутри локации)
+   const [rateScopeCharId, setRateScopeCharId] = useState(null); // null = всем, string = characterId
++  const [liveHubMerchantId, setLiveHubMerchantId] = useState(null);
+   const [liveSaleInput, setLiveSaleInput] = useState('0');
+   const [liveDeprInput, setLiveDeprInput] = useState('50');
+   const [liveCapsInput, setLiveCapsInput] = useState('0');
+@@ -316,16 +346,45 @@ export default function LootTradeScreen() {
+ 
+   const activeLiveSession = activeContainer ? getActiveSessionForContainer(activeContainer) : null;
+ 
+-  // Синхронизируем поля живой панели при смене выбранного получателя или приходе обновления
++  const liveHubMerchants = useMemo(() => {
++    if (!activeLiveSession || activeLiveSession.kind !== CONTAINER_KIND.HUB) return [];
++    return (activeLiveSession.nodes || []).filter((n) => n.kind === CONTAINER_KIND.MERCHANT);
++  }, [activeLiveSession]);
++
+   useEffect(() => {
+-    if (!activeLiveSession || activeLiveSession.kind !== CONTAINER_KIND.MERCHANT) return;
+-    const effective = getEffectiveMerchantRates(activeLiveSession, rateScopeCharId);
++    if (!activeLiveSession || activeLiveSession.kind !== CONTAINER_KIND.HUB) {
++      setLiveHubMerchantId(null);
++      return;
++    }
++    if (liveHubMerchants.length === 0) {
++      setLiveHubMerchantId(null);
++      return;
++    }
++    if (!liveHubMerchantId || !liveHubMerchants.some((m) => m.containerId === liveHubMerchantId)) {
++      setLiveHubMerchantId(liveHubMerchants[0].containerId);
++    }
++  }, [activeLiveSession, liveHubMerchants, liveHubMerchantId]);
++
++  const effectiveLiveMerchantNode = useMemo(() => {
++    if (!activeLiveSession) return null;
++    if (activeLiveSession.kind === CONTAINER_KIND.MERCHANT) return activeLiveSession;
++    if (activeLiveSession.kind === CONTAINER_KIND.HUB && liveHubMerchantId) {
++      return liveHubMerchants.find((m) => m.containerId === liveHubMerchantId) || null;
++    }
++    return null;
++  }, [activeLiveSession, liveHubMerchantId, liveHubMerchants]);
++
++  // Синхронизируем поля живой панели при смене выбранного получателя, торговца или приходе обновления
++  useEffect(() => {
++    if (!effectiveLiveMerchantNode) return;
++    const effective = getEffectiveMerchantRates(effectiveLiveMerchantNode, rateScopeCharId);
+     setLiveSaleInput(String(effective.saleMarkupPercent));
+     setLiveDeprInput(String(effective.buyDepreciationPercent));
+-    setLiveCapsInput(String(activeLiveSession.caps ?? 0));
++    setLiveCapsInput(String(effectiveLiveMerchantNode.caps ?? 0));
+   }, [
+     activeLiveSession?.sessionId,
+     activeLiveSession?.revision,
++    effectiveLiveMerchantNode?.containerId,
+     rateScopeCharId,
+   ]);
+ 
+@@ -359,30 +418,72 @@ export default function LootTradeScreen() {
+ 
+   const persistAndSyncContainer = async (nextContainer) => {
+     const saved = await db.saveGmContainer(nextContainer);
+-    await loadData();
++    const freshList = await db.getGmContainersList();
++    setContainers(freshList || []);
+     void syncGmContainerToCloudIfEnabled(saved.id);
+ 
+-    // Если этот контейнер прямо сейчас выдан в комнату — транслируем свежее содержимое/параметры
++    // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем
+     const live = getActiveSessionForContainer(saved);
+     if (live) {
+       try {
+-        await useRoomStore.getState().updateRoomSessionRates({
+-          code: saved.roomCode,
+-          sessionId: live.sessionId,
+-          name: saved.name,
+-          description: saved.description,
+-          items: saved.items,
+-          ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
+-            caps: saved.caps,
+-            saleMarkupPercent: saved.saleMarkupPercent,
+-            buyDepreciationPercent: saved.buyDepreciationPercent,
+-          } : {}),
+-        });
++        if (saved.kind === CONTAINER_KIND.HUB) {
++          await useRoomStore.getState().updateRoomSessionRates({
++            code: saved.roomCode,
++            sessionId: live.sessionId,
++            name: saved.name,
++            description: saved.description,
++            nodes: buildHubSessionNodes(saved, freshList),
++          });
++        } else {
++          await useRoomStore.getState().updateRoomSessionRates({
++            code: saved.roomCode,
++            sessionId: live.sessionId,
++            name: saved.name,
++            description: saved.description,
++            items: saved.items,
++            ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
++              caps: saved.caps,
++              saleMarkupPercent: saved.saleMarkupPercent,
++              buyDepreciationPercent: saved.buyDepreciationPercent,
++            } : {}),
++          });
++        }
+       } catch (e) {
+         debugLog('lootTrade.liveSyncAfterEdit:failed', { message: e?.message });
+       }
+     }
+ 
++    // 2. Если отредактирована вложенная карточка, которая сейчас открыта внутри живой Локации — обновляем узел
++    if (saved.kind !== CONTAINER_KIND.HUB) {
++      for (const [rCode, rEntry] of Object.entries(useRoomStore.getState().rooms || {})) {
++        const sess = rEntry?.activeSession;
++        if (
++          sess
++          && sess.kind === CONTAINER_KIND.HUB
++          && Array.isArray(sess.nodes)
++          && sess.nodes.some((n) => n.containerId === saved.id)
++        ) {
++          try {
++            await useRoomStore.getState().updateRoomSessionRates({
++              code: rCode,
++              sessionId: sess.sessionId,
++              nodeContainerId: saved.id,
++              nodeName: saved.name,
++              nodeDescription: saved.description,
++              nodeItems: saved.items,
++              ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
++                caps: saved.caps,
++                saleMarkupPercent: saved.saleMarkupPercent,
++                buyDepreciationPercent: saved.buyDepreciationPercent,
++              } : {}),
++            });
++          } catch (e) {
++            debugLog('lootTrade.liveHubNodeSync:failed', { message: e?.message });
++          }
++        }
++      }
++    }
++
+     return saved;
+   };
+ 
+@@ -440,7 +541,26 @@ export default function LootTradeScreen() {
+     }
+     await deleteGmContainerFromCloudIfEnabled(container.id);
+     await db.deleteGmContainer(container.id);
++
++    // Если удалён дочерний контейнер/торговец, вычищаем ссылки на него из локаций
++    if (container.kind !== CONTAINER_KIND.HUB) {
++      const remainingList = await db.getGmContainersList();
++      for (const item of remainingList) {
++        if (
++          item.kind === CONTAINER_KIND.HUB
++          && (item.links || []).some((l) => l.containerId === container.id)
++        ) {
++          const cleaned = await db.saveGmContainer({
++            ...item,
++            links: item.links.filter((l) => l.containerId !== container.id),
++          });
++          void syncGmContainerToCloudIfEnabled(cleaned.id);
++        }
++      }
++    }
++
+     if (activeContainerId === container.id) setActiveContainerId(null);
++    if (returnHubId === container.id) setReturnHubId(null);
+     await loadData();
+   };
+ 
+@@ -458,6 +578,14 @@ export default function LootTradeScreen() {
+       return;
+     }
+ 
++    if (container.kind === CONTAINER_KIND.HUB) {
++      const resolvedNodes = buildHubSessionNodes(container, containers);
++      if (resolvedNodes.length === 0) {
++        showRawAlert({ title: tLootTrade('detail.hubIssueEmptyWarn') });
++        return;
++      }
++    }
++
+     try {
+       await ensureGmRoomConnected(container.roomCode);
+     } catch {
+@@ -471,6 +599,7 @@ export default function LootTradeScreen() {
+     setIssueBusy(true);
+     try {
+       await ensureGmRoomConnected(issueTargetContainer.roomCode);
++      const isHub = issueTargetContainer.kind === CONTAINER_KIND.HUB;
+       await useRoomStore.getState().openRoomSession({
+         code: issueTargetContainer.roomCode,
+         session: {
+@@ -485,7 +614,8 @@ export default function LootTradeScreen() {
+           saleMarkupPercent: issueTargetContainer.saleMarkupPercent,
+           buyDepreciationPercent: issueTargetContainer.buyDepreciationPercent,
+           characterOverrides: {},
+-          items: issueTargetContainer.items,
++          items: isHub ? [] : issueTargetContainer.items,
++          ...(isHub ? { nodes: buildHubSessionNodes(issueTargetContainer, containers) } : {}),
+         },
+       });
+       setIssueTargetContainer(null);
+@@ -619,18 +749,91 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  const handleAddHubChild = async (childId) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    if ((activeContainer.links || []).some((l) => l.containerId === childId)) return;
++    const nextLinks = [
++      ...(activeContainer.links || []),
++      { containerId: childId, locked: false, lockLabel: '' },
++    ];
++    await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
++  };
++
++  const handleRemoveHubChild = async (childId) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
++    await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
++  };
++
++  const handleToggleHubChildLock = async (childId) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    const existingLink = (activeContainer.links || []).find((l) => l.containerId === childId);
++    if (!existingLink) return;
++    const nextLocked = !existingLink.locked;
++    const nextLinks = (activeContainer.links || []).map((l) => (
++      l.containerId === childId ? { ...l, locked: nextLocked } : l
++    ));
++    const saved = await db.saveGmContainer({ ...activeContainer, links: nextLinks });
++    await loadData();
++    void syncGmContainerToCloudIfEnabled(saved.id);
++
++    const live = getActiveSessionForContainer(saved);
++    if (live && live.kind === CONTAINER_KIND.HUB) {
++      try {
++        await ensureGmRoomConnected(saved.roomCode);
++        await useRoomStore.getState().updateRoomSessionRates({
++          code: saved.roomCode,
++          sessionId: live.sessionId,
++          nodeContainerId: childId,
++          locked: nextLocked,
++        });
++      } catch (error) {
++        debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
++      }
++    }
++  };
++
++  const handleUpdateHubChildLockLabel = async (childId, nextLabel) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    const cleanLabel = String(nextLabel || '');
++    const nextLinks = (activeContainer.links || []).map((l) => (
++      l.containerId === childId ? { ...l, lockLabel: cleanLabel } : l
++    ));
++    const saved = await db.saveGmContainer({ ...activeContainer, links: nextLinks });
++    await loadData();
++    void syncGmContainerToCloudIfEnabled(saved.id);
++
++    const live = getActiveSessionForContainer(saved);
++    if (live && live.kind === CONTAINER_KIND.HUB) {
++      try {
++        await ensureGmRoomConnected(saved.roomCode);
++        await useRoomStore.getState().updateRoomSessionRates({
++          code: saved.roomCode,
++          sessionId: live.sessionId,
++          nodeContainerId: childId,
++          lockLabel: cleanLabel,
++        });
++      } catch (error) {
++        debugLog('lootTrade.updateHubLockLabel:failed', { message: error?.message });
++      }
++    }
++  };
++
+   const applyLiveMerchantRates = async ({
+     sale = normalizeSaleMarkupPercent(liveSaleInput, 0),
+     depr = normalizeBuyDepreciationPercent(liveDeprInput, 50),
+-    caps = normalizeCapsAmount(liveCapsInput, activeLiveSession?.caps ?? 0),
++    caps = normalizeCapsAmount(liveCapsInput, effectiveLiveMerchantNode?.caps ?? 0),
+     resetPersonal = false,
+   } = {}) => {
+-    if (!activeContainer || !activeLiveSession) return;
++    if (!activeContainer || !activeLiveSession || !effectiveLiveMerchantNode) return;
++    const isHubSession = activeLiveSession.kind === CONTAINER_KIND.HUB;
++    const targetNodeContainerId = isHubSession ? effectiveLiveMerchantNode.containerId : null;
+     try {
+       await ensureGmRoomConnected(activeContainer.roomCode);
+       await useRoomStore.getState().updateRoomSessionRates({
+         code: activeContainer.roomCode,
+         sessionId: activeLiveSession.sessionId,
++        ...(targetNodeContainerId ? { nodeContainerId: targetNodeContainerId } : {}),
+         targetCharacterId: rateScopeCharId,
+         resetCharacterOverride: resetPersonal,
+         saleMarkupPercent: sale,
+@@ -638,15 +841,18 @@ export default function LootTradeScreen() {
+         caps,
+       });
+       if (!rateScopeCharId) {
+-        // Общие ставки и касса сохраняются на саму карточку торговца у Мастера
+-        const updated = await db.saveGmContainer({
+-          ...activeContainer,
+-          saleMarkupPercent: sale,
+-          buyDepreciationPercent: depr,
+-          caps,
+-        });
+-        await loadData();
+-        void syncGmContainerToCloudIfEnabled(updated.id);
++        const merchantIdToSave = targetNodeContainerId || activeContainer.id;
++        const merchantCard = await db.getGmContainerById(merchantIdToSave);
++        if (merchantCard && merchantCard.kind === CONTAINER_KIND.MERCHANT) {
++          const updated = await db.saveGmContainer({
++            ...merchantCard,
++            saleMarkupPercent: sale,
++            buyDepreciationPercent: depr,
++            caps,
++          });
++          await loadData();
++          void syncGmContainerToCloudIfEnabled(updated.id);
++        }
+       }
+     } catch (error) {
+       debugLog('lootTrade.applyLiveRates:failed', { message: error?.message });
+@@ -705,6 +911,7 @@ export default function LootTradeScreen() {
+   const gridItems = [
+     { type: 'createLoot', id: '__create_loot__' },
+     { type: 'createMerchant', id: '__create_merchant__' },
++    { type: 'createHub', id: '__create_hub__' },
+     ...containers.map((c) => ({ type: 'container', ...c })),
+   ];
+ 
+@@ -813,6 +1020,16 @@ export default function LootTradeScreen() {
+                         />
+                       );
+                     }
++                    if (cell.type === 'createHub') {
++                      return (
++                        <ActionCell
++                          key={cell.id}
++                          iconName="map-marker-multiple"
++                          label={tLootTrade('actions.createHub')}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
++                        />
++                      );
++                    }
+                     if (cell.type === 'empty') {
+                       return <View key={cell.id} style={styles.emptyCell} />;
+                     }
+@@ -826,7 +1043,10 @@ export default function LootTradeScreen() {
+                         container={cell}
+                         roomLabel={roomLabel}
+                         isLive={Boolean(getActiveSessionForContainer(cell))}
+-                        onOpen={() => setActiveContainerId(cell.id)}
++                        onOpen={() => {
++                          setReturnHubId(null);
++                          setActiveContainerId(cell.id);
++                        }}
+                         onIssueOrClose={() => handleIssueOrClosePress(cell)}
+                         onDuplicate={() => handleDuplicateCard(cell)}
+                         onEdit={() => setFormModal({ kind: cell.kind, initialContainer: cell })}
+@@ -840,12 +1060,31 @@ export default function LootTradeScreen() {
+           </ScrollView>
+         </>
+       ) : (
+-        /* Детальный экран выбранного контейнера / торговца */
++        /* Детальный экран выбранного контейнера / торговца / локации */
+         <View style={styles.detailWrapper}>
+           <View style={styles.detailHeaderCard}>
+             <View style={styles.detailTopRow}>
+-              <TouchableOpacity onPress={() => setActiveContainerId(null)}>
+-                <Text style={styles.backLink}>{tLootTrade('detail.backToList')}</Text>
++              <TouchableOpacity
++                onPress={() => {
++                  const backHub = returnHubId
++                    ? containers.find((c) => c.id === returnHubId)
++                    : null;
++                  if (backHub && backHub.id !== activeContainer.id) {
++                    setReturnHubId(null);
++                    setActiveContainerId(backHub.id);
++                  } else {
++                    setReturnHubId(null);
++                    setActiveContainerId(null);
++                  }
++                }}
++              >
++                <Text style={styles.backLink}>
++                  {returnHubId && containers.some((c) => c.id === returnHubId && c.id !== activeContainer.id)
++                    ? formatLootTrade(tLootTrade('detail.backToHub'), {
++                        name: containers.find((c) => c.id === returnHubId)?.name || '',
++                      })
++                    : tLootTrade('detail.backToList')}
++                </Text>
+               </TouchableOpacity>
+               <View style={styles.detailHeaderButtons}>
+                 <TouchableOpacity
+@@ -880,7 +1119,11 @@ export default function LootTradeScreen() {
+ 
+             <View style={styles.detailTitleRow}>
+               <MaterialCommunityIcons
+-                name={activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest'}
++                name={
++                  activeContainer.kind === CONTAINER_KIND.HUB
++                    ? 'map-marker-multiple'
++                    : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest')
++                }
+                 size={22}
+                 color="#f0e68c"
+               />
+@@ -914,15 +1157,17 @@ export default function LootTradeScreen() {
+             )}
+           </View>
+ 
+-          {/* Живая панель управления процентами во время активной раздачи/торговли */}
++          {/* Живая панель управления во время активной раздачи/торговли/локации */}
+           {activeLiveSession && (
+             <View style={styles.livePanel}>
+               <View style={styles.livePanelHeader}>
+                 <Text style={styles.livePanelTitle}>
+                   {tLootTrade(
+-                    activeLiveSession.kind === CONTAINER_KIND.MERCHANT
+-                      ? 'livePanel.activeTitleMerchant'
+-                      : 'livePanel.activeTitleLoot',
++                    activeLiveSession.kind === CONTAINER_KIND.HUB
++                      ? 'livePanel.activeTitleHub'
++                      : (activeLiveSession.kind === CONTAINER_KIND.MERCHANT
++                        ? 'livePanel.activeTitleMerchant'
++                        : 'livePanel.activeTitleLoot'),
+                   )}
+                 </Text>
+                 <Text style={styles.livePanelTarget}>
+@@ -934,7 +1179,58 @@ export default function LootTradeScreen() {
+                 </Text>
+               </View>
+ 
+-              {activeLiveSession.kind === CONTAINER_KIND.MERCHANT && (
++              {activeLiveSession.kind === CONTAINER_KIND.HUB && Array.isArray(activeLiveSession.nodes) && (
++                <>
++                  <Text style={styles.liveScopeLabel}>{tLootTrade('livePanel.hubLiveLocksLabel')}</Text>
++                  <View style={styles.scopeChipsRow}>
++                    {activeLiveSession.nodes.map((node) => (
++                      <TouchableOpacity
++                        key={node.containerId}
++                        style={[
++                          styles.scopeChip,
++                          node.locked ? styles.liveLockChipLocked : styles.liveLockChipUnlocked,
++                        ]}
++                        onPress={() => handleToggleHubChildLock(node.containerId)}
++                      >
++                        <Text
++                          style={node.locked ? styles.liveLockChipTextLocked : styles.liveLockChipTextUnlocked}
++                        >
++                          {`${node.locked ? '🔒' : '🔓'} ${node.name}`}
++                        </Text>
++                      </TouchableOpacity>
++                    ))}
++                  </View>
++
++                  {liveHubMerchants.length > 0 && (
++                    <>
++                      <Text style={styles.liveScopeLabel}>
++                        {tLootTrade('livePanel.hubLiveMerchantSelect')}
++                      </Text>
++                      <View style={styles.scopeChipsRow}>
++                        {liveHubMerchants.map((mNode) => {
++                          const selected = effectiveLiveMerchantNode?.containerId === mNode.containerId;
++                          return (
++                            <TouchableOpacity
++                              key={mNode.containerId}
++                              style={[styles.scopeChip, selected && styles.scopeChipActive]}
++                              onPress={() => setLiveHubMerchantId(mNode.containerId)}
++                            >
++                              <Text style={[
++                                styles.scopeChipText,
++                                selected && styles.scopeChipTextActive,
++                              ]}>
++                                {`💰 ${mNode.name}`}
++                              </Text>
++                            </TouchableOpacity>
++                          );
++                        })}
++                      </View>
++                    </>
++                  )}
++                </>
++              )}
++
++              {Boolean(effectiveLiveMerchantNode) && (
+                 <>
+                   <Text style={styles.liveScopeLabel}>{tLootTrade('livePanel.rateScopeLabel')}</Text>
+                   <View style={styles.scopeChipsRow}>
+@@ -950,7 +1246,7 @@ export default function LootTradeScreen() {
+                       </Text>
+                     </TouchableOpacity>
+                     {activeContainerRoomCharacters.map((char) => {
+-                      const hasPersonal = Boolean(activeLiveSession.characterOverrides?.[char.id]);
++                      const hasPersonal = Boolean(effectiveLiveMerchantNode.characterOverrides?.[char.id]);
+                       const selected = rateScopeCharId === char.id;
+                       return (
+                         <TouchableOpacity
+@@ -967,7 +1263,7 @@ export default function LootTradeScreen() {
+                         </TouchableOpacity>
+                       );
+                     })}
+-                    {rateScopeCharId && activeLiveSession.characterOverrides?.[rateScopeCharId] && (
++                    {rateScopeCharId && effectiveLiveMerchantNode.characterOverrides?.[rateScopeCharId] && (
+                       <TouchableOpacity
+                         style={styles.scopeChip}
+                         onPress={() => applyLiveMerchantRates({ resetPersonal: true })}
+@@ -1057,105 +1353,208 @@ export default function LootTradeScreen() {
+             </View>
+           )}
+ 
+-          <TouchableOpacity
+-            style={styles.addItemPrimaryBtn}
+-            onPress={() => {
+-              setCatalogFeedback('');
+-              setCatalogOpen(true);
+-            }}
+-          >
+-            <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addItem')}</Text>
+-          </TouchableOpacity>
+-
+-          <ScrollView style={styles.itemsListContainer}>
+-            {(activeContainer.items || []).length === 0 ? (
+-              <Text style={styles.emptyListText}>{tLootTrade('detail.emptyItems')}</Text>
+-            ) : (
+-              activeContainer.items.map((entry) => {
+-                const isMerchant = activeContainer.kind === CONTAINER_KIND.MERCHANT;
+-                const shopPrice = isMerchant
+-                  ? computeMerchantSellPriceToPlayer(entry, {
+-                      saleMarkupPercent: activeContainer.saleMarkupPercent,
+-                      capCollectorPercent: 0,
+-                    })
+-                  : 0;
+-                return (
+-                  <View key={entry.entryId} style={styles.itemRow}>
+-                    <View style={styles.itemRowMain}>
+-                      <View style={styles.itemRowTitleLine}>
+-                        {entry.itemType === 'caps' ? (
+-                          <CapIcon size={18} />
+-                        ) : (
+-                          <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
+-                        )}
+-                        <IconText style={styles.itemRowName}>{entry.name}</IconText>
+-                      </View>
+-                      <View style={styles.itemRowSub}>
+-                        <Text style={styles.itemRowSubText}>
+-                          {formatLootTrade(tLootTrade('detail.qtyPieces'), { qty: entry.quantity })}
+-                        </Text>
+-                        {entry.itemType !== 'caps' && (
+-                          <IconText style={styles.itemRowSubText}>
+-                            {formatLootTrade(tLootTrade('detail.baseCost'), { cost: entry.cost })}
+-                          </IconText>
+-                        )}
+-                        {isMerchant && entry.markupPercent !== 0 && (
+-                          <Text style={styles.itemRowSubText}>
+-                            {formatLootTrade(tLootTrade('detail.itemMarkup'), {
+-                              markup: entry.markupPercent > 0 ? `+${entry.markupPercent}` : entry.markupPercent,
+-                            })}
+-                          </Text>
+-                        )}
+-                        {isMerchant && (
+-                          <IconText style={styles.itemRowPriceHighlight}>
+-                            {formatLootTrade(tLootTrade('detail.shopPrice'), { price: shopPrice })}
+-                          </IconText>
+-                        )}
+-                        {entry.weight > 0 && (
+-                          <Text style={styles.itemRowSubText}>
+-                            {formatLootTrade(tLootTrade('detail.weight'), {
+-                              weight: Number((entry.weight * entry.quantity).toFixed(2)),
+-                            })}
+-                          </Text>
++          {activeContainer.kind === CONTAINER_KIND.HUB ? (
++            <>
++              <TouchableOpacity
++                style={styles.addItemPrimaryBtn}
++                onPress={() => setHubPickerOpen(true)}
++              >
++                <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addHubNode')}</Text>
++              </TouchableOpacity>
++
++              <ScrollView style={styles.itemsListContainer}>
++                {(activeContainer.links || []).length === 0 ? (
++                  <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
++                ) : (
++                  (activeContainer.links || []).map((link) => {
++                    const child = containers.find((c) => c.id === link.containerId);
++                    if (!child) return null;
++                    const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
++                    const childPieces = (child.items || []).reduce(
++                      (sum, it) => sum + (Number(it.quantity) || 0),
++                      0,
++                    );
++                    return (
++                      <View key={link.containerId} style={styles.hubChildRow}>
++                        <View style={styles.hubChildTopLine}>
++                          <View style={styles.itemRowMain}>
++                            <View style={styles.itemRowTitleLine}>
++                              <MaterialCommunityIcons
++                                name={childIsMerch ? 'sack' : 'treasure-chest'}
++                                size={18}
++                                color="#2b2b2b"
++                              />
++                              <Text style={styles.itemRowName}>{child.name}</Text>
++                            </View>
++                            <View style={styles.itemRowSub}>
++                              <Text style={styles.itemRowSubText}>
++                                {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
++                              </Text>
++                              {childIsMerch && (
++                                <IconText style={styles.itemRowSubText}>
++                                  {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
++                                </IconText>
++                              )}
++                            </View>
++                          </View>
++
++                          <View style={styles.itemRowControls}>
++                            <TouchableOpacity
++                              style={[
++                                styles.hubLockChip,
++                                link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
++                              ]}
++                              onPress={() => handleToggleHubChildLock(child.id)}
++                            >
++                              <Text
++                                style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
++                              >
++                                {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
++                              </Text>
++                            </TouchableOpacity>
++
++                            <TouchableOpacity
++                              style={styles.itemRowSmallBtn}
++                              onPress={() => {
++                                setReturnHubId(activeContainer.id);
++                                setActiveContainerId(child.id);
++                              }}
++                            >
++                              <Text style={styles.itemRowSmallBtnText}>
++                                {tLootTrade('detail.hubOpenChildCard')}
++                              </Text>
++                            </TouchableOpacity>
++
++                            <TouchableOpacity
++                              style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
++                              onPress={() => handleRemoveHubChild(child.id)}
++                            >
++                              <Text style={styles.itemRowDeleteBtnText}>
++                                {tLootTrade('detail.hubUnlinkChild')}
++                              </Text>
++                            </TouchableOpacity>
++                          </View>
++                        </View>
++
++                        {link.locked && (
++                          <TextInput
++                            style={styles.hubLockNoteInput}
++                            defaultValue={link.lockLabel || ''}
++                            placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
++                            placeholderTextColor="#888888"
++                            onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
++                            onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
++                          />
+                         )}
+                       </View>
+-                    </View>
++                    );
++                  })
++                )}
++              </ScrollView>
++            </>
++          ) : (
++            <>
++              <TouchableOpacity
++                style={styles.addItemPrimaryBtn}
++                onPress={() => {
++                  setCatalogFeedback('');
++                  setCatalogOpen(true);
++                }}
++              >
++                <Text style={styles.addItemPrimaryBtnText}>{tLootTrade('detail.addItem')}</Text>
++              </TouchableOpacity>
+ 
+-                    <View style={styles.itemRowControls}>
+-                      <TouchableOpacity
+-                        style={styles.itemRowSmallBtn}
+-                        onPress={() => handleStepRowQty(entry, -1)}
+-                      >
+-                        <Text style={styles.itemRowSmallBtnText}>−</Text>
+-                      </TouchableOpacity>
+-                      <TouchableOpacity
+-                        style={styles.itemRowSmallBtn}
+-                        onPress={() => handleStepRowQty(entry, 1)}
+-                      >
+-                        <Text style={styles.itemRowSmallBtnText}>+</Text>
+-                      </TouchableOpacity>
+-                      <TouchableOpacity
+-                        style={styles.itemRowSmallBtn}
+-                        onPress={() => setEditingEntry(entry)}
+-                      >
+-                        <Text style={styles.itemRowSmallBtnText}>{tLootTrade('detail.editItem')}</Text>
+-                      </TouchableOpacity>
+-                      <TouchableOpacity
+-                        style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
+-                        onPress={() => handleRemoveRow(entry.entryId)}
+-                      >
+-                        <Text style={styles.itemRowDeleteBtnText}>{tLootTrade('detail.removeItem')}</Text>
+-                      </TouchableOpacity>
+-                    </View>
+-                  </View>
+-                );
+-              })
+-            )}
+-          </ScrollView>
++              <ScrollView style={styles.itemsListContainer}>
++                {(activeContainer.items || []).length === 0 ? (
++                  <Text style={styles.emptyListText}>{tLootTrade('detail.emptyItems')}</Text>
++                ) : (
++                  activeContainer.items.map((entry) => {
++                    const isMerchant = activeContainer.kind === CONTAINER_KIND.MERCHANT;
++                    const shopPrice = isMerchant
++                      ? computeMerchantSellPriceToPlayer(entry, {
++                          saleMarkupPercent: activeContainer.saleMarkupPercent,
++                          capCollectorPercent: 0,
++                        })
++                      : 0;
++                    return (
++                      <View key={entry.entryId} style={styles.itemRow}>
++                        <View style={styles.itemRowMain}>
++                          <View style={styles.itemRowTitleLine}>
++                            {entry.itemType === 'caps' ? (
++                              <CapIcon size={18} />
++                            ) : (
++                              <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
++                            )}
++                            <IconText style={styles.itemRowName}>{entry.name}</IconText>
++                          </View>
++                          <View style={styles.itemRowSub}>
++                            <Text style={styles.itemRowSubText}>
++                              {formatLootTrade(tLootTrade('detail.qtyPieces'), { qty: entry.quantity })}
++                            </Text>
++                            {entry.itemType !== 'caps' && (
++                              <IconText style={styles.itemRowSubText}>
++                                {formatLootTrade(tLootTrade('detail.baseCost'), { cost: entry.cost })}
++                              </IconText>
++                            )}
++                            {isMerchant && entry.markupPercent !== 0 && (
++                              <Text style={styles.itemRowSubText}>
++                                {formatLootTrade(tLootTrade('detail.itemMarkup'), {
++                                  markup: entry.markupPercent > 0 ? `+${entry.markupPercent}` : entry.markupPercent,
++                                })}
++                              </Text>
++                            )}
++                            {isMerchant && (
++                              <IconText style={styles.itemRowPriceHighlight}>
++                                {formatLootTrade(tLootTrade('detail.shopPrice'), { price: shopPrice })}
++                              </IconText>
++                            )}
++                            {entry.weight > 0 && (
++                              <Text style={styles.itemRowSubText}>
++                                {formatLootTrade(tLootTrade('detail.weight'), {
++                                  weight: Number((entry.weight * entry.quantity).toFixed(2)),
++                                })}
++                              </Text>
++                            )}
++                          </View>
++                        </View>
++
++                        <View style={styles.itemRowControls}>
++                          <TouchableOpacity
++                            style={styles.itemRowSmallBtn}
++                            onPress={() => handleStepRowQty(entry, -1)}
++                          >
++                            <Text style={styles.itemRowSmallBtnText}>−</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity
++                            style={styles.itemRowSmallBtn}
++                            onPress={() => handleStepRowQty(entry, 1)}
++                          >
++                            <Text style={styles.itemRowSmallBtnText}>+</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity
++                            style={styles.itemRowSmallBtn}
++                            onPress={() => setEditingEntry(entry)}
++                          >
++                            <Text style={styles.itemRowSmallBtnText}>{tLootTrade('detail.editItem')}</Text>
++                          </TouchableOpacity>
++                          <TouchableOpacity
++                            style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
++                            onPress={() => handleRemoveRow(entry.entryId)}
++                          >
++                            <Text style={styles.itemRowDeleteBtnText}>{tLootTrade('detail.removeItem')}</Text>
++                          </TouchableOpacity>
++                        </View>
++                      </View>
++                    );
++                  })
++                )}
++              </ScrollView>
++            </>
++          )}
+         </View>
+       )}
+ 
+-      {/* Модалки создания/правки, каталога, правки строки и выдачи */}
++      {/* Модалки создания/правки, каталога, правки строки, локации и выдачи */}
+       <ContainerFormModal
+         visible={Boolean(formModal)}
+         kind={formModal?.kind || CONTAINER_KIND.LOOT}
+@@ -1165,6 +1564,15 @@ export default function LootTradeScreen() {
+         onClose={() => setFormModal(null)}
+       />
+ 
++      <HubChildPickerModal
++        visible={hubPickerOpen}
++        hub={activeContainer?.kind === CONTAINER_KIND.HUB ? activeContainer : null}
++        allContainers={containers}
++        roomByCode={roomByCode}
++        onAddChild={handleAddHubChild}
++        onClose={() => setHubPickerOpen(false)}
++      />
++
+       <ContainerCatalogModal
+         visible={catalogOpen}
+         isMerchant={activeContainer?.kind === CONTAINER_KIND.MERCHANT}
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index a50967f..74ee21e 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -36,7 +36,9 @@ const ContainerFormModal = ({
+ }) => {
+   useLocale();
+ 
+-  const isMerchant = (initialContainer?.kind || kind) === CONTAINER_KIND.MERCHANT;
++  const effectiveKind = initialContainer?.kind || kind;
++  const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
++  const isHub = effectiveKind === CONTAINER_KIND.HUB;
+   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
+ 
+   const [name, setName] = useState('');
+@@ -103,7 +105,9 @@ const ContainerFormModal = ({
+ 
+     onSave({
+       ...(initialContainer || {}),
+-      kind: isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT,
++      kind: isHub
++        ? CONTAINER_KIND.HUB
++        : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
+       name: cleanName,
+       roomCode,
+       roomName: roomRecord?.name || initialContainer?.roomName || roomCode,
+@@ -114,9 +118,12 @@ const ContainerFormModal = ({
+     }, capsRollInfo);
+   };
+ 
+-  const titleKey = isMerchant
+-    ? (isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle')
+-    : (isEditing ? 'form.editLootTitle' : 'form.createLootTitle');
++  let titleKey = isEditing ? 'form.editLootTitle' : 'form.createLootTitle';
++  if (isHub) {
++    titleKey = isEditing ? 'form.editHubTitle' : 'form.createHubTitle';
++  } else if (isMerchant) {
++    titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
++  }
+ 
+   return (
+     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+new file mode 100644
+index 0000000..7fcda85
+--- /dev/null
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -0,0 +1,211 @@
++import React, { useMemo } from 'react';
++import {
++  Modal,
++  View,
++  Text,
++  TouchableOpacity,
++  ScrollView,
++  StyleSheet,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import { useLocale } from '../../../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
++import { CONTAINER_KIND } from '../../../../domain/lootTrade';
++import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
++import IconText from '../../../lootTrade/LootTradeIconText';
++
++const HubChildPickerModal = ({
++  visible,
++  hub,
++  allContainers = [],
++  roomByCode = {},
++  onAddChild,
++  onClose,
++}) => {
++  useLocale();
++
++  const candidates = useMemo(() => {
++    if (!hub) return [];
++    const linkedIds = new Set((hub.links || []).map((l) => l.containerId));
++    return (allContainers || [])
++      .filter((c) => (
++        c
++        && c.id !== hub.id
++        && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT)
++        && !linkedIds.has(c.id)
++      ))
++      .sort((a, b) => {
++        const aSame = a.roomCode === hub.roomCode ? 0 : 1;
++        const bSame = b.roomCode === hub.roomCode ? 0 : 1;
++        if (aSame !== bSame) return aSame - bSame;
++        return String(a.name || '').localeCompare(String(b.name || ''));
++      });
++  }, [hub, allContainers]);
++
++  return (
++    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={styles.overlay}>
++        <View style={styles.card}>
++          <Text style={styles.title}>{tLootTrade('detail.hubPickerTitle')}</Text>
++          <Text style={styles.hint}>{tLootTrade('detail.hubPickerSameRoomHint')}</Text>
++
++          <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
++            {candidates.length === 0 ? (
++              <Text style={styles.emptyText}>{tLootTrade('detail.hubPickerEmpty')}</Text>
++            ) : (
++              candidates.map((item) => {
++                const isMerch = item.kind === CONTAINER_KIND.MERCHANT;
++                const pieces = (item.items || []).reduce(
++                  (sum, entry) => sum + (Number(entry.quantity) || 0),
++                  0,
++                );
++                const roomLabel = roomByCode[item.roomCode]?.name
++                  || item.roomName
++                  || formatRoomCodeForDisplay(item.roomCode);
++
++                return (
++                  <View key={item.id} style={styles.row}>
++                    <View style={styles.rowInfo}>
++                      <View style={styles.rowTitleLine}>
++                        <MaterialCommunityIcons
++                          name={isMerch ? 'sack' : 'treasure-chest'}
++                          size={18}
++                          color="#f0e68c"
++                        />
++                        <Text style={styles.rowName}>{item.name}</Text>
++                      </View>
++                      <IconText style={styles.rowMeta}>
++                        {isMerch
++                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })} • ${roomLabel}`
++                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${roomLabel}`}
++                      </IconText>
++                    </View>
++
++                    <TouchableOpacity
++                      style={styles.addBtn}
++                      onPress={() => onAddChild(item.id)}
++                    >
++                      <Text style={styles.addBtnText}>{tLootTrade('detail.hubPickerAddBtn')}</Text>
++                    </TouchableOpacity>
++                  </View>
++                );
++              })
++            )}
++          </ScrollView>
++
++          <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
++            <Text style={styles.closeBtnText}>{tLootTrade('detail.hubPickerClose')}</Text>
++          </TouchableOpacity>
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  overlay: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.72)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    paddingHorizontal: 28,
++    paddingVertical: 36,
++  },
++  card: {
++    width: '90%',
++    maxWidth: 560,
++    maxHeight: '80%',
++    backgroundColor: '#1f1f1f',
++    borderRadius: 5,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 24,
++    paddingVertical: 22,
++  },
++  title: {
++    color: '#f0e68c',
++    fontSize: 18,
++    fontWeight: '700',
++    textAlign: 'center',
++  },
++  hint: {
++    color: '#b0b0b0',
++    fontSize: 12,
++    textAlign: 'center',
++    marginTop: 4,
++    marginBottom: 12,
++  },
++  list: {
++    maxHeight: 380,
++  },
++  listContent: {
++    gap: 8,
++    paddingVertical: 4,
++  },
++  emptyText: {
++    color: '#a3a3a3',
++    fontSize: 13,
++    textAlign: 'center',
++    paddingVertical: 24,
++  },
++  row: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    gap: 10,
++    paddingVertical: 11,
++    paddingHorizontal: 13,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#484848',
++    backgroundColor: '#2a2a2a',
++  },
++  rowInfo: {
++    flex: 1,
++  },
++  rowTitleLine: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++  },
++  rowName: {
++    color: '#f0f0f0',
++    fontSize: 14,
++    fontWeight: '700',
++    flexShrink: 1,
++  },
++  rowMeta: {
++    color: '#b5b5b5',
++    fontSize: 12,
++    marginTop: 3,
++  },
++  addBtn: {
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    borderRadius: 5,
++    paddingHorizontal: 13,
++    paddingVertical: 8,
++  },
++  addBtnText: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  closeBtn: {
++    marginTop: 16,
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#777777',
++    borderRadius: 5,
++    paddingVertical: 12,
++    alignItems: 'center',
++  },
++  closeBtnText: {
++    color: '#e0e0e0',
++    fontSize: 14,
++    fontWeight: '700',
++  },
++});
++
++export default HubChildPickerModal;
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 07de36a..f2d5aff 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -25,6 +25,7 @@ export {
+ export const CONTAINER_KIND = Object.freeze({
+   LOOT: 'loot',
+   MERCHANT: 'merchant',
++  HUB: 'hub',
+ });
+ 
+ export const QUANTITY_UNIT = Object.freeze({
+@@ -217,14 +218,89 @@ export const normalizeContainerItem = (raw, now = Date.now()) => {
+ };
+ 
+ /**
+- * Нормализация контейнера добычи или торговца.
++ * Нормализация одной ссылки на вложенный контейнер/торговца внутри локации ('hub').
++ */
++export const normalizeHubLink = (raw) => {
++  if (!raw || typeof raw !== 'object') return null;
++  const containerId = String(raw.containerId || raw.id || '').trim();
++  if (!containerId) return null;
++  return {
++    containerId,
++    locked: Boolean(raw.locked),
++    lockLabel: String(raw.lockLabel || '').trim(),
++  };
++};
++
++export const normalizeHubLinks = (rawLinks = []) => {
++  if (!Array.isArray(rawLinks)) return [];
++  const seen = new Set();
++  const out = [];
++  for (const raw of rawLinks) {
++    const link = normalizeHubLink(raw);
++    if (!link || seen.has(link.containerId)) continue;
++    seen.add(link.containerId);
++    out.push(link);
++  }
++  return out;
++};
++
++/**
++ * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
++ * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
++ */
++export const buildHubSessionNodes = (hub, allContainers = []) => {
++  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
++  const byId = new Map(
++    (Array.isArray(allContainers) ? allContainers : [])
++      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
++      .map((c) => [c.id, c]),
++  );
++  const links = normalizeHubLinks(hub.links);
++  const nodes = [];
++  for (const link of links) {
++    const child = byId.get(link.containerId);
++    if (!child) continue;
++    nodes.push({
++      containerId: child.id,
++      kind: child.kind,
++      name: child.name,
++      description: child.description || '',
++      locked: Boolean(link.locked),
++      lockLabel: link.lockLabel || '',
++      caps: child.kind === CONTAINER_KIND.MERCHANT ? normalizeCapsAmount(child.caps, 0) : 0,
++      saleMarkupPercent: child.kind === CONTAINER_KIND.MERCHANT
++        ? normalizeSaleMarkupPercent(child.saleMarkupPercent, 0)
++        : 0,
++      buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
++        ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
++        : DEFAULT_BUY_DEPRECIATION_PERCENT,
++      characterOverrides: {},
++      items: Array.isArray(child.items)
++        ? child.items.map((entry) => ({
++            ...entry,
++            itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
++          }))
++        : [],
++    });
++  }
++  return nodes;
++};
++
++/**
++ * Нормализация контейнера добычи, торговца или локации ('hub').
+  */
+ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+-  const kind = raw.kind === CONTAINER_KIND.MERCHANT
+-    ? CONTAINER_KIND.MERCHANT
+-    : CONTAINER_KIND.LOOT;
+-  const items = Array.isArray(raw.items)
+-    ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
++  let kind = CONTAINER_KIND.LOOT;
++  if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
++  else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
++
++  const items = kind === CONTAINER_KIND.HUB
++    ? []
++    : (Array.isArray(raw.items)
++        ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
++        : []);
++  const links = kind === CONTAINER_KIND.HUB
++    ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
+     : [];
+ 
+   return {
+@@ -244,6 +320,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
+       : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     items,
++    links,
+     createdAt: Number(raw.createdAt) || now,
+     updatedAt: Number(raw.updatedAt) || now,
+   };
+@@ -512,6 +589,7 @@ export const duplicateContainerEntity = (
+       entryId: makeEntryId(now + index + 1),
+       itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+     })),
++    links: (normalized.links || []).map((lnk) => ({ ...lnk })),
+     createdAt: now,
+     updatedAt: now,
+   };
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index c9fb4f9..d55a73a 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -1,16 +1,20 @@
+ {
+   "title": "Loot & Trade",
+-  "subtitle": "Loot containers and merchants for room distribution",
++  "subtitle": "Loot containers, merchants, and locations for room distribution",
+   "actions": {
+     "createLoot": "Create\nContainer",
+     "createMerchant": "Create\nMerchant",
++    "createHub": "Create\nLocation",
+     "syncCloud": "Cloud sync"
+   },
+   "card": {
+     "lootBadge": "Loot",
+     "merchantBadge": "Merchant",
++    "hubBadge": "Location",
+     "activeBadge": "ACTIVE",
+     "itemsCount": "Items: {count}",
++    "hubNodesCount": "Objects: {count}",
++    "hubLockedCount": "Locked: {count}",
+     "capsCount": "Register: {caps} {CAP}",
+     "ratesSummary": "Sale: {sale}% • Buyback depr.: {depr}%",
+     "openMenu": "Container actions",
+@@ -26,8 +30,10 @@
+     "editLootTitle": "Container Settings",
+     "createMerchantTitle": "New Merchant",
+     "editMerchantTitle": "Merchant Settings",
++    "createHubTitle": "New Location (nested containers & merchants)",
++    "editHubTitle": "Location Settings",
+     "nameLabel": "Name *",
+-    "namePlaceholder": "e.g. Overseer's Safe / Caravan Joe",
++    "namePlaceholder": "e.g. Overseer's Safe / Caravan Joe / Diamond City Market",
+     "roomLabel": "Room *",
+     "noRoomsHint": "Create a campaign room on the «Campaigns» tab first.",
+     "descriptionLabel": "Description (optional)",
+@@ -44,8 +50,24 @@
+   },
+   "detail": {
+     "backToList": "← Back to containers",
++    "backToHub": "← Back to «{name}»",
+     "addItem": "+ Add item",
+     "emptyItems": "Empty. Tap «+ Add item» to populate contents.",
++    "addHubNode": "+ Add container / merchant",
++    "emptyHubNodes": "No objects in this location yet. Tap «+ Add container / merchant» to link shops and containers.",
++    "hubPickerTitle": "Add to Location",
++    "hubPickerEmpty": "No available containers or merchants yet. Create them on the main screen first.",
++    "hubPickerSameRoomHint": "Showing containers and merchants (1 nesting level).",
++    "hubPickerAddBtn": "Add",
++    "hubPickerClose": "Done",
++    "hubOpenChildCard": "Contents",
++    "hubUnlinkChild": "Remove",
++    "hubLockStateLocked": "🔒 Locked",
++    "hubLockStateUnlocked": "🔓 Unlocked",
++    "hubUnlockAction": "🔓 Unlock",
++    "hubLockAction": "🔒 Lock",
++    "hubLockLabelPlaceholder": "Lock note (e.g. Lockpick diff. 2 / Needs key)",
++    "hubIssueEmptyWarn": "Add at least one container or merchant to the location before issuing.",
+     "editSettings": "Settings",
+     "issueButton": "Issue to players",
+     "stopIssueButton": "Stop issuing",
+@@ -114,6 +136,9 @@
+   "livePanel": {
+     "activeTitleLoot": "Container is currently open for players",
+     "activeTitleMerchant": "Trade active — live rate controls",
++    "activeTitleHub": "Location open for players — live lock & shop controls",
++    "hubLiveLocksLabel": "Location objects (tap to unlock/lock live):",
++    "hubLiveMerchantSelect": "Live rate controls for merchant in location:",
+     "issuedToRoom": "Access: entire room",
+     "issuedToCharacter": "Access: {name}",
+     "rateScopeLabel": "Adjust % for (after Barter / Speech check):",
+@@ -128,9 +153,20 @@
+   "player": {
+     "minimizedLoot": "📦 Loot: {name}",
+     "minimizedMerchant": "💰 Merchant: {name}",
++    "minimizedHub": "🗺️ Location: {name}",
+     "openForBoundChar": "Open for «{charName}»",
+     "minimize": "Minimize",
+     "close": "Close",
++    "backToLocation": "← Location",
++    "hubEmpty": "No accessible objects in this location yet.",
++    "hubMasterClosesHint": "This location window stays open until the GM ends the scene.",
++    "hubNodeLockedBadge": "🔒 Locked",
++    "hubNodeLockedDefaultHint": "Requires lockpicking or GM permission",
++    "hubNodeOpenLoot": "Open",
++    "hubNodeOpenMerchant": "Trade",
++    "hubNodeEmptyLoot": "Empty",
++    "hubNodeItemsCount": "Items: {count}",
++    "containerLockedError": "This object is locked. Wait for GM permission.",
+     "closeLootConfirmTitle": "Close container?",
+     "closeLootConfirmMessage": "You haven't taken everything. Are you sure you want to close it?",
+     "closeMerchantConfirmTitle": "Close trade?",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 6a2ce86..45df8ad 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -1,16 +1,20 @@
+ {
+   "title": "Добыча и торговля",
+-  "subtitle": "Контейнеры добычи и торговцы для выдачи в комнаты",
++  "subtitle": "Контейнеры добычи, торговцы и локации для выдачи в комнаты",
+   "actions": {
+     "createLoot": "Создать\nконтейнер",
+     "createMerchant": "Создать\nторговца",
++    "createHub": "Создать\nлокацию",
+     "syncCloud": "Синхронизация с облаком"
+   },
+   "card": {
+     "lootBadge": "Добыча",
+     "merchantBadge": "Торговец",
++    "hubBadge": "Локация",
+     "activeBadge": "ВЫДАН",
+     "itemsCount": "Позиций: {count}",
++    "hubNodesCount": "Объектов: {count}",
++    "hubLockedCount": "Заперто: {count}",
+     "capsCount": "Касса: {caps} {CAP}",
+     "ratesSummary": "Продажа: {sale}% • Уценка скупки: {depr}%",
+     "openMenu": "Действия контейнера",
+@@ -26,8 +30,10 @@
+     "editLootTitle": "Параметры контейнера",
+     "createMerchantTitle": "Новый торговец",
+     "editMerchantTitle": "Параметры торговца",
++    "createHubTitle": "Новая локация (набор контейнеров и торговцев)",
++    "editHubTitle": "Параметры локации",
+     "nameLabel": "Имя *",
+-    "namePlaceholder": "Например: Сейф смотрителя / Караванщик Джо",
++    "namePlaceholder": "Например: Сейф смотрителя / Караванщик Джо / Рынок Даймонд-Сити",
+     "roomLabel": "Комната *",
+     "noRoomsHint": "Сначала создайте комнату на вкладке «Список кампаний».",
+     "descriptionLabel": "Описание (необязательно)",
+@@ -44,8 +50,24 @@
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
++    "backToHub": "← Назад в «{name}»",
+     "addItem": "+ Добавить предмет",
+     "emptyItems": "Список пуст. Нажмите «+ Добавить предмет», чтобы наполнить содержимое.",
++    "addHubNode": "+ Добавить контейнер / торговца",
++    "emptyHubNodes": "В локации пока нет объектов. Нажмите «+ Добавить контейнер / торговца», чтобы собрать внутри неё лавки и контейнеры.",
++    "hubPickerTitle": "Добавить в локацию",
++    "hubPickerEmpty": "Нет свободных контейнеров или торговцев. Создайте их на главном экране раздела.",
++    "hubPickerSameRoomHint": "Показаны контейнеры и торговцы (вложенность — 1 уровень).",
++    "hubPickerAddBtn": "Включить",
++    "hubPickerClose": "Готово",
++    "hubOpenChildCard": "Содержимое",
++    "hubUnlinkChild": "Убрать",
++    "hubLockStateLocked": "🔒 Заперто",
++    "hubLockStateUnlocked": "🔓 Открыто",
++    "hubUnlockAction": "🔓 Открыть замок",
++    "hubLockAction": "🔒 Запереть",
++    "hubLockLabelPlaceholder": "Подпись замка (напр.: Взлом сложность 2 / Нужен ключ)",
++    "hubIssueEmptyWarn": "Добавьте в локацию хотя бы один контейнер или торговца перед выдачей.",
+     "editSettings": "Параметры",
+     "issueButton": "Выдать игрокам",
+     "stopIssueButton": "Завершить выдачу",
+@@ -114,6 +136,9 @@
+   "livePanel": {
+     "activeTitleLoot": "Контейнер сейчас выдан игрокам",
+     "activeTitleMerchant": "Торговля активна — живое управление ценами",
++    "activeTitleHub": "Локация открыта игрокам — управление замками и лавками",
++    "hubLiveLocksLabel": "Доступ к объектам локации (нажмите, чтобы открыть/запереть вживую):",
++    "hubLiveMerchantSelect": "Живая настройка цен торговца в локации:",
+     "issuedToRoom": "Доступ: вся комната",
+     "issuedToCharacter": "Доступ: {name}",
+     "rateScopeLabel": "Кому менять % (по результатам проверки Бартера / Убеждения):",
+@@ -128,9 +153,20 @@
+   "player": {
+     "minimizedLoot": "📦 Добыча: {name}",
+     "minimizedMerchant": "💰 Торговец: {name}",
++    "minimizedHub": "🗺️ Локация: {name}",
+     "openForBoundChar": "Открыть для «{charName}»",
+     "minimize": "Свернуть",
+     "close": "Закрыть",
++    "backToLocation": "← К локации",
++    "hubEmpty": "В этой локации пока нет доступных объектов.",
++    "hubMasterClosesHint": "Окно локации закроется, когда Мастер завершит сцену.",
++    "hubNodeLockedBadge": "🔒 Заперто",
++    "hubNodeLockedDefaultHint": "Требуется взлом или разрешение Мастера",
++    "hubNodeOpenLoot": "Открыть",
++    "hubNodeOpenMerchant": "Торговать",
++    "hubNodeEmptyLoot": "Пусто",
++    "hubNodeItemsCount": "Предметов: {count}",
++    "containerLockedError": "Этот объект заперт. Дождитесь разрешения Мастера.",
+     "closeLootConfirmTitle": "Закрыть контейнер?",
+     "closeLootConfirmMessage": "Вы не всё забрали, уверены, что хотите закрыть?",
+     "closeMerchantConfirmTitle": "Закрыть торговлю?",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 0f618bb..1a26c4d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "471"
++  "baseline": "472"
+ }
+diff --git a/public/version.json b/public/version.json
+index 69c7570..3574eed 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "471",
++  "version": "472",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index c74c6e8..69387df 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -107,27 +107,100 @@ const normalizeCharacterOverrides = (raw) => {
+   return out;
+ };
+ 
+-const normalizeActiveSession = (raw, now = Date.now()) => {
++const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+   if (!raw || typeof raw !== 'object') return null;
++  const containerId = String(raw.containerId || raw.id || '').trim();
++  if (!containerId) return null;
+   const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
++  const items = Array.isArray(raw.items)
++    ? raw.items
++        .map((item, idx) => normalizeSessionItem(item, now, nodeIdx * 1000 + idx))
++        .filter(Boolean)
++    : [];
++  return {
++    containerId,
++    kind,
++    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
++    description: String(raw.description || '').trim(),
++    locked: Boolean(raw.locked),
++    lockLabel: String(raw.lockLabel || '').trim(),
++    caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
++    saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
++    buyDepreciationPercent: kind === 'merchant'
++      ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
++      : 50,
++    characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
++    items,
++  };
++};
++
++const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
++  if (!Array.isArray(rawNodes)) return [];
++  const seen = new Set();
++  const out = [];
++  rawNodes.forEach((raw, idx) => {
++    const node = normalizeHubSessionNode(raw, now, idx);
++    if (!node || seen.has(node.containerId)) return;
++    seen.add(node.containerId);
++    out.push(node);
++  });
++  return out;
++};
++
++/**
++ * Скрывает содержимое и кассу запертых (locked: true) вложенных контейнеров/торговцев
++ * от игроков по WebSocket. Мастер получает полное состояние без купюр.
++ */
++const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
++  if (!session || isGm || session.kind !== 'hub') return session;
++  return {
++    ...session,
++    nodes: (session.nodes || []).map((node) => {
++      if (!node.locked) return node;
++      return {
++        ...node,
++        items: [],
++        caps: 0,
++        saleMarkupPercent: 0,
++        buyDepreciationPercent: 50,
++        characterOverrides: {},
++        hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
++      };
++    }),
++  };
++};
++
++const normalizeActiveSession = (raw, now = Date.now()) => {
++  if (!raw || typeof raw !== 'object') return null;
++  let kind = 'loot';
++  if (raw.kind === 'merchant') kind = 'merchant';
++  else if (raw.kind === 'hub') kind = 'hub';
++
+   const targetType = raw.targetType === 'character' ? 'character' : 'room';
+   const targetCharacterId = targetType === 'character' && raw.targetCharacterId
+     ? String(raw.targetCharacterId)
+     : null;
+   if (targetType === 'character' && !targetCharacterId) return null;
+ 
+-  const items = Array.isArray(raw.items)
+-    ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
+-    : [];
++  const items = kind === 'hub'
++    ? []
++    : (Array.isArray(raw.items)
++        ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
++        : []);
++  const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
+   const closedByClientIds = Array.isArray(raw.closedByClientIds)
+     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
+     : [];
+ 
++  const defaultName = kind === 'hub'
++    ? 'Локация'
++    : (kind === 'merchant' ? 'Торговец' : 'Контейнер');
++
+   return {
+     sessionId: String(raw.sessionId || `ses_${now}_${Math.random().toString(36).slice(2, 8)}`),
+     containerId: String(raw.containerId || ''),
+     kind,
+-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
++    name: String(raw.name || '').trim() || defaultName,
+     description: String(raw.description || '').trim(),
+     targetType,
+     targetCharacterId,
+@@ -139,6 +212,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+       : 50,
+     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+     items,
++    nodes,
+     closedByClientIds,
+     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
+     openedAt: Number(raw.openedAt) || now,
+@@ -207,8 +281,52 @@ const isCharacterAllowed = (session, characterId) => {
+   return Boolean(characterId && session.targetCharacterId === String(characterId));
+ };
+ 
++const applyMerchantRatePatch = (target, payload = {}) => {
++  if (payload.caps !== undefined) {
++    target.caps = normalizeCapsAmount(payload.caps, target.caps);
++  }
++  const targetCharId = payload.targetCharacterId ? String(payload.targetCharacterId) : null;
++  if (targetCharId) {
++    if (payload.resetCharacterOverride) {
++      delete target.characterOverrides[targetCharId];
++    } else {
++      const prev = target.characterOverrides[targetCharId] || {};
++      const updatedOv = { ...prev };
++      if (payload.saleMarkupPercent !== undefined) {
++        updatedOv.saleMarkupPercent = normalizeSaleMarkupPercent(
++          payload.saleMarkupPercent,
++          target.saleMarkupPercent,
++        );
++      }
++      if (payload.buyDepreciationPercent !== undefined) {
++        updatedOv.buyDepreciationPercent = normalizeBuyDepreciationPercent(
++          payload.buyDepreciationPercent,
++          target.buyDepreciationPercent,
++        );
++      }
++      target.characterOverrides[targetCharId] = updatedOv;
++    }
++  } else {
++    if (payload.saleMarkupPercent !== undefined) {
++      target.saleMarkupPercent = normalizeSaleMarkupPercent(
++        payload.saleMarkupPercent,
++        target.saleMarkupPercent,
++      );
++    }
++    if (payload.buyDepreciationPercent !== undefined) {
++      target.buyDepreciationPercent = normalizeBuyDepreciationPercent(
++        payload.buyDepreciationPercent,
++        target.buyDepreciationPercent,
++      );
++    }
++    if (payload.resetAllCharacterOverrides) {
++      target.characterOverrides = {};
++    }
++  }
++};
++
+ /**
+- * Живое обновление процентов/кассы/содержимого открытой сессии Мастером.
++ * Живое обновление процентов/кассы/содержимого/замков открытой сессии Мастером.
+  */
+ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+   if (!session) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+@@ -219,7 +337,14 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+   const next = {
+     ...session,
+     characterOverrides: { ...(session.characterOverrides || {}) },
+-    items: session.items.map((item) => ({ ...item })),
++    items: (session.items || []).map((item) => ({ ...item })),
++    nodes: Array.isArray(session.nodes)
++      ? session.nodes.map((node) => ({
++          ...node,
++          characterOverrides: { ...(node.characterOverrides || {}) },
++          items: (node.items || []).map((item) => ({ ...item })),
++        }))
++      : [],
+     closedByClientIds: Array.isArray(session.closedByClientIds)
+       ? [...session.closedByClientIds]
+       : [],
+@@ -227,6 +352,67 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+     updatedAt: now,
+   };
+ 
++  if (next.kind === 'hub') {
++    if (payload.name !== undefined && String(payload.name).trim()) {
++      next.name = String(payload.name).trim();
++    }
++    if (payload.description !== undefined) {
++      next.description = String(payload.description || '').trim();
++    }
++
++    if (Array.isArray(payload.nodes)) {
++      // Сохраняем живые characterOverrides уже открытых торговцев при обновлении списка узлов
++      const prevById = new Map(next.nodes.map((n) => [n.containerId, n]));
++      next.nodes = normalizeHubSessionNodes(payload.nodes, now).map((node) => {
++        const prev = prevById.get(node.containerId);
++        if (prev && node.kind === 'merchant') {
++          return {
++            ...node,
++            characterOverrides: Object.keys(node.characterOverrides || {}).length > 0
++              ? node.characterOverrides
++              : { ...(prev.characterOverrides || {}) },
++          };
++        }
++        return node;
++      });
++    }
++
++    if (payload.nodeContainerId) {
++      const nodeId = String(payload.nodeContainerId);
++      const idx = next.nodes.findIndex((n) => n.containerId === nodeId);
++      if (idx >= 0) {
++        const targetNode = {
++          ...next.nodes[idx],
++          characterOverrides: { ...(next.nodes[idx].characterOverrides || {}) },
++          items: (next.nodes[idx].items || []).map((item) => ({ ...item })),
++        };
++        if (payload.nodeName !== undefined && String(payload.nodeName).trim()) {
++          targetNode.name = String(payload.nodeName).trim();
++        }
++        if (payload.nodeDescription !== undefined) {
++          targetNode.description = String(payload.nodeDescription || '').trim();
++        }
++        if (payload.locked !== undefined) {
++          targetNode.locked = Boolean(payload.locked);
++        }
++        if (payload.lockLabel !== undefined) {
++          targetNode.lockLabel = String(payload.lockLabel || '').trim();
++        }
++        if (Array.isArray(payload.nodeItems)) {
++          targetNode.items = payload.nodeItems
++            .map((item, itemIdx) => normalizeSessionItem(item, now, itemIdx))
++            .filter(Boolean);
++        }
++        if (targetNode.kind === 'merchant') {
++          applyMerchantRatePatch(targetNode, payload);
++        }
++        next.nodes[idx] = targetNode;
++      }
++    }
++
++    return { session: next };
++  }
++
+   if (Array.isArray(payload.items)) {
+     next.items = payload.items
+       .map((item, idx) => normalizeSessionItem(item, now, idx))
+@@ -241,70 +427,14 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+   }
+ 
+   if (next.kind === 'merchant') {
+-    if (payload.caps !== undefined) {
+-      next.caps = normalizeCapsAmount(payload.caps, next.caps);
+-    }
+-
+-    const targetCharId = payload.targetCharacterId ? String(payload.targetCharacterId) : null;
+-    if (targetCharId) {
+-      if (payload.resetCharacterOverride) {
+-        delete next.characterOverrides[targetCharId];
+-      } else {
+-        const prev = next.characterOverrides[targetCharId] || {};
+-        const updatedOv = { ...prev };
+-        if (payload.saleMarkupPercent !== undefined) {
+-          updatedOv.saleMarkupPercent = normalizeSaleMarkupPercent(
+-            payload.saleMarkupPercent,
+-            next.saleMarkupPercent,
+-          );
+-        }
+-        if (payload.buyDepreciationPercent !== undefined) {
+-          updatedOv.buyDepreciationPercent = normalizeBuyDepreciationPercent(
+-            payload.buyDepreciationPercent,
+-            next.buyDepreciationPercent,
+-          );
+-        }
+-        next.characterOverrides[targetCharId] = updatedOv;
+-      }
+-    } else {
+-      if (payload.saleMarkupPercent !== undefined) {
+-        next.saleMarkupPercent = normalizeSaleMarkupPercent(
+-          payload.saleMarkupPercent,
+-          next.saleMarkupPercent,
+-        );
+-      }
+-      if (payload.buyDepreciationPercent !== undefined) {
+-        next.buyDepreciationPercent = normalizeBuyDepreciationPercent(
+-          payload.buyDepreciationPercent,
+-          next.buyDepreciationPercent,
+-        );
+-      }
+-      if (payload.resetAllCharacterOverrides) {
+-        next.characterOverrides = {};
+-      }
+-    }
++    applyMerchantRatePatch(next, payload);
+   }
+ 
+   return { session: next };
+ };
+ 
+-/**
+- * Атомарное взятие предметов игроком из контейнера добычи.
+- */
+-const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+-  if (!session || session.kind !== 'loot') {
+-    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+-  }
+-  if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+-    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+-  }
+-  const characterId = String(payload.characterId || '');
+-  if (!isCharacterAllowed(session, characterId)) {
+-    return { error: ERROR_CODE.SESSION_FORBIDDEN };
+-  }
+-
+-  const takes = Array.isArray(payload.takes) ? payload.takes : [];
+-  const nextItems = session.items.map((entry) => ({ ...entry }));
++const deductLootItems = (itemsList, takes) => {
++  const nextItems = (itemsList || []).map((entry) => ({ ...entry }));
+   const granted = [];
+ 
+   for (const req of takes) {
+@@ -323,7 +453,69 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+     current.quantity -= actual;
+   }
+ 
+-  const remaining = nextItems.filter((entry) => entry.quantity > 0);
++  return {
++    granted,
++    remaining: nextItems.filter((entry) => entry.quantity > 0),
++  };
++};
++
++/**
++ * Атомарное взятие предметов игроком из контейнера добычи (или вложенного узла локации).
++ */
++const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
++  if (!session || (session.kind !== 'loot' && session.kind !== 'hub')) {
++    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  }
++  if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
++    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++  }
++  const characterId = String(payload.characterId || '');
++  if (!isCharacterAllowed(session, characterId)) {
++    return { error: ERROR_CODE.SESSION_FORBIDDEN };
++  }
++
++  const takes = Array.isArray(payload.takes) ? payload.takes : [];
++
++  if (session.kind === 'hub') {
++    const nodeId = String(payload.nodeContainerId || '');
++    const nodeIdx = (session.nodes || []).findIndex(
++      (n) => n.containerId === nodeId && n.kind === 'loot',
++    );
++    if (nodeIdx < 0) {
++      return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++    }
++    const targetNode = session.nodes[nodeIdx];
++    if (targetNode.locked) {
++      return { error: ERROR_CODE.CONTAINER_LOCKED, session };
++    }
++
++    const hadItemsBefore = Array.isArray(targetNode.items) && targetNode.items.length > 0;
++    const { granted, remaining } = deductLootItems(targetNode.items, takes);
++    const nextNodes = session.nodes.map((node, idx) => (
++      idx === nodeIdx ? { ...node, items: remaining } : node
++    ));
++    const emptiedNodeContainerId = (hadItemsBefore || granted.length > 0) && remaining.length === 0
++      ? targetNode.containerId
++      : null;
++
++    const nextSession = {
++      ...session,
++      nodes: nextNodes,
++      closedByClientIds: Array.isArray(session.closedByClientIds)
++        ? [...session.closedByClientIds]
++        : [],
++      revision: session.revision + 1,
++      updatedAt: now,
++    };
++
++    return {
++      granted,
++      emptiedNodeContainerId,
++      session: nextSession,
++    };
++  }
++
++  const { granted, remaining } = deductLootItems(session.items, takes);
+   const nextSession = {
+     ...session,
+     items: remaining,
+@@ -336,15 +528,16 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+ 
+   return {
+     granted,
++    emptiedNodeContainerId: null,
+     session: nextSession,
+   };
+ };
+ 
+ /**
+- * Атомарная бартерная сделка игрока с торговцем.
++ * Атомарная бартерная сделка игрока с торговцем (или вложенным торговцем локации).
+  */
+ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+-  if (!session || session.kind !== 'merchant') {
++  if (!session || (session.kind !== 'merchant' && session.kind !== 'hub')) {
+     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+   }
+   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+@@ -355,18 +548,34 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+     return { error: ERROR_CODE.SESSION_FORBIDDEN };
+   }
+ 
++  let merchantTarget = session;
++  let hubNodeIdx = -1;
++  if (session.kind === 'hub') {
++    const nodeId = String(payload.nodeContainerId || '');
++    hubNodeIdx = (session.nodes || []).findIndex(
++      (n) => n.containerId === nodeId && n.kind === 'merchant',
++    );
++    if (hubNodeIdx < 0) {
++      return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
++    }
++    merchantTarget = session.nodes[hubNodeIdx];
++    if (merchantTarget.locked) {
++      return { error: ERROR_CODE.CONTAINER_LOCKED, session };
++    }
++  }
++
+   const buyRequests = Array.isArray(payload.buyItems) ? payload.buyItems : [];
+   const sellRequests = Array.isArray(payload.sellItems) ? payload.sellItems : [];
+   if (buyRequests.length === 0 && sellRequests.length === 0) {
+     return { error: ERROR_CODE.BAD_MESSAGE };
+   }
+ 
+-  const rates = getEffectiveMerchantRates(session, characterId);
++  const rates = getEffectiveMerchantRates(merchantTarget, characterId);
+   const capCollectorPercent = clampNumber(payload.perkCapCollectorPercent, 0, 100, 0);
+   const playerCapsAvailable = normalizeCapsAmount(payload.playerCapsAvailable, 0);
+   const acceptCapShortfall = Boolean(payload.acceptCapShortfall);
+ 
+-  const nextItems = session.items.map((entry) => ({ ...entry }));
++  const nextItems = merchantTarget.items.map((entry) => ({ ...entry }));
+   const boughtEntries = [];
+   let totalBuyCost = 0;
+ 
+@@ -432,17 +641,17 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+     return { error: ERROR_CODE.TRADE_NOT_ENOUGH_PLAYER_CAPS, session };
+   }
+ 
+-  if (merchantOwes > session.caps && !acceptCapShortfall) {
++  if (merchantOwes > merchantTarget.caps && !acceptCapShortfall) {
+     return {
+       error: ERROR_CODE.TRADE_NOT_ENOUGH_MERCHANT_CAPS,
+-      merchantCaps: session.caps,
++      merchantCaps: merchantTarget.caps,
+       owedCaps: merchantOwes,
+       session,
+     };
+   }
+ 
+-  const actualMerchantPayout = Math.min(merchantOwes, session.caps);
+-  const nextMerchantCaps = session.caps + playerOwes - actualMerchantPayout;
++  const actualMerchantPayout = Math.min(merchantOwes, merchantTarget.caps);
++  const nextMerchantCaps = merchantTarget.caps + playerOwes - actualMerchantPayout;
+   const playerCapsDelta = actualMerchantPayout - playerOwes;
+ 
+   // 3. Применяем изменения к ассортименту торговца (проданные игроком вещи ложатся в лавку).
+@@ -451,16 +660,32 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
+     addOrMergeSessionItem(remaining, sold.entry, now);
+   }
+ 
+-  const nextSession = {
+-    ...session,
+-    caps: nextMerchantCaps,
+-    items: remaining,
+-    revision: session.revision + 1,
+-    updatedAt: now,
+-  };
++  const nextSession = session.kind === 'hub'
++    ? {
++        ...session,
++        nodes: session.nodes.map((node, idx) => (
++          idx === hubNodeIdx
++            ? {
++                ...node,
++                caps: nextMerchantCaps,
++                items: remaining,
++              }
++            : node
++        )),
++        revision: session.revision + 1,
++        updatedAt: now,
++      }
++    : {
++        ...session,
++        caps: nextMerchantCaps,
++        items: remaining,
++        revision: session.revision + 1,
++        updatedAt: now,
++      };
+ 
+   return {
+     committed: {
++      nodeContainerId: session.kind === 'hub' ? merchantTarget.containerId : null,
+       boughtEntries,
+       soldItems: soldItems.map((s) => ({
+         clientItemId: s.clientItemId,
+@@ -483,6 +708,7 @@ module.exports = {
+   normalizeBuyDepreciationPercent,
+   normalizeCapsAmount,
+   normalizeActiveSession,
++  sanitizeSessionForMember,
+   getEffectiveMerchantRates,
+   computeMerchantSellPriceToPlayer,
+   computeMerchantBuybackPriceFromPlayer,
+diff --git a/server/protocol.js b/server/protocol.js
+index f85ec36..d7b5870 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -43,6 +43,7 @@ const ERROR_CODE = Object.freeze({
+   UNKNOWN_TYPE: 'UNKNOWN_TYPE',
+   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
++  CONTAINER_LOCKED: 'CONTAINER_LOCKED',
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index b9c4bf7..c68258f 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -163,7 +163,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     let closedSession = null;
+     let closedReason = null;
+     const current = room.activeSession;
+-    if (left && current) {
++    // Локацию ('hub') закрывает только сам Мастер — уход игроков её не гасит.
++    if (left && current && current.kind !== 'hub') {
+       const closedSet = new Set(current.closedByClientIds || []);
+       const hadPreviousCloseOrEmpty =
+         closedSet.size > 0 || (current.kind === 'loot' && current.items.length === 0);
+@@ -268,6 +269,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (sessionId && current.sessionId !== String(sessionId)) {
+       return { room, session: current, closedSession: null, closedReason: null };
+     }
++    // Локацию ('hub') может закрыть только Мастер; игроки закрывают лишь вложенные окна внутри неё.
++    if (current.kind === 'hub') {
++      return { room, session: current, closedSession: null, closedReason: null };
++    }
+ 
+     const closedSet = new Set(current.closedByClientIds || []);
+     closedSet.add(clientId);
+@@ -353,7 +358,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     }
+ 
+     room.activeSession = result.session;
+-    return { room, granted: result.granted, session: result.session };
++    return {
++      room,
++      granted: result.granted,
++      emptiedNodeContainerId: result.emptiedNodeContainerId || null,
++      session: result.session,
++    };
+   };
+ 
+   /** Атомарная бартерная сделка игрока с торговцем. */
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 1033154..5a75fef 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -12,6 +12,7 @@ const path = require('node:path');
+ const zlib = require('node:zlib');
+ const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
+ const { createRoomRegistry } = require('./roomRegistry');
++const { sanitizeSessionForMember } = require('./lootTradeSession');
+ const { toCanonicalRoomCode } = require('./roomCode');
+ 
+ // Совместимость ws@6/7 (экспортирует ws.Server, где ws.WebSocketServer === undefined,
+@@ -292,6 +293,32 @@ const attachRoomWebSocketServer = (httpServer, {
+     }
+   };
+ 
++  const sanitizeSessionPayloadForClient = (room, payload, targetClientId) => {
++    if (!payload || typeof payload !== 'object') return payload;
++    const isGm = Boolean(room && room.ownerClientId === targetClientId);
++    const out = { ...payload };
++    if ('session' in out && out.session) {
++      out.session = sanitizeSessionForMember(out.session, { isGm });
++    }
++    if ('closedSession' in out && out.closedSession) {
++      out.closedSession = sanitizeSessionForMember(out.closedSession, { isGm });
++    }
++    return out;
++  };
++
++  const broadcastSessionState = (room, exceptClientId, basePayload) => {
++    for (const member of room.members.values()) {
++      if (member.clientId === exceptClientId || !member.ws) continue;
++      sendEnvelope(
++        member.ws,
++        MESSAGE.SESSION_STATE,
++        sanitizeSessionPayloadForClient(room, basePayload, member.clientId),
++        room.code,
++        member.clientId,
++      );
++    }
++  };
++
+   const handleUpgrade = (req, socket, head) => {
+     wss.handleUpgrade(req, socket, head, (ws) => {
+       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+@@ -404,7 +431,12 @@ const attachRoomWebSocketServer = (httpServer, {
+             break;
+           }
+           ws.meta.rooms.add(canonical);
+-          sendEnvelope(ws, MESSAGE.ROOM_STATE, { ...result.state, requestId: payload.requestId || null }, canonical, clientId);
++          const isJoiningGm = result.room.ownerClientId === clientId;
++          sendEnvelope(ws, MESSAGE.ROOM_STATE, {
++            ...result.state,
++            activeSession: sanitizeSessionForMember(result.state.activeSession, { isGm: isJoiningGm }),
++            requestId: payload.requestId || null,
++          }, canonical, clientId);
+           broadcastMembers(result.room, clientId);
+           break;
+         }
+@@ -417,7 +449,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           if (left && room) {
+             broadcastMembers(room, clientId);
+             if (closedSession) {
+-              broadcastToRoom(room, clientId, MESSAGE.SESSION_STATE, {
++              broadcastSessionState(room, clientId, {
+                 session: null,
+                 closedContainerId: closedSession.containerId || null,
+                 closedSession,
+@@ -502,11 +534,17 @@ const attachRoomWebSocketServer = (httpServer, {
+             sendError(ws, clientId, result.error, payload.requestId, canonical);
+             break;
+           }
+-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+-            session: result.session,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_STATE,
++            sanitizeSessionPayloadForClient(result.room, {
++              session: result.session,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, clientId, {
+             session: result.session,
+           });
+           break;
+@@ -527,11 +565,17 @@ const attachRoomWebSocketServer = (httpServer, {
+             sendError(ws, clientId, result.error, payload.requestId, canonical);
+             break;
+           }
+-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+-            session: result.session,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_STATE,
++            sanitizeSessionPayloadForClient(result.room, {
++              session: result.session,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, clientId, {
+             session: result.session,
+           });
+           break;
+@@ -557,11 +601,17 @@ const attachRoomWebSocketServer = (httpServer, {
+             closedContainerId: result.closedSession?.containerId || null,
+             closedSession: result.closedSession || null,
+           };
+-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+-            ...closePayload,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, closePayload);
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_STATE,
++            sanitizeSessionPayloadForClient(result.room, {
++              ...closePayload,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, clientId, closePayload);
+           break;
+         }
+ 
+@@ -587,12 +637,18 @@ const attachRoomWebSocketServer = (httpServer, {
+                 closedReason: result.closedReason || null,
+               }
+             : {};
+-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
+-            session: result.session,
+-            ...closeMeta,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_STATE,
++            sanitizeSessionPayloadForClient(result.room, {
++              session: result.session,
++              ...closeMeta,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, clientId, {
+             session: result.session,
+             ...closeMeta,
+           });
+@@ -605,33 +661,51 @@ const attachRoomWebSocketServer = (httpServer, {
+             sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+             break;
+           }
++          const roomRef = registry.getRoom(canonical);
+           const result = registry.lootTake({
+             code: canonical,
+             clientId,
+             payload,
+           });
+           if (result.error) {
+-            sendEnvelope(ws, MESSAGE.ERROR, {
+-              code: result.error,
+-              requestId: payload.requestId || null,
+-              session: result.session || null,
+-            }, canonical, clientId);
++            sendEnvelope(
++              ws,
++              MESSAGE.ERROR,
++              sanitizeSessionPayloadForClient(roomRef, {
++                code: result.error,
++                requestId: payload.requestId || null,
++                session: result.session || null,
++              }, clientId),
++              canonical,
++              clientId,
++            );
+             break;
+           }
+-          const closeMeta = result.closedSession
+-            ? {
+-                closedContainerId: result.closedSession.containerId || null,
+-                closedSession: result.closedSession,
+-                closedReason: result.autoClosedReason || null,
+-              }
+-            : {};
+-          sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
+-            granted: result.granted,
+-            session: result.session,
+-            ...closeMeta,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
++          const closeMeta = {
++            ...(result.emptiedNodeContainerId
++              ? { emptiedNodeContainerId: result.emptiedNodeContainerId }
++              : {}),
++            ...(result.closedSession
++              ? {
++                  closedContainerId: result.closedSession.containerId || null,
++                  closedSession: result.closedSession,
++                  closedReason: result.autoClosedReason || null,
++                }
++              : {}),
++          };
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_LOOT_TAKE,
++            sanitizeSessionPayloadForClient(result.room, {
++              granted: result.granted,
++              session: result.session,
++              ...closeMeta,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, null, {
+             session: result.session,
+             ...closeMeta,
+           });
+@@ -644,27 +718,40 @@ const attachRoomWebSocketServer = (httpServer, {
+             sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+             break;
+           }
++          const roomRef = registry.getRoom(canonical);
+           const result = registry.tradeCommit({
+             code: canonical,
+             clientId,
+             payload,
+           });
+           if (result.error) {
+-            sendEnvelope(ws, MESSAGE.ERROR, {
+-              code: result.error,
+-              merchantCaps: result.merchantCaps,
+-              owedCaps: result.owedCaps,
+-              session: result.session || null,
+-              requestId: payload.requestId || null,
+-            }, canonical, clientId);
++            sendEnvelope(
++              ws,
++              MESSAGE.ERROR,
++              sanitizeSessionPayloadForClient(roomRef, {
++                code: result.error,
++                merchantCaps: result.merchantCaps,
++                owedCaps: result.owedCaps,
++                session: result.session || null,
++                requestId: payload.requestId || null,
++              }, clientId),
++              canonical,
++              clientId,
++            );
+             break;
+           }
+-          sendEnvelope(ws, MESSAGE.SESSION_TRADE_COMMIT, {
+-            committed: result.committed,
+-            session: result.session,
+-            requestId: payload.requestId || null,
+-          }, canonical, clientId);
+-          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
++          sendEnvelope(
++            ws,
++            MESSAGE.SESSION_TRADE_COMMIT,
++            sanitizeSessionPayloadForClient(result.room, {
++              committed: result.committed,
++              session: result.session,
++              requestId: payload.requestId || null,
++            }, clientId),
++            canonical,
++            clientId,
++          );
++          broadcastSessionState(result.room, null, {
+             session: result.session,
+           });
+           break;
+@@ -685,7 +772,7 @@ const attachRoomWebSocketServer = (httpServer, {
+         if (left && room) {
+           broadcastMembers(room, ws.meta.clientId);
+           if (closedSession) {
+-            broadcastToRoom(room, ws.meta.clientId, MESSAGE.SESSION_STATE, {
++            broadcastSessionState(room, ws.meta.clientId, {
+               session: null,
+               closedContainerId: closedSession.containerId || null,
+               closedSession,
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index ea0059a..9e6fadb 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -49,12 +49,115 @@ export const startGmSessionPersistence = () => {
+       if (!room || room.role !== 'gm') return;
+ 
+       const closedReason = envelope?.payload?.closedReason || null;
++      const emptiedNodeContainerId = envelope?.payload?.emptiedNodeContainerId || null;
+       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
+       if (!session?.containerId) return;
+ 
+       const existing = await db.getGmContainerById(session.containerId);
+       if (!existing) return;
+ 
++      if (session.kind === 'hub' && existing.kind === 'hub') {
++        const nodes = Array.isArray(session.nodes) ? session.nodes : [];
++        const nodeById = new Map(nodes.map((n) => [n.containerId, n]));
++
++        // Синхронизируем флаги замков/подписей локации
++        const updatedLinks = (existing.links || []).map((lnk) => {
++          const liveNode = nodeById.get(lnk.containerId);
++          if (!liveNode) return lnk;
++          return {
++            ...lnk,
++            locked: Boolean(liveNode.locked),
++            lockLabel: liveNode.lockLabel !== undefined ? String(liveNode.lockLabel || '') : lnk.lockLabel,
++          };
++        });
++        await db.saveGmContainer({
++          ...existing,
++          links: updatedLinks,
++        });
++
++        // Синхронизируем каждый дочерний контейнер и каждого торговца локации в БД и Облако
++        for (const node of nodes) {
++          if (!node?.containerId) continue;
++          const childExisting = await db.getGmContainerById(node.containerId);
++          if (!childExisting) continue;
++          await db.saveGmContainer({
++            ...childExisting,
++            items: Array.isArray(node.items) ? node.items : childExisting.items,
++            caps: childExisting.kind === 'merchant' && node.caps !== undefined
++              ? node.caps
++              : childExisting.caps,
++            saleMarkupPercent: childExisting.kind === 'merchant' && node.saleMarkupPercent !== undefined
++              ? node.saleMarkupPercent
++              : childExisting.saleMarkupPercent,
++            buyDepreciationPercent: childExisting.kind === 'merchant' && node.buyDepreciationPercent !== undefined
++              ? node.buyDepreciationPercent
++              : childExisting.buyDepreciationPercent,
++          });
++          void syncGmContainerToCloudIfEnabled(childExisting.id);
++        }
++
++        notifyGmContainerUpdated(existing.id);
++        void syncGmContainerToCloudIfEnabled(existing.id);
++
++        if (emptiedNodeContainerId) {
++          const emptiedKey = `hub:${session.sessionId}:${emptiedNodeContainerId}:${session.revision || 0}`;
++          const emptiedChild = await db.getGmContainerById(emptiedNodeContainerId);
++          if (
++            emptiedChild
++            && emptiedChild.kind === 'loot'
++            && !promptedEmptySessionIds.has(emptiedKey)
++          ) {
++            promptedEmptySessionIds.add(emptiedKey);
++            showRawAlert({
++              title: tLootTrade('detail.emptyLootPromptTitle'),
++              message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
++                name: emptiedChild.name,
++              }),
++              buttons: [
++                { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
++                {
++                  text: tLootTrade('card.delete'),
++                  style: 'destructive',
++                  onPress: () => {
++                    void (async () => {
++                      try {
++                        await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
++                        await db.deleteGmContainer(emptiedChild.id);
++                        const freshHub = await db.getGmContainerById(existing.id);
++                        if (freshHub && freshHub.kind === 'hub') {
++                          const prunedLinks = (freshHub.links || []).filter(
++                            (l) => l.containerId !== emptiedChild.id,
++                          );
++                          await db.saveGmContainer({ ...freshHub, links: prunedLinks });
++                          void syncGmContainerToCloudIfEnabled(freshHub.id);
++                          const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
++                          if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
++                            const prunedNodes = (liveNow.nodes || []).filter(
++                              (n) => n.containerId !== emptiedChild.id,
++                            );
++                            await useRoomStore.getState().updateRoomSessionRates({
++                              code,
++                              sessionId: liveNow.sessionId,
++                              nodes: prunedNodes,
++                            }).catch(() => {});
++                          }
++                        }
++                        notifyGmContainerUpdated(emptiedChild.id);
++                      } catch (err) {
++                        debugLog('gm.sessionPersistence.deleteEmptyHubChild:failed', {
++                          message: err?.message || String(err),
++                        });
++                      }
++                    })();
++                  },
++                },
++              ],
++            });
++          }
++        }
++        return;
++      }
++
+       const nextContainer = {
+         ...existing,
+         items: Array.isArray(session.items) ? session.items : existing.items,
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 59a2ab5..1a70ede 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -39,6 +39,7 @@ export const ROOM_ERROR = {
+   UNKNOWN_TYPE: 'UNKNOWN_TYPE',
+   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
+   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
++  CONTAINER_LOCKED: 'CONTAINER_LOCKED',
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
+@@ -56,10 +57,28 @@ export interface ActiveLootTradeItem {
+   itemSnapshot?: Record<string, unknown> | null;
+ }
+ 
++export interface ActiveHubChildNode {
++  containerId: string;
++  kind: 'loot' | 'merchant';
++  name: string;
++  description: string;
++  locked: boolean;
++  lockLabel: string;
++  hasItemsHint?: boolean;
++  caps: number;
++  saleMarkupPercent: number;
++  buyDepreciationPercent: number;
++  characterOverrides: Record<string, {
++    saleMarkupPercent?: number;
++    buyDepreciationPercent?: number;
++  }>;
++  items: ActiveLootTradeItem[];
++}
++
+ export interface ActiveLootTradeSession {
+   sessionId: string;
+   containerId: string;
+-  kind: 'loot' | 'merchant';
++  kind: 'loot' | 'merchant' | 'hub';
+   name: string;
+   description: string;
+   targetType: 'room' | 'character';
+@@ -73,6 +92,7 @@ export interface ActiveLootTradeSession {
+     buyDepreciationPercent?: number;
+   }>;
+   items: ActiveLootTradeItem[];
++  nodes?: ActiveHubChildNode[];
+   closedByClientIds?: string[];
+   revision: number;
+   openedAt: number;
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 2920ffb..b0b4655 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -92,6 +92,13 @@ interface RoomStoreState {
+     items?: unknown[];
+     name?: string;
+     description?: string;
++    nodes?: unknown[];
++    nodeContainerId?: string | null;
++    nodeName?: string;
++    nodeDescription?: string;
++    nodeItems?: unknown[];
++    locked?: boolean;
++    lockLabel?: string;
+   }) => Promise<ActiveLootTradeSession>;
+   closeRoomSession: (input: {
+     code: string;
+@@ -109,6 +116,7 @@ interface RoomStoreState {
+     sessionId: string;
+     characterId: string;
+     takes: Array<{ entryId: string; quantity: number }>;
++    nodeContainerId?: string | null;
+   }) => Promise<{
+     granted: any[];
+     session: ActiveLootTradeSession | null;
+@@ -123,6 +131,7 @@ interface RoomStoreState {
+     acceptCapShortfall?: boolean;
+     buyItems: Array<{ entryId: string; quantity: number }>;
+     sellItems: Array<Record<string, unknown>>;
++    nodeContainerId?: string | null;
+   }) => Promise<{ committed: any; session: ActiveLootTradeSession }>;
+ }
+ 
+@@ -595,10 +604,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       }
+     },
+ 
+-    takeFromLootSession: async ({ code, sessionId, characterId, takes }) => {
++    takeFromLootSession: async ({ code, sessionId, characterId, takes, nodeContainerId = null }) => {
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_LOOT_TAKE,
+-        { code, sessionId, characterId, takes },
++        {
++          code,
++          sessionId,
++          characterId,
++          takes,
++          ...(nodeContainerId ? { nodeContainerId } : {}),
++        },
+         code,
+       );
+       return {
+@@ -617,6 +632,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       acceptCapShortfall = false,
+       buyItems,
+       sellItems,
++      nodeContainerId = null,
+     }) => {
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_TRADE_COMMIT,
+@@ -629,6 +645,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           acceptCapShortfall,
+           buyItems,
+           sellItems,
++          ...(nodeContainerId ? { nodeContainerId } : {}),
+         },
+         code,
+       );
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index f6c3100..8007a7b 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -118,6 +118,9 @@ const styles = StyleSheet.create({
+   cardHeroMerchant: {
+     backgroundColor: '#2d2a1e',
+   },
++  cardHeroHub: {
++    backgroundColor: '#252b22',
++  },
+   cardLiveBadge: {
+     position: 'absolute',
+     top: 5,
+@@ -551,6 +554,73 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+     fontSize: 12,
+   },
++  hubChildRow: {
++    paddingVertical: 11,
++    paddingHorizontal: 13,
++    borderBottomWidth: 1,
++    borderBottomColor: '#e0e0e0',
++    backgroundColor: '#ffffff',
++  },
++  hubChildTopLine: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  hubLockChip: {
++    paddingHorizontal: 10,
++    paddingVertical: 5,
++    borderRadius: 5,
++    borderWidth: 1,
++  },
++  hubLockChipUnlocked: {
++    backgroundColor: '#e8f2e6',
++    borderColor: '#7cb372',
++  },
++  hubLockChipLocked: {
++    backgroundColor: '#f7e4df',
++    borderColor: '#d48272',
++  },
++  hubLockChipTextUnlocked: {
++    color: '#235c1e',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  hubLockChipTextLocked: {
++    color: '#8e2b1d',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  hubLockNoteInput: {
++    marginTop: 8,
++    backgroundColor: '#f7f5ee',
++    borderWidth: 1,
++    borderColor: '#c9bf97',
++    borderRadius: 5,
++    paddingHorizontal: 10,
++    paddingVertical: 7,
++    fontSize: 12,
++    color: '#222222',
++  },
++  liveLockChipLocked: {
++    backgroundColor: '#4a1f1f',
++    borderColor: '#e57373',
++  },
++  liveLockChipUnlocked: {
++    backgroundColor: '#233624',
++    borderColor: '#81c784',
++  },
++  liveLockChipTextLocked: {
++    color: '#f5bcbc',
++    fontSize: 11,
++    fontWeight: '700',
++  },
++  liveLockChipTextUnlocked: {
++    color: '#c8e6c9',
++    fontSize: 11,
++    fontWeight: '700',
++  },
+ });
+ 
+ export default styles;

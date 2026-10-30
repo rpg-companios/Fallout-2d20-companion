@@ -118,6 +118,9 @@ const styles = StyleSheet.create({
   cardHeroMerchant: {
     backgroundColor: '#2d2a1e',
   },
+  cardHeroHub: {
+    backgroundColor: '#252b22',
+  },
   cardLiveBadge: {
     position: 'absolute',
     top: 5,
@@ -550,6 +553,73 @@ const styles = StyleSheet.create({
     color: '#9e2a2a',
     fontWeight: '700',
     fontSize: 12,
+  },
+  hubChildRow: {
+    paddingVertical: 11,
+    paddingHorizontal: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#ffffff',
+  },
+  hubChildTopLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hubLockChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  hubLockChipUnlocked: {
+    backgroundColor: '#e8f2e6',
+    borderColor: '#7cb372',
+  },
+  hubLockChipLocked: {
+    backgroundColor: '#f7e4df',
+    borderColor: '#d48272',
+  },
+  hubLockChipTextUnlocked: {
+    color: '#235c1e',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hubLockChipTextLocked: {
+    color: '#8e2b1d',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hubLockNoteInput: {
+    marginTop: 8,
+    backgroundColor: '#f7f5ee',
+    borderWidth: 1,
+    borderColor: '#c9bf97',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    color: '#222222',
+  },
+  liveLockChipLocked: {
+    backgroundColor: '#4a1f1f',
+    borderColor: '#e57373',
+  },
+  liveLockChipUnlocked: {
+    backgroundColor: '#233624',
+    borderColor: '#81c784',
+  },
+  liveLockChipTextLocked: {
+    color: '#f5bcbc',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  liveLockChipTextUnlocked: {
+    color: '#c8e6c9',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 

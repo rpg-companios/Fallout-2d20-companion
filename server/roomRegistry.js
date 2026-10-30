@@ -163,7 +163,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     let closedSession = null;
     let closedReason = null;
     const current = room.activeSession;
-    if (left && current) {
+    // Локацию ('hub') закрывает только сам Мастер — уход игроков её не гасит.
+    if (left && current && current.kind !== 'hub') {
       const closedSet = new Set(current.closedByClientIds || []);
       const hadPreviousCloseOrEmpty =
         closedSet.size > 0 || (current.kind === 'loot' && current.items.length === 0);
@@ -268,6 +269,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (sessionId && current.sessionId !== String(sessionId)) {
       return { room, session: current, closedSession: null, closedReason: null };
     }
+    // Локацию ('hub') может закрыть только Мастер; игроки закрывают лишь вложенные окна внутри неё.
+    if (current.kind === 'hub') {
+      return { room, session: current, closedSession: null, closedReason: null };
+    }
 
     const closedSet = new Set(current.closedByClientIds || []);
     closedSet.add(clientId);
@@ -353,7 +358,12 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     }
 
     room.activeSession = result.session;
-    return { room, granted: result.granted, session: result.session };
+    return {
+      room,
+      granted: result.granted,
+      emptiedNodeContainerId: result.emptiedNodeContainerId || null,
+      session: result.session,
+    };
   };
 
   /** Атомарная бартерная сделка игрока с торговцем. */

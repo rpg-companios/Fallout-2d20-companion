@@ -92,6 +92,13 @@ interface RoomStoreState {
     items?: unknown[];
     name?: string;
     description?: string;
+    nodes?: unknown[];
+    nodeContainerId?: string | null;
+    nodeName?: string;
+    nodeDescription?: string;
+    nodeItems?: unknown[];
+    locked?: boolean;
+    lockLabel?: string;
   }) => Promise<ActiveLootTradeSession>;
   closeRoomSession: (input: {
     code: string;
@@ -109,6 +116,7 @@ interface RoomStoreState {
     sessionId: string;
     characterId: string;
     takes: Array<{ entryId: string; quantity: number }>;
+    nodeContainerId?: string | null;
   }) => Promise<{
     granted: any[];
     session: ActiveLootTradeSession | null;
@@ -123,6 +131,7 @@ interface RoomStoreState {
     acceptCapShortfall?: boolean;
     buyItems: Array<{ entryId: string; quantity: number }>;
     sellItems: Array<Record<string, unknown>>;
+    nodeContainerId?: string | null;
   }) => Promise<{ committed: any; session: ActiveLootTradeSession }>;
 }
 
@@ -595,10 +604,16 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       }
     },
 
-    takeFromLootSession: async ({ code, sessionId, characterId, takes }) => {
+    takeFromLootSession: async ({ code, sessionId, characterId, takes, nodeContainerId = null }) => {
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_LOOT_TAKE,
-        { code, sessionId, characterId, takes },
+        {
+          code,
+          sessionId,
+          characterId,
+          takes,
+          ...(nodeContainerId ? { nodeContainerId } : {}),
+        },
         code,
       );
       return {
@@ -617,6 +632,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       acceptCapShortfall = false,
       buyItems,
       sellItems,
+      nodeContainerId = null,
     }) => {
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_TRADE_COMMIT,
@@ -629,6 +645,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           acceptCapShortfall,
           buyItems,
           sellItems,
+          ...(nodeContainerId ? { nodeContainerId } : {}),
         },
         code,
       );

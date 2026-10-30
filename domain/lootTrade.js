@@ -25,6 +25,7 @@ export {
 export const CONTAINER_KIND = Object.freeze({
   LOOT: 'loot',
   MERCHANT: 'merchant',
+  HUB: 'hub',
 });
 
 export const QUANTITY_UNIT = Object.freeze({
@@ -217,14 +218,89 @@ export const normalizeContainerItem = (raw, now = Date.now()) => {
 };
 
 /**
- * Нормализация контейнера добычи или торговца.
+ * Нормализация одной ссылки на вложенный контейнер/торговца внутри локации ('hub').
+ */
+export const normalizeHubLink = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const containerId = String(raw.containerId || raw.id || '').trim();
+  if (!containerId) return null;
+  return {
+    containerId,
+    locked: Boolean(raw.locked),
+    lockLabel: String(raw.lockLabel || '').trim(),
+  };
+};
+
+export const normalizeHubLinks = (rawLinks = []) => {
+  if (!Array.isArray(rawLinks)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of rawLinks) {
+    const link = normalizeHubLink(raw);
+    if (!link || seen.has(link.containerId)) continue;
+    seen.add(link.containerId);
+    out.push(link);
+  }
+  return out;
+};
+
+/**
+ * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
+ * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
+ */
+export const buildHubSessionNodes = (hub, allContainers = []) => {
+  if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
+  const byId = new Map(
+    (Array.isArray(allContainers) ? allContainers : [])
+      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .map((c) => [c.id, c]),
+  );
+  const links = normalizeHubLinks(hub.links);
+  const nodes = [];
+  for (const link of links) {
+    const child = byId.get(link.containerId);
+    if (!child) continue;
+    nodes.push({
+      containerId: child.id,
+      kind: child.kind,
+      name: child.name,
+      description: child.description || '',
+      locked: Boolean(link.locked),
+      lockLabel: link.lockLabel || '',
+      caps: child.kind === CONTAINER_KIND.MERCHANT ? normalizeCapsAmount(child.caps, 0) : 0,
+      saleMarkupPercent: child.kind === CONTAINER_KIND.MERCHANT
+        ? normalizeSaleMarkupPercent(child.saleMarkupPercent, 0)
+        : 0,
+      buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
+        ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
+        : DEFAULT_BUY_DEPRECIATION_PERCENT,
+      characterOverrides: {},
+      items: Array.isArray(child.items)
+        ? child.items.map((entry) => ({
+            ...entry,
+            itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+          }))
+        : [],
+    });
+  }
+  return nodes;
+};
+
+/**
+ * Нормализация контейнера добычи, торговца или локации ('hub').
  */
 export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
-  const kind = raw.kind === CONTAINER_KIND.MERCHANT
-    ? CONTAINER_KIND.MERCHANT
-    : CONTAINER_KIND.LOOT;
-  const items = Array.isArray(raw.items)
-    ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
+  let kind = CONTAINER_KIND.LOOT;
+  if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
+  else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
+
+  const items = kind === CONTAINER_KIND.HUB
+    ? []
+    : (Array.isArray(raw.items)
+        ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
+        : []);
+  const links = kind === CONTAINER_KIND.HUB
+    ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
     : [];
 
   return {
@@ -244,6 +320,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
       : DEFAULT_BUY_DEPRECIATION_PERCENT,
     items,
+    links,
     createdAt: Number(raw.createdAt) || now,
     updatedAt: Number(raw.updatedAt) || now,
   };
@@ -512,6 +589,7 @@ export const duplicateContainerEntity = (
       entryId: makeEntryId(now + index + 1),
       itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
     })),
+    links: (normalized.links || []).map((lnk) => ({ ...lnk })),
     createdAt: now,
     updatedAt: now,
   };

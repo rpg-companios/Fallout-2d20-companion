@@ -12,6 +12,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { PROTOCOL_VERSION, MESSAGE, ERROR_CODE, LIMITS } = require('./protocol');
 const { createRoomRegistry } = require('./roomRegistry');
+const { sanitizeSessionForMember } = require('./lootTradeSession');
 const { toCanonicalRoomCode } = require('./roomCode');
 
 // Совместимость ws@6/7 (экспортирует ws.Server, где ws.WebSocketServer === undefined,
@@ -292,6 +293,32 @@ const attachRoomWebSocketServer = (httpServer, {
     }
   };
 
+  const sanitizeSessionPayloadForClient = (room, payload, targetClientId) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    const isGm = Boolean(room && room.ownerClientId === targetClientId);
+    const out = { ...payload };
+    if ('session' in out && out.session) {
+      out.session = sanitizeSessionForMember(out.session, { isGm });
+    }
+    if ('closedSession' in out && out.closedSession) {
+      out.closedSession = sanitizeSessionForMember(out.closedSession, { isGm });
+    }
+    return out;
+  };
+
+  const broadcastSessionState = (room, exceptClientId, basePayload) => {
+    for (const member of room.members.values()) {
+      if (member.clientId === exceptClientId || !member.ws) continue;
+      sendEnvelope(
+        member.ws,
+        MESSAGE.SESSION_STATE,
+        sanitizeSessionPayloadForClient(room, basePayload, member.clientId),
+        room.code,
+        member.clientId,
+      );
+    }
+  };
+
   const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
       ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
@@ -404,7 +431,12 @@ const attachRoomWebSocketServer = (httpServer, {
             break;
           }
           ws.meta.rooms.add(canonical);
-          sendEnvelope(ws, MESSAGE.ROOM_STATE, { ...result.state, requestId: payload.requestId || null }, canonical, clientId);
+          const isJoiningGm = result.room.ownerClientId === clientId;
+          sendEnvelope(ws, MESSAGE.ROOM_STATE, {
+            ...result.state,
+            activeSession: sanitizeSessionForMember(result.state.activeSession, { isGm: isJoiningGm }),
+            requestId: payload.requestId || null,
+          }, canonical, clientId);
           broadcastMembers(result.room, clientId);
           break;
         }
@@ -417,7 +449,7 @@ const attachRoomWebSocketServer = (httpServer, {
           if (left && room) {
             broadcastMembers(room, clientId);
             if (closedSession) {
-              broadcastToRoom(room, clientId, MESSAGE.SESSION_STATE, {
+              broadcastSessionState(room, clientId, {
                 session: null,
                 closedContainerId: closedSession.containerId || null,
                 closedSession,
@@ -502,11 +534,17 @@ const attachRoomWebSocketServer = (httpServer, {
             sendError(ws, clientId, result.error, payload.requestId, canonical);
             break;
           }
-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
-            session: result.session,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_STATE,
+            sanitizeSessionPayloadForClient(result.room, {
+              session: result.session,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, clientId, {
             session: result.session,
           });
           break;
@@ -527,11 +565,17 @@ const attachRoomWebSocketServer = (httpServer, {
             sendError(ws, clientId, result.error, payload.requestId, canonical);
             break;
           }
-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
-            session: result.session,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_STATE,
+            sanitizeSessionPayloadForClient(result.room, {
+              session: result.session,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, clientId, {
             session: result.session,
           });
           break;
@@ -557,11 +601,17 @@ const attachRoomWebSocketServer = (httpServer, {
             closedContainerId: result.closedSession?.containerId || null,
             closedSession: result.closedSession || null,
           };
-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
-            ...closePayload,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, closePayload);
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_STATE,
+            sanitizeSessionPayloadForClient(result.room, {
+              ...closePayload,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, clientId, closePayload);
           break;
         }
 
@@ -587,12 +637,18 @@ const attachRoomWebSocketServer = (httpServer, {
                 closedReason: result.closedReason || null,
               }
             : {};
-          sendEnvelope(ws, MESSAGE.SESSION_STATE, {
-            session: result.session,
-            ...closeMeta,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, clientId, MESSAGE.SESSION_STATE, {
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_STATE,
+            sanitizeSessionPayloadForClient(result.room, {
+              session: result.session,
+              ...closeMeta,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, clientId, {
             session: result.session,
             ...closeMeta,
           });
@@ -605,33 +661,51 @@ const attachRoomWebSocketServer = (httpServer, {
             sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
             break;
           }
+          const roomRef = registry.getRoom(canonical);
           const result = registry.lootTake({
             code: canonical,
             clientId,
             payload,
           });
           if (result.error) {
-            sendEnvelope(ws, MESSAGE.ERROR, {
-              code: result.error,
-              requestId: payload.requestId || null,
-              session: result.session || null,
-            }, canonical, clientId);
+            sendEnvelope(
+              ws,
+              MESSAGE.ERROR,
+              sanitizeSessionPayloadForClient(roomRef, {
+                code: result.error,
+                requestId: payload.requestId || null,
+                session: result.session || null,
+              }, clientId),
+              canonical,
+              clientId,
+            );
             break;
           }
-          const closeMeta = result.closedSession
-            ? {
-                closedContainerId: result.closedSession.containerId || null,
-                closedSession: result.closedSession,
-                closedReason: result.autoClosedReason || null,
-              }
-            : {};
-          sendEnvelope(ws, MESSAGE.SESSION_LOOT_TAKE, {
-            granted: result.granted,
-            session: result.session,
-            ...closeMeta,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+          const closeMeta = {
+            ...(result.emptiedNodeContainerId
+              ? { emptiedNodeContainerId: result.emptiedNodeContainerId }
+              : {}),
+            ...(result.closedSession
+              ? {
+                  closedContainerId: result.closedSession.containerId || null,
+                  closedSession: result.closedSession,
+                  closedReason: result.autoClosedReason || null,
+                }
+              : {}),
+          };
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_LOOT_TAKE,
+            sanitizeSessionPayloadForClient(result.room, {
+              granted: result.granted,
+              session: result.session,
+              ...closeMeta,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, null, {
             session: result.session,
             ...closeMeta,
           });
@@ -644,27 +718,40 @@ const attachRoomWebSocketServer = (httpServer, {
             sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
             break;
           }
+          const roomRef = registry.getRoom(canonical);
           const result = registry.tradeCommit({
             code: canonical,
             clientId,
             payload,
           });
           if (result.error) {
-            sendEnvelope(ws, MESSAGE.ERROR, {
-              code: result.error,
-              merchantCaps: result.merchantCaps,
-              owedCaps: result.owedCaps,
-              session: result.session || null,
-              requestId: payload.requestId || null,
-            }, canonical, clientId);
+            sendEnvelope(
+              ws,
+              MESSAGE.ERROR,
+              sanitizeSessionPayloadForClient(roomRef, {
+                code: result.error,
+                merchantCaps: result.merchantCaps,
+                owedCaps: result.owedCaps,
+                session: result.session || null,
+                requestId: payload.requestId || null,
+              }, clientId),
+              canonical,
+              clientId,
+            );
             break;
           }
-          sendEnvelope(ws, MESSAGE.SESSION_TRADE_COMMIT, {
-            committed: result.committed,
-            session: result.session,
-            requestId: payload.requestId || null,
-          }, canonical, clientId);
-          broadcastToRoom(result.room, null, MESSAGE.SESSION_STATE, {
+          sendEnvelope(
+            ws,
+            MESSAGE.SESSION_TRADE_COMMIT,
+            sanitizeSessionPayloadForClient(result.room, {
+              committed: result.committed,
+              session: result.session,
+              requestId: payload.requestId || null,
+            }, clientId),
+            canonical,
+            clientId,
+          );
+          broadcastSessionState(result.room, null, {
             session: result.session,
           });
           break;
@@ -685,7 +772,7 @@ const attachRoomWebSocketServer = (httpServer, {
         if (left && room) {
           broadcastMembers(room, ws.meta.clientId);
           if (closedSession) {
-            broadcastToRoom(room, ws.meta.clientId, MESSAGE.SESSION_STATE, {
+            broadcastSessionState(room, ws.meta.clientId, {
               session: null,
               closedContainerId: closedSession.containerId || null,
               closedSession,

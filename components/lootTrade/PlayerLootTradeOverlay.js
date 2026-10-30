@@ -76,6 +76,7 @@ export default function PlayerLootTradeOverlay() {
   const [bindings, setBindings] = useState([]); // [{ characterId, code, name }]
   const [minimizedSessionId, setMinimizedSessionId] = useState(null);
   const [closedSessionIds, setClosedSessionIds] = useState({}); // { [sessionId]: true }
+  const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
 
@@ -152,22 +153,45 @@ export default function PlayerLootTradeOverlay() {
   }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
 
   const activeSession = matchedContext?.session || null;
+  const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
+
+  const selectedHubNode = useMemo(() => {
+    if (!isHubSession || !selectedHubNodeId) return null;
+    const found = (activeSession?.nodes || []).find(
+      (n) => n.containerId === selectedHubNodeId && !n.locked,
+    );
+    return found || null;
+  }, [isHubSession, activeSession?.nodes, selectedHubNodeId]);
+
+  // Активный объект просмотра: либо прямая сессия (loot / merchant), либо открытый узел внутри Локации
+  const viewTarget = isHubSession ? selectedHubNode : activeSession;
+  const isInsideHub = Boolean(isHubSession && selectedHubNode);
 
   // При открытии новой сессии очищаем старый буфер и разворачиваем модалку
   useEffect(() => {
     setBuyBuffer({});
     setSellBuffer({});
+    setSelectedHubNodeId(null);
     setMinimizedSessionId(null);
     setMobileTab('merchant');
   }, [activeSession?.sessionId]);
 
+  // Если Мастер вживую запер или удалил открытый игроком узел в Локации — возвращаем в список Локации
+  useEffect(() => {
+    if (isHubSession && selectedHubNodeId && !selectedHubNode) {
+      setSelectedHubNodeId(null);
+      setBuyBuffer({});
+      setSellBuffer({});
+    }
+  }, [isHubSession, selectedHubNodeId, selectedHubNode]);
+
   // Автоподрезка буфера покупки, если остаток в лавке уменьшился (купил другой игрок)
   useEffect(() => {
-    if (!activeSession || activeSession.kind !== CONTAINER_KIND.MERCHANT) return;
+    if (!viewTarget || viewTarget.kind !== CONTAINER_KIND.MERCHANT) return;
     setBuyBuffer((prev) => {
       let changed = false;
       const next = {};
-      const byId = Object.fromEntries((activeSession.items || []).map((it) => [it.entryId, it]));
+      const byId = Object.fromEntries((viewTarget.items || []).map((it) => [it.entryId, it]));
       for (const [entryId, qty] of Object.entries(prev)) {
         const avail = Math.max(0, Math.floor(Number(byId[entryId]?.quantity) || 0));
         const clamped = Math.min(qty, avail);
@@ -176,26 +200,26 @@ export default function PlayerLootTradeOverlay() {
       }
       return changed ? next : prev;
     });
-  }, [activeSession?.revision]);
+  }, [activeSession?.revision, viewTarget?.containerId]);
 
   const sellablePlayerItems = useMemo(() => {
-    if (!matchedContext?.isCharacterLoaded || activeSession?.kind !== CONTAINER_KIND.MERCHANT) {
+    if (!matchedContext?.isCharacterLoaded || viewTarget?.kind !== CONTAINER_KIND.MERCHANT) {
       return [];
     }
     return getSellablePlayerInventoryItems(storeItems, moduleLocale);
-  }, [matchedContext?.isCharacterLoaded, activeSession?.kind, storeItems, moduleLocale]);
+  }, [matchedContext?.isCharacterLoaded, viewTarget?.kind, storeItems, moduleLocale]);
 
   const capCollectorPercent = Number(perkBonuses?.capCollectorDiscountPercent) || 0;
 
   const effectiveRates = useMemo(
-    () => getEffectiveMerchantRates(activeSession, matchedContext?.characterId),
-    [activeSession, matchedContext?.characterId],
+    () => getEffectiveMerchantRates(viewTarget, matchedContext?.characterId),
+    [viewTarget, matchedContext?.characterId],
   );
 
   const barterSummary = useMemo(() => {
-    if (!activeSession || activeSession.kind !== CONTAINER_KIND.MERCHANT) return null;
+    if (!viewTarget || viewTarget.kind !== CONTAINER_KIND.MERCHANT) return null;
     return computeBarterSummary({
-      merchantItems: activeSession.items || [],
+      merchantItems: viewTarget.items || [],
       playerItems: sellablePlayerItems,
       buyBuffer,
       sellBuffer,
@@ -203,11 +227,11 @@ export default function PlayerLootTradeOverlay() {
       buyDepreciationPercent: effectiveRates.buyDepreciationPercent,
       capCollectorPercent,
       playerCaps,
-      merchantCaps: activeSession.caps || 0,
+      merchantCaps: viewTarget.caps || 0,
       resolvePlayerItemCatalogCost: (pItem) => pItem.cost,
     });
   }, [
-    activeSession,
+    viewTarget,
     sellablePlayerItems,
     buyBuffer,
     sellBuffer,
@@ -219,6 +243,11 @@ export default function PlayerLootTradeOverlay() {
   if (isGmMode || !matchedContext || !activeSession) return null;
 
   const isMinimized = minimizedSessionId === activeSession.sessionId;
+  const minimizedTitleKey = activeSession.kind === CONTAINER_KIND.HUB
+    ? 'player.minimizedHub'
+    : (activeSession.kind === CONTAINER_KIND.MERCHANT
+      ? 'player.minimizedMerchant'
+      : 'player.minimizedLoot');
 
   // Если привязанный персонаж ещё не открыт (например, игрок стоит в Менеджере персонажей) —
   // показываем компактную кнопку быстрого открытия этого персонажа и окна выдачи.
@@ -233,14 +262,7 @@ export default function PlayerLootTradeOverlay() {
           }}
         >
           <Text style={styles.floatingPillTitle}>
-            {formatLootTrade(
-              tLootTrade(
-                activeSession.kind === CONTAINER_KIND.MERCHANT
-                  ? 'player.minimizedMerchant'
-                  : 'player.minimizedLoot',
-              ),
-              { name: activeSession.name },
-            )}
+            {formatLootTrade(tLootTrade(minimizedTitleKey), { name: activeSession.name })}
           </Text>
           <Text style={styles.floatingPillAction}>
             {formatLootTrade(tLootTrade('player.openForBoundChar'), {
@@ -260,27 +282,159 @@ export default function PlayerLootTradeOverlay() {
           onPress={() => setMinimizedSessionId(null)}
         >
           <Text style={styles.floatingPillTitle}>
-            {formatLootTrade(
-              tLootTrade(
-                activeSession.kind === CONTAINER_KIND.MERCHANT
-                  ? 'player.minimizedMerchant'
-                  : 'player.minimizedLoot',
-              ),
-              { name: activeSession.name },
-            )}
+            {formatLootTrade(tLootTrade(minimizedTitleKey), { name: activeSession.name })}
           </Text>
         </TouchableOpacity>
       </View>
     );
   }
 
+  // ── Рендер ВНЕШНЕГО ОКНА ЛОКАЦИИ (закрыть его может ТОЛЬКО Мастер!) ───────
+  if (isHubSession && !viewTarget) {
+    const hubNodes = activeSession.nodes || [];
+    return (
+      <Modal
+        visible
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+      >
+        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+          <View style={styles.lootModalCard}>
+            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+              <View style={styles.modalTitleRow}>
+                <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
+                <Text style={styles.modalTitle}>{activeSession.name}</Text>
+              </View>
+              <View style={styles.headerActionsRow}>
+                {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
+                <TouchableOpacity
+                  style={styles.minimizeBtn}
+                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+                >
+                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {Boolean(activeSession.description) && (
+              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+                {activeSession.description}
+              </IconText>
+            )}
+
+            <ScrollView
+              style={styles.lootScroll}
+              contentContainerStyle={styles.lootScrollContent}
+            >
+              {hubNodes.length === 0 ? (
+                <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+              ) : (
+                hubNodes.map((node) => {
+                  const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+                  const nodeLocked = Boolean(node.locked);
+                  const piecesCount = (node.items || []).reduce(
+                    (sum, entry) => sum + (Number(entry.quantity) || 0),
+                    0,
+                  );
+
+                  return (
+                    <View
+                      key={node.containerId}
+                      style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
+                    >
+                      <View style={styles.lootRowInfo}>
+                        <View style={styles.hubNodeTitleRow}>
+                          <MaterialCommunityIcons
+                            name={nodeLocked ? 'lock' : (nodeIsMerch ? 'sack' : 'treasure-chest')}
+                            size={19}
+                            color={nodeLocked ? '#e57373' : '#f0e68c'}
+                          />
+                          <Text style={[
+                            styles.lootRowTitle,
+                            nodeLocked && styles.hubNodeTitleLocked,
+                          ]}>
+                            {node.name}
+                          </Text>
+                        </View>
+
+                        {Boolean(node.description) && (
+                          <IconText style={styles.lootRowSub}>{node.description}</IconText>
+                        )}
+
+                        {nodeLocked ? (
+                          <Text style={styles.hubLockedHintText}>
+                            {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                          </Text>
+                        ) : nodeIsMerch ? (
+                          <IconText style={styles.hubUnlockedMetaText}>
+                            {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
+                          </IconText>
+                        ) : (
+                          <Text style={styles.hubUnlockedMetaText}>
+                            {piecesCount > 0
+                              ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
+                              : tLootTrade('player.hubNodeEmptyLoot')}
+                          </Text>
+                        )}
+                      </View>
+
+                      <View style={styles.lootRowBtns}>
+                        {nodeLocked ? (
+                          <View style={styles.hubLockedBadge}>
+                            <Text style={styles.hubLockedBadgeText}>
+                              {tLootTrade('player.hubNodeLockedBadge')}
+                            </Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.takeAllRowBtn}
+                            onPress={() => {
+                              setBuyBuffer({});
+                              setSellBuffer({});
+                              setMobileTab('merchant');
+                              setSelectedHubNodeId(node.containerId);
+                            }}
+                          >
+                            <Text style={styles.takeAllRowBtnText}>
+                              {tLootTrade(
+                                nodeIsMerch
+                                  ? 'player.hubNodeOpenMerchant'
+                                  : 'player.hubNodeOpenLoot',
+                              )}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <Text style={styles.hubMasterClosesHint}>
+              {tLootTrade('player.hubMasterClosesHint')}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
   // ── Обработчики КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────────
 
+  const returnToHubList = () => {
+    setSelectedHubNodeId(null);
+    setBuyBuffer({});
+    setSellBuffer({});
+  };
+
   const handleTakeLoot = async (takes) => {
-    if (busy || !takes.length || !activeSession || !matchedContext) return;
+    if (busy || !takes.length || !activeSession || !viewTarget || !matchedContext) return;
     const targetSessionId = activeSession.sessionId;
     const targetRoomCode = matchedContext.roomCode;
     const targetCharacterId = matchedContext.characterId;
+    const nodeContainerId = isInsideHub ? viewTarget.containerId : null;
     setBusy(true);
     try {
       const { granted, session: updatedSession, closedReason } =
@@ -289,6 +443,7 @@ export default function PlayerLootTradeOverlay() {
           sessionId: targetSessionId,
           characterId: targetCharacterId,
           takes,
+          nodeContainerId,
         });
       if (granted?.length) {
         grantLootEntriesToCharacter(granted);
@@ -297,26 +452,41 @@ export default function PlayerLootTradeOverlay() {
         }, 650);
       }
 
-      const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
-      const emptiedByThisTake =
-        Boolean(granted?.length)
-        && Array.isArray(updatedSession?.items)
-        && updatedSession.items.length === 0;
+      if (isInsideHub) {
+        const updatedNode = (updatedSession?.nodes || []).find(
+          (n) => n.containerId === nodeContainerId,
+        );
+        if (!updatedNode || (updatedNode.items || []).length === 0) {
+          returnToHubList();
+        }
+      } else {
+        const sessionClosedOnServer = !updatedSession || Boolean(closedReason);
+        const emptiedByThisTake =
+          Boolean(granted?.length)
+          && Array.isArray(updatedSession?.items)
+          && updatedSession.items.length === 0;
 
-      if (sessionClosedOnServer || emptiedByThisTake) {
-        markSessionClosedLocally(targetSessionId);
-        if (
-          updatedSession
-          && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
-        ) {
-          void useRoomStore.getState().playerCloseRoomSession({
-            code: targetRoomCode,
-            sessionId: targetSessionId,
-          }).catch(() => {});
+        if (sessionClosedOnServer || emptiedByThisTake) {
+          markSessionClosedLocally(targetSessionId);
+          if (
+            updatedSession
+            && (!myClientId || !updatedSession.closedByClientIds?.includes(myClientId))
+          ) {
+            void useRoomStore.getState().playerCloseRoomSession({
+              code: targetRoomCode,
+              sessionId: targetSessionId,
+            }).catch(() => {});
+          }
         }
       }
     } catch (error) {
-      debugLog('playerOverlay.lootTake:failed', { message: error?.message });
+      const code = error?.code || error?.message;
+      if (code === 'CONTAINER_LOCKED') {
+        showRawAlert({ title: tLootTrade('player.containerLockedError') });
+        if (isInsideHub) returnToHubList();
+      } else {
+        debugLog('playerOverlay.lootTake:failed', { message: error?.message });
+      }
     } finally {
       setBusy(false);
     }
@@ -324,6 +494,10 @@ export default function PlayerLootTradeOverlay() {
 
   const performPlayerSessionClose = async () => {
     if (!activeSession || !matchedContext) return;
+    if (isInsideHub) {
+      returnToHubList();
+      return;
+    }
     const targetSessionId = activeSession.sessionId;
     const targetRoomCode = matchedContext.roomCode;
     markSessionClosedLocally(targetSessionId);
@@ -340,8 +514,12 @@ export default function PlayerLootTradeOverlay() {
   };
 
   const handleCloseLootPress = () => {
-    if (busy || !activeSession) return;
-    const remainingCount = Array.isArray(activeSession.items) ? activeSession.items.length : 0;
+    if (busy || !viewTarget) return;
+    if (isInsideHub) {
+      returnToHubList();
+      return;
+    }
+    const remainingCount = Array.isArray(viewTarget.items) ? viewTarget.items.length : 0;
     if (remainingCount > 0) {
       showRawAlert({
         title: tLootTrade('player.closeLootConfirmTitle'),
@@ -363,7 +541,7 @@ export default function PlayerLootTradeOverlay() {
   };
 
   const handleCloseMerchantPress = () => {
-    if (busy || !activeSession) return;
+    if (busy || !viewTarget) return;
     if (barterSummary?.hasItems) {
       showRawAlert({
         title: tLootTrade('player.closeMerchantConfirmTitle'),
@@ -426,14 +604,14 @@ export default function PlayerLootTradeOverlay() {
           title: tLootTrade('player.shortfallConfirmTitle'),
           message: formatLootTrade(tLootTrade('player.shortfallConfirmMessage'), {
             need: barterSummary.merchantOwes,
-            have: activeSession.caps || 0,
+            have: viewTarget.caps || 0,
             shortfall: barterSummary.merchantCapShortfall,
           }),
           buttons: [
             { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve(false) },
             {
               text: formatLootTrade(tLootTrade('player.shortfallAccept'), {
-                have: activeSession.caps || 0,
+                have: viewTarget.caps || 0,
               }),
               onPress: () => resolve(true),
             },
@@ -470,6 +648,7 @@ export default function PlayerLootTradeOverlay() {
         acceptCapShortfall,
         buyItems,
         sellItems,
+        nodeContainerId: isInsideHub ? viewTarget.containerId : null,
       });
 
       if (committed) {
@@ -482,10 +661,13 @@ export default function PlayerLootTradeOverlay() {
       }
     } catch (error) {
       const code = error?.code || error?.message;
-      if (code === 'TRADE_STOCK_CHANGED') {
+      if (code === 'CONTAINER_LOCKED') {
+        showRawAlert({ title: tLootTrade('player.containerLockedError') });
+        if (isInsideHub) returnToHubList();
+      } else if (code === 'TRADE_STOCK_CHANGED') {
         showRawAlert({ title: tLootTrade('player.stockChangedError') });
       } else if (code === 'TRADE_NOT_ENOUGH_MERCHANT_CAPS') {
-        const have = Number(error?.payload?.merchantCaps ?? activeSession.caps ?? 0);
+        const have = Number(error?.payload?.merchantCaps ?? viewTarget.caps ?? 0);
         const need = Number(error?.payload?.owedCaps ?? 0);
         showRawAlert({
           title: tLootTrade('player.shortfallConfirmTitle'),
@@ -503,23 +685,34 @@ export default function PlayerLootTradeOverlay() {
     }
   };
 
-  // ── Рендер модалки КОНТЕЙНЕРА ДОБЫЧИ ──────────────────────────────────────
+  // ── Рендер модалки КОНТЕЙНЕРА ДОБЫЧИ (отдельного или внутри Локации) ──────
 
-  if (activeSession.kind === CONTAINER_KIND.LOOT) {
-    const items = activeSession.items || [];
+  if (viewTarget.kind === CONTAINER_KIND.LOOT) {
+    const items = viewTarget.items || [];
     return (
       <Modal
         visible
         transparent
         animationType="slide"
-        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+        onRequestClose={() => (isInsideHub ? handleCloseLootPress() : setMinimizedSessionId(activeSession.sessionId))}
       >
         <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
           <View style={styles.lootModalCard}>
+            {isInsideHub && (
+              <TouchableOpacity
+                style={styles.backToLocationBtn}
+                disabled={busy}
+                onPress={handleCloseLootPress}
+              >
+                <Text style={styles.backToLocationBtnText}>
+                  {`${tLootTrade('player.backToLocation')} (${activeSession.name})`}
+                </Text>
+              </TouchableOpacity>
+            )}
             <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
               <View style={styles.modalTitleRow}>
                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
-                <Text style={styles.modalTitle}>{activeSession.name}</Text>
+                <Text style={styles.modalTitle}>{viewTarget.name}</Text>
               </View>
               <View style={styles.headerActionsRow}>
                 <TouchableOpacity
@@ -539,9 +732,9 @@ export default function PlayerLootTradeOverlay() {
               </View>
             </View>
 
-            {Boolean(activeSession.description) && (
+            {Boolean(viewTarget.description) && (
               <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
-                {activeSession.description}
+                {viewTarget.description}
               </IconText>
             )}
 
@@ -721,13 +914,13 @@ export default function PlayerLootTradeOverlay() {
   );
 
   const renderMerchantPane = () => {
-    const merchantStock = activeSession.items || [];
+    const merchantStock = viewTarget.items || [];
     return (
       <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
         <View style={styles.paneHeader}>
           <Text style={styles.paneHeaderTitle}>{tLootTrade('player.merchantInventoryTab')}</Text>
           <IconText style={styles.paneHeaderCaps}>
-            {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: activeSession.caps || 0 })}
+            {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: viewTarget.caps || 0 })}
           </IconText>
         </View>
 
@@ -841,15 +1034,26 @@ export default function PlayerLootTradeOverlay() {
       visible
       transparent
       animationType="slide"
-      onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+      onRequestClose={() => (isInsideHub ? handleCloseMerchantPress() : setMinimizedSessionId(activeSession.sessionId))}
     >
       <View style={[styles.modalBackdrop, isWideLayout && styles.backdropWide]}>
         <View style={styles.merchantModalCard}>
+          {isInsideHub && (
+            <TouchableOpacity
+              style={styles.backToLocationBtn}
+              disabled={busy}
+              onPress={handleCloseMerchantPress}
+            >
+              <Text style={styles.backToLocationBtnText}>
+                {`${tLootTrade('player.backToLocation')} (${activeSession.name})`}
+              </Text>
+            </TouchableOpacity>
+          )}
           {/* Шапка торговца */}
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleRow}>
               <MaterialCommunityIcons name="sack" size={23} color="#f0e68c" />
-              <Text style={styles.modalTitle}>{activeSession.name}</Text>
+              <Text style={styles.modalTitle}>{viewTarget.name}</Text>
             </View>
             <View style={styles.headerActionsRow}>
               <TouchableOpacity
@@ -869,8 +1073,8 @@ export default function PlayerLootTradeOverlay() {
             </View>
           </View>
 
-          {Boolean(activeSession.description) && (
-            <IconText style={styles.modalDesc}>{activeSession.description}</IconText>
+          {Boolean(viewTarget.description) && (
+            <IconText style={styles.modalDesc}>{viewTarget.description}</IconText>
           )}
 
           {/* На узком экране телефона — компактный переключатель двух панелей */}
@@ -897,7 +1101,7 @@ export default function PlayerLootTradeOverlay() {
                   styles.mobileTabText,
                   mobileTab === 'merchant' && styles.mobileTabTextActive,
                 ]}>
-                  {`${tLootTrade('player.merchantInventoryTab')} (${activeSession.caps || 0} {CAP})${
+                  {`${tLootTrade('player.merchantInventoryTab')} (${viewTarget.caps || 0} {CAP})${
                     barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''
                   }`}
                 </IconText>
@@ -954,7 +1158,7 @@ export default function PlayerLootTradeOverlay() {
                 {barterSummary.merchantCapShortfall > 0 && (
                   <IconText style={styles.barterWarnText}>
                     {formatLootTrade(tLootTrade('player.merchantShortfallWarn'), {
-                      have: activeSession.caps || 0,
+                      have: viewTarget.caps || 0,
                       need: barterSummary.merchantOwes,
                       shortfall: barterSummary.merchantCapShortfall,
                     })}
@@ -1459,5 +1663,64 @@ const styles = StyleSheet.create({
     color: '#f0e68c',
     fontSize: 14,
     fontWeight: '700',
+  },
+  backToLocationBtn: {
+    alignSelf: 'flex-start',
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#666666',
+  },
+  backToLocationBtnText: {
+    color: '#f0e68c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hubNodeRowLocked: {
+    opacity: 0.78,
+    borderColor: '#5c3434',
+    backgroundColor: '#251e1e',
+  },
+  hubNodeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  hubNodeTitleLocked: {
+    color: '#d8baba',
+  },
+  hubLockedHintText: {
+    color: '#e59898',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 3,
+  },
+  hubUnlockedMetaText: {
+    color: '#c9c19c',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  hubLockedBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 5,
+    backgroundColor: '#3f1e1e',
+    borderWidth: 1,
+    borderColor: '#b55b5b',
+  },
+  hubLockedBadgeText: {
+    color: '#f5bcbc',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  hubMasterClosesHint: {
+    color: '#9a9a9a',
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
