@@ -64,7 +64,7 @@ Long campaigns quickly accumulate dozens of stashes and shops. To keep the main 
 ### Room Binding & Shared Traders/Containers
 - **Locations** can be bound to **one room or multiple rooms at once** — handy when different parties visit the same settlements across campaigns.
 - **Loot containers and merchants** are not locked to a single room:
-  - when creating one, you can optionally link it straight into one or more locations, or leave it on the main screen;
+  - when creating or editing one, there is always a **«Bind to location»** field: open the list of existing locations or start typing — the input immediately suggests matching locations inline (for example, typing `New` suggests `New Vegas`), and even lets you create a brand-new location on the spot; leave it empty to place the card on the main screen;
   - on the main screen, drag any chest or merchant by the **four-way arrow handle** in its top-left corner onto a Location card (or use **`⋮` → «Move to location…»**);
   - the same merchant or stash can belong to **multiple locations at the same time** (for example, a traveling caravan trader visiting several towns — marked with a shared badge `🔗 ×2` inside locations).
 - Inside an opened location, use **«↗ To screen»** to bring a chest or merchant back out onto the main screen, or **«Unlink»** (when shared across multiple locations) to remove it only from the current location while keeping it in the others.

@@ -724,3 +724,107 @@ export const duplicateContainerEntity = (
     updatedAt: now,
   };
 };
+
+const HUB_WORD_SPLIT_RE = /[\s\-–—_/.,()"«»[\]]+/;
+
+/**
+ * Подбор и ранжирование локаций ('hub') для строки выбора + автодополнения
+ * в форме создания/редактирования сундука или торговца.
+ *
+ * Приоритет совпадений:
+ *  0 — точное совпадение названия (без учёта регистра);
+ *  1 — префикс с начала строки (напр. "New" -> "New Vegas");
+ *  2 — префикс с начала любого слова (напр. "Vegas" -> "New Vegas");
+ *  3 — подстрока внутри названия.
+ * Внутри одного ранга ещё не выбранные локации идут выше уже выбранных,
+ * чтобы автоподсказка всегда предлагала следующее полезное действие.
+ */
+export const matchHubSuggestions = (
+  query = '',
+  availableHubs = [],
+  selectedHubIds = [],
+) => {
+  const hubs = (Array.isArray(availableHubs) ? availableHubs : []).filter(
+    (h) => h && h.id && String(h.name || '').trim().length > 0,
+  );
+  const selectedSet = new Set(Array.isArray(selectedHubIds) ? selectedHubIds : []);
+  const cleanQuery = String(query ?? '').replace(/^\s+/, '');
+  const trimmedQuery = cleanQuery.trim();
+
+  if (!trimmedQuery) {
+    return {
+      matches: hubs,
+      bestMatch: null,
+      ghostSuffix: '',
+      exactHub: null,
+    };
+  }
+
+  const lowerQuery = trimmedQuery.toLowerCase();
+  const lowerCleanQuery = cleanQuery.toLowerCase();
+
+  let exactHub = null;
+  const scored = [];
+
+  hubs.forEach((hub, index) => {
+    const rawName = String(hub.name || '').trim();
+    const lowerName = rawName.toLowerCase();
+
+    if (lowerName === lowerQuery && !exactHub) {
+      exactHub = hub;
+    }
+
+    let rank = -1;
+    if (lowerName === lowerQuery) {
+      rank = 0;
+    } else if (lowerName.startsWith(lowerCleanQuery) || lowerName.startsWith(lowerQuery)) {
+      rank = 1;
+    } else {
+      const words = lowerName.split(HUB_WORD_SPLIT_RE).filter(Boolean);
+      if (words.some((w) => w.startsWith(lowerQuery))) {
+        rank = 2;
+      } else if (lowerName.includes(lowerQuery)) {
+        rank = 3;
+      }
+    }
+
+    if (rank >= 0) {
+      scored.push({
+        hub,
+        rank,
+        alreadySelected: selectedSet.has(hub.id) ? 1 : 0,
+        index,
+      });
+    }
+  });
+
+  scored.sort((a, b) => {
+    if (a.alreadySelected !== b.alreadySelected) {
+      return a.alreadySelected - b.alreadySelected;
+    }
+    if (a.rank !== b.rank) {
+      return a.rank - b.rank;
+    }
+    return a.index - b.index;
+  });
+
+  const matches = scored.map((entry) => entry.hub);
+  const bestEntry = scored.find((entry) => entry.alreadySelected === 0) || null;
+  const bestMatch = bestEntry ? bestEntry.hub : null;
+
+  let ghostSuffix = '';
+  if (bestMatch) {
+    const bestName = String(bestMatch.name || '').trim();
+    if (bestName.toLowerCase().startsWith(lowerCleanQuery) && bestName.length > cleanQuery.length) {
+      ghostSuffix = bestName.slice(cleanQuery.length);
+    }
+  }
+
+  return {
+    matches,
+    bestMatch,
+    ghostSuffix,
+    exactHub,
+  };
+};
+

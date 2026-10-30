@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
-import { tLootTrade } from '../logic/lootTradeI18n';
-import IconText from '../../../lootTrade/LootTradeIconText';
+import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+import IconText, { CdIcon } from '../../../lootTrade/LootTradeIconText';
 import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
 import {
   CONTAINER_KIND,
@@ -24,16 +25,20 @@ import {
   normalizeRoomCodes,
   normalizeSaleMarkupPercent,
   normalizeBuyDepreciationPercent,
+  matchHubSuggestions,
 } from '../../../../domain/lootTrade';
 import { showRawAlert } from '../../../alerts/alertService';
+
+const EMPTY_ARRAY = Object.freeze([]);
 
 const ContainerFormModal = ({
   visible,
   kind = CONTAINER_KIND.LOOT,
   initialContainer = null,
-  availableRooms = [],
-  availableHubs = [],
-  initialLinkedHubIds = [],
+  availableRooms = EMPTY_ARRAY,
+  availableHubs = EMPTY_ARRAY,
+  initialLinkedHubIds = EMPTY_ARRAY,
+  onQuickCreateHub = null,
   onSave,
   onClose,
 }) => {
@@ -43,10 +48,17 @@ const ContainerFormModal = ({
   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
   const isHub = effectiveKind === CONTAINER_KIND.HUB;
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
+  const initSessionKey = visible
+    ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
+    : '';
 
   const [name, setName] = useState('');
   const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
   const [selectedHubIds, setSelectedHubIds] = useState([]);
+  const [extraCreatedHubs, setExtraCreatedHubs] = useState([]);
+  const [hubQuery, setHubQuery] = useState('');
+  const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
+  const [creatingHub, setCreatingHub] = useState(false);
   const [description, setDescription] = useState('');
   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
@@ -54,8 +66,12 @@ const ContainerFormModal = ({
   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
 
   useEffect(() => {
-    if (!visible) return;
+    if (!initSessionKey) return;
     setName(initialContainer?.name || '');
+    setHubQuery('');
+    setHubDropdownOpen(false);
+    setCreatingHub(false);
+    setExtraCreatedHubs([]);
     if (isHub) {
       const existingCodes = normalizeRoomCodes(
         initialContainer?.roomCodes,
@@ -85,7 +101,29 @@ const ContainerFormModal = ({
         ? initialContainer.buyDepreciationPercent
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
     ));
-  }, [visible, initialContainer, availableRooms, isHub, initialLinkedHubIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initSessionKey]);
+
+  const combinedHubs = useMemo(() => {
+    const map = new Map();
+    for (const h of Array.isArray(availableHubs) ? availableHubs : []) {
+      if (h?.id) map.set(h.id, h);
+    }
+    for (const h of extraCreatedHubs) {
+      if (h?.id && !map.has(h.id)) map.set(h.id, h);
+    }
+    return Array.from(map.values());
+  }, [availableHubs, extraCreatedHubs]);
+
+  const hubSuggestion = useMemo(
+    () => matchHubSuggestions(hubQuery, combinedHubs, selectedHubIds),
+    [hubQuery, combinedHubs, selectedHubIds],
+  );
+
+  const selectedHubObjects = useMemo(
+    () => selectedHubIds.map((id) => combinedHubs.find((h) => h.id === id)).filter(Boolean),
+    [selectedHubIds, combinedHubs],
+  );
 
   const toggleRoomCode = (code) => {
     setSelectedRoomCodes((prev) => (
@@ -93,10 +131,68 @@ const ContainerFormModal = ({
     ));
   };
 
-  const toggleHubId = (hubId) => {
+  const selectHubById = (hubId) => {
+    if (!hubId) return;
+    setSelectedHubIds((prev) => (prev.includes(hubId) ? prev : [...prev, hubId]));
+    setHubQuery('');
+  };
+
+  const removeSelectedHub = (hubId) => {
+    setSelectedHubIds((prev) => prev.filter((id) => id !== hubId));
+  };
+
+  const toggleHubFromDropdown = (hubId) => {
     setSelectedHubIds((prev) => (
       prev.includes(hubId) ? prev.filter((id) => id !== hubId) : [...prev, hubId]
     ));
+    setHubQuery('');
+  };
+
+  const acceptBestHubSuggestion = () => {
+    if (hubSuggestion.bestMatch) {
+      selectHubById(hubSuggestion.bestMatch.id);
+      return true;
+    }
+    if (hubSuggestion.exactHub) {
+      selectHubById(hubSuggestion.exactHub.id);
+      return true;
+    }
+    return false;
+  };
+
+  const handleHubInputKeyPress = (e) => {
+    const key = e?.nativeEvent?.key;
+    if (
+      (key === 'Tab' || key === 'Enter')
+      && hubQuery.trim().length > 0
+      && (hubSuggestion.bestMatch || hubSuggestion.exactHub)
+    ) {
+      e?.preventDefault?.();
+      acceptBestHubSuggestion();
+    } else if (key === 'Escape') {
+      setHubDropdownOpen(false);
+    }
+  };
+
+  const handleCreateHubInline = async () => {
+    const cleanHubName = hubQuery.trim();
+    if (!cleanHubName || creatingHub || typeof onQuickCreateHub !== 'function') return;
+    if (hubSuggestion.exactHub) {
+      selectHubById(hubSuggestion.exactHub.id);
+      return;
+    }
+    setCreatingHub(true);
+    try {
+      const created = await onQuickCreateHub(cleanHubName);
+      if (created?.id) {
+        setExtraCreatedHubs((prev) => [...prev, created]);
+        setSelectedHubIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
+        setHubQuery('');
+        setHubDropdownOpen(false);
+      }
+    } finally {
+      setCreatingHub(false);
+    }
   };
 
   const stepCaps = (delta) => {
@@ -115,6 +211,13 @@ const ContainerFormModal = ({
     if (isHub && selectedRoomCodes.length === 0) {
       showRawAlert({ title: tLootTrade('form.validationRoom') });
       return;
+    }
+
+    let finalSelectedHubIds = selectedHubIds;
+    if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
+      if (!finalSelectedHubIds.includes(hubSuggestion.exactHub.id)) {
+        finalSelectedHubIds = [...finalSelectedHubIds, hubSuggestion.exactHub.id];
+      }
     }
 
     const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
@@ -150,7 +253,7 @@ const ContainerFormModal = ({
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
       },
       capsRollInfo,
-      isHub ? null : selectedHubIds,
+      isHub ? null : finalSelectedHubIds,
     );
   };
 
@@ -161,6 +264,21 @@ const ContainerFormModal = ({
     titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
   }
 
+  const trimmedHubQuery = hubQuery.trim();
+  const showGhostInline = Boolean(
+    !isHub
+    && hubSuggestion.ghostSuffix
+    && hubQuery.length > 0
+    && !/^\s/.test(hubQuery),
+  );
+  const showHubDropdown = !isHub && (hubDropdownOpen || trimmedHubQuery.length > 0);
+  const canCreateNewHubInline = Boolean(
+    !isHub
+    && trimmedHubQuery.length > 0
+    && !hubSuggestion.exactHub
+    && typeof onQuickCreateHub === 'function',
+  );
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView
@@ -170,9 +288,14 @@ const ContainerFormModal = ({
         <View style={styles.card}>
           <Text style={styles.title}>{tLootTrade(titleKey)}</Text>
 
-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={styles.label}>{tLootTrade('form.nameLabel')}</Text>
             <TextInput
+              testID="container-form-name"
               style={styles.input}
               value={name}
               onChangeText={setName}
@@ -211,28 +334,147 @@ const ContainerFormModal = ({
                 )}
               </>
             ) : (
-              availableHubs.length > 0 && (
-                <>
-                  <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
-                  <View style={styles.roomChips}>
-                    {availableHubs.map((hubItem) => {
-                      const selected = selectedHubIds.includes(hubItem.id);
-                      return (
-                        <TouchableOpacity
-                          key={hubItem.id}
-                          style={[styles.roomChip, selected && styles.roomChipActive]}
-                          onPress={() => toggleHubId(hubItem.id)}
-                        >
-                          <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
-                            {hubItem.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
+              <>
+                <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
+
+                {selectedHubObjects.length > 0 && (
+                  <View style={styles.selectedHubPills}>
+                    {selectedHubObjects.map((hubItem) => (
+                      <TouchableOpacity
+                        key={hubItem.id}
+                        style={styles.selectedHubPill}
+                        onPress={() => removeSelectedHub(hubItem.id)}
+                      >
+                        <Text style={styles.selectedHubPillText}>{hubItem.name}</Text>
+                        <Text style={styles.selectedHubPillRemove}>✕</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
-                </>
-              )
+                )}
+
+                <View style={[styles.hubComboRow, showHubDropdown && styles.hubComboRowActive]}>
+                  <View style={styles.hubInputWrap}>
+                    {showGhostInline && (
+                      <View pointerEvents="none" style={styles.ghostOverlay}>
+                        <Text numberOfLines={1} style={styles.ghostTextLine}>
+                          <Text style={styles.ghostTypedTransparent}>{hubQuery}</Text>
+                          <Text style={styles.ghostCompletion}>{hubSuggestion.ghostSuffix}</Text>
+                        </Text>
+                      </View>
+                    )}
+                    <TextInput
+                      testID="hub-combobox-input"
+                      style={styles.hubComboInput}
+                      value={hubQuery}
+                      onChangeText={(val) => {
+                        setHubQuery(val);
+                        if (!hubDropdownOpen) setHubDropdownOpen(true);
+                      }}
+                      onFocus={() => setHubDropdownOpen(true)}
+                      onSubmitEditing={acceptBestHubSuggestion}
+                      onKeyPress={handleHubInputKeyPress}
+                      placeholder={tLootTrade('form.bindHubsPlaceholder')}
+                      placeholderTextColor="#8c8c8c"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    testID="hub-combobox-toggle"
+                    style={styles.hubDropdownToggle}
+                    onPress={() => setHubDropdownOpen((prev) => !prev)}
+                  >
+                    <Text style={styles.hubDropdownToggleText}>
+                      {showHubDropdown ? '▴' : '▾'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {trimmedHubQuery.length > 0 && hubSuggestion.bestMatch && (
+                  <TouchableOpacity
+                    testID="hub-quick-suggest"
+                    style={styles.quickSuggestBar}
+                    onPress={acceptBestHubSuggestion}
+                  >
+                    <Text style={styles.quickSuggestText}>
+                      {formatLootTrade(tLootTrade('form.bindHubsSuggestAction'), {
+                        name: hubSuggestion.bestMatch.name,
+                      })}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {showHubDropdown && (
+                  <View style={styles.hubDropdownMenu}>
+                    <ScrollView
+                      style={styles.hubDropdownScroll}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {combinedHubs.length === 0 && !canCreateNewHubInline ? (
+                        <Text style={styles.hubDropdownEmpty}>
+                          {tLootTrade('form.bindHubsEmptyList')}
+                        </Text>
+                      ) : (
+                        <>
+                          {hubSuggestion.matches.length === 0 && !canCreateNewHubInline && (
+                            <Text style={styles.hubDropdownEmpty}>
+                              {tLootTrade('form.bindHubsNoMatch')}
+                            </Text>
+                          )}
+
+                          {hubSuggestion.matches.map((hubItem) => {
+                            const selected = selectedHubIds.includes(hubItem.id);
+                            const isBest = Boolean(
+                              trimmedHubQuery.length > 0
+                              && hubSuggestion.bestMatch?.id === hubItem.id,
+                            );
+                            return (
+                              <TouchableOpacity
+                                key={hubItem.id}
+                                style={[
+                                  styles.hubDropdownItem,
+                                  isBest && styles.hubDropdownItemSuggested,
+                                  selected && styles.hubDropdownItemSelected,
+                                ]}
+                                onPress={() => toggleHubFromDropdown(hubItem.id)}
+                              >
+                                <Text
+                                  style={[
+                                    styles.hubDropdownItemText,
+                                    (selected || isBest) && styles.hubDropdownItemTextHighlight,
+                                  ]}
+                                >
+                                  {hubItem.name}
+                                </Text>
+                                <Text style={styles.hubDropdownItemMark}>
+                                  {selected ? '✓' : '+'}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+
+                          {canCreateNewHubInline && (
+                            <TouchableOpacity
+                              testID="hub-inline-create"
+                              style={styles.hubDropdownCreateItem}
+                              disabled={creatingHub}
+                              onPress={handleCreateHubInline}
+                            >
+                              <Text style={styles.hubDropdownCreateText}>
+                                {formatLootTrade(tLootTrade('form.bindHubsCreateNew'), {
+                                  name: trimmedHubQuery,
+                                })}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+
+                <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
+              </>
             )}
 
             <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
@@ -249,42 +491,55 @@ const ContainerFormModal = ({
               <>
                 <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
                 <View style={styles.counterRow}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-10)}>
-                    <Text style={styles.stepBtnText}>−10</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-1)}>
+                  <TouchableOpacity
+                    testID="merchant-caps-minus"
+                    style={styles.stepBtn}
+                    onPress={() => stepCaps(-1)}
+                  >
                     <Text style={styles.stepBtnText}>−</Text>
                   </TouchableOpacity>
                   <TextInput
+                    testID="merchant-caps-input"
                     style={styles.counterInput}
                     value={capsCount}
                     onChangeText={setCapsCount}
                     keyboardType="number-pad"
                   />
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(1)}>
+                  <TouchableOpacity
+                    testID="merchant-caps-plus"
+                    style={styles.stepBtn}
+                    onPress={() => stepCaps(1)}
+                  >
                     <Text style={styles.stepBtnText}>+</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(10)}>
-                    <Text style={styles.stepBtnText}>+10</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.unitSegments}>
-                  {[
-                    [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
-                    [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
-                    [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
-                  ].map(([uKey, uLabel]) => (
-                    <TouchableOpacity
-                      key={uKey}
-                      style={[styles.unitSeg, capsUnit === uKey && styles.unitSegActive]}
-                      onPress={() => setCapsUnit(uKey)}
-                    >
-                      <IconText style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
-                        {uLabel}
-                      </IconText>
-                    </TouchableOpacity>
-                  ))}
+                  {[QUANTITY_UNIT.PCS, QUANTITY_UNIT.CD, QUANTITY_UNIT.D20].map((uKey) => {
+                    const active = capsUnit === uKey;
+                    return (
+                      <TouchableOpacity
+                        key={uKey}
+                        testID={`merchant-unit-${uKey}`}
+                        style={[
+                          styles.unitSeg,
+                          uKey === QUANTITY_UNIT.CD && styles.unitSegCd,
+                          active && styles.unitSegActive,
+                        ]}
+                        onPress={() => setCapsUnit(uKey)}
+                      >
+                        {uKey === QUANTITY_UNIT.CD ? (
+                          <CdIcon size={38} />
+                        ) : uKey === QUANTITY_UNIT.D20 ? (
+                          <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.unitSegText, active && styles.unitSegTextActive]}>
+                            {tLootTrade('itemConfig.unitPcs')}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 <Text style={styles.label}>{tLootTrade('form.saleMarkupLabel')}</Text>
@@ -309,7 +564,11 @@ const ContainerFormModal = ({
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
+            <TouchableOpacity
+              testID="container-form-save"
+              style={[styles.btn, styles.saveBtn]}
+              onPress={handleSave}
+            >
               <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
@@ -334,7 +593,7 @@ const styles = StyleSheet.create({
   card: {
     width: '90%',
     maxWidth: 520,
-    maxHeight: '82%',
+    maxHeight: '84%',
     backgroundColor: '#1f1f1f',
     borderRadius: 5,
     borderWidth: 1.5,
@@ -412,27 +671,184 @@ const styles = StyleSheet.create({
   roomChipTextActive: {
     color: '#1a1a1a',
   },
+  selectedHubPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  selectedHubPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#3a3a1e',
+    borderWidth: 1,
+    borderColor: '#f0e68c',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  selectedHubPillText: {
+    color: '#f0e68c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  selectedHubPillRemove: {
+    color: '#f0e68c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hubComboRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    backgroundColor: '#2a2a2a',
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  hubComboRowActive: {
+    borderColor: '#d4af37',
+  },
+  hubInputWrap: {
+    flex: 1,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  ghostOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
+  ghostTextLine: {
+    fontSize: 14,
+  },
+  ghostTypedTransparent: {
+    color: 'transparent',
+    fontSize: 14,
+  },
+  ghostCompletion: {
+    color: 'rgba(240, 230, 140, 0.5)',
+    fontSize: 14,
+  },
+  hubComboInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#f2f2f2',
+    fontSize: 14,
+    backgroundColor: 'transparent',
+  },
+  hubDropdownToggle: {
+    width: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderLeftWidth: 1,
+    borderLeftColor: '#484848',
+    backgroundColor: '#252525',
+  },
+  hubDropdownToggleText: {
+    color: '#f0e68c',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  quickSuggestBar: {
+    marginTop: 5,
+    alignSelf: 'flex-start',
+    backgroundColor: '#33311b',
+    borderWidth: 1,
+    borderColor: '#d4af37',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  quickSuggestText: {
+    color: '#f0e68c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  hubDropdownMenu: {
+    marginTop: 5,
+    backgroundColor: '#242424',
+    borderWidth: 1,
+    borderColor: '#5a5a5a',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  hubDropdownScroll: {
+    maxHeight: 170,
+  },
+  hubDropdownEmpty: {
+    color: '#9e9e9e',
+    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    lineHeight: 16,
+  },
+  hubDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#323232',
+  },
+  hubDropdownItemSuggested: {
+    backgroundColor: '#2f2d1c',
+  },
+  hubDropdownItemSelected: {
+    backgroundColor: '#3a3a1e',
+  },
+  hubDropdownItemText: {
+    color: '#eaeaea',
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
+    marginRight: 8,
+  },
+  hubDropdownItemTextHighlight: {
+    color: '#f0e68c',
+    fontWeight: '700',
+  },
+  hubDropdownItemMark: {
+    color: '#f0e68c',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  hubDropdownCreateItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#2b2b1d',
+  },
+  hubDropdownCreateText: {
+    color: '#f0e68c',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     marginVertical: 4,
   },
   stepBtn: {
     backgroundColor: '#2e2e2e',
-    minWidth: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: '#666666',
   },
   stepBtnText: {
     color: '#f0e68c',
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: '700',
   },
   counterInput: {
@@ -440,38 +856,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
-    width: 96,
-    height: 38,
+    width: 108,
+    height: 40,
     textAlign: 'center',
     color: '#f5f5f5',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   unitSegments: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 10,
     marginTop: 8,
   },
   unitSeg: {
+    minWidth: 58,
+    height: 40,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 0,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  unitSegCd: {
+    paddingHorizontal: 9,
   },
   unitSegActive: {
-    backgroundColor: '#f0e68c',
-    borderColor: '#d4af37',
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
   },
   unitSegText: {
     color: '#dcdcdc',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   unitSegTextActive: {
-    color: '#1a1a1a',
+    color: '#f0e68c',
   },
   footer: {
     flexDirection: 'row',
