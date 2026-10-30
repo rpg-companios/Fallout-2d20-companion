@@ -140,10 +140,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
 
   /**
    * Проверяет, остались ли в комнате другие подключённые игроки, у которых
-   * ещё открыт данный контейнер добычи (не считая Мастера и уже закрывших).
+   * ещё открыта данная раздача добычи или сессия торговли (не считая Мастера и уже закрывших).
    */
-  const hasRemainingActiveLootViewers = (room, session, closedSet) => {
-    if (!room || !session || session.kind !== 'loot') return false;
+  const hasRemainingActiveSessionViewers = (room, session, closedSet) => {
+    if (!room || !session) return false;
     if (session.targetType === 'character') return false;
     for (const member of room.members.values()) {
       if (!member || member.role !== 'player') continue;
@@ -163,17 +163,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     let closedSession = null;
     let closedReason = null;
     const current = room.activeSession;
-    if (left && current && current.kind === 'loot') {
+    if (left && current) {
       const closedSet = new Set(current.closedByClientIds || []);
-      const hadPreviousCloseOrEmpty = closedSet.size > 0 || current.items.length === 0;
-      if (hadPreviousCloseOrEmpty && !hasRemainingActiveLootViewers(room, current, closedSet)) {
+      const hadPreviousCloseOrEmpty =
+        closedSet.size > 0 || (current.kind === 'loot' && current.items.length === 0);
+      if (hadPreviousCloseOrEmpty && !hasRemainingActiveSessionViewers(room, current, closedSet)) {
         closedSession = {
           ...current,
           closedByClientIds: [...closedSet],
           revision: current.revision + 1,
           updatedAt: now(),
         };
-        closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
+        closedReason = closedSession.kind === 'loot' && closedSession.items.length === 0
+          ? 'loot_emptied'
+          : 'player_closed';
         room.activeSession = null;
       }
     }
@@ -269,14 +272,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const closedSet = new Set(current.closedByClientIds || []);
     closedSet.add(clientId);
 
-    if (current.kind === 'loot' && !hasRemainingActiveLootViewers(room, current, closedSet)) {
+    if (!hasRemainingActiveSessionViewers(room, current, closedSet)) {
       const closedSession = {
         ...current,
         closedByClientIds: [...closedSet],
         revision: current.revision + 1,
         updatedAt: now(),
       };
-      const closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
+      const closedReason = closedSession.kind === 'loot' && closedSession.items.length === 0
+        ? 'loot_emptied'
+        : 'player_closed';
       room.activeSession = null;
       return {
         room,
@@ -321,7 +326,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (emptiedByTake) {
       const closedSet = new Set(result.session.closedByClientIds || []);
       closedSet.add(clientId);
-      if (!hasRemainingActiveLootViewers(room, result.session, closedSet)) {
+      if (!hasRemainingActiveSessionViewers(room, result.session, closedSet)) {
         const closedSession = {
           ...result.session,
           closedByClientIds: [...closedSet],

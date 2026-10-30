@@ -5,11 +5,11 @@ import {
   Text,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
   TextInput,
   StyleSheet,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import IconText, { withCdToken, formatBasicsWithIcons } from '../../../lootTrade/LootTradeIconText';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
 import { tInventory, formatInventoryText } from '../../InventoryScreen/logic/inventoryI18n';
@@ -371,21 +371,19 @@ const ContainerCatalogModal = ({
 
     const baseBasics = item.__isLooseCaps
       ? tLootTrade('catalog.looseCapsSub')
-      : describeItemBasics(item, moduleLocale);
+      : formatBasicsWithIcons(describeItemBasics(item, moduleLocale));
     const ammoPackNote = !item.__isLooseCaps && isAmmoItem(item)
-      ? formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+      ? withCdToken(formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
           formula: formatAmmoFoundFormula(getAmmoFoundSpec(item)),
-        })
+        }))
       : '';
     const basicsLine = [ammoPackNote, baseBasics].filter(Boolean).join(' • ');
 
     return (
       <View style={[localStyles.itemContainer, localStyles.itemRowWithBtn]}>
         <View style={localStyles.itemInfoCol}>
-          <Text style={localStyles.itemName}>
-            {item.__isLooseCaps ? `💰 ${item.name}` : item.name}
-          </Text>
-          {Boolean(basicsLine) && <Text style={localStyles.itemBasics}>{basicsLine}</Text>}
+          <IconText style={localStyles.itemName}>{item.name}</IconText>
+          {Boolean(basicsLine) && <IconText style={localStyles.itemBasics}>{basicsLine}</IconText>}
         </View>
         <TouchableOpacity
           style={localStyles.chooseBtn}
@@ -400,7 +398,7 @@ const ContainerCatalogModal = ({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={localStyles.modalContainer}>
-        <SafeAreaView style={localStyles.modalContent}>
+        <View style={localStyles.modalContent}>
           <Text style={localStyles.title}>
             {currentPath.length > 0 && !searchTerm && !filterActive
               ? currentPath[currentPath.length - 1]
@@ -411,7 +409,7 @@ const ContainerCatalogModal = ({
 
           {Boolean(feedbackMessage) && (
             <View style={localStyles.feedbackBanner}>
-              <Text style={localStyles.feedbackText}>{feedbackMessage}</Text>
+              <IconText style={localStyles.feedbackText}>{withCdToken(feedbackMessage)}</IconText>
             </View>
           )}
 
@@ -482,7 +480,7 @@ const ContainerCatalogModal = ({
             }}
             onClose={() => setConfiguringItem(null)}
           />
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
@@ -493,35 +491,36 @@ const localStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.68)',
-    paddingHorizontal: 18,
-    paddingVertical: 24,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    paddingHorizontal: 28,
+    paddingVertical: 36,
   },
   modalContent: {
-    width: '92%',
+    width: '90%',
     maxWidth: 680,
-    height: '84%',
+    height: '80%',
+    maxHeight: 720,
     backgroundColor: '#1f1f1f',
-    borderRadius: 12,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#f0e68c',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 22,
+    paddingHorizontal: 24,
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
     color: '#f0e68c',
-    marginBottom: 12,
+    marginBottom: 14,
     textAlign: 'center',
     paddingHorizontal: 8,
   },
   backButton: {
     alignSelf: 'flex-start',
-    marginBottom: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 6,
+    marginBottom: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 5,
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#5a5a5a',
@@ -534,7 +533,7 @@ const localStyles = StyleSheet.create({
   filterToolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
@@ -543,16 +542,16 @@ const localStyles = StyleSheet.create({
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
     color: '#f0f0f0',
-    borderRadius: 8,
+    borderRadius: 5,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     fontSize: 14,
   },
   filterToggle: {
     width: 40,
     height: 40,
     marginLeft: 8,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#666666',
     backgroundColor: '#2e2e2e',
@@ -569,7 +568,7 @@ const localStyles = StyleSheet.create({
     right: -5,
     minWidth: 17,
     height: 17,
-    borderRadius: 9,
+    borderRadius: 5,
     backgroundColor: '#d4af37',
     alignItems: 'center',
     justifyContent: 'center',
@@ -589,7 +588,7 @@ const localStyles = StyleSheet.create({
   },
   itemContainer: {
     paddingVertical: 12,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#333333',
     flexDirection: 'row',
@@ -632,7 +631,7 @@ const localStyles = StyleSheet.create({
     borderColor: '#f0e68c',
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   chooseBtnText: {
     color: '#f0e68c',
@@ -643,10 +642,10 @@ const localStyles = StyleSheet.create({
     backgroundColor: '#2d2a1e',
     borderWidth: 1,
     borderColor: '#d4af37',
-    borderRadius: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginBottom: 8,
+    borderRadius: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    marginBottom: 10,
   },
   feedbackText: {
     color: '#f0e68c',
@@ -658,9 +657,9 @@ const localStyles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#777777',
-    paddingVertical: 11,
-    borderRadius: 8,
-    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 5,
+    marginTop: 14,
     alignItems: 'center',
   },
   closeButtonText: {

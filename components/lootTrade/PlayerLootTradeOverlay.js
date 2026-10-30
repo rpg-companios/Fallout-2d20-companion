@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
 import * as db from '../../db';
 import * as savesModule from '../../src/saves/characterSaves';
 import useCharacterStore from '../../src/store/characterStore';
@@ -322,11 +322,13 @@ export default function PlayerLootTradeOverlay() {
     }
   };
 
-  const performPlayerLootClose = async () => {
+  const performPlayerSessionClose = async () => {
     if (!activeSession || !matchedContext) return;
     const targetSessionId = activeSession.sessionId;
     const targetRoomCode = matchedContext.roomCode;
     markSessionClosedLocally(targetSessionId);
+    setBuyBuffer({});
+    setSellBuffer({});
     try {
       await useRoomStore.getState().playerCloseRoomSession({
         code: targetRoomCode,
@@ -350,14 +352,36 @@ export default function PlayerLootTradeOverlay() {
             text: tLootTrade('player.close'),
             style: 'destructive',
             onPress: () => {
-              void performPlayerLootClose();
+              void performPlayerSessionClose();
             },
           },
         ],
       });
       return;
     }
-    void performPlayerLootClose();
+    void performPlayerSessionClose();
+  };
+
+  const handleCloseMerchantPress = () => {
+    if (busy || !activeSession) return;
+    if (barterSummary?.hasItems) {
+      showRawAlert({
+        title: tLootTrade('player.closeMerchantConfirmTitle'),
+        message: tLootTrade('player.closeMerchantConfirmMessage'),
+        buttons: [
+          { text: tLootTrade('form.cancel'), style: 'cancel' },
+          {
+            text: tLootTrade('player.close'),
+            style: 'destructive',
+            onPress: () => {
+              void performPlayerSessionClose();
+            },
+          },
+        ],
+      });
+      return;
+    }
+    void performPlayerSessionClose();
   };
 
   // ── Обработчики ТОРГОВЦА (буфер обмена) ───────────────────────────────────
@@ -490,8 +514,8 @@ export default function PlayerLootTradeOverlay() {
         animationType="slide"
         onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
       >
-        <View style={styles.lootModalBackdrop}>
-          <SafeAreaView style={styles.lootModalCard}>
+        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+          <View style={styles.lootModalCard}>
             <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
               <View style={styles.modalTitleRow}>
                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
@@ -516,9 +540,9 @@ export default function PlayerLootTradeOverlay() {
             </View>
 
             {Boolean(activeSession.description) && (
-              <Text style={[styles.modalDesc, styles.lootDescSpacing]}>
+              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
                 {activeSession.description}
-              </Text>
+              </IconText>
             )}
 
             <ScrollView
@@ -533,12 +557,11 @@ export default function PlayerLootTradeOverlay() {
                   return (
                     <View key={entry.entryId} style={styles.lootRow}>
                       <View style={styles.lootRowInfo}>
-                        <Text style={styles.lootRowTitle}>
-                          {getItemIcon(entry.itemType)}{' '}
+                        <IconText style={styles.lootRowTitle}>
                           {isCaps
                             ? formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })
-                            : `${entry.name} ×${entry.quantity}`}
-                        </Text>
+                            : `${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
+                        </IconText>
                         {!isCaps && entry.weight > 0 && (
                           <Text style={styles.lootRowSub}>
                             {formatLootTrade(tLootTrade('detail.weight'), {
@@ -590,7 +613,7 @@ export default function PlayerLootTradeOverlay() {
                 </TouchableOpacity>
               )}
             </View>
-          </SafeAreaView>
+          </View>
         </View>
       </Modal>
     );
@@ -602,9 +625,9 @@ export default function PlayerLootTradeOverlay() {
     <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
       <View style={styles.paneHeader}>
         <Text style={styles.paneHeaderTitle}>{tLootTrade('player.playerInventoryTab')}</Text>
-        <Text style={styles.paneHeaderCaps}>
+        <IconText style={styles.paneHeaderCaps}>
           {formatLootTrade(tLootTrade('player.playerCaps'), { caps: playerCaps })}
-        </Text>
+        </IconText>
       </View>
 
       <ScrollView style={styles.paneScroll}>
@@ -618,9 +641,9 @@ export default function PlayerLootTradeOverlay() {
                 style={styles.bufferRow}
                 onPress={() => addToBuyBuffer(line.entry, -1)}
               >
-                <Text style={styles.bufferItalicText}>
-                  + {line.name} ×{line.quantity} ({line.lineTotal} кр.)
-                </Text>
+                <IconText style={styles.bufferItalicText}>
+                  {`+ ${line.name} ×${line.quantity} (${line.lineTotal} {CAP})`}
+                </IconText>
                 <TouchableOpacity
                   style={styles.bufferClearAllBtn}
                   onPress={(e) => {
@@ -663,9 +686,9 @@ export default function PlayerLootTradeOverlay() {
                   <Text style={styles.tradeRowName}>
                     {getItemIcon(pItem.itemType)} {pItem.name}{durSuffix} ×{remaining}
                   </Text>
-                  <Text style={styles.tradeRowPrice}>
+                  <IconText style={styles.tradeRowPrice}>
                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
-                  </Text>
+                  </IconText>
                 </View>
                 <View style={styles.tradeRowBtns}>
                   <TouchableOpacity
@@ -703,9 +726,9 @@ export default function PlayerLootTradeOverlay() {
       <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
         <View style={styles.paneHeader}>
           <Text style={styles.paneHeaderTitle}>{tLootTrade('player.merchantInventoryTab')}</Text>
-          <Text style={styles.paneHeaderCaps}>
+          <IconText style={styles.paneHeaderCaps}>
             {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: activeSession.caps || 0 })}
-          </Text>
+          </IconText>
         </View>
 
         <ScrollView style={styles.paneScroll}>
@@ -719,9 +742,9 @@ export default function PlayerLootTradeOverlay() {
                   style={styles.bufferRow}
                   onPress={() => addToSellBuffer(line.item, -1)}
                 >
-                  <Text style={styles.bufferItalicText}>
-                    + {line.name} ×{line.quantity} ({line.lineTotal} кр.)
-                  </Text>
+                  <IconText style={styles.bufferItalicText}>
+                    {`+ ${line.name} ×${line.quantity} (${line.lineTotal} {CAP})`}
+                  </IconText>
                   <TouchableOpacity
                     style={styles.bufferClearAllBtn}
                     onPress={(e) => {
@@ -749,8 +772,13 @@ export default function PlayerLootTradeOverlay() {
                 saleMarkupPercent: effectiveRates.saleMarkupPercent,
                 capCollectorPercent,
               });
+              // Не показываем каталожную базовую цену в карточке торговца,
+              // чтобы наценка торговца оставалась тайной для игрока.
               const basics = entry.itemSnapshot
-                ? describeItemBasics(entry.itemSnapshot, moduleLocale)
+                ? formatBasicsWithIcons(describeItemBasics(
+                    { ...entry.itemSnapshot, cost: null, price: null },
+                    moduleLocale,
+                  ))
                 : '';
 
               return (
@@ -764,11 +792,11 @@ export default function PlayerLootTradeOverlay() {
                       {getItemIcon(entry.itemType)} {entry.name} ×{remaining}
                     </Text>
                     {Boolean(basics) && (
-                      <Text style={styles.tradeRowBasics} numberOfLines={2}>{basics}</Text>
+                      <IconText style={styles.tradeRowBasics} numberOfLines={2}>{basics}</IconText>
                     )}
-                    <Text style={styles.tradeRowPriceBuy}>
+                    <IconText style={styles.tradeRowPriceBuy}>
                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}
-                    </Text>
+                    </IconText>
                   </View>
                   <View style={styles.tradeRowBtns}>
                     <TouchableOpacity
@@ -815,43 +843,35 @@ export default function PlayerLootTradeOverlay() {
       animationType="slide"
       onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
     >
-      <View style={styles.modalBackdrop}>
-        <SafeAreaView style={styles.merchantModalCard}>
+      <View style={[styles.modalBackdrop, isWideLayout && styles.backdropWide]}>
+        <View style={styles.merchantModalCard}>
           {/* Шапка торговца */}
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleRow}>
               <MaterialCommunityIcons name="sack" size={23} color="#f0e68c" />
               <Text style={styles.modalTitle}>{activeSession.name}</Text>
             </View>
-            <TouchableOpacity
-              style={styles.minimizeBtn}
-              onPress={() => setMinimizedSessionId(activeSession.sessionId)}
-            >
-              <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
-            </TouchableOpacity>
+            <View style={styles.headerActionsRow}>
+              <TouchableOpacity
+                style={styles.minimizeBtn}
+                disabled={busy}
+                onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+              >
+                <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.closeContainerBtn, busy && styles.disabledBtn]}
+                disabled={busy}
+                onPress={handleCloseMerchantPress}
+              >
+                <Text style={styles.closeContainerBtnText}>{tLootTrade('player.close')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {Boolean(activeSession.description) && (
-            <Text style={styles.modalDesc}>{activeSession.description}</Text>
+            <IconText style={styles.modalDesc}>{activeSession.description}</IconText>
           )}
-
-          {/* Живые ставки и автоперки */}
-          <View style={styles.ratesStrip}>
-            <Text style={styles.ratesStripText}>
-              {formatLootTrade(tLootTrade('player.ratesLine'), {
-                sale: effectiveRates.saleMarkupPercent >= 0
-                  ? `+${effectiveRates.saleMarkupPercent}`
-                  : String(effectiveRates.saleMarkupPercent),
-                depr: effectiveRates.buyDepreciationPercent,
-              })}
-            </Text>
-            {effectiveRates.isPersonalOverride && (
-              <Text style={styles.personalBadgeText}>{tLootTrade('player.personalRatesBadge')}</Text>
-            )}
-            {capCollectorPercent > 0 && (
-              <Text style={styles.perkBadgeText}>{tLootTrade('player.perkCapCollector')}</Text>
-            )}
-          </View>
 
           {/* На узком экране телефона — компактный переключатель двух панелей */}
           {!isWideLayout && (
@@ -860,25 +880,27 @@ export default function PlayerLootTradeOverlay() {
                 style={[styles.mobileTabBtn, mobileTab === 'player' && styles.mobileTabBtnActive]}
                 onPress={() => setMobileTab('player')}
               >
-                <Text style={[
+                <IconText style={[
                   styles.mobileTabText,
                   mobileTab === 'player' && styles.mobileTabTextActive,
                 ]}>
-                  {tLootTrade('player.playerInventoryTab')} ({playerCaps} кр.)
-                  {barterSummary?.buyLines.length ? ` +${barterSummary.buyLines.length}` : ''}
-                </Text>
+                  {`${tLootTrade('player.playerInventoryTab')} (${playerCaps} {CAP})${
+                    barterSummary?.buyLines.length ? ` +${barterSummary.buyLines.length}` : ''
+                  }`}
+                </IconText>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.mobileTabBtn, mobileTab === 'merchant' && styles.mobileTabBtnActive]}
                 onPress={() => setMobileTab('merchant')}
               >
-                <Text style={[
+                <IconText style={[
                   styles.mobileTabText,
                   mobileTab === 'merchant' && styles.mobileTabTextActive,
                 ]}>
-                  {tLootTrade('player.merchantInventoryTab')} ({activeSession.caps || 0} кр.)
-                  {barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''}
-                </Text>
+                  {`${tLootTrade('player.merchantInventoryTab')} (${activeSession.caps || 0} {CAP})${
+                    barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''
+                  }`}
+                </IconText>
               </TouchableOpacity>
             </View>
           )}
@@ -900,43 +922,43 @@ export default function PlayerLootTradeOverlay() {
             <View style={styles.barterFooter}>
               <View style={styles.barterBalanceCol}>
                 {barterSummary.playerOwes > 0 ? (
-                  <Text style={[
+                  <IconText style={[
                     styles.barterBalanceText,
                     !barterSummary.canPlayerAfford && styles.barterErrorText,
                   ]}>
                     {formatLootTrade(tLootTrade('player.barterPay'), {
                       amount: barterSummary.playerOwes,
                     })}
-                  </Text>
+                  </IconText>
                 ) : barterSummary.merchantOwes > 0 ? (
-                  <Text style={styles.barterReceiveText}>
+                  <IconText style={styles.barterReceiveText}>
                     {formatLootTrade(tLootTrade('player.barterReceive'), {
                       amount: barterSummary.actualMerchantPayout,
                     })}
-                  </Text>
+                  </IconText>
                 ) : (
-                  <Text style={styles.barterBalanceText}>
+                  <IconText style={styles.barterBalanceText}>
                     {tLootTrade('player.barterEven')}
-                  </Text>
+                  </IconText>
                 )}
 
                 {!barterSummary.canPlayerAfford && (
-                  <Text style={styles.barterErrorText}>
+                  <IconText style={styles.barterErrorText}>
                     {formatLootTrade(tLootTrade('player.notEnoughPlayerCaps'), {
                       need: barterSummary.playerOwes,
                       have: playerCaps,
                     })}
-                  </Text>
+                  </IconText>
                 )}
 
                 {barterSummary.merchantCapShortfall > 0 && (
-                  <Text style={styles.barterWarnText}>
+                  <IconText style={styles.barterWarnText}>
                     {formatLootTrade(tLootTrade('player.merchantShortfallWarn'), {
                       have: activeSession.caps || 0,
                       need: barterSummary.merchantOwes,
                       shortfall: barterSummary.merchantCapShortfall,
                     })}
-                  </Text>
+                  </IconText>
                 )}
               </View>
 
@@ -962,7 +984,7 @@ export default function PlayerLootTradeOverlay() {
               </View>
             </View>
           )}
-        </SafeAreaView>
+        </View>
       </View>
     </Modal>
   );
@@ -981,7 +1003,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1f1f1f',
     borderWidth: 1.5,
     borderColor: '#f0e68c',
-    borderRadius: 24,
+    borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 18,
     elevation: 8,
@@ -1003,7 +1025,7 @@ const styles = StyleSheet.create({
   },
   lootModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.68)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
@@ -1011,42 +1033,48 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.68)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
+  },
+  backdropWide: {
+    paddingHorizontal: 56,
+    paddingVertical: 46,
   },
   lootModalCard: {
-    width: '100%',
+    width: '90%',
     maxWidth: 540,
-    maxHeight: '82%',
+    maxHeight: '78%',
     backgroundColor: '#1f1f1f',
-    borderRadius: 14,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#f0e68c',
     paddingHorizontal: 24,
     paddingVertical: 22,
   },
   merchantModalCard: {
-    width: '100%',
-    maxWidth: 1040,
-    height: '90%',
+    width: '92%',
+    maxWidth: 960,
+    height: '80%',
+    maxHeight: 740,
     backgroundColor: '#1f1f1f',
-    borderRadius: 14,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#f0e68c',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 12,
+    marginBottom: 4,
   },
   lootHeaderSpacing: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   modalTitleRow: {
     flexDirection: 'row',
@@ -1068,7 +1096,7 @@ const styles = StyleSheet.create({
   minimizeBtn: {
     paddingHorizontal: 13,
     paddingVertical: 7,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#777777',
     backgroundColor: '#2a2a2a',
@@ -1081,7 +1109,7 @@ const styles = StyleSheet.create({
   closeContainerBtn: {
     paddingHorizontal: 13,
     paddingVertical: 7,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#e57373',
     backgroundColor: '#4a1f1f',
@@ -1100,12 +1128,12 @@ const styles = StyleSheet.create({
   },
   lootDescSpacing: {
     marginTop: 2,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   lootScroll: {
-    marginTop: 10,
-    marginBottom: 4,
-    maxHeight: 420,
+    marginTop: 12,
+    marginBottom: 6,
+    maxHeight: 400,
   },
   lootScrollContent: {
     paddingVertical: 4,
@@ -1124,7 +1152,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 13,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#484848',
     backgroundColor: '#2a2a2a',
@@ -1154,7 +1182,7 @@ const styles = StyleSheet.create({
     borderColor: '#777777',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   takeOneBtnText: {
     color: '#e8e8e8',
@@ -1167,7 +1195,7 @@ const styles = StyleSheet.create({
     borderColor: '#f0e68c',
     paddingHorizontal: 13,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 5,
   },
   takeAllRowBtnText: {
     color: '#f0e68c',
@@ -1183,7 +1211,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#f0e68c',
     paddingVertical: 13,
-    borderRadius: 8,
+    borderRadius: 5,
     alignItems: 'center',
   },
   primaryActionBtnText: {
@@ -1196,43 +1224,16 @@ const styles = StyleSheet.create({
   },
 
   // Стили двухпанельного торговца
-  ratesStrip: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1,
-    borderColor: '#4a4a4a',
-    borderRadius: 6,
-  },
-  ratesStripText: {
-    color: '#e5e5e5',
-    fontSize: 12,
-  },
-  personalBadgeText: {
-    color: '#f0e68c',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  perkBadgeText: {
-    color: '#d4af37',
-    fontSize: 11,
-    fontWeight: '700',
-  },
   mobileTabSwitch: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 8,
+    gap: 8,
+    marginTop: 10,
   },
   mobileTabBtn: {
     flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    borderRadius: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
@@ -1254,13 +1255,13 @@ const styles = StyleSheet.create({
   twoPanesContainer: {
     flex: 1,
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 8,
+    gap: 14,
+    marginTop: 12,
   },
   pane: {
     flex: 1,
     backgroundColor: '#242424',
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     overflow: 'hidden',
@@ -1270,8 +1271,8 @@ const styles = StyleSheet.create({
   },
   paneHeader: {
     backgroundColor: '#2d2a1e',
-    paddingVertical: 9,
-    paddingHorizontal: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1295,8 +1296,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#1b1b1b',
     borderBottomWidth: 2,
     borderBottomColor: '#4d4d4d',
-    paddingVertical: 7,
-    paddingHorizontal: 11,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
   },
   bufferHeader: {
     color: '#a3a3a3',
@@ -1308,7 +1309,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderTopWidth: 1,
     borderTopColor: '#333333',
   },
@@ -1322,7 +1323,7 @@ const styles = StyleSheet.create({
   bufferClearAllBtn: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 5,
     backgroundColor: '#333333',
     borderWidth: 1,
     borderColor: '#666666',
@@ -1336,15 +1337,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
-    paddingHorizontal: 11,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#363636',
     backgroundColor: '#2a2a2a',
   },
   tradeRowInfo: {
     flex: 1,
-    paddingRight: 8,
+    paddingRight: 10,
   },
   tradeRowName: {
     color: '#f0f0f0',
@@ -1354,19 +1355,19 @@ const styles = StyleSheet.create({
   tradeRowBasics: {
     color: '#a8a8a8',
     fontSize: 11,
-    marginTop: 1,
+    marginTop: 2,
   },
   tradeRowPrice: {
     color: '#f0e68c',
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 3,
   },
   tradeRowPriceBuy: {
     color: '#d4af37',
     fontSize: 12,
     fontWeight: '700',
-    marginTop: 2,
+    marginTop: 3,
   },
   tradeRowBtns: {
     flexDirection: 'row',
@@ -1376,7 +1377,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3a3a1e',
     borderWidth: 1,
     borderColor: '#f0e68c',
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 5,
   },
@@ -1384,7 +1385,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#333333',
     borderWidth: 1,
     borderColor: '#777777',
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 5,
   },
@@ -1394,15 +1395,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   barterFooter: {
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 14,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#444444',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   barterBalanceCol: {
     flex: 1,
@@ -1434,9 +1435,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clearBufBtn: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 5,
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#777777',
@@ -1449,7 +1450,7 @@ const styles = StyleSheet.create({
   commitTradeBtn: {
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 5,
     backgroundColor: '#3a3a1e',
     borderWidth: 1,
     borderColor: '#f0e68c',

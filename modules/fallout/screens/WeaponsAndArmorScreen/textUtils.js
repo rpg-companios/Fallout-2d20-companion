@@ -1,26 +1,28 @@
 import React from 'react';
-import { Text, Image } from 'react-native';
+import { Text, Image, StyleSheet } from 'react-native';
 
 const iconMap = {
   '{CD}': require('../../../../assets/CD.png'),
   '{/CD}': require('../../../../assets/CD.png'),
+  '{CAP}': require('../../assets/backgrounds/caps.png'),
 };
 
 const iconRegex = new RegExp(`(${Object.keys(iconMap).join('|')})`, 'g');
 
 // ---------------------------------------------------------------------------
-// Inline-разметка: **жирный**, *курсив*, токены кубика {CD}/{/CD}.
+// Inline-разметка: **жирный**, *курсив*, токены кубика {CD}/{/CD} и крышки {CAP}.
 // Возвращает плоский массив <Text>-узлов внутри одного родительского <Text>
 // (вложенные <Text> в RN наследуют стиль и дают акценты без разрыва строки).
 // ---------------------------------------------------------------------------
 
-const INLINE_TOKEN_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|\{\/?CD\})/g;
+const INLINE_TOKEN_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|\{\/?CD\}|\{CAP\})/g;
 
 const renderInline = (text, baseStyle, keyPrefix = 'it') => {
   if (text == null) return null;
-  const fontSize = baseStyle?.fontSize || 14;
-  const iconSize = fontSize + 10;
-  const verticalShift = Math.round(iconSize / 6);
+  const flat = StyleSheet.flatten(baseStyle) || {};
+  const fontSize = flat.fontSize || 14;
+  const cdSize = fontSize + 6;
+  const capSize = fontSize + 7;
 
   return String(text)
     .split(INLINE_TOKEN_RE)
@@ -28,11 +30,15 @@ const renderInline = (text, baseStyle, keyPrefix = 'it') => {
     .map((part, index) => {
       const key = `${keyPrefix}-${index}`;
       if (iconMap[part]) {
+        const isCap = part === '{CAP}';
+        const size = isCap ? capSize : cdSize;
+        const verticalShift = Math.round(size / 5);
         return (
           <Image
             key={key}
             source={iconMap[part]}
-            style={{ width: iconSize, height: iconSize, transform: [{ translateY: verticalShift }] }}
+            resizeMode="contain"
+            style={{ width: size, height: size, transform: [{ translateY: verticalShift }] }}
           />
         );
       }
@@ -104,20 +110,24 @@ export const setupRichText = () => {
   const testRe = new RegExp(tokenRe.source); // без флага g — безопасный .test()
 
   const toNodes = (str, baseStyle) => {
-    const fontSize = baseStyle?.fontSize || 14;
-    const iconSize = fontSize + 10;
-    const verticalShift = Math.round(iconSize / 6);
-    return String(str).split(tokenRe).filter(Boolean).map((part, index) =>
-      iconMap[part]
-        ? (
-          <Image
-            key={`icon-${index}`}
-            source={iconMap[part]}
-            style={{ width: iconSize, height: iconSize, transform: [{ translateY: verticalShift }] }}
-          />
-        )
-        : part
-    );
+    const flat = StyleSheet.flatten(baseStyle) || {};
+    const fontSize = flat.fontSize || 14;
+    const cdSize = fontSize + 6;
+    const capSize = fontSize + 7;
+    return String(str).split(tokenRe).filter(Boolean).map((part, index) => {
+      if (!iconMap[part]) return part;
+      const isCap = part === '{CAP}';
+      const size = isCap ? capSize : cdSize;
+      const verticalShift = Math.round(size / 5);
+      return (
+        <Image
+          key={`icon-${index}`}
+          source={iconMap[part]}
+          resizeMode="contain"
+          style={{ width: size, height: size, transform: [{ translateY: verticalShift }] }}
+        />
+      );
+    });
   };
 
   const originalRender = Text.render;

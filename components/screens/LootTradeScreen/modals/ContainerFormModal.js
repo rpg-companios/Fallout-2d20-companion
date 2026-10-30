@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade } from '../logic/lootTradeI18n';
+import IconText from '../../../lootTrade/LootTradeIconText';
 import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
 import {
   CONTAINER_KIND,
@@ -173,7 +174,7 @@ const ContainerFormModal = ({
 
             {isMerchant && (
               <>
-                <Text style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</Text>
+                <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
                 <View style={styles.counterRow}>
                   <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-10)}>
                     <Text style={styles.stepBtnText}>−10</Text>
@@ -206,9 +207,9 @@ const ContainerFormModal = ({
                       style={[styles.unitSeg, capsUnit === uKey && styles.unitSegActive]}
                       onPress={() => setCapsUnit(uKey)}
                     >
-                      <Text style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
+                      <IconText style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
                         {uLabel}
-                      </Text>
+                      </IconText>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -251,49 +252,51 @@ const ContainerFormModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.68)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
   },
   card: {
-    width: '100%',
+    width: '90%',
     maxWidth: 520,
-    maxHeight: '90%',
+    maxHeight: '82%',
     backgroundColor: '#1f1f1f',
-    borderRadius: 12,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#f0e68c',
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
   },
   title: {
     color: '#f0e68c',
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   scroll: { flexGrow: 0 },
-  scrollContent: { paddingBottom: 8 },
+  scrollContent: { paddingBottom: 10 },
   label: {
     color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: 12,
+    marginBottom: 6,
   },
   input: {
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#5a5a5a',
-    borderRadius: 8,
+    borderRadius: 5,
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     color: '#f2f2f2',
     fontSize: 14,
   },
   multilineInput: {
-    minHeight: 62,
+    minHeight: 64,
     textAlignVertical: 'top',
   },
   warnText: {
@@ -304,8 +307,8 @@ const styles = StyleSheet.create({
   hintText: {
     color: '#a3a3a3',
     fontSize: 11,
-    marginTop: 3,
-    lineHeight: 15,
+    marginTop: 4,
+    lineHeight: 16,
   },
   roomChips: {
     flexDirection: 'row',
@@ -313,9 +316,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   roomChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e2e2e',
     minWidth: 38,
     height: 38,
-    borderRadius: 8,
+    borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 8,
@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#777777',
-    borderRadius: 8,
+    borderRadius: 5,
     width: 96,
     height: 38,
     textAlign: 'center',
@@ -375,12 +378,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 6,
+    marginTop: 8,
   },
   unitSeg: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
+    paddingVertical: 7,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
@@ -400,12 +403,12 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   btn: {
     flex: 1,
-    paddingVertical: 11,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 5,
     alignItems: 'center',
     borderWidth: 1,
   },
