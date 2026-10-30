@@ -123,24 +123,29 @@ export const startGmSessionPersistence = () => {
                       try {
                         await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
                         await db.deleteGmContainer(emptiedChild.id);
-                        const freshHub = await db.getGmContainerById(existing.id);
-                        if (freshHub && freshHub.kind === 'hub') {
-                          const prunedLinks = (freshHub.links || []).filter(
-                            (l) => l.containerId !== emptiedChild.id,
-                          );
-                          await db.saveGmContainer({ ...freshHub, links: prunedLinks });
-                          void syncGmContainerToCloudIfEnabled(freshHub.id);
-                          const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
-                          if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
-                            const prunedNodes = (liveNow.nodes || []).filter(
-                              (n) => n.containerId !== emptiedChild.id,
+                        const allNow = await db.getGmContainersList();
+                        for (const item of allNow) {
+                          if (
+                            item.kind === 'hub'
+                            && (item.links || []).some((l) => l.containerId === emptiedChild.id)
+                          ) {
+                            const prunedLinks = item.links.filter(
+                              (l) => l.containerId !== emptiedChild.id,
                             );
-                            await useRoomStore.getState().updateRoomSessionRates({
-                              code,
-                              sessionId: liveNow.sessionId,
-                              nodes: prunedNodes,
-                            }).catch(() => {});
+                            await db.saveGmContainer({ ...item, links: prunedLinks });
+                            void syncGmContainerToCloudIfEnabled(item.id);
                           }
+                        }
+                        const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
+                        if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
+                          const prunedNodes = (liveNow.nodes || []).filter(
+                            (n) => n.containerId !== emptiedChild.id,
+                          );
+                          await useRoomStore.getState().updateRoomSessionRates({
+                            code,
+                            sessionId: liveNow.sessionId,
+                            nodes: prunedNodes,
+                          }).catch(() => {});
                         }
                         notifyGmContainerUpdated(emptiedChild.id);
                       } catch (err) {
@@ -198,6 +203,19 @@ export const startGmSessionPersistence = () => {
                   try {
                     await deleteGmContainerFromCloudIfEnabled(existing.id);
                     await db.deleteGmContainer(existing.id);
+                    const allNow = await db.getGmContainersList();
+                    for (const item of allNow) {
+                      if (
+                        item.kind === 'hub'
+                        && (item.links || []).some((l) => l.containerId === existing.id)
+                      ) {
+                        const prunedLinks = item.links.filter(
+                          (l) => l.containerId !== existing.id,
+                        );
+                        await db.saveGmContainer({ ...item, links: prunedLinks });
+                        void syncGmContainerToCloudIfEnabled(item.id);
+                      }
+                    }
                     notifyGmContainerUpdated(existing.id);
                   } catch (err) {
                     debugLog('gm.sessionPersistence.deleteEmpty:failed', {

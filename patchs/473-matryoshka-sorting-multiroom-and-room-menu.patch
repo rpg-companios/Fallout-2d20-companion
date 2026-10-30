@@ -1,0 +1,2748 @@
+diff --git a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+index b3ea421..5af48dd 100644
+--- a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
++++ b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+@@ -126,6 +126,7 @@ describe('Патч 468 — локальная БД gm_containers, облачна
+       'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
+       'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js',
+       'components/screens/LootTradeScreen/modals/ContainerCatalogModal.js',
++      'components/screens/LootTradeScreen/modals/HubChildPickerModal.js',
+       'components/screens/LootTradeScreen/modals/IssueContainerModal.js',
+       'components/lootTrade/PlayerLootTradeOverlay.js',
+     ];
+diff --git a/__tests__/lootTrade/matryoshka-rooms-473.test.js b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+new file mode 100644
+index 0000000..a8b8e17
+--- /dev/null
++++ b/__tests__/lootTrade/matryoshka-rooms-473.test.js
+@@ -0,0 +1,348 @@
++import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
++import fs from 'fs';
++import path from 'path';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++  Alert: { alert: vi.fn() },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: vi.fn(),
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn(() => Promise.resolve()),
++  deleteGmContainerFromCloudIfEnabled: vi.fn(() => Promise.resolve()),
++}));
++
++import * as db from '../../db/Database.web.js';
++import {
++  CONTAINER_KIND,
++  analyzeHubDeletion,
++  buildHubSessionNodes,
++  duplicateContainerEntity,
++  getHubIdsContainingChild,
++  isContainerVisibleOnRoot,
++  normalizeContainerEntity,
++  normalizeRoomCodes,
++  sortContainersForRoot,
++} from '../../domain/lootTrade';
++import { createRoomServer } from '../../server/roomServer.js';
++import { MESSAGE } from '../../server/protocol.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import { setCurrentLocale } from '../../i18n/locale';
++
++const waitFor = async (predicate, timeoutMs = 4000) => {
++  const started = Date.now();
++  while (Date.now() - started < timeoutMs) {
++    const val = await predicate();
++    if (val) return val;
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('Timed out waiting for condition');
++};
++
++describe('Patch 473 — Matryoshka organization, sorting, multi-room Locations & GM room ⋮ menu', () => {
++  let app = null;
++  let wsUrl = '';
++
++  beforeEach(async () => {
++    setCurrentLocale('ru-RU');
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++    await db.initDatabase();
++    const existing = await db.getGmContainersList();
++    for (const c of existing) {
++      await db.deleteGmContainer(c.id);
++    }
++
++    app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const started = await app.start();
++    wsUrl = `ws://127.0.0.1:${started.port}/ws`;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++  });
++
++  afterEach(async () => {
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    if (app) {
++      await app.close();
++      app = null;
++    }
++  });
++
++  it('сортирует корневой экран строго: Локации -> Сундуки -> Торговцы и скрывает упакованные в локации карточки', () => {
++    const merchRoot = normalizeContainerEntity({
++      id: 'm_root',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Бродячий караванщик',
++    });
++    const lootRoot = normalizeContainerEntity({
++      id: 'l_root',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Ящик у дороги',
++    });
++    const lootInsideHub = normalizeContainerEntity({
++      id: 'l_nested',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Сейф мэра',
++      inRoot: false,
++    });
++    const merchSharedPinnedRoot = normalizeContainerEntity({
++      id: 'm_shared_root',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Артуро Родригес',
++      inRoot: true,
++    });
++    const hubB = normalizeContainerEntity({
++      id: 'hub_b',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Санкчуари-Хиллз',
++      roomCodes: ['GM-AAA111'],
++      links: [{ containerId: 'm_shared_root', locked: false }],
++    });
++    const hubA = normalizeContainerEntity({
++      id: 'hub_a',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Даймонд-Сити',
++      roomCodes: ['GM-AAA111', 'GM-BBB222'],
++      links: [
++        { containerId: 'l_nested', locked: true, lockLabel: 'Сложность 2' },
++        { containerId: 'm_shared_root', locked: false },
++      ],
++    });
++
++    const all = [merchRoot, lootInsideHub, hubB, lootRoot, merchSharedPinnedRoot, hubA];
++    const visibleOnRoot = sortContainersForRoot(all.filter((c) => isContainerVisibleOnRoot(c, all)));
++
++    expect(visibleOnRoot.map((c) => `${c.kind}:${c.name}`)).toEqual([
++      'hub:Даймонд-Сити',
++      'hub:Санкчуари-Хиллз',
++      'loot:Ящик у дороги',
++      'merchant:Артуро Родригес',
++      'merchant:Бродячий караванщик',
++    ]);
++
++    // Сейф мэра привязан к Даймонд-Сити и не засоряет корневой экран
++    expect(isContainerVisibleOnRoot(lootInsideHub, all)).toBe(false);
++    // Артуро одновременно состоит в двух локациях
++    expect(getHubIdsContainingChild('m_shared_root', all)).toEqual(['hub_b', 'hub_a']);
++  });
++
++  it('умно анализирует удаление локации: отличает эксклюзивные вложения от общих с другими локациями', () => {
++    const exclusiveChest = normalizeContainerEntity({
++      id: 'l_only_dc',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Тайник Пайпер',
++    });
++    const sharedTrader = normalizeContainerEntity({
++      id: 'm_caravan',
++      kind: CONTAINER_KIND.MERCHANT,
++      name: 'Урна Карла',
++    });
++    const diamondCity = normalizeContainerEntity({
++      id: 'hub_dc',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Даймонд-Сити',
++      roomCodes: ['GM-111111'],
++      links: [
++        { containerId: 'l_only_dc', locked: false },
++        { containerId: 'm_caravan', locked: false },
++      ],
++    });
++    const bunkerHill = normalizeContainerEntity({
++      id: 'hub_bh',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Банкер-Хилл',
++      roomCodes: ['GM-111111'],
++      links: [{ containerId: 'm_caravan', locked: false }],
++    });
++
++    const mixedReport = analyzeHubDeletion('hub_dc', [
++      exclusiveChest,
++      sharedTrader,
++      diamondCity,
++      bunkerHill,
++    ]);
++    expect(mixedReport.allExclusive).toBe(false);
++    expect(mixedReport.exclusiveChildren.map((c) => c.id)).toEqual(['l_only_dc']);
++    expect(mixedReport.sharedChildren.map((c) => c.id)).toEqual(['m_caravan']);
++
++    // Если Банкер-Хилл содержит только общую Урну Карла — эксклюзивных вложений 0
++    const sharedOnlyReport = analyzeHubDeletion('hub_bh', [
++      exclusiveChest,
++      sharedTrader,
++      diamondCity,
++      bunkerHill,
++    ]);
++    expect(sharedOnlyReport.exclusiveChildren).toEqual([]);
++    expect(sharedOnlyReport.sharedChildren.map((c) => c.id)).toEqual(['m_caravan']);
++
++    // Если все вложения принадлежат только одной локации — allExclusive = true
++    const soloHub = normalizeContainerEntity({
++      id: 'hub_solo',
++      kind: CONTAINER_KIND.HUB,
++      name: 'Убежище 81',
++      roomCodes: ['GM-111111'],
++      links: [{ containerId: 'l_only_dc', locked: false }],
++    });
++    const allExclusiveReport = analyzeHubDeletion('hub_solo', [exclusiveChest, soloHub]);
++    expect(allExclusiveReport.allExclusive).toBe(true);
++    expect(allExclusiveReport.exclusiveChildren.map((c) => c.id)).toEqual(['l_only_dc']);
++    expect(allExclusiveReport.sharedChildren).toEqual([]);
++  });
++
++  it('сохраняет мульти-комнатные локации и непривязанные сундуки/торговцев в SQLite и выдаёт их в любую выбранную комнату', async () => {
++    expect(normalizeRoomCodes(['gm-7q3k9m', 'GM-EF34GH', 'GM-7Q3K9M', '  '])).toEqual([
++      'GM-7Q3K9M',
++      'GM-EF34GH',
++    ]);
++
++    const roomAlpha = await useRoomStore.getState().createRoom({ name: 'Партия Альфа' });
++    const roomBeta = await useRoomStore.getState().createRoom({ name: 'Партия Бета' });
++    await useRoomStore.getState().joinRoom({ code: roomAlpha.code, name: 'GM', role: 'gm' });
++    await useRoomStore.getState().joinRoom({ code: roomBeta.code, name: 'GM', role: 'gm' });
++
++    const unboundChest = await db.saveGmContainer({
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Полевой тайник Братства',
++      items: [{ itemId: 'stimpak', itemType: 'chem', name: 'Стимулятор', quantity: 3, cost: 50 }],
++    });
++    expect(unboundChest.roomCode).toBe('');
++    expect(unboundChest.roomCodes).toEqual([]);
++
++    const multiRoomHub = await db.saveGmContainer({
++      kind: CONTAINER_KIND.HUB,
++      name: 'Красная Ракета',
++      roomCodes: [roomAlpha.code, roomBeta.code],
++      links: [{ containerId: unboundChest.id, locked: false }],
++    });
++    expect(multiRoomHub.roomCodes).toEqual([roomAlpha.code, roomBeta.code]);
++    expect(multiRoomHub.roomCode).toBe(roomAlpha.code);
++
++    const duplicatedHub = duplicateContainerEntity(multiRoomHub, { existingNames: [multiRoomHub.name] });
++    expect(duplicatedHub.roomCodes).toEqual([roomAlpha.code, roomBeta.code]);
++
++    const reloadedHub = await db.getGmContainerById(multiRoomHub.id);
++    expect(reloadedHub.roomCodes).toEqual([roomAlpha.code, roomBeta.code]);
++
++    // Выдаём одну и ту же мульти-комнатную локацию во вторую комнату roomBeta
++    const allCards = await db.getGmContainersList();
++    const opened = await useRoomStore.getState().openRoomSession({
++      code: roomBeta.code,
++      session: {
++        containerId: reloadedHub.id,
++        kind: CONTAINER_KIND.HUB,
++        name: reloadedHub.name,
++        targetType: 'room',
++        items: [],
++        nodes: buildHubSessionNodes(reloadedHub, allCards),
++      },
++    });
++    expect(opened.kind).toBe('hub');
++    expect(useRoomStore.getState().rooms[roomBeta.code]?.activeSession?.containerId).toBe(reloadedHub.id);
++    expect(useRoomStore.getState().rooms[roomAlpha.code]?.activeSession).toBeNull();
++  });
++
++  it('переименование комнаты Мастера через createRoom обновляет имя в реестре и рассылает ROOM_MEMBER подключённым игрокам', async () => {
++    const created = await useRoomStore.getState().createRoom({
++      name: 'Кампния с опечаткой',
++    });
++    const roomCode = created.code;
++    expect(created.name).toBe('Кампния с опечаткой');
++    await useRoomStore.getState().joinRoom({ code: roomCode, name: 'GM', role: 'gm' });
++
++    // Подключаем независимый клиент игрока к комнате roomCode
++    const playerMessages = [];
++    const playerClient = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-rename-1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => playerMessages.push(m),
++    });
++    try {
++      await waitFor(() => playerClient.getStatus() === 'online');
++      playerClient.send(
++        MESSAGE.ROOM_JOIN,
++        { code: roomCode, name: 'Выживший', role: 'player', requestId: 'join-p1' },
++        roomCode,
++      );
++      await waitFor(() => playerMessages.some(
++        (m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'join-p1',
++      ));
++
++      // Мастер исправляет опечатку в названии комнаты внутри открытой комнаты (⋮ -> Редактировать)
++      const rebound = await useRoomStore.getState().createRoom({
++        requestedCode: roomCode,
++        ownerToken: created.ownerToken,
++        name: 'Кампания Содружества',
++      });
++      expect(rebound.code).toBe(roomCode);
++      expect(rebound.name).toBe('Кампания Содружества');
++      expect(useRoomStore.getState().rooms[roomCode]?.joined).toBe(true);
++      expect(useRoomStore.getState().rooms[roomCode]?.name).toBe('Кампания Содружества');
++
++      await waitFor(() => playerMessages.some(
++        (m) => m.type === MESSAGE.ROOM_MEMBER && m.payload?.name === 'Кампания Содружества',
++      ));
++    } finally {
++      playerClient.close();
++    }
++  });
++
++  it('сохраняет текстовые строки внутри локации (без витрины карточек), перетаскивание arrow-all и меню ⋮ внутри комнаты Мастера', () => {
++    const repoRoot = path.resolve(__dirname, '../..');
++    const lootScreenSrc = fs.readFileSync(
++      path.join(repoRoot, 'components/screens/LootTradeScreen/LootTradeScreen.js'),
++      'utf8',
++    );
++    const formModalSrc = fs.readFileSync(
++      path.join(repoRoot, 'components/screens/LootTradeScreen/modals/ContainerFormModal.js'),
++      'utf8',
++    );
++    const homeScreenSrc = fs.readFileSync(
++      path.join(repoRoot, 'components/screens/HomeScreen/HomeScreen.js'),
++      'utf8',
++    );
++
++    // 1. На корневом экране порядок плиток создания: Локация -> Контейнер -> Торговец
++    const idxHub = lootScreenSrc.indexOf("type: 'createHub'");
++    const idxLoot = lootScreenSrc.indexOf("type: 'createLoot'");
++    const idxMerch = lootScreenSrc.indexOf("type: 'createMerchant'");
++    expect(idxHub).toBeGreaterThan(-1);
++    expect(idxHub).toBeLessThan(idxLoot);
++    expect(idxLoot).toBeLessThan(idxMerch);
++
++    // 2. Внутри локации сохранён текстовый список hubChildRow + вынос на экран, а на корне есть PanResponder перетаскивания
++    expect(lootScreenSrc).toContain('styles.hubChildRow');
++    expect(lootScreenSrc).toContain('handleMoveChildOutToRoot');
++    expect(lootScreenSrc).toContain('handleMoveCardIntoHub');
++    expect(lootScreenSrc).toContain('analyzeHubDeletion');
++
++    // 3. При создании сундука/торговца нет привязки к комнате — есть опциональная привязка к локации, а у локации мультивыбор комнат
++    expect(formModalSrc).toContain('selectedRoomCodes');
++    expect(formModalSrc).toContain('selectedHubIds');
++    expect(formModalSrc).toContain("tLootTrade('form.bindHubsLabel')");
++    expect(formModalSrc).toContain("tLootTrade('form.roomsMultiLabel')");
++
++    // 4. Внутри открытой комнаты Мастера есть кнопка ⋮ с «Редактировать» и «Удалить»
++    expect(homeScreenSrc).toContain('openInsideRoomMenu');
++    expect(homeScreenSrc).toContain('handleSaveRoomEdit');
++    expect(homeScreenSrc).toContain("tHomeScreen('room.edit')");
++    expect(homeScreenSrc).toContain("tHomeScreen('room.delete')");
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index ed59d31..aeb5d2d 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -532,6 +532,9 @@ export default function HomeScreen({ navigation }) {
+   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
+   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
+   const [copiedCode, setCopiedCode] = useState(null);
++  const [roomMenuPos, setRoomMenuPos] = useState(null);
++  const [roomEditModal, setRoomEditModal] = useState(null); // { folderId, name }
++  const roomMenuBtnRef = useRef(null);
+   const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
+ 
+   const [installPrompt, setInstallPrompt] = useState(null);
+@@ -1002,6 +1005,47 @@ export default function HomeScreen({ navigation }) {
+     if (confirmed) remove();
+   };
+ 
++  const openInsideRoomMenu = () => {
++    if (!roomMenuBtnRef.current?.measureInWindow) {
++      setRoomMenuPos({ top: 140, left: 24 });
++      return;
++    }
++    roomMenuBtnRef.current.measureInWindow((x, y, width, height) => {
++      const { width: winW, height: winH } = Dimensions.get('window');
++      const menuW = 196;
++      const menuH = 98;
++      const left = Math.max(8, Math.min(x + width - menuW, winW - menuW - 8));
++      const top = y + height + menuH + 8 <= winH
++        ? y + height + 4
++        : Math.max(8, y - menuH - 4);
++      setRoomMenuPos({ top, left });
++    });
++  };
++
++  const handleSaveRoomEdit = async () => {
++    if (!roomEditModal?.folderId) return;
++    const cleanName = String(roomEditModal.name || '').trim();
++    if (!cleanName) {
++      showHomeAlert(tHomeScreen('room.editEmptyWarn'));
++      return;
++    }
++    const targetFolderId = roomEditModal.folderId;
++    await db.renameCharacterFolder(targetFolderId, cleanName);
++    setActiveFolder((prev) => (prev && prev.id === targetFolderId ? { ...prev, name: cleanName } : prev));
++    setRoomEditModal(null);
++
++    const code = folderRooms[targetFolderId];
++    const record = folderRoomRecords[targetFolderId];
++    if (code && record?.ownerToken && roomServerAvailable) {
++      useRoomStore.getState().createRoom({
++        name: cleanName,
++        requestedCode: code,
++        ownerToken: record.ownerToken,
++      }).catch((err) => debugLog('room.rename:failed', { code, message: err?.message }));
++    }
++    await loadList();
++  };
++
+   const handleCreate = () => {
+     if (!bundledSettingActive) return;
+     resetCharacter();
+@@ -1329,7 +1373,33 @@ export default function HomeScreen({ navigation }) {
+         <Text style={styles.title}>{tHomeScreen("title")}</Text>
+         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
+       </View>
+-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>{!isGmMode && movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
++      {activeFolder && (
++        <View style={styles.folderHeader}>
++          <View style={styles.folderHeaderTopRow}>
++            <TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}>
++              <Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text>
++            </TouchableOpacity>
++            <TouchableOpacity
++              ref={roomMenuBtnRef}
++              style={styles.folderMenuButton}
++              onPress={openInsideRoomMenu}
++              hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
++              accessibilityLabel={tHomeScreen('room.openMenu')}
++            >
++              <MaterialCommunityIcons name="dots-vertical" size={20} color="#f0e68c" />
++            </TouchableOpacity>
++          </View>
++          <Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text>
++          <Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>
++          {!isGmMode && movingCharacterId && (
++            <View ref={rootDropRef} collapsable={false}>
++              <TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}>
++                <Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text>
++              </TouchableOpacity>
++            </View>
++          )}
++        </View>
++      )}
+       {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
+         <View style={styles.folderRoomBar}>
+           <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
+@@ -1738,6 +1808,73 @@ export default function HomeScreen({ navigation }) {
+           </View>
+         </View>
+       </Modal>
++      <Modal
++        visible={Boolean(roomMenuPos && activeFolder)}
++        transparent
++        animationType="none"
++        onRequestClose={() => setRoomMenuPos(null)}
++      >
++        <Pressable style={styles.characterActionBackdrop} onPress={() => setRoomMenuPos(null)}>
++          {roomMenuPos && activeFolder && (
++            <View style={[styles.characterActionMenu, roomMenuPos]}>
++              <TouchableOpacity
++                style={styles.characterActionItem}
++                onPress={() => {
++                  const target = activeFolder;
++                  setRoomMenuPos(null);
++                  setRoomEditModal({ folderId: target.id, name: target.name || '' });
++                }}
++              >
++                <MaterialCommunityIcons name="pencil-outline" size={19} color="#111827" />
++                <Text style={styles.characterActionText}>{tHomeScreen('room.edit')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity
++                style={styles.characterActionItem}
++                onPress={() => {
++                  const target = activeFolder;
++                  setRoomMenuPos(null);
++                  handleDeleteFolder(target);
++                }}
++              >
++                <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
++                <Text style={[styles.characterActionText, styles.characterActionDeleteText]}>
++                  {tHomeScreen('room.delete')}
++                </Text>
++              </TouchableOpacity>
++            </View>
++          )}
++        </Pressable>
++      </Modal>
++
++      <Modal
++        visible={Boolean(roomEditModal)}
++        transparent
++        animationType="fade"
++        onRequestClose={() => setRoomEditModal(null)}
++      >
++        <View style={styles.modalBackdropCenter}>
++          <View style={styles.roomEditCard}>
++            <Text style={styles.roomEditTitle}>{tHomeScreen('room.editTitle')}</Text>
++            <TextInput
++              style={styles.roomEditInput}
++              value={roomEditModal?.name || ''}
++              onChangeText={(val) => setRoomEditModal((prev) => (prev ? { ...prev, name: val } : null))}
++              placeholder={tHomeScreen('room.editPlaceholder')}
++              placeholderTextColor="#888888"
++              autoFocus
++              onSubmitEditing={handleSaveRoomEdit}
++            />
++            <View style={styles.roomEditButtonsRow}>
++              <TouchableOpacity style={styles.roomEditCancelBtn} onPress={() => setRoomEditModal(null)}>
++                <Text style={styles.roomEditCancelText}>{tHomeScreen('room.editCancel')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity style={styles.roomEditSaveBtn} onPress={handleSaveRoomEdit}>
++                <Text style={styles.roomEditSaveText}>{tHomeScreen('room.editSave')}</Text>
++              </TouchableOpacity>
++            </View>
++          </View>
++        </View>
++      </Modal>
+     </View>
+   );
+ }
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 94ef705..0e2898e 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -10,6 +10,7 @@ import {
+   TextInput,
+   Dimensions,
+   Platform,
++  PanResponder,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+@@ -29,14 +30,20 @@ import { formatRoomCodeForDisplay } from '../../../src/room/roomCode';
+ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
+ import {
+   CONTAINER_KIND,
++  CONTAINER_KIND_SORT_ORDER,
+   addOrMergeContainerItem,
++  analyzeHubDeletion,
+   buildHubSessionNodes,
+   computeMerchantSellPriceToPlayer,
+   getEffectiveMerchantRates,
++  getHubIdsContainingChild,
++  isContainerVisibleOnRoot,
+   normalizeBuyDepreciationPercent,
+   normalizeCapsAmount,
++  normalizeRoomCodes,
+   normalizeSaleMarkupPercent,
+   resolveQuantitySpec,
++  sortContainersForRoot,
+ } from '../../../domain/lootTrade';
+ import { getItemPrice, getItemWeight, resolveItem } from '../../../domain/resolveItem';
+ import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
+@@ -92,22 +99,63 @@ const ContainerCardCell = ({
+   container,
+   roomLabel,
+   isLive,
++  isDropTarget = false,
++  canMoveToHub = false,
++  cardRefCallback,
+   onOpen,
+   onIssueOrClose,
++  onMoveToHub,
+   onDuplicate,
+   onEdit,
+   onDelete,
++  onDragStart,
++  onDragMove,
++  onDragEnd,
+ }) => {
+   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
+   const isHub = container.kind === CONTAINER_KIND.HUB;
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
+ 
++  const dragCallbacks = useRef({});
++  dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };
++  const lastDragPoint = useRef({ pageX: 0, pageY: 0 });
++  const draggingRef = useRef(false);
++  const panResponder = useRef(PanResponder.create({
++    onStartShouldSetPanResponderCapture: () => true,
++    onMoveShouldSetPanResponderCapture: () => true,
++    onStartShouldSetPanResponder: () => true,
++    onMoveShouldSetPanResponder: () => true,
++    onPanResponderTerminationRequest: () => false,
++    onShouldBlockNativeResponder: () => true,
++    onPanResponderGrant: (_evt, gesture) => {
++      draggingRef.current = true;
++      lastDragPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
++      dragCallbacks.current.onDragStart?.(
++        { pageX: gesture.x0, pageY: gesture.y0 },
++        dragCallbacks.current.container,
++      );
++    },
++    onPanResponderMove: (_evt, gesture) => {
++      if (gesture.moveX === 0 && gesture.moveY === 0) return;
++      lastDragPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
++      dragCallbacks.current.onDragMove?.(lastDragPoint.current);
++    },
++    onPanResponderRelease: () => {
++      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
++      setTimeout(() => { draggingRef.current = false; }, 0);
++    },
++    onPanResponderTerminate: () => {
++      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
++      setTimeout(() => { draggingRef.current = false; }, 0);
++    },
++  })).current;
++
+   const openMenu = (event) => {
+     event?.stopPropagation?.();
+     menuBtnRef.current?.measureInWindow((x, y, width, height) => {
+       const { width: winW, height: winH } = Dimensions.get('window');
+-      const menuH = 184;
++      const menuH = canMoveToHub ? 226 : 184;
+       const left = Math.max(8, Math.min(x + width - MENU_WIDTH, winW - MENU_WIDTH - 8));
+       const top = y + height + menuH + 8 <= winH
+         ? y + height + 4
+@@ -130,10 +178,23 @@ const ContainerCardCell = ({
+ 
+   return (
+     <TouchableOpacity
+-      style={[styles.cardCell, isLive && styles.cardCellActive]}
+-      onPress={onOpen}
++      ref={cardRefCallback}
++      style={[
++        styles.cardCell,
++        isLive && styles.cardCellActive,
++        isDropTarget && styles.cardCellDropTarget,
++      ]}
++      onPress={() => {
++        if (!draggingRef.current) onOpen();
++      }}
+       activeOpacity={0.82}
+     >
++      {!isHub && onDragStart && (
++        <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
++          <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
++        </View>
++      )}
++
+       <View style={[
+         styles.cardHero,
+         isMerchant && styles.cardHeroMerchant,
+@@ -149,11 +210,13 @@ const ContainerCardCell = ({
+           size={34}
+           color="#f0e68c"
+         />
+-        <View style={styles.cardRoomChip}>
+-          <Text style={styles.cardRoomChipText} numberOfLines={1}>
+-            {roomLabel || formatRoomCodeForDisplay(container.roomCode)}
+-          </Text>
+-        </View>
++        {isHub && Boolean(roomLabel) && (
++          <View style={styles.cardRoomChip}>
++            <Text style={styles.cardRoomChipText} numberOfLines={1}>
++              {roomLabel}
++            </Text>
++          </View>
++        )}
+       </View>
+ 
+       <View style={styles.cardBody}>
+@@ -219,6 +282,16 @@ const ContainerCardCell = ({
+                 </Text>
+               </TouchableOpacity>
+ 
++              {canMoveToHub && onMoveToHub && (
++                <TouchableOpacity
++                  style={styles.actionMenuItem}
++                  onPress={() => runMenuAction(onMoveToHub)}
++                >
++                  <MaterialCommunityIcons name="map-marker-plus-outline" size={19} color="#d4af37" />
++                  <Text style={styles.actionMenuText}>{tLootTrade('card.moveToHub')}</Text>
++                </TouchableOpacity>
++              )}
++
+               <TouchableOpacity
+                 style={styles.actionMenuItem}
+                 onPress={() => runMenuAction(onDuplicate)}
+@@ -264,12 +337,17 @@ export default function LootTradeScreen() {
+   const [availableRooms, setAvailableRooms] = useState([]); // [{ folderId, name, code, ownerToken }]
+   const [activeContainerId, setActiveContainerId] = useState(null);
+ 
+-  // Модалки
++  // Модалки и перетаскивание в локации
+   const [formModal, setFormModal] = useState(null); // { kind, initialContainer }
+   const [catalogOpen, setCatalogOpen] = useState(false);
+   const [catalogFeedback, setCatalogFeedback] = useState('');
+   const [editingEntry, setEditingEntry] = useState(null);
+   const [hubPickerOpen, setHubPickerOpen] = useState(false);
++  const [moveToHubTarget, setMoveToHubTarget] = useState(null); // container для переноса через меню ⋮
++  const [movingContainerId, setMovingContainerId] = useState(null);
++  const [drag, setDrag] = useState(null); // { container, x, y }
++  const hubRefs = useRef({});
++  const hubDropBounds = useRef({});
+   const [returnHubId, setReturnHubId] = useState(null);
+   const [issueTargetContainer, setIssueTargetContainer] = useState(null);
+   const [issueBusy, setIssueBusy] = useState(false);
+@@ -337,14 +415,28 @@ export default function LootTradeScreen() {
+     }
+   }, [loading, activeContainerId, containers]);
+ 
+-  const getActiveSessionForContainer = useCallback((cnt) => {
+-    if (!cnt?.roomCode) return null;
+-    const active = roomRooms[cnt.roomCode]?.activeSession;
+-    if (!active || active.containerId !== cnt.id) return null;
+-    return active;
++  const getActiveLiveEntriesForContainer = useCallback((cnt) => {
++    if (!cnt?.id) return [];
++    const matches = [];
++    for (const [code, roomState] of Object.entries(roomRooms || {})) {
++      const active = roomState?.activeSession;
++      if (active && active.containerId === cnt.id) {
++        matches.push({ roomCode: code, session: active });
++      }
++    }
++    return matches;
+   }, [roomRooms]);
+ 
+-  const activeLiveSession = activeContainer ? getActiveSessionForContainer(activeContainer) : null;
++  const getActiveSessionForContainer = useCallback((cnt) => {
++    const entries = getActiveLiveEntriesForContainer(cnt);
++    return entries[0]?.session || null;
++  }, [getActiveLiveEntriesForContainer]);
++
++  const activeLiveEntry = activeContainer
++    ? (getActiveLiveEntriesForContainer(activeContainer)[0] || null)
++    : null;
++  const activeLiveSession = activeLiveEntry?.session || null;
++  const activeLiveRoomCode = activeLiveEntry?.roomCode || activeContainer?.roomCode || '';
+ 
+   const liveHubMerchants = useMemo(() => {
+     if (!activeLiveSession || activeLiveSession.kind !== CONTAINER_KIND.HUB) return [];
+@@ -422,13 +514,13 @@ export default function LootTradeScreen() {
+     setContainers(freshList || []);
+     void syncGmContainerToCloudIfEnabled(saved.id);
+ 
+-    // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем
+-    const live = getActiveSessionForContainer(saved);
+-    if (live) {
++    // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
++    const liveEntries = getActiveLiveEntriesForContainer(saved);
++    for (const { roomCode: liveCode, session: live } of liveEntries) {
+       try {
+         if (saved.kind === CONTAINER_KIND.HUB) {
+           await useRoomStore.getState().updateRoomSessionRates({
+-            code: saved.roomCode,
++            code: liveCode,
+             sessionId: live.sessionId,
+             name: saved.name,
+             description: saved.description,
+@@ -436,7 +528,7 @@ export default function LootTradeScreen() {
+           });
+         } else {
+           await useRoomStore.getState().updateRoomSessionRates({
+-            code: saved.roomCode,
++            code: liveCode,
+             sessionId: live.sessionId,
+             name: saved.name,
+             description: saved.description,
+@@ -487,10 +579,37 @@ export default function LootTradeScreen() {
+     return saved;
+   };
+ 
+-  const handleSaveContainerForm = async (draft, capsRollInfo) => {
++  const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
+     const cleanDraft = { ...draft };
+     delete cleanDraft.__isDuplicateDraft;
++
++    if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
++      cleanDraft.inRoot = false;
++    }
++
+     const saved = await persistAndSyncContainer(cleanDraft);
++
++    if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
++      const targetHubSet = new Set(selectedHubIds);
++      const currentList = await db.getGmContainersList();
++      for (const item of currentList) {
++        if (item.kind !== CONTAINER_KIND.HUB) continue;
++        const hasLink = (item.links || []).some((l) => l.containerId === saved.id);
++        const shouldHaveLink = targetHubSet.has(item.id);
++        if (shouldHaveLink && !hasLink) {
++          await persistAndSyncContainer({
++            ...item,
++            links: [...(item.links || []), { containerId: saved.id, locked: false, lockLabel: '' }],
++          });
++        } else if (!shouldHaveLink && hasLink) {
++          await persistAndSyncContainer({
++            ...item,
++            links: (item.links || []).filter((l) => l.containerId !== saved.id),
++          });
++        }
++      }
++    }
++
+     setFormModal(null);
+     if (!activeContainerId && !draft.id) {
+       setActiveContainerId(saved.id);
+@@ -504,6 +623,90 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  const handleMoveCardIntoHub = async (cardId, hubId) => {
++    if (!cardId || !hubId) return;
++    const card = containers.find((c) => c.id === cardId);
++    const hub = containers.find((c) => c.id === hubId && c.kind === CONTAINER_KIND.HUB);
++    if (!card || !hub || card.kind === CONTAINER_KIND.HUB) return;
++
++    if (card.inRoot) {
++      await db.saveGmContainer({ ...card, inRoot: false });
++      void syncGmContainerToCloudIfEnabled(card.id);
++    }
++
++    const alreadyLinked = (hub.links || []).some((l) => l.containerId === card.id);
++    if (!alreadyLinked) {
++      await persistAndSyncContainer({
++        ...hub,
++        links: [...(hub.links || []), { containerId: card.id, locked: false, lockLabel: '' }],
++      });
++    } else {
++      await loadData();
++    }
++    setMovingContainerId(null);
++    setDrag(null);
++    hubDropBounds.current = {};
++  };
++
++  const handleMoveChildOutToRoot = async (childId) => {
++    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
++    const otherHubIds = getHubIdsContainingChild(childId, containers)
++      .filter((hid) => hid !== activeContainer.id);
++    const child = containers.find((c) => c.id === childId);
++    if (child) {
++      const nextInRoot = otherHubIds.length > 0;
++      if (Boolean(child.inRoot) !== nextInRoot) {
++        await db.saveGmContainer({ ...child, inRoot: nextInRoot });
++        void syncGmContainerToCloudIfEnabled(child.id);
++      }
++    }
++    const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
++    await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
++  };
++
++  const measureHubDropTargets = useCallback(() => {
++    const entries = Object.entries(hubRefs.current).map(([id, ref]) => new Promise((resolve) => {
++      if (!ref?.measureInWindow) {
++        resolve();
++        return;
++      }
++      ref.measureInWindow((x, y, width, height) => {
++        hubDropBounds.current[id] = { x, y, width, height };
++        resolve();
++      });
++    }));
++    return Promise.all(entries);
++  }, []);
++
++  const handleDragStart = async (point, card) => {
++    if (!card || card.kind === CONTAINER_KIND.HUB) return;
++    hubDropBounds.current = {};
++    setMovingContainerId(card.id);
++    setDrag({ container: card, x: point.pageX, y: point.pageY });
++    await measureHubDropTargets();
++  };
++
++  const handleDragMove = (point) => {
++    setDrag((cur) => (cur ? { ...cur, x: point.pageX, y: point.pageY } : null));
++  };
++
++  const handleDragEnd = async (point) => {
++    await measureHubDropTargets();
++    const hit = Object.entries(hubDropBounds.current).find(([, b]) => (
++      b
++      && point.pageX >= b.x
++      && point.pageX <= b.x + b.width
++      && point.pageY >= b.y
++      && point.pageY <= b.y + b.height
++    ));
++    if (hit && movingContainerId) {
++      await handleMoveCardIntoHub(movingContainerId, hit[0]);
++    } else {
++      setMovingContainerId(null);
++      setDrag(null);
++    }
++  };
++
+   const handleDuplicateCard = async (container) => {
+     try {
+       const copy = await db.duplicateGmContainer(container.id, tLootTrade('card.copySuffix'));
+@@ -519,7 +722,96 @@ export default function LootTradeScreen() {
+     }
+   };
+ 
++  const closeAllLiveSessionsForCard = async (card) => {
++    const liveEntries = getActiveLiveEntriesForContainer(card);
++    for (const { roomCode: liveCode, session: live } of liveEntries) {
++      await useRoomStore.getState().closeRoomSession({
++        code: liveCode,
++        sessionId: live.sessionId,
++      }).catch(() => {});
++    }
++  };
++
+   const handleDeleteCard = async (container) => {
++    if (container.kind === CONTAINER_KIND.HUB) {
++      const { exclusiveChildren, sharedChildren, allExclusive } = analyzeHubDeletion(
++        container.id,
++        containers,
++      );
++
++      let decision = 'cancel';
++      if (exclusiveChildren.length > 0) {
++        const message = allExclusive
++          ? formatLootTrade(tLootTrade('detail.deleteHubAllExclusiveMessage'), {
++              name: container.name,
++              count: exclusiveChildren.length,
++            })
++          : formatLootTrade(tLootTrade('detail.deleteHubMixedMessage'), {
++              name: container.name,
++              exclusiveCount: exclusiveChildren.length,
++              sharedCount: sharedChildren.length,
++            });
++        decision = await new Promise((resolve) => {
++          showRawAlert({
++            title: tLootTrade('detail.deleteHubConfirmTitle'),
++            message,
++            buttons: [
++              { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve('cancel') },
++              { text: tLootTrade('detail.deleteHubMoveOutOnly'), onPress: () => resolve('moveOut') },
++              {
++                text: tLootTrade('detail.deleteHubWithChildren'),
++                style: 'destructive',
++                onPress: () => resolve('deleteAll'),
++              },
++            ],
++          });
++        });
++      } else {
++        const message = sharedChildren.length > 0
++          ? formatLootTrade(tLootTrade('detail.deleteHubSharedOnlyMessage'), {
++              name: container.name,
++              sharedCount: sharedChildren.length,
++            })
++          : formatLootTrade(tLootTrade('detail.deleteConfirmMessage'), { name: container.name });
++        const ok = await new Promise((resolve) => {
++          showRawAlert({
++            title: tLootTrade('detail.deleteHubConfirmTitle'),
++            message,
++            buttons: [
++              { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve(false) },
++              { text: tLootTrade('card.delete'), style: 'destructive', onPress: () => resolve(true) },
++            ],
++          });
++        });
++        decision = ok ? 'deleteHubOnly' : 'cancel';
++      }
++
++      if (decision === 'cancel') return;
++
++      await closeAllLiveSessionsForCard(container);
++
++      if (decision === 'moveOut') {
++        for (const child of exclusiveChildren) {
++          await db.saveGmContainer({ ...child, inRoot: true });
++          void syncGmContainerToCloudIfEnabled(child.id);
++        }
++      } else if (decision === 'deleteAll') {
++        for (const child of exclusiveChildren) {
++          await closeAllLiveSessionsForCard(child);
++          await deleteGmContainerFromCloudIfEnabled(child.id);
++          await db.deleteGmContainer(child.id);
++          if (activeContainerId === child.id) setActiveContainerId(null);
++        }
++      }
++
++      await deleteGmContainerFromCloudIfEnabled(container.id);
++      await db.deleteGmContainer(container.id);
++      if (activeContainerId === container.id) setActiveContainerId(null);
++      if (returnHubId === container.id) setReturnHubId(null);
++      await loadData();
++      return;
++    }
++
+     const confirmed = await new Promise((resolve) => {
+       showRawAlert({
+         title: tLootTrade('detail.deleteConfirmTitle'),
+@@ -532,30 +824,22 @@ export default function LootTradeScreen() {
+     });
+     if (!confirmed) return;
+ 
+-    const live = getActiveSessionForContainer(container);
+-    if (live) {
+-      await useRoomStore.getState().closeRoomSession({
+-        code: container.roomCode,
+-        sessionId: live.sessionId,
+-      }).catch(() => {});
+-    }
++    await closeAllLiveSessionsForCard(container);
+     await deleteGmContainerFromCloudIfEnabled(container.id);
+     await db.deleteGmContainer(container.id);
+ 
+     // Если удалён дочерний контейнер/торговец, вычищаем ссылки на него из локаций
+-    if (container.kind !== CONTAINER_KIND.HUB) {
+-      const remainingList = await db.getGmContainersList();
+-      for (const item of remainingList) {
+-        if (
+-          item.kind === CONTAINER_KIND.HUB
+-          && (item.links || []).some((l) => l.containerId === container.id)
+-        ) {
+-          const cleaned = await db.saveGmContainer({
+-            ...item,
+-            links: item.links.filter((l) => l.containerId !== container.id),
+-          });
+-          void syncGmContainerToCloudIfEnabled(cleaned.id);
+-        }
++    const remainingList = await db.getGmContainersList();
++    for (const item of remainingList) {
++      if (
++        item.kind === CONTAINER_KIND.HUB
++        && (item.links || []).some((l) => l.containerId === container.id)
++      ) {
++        const cleaned = await db.saveGmContainer({
++          ...item,
++          links: item.links.filter((l) => l.containerId !== container.id),
++        });
++        void syncGmContainerToCloudIfEnabled(cleaned.id);
+       }
+     }
+ 
+@@ -565,15 +849,17 @@ export default function LootTradeScreen() {
+   };
+ 
+   const handleIssueOrClosePress = async (container) => {
+-    const live = getActiveSessionForContainer(container);
+-    if (live) {
+-      try {
+-        await useRoomStore.getState().closeRoomSession({
+-          code: container.roomCode,
+-          sessionId: live.sessionId,
+-        });
+-      } catch (e) {
+-        debugLog('lootTrade.closeSession:failed', { message: e?.message });
++    const liveEntries = getActiveLiveEntriesForContainer(container);
++    if (liveEntries.length > 0) {
++      for (const { roomCode: liveCode, session: live } of liveEntries) {
++        try {
++          await useRoomStore.getState().closeRoomSession({
++            code: liveCode,
++            sessionId: live.sessionId,
++          });
++        } catch (e) {
++          debugLog('lootTrade.closeSession:failed', { message: e?.message });
++        }
+       }
+       return;
+     }
+@@ -586,22 +872,30 @@ export default function LootTradeScreen() {
+       }
+     }
+ 
+-    try {
+-      await ensureGmRoomConnected(container.roomCode);
+-    } catch {
+-      // Откроем окно, при подтверждении повторим подключение
++    const defaultCode = container.roomCode || availableRooms[0]?.code || '';
++    if (defaultCode) {
++      try {
++        await ensureGmRoomConnected(defaultCode);
++      } catch {
++        // Откроем окно, при подтверждении повторим подключение
++      }
+     }
+     setIssueTargetContainer(container);
+   };
+ 
+-  const handleConfirmIssue = async ({ targetType, targetCharacterId, targetCharacterName }) => {
++  const handleConfirmIssue = async ({ roomCode: chosenRoomCode, targetType, targetCharacterId, targetCharacterName }) => {
+     if (!issueTargetContainer) return;
++    const effectiveRoomCode = chosenRoomCode || issueTargetContainer.roomCode || availableRooms[0]?.code || '';
++    if (!effectiveRoomCode) {
++      showRawAlert({ title: tLootTrade('issueModal.noRoomsAvailable') });
++      return;
++    }
+     setIssueBusy(true);
+     try {
+-      await ensureGmRoomConnected(issueTargetContainer.roomCode);
++      await ensureGmRoomConnected(effectiveRoomCode);
+       const isHub = issueTargetContainer.kind === CONTAINER_KIND.HUB;
+       await useRoomStore.getState().openRoomSession({
+-        code: issueTargetContainer.roomCode,
++        code: effectiveRoomCode,
+         session: {
+           containerId: issueTargetContainer.id,
+           kind: issueTargetContainer.kind,
+@@ -777,18 +1071,20 @@ export default function LootTradeScreen() {
+     await loadData();
+     void syncGmContainerToCloudIfEnabled(saved.id);
+ 
+-    const live = getActiveSessionForContainer(saved);
+-    if (live && live.kind === CONTAINER_KIND.HUB) {
+-      try {
+-        await ensureGmRoomConnected(saved.roomCode);
+-        await useRoomStore.getState().updateRoomSessionRates({
+-          code: saved.roomCode,
+-          sessionId: live.sessionId,
+-          nodeContainerId: childId,
+-          locked: nextLocked,
+-        });
+-      } catch (error) {
+-        debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
++    const liveEntries = getActiveLiveEntriesForContainer(saved);
++    for (const { roomCode: liveCode, session: live } of liveEntries) {
++      if (live && live.kind === CONTAINER_KIND.HUB) {
++        try {
++          await ensureGmRoomConnected(liveCode);
++          await useRoomStore.getState().updateRoomSessionRates({
++            code: liveCode,
++            sessionId: live.sessionId,
++            nodeContainerId: childId,
++            locked: nextLocked,
++          });
++        } catch (error) {
++          debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
++        }
+       }
+     }
+   };
+@@ -803,18 +1099,20 @@ export default function LootTradeScreen() {
+     await loadData();
+     void syncGmContainerToCloudIfEnabled(saved.id);
+ 
+-    const live = getActiveSessionForContainer(saved);
+-    if (live && live.kind === CONTAINER_KIND.HUB) {
+-      try {
+-        await ensureGmRoomConnected(saved.roomCode);
+-        await useRoomStore.getState().updateRoomSessionRates({
+-          code: saved.roomCode,
+-          sessionId: live.sessionId,
+-          nodeContainerId: childId,
+-          lockLabel: cleanLabel,
+-        });
+-      } catch (error) {
+-        debugLog('lootTrade.updateHubLockLabel:failed', { message: error?.message });
++    const liveEntries = getActiveLiveEntriesForContainer(saved);
++    for (const { roomCode: liveCode, session: live } of liveEntries) {
++      if (live && live.kind === CONTAINER_KIND.HUB) {
++        try {
++          await ensureGmRoomConnected(liveCode);
++          await useRoomStore.getState().updateRoomSessionRates({
++            code: liveCode,
++            sessionId: live.sessionId,
++            nodeContainerId: childId,
++            lockLabel: cleanLabel,
++          });
++        } catch (error) {
++          debugLog('lootTrade.updateHubLockLabel:failed', { message: error?.message });
++        }
+       }
+     }
+   };
+@@ -825,13 +1123,13 @@ export default function LootTradeScreen() {
+     caps = normalizeCapsAmount(liveCapsInput, effectiveLiveMerchantNode?.caps ?? 0),
+     resetPersonal = false,
+   } = {}) => {
+-    if (!activeContainer || !activeLiveSession || !effectiveLiveMerchantNode) return;
++    if (!activeContainer || !activeLiveSession || !activeLiveRoomCode || !effectiveLiveMerchantNode) return;
+     const isHubSession = activeLiveSession.kind === CONTAINER_KIND.HUB;
+     const targetNodeContainerId = isHubSession ? effectiveLiveMerchantNode.containerId : null;
+     try {
+-      await ensureGmRoomConnected(activeContainer.roomCode);
++      await ensureGmRoomConnected(activeLiveRoomCode);
+       await useRoomStore.getState().updateRoomSessionRates({
+-        code: activeContainer.roomCode,
++        code: activeLiveRoomCode,
+         sessionId: activeLiveSession.sessionId,
+         ...(targetNodeContainerId ? { nodeContainerId: targetNodeContainerId } : {}),
+         targetCharacterId: rateScopeCharId,
+@@ -908,11 +1206,42 @@ export default function LootTradeScreen() {
+     label: getLocaleLabel({ code, displayLocale: locale, translate: tHomeScreen }),
+   }));
+ 
++  const availableHubs = useMemo(
++    () => sortContainersForRoot(containers.filter((c) => c.kind === CONTAINER_KIND.HUB)),
++    [containers],
++  );
++
++  const rootVisibleContainers = useMemo(
++    () => sortContainersForRoot(containers.filter((c) => isContainerVisibleOnRoot(c, containers))),
++    [containers],
++  );
++
++  const formatSingleRoomName = useCallback((code, fallbackName = '') => {
++    if (!code) return '';
++    const rec = roomByCode[code];
++    return rec
++      ? `${rec.name} (${formatRoomCodeForDisplay(code)})`
++      : (fallbackName ? `${fallbackName} (${formatRoomCodeForDisplay(code)})` : formatRoomCodeForDisplay(code));
++  }, [roomByCode]);
++
++  const formatHubCardRoomLabel = useCallback((hub) => {
++    const codes = normalizeRoomCodes(hub.roomCodes, hub.roomCode);
++    if (codes.length === 0) return '';
++    const primary = formatSingleRoomName(codes[0], hub.roomName);
++    return codes.length > 1 ? `${primary} +${codes.length - 1}` : primary;
++  }, [formatSingleRoomName]);
++
++  const formatHubDetailRoomsLabel = useCallback((hub) => {
++    const codes = normalizeRoomCodes(hub.roomCodes, hub.roomCode);
++    if (codes.length === 0) return '';
++    return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
++  }, [formatSingleRoomName]);
++
+   const gridItems = [
++    { type: 'createHub', id: '__create_hub__' },
+     { type: 'createLoot', id: '__create_loot__' },
+     { type: 'createMerchant', id: '__create_merchant__' },
+-    { type: 'createHub', id: '__create_hub__' },
+-    ...containers.map((c) => ({ type: 'container', ...c })),
++    ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
+   ];
+ 
+   const rows = [];
+@@ -930,8 +1259,8 @@ export default function LootTradeScreen() {
+     ? buildGmRoomCharacterCards(roomRooms[issueTargetContainer.roomCode])
+     : [];
+ 
+-  const activeContainerRoomCharacters = activeContainer?.roomCode
+-    ? buildGmRoomCharacterCards(roomRooms[activeContainer.roomCode])
++  const activeContainerRoomCharacters = activeLiveRoomCode
++    ? buildGmRoomCharacterCards(roomRooms[activeLiveRoomCode])
+     : [];
+ 
+   return (
+@@ -987,6 +1316,10 @@ export default function LootTradeScreen() {
+             <Text style={styles.subtitle}>{tLootTrade('subtitle')}</Text>
+           </View>
+ 
++          {movingContainerId && (
++            <Text style={styles.moveHintBanner}>{tLootTrade('card.moveHint')}</Text>
++          )}
++
+           {Boolean(rollBanner) && (
+             <View style={[styles.rollBanner, { marginHorizontal: 16, marginTop: 8 }]}>
+               <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
+@@ -1000,6 +1333,16 @@ export default function LootTradeScreen() {
+               rows.map((row, rIdx) => (
+                 <View key={rIdx} style={styles.row}>
+                   {row.map((cell) => {
++                    if (cell.type === 'createHub') {
++                      return (
++                        <ActionCell
++                          key={cell.id}
++                          iconName="map-marker-multiple"
++                          label={tLootTrade('actions.createHub')}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
++                        />
++                      );
++                    }
+                     if (cell.type === 'createLoot') {
+                       return (
+                         <ActionCell
+@@ -1020,37 +1363,40 @@ export default function LootTradeScreen() {
+                         />
+                       );
+                     }
+-                    if (cell.type === 'createHub') {
+-                      return (
+-                        <ActionCell
+-                          key={cell.id}
+-                          iconName="map-marker-multiple"
+-                          label={tLootTrade('actions.createHub')}
+-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
+-                        />
+-                      );
+-                    }
+                     if (cell.type === 'empty') {
+                       return <View key={cell.id} style={styles.emptyCell} />;
+                     }
+-                    const roomRec = roomByCode[cell.roomCode];
+-                    const roomLabel = roomRec
+-                      ? `${roomRec.name} (${formatRoomCodeForDisplay(cell.roomCode)})`
+-                      : (cell.roomName || formatRoomCodeForDisplay(cell.roomCode));
++                    const isHubCell = cell.kind === CONTAINER_KIND.HUB;
++                    const roomLabel = isHubCell ? formatHubCardRoomLabel(cell) : '';
+                     return (
+                       <ContainerCardCell
+                         key={cell.id}
+                         container={cell}
+                         roomLabel={roomLabel}
+-                        isLive={Boolean(getActiveSessionForContainer(cell))}
++                        isLive={getActiveLiveEntriesForContainer(cell).length > 0}
++                        isDropTarget={Boolean(isHubCell && movingContainerId)}
++                        canMoveToHub={!isHubCell && availableHubs.length > 0}
++                        cardRefCallback={isHubCell
++                          ? (node) => { hubRefs.current[cell.id] = node; }
++                          : undefined}
+                         onOpen={() => {
++                          if (isHubCell && movingContainerId) {
++                            void handleMoveCardIntoHub(movingContainerId, cell.id);
++                            return;
++                          }
+                           setReturnHubId(null);
+                           setActiveContainerId(cell.id);
+                         }}
+                         onIssueOrClose={() => handleIssueOrClosePress(cell)}
++                        onMoveToHub={!isHubCell && availableHubs.length > 0
++                          ? () => setMoveToHubTarget(cell)
++                          : undefined}
+                         onDuplicate={() => handleDuplicateCard(cell)}
+                         onEdit={() => setFormModal({ kind: cell.kind, initialContainer: cell })}
+                         onDelete={() => handleDeleteCard(cell)}
++                        onDragStart={!isHubCell && availableHubs.length > 0 ? handleDragStart : undefined}
++                        onDragMove={!isHubCell && availableHubs.length > 0 ? handleDragMove : undefined}
++                        onDragEnd={!isHubCell && availableHubs.length > 0 ? handleDragEnd : undefined}
+                       />
+                     );
+                   })}
+@@ -1058,6 +1404,20 @@ export default function LootTradeScreen() {
+               ))
+             )}
+           </ScrollView>
++
++          {drag && (
++            <View
++              pointerEvents="none"
++              style={[
++                styles.dragPreviewCard,
++                { left: drag.x - 59, top: drag.y - 22 },
++              ]}
++            >
++              <Text style={styles.dragPreviewText} numberOfLines={1}>
++                {drag.container.name}
++              </Text>
++            </View>
++          )}
+         </>
+       ) : (
+         /* Детальный экран выбранного контейнера / торговца / локации */
+@@ -1130,11 +1490,19 @@ export default function LootTradeScreen() {
+               <Text style={styles.detailTitle}>{activeContainer.name}</Text>
+             </View>
+ 
+-            <Text style={styles.detailRoomText}>
+-              {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
+-                room: `${roomByCode[activeContainer.roomCode]?.name || activeContainer.roomName || ''} (${formatRoomCodeForDisplay(activeContainer.roomCode)})`.trim(),
+-              })}
+-            </Text>
++            {activeContainer.kind === CONTAINER_KIND.HUB ? (
++              <Text style={styles.detailRoomText}>
++                {formatLootTrade(tLootTrade('detail.roomsLabel'), {
++                  rooms: formatHubDetailRoomsLabel(activeContainer),
++                })}
++              </Text>
++            ) : Boolean(activeLiveEntry?.roomCode) && (
++              <Text style={styles.detailRoomText}>
++                {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
++                  room: formatSingleRoomName(activeLiveEntry.roomCode),
++                })}
++              </Text>
++            )}
+ 
+             {Boolean(activeContainer.description) && (
+               <Text style={styles.detailDescText}>{activeContainer.description}</Text>
+@@ -1366,89 +1734,118 @@ export default function LootTradeScreen() {
+                 {(activeContainer.links || []).length === 0 ? (
+                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
+                 ) : (
+-                  (activeContainer.links || []).map((link) => {
+-                    const child = containers.find((c) => c.id === link.containerId);
+-                    if (!child) return null;
+-                    const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
+-                    const childPieces = (child.items || []).reduce(
+-                      (sum, it) => sum + (Number(it.quantity) || 0),
+-                      0,
+-                    );
+-                    return (
+-                      <View key={link.containerId} style={styles.hubChildRow}>
+-                        <View style={styles.hubChildTopLine}>
+-                          <View style={styles.itemRowMain}>
+-                            <View style={styles.itemRowTitleLine}>
+-                              <MaterialCommunityIcons
+-                                name={childIsMerch ? 'sack' : 'treasure-chest'}
+-                                size={18}
+-                                color="#2b2b2b"
+-                              />
+-                              <Text style={styles.itemRowName}>{child.name}</Text>
++                  [...(activeContainer.links || [])]
++                    .sort((linkA, linkB) => {
++                      const childA = containers.find((c) => c.id === linkA.containerId);
++                      const childB = containers.find((c) => c.id === linkB.containerId);
++                      const orderA = CONTAINER_KIND_SORT_ORDER[childA?.kind] ?? 99;
++                      const orderB = CONTAINER_KIND_SORT_ORDER[childB?.kind] ?? 99;
++                      if (orderA !== orderB) return orderA - orderB;
++                      return String(childA?.name || '').localeCompare(String(childB?.name || ''), 'ru');
++                    })
++                    .map((link) => {
++                      const child = containers.find((c) => c.id === link.containerId);
++                      if (!child) return null;
++                      const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
++                      const childPieces = (child.items || []).reduce(
++                        (sum, it) => sum + (Number(it.quantity) || 0),
++                        0,
++                      );
++                      const parentHubIds = getHubIdsContainingChild(child.id, containers);
++                      const sharedHubCount = parentHubIds.length;
++                      return (
++                        <View key={link.containerId} style={styles.hubChildRow}>
++                          <View style={styles.hubChildTopLine}>
++                            <View style={styles.itemRowMain}>
++                              <View style={styles.itemRowTitleLine}>
++                                <MaterialCommunityIcons
++                                  name={childIsMerch ? 'sack' : 'treasure-chest'}
++                                  size={18}
++                                  color="#2b2b2b"
++                                />
++                                <Text style={styles.itemRowName}>{child.name}</Text>
++                                {sharedHubCount > 1 && (
++                                  <Text style={styles.hubSharedBadgeText}>
++                                    {formatLootTrade(tLootTrade('detail.hubSharedBadge'), {
++                                      count: sharedHubCount,
++                                    })}
++                                  </Text>
++                                )}
++                              </View>
++                              <View style={styles.itemRowSub}>
++                                <Text style={styles.itemRowSubText}>
++                                  {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
++                                </Text>
++                                {childIsMerch && (
++                                  <IconText style={styles.itemRowSubText}>
++                                    {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
++                                  </IconText>
++                                )}
++                              </View>
+                             </View>
+-                            <View style={styles.itemRowSub}>
+-                              <Text style={styles.itemRowSubText}>
+-                                {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
+-                              </Text>
+-                              {childIsMerch && (
+-                                <IconText style={styles.itemRowSubText}>
+-                                  {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
+-                                </IconText>
++
++                            <View style={styles.itemRowControls}>
++                              <TouchableOpacity
++                                style={[
++                                  styles.hubLockChip,
++                                  link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
++                                ]}
++                                onPress={() => handleToggleHubChildLock(child.id)}
++                              >
++                                <Text
++                                  style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
++                                >
++                                  {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
++                                </Text>
++                              </TouchableOpacity>
++
++                              <TouchableOpacity
++                                style={styles.itemRowSmallBtn}
++                                onPress={() => {
++                                  setReturnHubId(activeContainer.id);
++                                  setActiveContainerId(child.id);
++                                }}
++                              >
++                                <Text style={styles.itemRowSmallBtnText}>
++                                  {tLootTrade('detail.hubOpenChildCard')}
++                                </Text>
++                              </TouchableOpacity>
++
++                              <TouchableOpacity
++                                style={styles.itemRowSmallBtn}
++                                onPress={() => handleMoveChildOutToRoot(child.id)}
++                              >
++                                <Text style={styles.itemRowSmallBtnText}>
++                                  {tLootTrade('detail.hubMoveOutToRoot')}
++                                </Text>
++                              </TouchableOpacity>
++
++                              {(sharedHubCount > 1 || child.inRoot === true) && (
++                                <TouchableOpacity
++                                  style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
++                                  onPress={() => handleRemoveHubChild(child.id)}
++                                >
++                                  <Text style={styles.itemRowDeleteBtnText}>
++                                    {tLootTrade('detail.hubUnlinkChild')}
++                                  </Text>
++                                </TouchableOpacity>
+                               )}
+                             </View>
+                           </View>
+ 
+-                          <View style={styles.itemRowControls}>
+-                            <TouchableOpacity
+-                              style={[
+-                                styles.hubLockChip,
+-                                link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
+-                              ]}
+-                              onPress={() => handleToggleHubChildLock(child.id)}
+-                            >
+-                              <Text
+-                                style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
+-                              >
+-                                {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
+-                              </Text>
+-                            </TouchableOpacity>
+-
+-                            <TouchableOpacity
+-                              style={styles.itemRowSmallBtn}
+-                              onPress={() => {
+-                                setReturnHubId(activeContainer.id);
+-                                setActiveContainerId(child.id);
+-                              }}
+-                            >
+-                              <Text style={styles.itemRowSmallBtnText}>
+-                                {tLootTrade('detail.hubOpenChildCard')}
+-                              </Text>
+-                            </TouchableOpacity>
+-
+-                            <TouchableOpacity
+-                              style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
+-                              onPress={() => handleRemoveHubChild(child.id)}
+-                            >
+-                              <Text style={styles.itemRowDeleteBtnText}>
+-                                {tLootTrade('detail.hubUnlinkChild')}
+-                              </Text>
+-                            </TouchableOpacity>
+-                          </View>
++                          {link.locked && (
++                            <TextInput
++                              style={styles.hubLockNoteInput}
++                              defaultValue={link.lockLabel || ''}
++                              placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
++                              placeholderTextColor="#888888"
++                              onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
++                              onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
++                            />
++                          )}
+                         </View>
+-
+-                        {link.locked && (
+-                          <TextInput
+-                            style={styles.hubLockNoteInput}
+-                            defaultValue={link.lockLabel || ''}
+-                            placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
+-                            placeholderTextColor="#888888"
+-                            onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+-                            onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+-                          />
+-                        )}
+-                      </View>
+-                    );
+-                  })
++                      );
++                    })
+                 )}
+               </ScrollView>
+             </>
+@@ -1560,6 +1957,12 @@ export default function LootTradeScreen() {
+         kind={formModal?.kind || CONTAINER_KIND.LOOT}
+         initialContainer={formModal?.initialContainer || null}
+         availableRooms={availableRooms}
++        availableHubs={availableHubs}
++        initialLinkedHubIds={
++          formModal?.initialContainer?.id
++            ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
++            : []
++        }
+         onSave={handleSaveContainerForm}
+         onClose={() => setFormModal(null)}
+       />
+@@ -1596,11 +1999,56 @@ export default function LootTradeScreen() {
+         visible={Boolean(issueTargetContainer)}
+         container={issueTargetContainer}
+         roomName={issueTargetContainer ? (roomByCode[issueTargetContainer.roomCode]?.name || '') : ''}
++        availableRooms={availableRooms}
++        roomRooms={roomRooms}
+         roomCharacters={issueRoomCharacters}
+         busy={issueBusy}
++        onSelectRoom={(code) => {
++          void ensureGmRoomConnected(code).catch(() => {});
++        }}
+         onConfirmIssue={handleConfirmIssue}
+         onClose={() => setIssueTargetContainer(null)}
+       />
++
++      {/* Модалка быстрого перемещения карточки в локацию через меню ⋮ */}
++      <Modal
++        visible={Boolean(moveToHubTarget)}
++        transparent
++        animationType="fade"
++        onRequestClose={() => setMoveToHubTarget(null)}
++      >
++        <Pressable style={styles.movePickerOverlay} onPress={() => setMoveToHubTarget(null)}>
++          <Pressable style={styles.movePickerCard} onPress={(e) => e?.stopPropagation?.()}>
++            <Text style={styles.movePickerTitle}>
++              {tLootTrade('detail.moveToHubPickerTitle')}
++            </Text>
++            <ScrollView style={{ maxHeight: 280 }}>
++              {availableHubs.map((hub) => (
++                <TouchableOpacity
++                  key={hub.id}
++                  style={styles.movePickerRow}
++                  onPress={async () => {
++                    const target = moveToHubTarget;
++                    setMoveToHubTarget(null);
++                    if (target) {
++                      await handleMoveCardIntoHub(target.id, hub.id);
++                    }
++                  }}
++                >
++                  <MaterialCommunityIcons name="map-marker-multiple" size={20} color="#f0e68c" />
++                  <Text style={styles.movePickerRowText}>{hub.name}</Text>
++                </TouchableOpacity>
++              ))}
++            </ScrollView>
++            <TouchableOpacity
++              style={styles.movePickerCancelBtn}
++              onPress={() => setMoveToHubTarget(null)}
++            >
++              <Text style={styles.movePickerCancelText}>{tLootTrade('form.cancel')}</Text>
++            </TouchableOpacity>
++          </Pressable>
++        </Pressable>
++      </Modal>
+     </View>
+   );
+ }
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 74ee21e..3a64273 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -21,6 +21,7 @@ import {
+   DEFAULT_SALE_MARKUP_PERCENT,
+   DEFAULT_BUY_DEPRECIATION_PERCENT,
+   resolveQuantitySpec,
++  normalizeRoomCodes,
+   normalizeSaleMarkupPercent,
+   normalizeBuyDepreciationPercent,
+ } from '../../../../domain/lootTrade';
+@@ -31,6 +32,8 @@ const ContainerFormModal = ({
+   kind = CONTAINER_KIND.LOOT,
+   initialContainer = null,
+   availableRooms = [],
++  availableHubs = [],
++  initialLinkedHubIds = [],
+   onSave,
+   onClose,
+ }) => {
+@@ -42,7 +45,8 @@ const ContainerFormModal = ({
+   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
+ 
+   const [name, setName] = useState('');
+-  const [roomCode, setRoomCode] = useState('');
++  const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
++  const [selectedHubIds, setSelectedHubIds] = useState([]);
+   const [description, setDescription] = useState('');
+   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+@@ -52,8 +56,20 @@ const ContainerFormModal = ({
+   useEffect(() => {
+     if (!visible) return;
+     setName(initialContainer?.name || '');
+-    const defaultRoom = initialContainer?.roomCode || availableRooms[0]?.code || '';
+-    setRoomCode(defaultRoom);
++    if (isHub) {
++      const existingCodes = normalizeRoomCodes(
++        initialContainer?.roomCodes,
++        initialContainer?.roomCode,
++      );
++      const fallbackCodes = existingCodes.length > 0
++        ? existingCodes
++        : (availableRooms[0]?.code ? [availableRooms[0].code] : []);
++      setSelectedRoomCodes(fallbackCodes);
++      setSelectedHubIds([]);
++    } else {
++      setSelectedRoomCodes([]);
++      setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
++    }
+     setDescription(initialContainer?.description || '');
+     setCapsCount(String(
+       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
+@@ -69,7 +85,19 @@ const ContainerFormModal = ({
+         ? initialContainer.buyDepreciationPercent
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     ));
+-  }, [visible, initialContainer, availableRooms]);
++  }, [visible, initialContainer, availableRooms, isHub, initialLinkedHubIds]);
++
++  const toggleRoomCode = (code) => {
++    setSelectedRoomCodes((prev) => (
++      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
++    ));
++  };
++
++  const toggleHubId = (hubId) => {
++    setSelectedHubIds((prev) => (
++      prev.includes(hubId) ? prev.filter((id) => id !== hubId) : [...prev, hubId]
++    ));
++  };
+ 
+   const stepCaps = (delta) => {
+     const cur = parseInt(capsCount, 10) || 0;
+@@ -84,12 +112,15 @@ const ContainerFormModal = ({
+       showRawAlert({ title: tLootTrade('form.validationName') });
+       return;
+     }
+-    if (!roomCode) {
++    if (isHub && selectedRoomCodes.length === 0) {
+       showRawAlert({ title: tLootTrade('form.validationRoom') });
+       return;
+     }
+ 
+-    const roomRecord = availableRooms.find((r) => r.code === roomCode);
++    const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
++    const roomRecord = isHub
++      ? availableRooms.find((r) => r.code === primaryRoomCode)
++      : null;
+     let resolvedCaps = 0;
+     let capsRollInfo = null;
+ 
+@@ -103,19 +134,24 @@ const ContainerFormModal = ({
+       if (roll.rolled) capsRollInfo = roll;
+     }
+ 
+-    onSave({
+-      ...(initialContainer || {}),
+-      kind: isHub
+-        ? CONTAINER_KIND.HUB
+-        : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
+-      name: cleanName,
+-      roomCode,
+-      roomName: roomRecord?.name || initialContainer?.roomName || roomCode,
+-      description: description.trim(),
+-      caps: resolvedCaps,
+-      saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+-      buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+-    }, capsRollInfo);
++    onSave(
++      {
++        ...(initialContainer || {}),
++        kind: isHub
++          ? CONTAINER_KIND.HUB
++          : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
++        name: cleanName,
++        roomCode: primaryRoomCode,
++        roomCodes: isHub ? selectedRoomCodes : [],
++        roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
++        description: description.trim(),
++        caps: resolvedCaps,
++        saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
++        buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
++      },
++      capsRollInfo,
++      isHub ? null : selectedHubIds,
++    );
+   };
+ 
+   let titleKey = isEditing ? 'form.editLootTitle' : 'form.createLootTitle';
+@@ -144,29 +180,59 @@ const ContainerFormModal = ({
+               placeholderTextColor="#8c8c8c"
+             />
+ 
+-            <Text style={styles.label}>{tLootTrade('form.roomLabel')}</Text>
+-            {availableRooms.length === 0 ? (
+-              <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
++            {isHub ? (
++              <>
++                <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
++                {availableRooms.length === 0 ? (
++                  <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
++                ) : (
++                  <>
++                    <View style={styles.roomChips}>
++                      {availableRooms.map((room) => {
++                        const selected = selectedRoomCodes.includes(room.code);
++                        return (
++                          <TouchableOpacity
++                            key={room.code}
++                            style={[styles.roomChip, selected && styles.roomChipActive]}
++                            onPress={() => toggleRoomCode(room.code)}
++                          >
++                            <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
++                              {room.name}
++                            </Text>
++                            <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
++                              {formatRoomCodeForDisplay(room.code)}
++                            </Text>
++                          </TouchableOpacity>
++                        );
++                      })}
++                    </View>
++                    <Text style={styles.hintText}>{tLootTrade('form.roomsMultiHint')}</Text>
++                  </>
++                )}
++              </>
+             ) : (
+-              <View style={styles.roomChips}>
+-                {availableRooms.map((room) => {
+-                  const selected = room.code === roomCode;
+-                  return (
+-                    <TouchableOpacity
+-                      key={room.code}
+-                      style={[styles.roomChip, selected && styles.roomChipActive]}
+-                      onPress={() => setRoomCode(room.code)}
+-                    >
+-                      <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
+-                        {room.name}
+-                      </Text>
+-                      <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+-                        {formatRoomCodeForDisplay(room.code)}
+-                      </Text>
+-                    </TouchableOpacity>
+-                  );
+-                })}
+-              </View>
++              availableHubs.length > 0 && (
++                <>
++                  <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
++                  <View style={styles.roomChips}>
++                    {availableHubs.map((hubItem) => {
++                      const selected = selectedHubIds.includes(hubItem.id);
++                      return (
++                        <TouchableOpacity
++                          key={hubItem.id}
++                          style={[styles.roomChip, selected && styles.roomChipActive]}
++                          onPress={() => toggleHubId(hubItem.id)}
++                        >
++                          <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
++                            {hubItem.name}
++                          </Text>
++                        </TouchableOpacity>
++                      );
++                    })}
++                  </View>
++                  <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
++                </>
++              )
+             )}
+ 
+             <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+index 7fcda85..2d829e0 100644
+--- a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -59,9 +59,10 @@ const HubChildPickerModal = ({
+                   (sum, entry) => sum + (Number(entry.quantity) || 0),
+                   0,
+                 );
+-                const roomLabel = roomByCode[item.roomCode]?.name
+-                  || item.roomName
+-                  || formatRoomCodeForDisplay(item.roomCode);
++                const roomLabel = item.roomCode
++                  ? (roomByCode[item.roomCode]?.name || item.roomName || formatRoomCodeForDisplay(item.roomCode))
++                  : '';
++                const roomSuffix = roomLabel ? ` • ${roomLabel}` : '';
+ 
+                 return (
+                   <View key={item.id} style={styles.row}>
+@@ -76,8 +77,8 @@ const HubChildPickerModal = ({
+                       </View>
+                       <IconText style={styles.rowMeta}>
+                         {isMerch
+-                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })} • ${roomLabel}`
+-                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${roomLabel}`}
++                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
++                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`}
+                       </IconText>
+                     </View>
+ 
+diff --git a/components/screens/LootTradeScreen/modals/IssueContainerModal.js b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+index 6b3bb30..f59ebf2 100644
+--- a/components/screens/LootTradeScreen/modals/IssueContainerModal.js
++++ b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect } from 'react';
++import React, { useState, useEffect, useMemo } from 'react';
+ import {
+   Modal,
+   View,
+@@ -11,42 +11,93 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
++import { CONTAINER_KIND, normalizeRoomCodes } from '../../../../domain/lootTrade';
++import { buildGmRoomCharacterCards } from '../../../../src/room/roomCharacterSync';
+ 
+ const IssueContainerModal = ({
+   visible,
+   container,
++  availableRooms = [],
++  roomRooms = {},
+   roomName = '',
+   roomCharacters = [],
+   busy = false,
++  onSelectRoom,
+   onConfirmIssue,
+   onClose,
+ }) => {
+   useLocale();
++  const [selectedRoomCode, setSelectedRoomCode] = useState('');
+   const [targetType, setTargetType] = useState('room');
+   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
+ 
++  const candidateRooms = useMemo(() => {
++    if (!container) return [];
++    if (container.kind === CONTAINER_KIND.HUB) {
++      const codes = normalizeRoomCodes(container.roomCodes, container.roomCode);
++      if (codes.length > 0) {
++        return codes.map((code) => {
++          const found = availableRooms.find((r) => r.code === code);
++          return found || { code, name: roomName || container.roomName || code };
++        });
++      }
++    }
++    if (availableRooms.length > 0) return availableRooms;
++    if (container.roomCode) {
++      return [{ code: container.roomCode, name: roomName || container.roomName || container.roomCode }];
++    }
++    return [];
++  }, [container, availableRooms, roomName]);
++
+   useEffect(() => {
+-    if (!visible) return;
++    if (!visible || !container) return;
++    const preferred = candidateRooms.find((r) => r.code === container.roomCode)?.code
++      || candidateRooms[0]?.code
++      || '';
++    setSelectedRoomCode(preferred);
+     setTargetType('room');
+-    setSelectedCharacterId(roomCharacters[0]?.id || null);
+-  }, [visible, roomCharacters]);
++    if (preferred && onSelectRoom) {
++      onSelectRoom(preferred);
++    }
++  }, [visible, container?.id]);
++
++  const effectiveRoomCharacters = useMemo(() => {
++    if (!selectedRoomCode) return roomCharacters;
++    if (roomRooms && roomRooms[selectedRoomCode]) {
++      return buildGmRoomCharacterCards(roomRooms[selectedRoomCode]);
++    }
++    return roomCharacters;
++  }, [selectedRoomCode, roomRooms, roomCharacters]);
++
++  useEffect(() => {
++    if (!visible) return;
++    if (
++      !selectedCharacterId
++      || !effectiveRoomCharacters.some((c) => c.id === selectedCharacterId)
++    ) {
++      setSelectedCharacterId(effectiveRoomCharacters[0]?.id || null);
++    }
++  }, [visible, effectiveRoomCharacters, selectedCharacterId]);
+ 
+   if (!container) return null;
+ 
+-  const canSubmit = !busy && (
+-    targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId))
+-  );
++  const canSubmit = !busy
++    && Boolean(selectedRoomCode)
++    && (targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
+ 
+   const handleConfirm = () => {
+     if (!canSubmit) return;
+-    const pickedChar = roomCharacters.find((c) => c.id === selectedCharacterId) || null;
++    const pickedChar = effectiveRoomCharacters.find((c) => c.id === selectedCharacterId) || null;
+     onConfirmIssue({
++      roomCode: selectedRoomCode,
+       targetType,
+       targetCharacterId: targetType === 'character' ? selectedCharacterId : null,
+       targetCharacterName: targetType === 'character' ? (pickedChar?.name || null) : null,
+     });
+   };
+ 
++  const singleRoomObj = candidateRooms.length === 1 ? candidateRooms[0] : null;
++
+   return (
+     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+       <View style={styles.overlay}>
+@@ -54,11 +105,39 @@ const IssueContainerModal = ({
+           <Text style={styles.title}>
+             {formatLootTrade(tLootTrade('issueModal.title'), { name: container.name })}
+           </Text>
+-          <Text style={styles.roomSub}>
+-            {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
+-              room: `${roomName || container.roomName || ''} (${formatRoomCodeForDisplay(container.roomCode)})`.trim(),
+-            })}
+-          </Text>
++
++          {candidateRooms.length === 0 ? (
++            <Text style={styles.emptyChars}>{tLootTrade('issueModal.noRoomsAvailable')}</Text>
++          ) : singleRoomObj ? (
++            <Text style={styles.roomSub}>
++              {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
++                room: `${singleRoomObj.name || ''} (${formatRoomCodeForDisplay(singleRoomObj.code)})`.trim(),
++              })}
++            </Text>
++          ) : (
++            <View style={styles.roomsPickerBlock}>
++              <Text style={styles.sectionTitle}>{tLootTrade('issueModal.selectRoomTitle')}</Text>
++              <View style={styles.roomChipsRow}>
++                {candidateRooms.map((r) => {
++                  const active = r.code === selectedRoomCode;
++                  return (
++                    <TouchableOpacity
++                      key={r.code}
++                      style={[styles.roomChip, active && styles.roomChipActive]}
++                      onPress={() => {
++                        setSelectedRoomCode(r.code);
++                        onSelectRoom?.(r.code);
++                      }}
++                    >
++                      <Text style={[styles.roomChipText, active && styles.roomChipTextActive]}>
++                        {`${r.name} (${formatRoomCodeForDisplay(r.code)})`}
++                      </Text>
++                    </TouchableOpacity>
++                  );
++                })}
++              </View>
++            </View>
++          )}
+ 
+           <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>
+ 
+@@ -81,8 +160,8 @@ const IssueContainerModal = ({
+             style={[styles.optionCard, targetType === 'character' && styles.optionCardActive]}
+             onPress={() => {
+               setTargetType('character');
+-              if (!selectedCharacterId && roomCharacters[0]?.id) {
+-                setSelectedCharacterId(roomCharacters[0].id);
++              if (!selectedCharacterId && effectiveRoomCharacters[0]?.id) {
++                setSelectedCharacterId(effectiveRoomCharacters[0].id);
+               }
+             }}
+           >
+@@ -98,10 +177,10 @@ const IssueContainerModal = ({
+ 
+           {targetType === 'character' && (
+             <ScrollView style={styles.charList}>
+-              {roomCharacters.length === 0 ? (
++              {effectiveRoomCharacters.length === 0 ? (
+                 <Text style={styles.emptyChars}>{tLootTrade('issueModal.noCharactersInRoom')}</Text>
+               ) : (
+-                roomCharacters.map((char) => {
++                effectiveRoomCharacters.map((char) => {
+                   const chosen = char.id === selectedCharacterId;
+                   return (
+                     <TouchableOpacity
+@@ -174,6 +253,36 @@ const styles = StyleSheet.create({
+     marginTop: 4,
+     marginBottom: 16,
+   },
++  roomsPickerBlock: {
++    marginTop: 10,
++    marginBottom: 12,
++  },
++  roomChipsRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  roomChip: {
++    paddingHorizontal: 11,
++    paddingVertical: 7,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#555555',
++    backgroundColor: '#2a2a2a',
++  },
++  roomChipActive: {
++    borderColor: '#f0e68c',
++    backgroundColor: '#3a3a1e',
++  },
++  roomChipText: {
++    color: '#dddddd',
++    fontSize: 12,
++    fontWeight: '600',
++  },
++  roomChipTextActive: {
++    color: '#f0e68c',
++    fontWeight: '700',
++  },
+   sectionTitle: {
+     color: '#e8e8e8',
+     fontSize: 13,
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index f2d5aff..938bbe5 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -244,6 +244,128 @@ export const normalizeHubLinks = (rawLinks = []) => {
+   return out;
+ };
+ 
++/**
++ * Нормализация списка кодов комнат (локация может быть привязана сразу к нескольким комнатам).
++ */
++export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
++  const candidates = [];
++  if (Array.isArray(rawRoomCodes)) {
++    for (const c of rawRoomCodes) candidates.push(c);
++  } else if (typeof rawRoomCodes === 'string' && rawRoomCodes.trim()) {
++    candidates.push(rawRoomCodes);
++  }
++  if (fallbackRoomCode) candidates.push(fallbackRoomCode);
++
++  const seen = new Set();
++  const out = [];
++  for (const item of candidates) {
++    const code = String(item || '').trim().toUpperCase();
++    if (!code || seen.has(code)) continue;
++    seen.add(code);
++    out.push(code);
++  }
++  return out;
++};
++
++export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
++  [CONTAINER_KIND.HUB]: 0,
++  [CONTAINER_KIND.LOOT]: 1,
++  [CONTAINER_KIND.MERCHANT]: 2,
++});
++
++/**
++ * Сортировка карточек на главном экране «Добыча/Торговля»:
++ * 1) Локации ('hub') -> 2) Сундуки ('loot') -> 3) Торговцы ('merchant'),
++ * а внутри каждой группы — по алфавиту названия.
++ */
++export const sortContainersForRoot = (containers = []) => {
++  if (!Array.isArray(containers)) return [];
++  return [...containers].sort((a, b) => {
++    const rankA = CONTAINER_KIND_SORT_ORDER[a?.kind] ?? 99;
++    const rankB = CONTAINER_KIND_SORT_ORDER[b?.kind] ?? 99;
++    if (rankA !== rankB) return rankA - rankB;
++    const nameCmp = String(a?.name || '').localeCompare(String(b?.name || ''), 'ru', {
++      sensitivity: 'base',
++    });
++    if (nameCmp !== 0) return nameCmp;
++    return (Number(a?.createdAt) || 0) - (Number(b?.createdAt) || 0);
++  });
++};
++
++/**
++ * Список id всех локаций ('hub'), в которых числится данный контейнер/торговец.
++ */
++export const getHubIdsContainingChild = (childId, allContainers = []) => {
++  const targetId = String(childId || '').trim();
++  if (!targetId || !Array.isArray(allContainers)) return [];
++  const hubIds = [];
++  for (const c of allContainers) {
++    if (!c || c.kind !== CONTAINER_KIND.HUB) continue;
++    if ((c.links || []).some((lnk) => lnk?.containerId === targetId)) {
++      hubIds.push(c.id);
++    }
++  }
++  return hubIds;
++};
++
++/**
++ * Определяет, показывается ли карточка на корневом экране «Добыча/Торговля»:
++ * - все локации ('hub') всегда на корневом экране;
++ * - сундук/торговец показывается на корне, если он не привязан ни к одной локации
++ *   (защита от «потерянных» карточек) ИЛИ если Мастер явно вынес его на экран (inRoot === true).
++ */
++export const isContainerVisibleOnRoot = (container, allContainers = []) => {
++  if (!container) return false;
++  if (container.kind === CONTAINER_KIND.HUB) return true;
++  const parentHubIds = getHubIdsContainingChild(container.id, allContainers);
++  if (parentHubIds.length === 0) return true;
++  return container.inRoot === true;
++};
++
++/**
++ * Анализ последствий удаления локации ('hub'):
++ * - exclusiveChildren: сундуки/торговцы, которые числятся ТОЛЬКО в этой локации (и не вынесены на корень);
++ * - sharedChildren: сундуки/торговцы из этой локации, которые также есть в других локациях или на корне.
++ */
++export const analyzeHubDeletion = (hubId, allContainers = []) => {
++  const targetHubId = String(hubId || '').trim();
++  const list = Array.isArray(allContainers) ? allContainers : [];
++  const hub = list.find((c) => c && c.id === targetHubId && c.kind === CONTAINER_KIND.HUB);
++  if (!hub) {
++    return { exclusiveChildren: [], sharedChildren: [], allExclusive: false };
++  }
++
++  const otherHubs = list.filter(
++    (c) => c && c.kind === CONTAINER_KIND.HUB && c.id !== targetHubId,
++  );
++  const byId = new Map(
++    list
++      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
++      .map((c) => [c.id, c]),
++  );
++
++  const exclusiveChildren = [];
++  const sharedChildren = [];
++  for (const link of normalizeHubLinks(hub.links)) {
++    const child = byId.get(link.containerId);
++    if (!child) continue;
++    const inOtherHub = otherHubs.some((other) => (
++      (other.links || []).some((l) => l?.containerId === child.id)
++    ));
++    if (inOtherHub || child.inRoot === true) {
++      sharedChildren.push(child);
++    } else {
++      exclusiveChildren.push(child);
++    }
++  }
++
++  return {
++    exclusiveChildren,
++    sharedChildren,
++    allExclusive: exclusiveChildren.length > 0 && sharedChildren.length === 0,
++  };
++};
++
+ /**
+  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
+  * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
+@@ -302,13 +424,20 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+   const links = kind === CONTAINER_KIND.HUB
+     ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
+     : [];
++  const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
++  const primaryRoomCode = roomCodes[0] || '';
++  const inRoot = kind === CONTAINER_KIND.HUB
++    ? true
++    : (raw.inRoot === undefined ? undefined : Boolean(raw.inRoot));
+ 
+   return {
+     id: String(raw.id || makeContainerId(now)),
+     kind,
+     name: String(raw.name || '').trim(),
+-    roomCode: String(raw.roomCode || '').trim(),
++    roomCode: primaryRoomCode,
++    roomCodes,
+     roomName: String(raw.roomName || '').trim(),
++    inRoot,
+     description: String(raw.description || '').trim(),
+     caps: kind === CONTAINER_KIND.MERCHANT
+       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
+@@ -590,6 +719,7 @@ export const duplicateContainerEntity = (
+       itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+     })),
+     links: (normalized.links || []).map((lnk) => ({ ...lnk })),
++    roomCodes: [...(normalized.roomCodes || [])],
+     createdAt: now,
+     updatedAt: now,
+   };
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index 3600822..a53f672 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -202,7 +202,15 @@
+     "hint": "Share this address with your players: they will enter it via the “Server” menu item.",
+     "players": "Players",
+     "noPlayers": "Nobody here yet",
+-    "createFailed": "Failed to create the room. Check your connection and try again."
++    "createFailed": "Failed to create the room. Check your connection and try again.",
++    "openMenu": "Room actions",
++    "edit": "Edit",
++    "delete": "Delete",
++    "editTitle": "Room name",
++    "editPlaceholder": "Enter room name",
++    "editSave": "Save",
++    "editCancel": "Cancel",
++    "editEmptyWarn": "Please enter a room name."
+   },
+   "about": {
+     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index d55a73a..4e559bf 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -20,6 +20,8 @@
+     "openMenu": "Container actions",
+     "issue": "Issue",
+     "closeIssue": "Stop issuing",
++    "moveToHub": "Move to location…",
++    "moveHint": "Drag onto a location or tap a location to move",
+     "duplicate": "Duplicate",
+     "edit": "Edit",
+     "delete": "Delete",
+@@ -35,6 +37,10 @@
+     "nameLabel": "Name *",
+     "namePlaceholder": "e.g. Overseer's Safe / Caravan Joe / Diamond City Market",
+     "roomLabel": "Room *",
++    "roomsMultiLabel": "Room / rooms *",
++    "roomsMultiHint": "Select one or multiple rooms if different parties visit the same location.",
++    "bindHubsLabel": "Bind to location (optional)",
++    "bindHubsHint": "Leave unselected to place on the main screen (you can drag it into a location later).",
+     "noRoomsHint": "Create a campaign room on the «Campaigns» tab first.",
+     "descriptionLabel": "Description (optional)",
+     "descriptionPlaceholder": "Short description shown to players...",
+@@ -61,7 +67,11 @@
+     "hubPickerAddBtn": "Add",
+     "hubPickerClose": "Done",
+     "hubOpenChildCard": "Contents",
+-    "hubUnlinkChild": "Remove",
++    "hubMoveOutToRoot": "↗ To screen",
++    "hubUnlinkChild": "Unlink",
++    "hubSharedBadge": "🔗 ×{count}",
++    "roomsLabel": "Rooms: {rooms}",
++    "moveToHubPickerTitle": "Move «{name}» to Location",
+     "hubLockStateLocked": "🔒 Locked",
+     "hubLockStateUnlocked": "🔓 Unlocked",
+     "hubUnlockAction": "🔓 Unlock",
+@@ -84,6 +94,12 @@
+     "capsRollNotice": "Rolled cash {dice} {unit}: {total} {CAP}.",
+     "deleteConfirmTitle": "Delete card?",
+     "deleteConfirmMessage": "«{name}» will be deleted locally and from the cloud.",
++    "deleteHubConfirmTitle": "Delete location?",
++    "deleteHubAllExclusiveMessage": "All containers and merchants inside «{name}» ({count}) are not used in other locations and will be deleted with it.",
++    "deleteHubMixedMessage": "Deleting «{name}» will also delete {exclusiveCount} objects exclusive to it. Another {sharedCount} objects exist in other locations and will be kept.",
++    "deleteHubSharedOnlyMessage": "Location «{name}» will be deleted. Its {sharedCount} objects also exist in other locations and will be kept there.",
++    "deleteHubMoveOutOnly": "Move to screen",
++    "deleteHubWithChildren": "Delete all",
+     "emptyLootPromptTitle": "Container is empty. Delete it?",
+     "emptyLootPromptMessage": "All loot has been taken from «{name}» — distribution closed.",
+     "emptyLootKeep": "Keep"
+@@ -122,6 +138,8 @@
+   "issueModal": {
+     "title": "Issue: {name}",
+     "roomLabel": "Room: {room}",
++    "selectRoomTitle": "Select room to issue into",
++    "noRoomsAvailable": "No rooms available yet. Create a room on the «Campaigns» tab first.",
+     "targetTitle": "Who gets access?",
+     "wholeRoom": "Entire room (shared live pool)",
+     "wholeRoomHint": "Opens for all players in the room; taken/bought items update live for everyone.",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index d950864..e862f8d 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -202,7 +202,15 @@
+     "hint": "Передайте этот адрес игрокам: они введут его у себя в пункте «Сервер».",
+     "players": "Игроки",
+     "noPlayers": "Пока никого нет",
+-    "createFailed": "Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз."
++    "createFailed": "Не удалось создать комнату. Проверьте соединение и попробуйте ещё раз.",
++    "openMenu": "Действия комнаты",
++    "edit": "Редактировать",
++    "delete": "Удалить",
++    "editTitle": "Название комнаты",
++    "editPlaceholder": "Введите название комнаты",
++    "editSave": "Сохранить",
++    "editCancel": "Отмена",
++    "editEmptyWarn": "Укажите название комнаты."
+   },
+   "about": {
+     "description": "Positronium — менеджер персонажей для настольных ролевых игр: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация.",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 45df8ad..9dafb77 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -20,6 +20,8 @@
+     "openMenu": "Действия контейнера",
+     "issue": "Выдать",
+     "closeIssue": "Завершить выдачу",
++    "moveToHub": "В локацию…",
++    "moveHint": "Перетащите на локацию или нажмите на неё для переноса",
+     "duplicate": "Дублировать",
+     "edit": "Изменить",
+     "delete": "Удалить",
+@@ -35,6 +37,10 @@
+     "nameLabel": "Имя *",
+     "namePlaceholder": "Например: Сейф смотрителя / Караванщик Джо / Рынок Даймонд-Сити",
+     "roomLabel": "Комната *",
++    "roomsMultiLabel": "Комната / комнаты *",
++    "roomsMultiHint": "Можно выбрать сразу несколько комнат, если разные группы посещают одну и ту же локацию.",
++    "bindHubsLabel": "Привязать к локации (необязательно)",
++    "bindHubsHint": "Если не выбирать — попадёт в общий список на экране, откуда карточку можно в любой момент перетащить в локацию.",
+     "noRoomsHint": "Сначала создайте комнату на вкладке «Список кампаний».",
+     "descriptionLabel": "Описание (необязательно)",
+     "descriptionPlaceholder": "Короткое описание для игроков...",
+@@ -61,7 +67,11 @@
+     "hubPickerAddBtn": "Включить",
+     "hubPickerClose": "Готово",
+     "hubOpenChildCard": "Содержимое",
+-    "hubUnlinkChild": "Убрать",
++    "hubMoveOutToRoot": "↗ На экран",
++    "hubUnlinkChild": "Отвязать",
++    "hubSharedBadge": "🔗 ×{count}",
++    "roomsLabel": "Комнаты: {rooms}",
++    "moveToHubPickerTitle": "Перенести «{name}» в локацию",
+     "hubLockStateLocked": "🔒 Заперто",
+     "hubLockStateUnlocked": "🔓 Открыто",
+     "hubUnlockAction": "🔓 Открыть замок",
+@@ -84,6 +94,12 @@
+     "capsRollNotice": "Касса по броску {dice} {unit}: {total} {CAP}",
+     "deleteConfirmTitle": "Удалить карточку?",
+     "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке.",
++    "deleteHubConfirmTitle": "Удалить локацию?",
++    "deleteHubAllExclusiveMessage": "Все контейнеры и торговцы внутри локации «{name}» ({count} шт.) не числятся в других локациях и будут удалены вместе с ней.",
++    "deleteHubMixedMessage": "Вместе с локацией «{name}» будут удалены {exclusiveCount} объектов, числящихся только в ней. Ещё {sharedCount} объектов используются в других локациях и сохранятся.",
++    "deleteHubSharedOnlyMessage": "Локация «{name}» будет удалена. Находящиеся в ней объекты ({sharedCount} шт.) есть в других локациях и останутся там.",
++    "deleteHubMoveOutOnly": "Вынести на экран",
++    "deleteHubWithChildren": "Удалить всё",
+     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
+     "emptyLootPromptMessage": "Из контейнера «{name}» забрали всю добычу — раздача завершена.",
+     "emptyLootKeep": "Оставить"
+@@ -122,6 +138,8 @@
+   "issueModal": {
+     "title": "Выдать: {name}",
+     "roomLabel": "Комната: {room}",
++    "selectRoomTitle": "В какую комнату выдать?",
++    "noRoomsAvailable": "Нет доступных комнат. Сначала создайте комнату на вкладке «Список кампаний».",
+     "targetTitle": "Кому открыть доступ?",
+     "wholeRoom": "Всей комнате (общий живой пул)",
+     "wholeRoomHint": "Открывается у всех игроков комнаты; взятое/купленное сразу списывается у остальных.",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 1a26c4d..6364f65 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "472"
++  "baseline": "473"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3574eed..f417af7 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "472",
++  "version": "473",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 5a75fef..24bc9fb 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -282,7 +282,13 @@ const attachRoomWebSocketServer = (httpServer, {
+     }));
+     for (const member of room.members.values()) {
+       if (member.clientId === exceptClientId || !member.ws) continue;
+-      sendEnvelope(member.ws, MESSAGE.ROOM_MEMBER, { members }, room.code, member.clientId);
++      sendEnvelope(
++        member.ws,
++        MESSAGE.ROOM_MEMBER,
++        { members, name: room.name },
++        room.code,
++        member.clientId,
++      );
+     }
+   };
+ 
+@@ -409,6 +415,9 @@ const attachRoomWebSocketServer = (httpServer, {
+             rebound: result.rebound,
+             requestId: payload.requestId || null,
+           }, result.room.code, clientId);
++          if (result.rebound && result.room.members.size > 0) {
++            broadcastMembers(result.room, null);
++          }
+           break;
+         }
+ 
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index 9e6fadb..00e61ec 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -123,25 +123,30 @@ export const startGmSessionPersistence = () => {
+                       try {
+                         await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
+                         await db.deleteGmContainer(emptiedChild.id);
+-                        const freshHub = await db.getGmContainerById(existing.id);
+-                        if (freshHub && freshHub.kind === 'hub') {
+-                          const prunedLinks = (freshHub.links || []).filter(
+-                            (l) => l.containerId !== emptiedChild.id,
+-                          );
+-                          await db.saveGmContainer({ ...freshHub, links: prunedLinks });
+-                          void syncGmContainerToCloudIfEnabled(freshHub.id);
+-                          const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
+-                          if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
+-                            const prunedNodes = (liveNow.nodes || []).filter(
+-                              (n) => n.containerId !== emptiedChild.id,
++                        const allNow = await db.getGmContainersList();
++                        for (const item of allNow) {
++                          if (
++                            item.kind === 'hub'
++                            && (item.links || []).some((l) => l.containerId === emptiedChild.id)
++                          ) {
++                            const prunedLinks = item.links.filter(
++                              (l) => l.containerId !== emptiedChild.id,
+                             );
+-                            await useRoomStore.getState().updateRoomSessionRates({
+-                              code,
+-                              sessionId: liveNow.sessionId,
+-                              nodes: prunedNodes,
+-                            }).catch(() => {});
++                            await db.saveGmContainer({ ...item, links: prunedLinks });
++                            void syncGmContainerToCloudIfEnabled(item.id);
+                           }
+                         }
++                        const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
++                        if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
++                          const prunedNodes = (liveNow.nodes || []).filter(
++                            (n) => n.containerId !== emptiedChild.id,
++                          );
++                          await useRoomStore.getState().updateRoomSessionRates({
++                            code,
++                            sessionId: liveNow.sessionId,
++                            nodes: prunedNodes,
++                          }).catch(() => {});
++                        }
+                         notifyGmContainerUpdated(emptiedChild.id);
+                       } catch (err) {
+                         debugLog('gm.sessionPersistence.deleteEmptyHubChild:failed', {
+@@ -198,6 +203,19 @@ export const startGmSessionPersistence = () => {
+                   try {
+                     await deleteGmContainerFromCloudIfEnabled(existing.id);
+                     await db.deleteGmContainer(existing.id);
++                    const allNow = await db.getGmContainersList();
++                    for (const item of allNow) {
++                      if (
++                        item.kind === 'hub'
++                        && (item.links || []).some((l) => l.containerId === existing.id)
++                      ) {
++                        const prunedLinks = item.links.filter(
++                          (l) => l.containerId !== existing.id,
++                        );
++                        await db.saveGmContainer({ ...item, links: prunedLinks });
++                        void syncGmContainerToCloudIfEnabled(item.id);
++                      }
++                    }
+                     notifyGmContainerUpdated(existing.id);
+                   } catch (err) {
+                     debugLog('gm.sessionPersistence.deleteEmpty:failed', {
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index b0b4655..dc90aa5 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -299,7 +299,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         set({
+           rooms: {
+             ...get().rooms,
+-            [code]: { ...current, members: message.payload?.members || [] },
++            [code]: {
++              ...current,
++              name: typeof message.payload?.name === 'string' && message.payload.name.trim()
++                ? message.payload.name.trim()
++                : current.name,
++              members: message.payload?.members || [],
++            },
+           },
+         });
+         return;
+@@ -428,7 +434,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             name: roomName || name,
+             role: 'gm',
+             members: prev?.members || [],
+-            joined: false,
++            joined: Boolean(prev?.joined && requestedCode),
+             snapshots: prev?.snapshots || {},
+             activeSession: prev?.activeSession ?? null,
+           },
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 52fd304..95c34cc 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -206,6 +206,16 @@ const styles = StyleSheet.create({
+   folderNameInput: { width: '100%', borderBottomWidth: 1, borderColor: '#555', textAlign: 'center', marginTop: 8, padding: 4 },
+   folderDraftActions: { flexDirection: 'row', gap: 12, marginTop: 12 },
+   folderHeader: { marginHorizontal: 16, marginBottom: 8, padding: 10, borderWidth: 1, borderColor: '#d4af37', borderRadius: 8, backgroundColor: '#111827' },
++  folderHeaderTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
++  folderMenuButton: { width: 30, height: 30, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(240,230,140,0.45)', alignItems: 'center', justifyContent: 'center' },
++  roomEditCard: { width: '90%', maxWidth: 420, backgroundColor: '#1f1f1f', borderRadius: 5, borderWidth: 1.5, borderColor: '#f0e68c', paddingHorizontal: 24, paddingVertical: 22 },
++  roomEditTitle: { color: '#f0e68c', fontSize: 18, fontWeight: '700', textAlign: 'center', marginBottom: 14 },
++  roomEditInput: { backgroundColor: '#2a2a2a', borderWidth: 1, borderColor: '#5a5a5a', borderRadius: 5, color: '#f5f5f5', fontSize: 15, paddingHorizontal: 12, paddingVertical: 10 },
++  roomEditButtonsRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
++  roomEditCancelBtn: { backgroundColor: '#2a2a2a', borderWidth: 1, borderColor: '#777777', borderRadius: 5, paddingHorizontal: 16, paddingVertical: 10 },
++  roomEditCancelText: { color: '#e0e0e0', fontSize: 14, fontWeight: '700' },
++  roomEditSaveBtn: { backgroundColor: '#3a3a1e', borderWidth: 1, borderColor: '#f0e68c', borderRadius: 5, paddingHorizontal: 18, paddingVertical: 10 },
++  roomEditSaveText: { color: '#f0e68c', fontSize: 14, fontWeight: '700' },
+   folderBack: { color: '#93c5fd', fontWeight: '700' },
+   folderHeaderTitle: { color: '#f0e68c', fontSize: 18, fontWeight: '700', marginTop: 6 },
+   folderHeaderCount: { color: '#d1d5db', marginTop: 2 },
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index 8007a7b..c2bf402 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -106,6 +106,59 @@ const styles = StyleSheet.create({
+     borderWidth: 2,
+     borderColor: '#d4af37',
+   },
++  cardCellDropTarget: {
++    borderWidth: 2.5,
++    borderColor: '#f0e68c',
++    backgroundColor: '#f7f3dc',
++  },
++  cardDragHandle: {
++    position: 'absolute',
++    top: 5,
++    left: 5,
++    zIndex: 20,
++    width: 26,
++    height: 26,
++    borderRadius: 13,
++    backgroundColor: '#ffffff',
++    borderWidth: 1,
++    borderColor: '#cccccc',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  moveHintBanner: {
++    position: 'absolute',
++    top: 46,
++    left: 16,
++    right: 16,
++    zIndex: 60,
++    color: '#f0e68c',
++    textAlign: 'center',
++    fontSize: 12,
++    fontWeight: '700',
++    paddingVertical: 6,
++    paddingHorizontal: 10,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#d4af37',
++    backgroundColor: 'rgba(26,26,26,0.94)',
++  },
++  dragPreviewCard: {
++    position: 'absolute',
++    zIndex: 120,
++    width: 118,
++    paddingVertical: 8,
++    paddingHorizontal: 8,
++    borderRadius: 5,
++    backgroundColor: '#1f1f1f',
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++  },
++  dragPreviewText: {
++    color: '#f0e68c',
++    fontSize: 11,
++    fontWeight: '700',
++    textAlign: 'center',
++  },
+   cardHero: {
+     height: '42%',
+     backgroundColor: '#242424',
+@@ -124,7 +177,7 @@ const styles = StyleSheet.create({
+   cardLiveBadge: {
+     position: 'absolute',
+     top: 5,
+-    left: 5,
++    right: 5,
+     backgroundColor: '#d4af37',
+     paddingHorizontal: 6,
+     paddingVertical: 2,
+@@ -621,6 +674,75 @@ const styles = StyleSheet.create({
+     fontSize: 11,
+     fontWeight: '700',
+   },
++  hubSharedBadgeText: {
++    fontSize: 11,
++    fontWeight: '700',
++    color: '#6b5b1e',
++    backgroundColor: '#f3ecd2',
++    borderWidth: 1,
++    borderColor: '#d4c385',
++    borderRadius: 4,
++    paddingHorizontal: 6,
++    paddingVertical: 1,
++  },
++  movePickerOverlay: {
++    flex: 1,
++    backgroundColor: 'rgba(0,0,0,0.72)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    paddingHorizontal: 28,
++    paddingVertical: 36,
++  },
++  movePickerCard: {
++    width: '90%',
++    maxWidth: 460,
++    maxHeight: '78%',
++    backgroundColor: '#1f1f1f',
++    borderRadius: 5,
++    borderWidth: 1.5,
++    borderColor: '#f0e68c',
++    paddingHorizontal: 24,
++    paddingVertical: 22,
++  },
++  movePickerTitle: {
++    color: '#f0e68c',
++    fontSize: 17,
++    fontWeight: '700',
++    textAlign: 'center',
++    marginBottom: 14,
++  },
++  movePickerRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 10,
++    paddingVertical: 11,
++    paddingHorizontal: 13,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#4d4d4d',
++    backgroundColor: '#2a2a2a',
++    marginBottom: 8,
++  },
++  movePickerRowText: {
++    color: '#f0f0f0',
++    fontSize: 14,
++    fontWeight: '700',
++    flex: 1,
++  },
++  movePickerCancelBtn: {
++    marginTop: 10,
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#777777',
++    borderRadius: 5,
++    paddingVertical: 11,
++    alignItems: 'center',
++  },
++  movePickerCancelText: {
++    color: '#e0e0e0',
++    fontSize: 14,
++    fontWeight: '700',
++  },
+ });
+ 
+ export default styles;

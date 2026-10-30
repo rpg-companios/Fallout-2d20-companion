@@ -21,6 +21,7 @@ import {
   DEFAULT_SALE_MARKUP_PERCENT,
   DEFAULT_BUY_DEPRECIATION_PERCENT,
   resolveQuantitySpec,
+  normalizeRoomCodes,
   normalizeSaleMarkupPercent,
   normalizeBuyDepreciationPercent,
 } from '../../../../domain/lootTrade';
@@ -31,6 +32,8 @@ const ContainerFormModal = ({
   kind = CONTAINER_KIND.LOOT,
   initialContainer = null,
   availableRooms = [],
+  availableHubs = [],
+  initialLinkedHubIds = [],
   onSave,
   onClose,
 }) => {
@@ -42,7 +45,8 @@ const ContainerFormModal = ({
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
 
   const [name, setName] = useState('');
-  const [roomCode, setRoomCode] = useState('');
+  const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
+  const [selectedHubIds, setSelectedHubIds] = useState([]);
   const [description, setDescription] = useState('');
   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
@@ -52,8 +56,20 @@ const ContainerFormModal = ({
   useEffect(() => {
     if (!visible) return;
     setName(initialContainer?.name || '');
-    const defaultRoom = initialContainer?.roomCode || availableRooms[0]?.code || '';
-    setRoomCode(defaultRoom);
+    if (isHub) {
+      const existingCodes = normalizeRoomCodes(
+        initialContainer?.roomCodes,
+        initialContainer?.roomCode,
+      );
+      const fallbackCodes = existingCodes.length > 0
+        ? existingCodes
+        : (availableRooms[0]?.code ? [availableRooms[0].code] : []);
+      setSelectedRoomCodes(fallbackCodes);
+      setSelectedHubIds([]);
+    } else {
+      setSelectedRoomCodes([]);
+      setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
+    }
     setDescription(initialContainer?.description || '');
     setCapsCount(String(
       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
@@ -69,7 +85,19 @@ const ContainerFormModal = ({
         ? initialContainer.buyDepreciationPercent
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
     ));
-  }, [visible, initialContainer, availableRooms]);
+  }, [visible, initialContainer, availableRooms, isHub, initialLinkedHubIds]);
+
+  const toggleRoomCode = (code) => {
+    setSelectedRoomCodes((prev) => (
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    ));
+  };
+
+  const toggleHubId = (hubId) => {
+    setSelectedHubIds((prev) => (
+      prev.includes(hubId) ? prev.filter((id) => id !== hubId) : [...prev, hubId]
+    ));
+  };
 
   const stepCaps = (delta) => {
     const cur = parseInt(capsCount, 10) || 0;
@@ -84,12 +112,15 @@ const ContainerFormModal = ({
       showRawAlert({ title: tLootTrade('form.validationName') });
       return;
     }
-    if (!roomCode) {
+    if (isHub && selectedRoomCodes.length === 0) {
       showRawAlert({ title: tLootTrade('form.validationRoom') });
       return;
     }
 
-    const roomRecord = availableRooms.find((r) => r.code === roomCode);
+    const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
+    const roomRecord = isHub
+      ? availableRooms.find((r) => r.code === primaryRoomCode)
+      : null;
     let resolvedCaps = 0;
     let capsRollInfo = null;
 
@@ -103,19 +134,24 @@ const ContainerFormModal = ({
       if (roll.rolled) capsRollInfo = roll;
     }
 
-    onSave({
-      ...(initialContainer || {}),
-      kind: isHub
-        ? CONTAINER_KIND.HUB
-        : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
-      name: cleanName,
-      roomCode,
-      roomName: roomRecord?.name || initialContainer?.roomName || roomCode,
-      description: description.trim(),
-      caps: resolvedCaps,
-      saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
-      buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
-    }, capsRollInfo);
+    onSave(
+      {
+        ...(initialContainer || {}),
+        kind: isHub
+          ? CONTAINER_KIND.HUB
+          : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
+        name: cleanName,
+        roomCode: primaryRoomCode,
+        roomCodes: isHub ? selectedRoomCodes : [],
+        roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
+        description: description.trim(),
+        caps: resolvedCaps,
+        saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+        buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+      },
+      capsRollInfo,
+      isHub ? null : selectedHubIds,
+    );
   };
 
   let titleKey = isEditing ? 'form.editLootTitle' : 'form.createLootTitle';
@@ -144,29 +180,59 @@ const ContainerFormModal = ({
               placeholderTextColor="#8c8c8c"
             />
 
-            <Text style={styles.label}>{tLootTrade('form.roomLabel')}</Text>
-            {availableRooms.length === 0 ? (
-              <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
+            {isHub ? (
+              <>
+                <Text style={styles.label}>{tLootTrade('form.roomsMultiLabel')}</Text>
+                {availableRooms.length === 0 ? (
+                  <Text style={styles.warnText}>{tLootTrade('form.noRoomsHint')}</Text>
+                ) : (
+                  <>
+                    <View style={styles.roomChips}>
+                      {availableRooms.map((room) => {
+                        const selected = selectedRoomCodes.includes(room.code);
+                        return (
+                          <TouchableOpacity
+                            key={room.code}
+                            style={[styles.roomChip, selected && styles.roomChipActive]}
+                            onPress={() => toggleRoomCode(room.code)}
+                          >
+                            <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
+                              {room.name}
+                            </Text>
+                            <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
+                              {formatRoomCodeForDisplay(room.code)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.hintText}>{tLootTrade('form.roomsMultiHint')}</Text>
+                  </>
+                )}
+              </>
             ) : (
-              <View style={styles.roomChips}>
-                {availableRooms.map((room) => {
-                  const selected = room.code === roomCode;
-                  return (
-                    <TouchableOpacity
-                      key={room.code}
-                      style={[styles.roomChip, selected && styles.roomChipActive]}
-                      onPress={() => setRoomCode(room.code)}
-                    >
-                      <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
-                        {room.name}
-                      </Text>
-                      <Text style={[styles.roomChipCode, selected && styles.roomChipTextActive]}>
-                        {formatRoomCodeForDisplay(room.code)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              availableHubs.length > 0 && (
+                <>
+                  <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
+                  <View style={styles.roomChips}>
+                    {availableHubs.map((hubItem) => {
+                      const selected = selectedHubIds.includes(hubItem.id);
+                      return (
+                        <TouchableOpacity
+                          key={hubItem.id}
+                          style={[styles.roomChip, selected && styles.roomChipActive]}
+                          onPress={() => toggleHubId(hubItem.id)}
+                        >
+                          <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
+                            {hubItem.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
+                </>
+              )
             )}
 
             <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>

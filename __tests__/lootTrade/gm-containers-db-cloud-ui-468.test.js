@@ -126,6 +126,7 @@ describe('Патч 468 — локальная БД gm_containers, облачна
       'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
       'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js',
       'components/screens/LootTradeScreen/modals/ContainerCatalogModal.js',
+      'components/screens/LootTradeScreen/modals/HubChildPickerModal.js',
       'components/screens/LootTradeScreen/modals/IssueContainerModal.js',
       'components/lootTrade/PlayerLootTradeOverlay.js',
     ];
