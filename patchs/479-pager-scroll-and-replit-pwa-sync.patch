@@ -1,0 +1,1287 @@
+diff --git a/App.js b/App.js
+index 716ae10..71dc55a 100644
+--- a/App.js
++++ b/App.js
+@@ -41,6 +41,7 @@ import {
+   enforceAdminModeEntitlement,
+   useAdminAccess,
+ } from './src/premium/adminAccessGate';
++import { startWebPagerScrollGuard } from './src/web/pagerScrollGuard';
+ // Side-effect: сеттинг регистрирует расширение состояния (поле сейва
+ // survival + миграцию v22→v23) в реестре движка ДО монтирования
+ // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
+@@ -104,6 +105,13 @@ function App() {
+   // (CharacterScreen) while rendering a different component (CharacterProvider)".
+   const moduleTabsActive = activeSettingId != null;
+   const characterSheetTabsActive = moduleTabsActive && (!isGmMode || gmInspectingCharacter);
++  const navTopologyKey = isGmMode
++    ? (characterSheetTabsActive ? 'gm-inspect' : 'gm')
++    : (moduleTabsActive ? 'fallout' : 'empty');
++
++  useEffect(() => {
++    startWebPagerScrollGuard();
++  }, []);
+ 
+   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
+   // даже если версия @react-navigation/native не поддерживает documentTitle.
+@@ -224,7 +232,7 @@ function App() {
+     <PaperProvider>
+       <SafeAreaProvider>
+           <NavigationContainer
+-            key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}
++            key={`${locale}:${navTopologyKey}`}
+             // Единый бренд приложения в заголовке вкладки браузера (Google-брендинг):
+             // react-navigation иначе подставляет имя маршрута («HomeTab» и т.п.).
+             documentTitle={{ formatter: () => APP_BRAND }}
+diff --git a/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js b/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js
+new file mode 100644
+index 0000000..444a417
+--- /dev/null
++++ b/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js
+@@ -0,0 +1,361 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: vi.fn(),
++  showAlert: vi.fn(),
++  confirmAlert: vi.fn().mockResolvedValue(true),
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncGmContainerToCloudIfEnabled: vi.fn().mockResolvedValue(undefined),
++  deleteGmContainerFromCloudIfEnabled: vi.fn().mockResolvedValue({ removed: false }),
++  syncGmRoomToCloudIfEnabled: vi.fn().mockResolvedValue(undefined),
++  deleteGmRoomFromCloudIfEnabled: vi.fn().mockResolvedValue({ removed: false }),
++  syncAllCharactersWithCloud: vi.fn().mockResolvedValue({ uploaded: 0, downloaded: 0 }),
++  openCloudFolderInDrive: vi.fn().mockResolvedValue(undefined),
++}));
++
++import {
++  clampHiddenOverflowAncestors,
++  installSafeProgrammaticFocus,
++  sanitizeRootPagerDom,
++} from '../../src/web/pagerScrollGuard';
++import { createRoomServer } from '../../server/roomServer';
++import { showRawAlert } from '../../components/alerts/alertService';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++const createWsAdapter = (url) => {
++  const ws = new WebSocket(url);
++  const adapter = {
++    get readyState() { return ws.readyState; },
++    onopen: null,
++    onclose: null,
++    onerror: null,
++    onmessage: null,
++    send(data) { ws.send(data); },
++    close() { ws.close(); },
++  };
++  ws.on('open', () => { if (adapter.onopen) adapter.onopen(); });
++  ws.on('close', () => { if (adapter.onclose) adapter.onclose(); });
++  ws.on('error', (err) => { if (adapter.onerror) adapter.onerror(err); });
++  ws.on('message', (buf) => {
++    if (adapter.onmessage) adapter.onmessage({ data: buf.toString('utf8') });
++  });
++  return adapter;
++};
++
++const waitFor = async (predicate, timeoutMs = 2500) => {
++  const deadline = Date.now() + timeoutMs;
++  while (Date.now() < deadline) {
++    const val = await predicate();
++    if (val) return val;
++    await new Promise((r) => setTimeout(r, 15));
++  }
++  throw new Error('waitFor timed out');
++};
++
++describe('Патч 479: защита от 50%-смещения экрана при синке в админке и сверка PWA <-> Replit', () => {
++  let serverInstance = null;
++
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  afterEach(async () => {
++    if (serverInstance) {
++      await serverInstance.close();
++      serverInstance = null;
++    }
++    delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++  });
++
++  it('pagerScrollGuard блокирует 50%-смещение scrollLeft на overflow:hidden пейджере и помечает скрытые вкладки inert', () => {
++    // Имитация DOM-дерева TabView в режиме Админа (2 вкладки шириной по 1000px -> лента 2000px)
++    const makeEl = (tag, { overflowX = 'visible', scrollLeft = 0, attrs = {}, parent = null } = {}) => {
++      const attrMap = new Map(Object.entries(attrs));
++      const el = {
++        nodeType: 1,
++        tagName: tag.toUpperCase(),
++        style: { overflowX, overflow: overflowX },
++        scrollLeft,
++        inert: false,
++        parentElement: parent,
++        children: [],
++        getAttribute: (k) => (attrMap.has(k) ? attrMap.get(k) : null),
++        setAttribute: (k, v) => { attrMap.set(k, String(v)); },
++        removeAttribute: (k) => { attrMap.delete(k); },
++        hasAttribute: (k) => attrMap.has(k),
++        closest(selector) {
++          if (selector === '[aria-hidden="true"]') {
++            let cur = this;
++            while (cur) {
++              if (cur.getAttribute?.('aria-hidden') === 'true') return cur;
++              cur = cur.parentElement;
++            }
++          }
++          return null;
++        },
++      };
++      if (parent) parent.children.push(el);
++      return el;
++    };
++
++    const root = makeEl('div', { overflowX: 'visible' });
++    const pagerDiv = makeEl('div', { overflowX: 'hidden', scrollLeft: 500, parent: root }); // сдвинулся на 50%!
++    const sheetDiv = makeEl('div', { overflowX: 'visible', parent: pagerDiv });
++    const homeScene = makeEl('div', { overflowX: 'hidden', attrs: { 'aria-hidden': 'false' }, parent: sheetDiv });
++    const lootScene = makeEl('div', { overflowX: 'hidden', attrs: { 'aria-hidden': 'true' }, parent: sheetDiv });
++    const homeBtn = makeEl('button', { parent: homeScene });
++    const hiddenLootBtn = makeEl('button', { parent: lootScene });
++    const userHorizontalScroll = makeEl('div', { overflowX: 'auto', scrollLeft: 180, parent: homeScene });
++
++    const collectAll = (node, pred, acc = []) => {
++      for (const ch of node.children || []) {
++        if (pred(ch)) acc.push(ch);
++        collectAll(ch, pred, acc);
++      }
++      return acc;
++    };
++    root.querySelectorAll = (sel) => {
++      if (sel === '[aria-hidden]') return collectAll(root, (n) => n.hasAttribute('aria-hidden'));
++      if (sel === 'div') return collectAll(root, (n) => n.tagName === 'DIV');
++      return [];
++    };
++
++    const fakeWin = {
++      getComputedStyle: (el) => ({ overflowX: el.style.overflowX || 'visible' }),
++    };
++
++    // 1. sanitizeRootPagerDom сбрасывает 50%-смещение (500 -> 0), ставит inert на скрытую вкладку
++    //    и НЕ трогает легитимный горизонтальный ScrollView (overflow-x: auto -> 180).
++    const fixedCount = sanitizeRootPagerDom(root, fakeWin);
++    expect(fixedCount).toBe(1);
++    expect(pagerDiv.scrollLeft).toBe(0);
++    expect(userHorizontalScroll.scrollLeft).toBe(180);
++    expect(lootScene.inert).toBe(true);
++    expect(lootScene.getAttribute('inert')).toBe('');
++    expect(homeScene.inert).toBe(false);
++
++    // 2. installSafeProgrammaticFocus передаёт { preventScroll: true } для узлов внутри пейджера,
++    //    блокирует фокус внутрь скрытой вкладки [aria-hidden="true"] и гасит случайный сдвиг браузера.
++    const focusCalls = [];
++    function FakeHTMLElement() {}
++    FakeHTMLElement.prototype.focus = function mockNativeFocus(opts) {
++      focusCalls.push({ target: this, opts });
++      if (!opts?.preventScroll) {
++        // Имитация поведения Blink без preventScroll: центрирование 2W-ленты даёт scrollLeft = 500
++        pagerDiv.scrollLeft = 500;
++      }
++    };
++    fakeWin.HTMLElement = FakeHTMLElement;
++    Object.setPrototypeOf(homeBtn, FakeHTMLElement.prototype);
++    Object.setPrototypeOf(hiddenLootBtn, FakeHTMLElement.prototype);
++
++    installSafeProgrammaticFocus(fakeWin);
++
++    hiddenLootBtn.focus();
++    expect(focusCalls).toHaveLength(0);
++    expect(pagerDiv.scrollLeft).toBe(0);
++
++    homeBtn.focus();
++    expect(focusCalls).toHaveLength(1);
++    expect(focusCalls[0].opts).toEqual({ preventScroll: true });
++    expect(pagerDiv.scrollLeft).toBe(0);
++
++    // 3. Даже если браузер напрямую сдвинул scrollLeft во время события, clampHiddenOverflowAncestors мгновенно возвращает 0
++    pagerDiv.scrollLeft = 500;
++    expect(clampHiddenOverflowAncestors(homeBtn, fakeWin)).toBe(1);
++    expect(pagerDiv.scrollLeft).toBe(0);
++  });
++
++  it('App.js и googleDriveSync.js содержат ключ топологии навигатора и синхронизацию комнат Мастера gm_rooms', () => {
++    const appSrc = fs.readFileSync(path.join(ROOT, 'App.js'), 'utf8');
++    expect(appSrc).toContain('navTopologyKey');
++    expect(appSrc).toContain('key={`${locale}:${navTopologyKey}`}');
++    expect(appSrc).toContain('startWebPagerScrollGuard');
++
++    const driveSrc = fs.readFileSync(path.join(ROOT, 'components/cloudSync/googleDriveSync.js'), 'utf8');
++    expect(driveSrc).toContain("const GM_ROOMS_FOLDER_NAME = 'gm_rooms';");
++    expect(driveSrc).toContain('syncGmRoomsInSession');
++    expect(driveSrc).toContain('export const syncGmRoomToCloudIfEnabled = async');
++    expect(driveSrc).toContain('export const deleteGmRoomFromCloudIfEnabled = async');
++  });
++
++  it('если вкладка Мастера на Replit временно отсоединялась в момент «Забрать всё» из PWA, переподключение сразу опустошает и закрывает сундук у Мастера', async () => {
++    serverInstance = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await serverInstance.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    const db = await import('../../db');
++    await db.initDatabase();
++
++    const { createRoomClient } = await import('../../src/room/roomClient');
++    const roomStoreMod = await import('../../src/room/roomStore');
++    const useRoomStore = roomStoreMod.default;
++    const {
++      startGmSessionPersistence,
++      subscribeGmContainerUpdates,
++    } = await import('../../src/lootTrade/gmSessionPersistence');
++
++    // 1. Мастер в браузере (Replit) создаёт комнату и выдаёт сохранённый сундук
++    roomStoreMod.resetRoomClientForTests();
++    roomStoreMod.setRoomClientFactoryForTests(({ url, onStatus, onMessage }) => (
++      createRoomClient({
++        url,
++        clientId: 'replit-gm-browser:t-tab1',
++        onStatus,
++        onMessage,
++        webSocketFactory: createWsAdapter,
++      })
++    ));
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++
++    const created = await useRoomStore.getState().createRoom({ name: 'Стол Replit+PWA' });
++    const folder = await db.createCharacterFolder('Стол Replit+PWA');
++    await db.upsertFolderRoom(folder.id, created.code, created.ownerToken);
++    await useRoomStore.getState().joinRoom({
++      code: created.code,
++      name: 'GM',
++      role: 'gm',
++      ownerToken: created.ownerToken,
++    });
++
++    const savedChest = await db.saveGmContainer({
++      id: 'cnt_replit_pwa_479',
++      kind: 'loot',
++      name: 'Ящик из облака',
++      items: [
++        { entryId: 'e_ammo', itemId: 'ammo_10mm', category: 'ammo', name: '10-мм патроны', quantity: 14 },
++        { entryId: 'e_stim', itemId: 'chem_stimpak', category: 'chems', name: 'Стимулятор', quantity: 3 },
++      ],
++    });
++
++    const stopPersistence = startGmSessionPersistence();
++    const emptiedEvents = [];
++    const unsubUpdates = subscribeGmContainerUpdates((id, meta) => {
++      if (meta?.emptied) emptiedEvents.push({ id, meta });
++    });
++
++    // 2. Игрок открывает приложение через отдельное установленное PWA и входит в комнату
++    let pwaSession = null;
++    const pwaClient = createRoomClient({
++      url: wsUrl,
++      clientId: 'pwa-standalone-player:t-pwa1',
++      onStatus: () => {},
++      onMessage: (msg) => {
++        if (msg.type === 'session.state' && msg.payload && 'session' in msg.payload) {
++          pwaSession = msg.payload.session;
++        }
++      },
++      webSocketFactory: createWsAdapter,
++    });
++    pwaClient.send('room.join', {
++      code: created.code,
++      name: 'Курьер (PWA)',
++      role: 'player',
++      requestId: 'req-pwa-join',
++    }, created.code);
++
++    await waitFor(() => serverInstance.registry.getRoom(created.code)?.members.has('pwa-standalone-player:t-pwa1'));
++
++    // Мастер выдаёт сундук на всю комнату
++    const opened = await useRoomStore.getState().openRoomSession({
++      code: created.code,
++      ownerToken: created.ownerToken,
++      session: {
++        containerId: savedChest.id,
++        kind: 'loot',
++        name: savedChest.name,
++        targetType: 'room',
++        items: savedChest.items,
++      },
++    });
++    await waitFor(() => pwaSession?.sessionId === opened.sessionId);
++
++    // 3. Вкладка Мастера на Replit временно теряет WS-соединение (например, фоновый троттлинг вкладки)
++    roomStoreMod.resetRoomClientForTests();
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++
++    // Пока Мастер оффлайн, игрок в PWA нажимает «Забрать всё»!
++    let pwaTakeResult = null;
++    const origOnMsg = pwaClient;
++    expect(origOnMsg).toBeTruthy();
++    const pwaClient2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'pwa-standalone-player:t-pwa1',
++      onStatus: () => {},
++      onMessage: (msg) => {
++        if (msg.type === 'session.lootTake') pwaTakeResult = msg;
++      },
++      webSocketFactory: createWsAdapter,
++    });
++    pwaClient.close();
++    pwaClient2.send('room.join', {
++      code: created.code,
++      name: 'Курьер (PWA)',
++      role: 'player',
++      requestId: 'req-pwa-rejoin',
++    }, created.code);
++    await new Promise((r) => setTimeout(r, 40));
++
++    pwaClient2.send('session.lootTake', {
++      sessionId: opened.sessionId,
++      characterId: 'char_pwa_1',
++      takes: [
++        { entryId: 'e_ammo', quantity: 14 },
++        { entryId: 'e_stim', quantity: 3 },
++      ],
++      requestId: 'req-pwa-take-all',
++    }, created.code);
++
++    await waitFor(() => pwaTakeResult !== null);
++    expect(pwaTakeResult.payload.session).toBeNull();
++    expect(pwaTakeResult.payload.closedReason).toBe('loot_emptied');
++
++    // 4. Вкладка Мастера на Replit восстанавливает соединение и переподключается к комнате с ownerToken
++    roomStoreMod.setRoomClientFactoryForTests(({ url, onStatus, onMessage }) => (
++      createRoomClient({
++        url,
++        clientId: 'replit-gm-browser:t-tab2',
++        onStatus,
++        onMessage,
++        webSocketFactory: createWsAdapter,
++      })
++    ));
++
++    await useRoomStore.getState().joinRoom({
++      code: created.code,
++      name: 'GM',
++      role: 'gm',
++      ownerToken: created.ownerToken,
++    });
++
++    // Сразу после переподключения сундук Мастера в БД опустошается, уходит сигнал закрытия карточки и алерт удаления!
++    await waitFor(async () => {
++      const c = await db.getGmContainerById(savedChest.id);
++      return Array.isArray(c?.items) && c.items.length === 0;
++    });
++
++    const finalChest = await db.getGmContainerById(savedChest.id);
++    expect(finalChest.items).toEqual([]);
++    expect(useRoomStore.getState().rooms[created.code]?.activeSession).toBeNull();
++    expect(emptiedEvents.some((ev) => ev.id === savedChest.id)).toBe(true);
++    expect(showRawAlert).toHaveBeenCalledTimes(1);
++
++    unsubUpdates();
++    stopPersistence();
++    pwaClient2.close();
++    roomStoreMod.resetRoomClientForTests();
++  });
++});
+diff --git a/components/alerts/AlertHost.js b/components/alerts/AlertHost.js
+index 661ec8b..ab122ef 100644
+--- a/components/alerts/AlertHost.js
++++ b/components/alerts/AlertHost.js
+@@ -8,7 +8,7 @@
+  */
+ 
+ import React, { useCallback, useEffect, useRef, useState } from 'react';
+-import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
++import { Modal, Platform, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+ import { registerAlertHost } from './alertService';
+ import IconText from '../lootTrade/LootTradeIconText';
+ import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
+@@ -138,7 +138,7 @@ const AlertHost = () => {
+     <Modal
+       visible
+       transparent
+-      animationType="fade"
++      animationType={Platform.OS === 'web' ? 'none' : 'fade'}
+       onRequestClose={() => finish(cancelValue)}
+     >
+       <View style={styles.overlay}>
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index 0cf2e11..419d2f9 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import * as db from '../../db';
+ import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
+-import { isGmLootTradeLicensed } from '../../domain/premium';
++import { isGmCampaignsLicensed, isGmLootTradeLicensed } from '../../domain/premium';
+ import { normalizeContainerEntity } from '../../domain/lootTrade';
+ import { getActiveModuleId } from '../../domain/moduleLocale';
+ import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
+@@ -11,6 +11,7 @@ import { validateAvatarDataUrl } from '../../domain/characterAvatar';
+ import * as avatarCache from '../../db/avatarCache';
+ 
+ const GM_CONTAINERS_FOLDER_NAME = 'gm_containers';
++const GM_ROOMS_FOLDER_NAME = 'gm_rooms';
+ 
+ // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
+ // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
+@@ -378,6 +379,186 @@ const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownloa
+   return { uploaded: uploads.length, downloaded: downloadedCount };
+ };
+ 
++// ─── Комнаты кампаний Мастера (gm_rooms в appDataFolder/<сеттинг>/gm_rooms/) ──
++// Позволяет Мастеру синхронизировать созданные комнаты вместе с owner_token
++// между разными браузерами и режимами запуска (например, PWA <-> Replit).
++// Каждая импортированная комната сразу получает запись в folder_rooms, поэтому
++// отображается строго в разделе «Админ» и никогда не попадает в «Пользователь».
++
++const makeRemoteGmRoomFilename = (room) => {
++  const safeName = sanitizeFileName(room?.name || room?.code || 'room')
++    .replace(/\.rpgc$/i, '');
++  return `${room.folderId}__${safeName}.json`;
++};
++
++const findGmRoomsFolderId = async (token, moduleFolderId) => {
++  const q = encodeURIComponent(
++    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${GM_ROOMS_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
++  );
++  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
++  const listData = await listResp.json();
++  return listData.files?.[0]?.id ?? null;
++};
++
++const getGmRoomsFolderId = async (token, moduleFolderId) => {
++  const existingId = await findGmRoomsFolderId(token, moduleFolderId);
++  if (existingId) return existingId;
++
++  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
++    method: 'POST',
++    headers: { 'Content-Type': 'application/json' },
++    body: JSON.stringify({
++      name: GM_ROOMS_FOLDER_NAME,
++      mimeType: 'application/vnd.google-apps.folder',
++      parents: [moduleFolderId],
++    }),
++  });
++  const created = await createResp.json();
++  if (!created.id) {
++    throw new Error('Не удалось создать подпапку gm_rooms в appDataFolder');
++  }
++  return created.id;
++};
++
++const listLocalGmRooms = async () => {
++  if (typeof db.getFolderRooms !== 'function' || typeof db.getCharacterFolders !== 'function') {
++    return [];
++  }
++  const [roomRows, folders] = await Promise.all([
++    db.getFolderRooms(),
++    db.getCharacterFolders(),
++  ]);
++  const folderById = new Map((folders || []).map((f) => [f.id, f]));
++  return (roomRows || [])
++    .filter((row) => row?.folder_id && row?.code && row?.owner_token)
++    .map((row) => {
++      const folder = folderById.get(row.folder_id);
++      return {
++        folderId: String(row.folder_id),
++        name: String(folder?.name || row.code).trim() || String(row.code),
++        code: String(row.code),
++        ownerToken: String(row.owner_token),
++        updatedAt: Number(folder?.updatedAt || folder?.createdAt || 0),
++      };
++    });
++};
++
++const parseGmRoomCloudPayload = (rawText) => {
++  try {
++    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
++    const body = parsed?.room && typeof parsed.room === 'object' ? parsed.room : parsed;
++    if (!body || typeof body !== 'object' || !body.folderId || !body.code || !body.ownerToken) {
++      return { error: 'INVALID_GM_ROOM' };
++    }
++    return {
++      room: {
++        folderId: String(body.folderId),
++        name: String(body.name || body.code).trim() || String(body.code),
++        code: String(body.code),
++        ownerToken: String(body.ownerToken),
++        updatedAt: Number(body.updatedAt || 0),
++      },
++    };
++  } catch {
++    return { error: 'INVALID_JSON' };
++  }
++};
++
++const saveImportedGmRoom = async (room, localRoomsByCode) => {
++  const existingSameCode = localRoomsByCode.get(room.code);
++  const targetFolderId = existingSameCode ? existingSameCode.folderId : room.folderId;
++  await db.ensureCharacterFolder({ id: targetFolderId, name: room.name });
++  if (typeof db.renameCharacterFolder === 'function') {
++    await db.renameCharacterFolder(targetFolderId, room.name);
++  }
++  await db.upsertFolderRoom(targetFolderId, room.code, room.ownerToken);
++  localRoomsByCode.set(room.code, { ...room, folderId: targetFolderId });
++};
++
++const syncGmRoomsInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
++  if (!isGmCampaignsLicensed()) {
++    return { uploaded: 0, downloaded: 0 };
++  }
++  const localRooms = await listLocalGmRooms();
++  const existingFolderId = await findGmRoomsFolderId(token, moduleFolderId);
++  if (!existingFolderId && localRooms.length === 0) {
++    return { uploaded: 0, downloaded: 0 };
++  }
++
++  const gmRoomsFolderId = existingFolderId || await getGmRoomsFolderId(token, moduleFolderId);
++  const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
++  const remoteById = new Map();
++  for (const file of remoteFiles) {
++    const maybeId = (file.name || '').split('__')[0];
++    if (maybeId) remoteById.set(maybeId, file);
++  }
++
++  const localRoomsByCode = new Map(localRooms.map((r) => [r.code, r]));
++  const outdatedLocals = [];
++  const uploads = [];
++
++  for (const room of localRooms) {
++    const remote = remoteById.get(room.folderId);
++    const localUpdated = Number(room.updatedAt || 0);
++    const remoteUpdated = remote?.modifiedTime ? new Date(remote.modifiedTime).getTime() : 0;
++    if (remote && remoteUpdated > localUpdated + 1000) {
++      outdatedLocals.push({ room, remote });
++    } else {
++      uploads.push({ room, remote });
++    }
++  }
++
++  let downloadedCount = 0;
++  const localIds = new Set(localRooms.map((r) => r.folderId));
++  const newRemoteFiles = remoteFiles.filter((file) => {
++    const maybeId = (file.name || '').split('__')[0];
++    return maybeId && !localIds.has(maybeId);
++  });
++
++  for (const file of newRemoteFiles) {
++    const raw = await downloadRemoteCharacter(token, file.id);
++    const parsed = parseGmRoomCloudPayload(raw);
++    if (parsed.error || !parsed.room) continue;
++    await saveImportedGmRoom(parsed.room, localRoomsByCode);
++    downloadedCount += 1;
++  }
++
++  if (outdatedLocals.length > 0) {
++    const shouldDownload = typeof confirmDownload === 'function'
++      ? await confirmDownload(outdatedLocals)
++      : true;
++    if (shouldDownload) {
++      for (const { remote } of outdatedLocals) {
++        const raw = await downloadRemoteCharacter(token, remote.id);
++        const parsed = parseGmRoomCloudPayload(raw);
++        if (parsed.error || !parsed.room) continue;
++        await saveImportedGmRoom(parsed.room, localRoomsByCode);
++        downloadedCount += 1;
++      }
++    } else {
++      uploads.push(...outdatedLocals);
++    }
++  }
++
++  for (const { room, remote } of uploads) {
++    const payload = JSON.stringify({
++      formatVersion: 1,
++      type: 'gm_room',
++      exportedAt: Date.now(),
++      room,
++    });
++    await uploadCharacterFile({
++      token,
++      folderId: gmRoomsFolderId,
++      fileId: remote?.id,
++      filename: makeRemoteGmRoomFilename(room),
++      payload,
++    });
++  }
++
++  return { uploaded: uploads.length, downloaded: downloadedCount };
++};
++
+ // ─── Аватары персонажей (задел премиум-фичи, патч 193; UI нет) ───────────────
+ // Файлы лежат РЯДОМ с сейвами: appDataFolder/<сеттинг>/avatars/<characterId>.jpg.
+ // Синк редкий: только полная синхронизация и (в будущем) первая загрузка
+@@ -654,6 +835,19 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+ 
+   await setCloudSyncConfigured(true);
+ 
++  // Комнаты кампаний Мастера (патч 479): двусторонняя синхронизация вместе с owner_token
++  // в подпапке appDataFolder/<сеттинг>/gm_rooms/, чтобы Replit и PWA видели одни и те же комнаты.
++  let gmRoomsUploaded = 0;
++  let gmRoomsDownloaded = 0;
++  try {
++    const gmRoomStats = await syncGmRoomsInSession(token, folderId, { confirmDownload });
++    gmRoomsUploaded = gmRoomStats.uploaded || 0;
++    gmRoomsDownloaded = gmRoomStats.downloaded || 0;
++    debugLog('sync.gmRooms:done', gmRoomStats);
++  } catch (e) {
++    debugLog('sync.gmRooms:failed', { message: e?.message });
++  }
++
+   // Контейнеры и торговцы Мастера («Добыча/Торговля», патч 468): двусторонняя
+   // синхронизация в подпапке appDataFolder/<сеттинг>/gm_containers/.
+   let gmUploaded = 0;
+@@ -677,8 +871,8 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
+   }
+ 
+   report('done');
+-  const totalUploaded = uploads.length + gmUploaded;
+-  const totalDownloaded = downloadedCount + gmDownloaded;
++  const totalUploaded = uploads.length + gmRoomsUploaded + gmUploaded;
++  const totalDownloaded = downloadedCount + gmRoomsDownloaded + gmDownloaded;
+   debugLog('sync.all:done', { uploaded: totalUploaded, downloaded: totalDownloaded });
+   return { uploaded: totalUploaded, downloaded: totalDownloaded };
+ };
+@@ -830,3 +1024,70 @@ export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
+     return { removed: false, reason: 'error', message };
+   }
+ };
++
++// Фоновая выгрузка комнаты Мастера в Google Drive при создании/переименовании.
++export const syncGmRoomToCloudIfEnabled = async (folderId) => {
++  if (!ensureWeb() || !folderId || !isGmCampaignsLicensed()) return;
++
++  try {
++    const configured = await isCloudSyncConfigured();
++    if (!configured) return;
++
++    const localRooms = await listLocalGmRooms();
++    const room = localRooms.find((r) => r.folderId === String(folderId));
++    if (!room) return;
++
++    await loadGoogleIdentityScript();
++    const token = await requestAccessToken();
++    const moduleFolderId = await getModuleFolderId(token);
++    const gmRoomsFolderId = await getGmRoomsFolderId(token, moduleFolderId);
++    const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
++    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${room.folderId}__`));
++
++    const payload = JSON.stringify({
++      formatVersion: 1,
++      type: 'gm_room',
++      exportedAt: Date.now(),
++      room,
++    });
++    await uploadCharacterFile({
++      token,
++      folderId: gmRoomsFolderId,
++      fileId: remote?.id,
++      filename: makeRemoteGmRoomFilename(room),
++      payload,
++    });
++    debugLog('sync.gmRoom.auto:done', { folderId: room.folderId, code: room.code });
++  } catch (e) {
++    debugLog('sync.gmRoom.auto:failed', { folderId, message: e?.message || String(e) });
++  }
++};
++
++// Удаление комнаты Мастера из Google Drive при удалении локальной комнаты.
++export const deleteGmRoomFromCloudIfEnabled = async (folderId) => {
++  if (!ensureWeb() || !folderId) return { removed: false, reason: 'not-web' };
++  if (!isGmCampaignsLicensed()) return { removed: false, reason: 'unlicensed' };
++
++  try {
++    const configured = await isCloudSyncConfigured();
++    if (!configured) return { removed: false, reason: 'not-configured' };
++
++    await loadGoogleIdentityScript();
++    const token = await requestAccessToken();
++    const moduleFolderId = await getModuleFolderId(token);
++    const gmRoomsFolderId = await findGmRoomsFolderId(token, moduleFolderId);
++    if (!gmRoomsFolderId) return { removed: false, reason: 'absent' };
++
++    const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
++    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${folderId}__`));
++    if (!remote) return { removed: false, reason: 'absent' };
++
++    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
++    debugLog('sync.gmRoom.delete:done', { folderId, fileId: remote.id });
++    return { removed: true };
++  } catch (e) {
++    const message = e?.message || String(e);
++    debugLog('sync.gmRoom.delete:failed', { folderId, message });
++    return { removed: false, reason: 'error', message };
++  }
++};
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index fb1c5f1..e2da0c7 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -40,7 +40,14 @@ import {
+   pickCharacterFile,
+   IMPORT_ERRORS,
+ } from './logic/characterTransfer';
+-import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
++import {
++  deleteCharacterFromCloudIfEnabled,
++  deleteGmRoomFromCloudIfEnabled,
++  openCloudFolderInDrive,
++  syncAllCharactersWithCloud,
++  syncGmRoomToCloudIfEnabled,
++} from '../../cloudSync/googleDriveSync';
++import { notifyGmContainerUpdated } from '../../../src/lootTrade/gmSessionPersistence';
+ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+@@ -725,6 +732,8 @@ export default function HomeScreen({ navigation }) {
+       await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm', ownerToken }).catch(() => {});
+       const folder = await db.createCharacterFolder(name);
+       await db.upsertFolderRoom(folder.id, code, ownerToken);
++      void syncGmRoomToCloudIfEnabled(folder.id);
++      notifyGmContainerUpdated('gm_room_created');
+       setFolderName('');
+       setFolderDraftVisible(false);
+       setRoomDialog({ code });
+@@ -1013,6 +1022,7 @@ export default function HomeScreen({ navigation }) {
+     const remove = async () => {
+       if (roomCode) {
+         await useRoomStore.getState().leaveRoom({ code: roomCode }).catch(() => {});
++        await deleteGmRoomFromCloudIfEnabled(folder.id);
+       }
+       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
+       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
+@@ -1021,6 +1031,9 @@ export default function HomeScreen({ navigation }) {
+       for (const id of removedIds || []) {
+         await deleteCharacterFromCloudIfEnabled(id);
+       }
++      if (roomCode) {
++        notifyGmContainerUpdated('gm_room_deleted');
++      }
+       debugLog('folder.delete:done', { folderId: folder.id, characters: removedIds?.length || 0 });
+       if (activeFolder?.id === folder.id) setActiveFolder(null);
+       loadList();
+@@ -1060,6 +1073,10 @@ export default function HomeScreen({ navigation }) {
+ 
+     const code = folderRooms[targetFolderId];
+     const record = folderRoomRecords[targetFolderId];
++    if (code) {
++      void syncGmRoomToCloudIfEnabled(targetFolderId);
++      notifyGmContainerUpdated('gm_room_renamed');
++    }
+     if (code && record?.ownerToken && roomServerAvailable) {
+       useRoomStore.getState().createRoom({
+         name: cleanName,
+@@ -1217,6 +1234,7 @@ export default function HomeScreen({ navigation }) {
+     if (syncProgress) return;
+ 
+     debugLog('sync.manual:start', {});
++    await new Promise((resolve) => setTimeout(resolve, 0));
+     setSyncProgress({ stage: 'auth', current: 0, total: 0 });
+     try {
+       const result = await syncAllCharactersWithCloud({
+@@ -1229,6 +1247,7 @@ export default function HomeScreen({ navigation }) {
+       debugLog('sync.manual:done', result);
+       setSyncProgress(null);
+       await loadList();
++      notifyGmContainerUpdated('cloud_sync');
+       await openCloudFolderInDrive();
+       await showCatalogAlert('cloudSyncSuccess', {
+         uploaded: result.uploaded,
+@@ -1538,7 +1557,12 @@ export default function HomeScreen({ navigation }) {
+         </TouchableOpacity>
+       )}
+ 
+-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
++      <Modal
++        visible={menuVisible}
++        transparent
++        animationType={Platform.OS === 'web' ? 'none' : 'fade'}
++        onRequestClose={() => setMenuVisible(false)}
++      >
+         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
+           <Pressable style={styles.menuPanel} onPress={() => {}}>
+             {GAME_SETTINGS_UI_ENABLED && (
+@@ -1589,7 +1613,11 @@ export default function HomeScreen({ navigation }) {
+       {/* Заглушка процесса синхронизации. Модалка без onRequestClose-выхода:
+           закрыть её пользователь не может, что и решает исходную проблему —
+           «не хватает ощущения процесса, и можно прервать его иначе». */}
+-      <Modal visible={!!syncProgress} transparent animationType="fade">
++      <Modal
++        visible={!!syncProgress}
++        transparent
++        animationType={Platform.OS === 'web' ? 'none' : 'fade'}
++      >
+         <View style={styles.modalBackdropCenter}>
+           <View style={styles.syncProgressModal}>
+             <ActivityIndicator size="large" color="#d4af37" />
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 290a3f6..5c0c94a 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,22 @@
+ # Changelog
++---
++## Fix 50% horizontal screen shift on Admin cloud sync & PWA ↔ Replit reconnect reconciliation (patch 479)
++
++Fixed the 50% horizontal layout shift triggered during Google Drive sync in Admin
++mode and hardened cross-browser synchronization between installed PWAs and Replit
++browser sessions:
++
++- added `src/web/pagerScrollGuard.ts` to enforce `{ preventScroll: true }` on
++  programmatic focus inside `overflow-x: hidden` tab pagers, mark off-screen
++  `[aria-hidden="true"]` tab scenes `inert`, clamp accidental `scrollLeft`
++  offsets to `0`, and include tab topology in `NavigationContainer`'s `key`;
++- stored `lastClosedSession` on room state so a reconnecting GM tab immediately
++  reconciles emptied loot containers (`items: []`), closes the open chest view,
++  and prompts deletion even if the GM tab reconnected while a PWA player clicked
++  "Take All";
++- added Google Drive synchronization for GM campaign rooms (`gm_rooms` with
++  `owner_token`), keeping them strictly scoped to the Admin section.
++
+ ---
+ ## Reliable GM chest emptying & auto-close when a player clicks "Take All" (patch 478)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 1ccc034..821d1e8 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,24 @@
+ # История изменений
+ 
++---
++## Защита от 50%-смещения экрана при облачной синхронизации в «Админе» и кросс-браузерная сверка PWA ↔ Replit (патч 479)
++
++Устранены горизонтальный сдвиг интерфейса на 50% после синхронизации с Google Drive
++в разделе «Админ» и остаточные сценарии рассинхронизации между установленным PWA
++и браузерной сборкой Replit:
++
++- добавлена защита горизонтального пейджера (`src/web/pagerScrollGuard.ts`):
++  программный возврат фокуса после закрытия модалок и окон OAuth не вызывает
++  нативную прокрутку `scrollLeft` у контейнеров `overflow-x: hidden`, скрытые
++  соседние вкладки помечаются `inert`, а ключ `NavigationContainer` учитывает
++  топологию режима (`gm` / `gm-inspect` / `fallout` / `empty`);
++- реестр комнат на сервере запоминает `lastClosedSession` при закрытии или
++  опустошении сундука, а `roomStore.joinRoom` сверяет его сразу при
++  переподключении вкладки Мастера (даже если вкладка Replit была свёрнута во
++  время «Забрать всё» в PWA);
++- в синхронизацию Google Drive добавлены комнаты кампаний Мастера (`gm_rooms`
++  вместе с `owner_token`), строго остающиеся в разделе «Админ».
++
+ ---
+ ## Надёжная очистка и закрытие сундука у Мастера при «Забрать всё» игроком (патч 478)
+ 
+diff --git a/index.js b/index.js
+index a1c2efa..2b05496 100644
+--- a/index.js
++++ b/index.js
+@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
+ import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+ import { debugLog } from './src/debug/falloutDebug';
+ import { startWebVersionWatcher } from './src/web/versionGuard';
++import { startWebPagerScrollGuard } from './src/web/pagerScrollGuard';
+ 
+ // Высокоприоритетная предзагрузка шрифта в <head> (453): браузер начинает
+ // скачивать .ttf сразу с приоритетом high, не дожидаясь первого layout текста.
+@@ -149,6 +150,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+ 
+ if (Platform.OS === 'web' && typeof window !== 'undefined') {
+   startWebVersionWatcher();
++  startWebPagerScrollGuard();
+ }
+ 
+ // registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 055b4e9..213c3d3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "478"
++  "baseline": "479"
+ }
+diff --git a/public/version.json b/public/version.json
+index 75cba97..56c7478 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "478",
++  "version": "479",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index fe4e653..cd3e988 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -45,6 +45,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     members: new Map(), // clientId -> { clientId, name, role, ws }
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
++    lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+     createdAt: now(),
+     emptySince: null,
+   });
+@@ -63,6 +64,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       fromName: entry.fromName,
+     })),
+     activeSession: room.activeSession || null,
++    lastClosedSession: room.lastClosedSession || null,
+   });
+ 
+   const countOwnedRooms = (ownerClientId) => (
+@@ -165,9 +167,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return false;
+   };
+ 
+-  const leaveRoom = ({ code, clientId }) => {
++  const leaveRoom = ({ code, clientId, expectedWs = null }) => {
+     const room = rooms.get(code);
+     if (!room) return { room: null, left: false, closedSession: null, closedReason: null };
++    const currentMember = room.members.get(clientId);
++    if (!currentMember) {
++      return { room, left: false, closedSession: null, closedReason: null };
++    }
++    if (expectedWs && currentMember.ws && currentMember.ws !== expectedWs) {
++      return { room, left: false, closedSession: null, closedReason: null };
++    }
+     const left = room.members.delete(clientId);
+     if (room.members.size === 0) room.emptySince = now();
+ 
+@@ -190,6 +199,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           ? 'loot_emptied'
+           : 'player_closed';
+         room.activeSession = null;
++        room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
+       }
+     }
+ 
+@@ -257,6 +267,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = normalized;
++    room.lastClosedSession = null;
+     return { room, session: normalized };
+   };
+ 
+@@ -285,6 +296,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       return { room, session: previous };
+     }
+     room.activeSession = null;
++    if (previous) {
++      room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
++    }
+     return { room, session: null, closedSession: previous };
+   };
+ 
+@@ -323,6 +337,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+         ? 'loot_emptied'
+         : 'player_closed';
+       room.activeSession = null;
++      room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
+       return {
+         room,
+         session: null,
+@@ -372,6 +387,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+           closedByClientIds: [...closedSet],
+         };
+         room.activeSession = null;
++        room.lastClosedSession = {
++          session: closedSession,
++          closedReason: 'loot_emptied',
++          closedAt: now(),
++        };
+         return {
+           room,
+           granted: result.granted,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index a8fa532..5f852c5 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -445,9 +445,18 @@ const attachRoomWebSocketServer = (httpServer, {
+           }
+           ws.meta.rooms.add(canonical);
+           const isJoiningGm = result.room.ownerClientId === clientId;
++          const sanitizedLastClosed = result.state.lastClosedSession?.session
++            ? {
++                ...result.state.lastClosedSession,
++                session: sanitizeSessionForMember(result.state.lastClosedSession.session, {
++                  isGm: isJoiningGm,
++                }),
++              }
++            : null;
+           sendEnvelope(ws, MESSAGE.ROOM_STATE, {
+             ...result.state,
+             activeSession: sanitizeSessionForMember(result.state.activeSession, { isGm: isJoiningGm }),
++            lastClosedSession: sanitizedLastClosed,
+             requestId: payload.requestId || null,
+           }, canonical, clientId);
+           broadcastMembers(result.room, clientId);
+@@ -790,6 +799,7 @@ const attachRoomWebSocketServer = (httpServer, {
+         const { room, left, closedSession, closedReason } = registry.leaveRoom({
+           code,
+           clientId: ws.meta.clientId,
++          expectedWs: ws,
+         });
+         if (left && room) {
+           broadcastMembers(room, ws.meta.clientId);
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 7652ad6..8cae1e5 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -473,6 +473,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         const payloadRooms = response.payload;
+         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
++        const lastClosedEntry = payloadRooms.lastClosedSession as {
++          session?: ActiveLootTradeSession | null;
++          closedReason?: string | null;
++        } | null | undefined;
+         set({
+           rooms: {
+             ...get().rooms,
+@@ -487,6 +491,27 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             },
+           },
+         });
++        if (activeSession || lastClosedEntry?.session) {
++          const syntheticEnvelope: RoomEnvelope = {
++            v: 1,
++            type: ROOM_MESSAGE.SESSION_STATE,
++            roomCode: code,
++            clientId: get().clientId || '',
++            ts: Date.now(),
++            payload: {
++              session: activeSession,
++              ...(activeSession ? {} : {
++                closedSession: lastClosedEntry?.session ?? null,
++                closedReason: lastClosedEntry?.closedReason ?? null,
++              }),
++            },
++          };
++          sessionListeners.forEach((listener) => {
++            try { listener(syntheticEnvelope); } catch (error) {
++              debugLog('room.sessionListener:failed', { message: (error as Error)?.message });
++            }
++          });
++        }
+         debugLog('room.join:ok', { code, role });
+         return {
+           code,
+diff --git a/src/web/pagerScrollGuard.ts b/src/web/pagerScrollGuard.ts
+new file mode 100644
+index 0000000..986ea69
+--- /dev/null
++++ b/src/web/pagerScrollGuard.ts
+@@ -0,0 +1,192 @@
++// src/web/pagerScrollGuard.ts
++// Защита горизонтального пейджера вкладок (@react-navigation/material-top-tabs /
++// react-native-tab-view) от нативного смещения scrollLeft на Web и в PWA (патч 479).
++//
++// Причина бага «интерфейс смещается на 50% в сторону при синхронизации в админке,
++// видно по 50% соседних экранов, навигация не работает»:
++// - TabView рендерит общий контейнер <div style="overflow: hidden"> шириной W,
++//   внутри которого лежат:
++//   1) горизонтальная лента экранов шириной N*W (в админке N=2 -> 2*W:
++//      [0..W] «Список компаний» и [W..2W] «Добыча/Торговля», оба смонтированы);
++//   2) нижняя панель вкладок TabBar шириной W ([0..W]).
++// - Во время облачной синхронизации открываются/закрываются модалки (меню, прогресс,
++//   окно Google OAuth / вкладка Drive, итоговый AlertHost). ModalFocusTrap в
++//   react-native-web вызывает UIManager.focus(node) -> node.focus() БЕЗ
++//   { preventScroll: true }, а скрытая соседняя вкладка помечена только
++//   aria-hidden="true" (без inert).
++// - Браузер центрирует сфокусированный контейнер шириной 2*W (или узел соседней
++//   вкладки) внутри overflow: hidden, выставляя scrollLeft = (2*W - W)/2 = 0.5*W (50%)!
++//   Из-за этого одновременно уезжают и экраны, и нижний TabBar, а смена режима
++//   Админ <-> Пользователь без перемонтирования NavigationContainer не сбрасывает
++//   DOM-свойство scrollLeft.
++
++const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
++
++const isHorizontalHiddenOverflow = (el: HTMLElement, win: Window): boolean => {
++  try {
++    const inlineOverflow = el.style?.overflowX || el.style?.overflow || '';
++    if (inlineOverflow === 'hidden' || inlineOverflow === 'clip') return true;
++    const computed = win.getComputedStyle?.(el);
++    const ox = computed?.overflowX;
++    return ox === 'hidden' || ox === 'clip';
++  } catch {
++    return false;
++  }
++};
++
++/**
++ * Сбрасывает ненулевой scrollLeft у всех предков (и самого узла), для которых
++ * горизонтальная прокрутка запрещена стилем overflow-x: hidden | clip.
++ * Пользовательские горизонтальные ScrollView имеют overflow-x: auto | scroll и не затрагиваются.
++ */
++export const clampHiddenOverflowAncestors = (
++  startNode: EventTarget | Node | null | undefined,
++  win: Window | undefined = typeof window !== 'undefined' ? window : undefined,
++): number => {
++  if (!win || !startNode) return 0;
++  let fixed = 0;
++  let cur: Node | null = startNode as Node;
++  while (cur && cur.nodeType === 1) {
++    const el = cur as HTMLElement;
++    if (!EDITABLE_TAGS.has(el.tagName) && el.scrollLeft !== 0 && isHorizontalHiddenOverflow(el, win)) {
++      el.scrollLeft = 0;
++      fixed += 1;
++    }
++    cur = el.parentElement;
++  }
++  return fixed;
++};
++
++/**
++ * Проходит по поддереву (например, #root после возврата из окна OAuth / смены фокуса)
++ * и сбрасывает застрявший scrollLeft у всех overflow-x: hidden контейнеров, а также
++ * синхронизирует атрибут inert со скрытыми вкладками [aria-hidden="true"].
++ */
++export const sanitizeRootPagerDom = (
++  root: ParentNode | null | undefined,
++  win: Window | undefined = typeof window !== 'undefined' ? window : undefined,
++): number => {
++  if (!win || !root || typeof (root as Element).querySelectorAll !== 'function') return 0;
++  let fixed = 0;
++
++  const hiddenNodes = (root as Element).querySelectorAll('[aria-hidden]');
++  hiddenNodes.forEach((node) => {
++    const el = node as HTMLElement & { inert?: boolean };
++    const isHidden = el.getAttribute('aria-hidden') === 'true';
++    if (isHidden) {
++      el.inert = true;
++      el.setAttribute('inert', '');
++    } else if (el.hasAttribute('inert') || el.inert) {
++      el.inert = false;
++      el.removeAttribute('inert');
++    }
++  });
++
++  const allDivs = (root as Element).querySelectorAll('div');
++  allDivs.forEach((div) => {
++    if (div.scrollLeft !== 0 && isHorizontalHiddenOverflow(div, win)) {
++      div.scrollLeft = 0;
++      fixed += 1;
++    }
++  });
++
++  return fixed;
++};
++
++const hasHiddenOverflowAncestor = (el: HTMLElement, win: Window): boolean => {
++  let cur: HTMLElement | null = el.parentElement;
++  while (cur) {
++    if (isHorizontalHiddenOverflow(cur, win)) return true;
++    cur = cur.parentElement;
++  }
++  return false;
++};
++
++/**
++ * Оборачивает HTMLElement.prototype.focus так, чтобы программный вызов focus()
++ * без аргументов (как в react-native-web ModalFocusTrap / UIManager.focus):
++ * 1) не переводил фокус внутрь скрытой соседней вкладки [aria-hidden="true"];
++ * 2) передавал { preventScroll: true }, если элемент находится внутри overflow-x: hidden пейджера;
++ * 3) гарантированно удерживал scrollLeft = 0 на скрытых горизонтальных обёртках.
++ */
++export const installSafeProgrammaticFocus = (
++  win: (Window & { HTMLElement?: typeof HTMLElement }) | undefined =
++    typeof window !== 'undefined' ? window : undefined,
++): void => {
++  const proto = win?.HTMLElement?.prototype as (HTMLElement & { __positroniumSafeFocus?: boolean }) | undefined;
++  if (!win || !proto || typeof proto.focus !== 'function' || proto.__positroniumSafeFocus) {
++    return;
++  }
++
++  const nativeFocus = proto.focus;
++  Object.defineProperty(proto, '__positroniumSafeFocus', {
++    value: true,
++    configurable: true,
++  });
++
++  proto.focus = function safeFocus(this: HTMLElement, options?: FocusOptions) {
++    try {
++      if (typeof this.closest === 'function' && this.closest('[aria-hidden="true"]')) {
++        return;
++      }
++      if (options === undefined && !EDITABLE_TAGS.has(this.tagName) && hasHiddenOverflowAncestor(this, win)) {
++        nativeFocus.call(this, { preventScroll: true });
++      } else {
++        nativeFocus.call(this, options);
++      }
++    } finally {
++      clampHiddenOverflowAncestors(this, win);
++    }
++  };
++};
++
++let guardStarted = false;
++
++export const startWebPagerScrollGuard = (): void => {
++  if (guardStarted || typeof window === 'undefined' || typeof document === 'undefined') {
++    return;
++  }
++  guardStarted = true;
++
++  installSafeProgrammaticFocus(window);
++
++  const getRoot = () => document.getElementById('root') || document.body;
++
++  const onCaptureEvent = (event: Event) => {
++    clampHiddenOverflowAncestors(event.target, window);
++  };
++
++  const onWindowRestore = () => {
++    sanitizeRootPagerDom(getRoot(), window);
++  };
++
++  document.addEventListener('scroll', onCaptureEvent, true);
++  document.addEventListener('focusin', onCaptureEvent, true);
++  document.addEventListener('focusout', onWindowRestore, true);
++  window.addEventListener('focus', onWindowRestore);
++  window.addEventListener('resize', onWindowRestore);
++  document.addEventListener('visibilitychange', onWindowRestore);
++
++  if (typeof MutationObserver === 'function') {
++    const startObserver = () => {
++      const root = getRoot();
++      if (!root) return;
++      sanitizeRootPagerDom(root, window);
++      const observer = new MutationObserver(() => {
++        sanitizeRootPagerDom(root, window);
++      });
++      observer.observe(root, {
++        subtree: true,
++        childList: true,
++        attributes: true,
++        attributeFilter: ['aria-hidden'],
++      });
++    };
++
++    if (document.readyState === 'loading') {
++      document.addEventListener('DOMContentLoaded', startObserver, { once: true });
++    } else {
++      startObserver();
++    }
++  }
++};

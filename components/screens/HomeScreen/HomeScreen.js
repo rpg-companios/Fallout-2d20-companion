@@ -40,7 +40,14 @@ import {
   pickCharacterFile,
   IMPORT_ERRORS,
 } from './logic/characterTransfer';
-import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllCharactersWithCloud } from '../../cloudSync/googleDriveSync';
+import {
+  deleteCharacterFromCloudIfEnabled,
+  deleteGmRoomFromCloudIfEnabled,
+  openCloudFolderInDrive,
+  syncAllCharactersWithCloud,
+  syncGmRoomToCloudIfEnabled,
+} from '../../cloudSync/googleDriveSync';
+import { notifyGmContainerUpdated } from '../../../src/lootTrade/gmSessionPersistence';
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
@@ -725,6 +732,8 @@ export default function HomeScreen({ navigation }) {
       await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm', ownerToken }).catch(() => {});
       const folder = await db.createCharacterFolder(name);
       await db.upsertFolderRoom(folder.id, code, ownerToken);
+      void syncGmRoomToCloudIfEnabled(folder.id);
+      notifyGmContainerUpdated('gm_room_created');
       setFolderName('');
       setFolderDraftVisible(false);
       setRoomDialog({ code });
@@ -1013,6 +1022,7 @@ export default function HomeScreen({ navigation }) {
     const remove = async () => {
       if (roomCode) {
         await useRoomStore.getState().leaveRoom({ code: roomCode }).catch(() => {});
+        await deleteGmRoomFromCloudIfEnabled(folder.id);
       }
       // deleteCharacterFolderAndCharacters возвращает id удалённых персонажей —
       // их облачные копии тоже надо убрать, иначе вся папка воскреснет при
@@ -1020,6 +1030,9 @@ export default function HomeScreen({ navigation }) {
       const removedIds = await db.deleteCharacterFolderAndCharacters(folder.id);
       for (const id of removedIds || []) {
         await deleteCharacterFromCloudIfEnabled(id);
+      }
+      if (roomCode) {
+        notifyGmContainerUpdated('gm_room_deleted');
       }
       debugLog('folder.delete:done', { folderId: folder.id, characters: removedIds?.length || 0 });
       if (activeFolder?.id === folder.id) setActiveFolder(null);
@@ -1060,6 +1073,10 @@ export default function HomeScreen({ navigation }) {
 
     const code = folderRooms[targetFolderId];
     const record = folderRoomRecords[targetFolderId];
+    if (code) {
+      void syncGmRoomToCloudIfEnabled(targetFolderId);
+      notifyGmContainerUpdated('gm_room_renamed');
+    }
     if (code && record?.ownerToken && roomServerAvailable) {
       useRoomStore.getState().createRoom({
         name: cleanName,
@@ -1217,6 +1234,7 @@ export default function HomeScreen({ navigation }) {
     if (syncProgress) return;
 
     debugLog('sync.manual:start', {});
+    await new Promise((resolve) => setTimeout(resolve, 0));
     setSyncProgress({ stage: 'auth', current: 0, total: 0 });
     try {
       const result = await syncAllCharactersWithCloud({
@@ -1229,6 +1247,7 @@ export default function HomeScreen({ navigation }) {
       debugLog('sync.manual:done', result);
       setSyncProgress(null);
       await loadList();
+      notifyGmContainerUpdated('cloud_sync');
       await openCloudFolderInDrive();
       await showCatalogAlert('cloudSyncSuccess', {
         uploaded: result.uploaded,
@@ -1538,7 +1557,12 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType={Platform.OS === 'web' ? 'none' : 'fade'}
+        onRequestClose={() => setMenuVisible(false)}
+      >
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <Pressable style={styles.menuPanel} onPress={() => {}}>
             {GAME_SETTINGS_UI_ENABLED && (
@@ -1589,7 +1613,11 @@ export default function HomeScreen({ navigation }) {
       {/* Заглушка процесса синхронизации. Модалка без onRequestClose-выхода:
           закрыть её пользователь не может, что и решает исходную проблему —
           «не хватает ощущения процесса, и можно прервать его иначе». */}
-      <Modal visible={!!syncProgress} transparent animationType="fade">
+      <Modal
+        visible={!!syncProgress}
+        transparent
+        animationType={Platform.OS === 'web' ? 'none' : 'fade'}
+      >
         <View style={styles.modalBackdropCenter}>
           <View style={styles.syncProgressModal}>
             <ActivityIndicator size="large" color="#d4af37" />

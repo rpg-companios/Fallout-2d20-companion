@@ -445,9 +445,18 @@ const attachRoomWebSocketServer = (httpServer, {
           }
           ws.meta.rooms.add(canonical);
           const isJoiningGm = result.room.ownerClientId === clientId;
+          const sanitizedLastClosed = result.state.lastClosedSession?.session
+            ? {
+                ...result.state.lastClosedSession,
+                session: sanitizeSessionForMember(result.state.lastClosedSession.session, {
+                  isGm: isJoiningGm,
+                }),
+              }
+            : null;
           sendEnvelope(ws, MESSAGE.ROOM_STATE, {
             ...result.state,
             activeSession: sanitizeSessionForMember(result.state.activeSession, { isGm: isJoiningGm }),
+            lastClosedSession: sanitizedLastClosed,
             requestId: payload.requestId || null,
           }, canonical, clientId);
           broadcastMembers(result.room, clientId);
@@ -790,6 +799,7 @@ const attachRoomWebSocketServer = (httpServer, {
         const { room, left, closedSession, closedReason } = registry.leaveRoom({
           code,
           clientId: ws.meta.clientId,
+          expectedWs: ws,
         });
         if (left && room) {
           broadcastMembers(room, ws.meta.clientId);

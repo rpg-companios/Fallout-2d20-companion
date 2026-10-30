@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { Modal, Platform, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { registerAlertHost } from './alertService';
 import IconText from '../lootTrade/LootTradeIconText';
 import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
@@ -138,7 +138,7 @@ const AlertHost = () => {
     <Modal
       visible
       transparent
-      animationType="fade"
+      animationType={Platform.OS === 'web' ? 'none' : 'fade'}
       onRequestClose={() => finish(cancelValue)}
     >
       <View style={styles.overlay}>

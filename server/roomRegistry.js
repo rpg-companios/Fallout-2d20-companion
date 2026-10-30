@@ -45,6 +45,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     members: new Map(), // clientId -> { clientId, name, role, ws }
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
+    lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
     createdAt: now(),
     emptySince: null,
   });
@@ -63,6 +64,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
+    lastClosedSession: room.lastClosedSession || null,
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -165,9 +167,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return false;
   };
 
-  const leaveRoom = ({ code, clientId }) => {
+  const leaveRoom = ({ code, clientId, expectedWs = null }) => {
     const room = rooms.get(code);
     if (!room) return { room: null, left: false, closedSession: null, closedReason: null };
+    const currentMember = room.members.get(clientId);
+    if (!currentMember) {
+      return { room, left: false, closedSession: null, closedReason: null };
+    }
+    if (expectedWs && currentMember.ws && currentMember.ws !== expectedWs) {
+      return { room, left: false, closedSession: null, closedReason: null };
+    }
     const left = room.members.delete(clientId);
     if (room.members.size === 0) room.emptySince = now();
 
@@ -190,6 +199,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           ? 'loot_emptied'
           : 'player_closed';
         room.activeSession = null;
+        room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
       }
     }
 
@@ -257,6 +267,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
+    room.lastClosedSession = null;
     return { room, session: normalized };
   };
 
@@ -285,6 +296,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       return { room, session: previous };
     }
     room.activeSession = null;
+    if (previous) {
+      room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
+    }
     return { room, session: null, closedSession: previous };
   };
 
@@ -323,6 +337,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         ? 'loot_emptied'
         : 'player_closed';
       room.activeSession = null;
+      room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
       return {
         room,
         session: null,
@@ -372,6 +387,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           closedByClientIds: [...closedSet],
         };
         room.activeSession = null;
+        room.lastClosedSession = {
+          session: closedSession,
+          closedReason: 'loot_emptied',
+          closedAt: now(),
+        };
         return {
           room,
           granted: result.granted,

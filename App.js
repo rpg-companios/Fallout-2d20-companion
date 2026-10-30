@@ -41,6 +41,7 @@ import {
   enforceAdminModeEntitlement,
   useAdminAccess,
 } from './src/premium/adminAccessGate';
+import { startWebPagerScrollGuard } from './src/web/pagerScrollGuard';
 // Side-effect: сеттинг регистрирует расширение состояния (поле сейва
 // survival + миграцию v22→v23) в реестре движка ДО монтирования
 // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
@@ -104,6 +105,13 @@ function App() {
   // (CharacterScreen) while rendering a different component (CharacterProvider)".
   const moduleTabsActive = activeSettingId != null;
   const characterSheetTabsActive = moduleTabsActive && (!isGmMode || gmInspectingCharacter);
+  const navTopologyKey = isGmMode
+    ? (characterSheetTabsActive ? 'gm-inspect' : 'gm')
+    : (moduleTabsActive ? 'fallout' : 'empty');
+
+  useEffect(() => {
+    startWebPagerScrollGuard();
+  }, []);
 
   // Фолбэк: гарантируем имя приложения в заголовке вкладки браузера на вебе,
   // даже если версия @react-navigation/native не поддерживает documentTitle.
@@ -224,7 +232,7 @@ function App() {
     <PaperProvider>
       <SafeAreaProvider>
           <NavigationContainer
-            key={`${locale}:${moduleTabsActive ? 'fallout' : 'empty'}`}
+            key={`${locale}:${navTopologyKey}`}
             // Единый бренд приложения в заголовке вкладки браузера (Google-брендинг):
             // react-navigation иначе подставляет имя маршрута («HomeTab» и т.п.).
             documentTitle={{ formatter: () => APP_BRAND }}

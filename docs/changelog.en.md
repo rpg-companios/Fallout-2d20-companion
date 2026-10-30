@@ -1,5 +1,23 @@
 # Changelog
 ---
+## Fix 50% horizontal screen shift on Admin cloud sync & PWA ↔ Replit reconnect reconciliation (patch 479)
+
+Fixed the 50% horizontal layout shift triggered during Google Drive sync in Admin
+mode and hardened cross-browser synchronization between installed PWAs and Replit
+browser sessions:
+
+- added `src/web/pagerScrollGuard.ts` to enforce `{ preventScroll: true }` on
+  programmatic focus inside `overflow-x: hidden` tab pagers, mark off-screen
+  `[aria-hidden="true"]` tab scenes `inert`, clamp accidental `scrollLeft`
+  offsets to `0`, and include tab topology in `NavigationContainer`'s `key`;
+- stored `lastClosedSession` on room state so a reconnecting GM tab immediately
+  reconciles emptied loot containers (`items: []`), closes the open chest view,
+  and prompts deletion even if the GM tab reconnected while a PWA player clicked
+  "Take All";
+- added Google Drive synchronization for GM campaign rooms (`gm_rooms` with
+  `owner_token`), keeping them strictly scoped to the Admin section.
+
+---
 ## Reliable GM chest emptying & auto-close when a player clicks "Take All" (patch 478)
 
 Fixed a desynchronization where clicking "Take All" closed the player's loot

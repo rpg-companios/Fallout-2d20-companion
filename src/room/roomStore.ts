@@ -473,6 +473,10 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         const payloadRooms = response.payload;
         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
+        const lastClosedEntry = payloadRooms.lastClosedSession as {
+          session?: ActiveLootTradeSession | null;
+          closedReason?: string | null;
+        } | null | undefined;
         set({
           rooms: {
             ...get().rooms,
@@ -487,6 +491,27 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             },
           },
         });
+        if (activeSession || lastClosedEntry?.session) {
+          const syntheticEnvelope: RoomEnvelope = {
+            v: 1,
+            type: ROOM_MESSAGE.SESSION_STATE,
+            roomCode: code,
+            clientId: get().clientId || '',
+            ts: Date.now(),
+            payload: {
+              session: activeSession,
+              ...(activeSession ? {} : {
+                closedSession: lastClosedEntry?.session ?? null,
+                closedReason: lastClosedEntry?.closedReason ?? null,
+              }),
+            },
+          };
+          sessionListeners.forEach((listener) => {
+            try { listener(syntheticEnvelope); } catch (error) {
+              debugLog('room.sessionListener:failed', { message: (error as Error)?.message });
+            }
+          });
+        }
         debugLog('room.join:ok', { code, role });
         return {
           code,

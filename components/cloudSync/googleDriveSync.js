@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
-import { isGmLootTradeLicensed } from '../../domain/premium';
+import { isGmCampaignsLicensed, isGmLootTradeLicensed } from '../../domain/premium';
 import { normalizeContainerEntity } from '../../domain/lootTrade';
 import { getActiveModuleId } from '../../domain/moduleLocale';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
@@ -11,6 +11,7 @@ import { validateAvatarDataUrl } from '../../domain/characterAvatar';
 import * as avatarCache from '../../db/avatarCache';
 
 const GM_CONTAINERS_FOLDER_NAME = 'gm_containers';
+const GM_ROOMS_FOLDER_NAME = 'gm_rooms';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
@@ -378,6 +379,186 @@ const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownloa
   return { uploaded: uploads.length, downloaded: downloadedCount };
 };
 
+// ─── Комнаты кампаний Мастера (gm_rooms в appDataFolder/<сеттинг>/gm_rooms/) ──
+// Позволяет Мастеру синхронизировать созданные комнаты вместе с owner_token
+// между разными браузерами и режимами запуска (например, PWA <-> Replit).
+// Каждая импортированная комната сразу получает запись в folder_rooms, поэтому
+// отображается строго в разделе «Админ» и никогда не попадает в «Пользователь».
+
+const makeRemoteGmRoomFilename = (room) => {
+  const safeName = sanitizeFileName(room?.name || room?.code || 'room')
+    .replace(/\.rpgc$/i, '');
+  return `${room.folderId}__${safeName}.json`;
+};
+
+const findGmRoomsFolderId = async (token, moduleFolderId) => {
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${GM_ROOMS_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
+  );
+  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
+  const listData = await listResp.json();
+  return listData.files?.[0]?.id ?? null;
+};
+
+const getGmRoomsFolderId = async (token, moduleFolderId) => {
+  const existingId = await findGmRoomsFolderId(token, moduleFolderId);
+  if (existingId) return existingId;
+
+  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: GM_ROOMS_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [moduleFolderId],
+    }),
+  });
+  const created = await createResp.json();
+  if (!created.id) {
+    throw new Error('Не удалось создать подпапку gm_rooms в appDataFolder');
+  }
+  return created.id;
+};
+
+const listLocalGmRooms = async () => {
+  if (typeof db.getFolderRooms !== 'function' || typeof db.getCharacterFolders !== 'function') {
+    return [];
+  }
+  const [roomRows, folders] = await Promise.all([
+    db.getFolderRooms(),
+    db.getCharacterFolders(),
+  ]);
+  const folderById = new Map((folders || []).map((f) => [f.id, f]));
+  return (roomRows || [])
+    .filter((row) => row?.folder_id && row?.code && row?.owner_token)
+    .map((row) => {
+      const folder = folderById.get(row.folder_id);
+      return {
+        folderId: String(row.folder_id),
+        name: String(folder?.name || row.code).trim() || String(row.code),
+        code: String(row.code),
+        ownerToken: String(row.owner_token),
+        updatedAt: Number(folder?.updatedAt || folder?.createdAt || 0),
+      };
+    });
+};
+
+const parseGmRoomCloudPayload = (rawText) => {
+  try {
+    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+    const body = parsed?.room && typeof parsed.room === 'object' ? parsed.room : parsed;
+    if (!body || typeof body !== 'object' || !body.folderId || !body.code || !body.ownerToken) {
+      return { error: 'INVALID_GM_ROOM' };
+    }
+    return {
+      room: {
+        folderId: String(body.folderId),
+        name: String(body.name || body.code).trim() || String(body.code),
+        code: String(body.code),
+        ownerToken: String(body.ownerToken),
+        updatedAt: Number(body.updatedAt || 0),
+      },
+    };
+  } catch {
+    return { error: 'INVALID_JSON' };
+  }
+};
+
+const saveImportedGmRoom = async (room, localRoomsByCode) => {
+  const existingSameCode = localRoomsByCode.get(room.code);
+  const targetFolderId = existingSameCode ? existingSameCode.folderId : room.folderId;
+  await db.ensureCharacterFolder({ id: targetFolderId, name: room.name });
+  if (typeof db.renameCharacterFolder === 'function') {
+    await db.renameCharacterFolder(targetFolderId, room.name);
+  }
+  await db.upsertFolderRoom(targetFolderId, room.code, room.ownerToken);
+  localRoomsByCode.set(room.code, { ...room, folderId: targetFolderId });
+};
+
+const syncGmRoomsInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+  if (!isGmCampaignsLicensed()) {
+    return { uploaded: 0, downloaded: 0 };
+  }
+  const localRooms = await listLocalGmRooms();
+  const existingFolderId = await findGmRoomsFolderId(token, moduleFolderId);
+  if (!existingFolderId && localRooms.length === 0) {
+    return { uploaded: 0, downloaded: 0 };
+  }
+
+  const gmRoomsFolderId = existingFolderId || await getGmRoomsFolderId(token, moduleFolderId);
+  const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
+  const remoteById = new Map();
+  for (const file of remoteFiles) {
+    const maybeId = (file.name || '').split('__')[0];
+    if (maybeId) remoteById.set(maybeId, file);
+  }
+
+  const localRoomsByCode = new Map(localRooms.map((r) => [r.code, r]));
+  const outdatedLocals = [];
+  const uploads = [];
+
+  for (const room of localRooms) {
+    const remote = remoteById.get(room.folderId);
+    const localUpdated = Number(room.updatedAt || 0);
+    const remoteUpdated = remote?.modifiedTime ? new Date(remote.modifiedTime).getTime() : 0;
+    if (remote && remoteUpdated > localUpdated + 1000) {
+      outdatedLocals.push({ room, remote });
+    } else {
+      uploads.push({ room, remote });
+    }
+  }
+
+  let downloadedCount = 0;
+  const localIds = new Set(localRooms.map((r) => r.folderId));
+  const newRemoteFiles = remoteFiles.filter((file) => {
+    const maybeId = (file.name || '').split('__')[0];
+    return maybeId && !localIds.has(maybeId);
+  });
+
+  for (const file of newRemoteFiles) {
+    const raw = await downloadRemoteCharacter(token, file.id);
+    const parsed = parseGmRoomCloudPayload(raw);
+    if (parsed.error || !parsed.room) continue;
+    await saveImportedGmRoom(parsed.room, localRoomsByCode);
+    downloadedCount += 1;
+  }
+
+  if (outdatedLocals.length > 0) {
+    const shouldDownload = typeof confirmDownload === 'function'
+      ? await confirmDownload(outdatedLocals)
+      : true;
+    if (shouldDownload) {
+      for (const { remote } of outdatedLocals) {
+        const raw = await downloadRemoteCharacter(token, remote.id);
+        const parsed = parseGmRoomCloudPayload(raw);
+        if (parsed.error || !parsed.room) continue;
+        await saveImportedGmRoom(parsed.room, localRoomsByCode);
+        downloadedCount += 1;
+      }
+    } else {
+      uploads.push(...outdatedLocals);
+    }
+  }
+
+  for (const { room, remote } of uploads) {
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_room',
+      exportedAt: Date.now(),
+      room,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmRoomsFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmRoomFilename(room),
+      payload,
+    });
+  }
+
+  return { uploaded: uploads.length, downloaded: downloadedCount };
+};
+
 // ─── Аватары персонажей (задел премиум-фичи, патч 193; UI нет) ───────────────
 // Файлы лежат РЯДОМ с сейвами: appDataFolder/<сеттинг>/avatars/<characterId>.jpg.
 // Синк редкий: только полная синхронизация и (в будущем) первая загрузка
@@ -654,6 +835,19 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
 
   await setCloudSyncConfigured(true);
 
+  // Комнаты кампаний Мастера (патч 479): двусторонняя синхронизация вместе с owner_token
+  // в подпапке appDataFolder/<сеттинг>/gm_rooms/, чтобы Replit и PWA видели одни и те же комнаты.
+  let gmRoomsUploaded = 0;
+  let gmRoomsDownloaded = 0;
+  try {
+    const gmRoomStats = await syncGmRoomsInSession(token, folderId, { confirmDownload });
+    gmRoomsUploaded = gmRoomStats.uploaded || 0;
+    gmRoomsDownloaded = gmRoomStats.downloaded || 0;
+    debugLog('sync.gmRooms:done', gmRoomStats);
+  } catch (e) {
+    debugLog('sync.gmRooms:failed', { message: e?.message });
+  }
+
   // Контейнеры и торговцы Мастера («Добыча/Торговля», патч 468): двусторонняя
   // синхронизация в подпапке appDataFolder/<сеттинг>/gm_containers/.
   let gmUploaded = 0;
@@ -677,8 +871,8 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   }
 
   report('done');
-  const totalUploaded = uploads.length + gmUploaded;
-  const totalDownloaded = downloadedCount + gmDownloaded;
+  const totalUploaded = uploads.length + gmRoomsUploaded + gmUploaded;
+  const totalDownloaded = downloadedCount + gmRoomsDownloaded + gmDownloaded;
   debugLog('sync.all:done', { uploaded: totalUploaded, downloaded: totalDownloaded });
   return { uploaded: totalUploaded, downloaded: totalDownloaded };
 };
@@ -827,6 +1021,73 @@ export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
   } catch (e) {
     const message = e?.message || String(e);
     debugLog('sync.gmContainer.delete:failed', { containerId, message });
+    return { removed: false, reason: 'error', message };
+  }
+};
+
+// Фоновая выгрузка комнаты Мастера в Google Drive при создании/переименовании.
+export const syncGmRoomToCloudIfEnabled = async (folderId) => {
+  if (!ensureWeb() || !folderId || !isGmCampaignsLicensed()) return;
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return;
+
+    const localRooms = await listLocalGmRooms();
+    const room = localRooms.find((r) => r.folderId === String(folderId));
+    if (!room) return;
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmRoomsFolderId = await getGmRoomsFolderId(token, moduleFolderId);
+    const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${room.folderId}__`));
+
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_room',
+      exportedAt: Date.now(),
+      room,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmRoomsFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmRoomFilename(room),
+      payload,
+    });
+    debugLog('sync.gmRoom.auto:done', { folderId: room.folderId, code: room.code });
+  } catch (e) {
+    debugLog('sync.gmRoom.auto:failed', { folderId, message: e?.message || String(e) });
+  }
+};
+
+// Удаление комнаты Мастера из Google Drive при удалении локальной комнаты.
+export const deleteGmRoomFromCloudIfEnabled = async (folderId) => {
+  if (!ensureWeb() || !folderId) return { removed: false, reason: 'not-web' };
+  if (!isGmCampaignsLicensed()) return { removed: false, reason: 'unlicensed' };
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return { removed: false, reason: 'not-configured' };
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmRoomsFolderId = await findGmRoomsFolderId(token, moduleFolderId);
+    if (!gmRoomsFolderId) return { removed: false, reason: 'absent' };
+
+    const remoteFiles = await listRemoteCharacterFiles(token, gmRoomsFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${folderId}__`));
+    if (!remote) return { removed: false, reason: 'absent' };
+
+    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
+    debugLog('sync.gmRoom.delete:done', { folderId, fileId: remote.id });
+    return { removed: true };
+  } catch (e) {
+    const message = e?.message || String(e);
+    debugLog('sync.gmRoom.delete:failed', { folderId, message });
     return { removed: false, reason: 'error', message };
   }
 };
