@@ -46,9 +46,18 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+    directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
     createdAt: now(),
     emptySince: null,
   });
+
+  const cloneDirectives = (directives) => (
+    (directives || []).map((entry) => ({
+      ...entry,
+      targetCharacterIds: [...(entry.targetCharacterIds || [])],
+      ackedByCharacterIds: [...(entry.ackedByCharacterIds || [])],
+    }))
+  );
 
   const roomSnapshot = (room) => ({
     code: room.code,
@@ -65,6 +74,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     })),
     activeSession: room.activeSession || null,
     lastClosedSession: room.lastClosedSession || null,
+    directives: cloneDirectives(room.directives),
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -431,6 +441,96 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, committed: result.committed, session: result.session };
   };
 
+  /** Отправить команду Мастера группе или выбранному персонажу (с очередью для офлайн-телефонов). */
+  const issueDirective = ({ code, clientId, ownerToken = null, directive = {}, ws = null }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const kind = String(directive?.kind || '').trim();
+    if (!kind) return { error: ERROR_CODE.BAD_MESSAGE };
+
+    ensureOwnerMemberWs(room, clientId, ws);
+
+    const directiveId = String(directive?.directiveId || '').trim() || crypto.randomUUID();
+    const existing = room.directives.find((d) => d.directiveId === directiveId);
+    if (existing) {
+      return {
+        room,
+        directive: { ...existing },
+        directives: cloneDirectives(room.directives),
+      };
+    }
+
+    const targetType = directive?.targetType === 'character' ? 'character' : 'room';
+    const targetCharacterId = targetType === 'character' && directive?.targetCharacterId
+      ? String(directive.targetCharacterId)
+      : null;
+
+    let targetCharacterIds = [];
+    if (targetType === 'character') {
+      if (targetCharacterId) targetCharacterIds = [targetCharacterId];
+    } else if (Array.isArray(directive?.targetCharacterIds) && directive.targetCharacterIds.length > 0) {
+      targetCharacterIds = [...new Set(
+        directive.targetCharacterIds.map((id) => String(id || '').trim()).filter(Boolean),
+      )];
+    } else {
+      targetCharacterIds = [...room.lastSnapshots.keys()];
+    }
+
+    const rawAmount = Number(directive?.amount);
+    const entry = {
+      directiveId,
+      kind,
+      amount: Number.isFinite(rawAmount) ? rawAmount : 1,
+      mode: directive?.mode ? String(directive.mode) : null,
+      note: String(directive?.note || '').trim().slice(0, 240),
+      targetType,
+      targetCharacterId,
+      targetCharacterIds,
+      ackedByCharacterIds: [],
+      fromClientId: clientId,
+      fromName: room.members.get(clientId)?.name || 'GM',
+      createdAt: now(),
+    };
+
+    room.directives.push(entry);
+    if (room.directives.length > 20) {
+      room.directives.splice(0, room.directives.length - 20);
+    }
+
+    return {
+      room,
+      directive: { ...entry },
+      directives: cloneDirectives(room.directives),
+    };
+  };
+
+  /** Подтверждение применения команды Мастера конкретным персонажем игрока. */
+  const ackDirective = ({ code, clientId, directiveId, characterId }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const cleanDirectiveId = String(directiveId || '').trim();
+    const cleanCharId = String(characterId || '').trim();
+    if (!cleanDirectiveId || !cleanCharId) return { error: ERROR_CODE.BAD_MESSAGE };
+
+    const entry = room.directives.find((d) => d.directiveId === cleanDirectiveId);
+    if (entry) {
+      if (!entry.ackedByCharacterIds.includes(cleanCharId)) {
+        entry.ackedByCharacterIds.push(cleanCharId);
+      }
+      if (entry.targetType === 'room' && !entry.targetCharacterIds.includes(cleanCharId)) {
+        entry.targetCharacterIds.push(cleanCharId);
+      }
+    }
+
+    return {
+      room,
+      directive: entry ? { ...entry } : null,
+      directives: cloneDirectives(room.directives),
+    };
+  };
+
   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
   const sweep = () => {
     const removed = [];
@@ -460,6 +560,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     playerCloseSession,
     lootTake,
     tradeCommit,
+    issueDirective,
+    ackDirective,
     sweep,
     _rooms: rooms, // диагностика/тесты
   };

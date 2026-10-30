@@ -21,6 +21,8 @@ const MESSAGE = Object.freeze({
   CHAR_PUBLISH: 'char.publish',
   CHAR_FOCUS: 'char.focus',
   GM_DIRECTIVE: 'gm.directive',
+  GM_DIRECTIVE_ACK: 'gm.directiveAck',
+  GM_DIRECTIVE_STATE: 'gm.directiveState',
   // Выдача контейнеров добычи и торговли Мастером (патч 468):
   SESSION_OPEN: 'session.open',
   SESSION_STATE: 'session.state',

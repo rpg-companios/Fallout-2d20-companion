@@ -29,11 +29,12 @@ import useCharacterStore from './src/store/characterStore';
 import { debugLog } from './src/debug/falloutDebug';
 
 import HomeScreen from './components/screens/HomeScreen/HomeScreen';
-import LootTradeScreen from './components/screens/LootTradeScreen/LootTradeScreen';
 import CharacterScreen from './modules/fallout/screens/CharacterScreen/CharacterScreen';
 import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
 import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
 import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
+import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
+import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
 import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
 import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
 import useUiModeStore from './src/room/uiModeStore';
@@ -84,7 +85,6 @@ function App() {
   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
   const storeUiMode = useAppSettingsStore(selectUiMode);
   const tabUiMode = useUiModeStore((s) => s.tabUiMode);
-  const gmInspectingCharacter = useUiModeStore((s) => s.gmInspectingCharacter);
   const { adminLicensed, gmLootTradeLicensed } = useAdminAccess();
   const rawIsGmMode = (tabUiMode || storeUiMode) === 'gm';
   const isGmMode = rawIsGmMode && adminLicensed;
@@ -97,16 +97,14 @@ function App() {
     }
   }, [rawIsGmMode, adminLicensed]);
   const activeSettingId = useSettingPackStore(selectActiveSettingId);
-  // Модульные экраны (Character, Equipment, Inventory, Perks) рендерятся только
-  // когда юзер **явно выбрал** активный модуль (activeSettingId !== null), а не
-  // автоматически при загрузке. См. docs/module-lifecycle-plan.md.
-  // Раньше условием был bundledSettingActive, что монтировало все экраны
-  // сразу при загрузке стора и приводило к крэшу "Cannot update a component
-  // (CharacterScreen) while rendering a different component (CharacterProvider)".
+  // Модульные экраны Игрока (Character, Equipment, Inventory, Perks) монтируются
+  // ТОЛЬКО в пространстве Игрока (!isGmMode) и когда выбран активный модуль.
+  // В режиме Мастера работает свой отдельный навигатор GmWorkspaceNavigator (navbar2)
+  // со свайпами между разделами Мастера, а персонажи комнаты просматриваются readonly.
   const moduleTabsActive = activeSettingId != null;
-  const characterSheetTabsActive = moduleTabsActive && (!isGmMode || gmInspectingCharacter);
+  const characterSheetTabsActive = !isGmMode && moduleTabsActive;
   const navTopologyKey = isGmMode
-    ? (characterSheetTabsActive ? 'gm-inspect' : 'gm')
+    ? `gm-navbar2:${gmLootTradeLicensed ? 'full' : 'campaigns'}`
     : (moduleTabsActive ? 'fallout' : 'empty');
 
   useEffect(() => {
@@ -244,107 +242,99 @@ function App() {
                 imageStyle={{ opacity: 0.3 }}
               >
                 <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-                  <Tab.Navigator
-                    tabBarPosition="bottom"
-                    initialRouteName={TAB_ROUTES.HOME}
-                    screenOptions={({ route }) => ({
-                      tabBarIcon: ({ focused, color }) => {
-                        let iconName;
-                        if (route.name === TAB_ROUTES.HOME) {
-                          iconName = isGmMode
-                            ? (focused ? 'albums' : 'albums-outline')
-                            : (focused ? 'people' : 'people-outline');
-                        } else if (route.name === TAB_ROUTES.LOOT_TRADE) {
-                          iconName = focused ? 'cube' : 'cube-outline';
-                        } else if (route.name === TAB_ROUTES.CHARACTER) {
-                          iconName = focused ? 'person' : 'person-outline';
-                        } else if (route.name === TAB_ROUTES.EQUIPMENT) {
-                          iconName = focused ? 'shield' : 'shield-outline';
-                        } else if (route.name === TAB_ROUTES.INVENTORY) {
-                          iconName = focused ? 'briefcase' : 'briefcase-outline';
-                        } else if (route.name === TAB_ROUTES.PERKS) {
-                          iconName = focused ? 'star' : 'star-outline';
-                        }
-                        return <Ionicons name={iconName} size={16} color={color} />;
-                      },
-                      tabBarStyle: {
-                        backgroundColor: '#1a1a1a',
-                        borderTopColor: '#5a5a5a',
-                      },
-                      tabBarActiveTintColor: '#f0e68c',
-                      tabBarInactiveTintColor: 'gray',
-                      tabBarShowIcon: true,
-                      tabBarIndicatorStyle: { backgroundColor: '#f0e68c', height: 2 },
-                      swipeEnabled: true,
-                      animationEnabled: true,
-                      style: { backgroundColor: 'transparent' },
-                    })}
-                  >
-                    <Tab.Screen
-                      name={TAB_ROUTES.HOME}
-                      component={HomeScreen}
-                      options={{
-                        tabBarLabel: ({ focused, color }) => (
-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
-                            {isGmMode ? tApp('tabs.gmCampaigns') : tApp('tabs.home')}
-                          </Text>
-                        ),
-                      }}
+                  {isGmMode ? (
+                    <GmWorkspaceNavigator
+                      gmLootTradeLicensed={gmLootTradeLicensed}
+                      campaignsLabel={tApp('tabs.gmCampaigns')}
+                      lootTradeLabel={tApp('tabs.gmLootTrade')}
                     />
-                    {(isGmMode && gmLootTradeLicensed) ? (
+                  ) : (
+                    <Tab.Navigator
+                      id="PlayerNavbar"
+                      tabBarPosition="bottom"
+                      initialRouteName={TAB_ROUTES.HOME}
+                      screenOptions={({ route }) => ({
+                        tabBarIcon: ({ focused, color }) => {
+                          let iconName;
+                          if (route.name === TAB_ROUTES.HOME) {
+                            iconName = focused ? 'people' : 'people-outline';
+                          } else if (route.name === TAB_ROUTES.CHARACTER) {
+                            iconName = focused ? 'person' : 'person-outline';
+                          } else if (route.name === TAB_ROUTES.EQUIPMENT) {
+                            iconName = focused ? 'shield' : 'shield-outline';
+                          } else if (route.name === TAB_ROUTES.INVENTORY) {
+                            iconName = focused ? 'briefcase' : 'briefcase-outline';
+                          } else if (route.name === TAB_ROUTES.PERKS) {
+                            iconName = focused ? 'star' : 'star-outline';
+                          }
+                          return <Ionicons name={iconName} size={16} color={color} />;
+                        },
+                        tabBarStyle: {
+                          backgroundColor: '#1a1a1a',
+                          borderTopColor: '#5a5a5a',
+                        },
+                        tabBarActiveTintColor: '#f0e68c',
+                        tabBarInactiveTintColor: 'gray',
+                        tabBarShowIcon: true,
+                        tabBarIndicatorStyle: { backgroundColor: '#f0e68c', height: 2 },
+                        swipeEnabled: true,
+                        animationEnabled: true,
+                        style: { backgroundColor: 'transparent' },
+                      })}
+                    >
                       <Tab.Screen
-                        name={TAB_ROUTES.LOOT_TRADE}
-                        component={LootTradeScreen}
+                        name={TAB_ROUTES.HOME}
+                        component={HomeScreen}
                         options={{
-                          tabBarLabel: ({ focused, color }) => (
+                          tabBarLabel: ({ color }) => (
                             <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
-                              {tApp('tabs.gmLootTrade')}
+                              {tApp('tabs.home')}
                             </Text>
                           ),
                         }}
                       />
-                    ) : null}
-                    {characterSheetTabsActive ? (
-                      <>
-                        <Tab.Screen
-                          name={TAB_ROUTES.CHARACTER}
-                          component={CharacterScreen}
-                          options={{
-                            tabBarLabel: ({ focused, color }) => (
-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
-                            ),
-                          }}
-                        />
-                        <Tab.Screen
-                          name={TAB_ROUTES.EQUIPMENT}
-                          component={EquipmentScreen}
-                          options={{
-                            tabBarLabel: ({ focused, color }) => (
-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
-                            ),
-                          }}
-                        />
-                        <Tab.Screen
-                          name={TAB_ROUTES.INVENTORY}
-                          component={InventoryScreen}
-                          options={{
-                            tabBarLabel: ({ focused, color }) => (
-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
-                            ),
-                          }}
-                        />
-                        <Tab.Screen
-                          name={TAB_ROUTES.PERKS}
-                          component={PerksAndTraitsScreen}
-                          options={{
-                            tabBarLabel: ({ focused, color }) => (
-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
-                            ),
-                          }}
-                        />
-                      </>
-                    ) : null}
-                  </Tab.Navigator>
+                      {characterSheetTabsActive ? (
+                        <>
+                          <Tab.Screen
+                            name={TAB_ROUTES.CHARACTER}
+                            component={CharacterScreen}
+                            options={{
+                              tabBarLabel: ({ color }) => (
+                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
+                              ),
+                            }}
+                          />
+                          <Tab.Screen
+                            name={TAB_ROUTES.EQUIPMENT}
+                            component={EquipmentScreen}
+                            options={{
+                              tabBarLabel: ({ color }) => (
+                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
+                              ),
+                            }}
+                          />
+                          <Tab.Screen
+                            name={TAB_ROUTES.INVENTORY}
+                            component={InventoryScreen}
+                            options={{
+                              tabBarLabel: ({ color }) => (
+                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
+                              ),
+                            }}
+                          />
+                          <Tab.Screen
+                            name={TAB_ROUTES.PERKS}
+                            component={PerksAndTraitsScreen}
+                            options={{
+                              tabBarLabel: ({ color }) => (
+                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
+                              ),
+                            }}
+                          />
+                        </>
+                      ) : null}
+                    </Tab.Navigator>
+                  )}
                 </SafeAreaView>
               </ImageBackground>
             </View>
@@ -352,6 +342,7 @@ function App() {
           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
           <FusionCoreChoiceModal />
           <PlayerLootTradeOverlay />
+          <PlayerDirectiveOverlay />
           <AlertHost />
           <UpdateNoticeModal />
           <SurvivalClock />

@@ -1,24 +1,17 @@
 // src/web/pagerScrollGuard.ts
 // Защита горизонтального пейджера вкладок (@react-navigation/material-top-tabs /
-// react-native-tab-view) от нативного смещения scrollLeft на Web и в PWA (патч 479).
+// react-native-tab-view) от нативного смещения scrollLeft на Web и в PWA (патчи 479–480).
 //
-// Причина бага «интерфейс смещается на 50% в сторону при синхронизации в админке,
-// видно по 50% соседних экранов, навигация не работает»:
-// - TabView рендерит общий контейнер <div style="overflow: hidden"> шириной W,
-//   внутри которого лежат:
-//   1) горизонтальная лента экранов шириной N*W (в админке N=2 -> 2*W:
-//      [0..W] «Список компаний» и [W..2W] «Добыча/Торговля», оба смонтированы);
-//   2) нижняя панель вкладок TabBar шириной W ([0..W]).
-// - Во время облачной синхронизации открываются/закрываются модалки (меню, прогресс,
-//   окно Google OAuth / вкладка Drive, итоговый AlertHost). ModalFocusTrap в
-//   react-native-web вызывает UIManager.focus(node) -> node.focus() БЕЗ
-//   { preventScroll: true }, а скрытая соседняя вкладка помечена только
-//   aria-hidden="true" (без inert).
-// - Браузер центрирует сфокусированный контейнер шириной 2*W (или узел соседней
-//   вкладки) внутри overflow: hidden, выставляя scrollLeft = (2*W - W)/2 = 0.5*W (50%)!
-//   Из-за этого одновременно уезжают и экраны, и нижний TabBar, а смена режима
-//   Админ <-> Пользователь без перемонтирования NavigationContainer не сбрасывает
-//   DOM-свойство scrollLeft.
+// Важное правило (патч 480):
+// НЕЛЬЗЯ выставлять HTML-атрибут `inert` на узлы вкладок по `[aria-hidden="true"]`!
+// В react-native-web при переключении вкладки `aria-hidden={false}` полностью УДАЛЯЕТ
+// атрибут `aria-hidden` с DOM-узла (а не ставит `"false"`), из-за чего `inert`
+// оставался висеть на вкладке «Добыча/Торговля» навсегда и блокировал все клики.
+//
+// Для полной защиты от 50%-смещения достаточно и безопасно ТОЛЬКО удерживать
+// `scrollLeft = 0` у контейнеров с `overflow-x: hidden | clip` и передавать
+// `{ preventScroll: true }` при программном `focus()` без аргументов — это вообще не
+// меняет атрибуты DOM и никак не влияет на клики, ввод или события указателя.
 
 const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
@@ -59,8 +52,8 @@ export const clampHiddenOverflowAncestors = (
 
 /**
  * Проходит по поддереву (например, #root после возврата из окна OAuth / смены фокуса)
- * и сбрасывает застрявший scrollLeft у всех overflow-x: hidden контейнеров, а также
- * синхронизирует атрибут inert со скрытыми вкладками [aria-hidden="true"].
+ * и сбрасывает застрявший scrollLeft у всех overflow-x: hidden контейнеров, не меняя
+ * никаких DOM-атрибутов и не блокируя события клика (и снимая случайный inert, если был).
  */
 export const sanitizeRootPagerDom = (
   root: ParentNode | null | undefined,
@@ -69,17 +62,11 @@ export const sanitizeRootPagerDom = (
   if (!win || !root || typeof (root as Element).querySelectorAll !== 'function') return 0;
   let fixed = 0;
 
-  const hiddenNodes = (root as Element).querySelectorAll('[aria-hidden]');
-  hiddenNodes.forEach((node) => {
+  const inertNodes = (root as Element).querySelectorAll('[inert]');
+  inertNodes.forEach((node) => {
     const el = node as HTMLElement & { inert?: boolean };
-    const isHidden = el.getAttribute('aria-hidden') === 'true';
-    if (isHidden) {
-      el.inert = true;
-      el.setAttribute('inert', '');
-    } else if (el.hasAttribute('inert') || el.inert) {
-      el.inert = false;
-      el.removeAttribute('inert');
-    }
+    el.inert = false;
+    el.removeAttribute('inert');
   });
 
   const allDivs = (root as Element).querySelectorAll('div');
@@ -104,10 +91,9 @@ const hasHiddenOverflowAncestor = (el: HTMLElement, win: Window): boolean => {
 
 /**
  * Оборачивает HTMLElement.prototype.focus так, чтобы программный вызов focus()
- * без аргументов (как в react-native-web ModalFocusTrap / UIManager.focus):
- * 1) не переводил фокус внутрь скрытой соседней вкладки [aria-hidden="true"];
- * 2) передавал { preventScroll: true }, если элемент находится внутри overflow-x: hidden пейджера;
- * 3) гарантированно удерживал scrollLeft = 0 на скрытых горизонтальных обёртках.
+ * без аргументов (как в react-native-web ModalFocusTrap / UIManager.focus)
+ * передавал { preventScroll: true }, если элемент находится внутри overflow-x: hidden
+ * пейджера, и гарантированно удерживал scrollLeft = 0 без блокировки самого фокуса.
  */
 export const installSafeProgrammaticFocus = (
   win: (Window & { HTMLElement?: typeof HTMLElement }) | undefined =
@@ -126,9 +112,6 @@ export const installSafeProgrammaticFocus = (
 
   proto.focus = function safeFocus(this: HTMLElement, options?: FocusOptions) {
     try {
-      if (typeof this.closest === 'function' && this.closest('[aria-hidden="true"]')) {
-        return;
-      }
       if (options === undefined && !EDITABLE_TAGS.has(this.tagName) && hasHiddenOverflowAncestor(this, win)) {
         nativeFocus.call(this, { preventScroll: true });
       } else {
@@ -166,27 +149,4 @@ export const startWebPagerScrollGuard = (): void => {
   window.addEventListener('focus', onWindowRestore);
   window.addEventListener('resize', onWindowRestore);
   document.addEventListener('visibilitychange', onWindowRestore);
-
-  if (typeof MutationObserver === 'function') {
-    const startObserver = () => {
-      const root = getRoot();
-      if (!root) return;
-      sanitizeRootPagerDom(root, window);
-      const observer = new MutationObserver(() => {
-        sanitizeRootPagerDom(root, window);
-      });
-      observer.observe(root, {
-        subtree: true,
-        childList: true,
-        attributes: true,
-        attributeFilter: ['aria-hidden'],
-      });
-    };
-
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startObserver, { once: true });
-    } else {
-      startObserver();
-    }
-  }
 };

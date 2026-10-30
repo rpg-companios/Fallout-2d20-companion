@@ -79,7 +79,7 @@ describe('Патч 479: защита от 50%-смещения экрана пр
     delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
   });
 
-  it('pagerScrollGuard блокирует 50%-смещение scrollLeft на overflow:hidden пейджере и помечает скрытые вкладки inert', () => {
+  it('pagerScrollGuard блокирует 50%-смещение scrollLeft на overflow:hidden пейджере без блокировки кликов (без inert)', () => {
     // Имитация DOM-дерева TabView в режиме Админа (2 вкладки шириной по 1000px -> лента 2000px)
     const makeEl = (tag, { overflowX = 'visible', scrollLeft = 0, attrs = {}, parent = null } = {}) => {
       const attrMap = new Map(Object.entries(attrs));
@@ -95,16 +95,6 @@ describe('Патч 479: защита от 50%-смещения экрана пр
         setAttribute: (k, v) => { attrMap.set(k, String(v)); },
         removeAttribute: (k) => { attrMap.delete(k); },
         hasAttribute: (k) => attrMap.has(k),
-        closest(selector) {
-          if (selector === '[aria-hidden="true"]') {
-            let cur = this;
-            while (cur) {
-              if (cur.getAttribute?.('aria-hidden') === 'true') return cur;
-              cur = cur.parentElement;
-            }
-          }
-          return null;
-        },
       };
       if (parent) parent.children.push(el);
       return el;
@@ -127,7 +117,7 @@ describe('Патч 479: защита от 50%-смещения экрана пр
       return acc;
     };
     root.querySelectorAll = (sel) => {
-      if (sel === '[aria-hidden]') return collectAll(root, (n) => n.hasAttribute('aria-hidden'));
+      if (sel === '[inert]') return collectAll(root, (n) => n.hasAttribute('inert') || n.inert);
       if (sel === 'div') return collectAll(root, (n) => n.tagName === 'DIV');
       return [];
     };
@@ -136,18 +126,18 @@ describe('Патч 479: защита от 50%-смещения экрана пр
       getComputedStyle: (el) => ({ overflowX: el.style.overflowX || 'visible' }),
     };
 
-    // 1. sanitizeRootPagerDom сбрасывает 50%-смещение (500 -> 0), ставит inert на скрытую вкладку
+    // 1. sanitizeRootPagerDom сбрасывает 50%-смещение (500 -> 0), НЕ ставит inert ни на одну вкладку
     //    и НЕ трогает легитимный горизонтальный ScrollView (overflow-x: auto -> 180).
     const fixedCount = sanitizeRootPagerDom(root, fakeWin);
     expect(fixedCount).toBe(1);
     expect(pagerDiv.scrollLeft).toBe(0);
     expect(userHorizontalScroll.scrollLeft).toBe(180);
-    expect(lootScene.inert).toBe(true);
-    expect(lootScene.getAttribute('inert')).toBe('');
+    expect(lootScene.inert).toBe(false);
+    expect(lootScene.hasAttribute('inert')).toBe(false);
     expect(homeScene.inert).toBe(false);
 
-    // 2. installSafeProgrammaticFocus передаёт { preventScroll: true } для узлов внутри пейджера,
-    //    блокирует фокус внутрь скрытой вкладки [aria-hidden="true"] и гасит случайный сдвиг браузера.
+    // 2. installSafeProgrammaticFocus передаёт { preventScroll: true } для узлов внутри пейджера
+    //    и гасит случайный сдвиг браузера без блокировки самого фокуса.
     const focusCalls = [];
     function FakeHTMLElement() {}
     FakeHTMLElement.prototype.focus = function mockNativeFocus(opts) {
@@ -164,12 +154,13 @@ describe('Патч 479: защита от 50%-смещения экрана пр
     installSafeProgrammaticFocus(fakeWin);
 
     hiddenLootBtn.focus();
-    expect(focusCalls).toHaveLength(0);
+    expect(focusCalls).toHaveLength(1);
+    expect(focusCalls[0].opts).toEqual({ preventScroll: true });
     expect(pagerDiv.scrollLeft).toBe(0);
 
     homeBtn.focus();
-    expect(focusCalls).toHaveLength(1);
-    expect(focusCalls[0].opts).toEqual({ preventScroll: true });
+    expect(focusCalls).toHaveLength(2);
+    expect(focusCalls[1].opts).toEqual({ preventScroll: true });
     expect(pagerDiv.scrollLeft).toBe(0);
 
     // 3. Даже если браузер напрямую сдвинул scrollLeft во время события, clampHiddenOverflowAncestors мгновенно возвращает 0

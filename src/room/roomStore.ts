@@ -14,6 +14,7 @@ import {
 import {
   ROOM_MESSAGE,
   type ActiveLootTradeSession,
+  type RoomDirectiveEntry,
   type RoomEnvelope,
   type RoomMember,
   type RoomSnapshotEntry,
@@ -33,6 +34,7 @@ export interface RoomStateEntry {
   joined?: boolean;
   snapshots?: Record<string, RoomSnapshotEntry>;
   activeSession?: ActiveLootTradeSession | null;
+  directives?: RoomDirectiveEntry[];
 }
 
 interface CreateRoomResult {
@@ -47,6 +49,7 @@ interface JoinRoomResult {
   members: RoomMember[];
   snapshots: RoomSnapshotEntry[];
   activeSession?: ActiveLootTradeSession | null;
+  directives?: RoomDirectiveEntry[];
 }
 
 interface RoomStoreState {
@@ -138,6 +141,29 @@ interface RoomStoreState {
     sellItems: Array<Record<string, unknown>>;
     nodeContainerId?: string | null;
   }) => Promise<{ committed: any; session: ActiveLootTradeSession }>;
+  sendGmDirective: (input: {
+    code: string;
+    ownerToken?: string;
+    directiveId?: string;
+    kind: string;
+    amount?: number;
+    mode?: string | null;
+    note?: string;
+    targetType?: 'room' | 'character';
+    targetCharacterId?: string | null;
+    targetCharacterIds?: string[];
+  }) => Promise<{
+    directive: RoomDirectiveEntry;
+    directives: RoomDirectiveEntry[];
+  }>;
+  ackGmDirective: (input: {
+    code: string;
+    directiveId: string;
+    characterId: string;
+  }) => Promise<{
+    directive: RoomDirectiveEntry | null;
+    directives: RoomDirectiveEntry[];
+  }>;
 }
 
 // ── Внутреннее состояние соединения (не в стейт-дереве: не для рендера) ──
@@ -152,6 +178,7 @@ const pendingRequests = new Map<string, {
 const joiningCodes = new Set<string>();
 const publishListeners = new Set<(message: RoomEnvelope) => void>();
 const sessionListeners = new Set<(message: RoomEnvelope) => void>();
+const directiveListeners = new Set<(message: RoomEnvelope) => void>();
 
 const getWebTabSessionSuffix = (): string => {
   if (typeof window === 'undefined') return '';
@@ -219,6 +246,12 @@ export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) =>
   return () => { sessionListeners.delete(listener); };
 };
 
+/** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
+export const onRoomDirective = (listener: (message: RoomEnvelope) => void) => {
+  directiveListeners.add(listener);
+  return () => { directiveListeners.delete(listener); };
+};
+
 /** Точка подмены клиента для тестов (мок-транспорт вместо настоящего ws). */
 let clientFactory: ((input: { url: string; clientId: string; onStatus: any; onMessage: any }) => RoomClient) | null = null;
 export const setRoomClientFactoryForTests = (
@@ -255,6 +288,37 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     });
   };
 
+  const applyDirectiveEnvelopeToStore = (message: RoomEnvelope) => {
+    const code = message.roomCode;
+    if (!code || !message.payload) return;
+    const current = get().rooms[code];
+    if (current) {
+      let nextDirectives = Array.isArray(current.directives) ? [...current.directives] : [];
+      if (Array.isArray(message.payload.directives)) {
+        nextDirectives = message.payload.directives as RoomDirectiveEntry[];
+      } else if (message.payload.directiveId) {
+        const incoming = message.payload as RoomDirectiveEntry;
+        const idx = nextDirectives.findIndex((d) => d.directiveId === incoming.directiveId);
+        if (idx >= 0) nextDirectives[idx] = incoming;
+        else nextDirectives.push(incoming);
+      }
+      set({
+        rooms: {
+          ...get().rooms,
+          [code]: {
+            ...current,
+            directives: nextDirectives,
+          },
+        },
+      });
+    }
+    directiveListeners.forEach((listener) => {
+      try { listener(message); } catch (error) {
+        debugLog('room.directiveListener:failed', { message: (error as Error)?.message });
+      }
+    });
+  };
+
   const handleMessage = (message: RoomEnvelope) => {
     const requestId = message?.payload?.requestId;
     if (message.type === ROOM_MESSAGE.ERROR) {
@@ -283,6 +347,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       || message.type === ROOM_MESSAGE.SESSION_TRADE_COMMIT
     ) {
       applySessionEnvelopeToStore(message);
+    }
+    if (
+      message.type === ROOM_MESSAGE.GM_DIRECTIVE
+      || message.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
+    ) {
+      applyDirectiveEnvelopeToStore(message);
     }
     if (requestId && pendingRequests.has(requestId)) {
       const pending = pendingRequests.get(requestId)!;
@@ -443,6 +513,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             joined: Boolean(prev?.joined && requestedCode),
             snapshots: prev?.snapshots || {},
             activeSession: prev?.activeSession ?? null,
+            directives: prev?.directives || [],
           },
         },
       });
@@ -462,6 +533,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           members: existing.members,
           snapshots: Object.values(existing.snapshots || {}),
           activeSession: existing.activeSession ?? null,
+          directives: existing.directives || [],
         };
       }
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
@@ -473,6 +545,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         const payloadRooms = response.payload;
         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
+        const directives = Array.isArray(payloadRooms.directives)
+          ? (payloadRooms.directives as RoomDirectiveEntry[])
+          : [];
         const lastClosedEntry = payloadRooms.lastClosedSession as {
           session?: ActiveLootTradeSession | null;
           closedReason?: string | null;
@@ -488,9 +563,25 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               joined: true,
               snapshots: snapshotsMap,
               activeSession,
+              directives,
             },
           },
         });
+        if (directives.length > 0) {
+          const directiveEnvelope: RoomEnvelope = {
+            v: 1,
+            type: ROOM_MESSAGE.GM_DIRECTIVE_STATE,
+            roomCode: code,
+            clientId: get().clientId || '',
+            ts: Date.now(),
+            payload: { directives },
+          };
+          directiveListeners.forEach((listener) => {
+            try { listener(directiveEnvelope); } catch (error) {
+              debugLog('room.directiveListener:failed', { message: (error as Error)?.message });
+            }
+          });
+        }
         if (activeSession || lastClosedEntry?.session) {
           const syntheticEnvelope: RoomEnvelope = {
             v: 1,
@@ -519,6 +610,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           members: payloadRooms.members || [],
           snapshots: Object.values(snapshotsMap),
           activeSession,
+          directives,
         };
       } finally {
         joiningCodes.delete(code);
@@ -703,6 +795,57 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       return {
         committed: response.payload?.committed,
         session: response.payload?.session as ActiveLootTradeSession,
+      };
+    },
+
+    sendGmDirective: async ({
+      code,
+      ownerToken,
+      directiveId,
+      kind,
+      amount = 1,
+      mode = null,
+      note = '',
+      targetType = 'room',
+      targetCharacterId = null,
+      targetCharacterIds,
+    }) => {
+      assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
+      const response = await sendRequest(
+        ROOM_MESSAGE.GM_DIRECTIVE,
+        {
+          code,
+          kind,
+          amount,
+          ...(mode ? { mode } : {}),
+          ...(note ? { note } : {}),
+          targetType,
+          ...(targetCharacterId ? { targetCharacterId } : {}),
+          ...(Array.isArray(targetCharacterIds) ? { targetCharacterIds } : {}),
+          ...(directiveId ? { directiveId } : {}),
+          ...(ownerToken ? { ownerToken } : {}),
+        },
+        code,
+      );
+      return {
+        directive: response.payload?.directive as RoomDirectiveEntry,
+        directives: (response.payload?.directives || []) as RoomDirectiveEntry[],
+      };
+    },
+
+    ackGmDirective: async ({ code, directiveId, characterId }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.GM_DIRECTIVE_ACK,
+        {
+          code,
+          directiveId,
+          characterId,
+        },
+        code,
+      );
+      return {
+        directive: (response.payload?.directive || null) as RoomDirectiveEntry | null,
+        directives: (response.payload?.directives || []) as RoomDirectiveEntry[],
       };
     },
   };
