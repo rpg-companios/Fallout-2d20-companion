@@ -1,0 +1,2600 @@
+diff --git a/__tests__/lootTrade/loot-trade-polish-471.test.js b/__tests__/lootTrade/loot-trade-polish-471.test.js
+new file mode 100644
+index 0000000..219d1f0
+--- /dev/null
++++ b/__tests__/lootTrade/loot-trade-polish-471.test.js
+@@ -0,0 +1,250 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import { setCurrentLocale } from '../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
++import { describeItemBasics } from '../../domain/itemBasics';
++
++const repoRoot = path.resolve(__dirname, '../..');
++
++const readSource = (relPath) => fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
++
++const makeWaitMsg = () => (box, pred, timeoutMs = 4000) => new Promise((resolve, reject) => {
++  const started = Date.now();
++  const timer = setInterval(() => {
++    const idx = box.findIndex(pred);
++    if (idx >= 0) {
++      const [hit] = box.splice(idx, 1);
++      clearInterval(timer);
++      resolve(hit);
++      return;
++    }
++    if (Date.now() - started > timeoutMs) {
++      clearInterval(timer);
++      reject(new Error('timeout waiting WS message'));
++    }
++  }, 12);
++});
++
++/** Зеркало withCdToken и formatBasicsWithIcons из LootTradeIconText без подтягивания RN PNG-ассетов в Node. */
++const withCdToken = (text) => {
++  if (typeof text !== 'string' || !text) return text;
++  return text.replace(/(^|[^A-Za-z{])CD(?![A-Za-z}])/g, '$1{CD}');
++};
++
++const formatBasicsWithIcons = (text) => {
++  if (typeof text !== 'string' || !text) return text;
++  return withCdToken(text)
++    .replace(/(Урон|Damage)\s+(\d+)(?!\s*\{CD\})/g, '$1 $2 {CD}')
++    .replace(/(Цена|Cost)\s+(\d+(?:[.,]\d+)?)(?!\s*\{CAP\})/g, '$1 $2 {CAP}');
++};
++
++describe('Патч 471 — поля и воздух модалок, borderRadius 5, «Закрыть» у торговца, скрытый % торговца и иконки {CAP}/{CD}', () => {
++  beforeEach(() => {
++    setCurrentLocale('ru-RU');
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++  });
++
++  it('все модалки добычи и торговли используют View вместо SafeAreaView, отступы от краёв и borderRadius: 5', () => {
++    const overlaySrc = readSource('components/lootTrade/PlayerLootTradeOverlay.js');
++    const catalogSrc = readSource('components/screens/LootTradeScreen/modals/ContainerCatalogModal.js');
++    const formSrc = readSource('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++    const configSrc = readSource('components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js');
++    const issueSrc = readSource('components/screens/LootTradeScreen/modals/IssueContainerModal.js');
++    const alertHostSrc = readSource('components/alerts/AlertHost.js');
++
++    // Ни одна центрированная модалка не должна оборачивать карточку в SafeAreaView
++    // (в react-native-web SafeAreaView сбрасывает внутренний padding в 0px).
++    expect(overlaySrc).not.toContain('SafeAreaView');
++    expect(catalogSrc).not.toContain('SafeAreaView');
++
++    // Отступы от краёв окна (backdrop padding + width < 100%) и воздух внутри карточек
++    for (const src of [overlaySrc, catalogSrc, formSrc, configSrc, issueSrc]) {
++      expect(src).toContain('paddingHorizontal: 28');
++      expect(src).toContain('paddingVertical: 36');
++      expect(src).toContain('paddingHorizontal: 24');
++      expect(src).toContain('paddingVertical: 22');
++      expect(src).toContain('borderRadius: 5');
++      expect(src).not.toMatch(/borderRadius:\s*(1[0-9]|2[0-9])/);
++    }
++
++    expect(alertHostSrc).toContain('borderRadius: 5');
++    expect(alertHostSrc).toContain('paddingHorizontal: 28');
++  });
++
++  it('окно торговли у игрока содержит кнопку «Закрыть» рядом со «Свернуть» и полностью скрывает % наценки/скупки торговца', () => {
++    const overlaySrc = readSource('components/lootTrade/PlayerLootTradeOverlay.js');
++    const ruJson = JSON.parse(readSource('i18n/ru-RU/screens/lootTrade/screen.json'));
++    const enJson = JSON.parse(readSource('i18n/en-EN/screens/lootTrade/screen.json'));
++
++    // Наличие обработчика закрытия торговли и обеих кнопок в шапке торговца
++    expect(overlaySrc).toContain('handleCloseMerchantPress');
++    expect(overlaySrc).toContain("tLootTrade('player.closeMerchantConfirmTitle')");
++    expect(overlaySrc).toContain("tLootTrade('player.closeMerchantConfirmMessage')");
++    expect(ruJson.player.close).toBe('Закрыть');
++    expect(enJson.player.close).toBe('Close');
++
++    // Процент наценки/скупки торговца для игрока является тайной:
++    // ни полосы ставок, ни ключей ratesLine/personalRatesBadge/perkCapCollector в окне игрока нет.
++    expect(overlaySrc).not.toContain('ratesStrip');
++    expect(overlaySrc).not.toContain('player.ratesLine');
++    expect(overlaySrc).not.toContain('player.personalRatesBadge');
++    expect(overlaySrc).not.toContain('player.perkCapCollector');
++    expect(ruJson.player.ratesLine).toBeUndefined();
++    expect(enJson.player.ratesLine).toBeUndefined();
++
++    // Базовая каталожная цена товара также скрывается в описании товара у торговца,
++    // чтобы игрок не вычислял % наценки по строке «Цена: X».
++    expect(overlaySrc).toContain('cost: null, price: null');
++    const sanitizedBasics = formatBasicsWithIcons(describeItemBasics(
++      { weaponType: 'Light', damage: 5, cost: null, price: null },
++      'ru-RU',
++    ));
++    expect(sanitizedBasics).toContain('Урон 5 {CD}');
++    expect(sanitizedBasics).not.toContain('Цена');
++    expect(sanitizedBasics).not.toContain('{CAP}');
++  });
++
++  it('сервер комнаты сохраняет сессию торговца открытой для других игроков, когда один игрок нажимает «Закрыть», и гасит её после последнего игрока', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const waitMsg = makeWaitMsg();
++
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++
++    const p1Box = [];
++    const p2Box = [];
++    const p1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-a-471',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p1Box.push(m),
++    });
++    const p2 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-b-471',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => p2Box.push(m),
++    });
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Караван 471' });
++      const code = created.code;
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' });
++
++      p1.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок А', role: 'player', requestId: 'ja' }, code);
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'ja');
++
++      p2.send(ROOM_MESSAGE.ROOM_JOIN, { code, name: 'Игрок Б', role: 'player', requestId: 'jb' }, code);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'jb');
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code,
++        session: {
++          containerId: 'cnt-merch-471',
++          kind: 'merchant',
++          name: 'Караванщик Лукас',
++          targetType: 'room',
++          caps: 250,
++          saleMarkupPercent: 25,
++          buyDepreciationPercent: 50,
++          items: [
++            { entryId: 'e1', itemId: 'stimpak', itemType: 'chem', name: 'Стимулятор', cost: 50, quantity: 4 },
++          ],
++        },
++      });
++      expect(opened.kind).toBe('merchant');
++
++      await waitMsg(p1Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++      await waitMsg(p2Box, (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId);
++
++      // Игрок А закрывает окно торговли — Игрок Б остаётся подключён к торговцу
++      p1.send(ROOM_MESSAGE.SESSION_PLAYER_CLOSE, {
++        code,
++        sessionId: opened.sessionId,
++        requestId: 'close-a',
++      }, code);
++      const afterAClose = await waitMsg(
++        p1Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.requestId === 'close-a',
++      );
++      expect(afterAClose.payload.session).toBeTruthy();
++      expect(afterAClose.payload.session.closedByClientIds).toContain('player-a-471');
++      expect(afterAClose.payload.session.closedByClientIds).not.toContain('player-b-471');
++
++      // Игрок Б также закрывает окно торговли — активных зрителей не осталось, сессия завершается
++      p2.send(ROOM_MESSAGE.SESSION_PLAYER_CLOSE, {
++        code,
++        sessionId: opened.sessionId,
++        requestId: 'close-b',
++      }, code);
++      const afterBClose = await waitMsg(
++        p2Box,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.requestId === 'close-b',
++      );
++      expect(afterBClose.payload.session).toBeNull();
++      expect(afterBClose.payload.closedReason).toBe('player_closed');
++    } finally {
++      p1.close();
++      p2.close();
++      resetRoomClientForTests();
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      await app.close();
++    }
++  });
++
++  it('тексты окон используют токены иконок {CAP} (caps.png) и {CD} (CD.png) вместо «кр.», «крышки», «крышек» и «CD»', () => {
++    const ruRaw = readSource('i18n/ru-RU/screens/lootTrade/screen.json');
++    const enRaw = readSource('i18n/en-EN/screens/lootTrade/screen.json');
++    const iconHelperSrc = readSource('components/lootTrade/LootTradeIconText.js');
++    const textUtilsSrc = readSource('modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js');
++
++    // Проводка реальных иконок caps.png (из инвентаря пользователя) и CD.png (из таблицы статов оружия)
++    expect(iconHelperSrc).toContain('modules/fallout/assets/backgrounds/caps.png');
++    expect(iconHelperSrc).toContain('assets/CD.png');
++    expect(textUtilsSrc).toContain('assets/backgrounds/caps.png');
++    expect(textUtilsSrc).toContain('assets/CD.png');
++
++    // Ни одного текстового «кр.», «крышки», «крышек» в локализации окон нет
++    expect(ruRaw).not.toMatch(/кр\.|крышки|крышек/i);
++    // В английской локализации нет литерального слова caps вне плейсхолдера {caps}
++    const enWithoutPlaceholders = enRaw.replace(/\{caps\}|\{CAP\}|\{CD\}/g, '');
++    expect(enWithoutPlaceholders).not.toMatch(/\bcaps\b|\bCD\b/i);
++    const ruWithoutPlaceholders = ruRaw.replace(/\{caps\}|\{CAP\}|\{CD\}/g, '');
++    expect(ruWithoutPlaceholders).not.toMatch(/\bCD\b/);
++
++    // Проверка форматирования строк с токенами {CAP} и {CD}
++    expect(formatLootTrade(tLootTrade('player.unitPrice'), { price: 65 })).toContain('{CAP}');
++    expect(formatLootTrade(tLootTrade('player.barterPay'), { amount: 120 })).toContain('{CAP}');
++    expect(tLootTrade('itemConfig.unitCd')).toBe('{CD}');
++    expect(withCdToken('6 + 3 CD')).toBe('6 + 3 {CD}');
++    expect(withCdToken('Формула 1 пачки: 10 + 5 {CD}')).toBe('Формула 1 пачки: 10 + 5 {CD}');
++  });
++});
+diff --git a/components/alerts/AlertHost.js b/components/alerts/AlertHost.js
+index 6457226..661ec8b 100644
+--- a/components/alerts/AlertHost.js
++++ b/components/alerts/AlertHost.js
+@@ -10,6 +10,7 @@
+ import React, { useCallback, useEffect, useRef, useState } from 'react';
+ import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+ import { registerAlertHost } from './alertService';
++import IconText from '../lootTrade/LootTradeIconText';
+ import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
+ import { useLocale } from '../../i18n/locale';
+ import { tApp } from '../../i18n/appI18n';
+@@ -142,10 +143,10 @@ const AlertHost = () => {
+     >
+       <View style={styles.overlay}>
+         <View style={styles.content}>
+-          {!!title && <Text style={styles.title}>{title}</Text>}
++          {!!title && <IconText style={styles.title}>{title}</IconText>}
+           {!!message && (
+             <ScrollView style={styles.messageScroll} contentContainerStyle={styles.messageWrap}>
+-              <Text style={styles.message}>{message}</Text>
++              <IconText style={styles.message}>{message}</IconText>
+             </ScrollView>
+           )}
+           <View style={styles.buttons}>
+@@ -162,14 +163,14 @@ const AlertHost = () => {
+                   if (typeof button.onPress === 'function') button.onPress();
+                 }}
+               >
+-                <Text
++                <IconText
+                   style={[
+                     styles.buttonText,
+                     button.style === 'cancel' && styles.buttonTextCancel,
+                   ]}
+                 >
+                   {button.label}
+-                </Text>
++                </IconText>
+               </TouchableOpacity>
+             ))}
+           </View>
+@@ -184,17 +185,18 @@ const styles = StyleSheet.create({
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+-    paddingHorizontal: 16,
++    backgroundColor: 'rgba(0, 0, 0, 0.65)',
++    paddingHorizontal: 28,
++    paddingVertical: 32,
+   },
+   content: {
+-    width: '100%',
+-    maxWidth: 520,
++    width: '92%',
++    maxWidth: 500,
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 10,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+-    padding: 20,
++    padding: 22,
+   },
+   title: {
+     fontSize: 18,
+@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
+   button: {
+     paddingVertical: 12,
+     paddingHorizontal: 16,
+-    borderRadius: 8,
++    borderRadius: 5,
+     backgroundColor: '#3a3a1e',
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+diff --git a/components/lootTrade/LootTradeIconText.js b/components/lootTrade/LootTradeIconText.js
+new file mode 100644
+index 0000000..883f927
+--- /dev/null
++++ b/components/lootTrade/LootTradeIconText.js
+@@ -0,0 +1,103 @@
++import React from 'react';
++import { Text, Image, StyleSheet } from 'react-native';
++
++export const CAP_ICON_SOURCE = require('../../modules/fallout/assets/backgrounds/caps.png');
++export const CD_ICON_SOURCE = require('../../assets/CD.png');
++
++const TOKEN_SPLIT_RE = /(\{\/?CD\}|\{CAP\})/g;
++const BARE_CD_RE = /(^|[^A-Za-z{])CD(?![A-Za-z}])/g;
++
++/**
++ * Заменяет словесное обозначение «CD» (например, в «6 + 3 CD») на токен {CD},
++ * не дублируя скобки у уже токенизированного «{CD}».
++ */
++export const withCdToken = (value) => {
++  if (value === null || value === undefined) return '';
++  return String(value).replace(BARE_CD_RE, '$1{CD}');
++};
++
++/**
++ * Дополняет строку характеристик describeItemBasics иконками {CD} (у урона)
++ * и {CAP} (у базовой цены в каталоге Мастера), не меняя чистую доменную функцию.
++ */
++export const formatBasicsWithIcons = (value) => {
++  if (value === null || value === undefined) return '';
++  return withCdToken(value)
++    .replace(/(Урон|Damage)\s+(\d+)(?!\s*\{CD\})/g, '$1 $2 {CD}')
++    .replace(/(Цена|Cost)\s+(\d+(?:[.,]\d+)?)(?!\s*\{CAP\})/g, '$1 $2 {CAP}');
++};
++
++export const CapIcon = ({ size = 18, style }) => (
++  <Image
++    source={CAP_ICON_SOURCE}
++    resizeMode="contain"
++    style={[{ width: size, height: size }, style]}
++  />
++);
++
++export const CdIcon = ({ size = 16, style }) => (
++  <Image
++    source={CD_ICON_SOURCE}
++    resizeMode="contain"
++    style={[{ width: size, height: size }, style]}
++  />
++);
++
++const renderStringTokens = (str, fontSize, keyPrefix) => {
++  const cdSize = Math.max(13, Math.round(fontSize + 4));
++  const capSize = Math.max(14, Math.round(fontSize + 6));
++
++  return String(str)
++    .split(TOKEN_SPLIT_RE)
++    .filter((part) => part !== '')
++    .map((part, idx) => {
++      const key = `${keyPrefix}-${idx}`;
++      if (part === '{CAP}') {
++        const shift = Math.round(capSize * 0.18);
++        return (
++          <Image
++            key={key}
++            source={CAP_ICON_SOURCE}
++            resizeMode="contain"
++            style={{ width: capSize, height: capSize, transform: [{ translateY: shift }] }}
++          />
++        );
++      }
++      if (part === '{CD}' || part === '{/CD}') {
++        const shift = Math.round(cdSize * 0.16);
++        return (
++          <Image
++            key={key}
++            source={CD_ICON_SOURCE}
++            resizeMode="contain"
++            style={{ width: cdSize, height: cdSize, transform: [{ translateY: shift }] }}
++          />
++        );
++      }
++      return <React.Fragment key={key}>{part}</React.Fragment>;
++    });
++};
++
++/**
++ * Обёртка над <Text>, заменяющая токены {CAP} и {CD}/{/CD} на встроенные
++ * иконки крышки и боевого кубика (включая составные JSX-children).
++ */
++export const IconText = ({ style, children, ...rest }) => {
++  const flat = StyleSheet.flatten(style) || {};
++  const fontSize = Number(flat.fontSize) || 14;
++
++  const nodes = React.Children.toArray(children).flatMap((child, idx) => {
++    if (typeof child === 'string' || typeof child === 'number') {
++      return renderStringTokens(String(child), fontSize, `ic-${idx}`);
++    }
++    return child;
++  });
++
++  return (
++    <Text style={style} {...rest}>
++      {nodes}
++    </Text>
++  );
++};
++
++export default IconText;
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 3282131..c1ed79f 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -6,10 +6,10 @@ import {
+   TouchableOpacity,
+   ScrollView,
+   StyleSheet,
+-  SafeAreaView,
+   useWindowDimensions,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
++import IconText, { formatBasicsWithIcons } from './LootTradeIconText';
+ import * as db from '../../db';
+ import * as savesModule from '../../src/saves/characterSaves';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -322,11 +322,13 @@ export default function PlayerLootTradeOverlay() {
+     }
+   };
+ 
+-  const performPlayerLootClose = async () => {
++  const performPlayerSessionClose = async () => {
+     if (!activeSession || !matchedContext) return;
+     const targetSessionId = activeSession.sessionId;
+     const targetRoomCode = matchedContext.roomCode;
+     markSessionClosedLocally(targetSessionId);
++    setBuyBuffer({});
++    setSellBuffer({});
+     try {
+       await useRoomStore.getState().playerCloseRoomSession({
+         code: targetRoomCode,
+@@ -350,14 +352,36 @@ export default function PlayerLootTradeOverlay() {
+             text: tLootTrade('player.close'),
+             style: 'destructive',
+             onPress: () => {
+-              void performPlayerLootClose();
++              void performPlayerSessionClose();
++            },
++          },
++        ],
++      });
++      return;
++    }
++    void performPlayerSessionClose();
++  };
++
++  const handleCloseMerchantPress = () => {
++    if (busy || !activeSession) return;
++    if (barterSummary?.hasItems) {
++      showRawAlert({
++        title: tLootTrade('player.closeMerchantConfirmTitle'),
++        message: tLootTrade('player.closeMerchantConfirmMessage'),
++        buttons: [
++          { text: tLootTrade('form.cancel'), style: 'cancel' },
++          {
++            text: tLootTrade('player.close'),
++            style: 'destructive',
++            onPress: () => {
++              void performPlayerSessionClose();
+             },
+           },
+         ],
+       });
+       return;
+     }
+-    void performPlayerLootClose();
++    void performPlayerSessionClose();
+   };
+ 
+   // ── Обработчики ТОРГОВЦА (буфер обмена) ───────────────────────────────────
+@@ -490,8 +514,8 @@ export default function PlayerLootTradeOverlay() {
+         animationType="slide"
+         onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+       >
+-        <View style={styles.lootModalBackdrop}>
+-          <SafeAreaView style={styles.lootModalCard}>
++        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
++          <View style={styles.lootModalCard}>
+             <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+               <View style={styles.modalTitleRow}>
+                 <MaterialCommunityIcons name="treasure-chest" size={24} color="#f0e68c" />
+@@ -516,9 +540,9 @@ export default function PlayerLootTradeOverlay() {
+             </View>
+ 
+             {Boolean(activeSession.description) && (
+-              <Text style={[styles.modalDesc, styles.lootDescSpacing]}>
++              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+                 {activeSession.description}
+-              </Text>
++              </IconText>
+             )}
+ 
+             <ScrollView
+@@ -533,12 +557,11 @@ export default function PlayerLootTradeOverlay() {
+                   return (
+                     <View key={entry.entryId} style={styles.lootRow}>
+                       <View style={styles.lootRowInfo}>
+-                        <Text style={styles.lootRowTitle}>
+-                          {getItemIcon(entry.itemType)}{' '}
++                        <IconText style={styles.lootRowTitle}>
+                           {isCaps
+                             ? formatLootTrade(tLootTrade('player.capsItemLabel'), { qty: entry.quantity })
+-                            : `${entry.name} ×${entry.quantity}`}
+-                        </Text>
++                            : `${getItemIcon(entry.itemType)} ${entry.name} ×${entry.quantity}`}
++                        </IconText>
+                         {!isCaps && entry.weight > 0 && (
+                           <Text style={styles.lootRowSub}>
+                             {formatLootTrade(tLootTrade('detail.weight'), {
+@@ -590,7 +613,7 @@ export default function PlayerLootTradeOverlay() {
+                 </TouchableOpacity>
+               )}
+             </View>
+-          </SafeAreaView>
++          </View>
+         </View>
+       </Modal>
+     );
+@@ -602,9 +625,9 @@ export default function PlayerLootTradeOverlay() {
+     <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
+       <View style={styles.paneHeader}>
+         <Text style={styles.paneHeaderTitle}>{tLootTrade('player.playerInventoryTab')}</Text>
+-        <Text style={styles.paneHeaderCaps}>
++        <IconText style={styles.paneHeaderCaps}>
+           {formatLootTrade(tLootTrade('player.playerCaps'), { caps: playerCaps })}
+-        </Text>
++        </IconText>
+       </View>
+ 
+       <ScrollView style={styles.paneScroll}>
+@@ -618,9 +641,9 @@ export default function PlayerLootTradeOverlay() {
+                 style={styles.bufferRow}
+                 onPress={() => addToBuyBuffer(line.entry, -1)}
+               >
+-                <Text style={styles.bufferItalicText}>
+-                  + {line.name} ×{line.quantity} ({line.lineTotal} кр.)
+-                </Text>
++                <IconText style={styles.bufferItalicText}>
++                  {`+ ${line.name} ×${line.quantity} (${line.lineTotal} {CAP})`}
++                </IconText>
+                 <TouchableOpacity
+                   style={styles.bufferClearAllBtn}
+                   onPress={(e) => {
+@@ -663,9 +686,9 @@ export default function PlayerLootTradeOverlay() {
+                   <Text style={styles.tradeRowName}>
+                     {getItemIcon(pItem.itemType)} {pItem.name}{durSuffix} ×{remaining}
+                   </Text>
+-                  <Text style={styles.tradeRowPrice}>
++                  <IconText style={styles.tradeRowPrice}>
+                     {formatLootTrade(tLootTrade('player.unitPrice'), { price: sellUnitPrice })}
+-                  </Text>
++                  </IconText>
+                 </View>
+                 <View style={styles.tradeRowBtns}>
+                   <TouchableOpacity
+@@ -703,9 +726,9 @@ export default function PlayerLootTradeOverlay() {
+       <View style={[styles.pane, isWideLayout && styles.paneHalf]}>
+         <View style={styles.paneHeader}>
+           <Text style={styles.paneHeaderTitle}>{tLootTrade('player.merchantInventoryTab')}</Text>
+-          <Text style={styles.paneHeaderCaps}>
++          <IconText style={styles.paneHeaderCaps}>
+             {formatLootTrade(tLootTrade('player.merchantCaps'), { caps: activeSession.caps || 0 })}
+-          </Text>
++          </IconText>
+         </View>
+ 
+         <ScrollView style={styles.paneScroll}>
+@@ -719,9 +742,9 @@ export default function PlayerLootTradeOverlay() {
+                   style={styles.bufferRow}
+                   onPress={() => addToSellBuffer(line.item, -1)}
+                 >
+-                  <Text style={styles.bufferItalicText}>
+-                    + {line.name} ×{line.quantity} ({line.lineTotal} кр.)
+-                  </Text>
++                  <IconText style={styles.bufferItalicText}>
++                    {`+ ${line.name} ×${line.quantity} (${line.lineTotal} {CAP})`}
++                  </IconText>
+                   <TouchableOpacity
+                     style={styles.bufferClearAllBtn}
+                     onPress={(e) => {
+@@ -749,8 +772,13 @@ export default function PlayerLootTradeOverlay() {
+                 saleMarkupPercent: effectiveRates.saleMarkupPercent,
+                 capCollectorPercent,
+               });
++              // Не показываем каталожную базовую цену в карточке торговца,
++              // чтобы наценка торговца оставалась тайной для игрока.
+               const basics = entry.itemSnapshot
+-                ? describeItemBasics(entry.itemSnapshot, moduleLocale)
++                ? formatBasicsWithIcons(describeItemBasics(
++                    { ...entry.itemSnapshot, cost: null, price: null },
++                    moduleLocale,
++                  ))
+                 : '';
+ 
+               return (
+@@ -764,11 +792,11 @@ export default function PlayerLootTradeOverlay() {
+                       {getItemIcon(entry.itemType)} {entry.name} ×{remaining}
+                     </Text>
+                     {Boolean(basics) && (
+-                      <Text style={styles.tradeRowBasics} numberOfLines={2}>{basics}</Text>
++                      <IconText style={styles.tradeRowBasics} numberOfLines={2}>{basics}</IconText>
+                     )}
+-                    <Text style={styles.tradeRowPriceBuy}>
++                    <IconText style={styles.tradeRowPriceBuy}>
+                       {formatLootTrade(tLootTrade('player.unitPrice'), { price: buyUnitPrice })}
+-                    </Text>
++                    </IconText>
+                   </View>
+                   <View style={styles.tradeRowBtns}>
+                     <TouchableOpacity
+@@ -815,44 +843,36 @@ export default function PlayerLootTradeOverlay() {
+       animationType="slide"
+       onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+     >
+-      <View style={styles.modalBackdrop}>
+-        <SafeAreaView style={styles.merchantModalCard}>
++      <View style={[styles.modalBackdrop, isWideLayout && styles.backdropWide]}>
++        <View style={styles.merchantModalCard}>
+           {/* Шапка торговца */}
+           <View style={styles.modalHeader}>
+             <View style={styles.modalTitleRow}>
+               <MaterialCommunityIcons name="sack" size={23} color="#f0e68c" />
+               <Text style={styles.modalTitle}>{activeSession.name}</Text>
+             </View>
+-            <TouchableOpacity
+-              style={styles.minimizeBtn}
+-              onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+-            >
+-              <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+-            </TouchableOpacity>
++            <View style={styles.headerActionsRow}>
++              <TouchableOpacity
++                style={styles.minimizeBtn}
++                disabled={busy}
++                onPress={() => setMinimizedSessionId(activeSession.sessionId)}
++              >
++                <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
++              </TouchableOpacity>
++              <TouchableOpacity
++                style={[styles.closeContainerBtn, busy && styles.disabledBtn]}
++                disabled={busy}
++                onPress={handleCloseMerchantPress}
++              >
++                <Text style={styles.closeContainerBtnText}>{tLootTrade('player.close')}</Text>
++              </TouchableOpacity>
++            </View>
+           </View>
+ 
+           {Boolean(activeSession.description) && (
+-            <Text style={styles.modalDesc}>{activeSession.description}</Text>
++            <IconText style={styles.modalDesc}>{activeSession.description}</IconText>
+           )}
+ 
+-          {/* Живые ставки и автоперки */}
+-          <View style={styles.ratesStrip}>
+-            <Text style={styles.ratesStripText}>
+-              {formatLootTrade(tLootTrade('player.ratesLine'), {
+-                sale: effectiveRates.saleMarkupPercent >= 0
+-                  ? `+${effectiveRates.saleMarkupPercent}`
+-                  : String(effectiveRates.saleMarkupPercent),
+-                depr: effectiveRates.buyDepreciationPercent,
+-              })}
+-            </Text>
+-            {effectiveRates.isPersonalOverride && (
+-              <Text style={styles.personalBadgeText}>{tLootTrade('player.personalRatesBadge')}</Text>
+-            )}
+-            {capCollectorPercent > 0 && (
+-              <Text style={styles.perkBadgeText}>{tLootTrade('player.perkCapCollector')}</Text>
+-            )}
+-          </View>
+-
+           {/* На узком экране телефона — компактный переключатель двух панелей */}
+           {!isWideLayout && (
+             <View style={styles.mobileTabSwitch}>
+@@ -860,25 +880,27 @@ export default function PlayerLootTradeOverlay() {
+                 style={[styles.mobileTabBtn, mobileTab === 'player' && styles.mobileTabBtnActive]}
+                 onPress={() => setMobileTab('player')}
+               >
+-                <Text style={[
++                <IconText style={[
+                   styles.mobileTabText,
+                   mobileTab === 'player' && styles.mobileTabTextActive,
+                 ]}>
+-                  {tLootTrade('player.playerInventoryTab')} ({playerCaps} кр.)
+-                  {barterSummary?.buyLines.length ? ` +${barterSummary.buyLines.length}` : ''}
+-                </Text>
++                  {`${tLootTrade('player.playerInventoryTab')} (${playerCaps} {CAP})${
++                    barterSummary?.buyLines.length ? ` +${barterSummary.buyLines.length}` : ''
++                  }`}
++                </IconText>
+               </TouchableOpacity>
+               <TouchableOpacity
+                 style={[styles.mobileTabBtn, mobileTab === 'merchant' && styles.mobileTabBtnActive]}
+                 onPress={() => setMobileTab('merchant')}
+               >
+-                <Text style={[
++                <IconText style={[
+                   styles.mobileTabText,
+                   mobileTab === 'merchant' && styles.mobileTabTextActive,
+                 ]}>
+-                  {tLootTrade('player.merchantInventoryTab')} ({activeSession.caps || 0} кр.)
+-                  {barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''}
+-                </Text>
++                  {`${tLootTrade('player.merchantInventoryTab')} (${activeSession.caps || 0} {CAP})${
++                    barterSummary?.sellLines.length ? ` +${barterSummary.sellLines.length}` : ''
++                  }`}
++                </IconText>
+               </TouchableOpacity>
+             </View>
+           )}
+@@ -900,43 +922,43 @@ export default function PlayerLootTradeOverlay() {
+             <View style={styles.barterFooter}>
+               <View style={styles.barterBalanceCol}>
+                 {barterSummary.playerOwes > 0 ? (
+-                  <Text style={[
++                  <IconText style={[
+                     styles.barterBalanceText,
+                     !barterSummary.canPlayerAfford && styles.barterErrorText,
+                   ]}>
+                     {formatLootTrade(tLootTrade('player.barterPay'), {
+                       amount: barterSummary.playerOwes,
+                     })}
+-                  </Text>
++                  </IconText>
+                 ) : barterSummary.merchantOwes > 0 ? (
+-                  <Text style={styles.barterReceiveText}>
++                  <IconText style={styles.barterReceiveText}>
+                     {formatLootTrade(tLootTrade('player.barterReceive'), {
+                       amount: barterSummary.actualMerchantPayout,
+                     })}
+-                  </Text>
++                  </IconText>
+                 ) : (
+-                  <Text style={styles.barterBalanceText}>
++                  <IconText style={styles.barterBalanceText}>
+                     {tLootTrade('player.barterEven')}
+-                  </Text>
++                  </IconText>
+                 )}
+ 
+                 {!barterSummary.canPlayerAfford && (
+-                  <Text style={styles.barterErrorText}>
++                  <IconText style={styles.barterErrorText}>
+                     {formatLootTrade(tLootTrade('player.notEnoughPlayerCaps'), {
+                       need: barterSummary.playerOwes,
+                       have: playerCaps,
+                     })}
+-                  </Text>
++                  </IconText>
+                 )}
+ 
+                 {barterSummary.merchantCapShortfall > 0 && (
+-                  <Text style={styles.barterWarnText}>
++                  <IconText style={styles.barterWarnText}>
+                     {formatLootTrade(tLootTrade('player.merchantShortfallWarn'), {
+                       have: activeSession.caps || 0,
+                       need: barterSummary.merchantOwes,
+                       shortfall: barterSummary.merchantCapShortfall,
+                     })}
+-                  </Text>
++                  </IconText>
+                 )}
+               </View>
+ 
+@@ -962,7 +984,7 @@ export default function PlayerLootTradeOverlay() {
+               </View>
+             </View>
+           )}
+-        </SafeAreaView>
++        </View>
+       </View>
+     </Modal>
+   );
+@@ -981,7 +1003,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#1f1f1f',
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    borderRadius: 24,
++    borderRadius: 5,
+     paddingVertical: 10,
+     paddingHorizontal: 18,
+     elevation: 8,
+@@ -1003,7 +1025,7 @@ const styles = StyleSheet.create({
+   },
+   lootModalBackdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.68)',
++    backgroundColor: 'rgba(0,0,0,0.72)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     paddingHorizontal: 28,
+@@ -1011,42 +1033,48 @@ const styles = StyleSheet.create({
+   },
+   modalBackdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.68)',
++    backgroundColor: 'rgba(0,0,0,0.72)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    paddingHorizontal: 18,
+-    paddingVertical: 20,
++    paddingHorizontal: 28,
++    paddingVertical: 36,
++  },
++  backdropWide: {
++    paddingHorizontal: 56,
++    paddingVertical: 46,
+   },
+   lootModalCard: {
+-    width: '100%',
++    width: '90%',
+     maxWidth: 540,
+-    maxHeight: '82%',
++    maxHeight: '78%',
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 14,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+     paddingHorizontal: 24,
+     paddingVertical: 22,
+   },
+   merchantModalCard: {
+-    width: '100%',
+-    maxWidth: 1040,
+-    height: '90%',
++    width: '92%',
++    maxWidth: 960,
++    height: '80%',
++    maxHeight: 740,
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 14,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    paddingHorizontal: 16,
+-    paddingVertical: 14,
++    paddingHorizontal: 24,
++    paddingVertical: 22,
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    gap: 10,
++    gap: 12,
++    marginBottom: 4,
+   },
+   lootHeaderSpacing: {
+-    marginBottom: 8,
++    marginBottom: 10,
+   },
+   modalTitleRow: {
+     flexDirection: 'row',
+@@ -1068,7 +1096,7 @@ const styles = StyleSheet.create({
+   minimizeBtn: {
+     paddingHorizontal: 13,
+     paddingVertical: 7,
+-    borderRadius: 6,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#777777',
+     backgroundColor: '#2a2a2a',
+@@ -1081,7 +1109,7 @@ const styles = StyleSheet.create({
+   closeContainerBtn: {
+     paddingHorizontal: 13,
+     paddingVertical: 7,
+-    borderRadius: 6,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#e57373',
+     backgroundColor: '#4a1f1f',
+@@ -1100,12 +1128,12 @@ const styles = StyleSheet.create({
+   },
+   lootDescSpacing: {
+     marginTop: 2,
+-    marginBottom: 6,
++    marginBottom: 8,
+   },
+   lootScroll: {
+-    marginTop: 10,
+-    marginBottom: 4,
+-    maxHeight: 420,
++    marginTop: 12,
++    marginBottom: 6,
++    maxHeight: 400,
+   },
+   lootScrollContent: {
+     paddingVertical: 4,
+@@ -1124,7 +1152,7 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingVertical: 13,
+     paddingHorizontal: 16,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#484848',
+     backgroundColor: '#2a2a2a',
+@@ -1154,7 +1182,7 @@ const styles = StyleSheet.create({
+     borderColor: '#777777',
+     paddingHorizontal: 12,
+     paddingVertical: 8,
+-    borderRadius: 6,
++    borderRadius: 5,
+   },
+   takeOneBtnText: {
+     color: '#e8e8e8',
+@@ -1167,7 +1195,7 @@ const styles = StyleSheet.create({
+     borderColor: '#f0e68c',
+     paddingHorizontal: 13,
+     paddingVertical: 8,
+-    borderRadius: 6,
++    borderRadius: 5,
+   },
+   takeAllRowBtnText: {
+     color: '#f0e68c',
+@@ -1183,7 +1211,7 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+     paddingVertical: 13,
+-    borderRadius: 8,
++    borderRadius: 5,
+     alignItems: 'center',
+   },
+   primaryActionBtnText: {
+@@ -1196,43 +1224,16 @@ const styles = StyleSheet.create({
+   },
+ 
+   // Стили двухпанельного торговца
+-  ratesStrip: {
+-    flexDirection: 'row',
+-    flexWrap: 'wrap',
+-    alignItems: 'center',
+-    gap: 10,
+-    marginTop: 8,
+-    paddingVertical: 6,
+-    paddingHorizontal: 10,
+-    backgroundColor: '#2a2a2a',
+-    borderWidth: 1,
+-    borderColor: '#4a4a4a',
+-    borderRadius: 6,
+-  },
+-  ratesStripText: {
+-    color: '#e5e5e5',
+-    fontSize: 12,
+-  },
+-  personalBadgeText: {
+-    color: '#f0e68c',
+-    fontSize: 11,
+-    fontWeight: '700',
+-  },
+-  perkBadgeText: {
+-    color: '#d4af37',
+-    fontSize: 11,
+-    fontWeight: '700',
+-  },
+   mobileTabSwitch: {
+     flexDirection: 'row',
+-    gap: 6,
+-    marginTop: 8,
++    gap: 8,
++    marginTop: 10,
+   },
+   mobileTabBtn: {
+     flex: 1,
+-    paddingVertical: 8,
+-    paddingHorizontal: 6,
+-    borderRadius: 6,
++    paddingVertical: 9,
++    paddingHorizontal: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     backgroundColor: '#2a2a2a',
+@@ -1254,13 +1255,13 @@ const styles = StyleSheet.create({
+   twoPanesContainer: {
+     flex: 1,
+     flexDirection: 'row',
+-    gap: 10,
+-    marginTop: 8,
++    gap: 14,
++    marginTop: 12,
+   },
+   pane: {
+     flex: 1,
+     backgroundColor: '#242424',
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     overflow: 'hidden',
+@@ -1270,8 +1271,8 @@ const styles = StyleSheet.create({
+   },
+   paneHeader: {
+     backgroundColor: '#2d2a1e',
+-    paddingVertical: 9,
+-    paddingHorizontal: 12,
++    paddingVertical: 11,
++    paddingHorizontal: 14,
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+@@ -1295,8 +1296,8 @@ const styles = StyleSheet.create({
+     backgroundColor: '#1b1b1b',
+     borderBottomWidth: 2,
+     borderBottomColor: '#4d4d4d',
+-    paddingVertical: 7,
+-    paddingHorizontal: 11,
++    paddingVertical: 9,
++    paddingHorizontal: 14,
+   },
+   bufferHeader: {
+     color: '#a3a3a3',
+@@ -1308,7 +1309,7 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    paddingVertical: 6,
++    paddingVertical: 7,
+     borderTopWidth: 1,
+     borderTopColor: '#333333',
+   },
+@@ -1322,7 +1323,7 @@ const styles = StyleSheet.create({
+   bufferClearAllBtn: {
+     paddingHorizontal: 8,
+     paddingVertical: 3,
+-    borderRadius: 4,
++    borderRadius: 5,
+     backgroundColor: '#333333',
+     borderWidth: 1,
+     borderColor: '#666666',
+@@ -1336,15 +1337,15 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+-    paddingVertical: 9,
+-    paddingHorizontal: 11,
++    paddingVertical: 11,
++    paddingHorizontal: 14,
+     borderBottomWidth: 1,
+     borderBottomColor: '#363636',
+     backgroundColor: '#2a2a2a',
+   },
+   tradeRowInfo: {
+     flex: 1,
+-    paddingRight: 8,
++    paddingRight: 10,
+   },
+   tradeRowName: {
+     color: '#f0f0f0',
+@@ -1354,19 +1355,19 @@ const styles = StyleSheet.create({
+   tradeRowBasics: {
+     color: '#a8a8a8',
+     fontSize: 11,
+-    marginTop: 1,
++    marginTop: 2,
+   },
+   tradeRowPrice: {
+     color: '#f0e68c',
+     fontSize: 12,
+     fontWeight: '700',
+-    marginTop: 2,
++    marginTop: 3,
+   },
+   tradeRowPriceBuy: {
+     color: '#d4af37',
+     fontSize: 12,
+     fontWeight: '700',
+-    marginTop: 2,
++    marginTop: 3,
+   },
+   tradeRowBtns: {
+     flexDirection: 'row',
+@@ -1376,7 +1377,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#3a3a1e',
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+-    paddingHorizontal: 9,
++    paddingHorizontal: 10,
+     paddingVertical: 6,
+     borderRadius: 5,
+   },
+@@ -1384,7 +1385,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#333333',
+     borderWidth: 1,
+     borderColor: '#777777',
+-    paddingHorizontal: 9,
++    paddingHorizontal: 10,
+     paddingVertical: 6,
+     borderRadius: 5,
+   },
+@@ -1394,15 +1395,15 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+   },
+   barterFooter: {
+-    marginTop: 10,
+-    paddingTop: 10,
++    marginTop: 14,
++    paddingTop: 12,
+     borderTopWidth: 1,
+     borderTopColor: '#444444',
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+     flexWrap: 'wrap',
+-    gap: 8,
++    gap: 10,
+   },
+   barterBalanceCol: {
+     flex: 1,
+@@ -1434,9 +1435,9 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   clearBufBtn: {
+-    paddingHorizontal: 13,
++    paddingHorizontal: 14,
+     paddingVertical: 10,
+-    borderRadius: 8,
++    borderRadius: 5,
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#777777',
+@@ -1449,7 +1450,7 @@ const styles = StyleSheet.create({
+   commitTradeBtn: {
+     paddingHorizontal: 18,
+     paddingVertical: 10,
+-    borderRadius: 8,
++    borderRadius: 5,
+     backgroundColor: '#3a3a1e',
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 5245840..2561754 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -54,6 +54,7 @@ import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPer
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import styles from '../../../styles/LootTradeScreen.styles';
+ import homeStyles from '../../../styles/HomeScreen.styles';
++import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
+ import ContainerFormModal from './modals/ContainerFormModal';
+ import ContainerCatalogModal from './modals/ContainerCatalogModal';
+ import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
+@@ -152,9 +153,9 @@ const ContainerCardCell = ({
+           {formatLootTrade(tLootTrade('card.itemsCount'), { count: totalPieces })}
+         </Text>
+         {isMerchant && (
+-          <Text style={styles.cardMeta} numberOfLines={1}>
++          <IconText style={styles.cardMeta} numberOfLines={1}>
+             {formatLootTrade(tLootTrade('card.capsCount'), { caps: container.caps })}
+-          </Text>
++          </IconText>
+         )}
+       </View>
+ 
+@@ -396,7 +397,7 @@ export default function LootTradeScreen() {
+     if (capsRollInfo?.rolled) {
+       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
+         dice: capsRollInfo.diceCount,
+-        unit: capsRollInfo.unit === 'cd' ? 'CD' : 'd20',
++        unit: capsRollInfo.unit === 'cd' ? '{CD}' : 'd20',
+         total: capsRollInfo.quantity,
+       }));
+     }
+@@ -499,13 +500,13 @@ export default function LootTradeScreen() {
+ 
+   const formatRollBannerForItem = (itemName, roll) => {
+     if (roll.unit === 'packs') {
+-      return `${itemName}: ${formatLootTrade(tLootTrade('detail.packsRollNotice'), {
++      return `${itemName}: ${withCdToken(formatLootTrade(tLootTrade('detail.packsRollNotice'), {
+         packs: roll.packCount || 1,
+         formula: roll.formula || '',
+         total: roll.quantity,
+-      })}`;
++      }))}`;
+     }
+-    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
++    const unitLabel = roll.unit === 'cd' ? '{CD}' : 'd20';
+     return `${itemName}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
+       dice: roll.diceCount,
+       unit: unitLabel,
+@@ -522,7 +523,7 @@ export default function LootTradeScreen() {
+       allowZeroPcs: false,
+     });
+ 
+-    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
++    const unitLabel = roll.unit === 'cd' ? '{CD}' : 'd20';
+     if (roll.rolled && roll.quantity <= 0) {
+       const zeroMsg = formatLootTrade(tLootTrade('detail.rollZeroNotice'), {
+         dice: roll.diceCount,
+@@ -781,7 +782,7 @@ export default function LootTradeScreen() {
+ 
+           {Boolean(rollBanner) && (
+             <View style={[styles.rollBanner, { marginHorizontal: 16, marginTop: 8 }]}>
+-              <Text style={styles.rollBannerText}>{rollBanner}</Text>
++              <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
+             </View>
+           )}
+ 
+@@ -898,9 +899,9 @@ export default function LootTradeScreen() {
+ 
+             {activeContainer.kind === CONTAINER_KIND.MERCHANT && (
+               <View style={styles.detailRatesRow}>
+-                <Text style={styles.detailRateBadge}>
++                <IconText style={styles.detailRateBadge}>
+                   {formatLootTrade(tLootTrade('card.capsCount'), { caps: activeContainer.caps })}
+-                </Text>
++                </IconText>
+                 <Text style={styles.detailRateBadge}>
+                   {formatLootTrade(tLootTrade('card.ratesSummary'), {
+                     sale: activeContainer.saleMarkupPercent >= 0
+@@ -1026,7 +1027,9 @@ export default function LootTradeScreen() {
+                     </View>
+ 
+                     <View style={styles.liveControlBox}>
+-                      <Text style={styles.liveControlLabel}>{tLootTrade('livePanel.merchantCapsControl')}</Text>
++                      <IconText style={styles.liveControlLabel}>
++                        {tLootTrade('livePanel.merchantCapsControl')}
++                      </IconText>
+                       <View style={styles.liveStepperRow}>
+                         <TextInput
+                           style={[styles.liveStepInput, { width: 78 }]}
+@@ -1050,7 +1053,7 @@ export default function LootTradeScreen() {
+ 
+           {Boolean(rollBanner) && (
+             <View style={styles.rollBanner}>
+-              <Text style={styles.rollBannerText}>{rollBanner}</Text>
++              <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
+             </View>
+           )}
+ 
+@@ -1080,17 +1083,21 @@ export default function LootTradeScreen() {
+                   <View key={entry.entryId} style={styles.itemRow}>
+                     <View style={styles.itemRowMain}>
+                       <View style={styles.itemRowTitleLine}>
+-                        <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
+-                        <Text style={styles.itemRowName}>{entry.name}</Text>
++                        {entry.itemType === 'caps' ? (
++                          <CapIcon size={18} />
++                        ) : (
++                          <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
++                        )}
++                        <IconText style={styles.itemRowName}>{entry.name}</IconText>
+                       </View>
+                       <View style={styles.itemRowSub}>
+                         <Text style={styles.itemRowSubText}>
+                           {formatLootTrade(tLootTrade('detail.qtyPieces'), { qty: entry.quantity })}
+                         </Text>
+                         {entry.itemType !== 'caps' && (
+-                          <Text style={styles.itemRowSubText}>
++                          <IconText style={styles.itemRowSubText}>
+                             {formatLootTrade(tLootTrade('detail.baseCost'), { cost: entry.cost })}
+-                          </Text>
++                          </IconText>
+                         )}
+                         {isMerchant && entry.markupPercent !== 0 && (
+                           <Text style={styles.itemRowSubText}>
+@@ -1100,9 +1107,9 @@ export default function LootTradeScreen() {
+                           </Text>
+                         )}
+                         {isMerchant && (
+-                          <Text style={styles.itemRowPriceHighlight}>
++                          <IconText style={styles.itemRowPriceHighlight}>
+                             {formatLootTrade(tLootTrade('detail.shopPrice'), { price: shopPrice })}
+-                          </Text>
++                          </IconText>
+                         )}
+                         {entry.weight > 0 && (
+                           <Text style={styles.itemRowSubText}>
+diff --git a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+index c39d6e7..579ab87 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+@@ -5,11 +5,11 @@ import {
+   Text,
+   TouchableOpacity,
+   FlatList,
+-  SafeAreaView,
+   TextInput,
+   StyleSheet,
+ } from 'react-native';
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
++import IconText, { withCdToken, formatBasicsWithIcons } from '../../../lootTrade/LootTradeIconText';
+ import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
+ import { getWeaponById, getWeapons, getRowCount } from '../../../../db';
+ import { tInventory, formatInventoryText } from '../../InventoryScreen/logic/inventoryI18n';
+@@ -371,21 +371,19 @@ const ContainerCatalogModal = ({
+ 
+     const baseBasics = item.__isLooseCaps
+       ? tLootTrade('catalog.looseCapsSub')
+-      : describeItemBasics(item, moduleLocale);
++      : formatBasicsWithIcons(describeItemBasics(item, moduleLocale));
+     const ammoPackNote = !item.__isLooseCaps && isAmmoItem(item)
+-      ? formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
++      ? withCdToken(formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+           formula: formatAmmoFoundFormula(getAmmoFoundSpec(item)),
+-        })
++        }))
+       : '';
+     const basicsLine = [ammoPackNote, baseBasics].filter(Boolean).join(' • ');
+ 
+     return (
+       <View style={[localStyles.itemContainer, localStyles.itemRowWithBtn]}>
+         <View style={localStyles.itemInfoCol}>
+-          <Text style={localStyles.itemName}>
+-            {item.__isLooseCaps ? `💰 ${item.name}` : item.name}
+-          </Text>
+-          {Boolean(basicsLine) && <Text style={localStyles.itemBasics}>{basicsLine}</Text>}
++          <IconText style={localStyles.itemName}>{item.name}</IconText>
++          {Boolean(basicsLine) && <IconText style={localStyles.itemBasics}>{basicsLine}</IconText>}
+         </View>
+         <TouchableOpacity
+           style={localStyles.chooseBtn}
+@@ -400,7 +398,7 @@ const ContainerCatalogModal = ({
+   return (
+     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+       <View style={localStyles.modalContainer}>
+-        <SafeAreaView style={localStyles.modalContent}>
++        <View style={localStyles.modalContent}>
+           <Text style={localStyles.title}>
+             {currentPath.length > 0 && !searchTerm && !filterActive
+               ? currentPath[currentPath.length - 1]
+@@ -411,7 +409,7 @@ const ContainerCatalogModal = ({
+ 
+           {Boolean(feedbackMessage) && (
+             <View style={localStyles.feedbackBanner}>
+-              <Text style={localStyles.feedbackText}>{feedbackMessage}</Text>
++              <IconText style={localStyles.feedbackText}>{withCdToken(feedbackMessage)}</IconText>
+             </View>
+           )}
+ 
+@@ -482,7 +480,7 @@ const ContainerCatalogModal = ({
+             }}
+             onClose={() => setConfiguringItem(null)}
+           />
+-        </SafeAreaView>
++        </View>
+       </View>
+     </Modal>
+   );
+@@ -493,35 +491,36 @@ const localStyles = StyleSheet.create({
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+-    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+-    paddingHorizontal: 18,
+-    paddingVertical: 24,
++    backgroundColor: 'rgba(0, 0, 0, 0.72)',
++    paddingHorizontal: 28,
++    paddingVertical: 36,
+   },
+   modalContent: {
+-    width: '92%',
++    width: '90%',
+     maxWidth: 680,
+-    height: '84%',
++    height: '80%',
++    maxHeight: 720,
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 12,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    paddingVertical: 18,
+-    paddingHorizontal: 20,
++    paddingVertical: 22,
++    paddingHorizontal: 24,
+   },
+   title: {
+     fontSize: 20,
+     fontWeight: '700',
+     color: '#f0e68c',
+-    marginBottom: 12,
++    marginBottom: 14,
+     textAlign: 'center',
+     paddingHorizontal: 8,
+   },
+   backButton: {
+     alignSelf: 'flex-start',
+-    marginBottom: 8,
+-    paddingVertical: 4,
+-    paddingHorizontal: 10,
+-    borderRadius: 6,
++    marginBottom: 10,
++    paddingVertical: 5,
++    paddingHorizontal: 11,
++    borderRadius: 5,
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+@@ -534,7 +533,7 @@ const localStyles = StyleSheet.create({
+   filterToolbar: {
+     flexDirection: 'row',
+     alignItems: 'center',
+-    marginBottom: 8,
++    marginBottom: 10,
+   },
+   searchInput: {
+     flex: 1,
+@@ -543,16 +542,16 @@ const localStyles = StyleSheet.create({
+     borderColor: '#5a5a5a',
+     backgroundColor: '#2a2a2a',
+     color: '#f0f0f0',
+-    borderRadius: 8,
++    borderRadius: 5,
+     paddingHorizontal: 12,
+-    paddingVertical: 9,
++    paddingVertical: 10,
+     fontSize: 14,
+   },
+   filterToggle: {
+     width: 40,
+     height: 40,
+     marginLeft: 8,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#666666',
+     backgroundColor: '#2e2e2e',
+@@ -569,7 +568,7 @@ const localStyles = StyleSheet.create({
+     right: -5,
+     minWidth: 17,
+     height: 17,
+-    borderRadius: 9,
++    borderRadius: 5,
+     backgroundColor: '#d4af37',
+     alignItems: 'center',
+     justifyContent: 'center',
+@@ -589,7 +588,7 @@ const localStyles = StyleSheet.create({
+   },
+   itemContainer: {
+     paddingVertical: 12,
+-    paddingHorizontal: 6,
++    paddingHorizontal: 8,
+     borderBottomWidth: 1,
+     borderBottomColor: '#333333',
+     flexDirection: 'row',
+@@ -632,7 +631,7 @@ const localStyles = StyleSheet.create({
+     borderColor: '#f0e68c',
+     paddingHorizontal: 14,
+     paddingVertical: 8,
+-    borderRadius: 6,
++    borderRadius: 5,
+   },
+   chooseBtnText: {
+     color: '#f0e68c',
+@@ -643,10 +642,10 @@ const localStyles = StyleSheet.create({
+     backgroundColor: '#2d2a1e',
+     borderWidth: 1,
+     borderColor: '#d4af37',
+-    borderRadius: 6,
+-    paddingVertical: 6,
+-    paddingHorizontal: 10,
+-    marginBottom: 8,
++    borderRadius: 5,
++    paddingVertical: 7,
++    paddingHorizontal: 12,
++    marginBottom: 10,
+   },
+   feedbackText: {
+     color: '#f0e68c',
+@@ -658,9 +657,9 @@ const localStyles = StyleSheet.create({
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#777777',
+-    paddingVertical: 11,
+-    borderRadius: 8,
+-    marginTop: 12,
++    paddingVertical: 12,
++    borderRadius: 5,
++    marginTop: 14,
+     alignItems: 'center',
+   },
+   closeButtonText: {
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 3939c01..a50967f 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -12,6 +12,7 @@ import {
+ } from 'react-native';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade } from '../logic/lootTradeI18n';
++import IconText from '../../../lootTrade/LootTradeIconText';
+ import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
+ import {
+   CONTAINER_KIND,
+@@ -173,7 +174,7 @@ const ContainerFormModal = ({
+ 
+             {isMerchant && (
+               <>
+-                <Text style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</Text>
++                <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
+                 <View style={styles.counterRow}>
+                   <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-10)}>
+                     <Text style={styles.stepBtnText}>−10</Text>
+@@ -206,9 +207,9 @@ const ContainerFormModal = ({
+                       style={[styles.unitSeg, capsUnit === uKey && styles.unitSegActive]}
+                       onPress={() => setCapsUnit(uKey)}
+                     >
+-                      <Text style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
++                      <IconText style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
+                         {uLabel}
+-                      </Text>
++                      </IconText>
+                     </TouchableOpacity>
+                   ))}
+                 </View>
+@@ -251,49 +252,51 @@ const ContainerFormModal = ({
+ const styles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.68)',
++    backgroundColor: 'rgba(0,0,0,0.72)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 20,
++    paddingHorizontal: 28,
++    paddingVertical: 36,
+   },
+   card: {
+-    width: '100%',
++    width: '90%',
+     maxWidth: 520,
+-    maxHeight: '90%',
++    maxHeight: '82%',
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 12,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    padding: 20,
++    paddingHorizontal: 24,
++    paddingVertical: 22,
+   },
+   title: {
+     color: '#f0e68c',
+     fontSize: 18,
+     fontWeight: '700',
+     textAlign: 'center',
+-    marginBottom: 12,
++    marginBottom: 14,
+   },
+   scroll: { flexGrow: 0 },
+-  scrollContent: { paddingBottom: 8 },
++  scrollContent: { paddingBottom: 10 },
+   label: {
+     color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+-    marginTop: 10,
+-    marginBottom: 5,
++    marginTop: 12,
++    marginBottom: 6,
+   },
+   input: {
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    borderRadius: 8,
++    borderRadius: 5,
+     paddingHorizontal: 12,
+-    paddingVertical: 9,
++    paddingVertical: 10,
+     color: '#f2f2f2',
+     fontSize: 14,
+   },
+   multilineInput: {
+-    minHeight: 62,
++    minHeight: 64,
+     textAlignVertical: 'top',
+   },
+   warnText: {
+@@ -304,8 +307,8 @@ const styles = StyleSheet.create({
+   hintText: {
+     color: '#a3a3a3',
+     fontSize: 11,
+-    marginTop: 3,
+-    lineHeight: 15,
++    marginTop: 4,
++    lineHeight: 16,
+   },
+   roomChips: {
+     flexDirection: 'row',
+@@ -313,9 +316,9 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   roomChip: {
+-    paddingHorizontal: 10,
+-    paddingVertical: 7,
+-    borderRadius: 8,
++    paddingHorizontal: 11,
++    paddingVertical: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     backgroundColor: '#2a2a2a',
+@@ -347,7 +350,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2e2e2e',
+     minWidth: 38,
+     height: 38,
+-    borderRadius: 8,
++    borderRadius: 5,
+     justifyContent: 'center',
+     alignItems: 'center',
+     paddingHorizontal: 8,
+@@ -363,7 +366,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#777777',
+-    borderRadius: 8,
++    borderRadius: 5,
+     width: 96,
+     height: 38,
+     textAlign: 'center',
+@@ -375,12 +378,12 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     justifyContent: 'center',
+     gap: 8,
+-    marginTop: 6,
++    marginTop: 8,
+   },
+   unitSeg: {
+     paddingHorizontal: 14,
+-    paddingVertical: 6,
+-    borderRadius: 6,
++    paddingVertical: 7,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     backgroundColor: '#2a2a2a',
+@@ -400,12 +403,12 @@ const styles = StyleSheet.create({
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+-    marginTop: 18,
++    marginTop: 20,
+   },
+   btn: {
+     flex: 1,
+-    paddingVertical: 11,
+-    borderRadius: 8,
++    paddingVertical: 12,
++    borderRadius: 5,
+     alignItems: 'center',
+     borderWidth: 1,
+   },
+diff --git a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+index 994a4c7..f2fb239 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+@@ -11,6 +11,7 @@ import {
+ } from 'react-native';
+ import { useLocale } from '../../../../i18n/locale';
+ import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
++import IconText, { withCdToken } from '../../../lootTrade/LootTradeIconText';
+ import {
+   QUANTITY_UNIT,
+   isAmmoItem,
+@@ -126,7 +127,7 @@ const ContainerItemConfigModal = ({
+           <Text style={styles.subtitle}>
+             {tLootTrade(isEditing ? 'itemConfig.titleEdit' : 'itemConfig.titleAdd')}
+           </Text>
+-          <Text style={styles.title}>{item.name}</Text>
++          <IconText style={styles.title}>{item.name}</IconText>
+ 
+           {ammoMode ? (
+             <>
+@@ -155,25 +156,25 @@ const ContainerItemConfigModal = ({
+               </View>
+ 
+               <View style={styles.packFormulaPill}>
+-                <Text style={styles.packFormulaText}>
+-                  {formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
++                <IconText style={styles.packFormulaText}>
++                  {withCdToken(formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+                     formula: singlePackFormula,
+-                  })}
+-                </Text>
++                  }))}
++                </IconText>
+               </View>
+ 
+               {(!isEditing || packsTouched) ? (
+-                <Text style={styles.hint}>
++                <IconText style={styles.hint}>
+                   {ammoSpec?.cd > 0
+-                    ? formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
++                    ? withCdToken(formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
+                         packs: numericCount,
+                         formula: totalPackFormula,
+-                      })
++                      }))
+                     : formatLootTrade(tLootTrade('itemConfig.packsFixedHint'), {
+                         packs: numericCount,
+                         total: numericCount * Math.max(1, ammoSpec?.base || 1),
+                       })}
+-                </Text>
++                </IconText>
+               ) : (
+                 <Text style={styles.hint}>{tLootTrade('itemConfig.packsEditKeepHint')}</Text>
+               )}
+@@ -208,14 +209,14 @@ const ContainerItemConfigModal = ({
+                     style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
+                     onPress={() => setUnit(uKey)}
+                   >
+-                    <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
++                    <IconText style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
+                       {uLabel}
+-                    </Text>
++                    </IconText>
+                   </TouchableOpacity>
+                 ))}
+               </View>
+               {unit === QUANTITY_UNIT.CD && (
+-                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
++                <IconText style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</IconText>
+               )}
+               {unit === QUANTITY_UNIT.D20 && (
+                 <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
+@@ -253,12 +254,12 @@ const ContainerItemConfigModal = ({
+                     : String(merchantSaleMarkupPercent),
+                 })}
+               </Text>
+-              <Text style={styles.previewPrice}>
++              <IconText style={styles.previewPrice}>
+                 {formatLootTrade(tLootTrade('itemConfig.pricePreview'), {
+                   base: baseCost,
+                   final: previewPrice,
+                 })}
+-              </Text>
++              </IconText>
+             </View>
+           )}
+ 
+@@ -279,19 +280,21 @@ const ContainerItemConfigModal = ({
+ const styles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.68)',
++    backgroundColor: 'rgba(0,0,0,0.72)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 20,
++    paddingHorizontal: 28,
++    paddingVertical: 36,
+   },
+   card: {
+-    width: '100%',
++    width: '90%',
+     maxWidth: 460,
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 12,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    padding: 22,
++    paddingHorizontal: 24,
++    paddingVertical: 22,
+     alignItems: 'center',
+   },
+   subtitle: {
+@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
+     fontWeight: '700',
+     textAlign: 'center',
+     marginTop: 4,
+-    marginBottom: 12,
++    marginBottom: 14,
+   },
+   currentStockText: {
+     color: '#d4d4d4',
+@@ -317,8 +320,8 @@ const styles = StyleSheet.create({
+     color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+-    marginTop: 8,
+-    marginBottom: 6,
++    marginTop: 10,
++    marginBottom: 7,
+     textAlign: 'center',
+   },
+   counterRow: {
+@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
+   circleBtn: {
+     width: 42,
+     height: 42,
+-    borderRadius: 21,
++    borderRadius: 5,
+     backgroundColor: '#2e2e2e',
+     borderWidth: 1,
+     borderColor: '#666666',
+@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#777777',
+-    borderRadius: 8,
++    borderRadius: 5,
+     color: '#f5f5f5',
+     fontSize: 22,
+     fontWeight: '700',
+@@ -357,8 +360,8 @@ const styles = StyleSheet.create({
+   packFormulaPill: {
+     marginTop: 10,
+     paddingHorizontal: 14,
+-    paddingVertical: 6,
+-    borderRadius: 8,
++    paddingVertical: 7,
++    borderRadius: 5,
+     backgroundColor: '#2d2a1e',
+     borderWidth: 1,
+     borderColor: '#d4af37',
+@@ -376,7 +379,7 @@ const styles = StyleSheet.create({
+   unitBtn: {
+     paddingHorizontal: 18,
+     paddingVertical: 8,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     backgroundColor: '#2a2a2a',
+@@ -397,13 +400,13 @@ const styles = StyleSheet.create({
+     color: '#b0b0b0',
+     fontSize: 11,
+     textAlign: 'center',
+-    marginTop: 6,
++    marginTop: 7,
+     lineHeight: 16,
+   },
+   markupSection: {
+     width: '100%',
+-    marginTop: 12,
+-    paddingTop: 10,
++    marginTop: 14,
++    paddingTop: 12,
+     borderTopWidth: 1,
+     borderTopColor: '#3d3d3d',
+     alignItems: 'center',
+@@ -412,7 +415,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2e2e2e',
+     paddingHorizontal: 8,
+     paddingVertical: 7,
+-    borderRadius: 6,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#666666',
+   },
+@@ -427,7 +430,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+     borderColor: '#777777',
+-    borderRadius: 8,
++    borderRadius: 5,
+     color: '#f5f5f5',
+     fontSize: 16,
+     fontWeight: '700',
+@@ -437,19 +440,19 @@ const styles = StyleSheet.create({
+     color: '#f0e68c',
+     fontSize: 13,
+     fontWeight: '700',
+-    marginTop: 6,
++    marginTop: 7,
+     textAlign: 'center',
+   },
+   footer: {
+     flexDirection: 'row',
+     width: '100%',
+     gap: 10,
+-    marginTop: 18,
++    marginTop: 20,
+   },
+   actionBtn: {
+     flex: 1,
+-    paddingVertical: 11,
+-    borderRadius: 8,
++    paddingVertical: 12,
++    borderRadius: 5,
+     alignItems: 'center',
+     borderWidth: 1,
+   },
+diff --git a/components/screens/LootTradeScreen/modals/IssueContainerModal.js b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+index 5fa20d4..6b3bb30 100644
+--- a/components/screens/LootTradeScreen/modals/IssueContainerModal.js
++++ b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+@@ -144,20 +144,22 @@ const IssueContainerModal = ({
+ const styles = StyleSheet.create({
+   overlay: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.68)',
++    backgroundColor: 'rgba(0,0,0,0.72)',
+     justifyContent: 'center',
+     alignItems: 'center',
+-    padding: 20,
++    paddingHorizontal: 28,
++    paddingVertical: 36,
+   },
+   card: {
+-    width: '100%',
++    width: '90%',
+     maxWidth: 460,
+-    maxHeight: '86%',
++    maxHeight: '82%',
+     backgroundColor: '#1f1f1f',
+-    borderRadius: 12,
++    borderRadius: 5,
+     borderWidth: 1.5,
+     borderColor: '#f0e68c',
+-    padding: 20,
++    paddingHorizontal: 24,
++    paddingVertical: 22,
+   },
+   title: {
+     color: '#f0e68c',
+@@ -170,21 +172,21 @@ const styles = StyleSheet.create({
+     fontSize: 12,
+     textAlign: 'center',
+     marginTop: 4,
+-    marginBottom: 14,
++    marginBottom: 16,
+   },
+   sectionTitle: {
+     color: '#e8e8e8',
+     fontSize: 13,
+     fontWeight: '700',
+-    marginBottom: 8,
++    marginBottom: 9,
+   },
+   optionCard: {
+     borderWidth: 1,
+     borderColor: '#555555',
+     backgroundColor: '#2a2a2a',
+-    borderRadius: 8,
+-    padding: 12,
+-    marginBottom: 8,
++    borderRadius: 5,
++    padding: 13,
++    marginBottom: 10,
+   },
+   optionCardActive: {
+     borderColor: '#f0e68c',
+@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
+   charList: {
+     maxHeight: 180,
+     marginTop: 2,
+-    marginBottom: 4,
++    marginBottom: 6,
+   },
+   emptyChars: {
+     color: '#e57373',
+@@ -221,9 +223,9 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: 8,
+-    paddingVertical: 9,
+-    paddingHorizontal: 12,
+-    borderRadius: 6,
++    paddingVertical: 10,
++    paddingHorizontal: 13,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#4d4d4d',
+     backgroundColor: '#2a2a2a',
+@@ -257,12 +259,12 @@ const styles = StyleSheet.create({
+   footer: {
+     flexDirection: 'row',
+     gap: 10,
+-    marginTop: 16,
++    marginTop: 18,
+   },
+   btn: {
+     flex: 1,
+-    paddingVertical: 11,
+-    borderRadius: 8,
++    paddingVertical: 12,
++    borderRadius: 5,
+     alignItems: 'center',
+     borderWidth: 1,
+   },
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 042e885..c9fb4f9 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -11,7 +11,7 @@
+     "merchantBadge": "Merchant",
+     "activeBadge": "ACTIVE",
+     "itemsCount": "Items: {count}",
+-    "capsCount": "Caps: {caps}",
++    "capsCount": "Register: {caps} {CAP}",
+     "ratesSummary": "Sale: {sale}% • Buyback depr.: {depr}%",
+     "openMenu": "Container actions",
+     "issue": "Issue",
+@@ -32,7 +32,7 @@
+     "noRoomsHint": "Create a campaign room on the «Campaigns» tab first.",
+     "descriptionLabel": "Description (optional)",
+     "descriptionPlaceholder": "Short description shown to players...",
+-    "merchantCapsLabel": "Merchant caps (cash limit)",
++    "merchantCapsLabel": "Merchant register limit {CAP}",
+     "saleMarkupLabel": "General sale markup (%)",
+     "saleMarkupHint": "0 — catalog cost; accepts + and −. Adds to item-specific specialization markup.",
+     "buyDepreciationLabel": "Buyback depreciation (%)",
+@@ -50,16 +50,16 @@
+     "issueButton": "Issue to players",
+     "stopIssueButton": "Stop issuing",
+     "qtyPieces": "{qty} pcs",
+-    "baseCost": "Base: {cost} caps",
++    "baseCost": "Base: {cost} {CAP}",
+     "itemMarkup": "Spec. markup: {markup}%",
+-    "shopPrice": "Shop price: {price} caps",
++    "shopPrice": "Shop price: {price} {CAP}",
+     "weight": "Weight: {weight}",
+     "editItem": "Edit",
+     "removeItem": "✕",
+     "rollNotice": "Rolled {dice} {unit}: {total} pcs.",
+     "packsRollNotice": "Packs ({packs} × [{formula}]): {total} pcs.",
+     "rollZeroNotice": "Rolled {dice} {unit}: 0 — item was not added.",
+-    "capsRollNotice": "Rolled cash {dice} {unit}: {total} caps.",
++    "capsRollNotice": "Rolled cash {dice} {unit}: {total} {CAP}.",
+     "deleteConfirmTitle": "Delete card?",
+     "deleteConfirmMessage": "«{name}» will be deleted locally and from the cloud.",
+     "emptyLootPromptTitle": "Container is empty. Delete it?",
+@@ -70,8 +70,8 @@
+     "titleLoot": "Add to Container",
+     "titleMerchant": "Add Item to Merchant",
+     "chooseButton": "Select",
+-    "looseCapsName": "Bottle Caps (currency)",
+-    "looseCapsSub": "Loose caps inside the loot container",
++    "looseCapsName": "Currency {CAP}",
++    "looseCapsSub": "Loose {CAP} inside the loot container",
+     "back": "← Back",
+     "close": "Close"
+   },
+@@ -87,13 +87,13 @@
+     "packsEditKeepHint": "Adjust pack count to re-roll stock (otherwise current quantity is kept).",
+     "unitLabel": "Unit",
+     "unitPcs": "pcs",
+-    "unitCd": "CD",
++    "unitCd": "{CD}",
+     "unitD20": "d20",
+-    "diceHintCd": "Fallout Combat Dice (CD) will be rolled immediately when you tap «Save».",
++    "diceHintCd": "Fallout Combat Dice {CD} will be rolled immediately when you tap «Save».",
+     "diceHintD20": "d20 dice will be rolled immediately when you tap «Save».",
+     "itemMarkupLabel": "Item markup % (specialization)",
+     "itemMarkupHint": "Adds to the merchant's general markup ({merchantMarkup}%).",
+-    "pricePreview": "Base: {base} caps → Shop price (before perks): {final} caps/pc",
++    "pricePreview": "Base: {base} {CAP} → Shop price (before perks): {final} {CAP}/pc",
+     "save": "Save",
+     "cancel": "Cancel"
+   },
+@@ -122,7 +122,7 @@
+     "resetPersonal": "Reset personal %",
+     "saleMarkupControl": "Sale %",
+     "buyDeprControl": "Buyback depr. %",
+-    "merchantCapsControl": "Cash (caps)",
++    "merchantCapsControl": "Register {CAP}",
+     "applyRates": "Apply"
+   },
+   "player": {
+@@ -133,35 +133,34 @@
+     "close": "Close",
+     "closeLootConfirmTitle": "Close container?",
+     "closeLootConfirmMessage": "You haven't taken everything. Are you sure you want to close it?",
++    "closeMerchantConfirmTitle": "Close trade?",
++    "closeMerchantConfirmMessage": "You have unconfirmed items in the barter buffer. Are you sure you want to close the trade window?",
+     "lootEmpty": "Container is empty — everything has been taken.",
+     "takeOne": "Take 1",
+     "takeAllRow": "All ({qty})",
+     "takeAllContainer": "Take all",
+-    "capsItemLabel": "Bottle Caps: {qty} caps",
++    "capsItemLabel": "{qty} {CAP}",
+     "playerInventoryTab": "Your Inventory",
+     "merchantInventoryTab": "Merchant Stock",
+-    "playerCaps": "Your caps: {caps}",
+-    "merchantCaps": "Merchant caps: {caps}",
+-    "perkCapCollector": "★ Cap Collector (±10%)",
+-    "personalRatesBadge": "Rates adjusted by GM",
+-    "ratesLine": "Shop markup: {sale}% • Buyback depr.: {depr}%",
++    "playerCaps": "You have: {caps} {CAP}",
++    "merchantCaps": "Register: {caps} {CAP}",
+     "bufferReceivingHeader": "Receiving from merchant (tap to remove):",
+     "bufferGivingHeader": "Giving to merchant (tap to take back):",
+     "playerEmpty": "No unequipped items available to sell.",
+     "merchantEmpty": "Merchant has no items left.",
+-    "unitPrice": "{price} caps/pc",
++    "unitPrice": "{price} {CAP}/pc",
+     "giveOne": "+1",
+     "giveAll": "All",
+-    "barterPay": "You pay: {amount} caps",
+-    "barterReceive": "You receive: {amount} caps",
+-    "barterEven": "Even barter: 0 caps",
+-    "notEnoughPlayerCaps": "Not enough caps ({need} > {have})",
+-    "merchantShortfallWarn": "Merchant only has {have} of {need} caps (short by {shortfall})",
++    "barterPay": "You pay: {amount} {CAP}",
++    "barterReceive": "You receive: {amount} {CAP}",
++    "barterEven": "Even barter: 0 {CAP}",
++    "notEnoughPlayerCaps": "Not enough {CAP} ({need} {CAP} > {have} {CAP})",
++    "merchantShortfallWarn": "Merchant only has {have} {CAP} of {need} {CAP} (short by {shortfall} {CAP})",
+     "clearBuffer": "Clear",
+     "commitTrade": "Confirm Trade",
+-    "shortfallConfirmTitle": "Merchant is short on caps",
+-    "shortfallConfirmMessage": "The merchant owes you {need} caps, but only has {have} caps in the register (short by {shortfall}).\n\nCancel to pick more goods, or accept all available {have} caps.",
+-    "shortfallAccept": "Accept {have} caps",
++    "shortfallConfirmTitle": "Merchant is short on {CAP}",
++    "shortfallConfirmMessage": "The merchant owes you {need} {CAP}, but only has {have} {CAP} in the register (short by {shortfall} {CAP}).\n\nCancel to pick more goods, or accept all available {have} {CAP}.",
++    "shortfallAccept": "Accept {have} {CAP}",
+     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
+     "tradeSuccess": "Trade completed!"
+   }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index d5ee6b8..6a2ce86 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -11,7 +11,7 @@
+     "merchantBadge": "Торговец",
+     "activeBadge": "ВЫДАН",
+     "itemsCount": "Позиций: {count}",
+-    "capsCount": "Касса: {caps} кр.",
++    "capsCount": "Касса: {caps} {CAP}",
+     "ratesSummary": "Продажа: {sale}% • Уценка скупки: {depr}%",
+     "openMenu": "Действия контейнера",
+     "issue": "Выдать",
+@@ -32,7 +32,7 @@
+     "noRoomsHint": "Сначала создайте комнату на вкладке «Список кампаний».",
+     "descriptionLabel": "Описание (необязательно)",
+     "descriptionPlaceholder": "Короткое описание для игроков...",
+-    "merchantCapsLabel": "Крышки торговца (лимит кассы)",
++    "merchantCapsLabel": "Лимит кассы торговца {CAP}",
+     "saleMarkupLabel": "Общая наценка продажи (%)",
+     "saleMarkupHint": "0 — по каталогу; можно ставить + и −. Суммируется с точечной наценкой товара.",
+     "buyDepreciationLabel": "% обесценивания закупки",
+@@ -50,16 +50,16 @@
+     "issueButton": "Выдать игрокам",
+     "stopIssueButton": "Завершить выдачу",
+     "qtyPieces": "{qty} шт.",
+-    "baseCost": "База: {cost} кр.",
++    "baseCost": "База: {cost} {CAP}",
+     "itemMarkup": "Спец. наценка: {markup}%",
+-    "shopPrice": "Цена в лавке: {price} кр.",
++    "shopPrice": "Цена в лавке: {price} {CAP}",
+     "weight": "Вес: {weight}",
+     "editItem": "Изм.",
+     "removeItem": "✕",
+     "rollNotice": "Бросок {dice} {unit}: выпало {total} шт.",
+     "packsRollNotice": "Пачки ({packs} × [{formula}]): выпало {total} шт.",
+     "rollZeroNotice": "Бросок {dice} {unit}: выпало 0 — предмет не добавлен.",
+-    "capsRollNotice": "Касса по броску {dice} {unit}: {total} кр.",
++    "capsRollNotice": "Касса по броску {dice} {unit}: {total} {CAP}",
+     "deleteConfirmTitle": "Удалить карточку?",
+     "deleteConfirmMessage": "Карточка «{name}» будет удалена локально и в облаке.",
+     "emptyLootPromptTitle": "Контейнер пуст. Хотите удалить?",
+@@ -70,8 +70,8 @@
+     "titleLoot": "Добавить в контейнер",
+     "titleMerchant": "Добавить товар торговцу",
+     "chooseButton": "Выбрать",
+-    "looseCapsName": "Крышки (валюта)",
+-    "looseCapsSub": "Наличные крышки в контейнере добычи",
++    "looseCapsName": "Валюта {CAP}",
++    "looseCapsSub": "Наличные {CAP} в контейнере добычи",
+     "back": "← Назад",
+     "close": "Закрыть"
+   },
+@@ -87,13 +87,13 @@
+     "packsEditKeepHint": "Измените число пачек, чтобы перебросить запас (иначе сохранится текущее количество).",
+     "unitLabel": "Единица измерения",
+     "unitPcs": "шт.",
+-    "unitCd": "CD",
++    "unitCd": "{CD}",
+     "unitD20": "d20",
+-    "diceHintCd": "При нажатии «Сохранить» будут брошены боевые кости Fallout (CD).",
++    "diceHintCd": "При нажатии «Сохранить» будут брошены боевые кости {CD}.",
+     "diceHintD20": "При нажатии «Сохранить» будут брошены кости d20.",
+     "itemMarkupLabel": "% наценки товара (специализация)",
+     "itemMarkupHint": "Суммируется с общей наценкой торговца ({merchantMarkup}%).",
+-    "pricePreview": "База: {base} кр. → В лавке (без перков): {final} кр. за шт.",
++    "pricePreview": "База: {base} {CAP} → В лавке (без перков): {final} {CAP} за шт.",
+     "save": "Сохранить",
+     "cancel": "Отмена"
+   },
+@@ -122,7 +122,7 @@
+     "resetPersonal": "Сбросить персональный %",
+     "saleMarkupControl": "% продажи",
+     "buyDeprControl": "% обесценивания скупки",
+-    "merchantCapsControl": "Касса (кр.)",
++    "merchantCapsControl": "Касса {CAP}",
+     "applyRates": "Применить"
+   },
+   "player": {
+@@ -133,35 +133,34 @@
+     "close": "Закрыть",
+     "closeLootConfirmTitle": "Закрыть контейнер?",
+     "closeLootConfirmMessage": "Вы не всё забрали, уверены, что хотите закрыть?",
++    "closeMerchantConfirmTitle": "Закрыть торговлю?",
++    "closeMerchantConfirmMessage": "В буфере обмена остались неподтверждённые позиции. Уверены, что хотите закрыть окно торговли?",
+     "lootEmpty": "Контейнер пуст — всё уже разобрали.",
+     "takeOne": "Взять 1",
+     "takeAllRow": "Все ({qty})",
+     "takeAllContainer": "Забрать всё",
+-    "capsItemLabel": "Крышки: {qty} кр.",
++    "capsItemLabel": "{qty} {CAP}",
+     "playerInventoryTab": "Ваш инвентарь",
+     "merchantInventoryTab": "Лавка торговца",
+-    "playerCaps": "Ваши крышки: {caps} кр.",
+-    "merchantCaps": "Касса торговца: {caps} кр.",
+-    "perkCapCollector": "★ Коллекционер крышек (±10%)",
+-    "personalRatesBadge": "Условия торга изменены Мастером",
+-    "ratesLine": "Наценка лавки: {sale}% • Уценка скупки: {depr}%",
++    "playerCaps": "У вас: {caps} {CAP}",
++    "merchantCaps": "Касса: {caps} {CAP}",
+     "bufferReceivingHeader": "К получению от торговца (нажмите, чтобы убрать):",
+     "bufferGivingHeader": "Отдаёте торговцу (нажмите, чтобы забрать назад):",
+     "playerEmpty": "Нет свободных предметов для продажи.",
+     "merchantEmpty": "У торговца закончились товары.",
+-    "unitPrice": "{price} кр./шт.",
++    "unitPrice": "{price} {CAP} / шт.",
+     "giveOne": "+1",
+     "giveAll": "Все",
+-    "barterPay": "К доплате вами: {amount} кр.",
+-    "barterReceive": "К получению вами: {amount} кр.",
+-    "barterEven": "Равный бартер: 0 кр.",
+-    "notEnoughPlayerCaps": "Не хватает ваших крышек ({need} кр. > {have} кр.)",
+-    "merchantShortfallWarn": "В кассе торговца только {have} кр. из {need} кр. (не хватает {shortfall} кр.)",
++    "barterPay": "К доплате вами: {amount} {CAP}",
++    "barterReceive": "К получению вами: {amount} {CAP}",
++    "barterEven": "Равный бартер: 0 {CAP}",
++    "notEnoughPlayerCaps": "Не хватает {CAP} ({need} {CAP} > {have} {CAP})",
++    "merchantShortfallWarn": "В кассе торговца только {have} {CAP} из {need} {CAP} (не хватает {shortfall} {CAP})",
+     "clearBuffer": "Сбросить",
+     "commitTrade": "Совершить сделку",
+-    "shortfallConfirmTitle": "В кассе торговца не хватает крышек",
+-    "shortfallConfirmMessage": "Торговец должен вам {need} кр., но в его кассе есть только {have} кр. (не хватает {shortfall} кр.).\n\nВы можете отменить и добрать разницу товаром, либо согласиться получить все доступные {have} кр.",
+-    "shortfallAccept": "Согласиться на {have} кр.",
++    "shortfallConfirmTitle": "В кассе торговца не хватает {CAP}",
++    "shortfallConfirmMessage": "Торговец должен вам {need} {CAP}, но в его кассе есть только {have} {CAP} (не хватает {shortfall} {CAP}).\n\nВы можете отменить и добрать разницу товаром, либо согласиться получить все доступные {have} {CAP}.",
++    "shortfallAccept": "Согласиться на {have} {CAP}",
+     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
+     "tradeSuccess": "Сделка успешно завершена!"
+   }
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js b/modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js
+index b46963c..2d0b3bf 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/textUtils.js
+@@ -1,26 +1,28 @@
+ import React from 'react';
+-import { Text, Image } from 'react-native';
++import { Text, Image, StyleSheet } from 'react-native';
+ 
+ const iconMap = {
+   '{CD}': require('../../../../assets/CD.png'),
+   '{/CD}': require('../../../../assets/CD.png'),
++  '{CAP}': require('../../assets/backgrounds/caps.png'),
+ };
+ 
+ const iconRegex = new RegExp(`(${Object.keys(iconMap).join('|')})`, 'g');
+ 
+ // ---------------------------------------------------------------------------
+-// Inline-разметка: **жирный**, *курсив*, токены кубика {CD}/{/CD}.
++// Inline-разметка: **жирный**, *курсив*, токены кубика {CD}/{/CD} и крышки {CAP}.
+ // Возвращает плоский массив <Text>-узлов внутри одного родительского <Text>
+ // (вложенные <Text> в RN наследуют стиль и дают акценты без разрыва строки).
+ // ---------------------------------------------------------------------------
+ 
+-const INLINE_TOKEN_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|\{\/?CD\})/g;
++const INLINE_TOKEN_RE = /(\*\*[^*]+\*\*|\*[^*]+\*|\{\/?CD\}|\{CAP\})/g;
+ 
+ const renderInline = (text, baseStyle, keyPrefix = 'it') => {
+   if (text == null) return null;
+-  const fontSize = baseStyle?.fontSize || 14;
+-  const iconSize = fontSize + 10;
+-  const verticalShift = Math.round(iconSize / 6);
++  const flat = StyleSheet.flatten(baseStyle) || {};
++  const fontSize = flat.fontSize || 14;
++  const cdSize = fontSize + 6;
++  const capSize = fontSize + 7;
+ 
+   return String(text)
+     .split(INLINE_TOKEN_RE)
+@@ -28,11 +30,15 @@ const renderInline = (text, baseStyle, keyPrefix = 'it') => {
+     .map((part, index) => {
+       const key = `${keyPrefix}-${index}`;
+       if (iconMap[part]) {
++        const isCap = part === '{CAP}';
++        const size = isCap ? capSize : cdSize;
++        const verticalShift = Math.round(size / 5);
+         return (
+           <Image
+             key={key}
+             source={iconMap[part]}
+-            style={{ width: iconSize, height: iconSize, transform: [{ translateY: verticalShift }] }}
++            resizeMode="contain"
++            style={{ width: size, height: size, transform: [{ translateY: verticalShift }] }}
+           />
+         );
+       }
+@@ -104,20 +110,24 @@ export const setupRichText = () => {
+   const testRe = new RegExp(tokenRe.source); // без флага g — безопасный .test()
+ 
+   const toNodes = (str, baseStyle) => {
+-    const fontSize = baseStyle?.fontSize || 14;
+-    const iconSize = fontSize + 10;
+-    const verticalShift = Math.round(iconSize / 6);
+-    return String(str).split(tokenRe).filter(Boolean).map((part, index) =>
+-      iconMap[part]
+-        ? (
+-          <Image
+-            key={`icon-${index}`}
+-            source={iconMap[part]}
+-            style={{ width: iconSize, height: iconSize, transform: [{ translateY: verticalShift }] }}
+-          />
+-        )
+-        : part
+-    );
++    const flat = StyleSheet.flatten(baseStyle) || {};
++    const fontSize = flat.fontSize || 14;
++    const cdSize = fontSize + 6;
++    const capSize = fontSize + 7;
++    return String(str).split(tokenRe).filter(Boolean).map((part, index) => {
++      if (!iconMap[part]) return part;
++      const isCap = part === '{CAP}';
++      const size = isCap ? capSize : cdSize;
++      const verticalShift = Math.round(size / 5);
++      return (
++        <Image
++          key={`icon-${index}`}
++          source={iconMap[part]}
++          resizeMode="contain"
++          style={{ width: size, height: size, transform: [{ translateY: verticalShift }] }}
++        />
++      );
++    });
+   };
+ 
+   const originalRender = Text.render;
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 1f819f8..0f618bb 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "470"
++  "baseline": "471"
+ }
+diff --git a/public/version.json b/public/version.json
+index 34c1e42..69c7570 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "470",
++  "version": "471",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index c875532..b9c4bf7 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -140,10 +140,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+ 
+   /**
+    * Проверяет, остались ли в комнате другие подключённые игроки, у которых
+-   * ещё открыт данный контейнер добычи (не считая Мастера и уже закрывших).
++   * ещё открыта данная раздача добычи или сессия торговли (не считая Мастера и уже закрывших).
+    */
+-  const hasRemainingActiveLootViewers = (room, session, closedSet) => {
+-    if (!room || !session || session.kind !== 'loot') return false;
++  const hasRemainingActiveSessionViewers = (room, session, closedSet) => {
++    if (!room || !session) return false;
+     if (session.targetType === 'character') return false;
+     for (const member of room.members.values()) {
+       if (!member || member.role !== 'player') continue;
+@@ -163,17 +163,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     let closedSession = null;
+     let closedReason = null;
+     const current = room.activeSession;
+-    if (left && current && current.kind === 'loot') {
++    if (left && current) {
+       const closedSet = new Set(current.closedByClientIds || []);
+-      const hadPreviousCloseOrEmpty = closedSet.size > 0 || current.items.length === 0;
+-      if (hadPreviousCloseOrEmpty && !hasRemainingActiveLootViewers(room, current, closedSet)) {
++      const hadPreviousCloseOrEmpty =
++        closedSet.size > 0 || (current.kind === 'loot' && current.items.length === 0);
++      if (hadPreviousCloseOrEmpty && !hasRemainingActiveSessionViewers(room, current, closedSet)) {
+         closedSession = {
+           ...current,
+           closedByClientIds: [...closedSet],
+           revision: current.revision + 1,
+           updatedAt: now(),
+         };
+-        closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
++        closedReason = closedSession.kind === 'loot' && closedSession.items.length === 0
++          ? 'loot_emptied'
++          : 'player_closed';
+         room.activeSession = null;
+       }
+     }
+@@ -269,14 +272,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     const closedSet = new Set(current.closedByClientIds || []);
+     closedSet.add(clientId);
+ 
+-    if (current.kind === 'loot' && !hasRemainingActiveLootViewers(room, current, closedSet)) {
++    if (!hasRemainingActiveSessionViewers(room, current, closedSet)) {
+       const closedSession = {
+         ...current,
+         closedByClientIds: [...closedSet],
+         revision: current.revision + 1,
+         updatedAt: now(),
+       };
+-      const closedReason = closedSession.items.length === 0 ? 'loot_emptied' : 'player_closed';
++      const closedReason = closedSession.kind === 'loot' && closedSession.items.length === 0
++        ? 'loot_emptied'
++        : 'player_closed';
+       room.activeSession = null;
+       return {
+         room,
+@@ -321,7 +326,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (emptiedByTake) {
+       const closedSet = new Set(result.session.closedByClientIds || []);
+       closedSet.add(clientId);
+-      if (!hasRemainingActiveLootViewers(room, result.session, closedSet)) {
++      if (!hasRemainingActiveSessionViewers(room, result.session, closedSet)) {
+         const closedSession = {
+           ...result.session,
+           closedByClientIds: [...closedSet],
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index cc8dd45..f6c3100 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -16,7 +16,7 @@ const styles = StyleSheet.create({
+   syncIconButton: {
+     width: 38,
+     height: 38,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#666666',
+     backgroundColor: 'rgba(31,31,31,0.9)',
+@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 12,
+     paddingVertical: 6,
+     minHeight: 34,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#d4af37',
+     backgroundColor: 'rgba(212,175,55,0.22)',
+@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
+     borderWidth: 2,
+     borderStyle: 'dashed',
+     borderColor: '#5a5a5a',
+-    borderRadius: 8,
++    borderRadius: 5,
+     backgroundColor: 'rgba(255,255,255,0.88)',
+     justifyContent: 'center',
+     alignItems: 'center',
+@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
+     aspectRatio: 0.75,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    borderRadius: 8,
++    borderRadius: 5,
+     backgroundColor: 'rgba(255,255,255,0.94)',
+     overflow: 'hidden',
+   },
+@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#d4af37',
+     paddingHorizontal: 6,
+     paddingVertical: 2,
+-    borderRadius: 6,
++    borderRadius: 5,
+   },
+   cardLiveBadgeText: {
+     color: '#1a1a1a',
+@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
+     position: 'absolute',
+     width: 224,
+     paddingVertical: 6,
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+     backgroundColor: '#1f1f1f',
+@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
+     backgroundColor: 'rgba(31,31,31,0.95)',
+     borderWidth: 1,
+     borderColor: '#d4af37',
+-    borderRadius: 8,
++    borderRadius: 5,
+     padding: 12,
+     marginBottom: 10,
+   },
+@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
+     gap: 5,
+     paddingHorizontal: 10,
+     paddingVertical: 6,
+-    borderRadius: 6,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#777777',
+     backgroundColor: '#2e2e2e',
+@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
+     backgroundColor: 'rgba(43, 40, 26, 0.95)',
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+-    borderRadius: 8,
++    borderRadius: 5,
+     padding: 10,
+     marginBottom: 10,
+   },
+@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
+   scopeChip: {
+     paddingHorizontal: 10,
+     paddingVertical: 5,
+-    borderRadius: 14,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#888888',
+     backgroundColor: '#262626',
+@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
+   },
+   liveControlBox: {
+     backgroundColor: 'rgba(0,0,0,0.38)',
+-    borderRadius: 6,
++    borderRadius: 5,
+     padding: 7,
+     minWidth: 150,
+     borderWidth: 1,
+@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#d4af37',
+     paddingHorizontal: 12,
+     paddingVertical: 8,
+-    borderRadius: 6,
++    borderRadius: 5,
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
+     backgroundColor: '#2d2a1e',
+     borderWidth: 1,
+     borderColor: '#f0e68c',
+-    borderRadius: 6,
++    borderRadius: 5,
+     paddingVertical: 7,
+     paddingHorizontal: 10,
+     marginBottom: 8,
+@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
+   // Кнопка + и список предметов в стиле Инвентаря
+   addItemPrimaryBtn: {
+     backgroundColor: '#3a3a1e',
+-    borderRadius: 8,
++    borderRadius: 5,
+     paddingVertical: 11,
+     paddingHorizontal: 16,
+     alignItems: 'center',
+@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
+   itemsListContainer: {
+     flex: 1,
+     backgroundColor: 'rgba(255,255,255,0.95)',
+-    borderRadius: 8,
++    borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#888888',
+     overflow: 'hidden',

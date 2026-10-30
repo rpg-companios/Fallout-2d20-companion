@@ -54,6 +54,7 @@ import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPer
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
+import IconText, { CapIcon, withCdToken } from '../../lootTrade/LootTradeIconText';
 import ContainerFormModal from './modals/ContainerFormModal';
 import ContainerCatalogModal from './modals/ContainerCatalogModal';
 import ContainerItemConfigModal from './modals/ContainerItemConfigModal';
@@ -152,9 +153,9 @@ const ContainerCardCell = ({
           {formatLootTrade(tLootTrade('card.itemsCount'), { count: totalPieces })}
         </Text>
         {isMerchant && (
-          <Text style={styles.cardMeta} numberOfLines={1}>
+          <IconText style={styles.cardMeta} numberOfLines={1}>
             {formatLootTrade(tLootTrade('card.capsCount'), { caps: container.caps })}
-          </Text>
+          </IconText>
         )}
       </View>
 
@@ -396,7 +397,7 @@ export default function LootTradeScreen() {
     if (capsRollInfo?.rolled) {
       showTimedBanner(formatLootTrade(tLootTrade('detail.capsRollNotice'), {
         dice: capsRollInfo.diceCount,
-        unit: capsRollInfo.unit === 'cd' ? 'CD' : 'd20',
+        unit: capsRollInfo.unit === 'cd' ? '{CD}' : 'd20',
         total: capsRollInfo.quantity,
       }));
     }
@@ -499,13 +500,13 @@ export default function LootTradeScreen() {
 
   const formatRollBannerForItem = (itemName, roll) => {
     if (roll.unit === 'packs') {
-      return `${itemName}: ${formatLootTrade(tLootTrade('detail.packsRollNotice'), {
+      return `${itemName}: ${withCdToken(formatLootTrade(tLootTrade('detail.packsRollNotice'), {
         packs: roll.packCount || 1,
         formula: roll.formula || '',
         total: roll.quantity,
-      })}`;
+      }))}`;
     }
-    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
+    const unitLabel = roll.unit === 'cd' ? '{CD}' : 'd20';
     return `${itemName}: ${formatLootTrade(tLootTrade('detail.rollNotice'), {
       dice: roll.diceCount,
       unit: unitLabel,
@@ -522,7 +523,7 @@ export default function LootTradeScreen() {
       allowZeroPcs: false,
     });
 
-    const unitLabel = roll.unit === 'cd' ? 'CD' : 'd20';
+    const unitLabel = roll.unit === 'cd' ? '{CD}' : 'd20';
     if (roll.rolled && roll.quantity <= 0) {
       const zeroMsg = formatLootTrade(tLootTrade('detail.rollZeroNotice'), {
         dice: roll.diceCount,
@@ -781,7 +782,7 @@ export default function LootTradeScreen() {
 
           {Boolean(rollBanner) && (
             <View style={[styles.rollBanner, { marginHorizontal: 16, marginTop: 8 }]}>
-              <Text style={styles.rollBannerText}>{rollBanner}</Text>
+              <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
             </View>
           )}
 
@@ -898,9 +899,9 @@ export default function LootTradeScreen() {
 
             {activeContainer.kind === CONTAINER_KIND.MERCHANT && (
               <View style={styles.detailRatesRow}>
-                <Text style={styles.detailRateBadge}>
+                <IconText style={styles.detailRateBadge}>
                   {formatLootTrade(tLootTrade('card.capsCount'), { caps: activeContainer.caps })}
-                </Text>
+                </IconText>
                 <Text style={styles.detailRateBadge}>
                   {formatLootTrade(tLootTrade('card.ratesSummary'), {
                     sale: activeContainer.saleMarkupPercent >= 0
@@ -1026,7 +1027,9 @@ export default function LootTradeScreen() {
                     </View>
 
                     <View style={styles.liveControlBox}>
-                      <Text style={styles.liveControlLabel}>{tLootTrade('livePanel.merchantCapsControl')}</Text>
+                      <IconText style={styles.liveControlLabel}>
+                        {tLootTrade('livePanel.merchantCapsControl')}
+                      </IconText>
                       <View style={styles.liveStepperRow}>
                         <TextInput
                           style={[styles.liveStepInput, { width: 78 }]}
@@ -1050,7 +1053,7 @@ export default function LootTradeScreen() {
 
           {Boolean(rollBanner) && (
             <View style={styles.rollBanner}>
-              <Text style={styles.rollBannerText}>{rollBanner}</Text>
+              <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
             </View>
           )}
 
@@ -1080,17 +1083,21 @@ export default function LootTradeScreen() {
                   <View key={entry.entryId} style={styles.itemRow}>
                     <View style={styles.itemRowMain}>
                       <View style={styles.itemRowTitleLine}>
-                        <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
-                        <Text style={styles.itemRowName}>{entry.name}</Text>
+                        {entry.itemType === 'caps' ? (
+                          <CapIcon size={18} />
+                        ) : (
+                          <Text style={styles.itemRowIcon}>{getItemIcon(entry.itemType)}</Text>
+                        )}
+                        <IconText style={styles.itemRowName}>{entry.name}</IconText>
                       </View>
                       <View style={styles.itemRowSub}>
                         <Text style={styles.itemRowSubText}>
                           {formatLootTrade(tLootTrade('detail.qtyPieces'), { qty: entry.quantity })}
                         </Text>
                         {entry.itemType !== 'caps' && (
-                          <Text style={styles.itemRowSubText}>
+                          <IconText style={styles.itemRowSubText}>
                             {formatLootTrade(tLootTrade('detail.baseCost'), { cost: entry.cost })}
-                          </Text>
+                          </IconText>
                         )}
                         {isMerchant && entry.markupPercent !== 0 && (
                           <Text style={styles.itemRowSubText}>
@@ -1100,9 +1107,9 @@ export default function LootTradeScreen() {
                           </Text>
                         )}
                         {isMerchant && (
-                          <Text style={styles.itemRowPriceHighlight}>
+                          <IconText style={styles.itemRowPriceHighlight}>
                             {formatLootTrade(tLootTrade('detail.shopPrice'), { price: shopPrice })}
-                          </Text>
+                          </IconText>
                         )}
                         {entry.weight > 0 && (
                           <Text style={styles.itemRowSubText}>

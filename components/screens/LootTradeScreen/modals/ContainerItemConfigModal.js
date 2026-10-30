@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+import IconText, { withCdToken } from '../../../lootTrade/LootTradeIconText';
 import {
   QUANTITY_UNIT,
   isAmmoItem,
@@ -126,7 +127,7 @@ const ContainerItemConfigModal = ({
           <Text style={styles.subtitle}>
             {tLootTrade(isEditing ? 'itemConfig.titleEdit' : 'itemConfig.titleAdd')}
           </Text>
-          <Text style={styles.title}>{item.name}</Text>
+          <IconText style={styles.title}>{item.name}</IconText>
 
           {ammoMode ? (
             <>
@@ -155,25 +156,25 @@ const ContainerItemConfigModal = ({
               </View>
 
               <View style={styles.packFormulaPill}>
-                <Text style={styles.packFormulaText}>
-                  {formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
+                <IconText style={styles.packFormulaText}>
+                  {withCdToken(formatLootTrade(tLootTrade('itemConfig.packFormulaBadge'), {
                     formula: singlePackFormula,
-                  })}
-                </Text>
+                  }))}
+                </IconText>
               </View>
 
               {(!isEditing || packsTouched) ? (
-                <Text style={styles.hint}>
+                <IconText style={styles.hint}>
                   {ammoSpec?.cd > 0
-                    ? formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
+                    ? withCdToken(formatLootTrade(tLootTrade('itemConfig.packsTotalRollHint'), {
                         packs: numericCount,
                         formula: totalPackFormula,
-                      })
+                      }))
                     : formatLootTrade(tLootTrade('itemConfig.packsFixedHint'), {
                         packs: numericCount,
                         total: numericCount * Math.max(1, ammoSpec?.base || 1),
                       })}
-                </Text>
+                </IconText>
               ) : (
                 <Text style={styles.hint}>{tLootTrade('itemConfig.packsEditKeepHint')}</Text>
               )}
@@ -208,14 +209,14 @@ const ContainerItemConfigModal = ({
                     style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
                     onPress={() => setUnit(uKey)}
                   >
-                    <Text style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
+                    <IconText style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
                       {uLabel}
-                    </Text>
+                    </IconText>
                   </TouchableOpacity>
                 ))}
               </View>
               {unit === QUANTITY_UNIT.CD && (
-                <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</Text>
+                <IconText style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</IconText>
               )}
               {unit === QUANTITY_UNIT.D20 && (
                 <Text style={styles.hint}>{tLootTrade('itemConfig.diceHintD20')}</Text>
@@ -253,12 +254,12 @@ const ContainerItemConfigModal = ({
                     : String(merchantSaleMarkupPercent),
                 })}
               </Text>
-              <Text style={styles.previewPrice}>
+              <IconText style={styles.previewPrice}>
                 {formatLootTrade(tLootTrade('itemConfig.pricePreview'), {
                   base: baseCost,
                   final: previewPrice,
                 })}
-              </Text>
+              </IconText>
             </View>
           )}
 
@@ -279,19 +280,21 @@ const ContainerItemConfigModal = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.68)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 28,
+    paddingVertical: 36,
   },
   card: {
-    width: '100%',
+    width: '90%',
     maxWidth: 460,
     backgroundColor: '#1f1f1f',
-    borderRadius: 12,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#f0e68c',
-    padding: 22,
+    paddingHorizontal: 24,
+    paddingVertical: 22,
     alignItems: 'center',
   },
   subtitle: {
@@ -306,7 +309,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginTop: 4,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   currentStockText: {
     color: '#d4d4d4',
@@ -317,8 +320,8 @@ const styles = StyleSheet.create({
     color: '#e8e8e8',
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 6,
+    marginTop: 10,
+    marginBottom: 7,
     textAlign: 'center',
   },
   counterRow: {
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
   circleBtn: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 5,
     backgroundColor: '#2e2e2e',
     borderWidth: 1,
     borderColor: '#666666',
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#777777',
-    borderRadius: 8,
+    borderRadius: 5,
     color: '#f5f5f5',
     fontSize: 22,
     fontWeight: '700',
@@ -357,8 +360,8 @@ const styles = StyleSheet.create({
   packFormulaPill: {
     marginTop: 10,
     paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 7,
+    borderRadius: 5,
     backgroundColor: '#2d2a1e',
     borderWidth: 1,
     borderColor: '#d4af37',
@@ -376,7 +379,7 @@ const styles = StyleSheet.create({
   unitBtn: {
     paddingHorizontal: 18,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
@@ -397,13 +400,13 @@ const styles = StyleSheet.create({
     color: '#b0b0b0',
     fontSize: 11,
     textAlign: 'center',
-    marginTop: 6,
+    marginTop: 7,
     lineHeight: 16,
   },
   markupSection: {
     width: '100%',
-    marginTop: 12,
-    paddingTop: 10,
+    marginTop: 14,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#3d3d3d',
     alignItems: 'center',
@@ -412,7 +415,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e2e2e',
     paddingHorizontal: 8,
     paddingVertical: 7,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#666666',
   },
@@ -427,7 +430,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     borderWidth: 1,
     borderColor: '#777777',
-    borderRadius: 8,
+    borderRadius: 5,
     color: '#f5f5f5',
     fontSize: 16,
     fontWeight: '700',
@@ -437,19 +440,19 @@ const styles = StyleSheet.create({
     color: '#f0e68c',
     fontSize: 13,
     fontWeight: '700',
-    marginTop: 6,
+    marginTop: 7,
     textAlign: 'center',
   },
   footer: {
     flexDirection: 'row',
     width: '100%',
     gap: 10,
-    marginTop: 18,
+    marginTop: 20,
   },
   actionBtn: {
     flex: 1,
-    paddingVertical: 11,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 5,
     alignItems: 'center',
     borderWidth: 1,
   },

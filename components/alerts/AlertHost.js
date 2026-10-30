@@ -10,6 +10,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { registerAlertHost } from './alertService';
+import IconText from '../lootTrade/LootTradeIconText';
 import { DEFAULT_CONFIRM_BUTTONS } from './catalog';
 import { useLocale } from '../../i18n/locale';
 import { tApp } from '../../i18n/appI18n';
@@ -142,10 +143,10 @@ const AlertHost = () => {
     >
       <View style={styles.overlay}>
         <View style={styles.content}>
-          {!!title && <Text style={styles.title}>{title}</Text>}
+          {!!title && <IconText style={styles.title}>{title}</IconText>}
           {!!message && (
             <ScrollView style={styles.messageScroll} contentContainerStyle={styles.messageWrap}>
-              <Text style={styles.message}>{message}</Text>
+              <IconText style={styles.message}>{message}</IconText>
             </ScrollView>
           )}
           <View style={styles.buttons}>
@@ -162,14 +163,14 @@ const AlertHost = () => {
                   if (typeof button.onPress === 'function') button.onPress();
                 }}
               >
-                <Text
+                <IconText
                   style={[
                     styles.buttonText,
                     button.style === 'cancel' && styles.buttonTextCancel,
                   ]}
                 >
                   {button.label}
-                </Text>
+                </IconText>
               </TouchableOpacity>
             ))}
           </View>
@@ -184,17 +185,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 28,
+    paddingVertical: 32,
   },
   content: {
-    width: '100%',
-    maxWidth: 520,
+    width: '92%',
+    maxWidth: 500,
     backgroundColor: '#1f1f1f',
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#f0e68c',
-    padding: 20,
+    padding: 22,
   },
   title: {
     fontSize: 18,
@@ -210,7 +212,7 @@ const styles = StyleSheet.create({
   button: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 5,
     backgroundColor: '#3a3a1e',
     borderWidth: 1,
     borderColor: '#f0e68c',
