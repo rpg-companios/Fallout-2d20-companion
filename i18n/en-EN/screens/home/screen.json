@@ -202,7 +202,15 @@
     "hint": "Share this address with your players: they will enter it via the “Server” menu item.",
     "players": "Players",
     "noPlayers": "Nobody here yet",
-    "createFailed": "Failed to create the room. Check your connection and try again."
+    "createFailed": "Failed to create the room. Check your connection and try again.",
+    "openMenu": "Room actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "editTitle": "Room name",
+    "editPlaceholder": "Enter room name",
+    "editSave": "Save",
+    "editCancel": "Cancel",
+    "editEmptyWarn": "Please enter a room name."
   },
   "about": {
     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",

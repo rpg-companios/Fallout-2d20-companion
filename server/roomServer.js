@@ -282,7 +282,13 @@ const attachRoomWebSocketServer = (httpServer, {
     }));
     for (const member of room.members.values()) {
       if (member.clientId === exceptClientId || !member.ws) continue;
-      sendEnvelope(member.ws, MESSAGE.ROOM_MEMBER, { members }, room.code, member.clientId);
+      sendEnvelope(
+        member.ws,
+        MESSAGE.ROOM_MEMBER,
+        { members, name: room.name },
+        room.code,
+        member.clientId,
+      );
     }
   };
 
@@ -409,6 +415,9 @@ const attachRoomWebSocketServer = (httpServer, {
             rebound: result.rebound,
             requestId: payload.requestId || null,
           }, result.room.code, clientId);
+          if (result.rebound && result.room.members.size > 0) {
+            broadcastMembers(result.room, null);
+          }
           break;
         }
 

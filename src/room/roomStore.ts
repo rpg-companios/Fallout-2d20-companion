@@ -299,7 +299,13 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         set({
           rooms: {
             ...get().rooms,
-            [code]: { ...current, members: message.payload?.members || [] },
+            [code]: {
+              ...current,
+              name: typeof message.payload?.name === 'string' && message.payload.name.trim()
+                ? message.payload.name.trim()
+                : current.name,
+              members: message.payload?.members || [],
+            },
           },
         });
         return;
@@ -428,7 +434,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             name: roomName || name,
             role: 'gm',
             members: prev?.members || [],
-            joined: false,
+            joined: Boolean(prev?.joined && requestedCode),
             snapshots: prev?.snapshots || {},
             activeSession: prev?.activeSession ?? null,
           },

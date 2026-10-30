@@ -59,9 +59,10 @@ const HubChildPickerModal = ({
                   (sum, entry) => sum + (Number(entry.quantity) || 0),
                   0,
                 );
-                const roomLabel = roomByCode[item.roomCode]?.name
-                  || item.roomName
-                  || formatRoomCodeForDisplay(item.roomCode);
+                const roomLabel = item.roomCode
+                  ? (roomByCode[item.roomCode]?.name || item.roomName || formatRoomCodeForDisplay(item.roomCode))
+                  : '';
+                const roomSuffix = roomLabel ? ` • ${roomLabel}` : '';
 
                 return (
                   <View key={item.id} style={styles.row}>
@@ -76,8 +77,8 @@ const HubChildPickerModal = ({
                       </View>
                       <IconText style={styles.rowMeta}>
                         {isMerch
-                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })} • ${roomLabel}`
-                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${roomLabel}`}
+                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
+                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`}
                       </IconText>
                     </View>
 

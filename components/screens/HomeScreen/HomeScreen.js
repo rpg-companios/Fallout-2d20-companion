@@ -532,6 +532,9 @@ export default function HomeScreen({ navigation }) {
   const [roomDialog, setRoomDialog] = useState(null); // { code } — адрес/участники комнаты
   const [serverDialog, setServerDialog] = useState(null); // { character, boundCode, address, busy, error }
   const [copiedCode, setCopiedCode] = useState(null);
+  const [roomMenuPos, setRoomMenuPos] = useState(null);
+  const [roomEditModal, setRoomEditModal] = useState(null); // { folderId, name }
+  const roomMenuBtnRef = useRef(null);
   const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
 
   const [installPrompt, setInstallPrompt] = useState(null);
@@ -1002,6 +1005,47 @@ export default function HomeScreen({ navigation }) {
     if (confirmed) remove();
   };
 
+  const openInsideRoomMenu = () => {
+    if (!roomMenuBtnRef.current?.measureInWindow) {
+      setRoomMenuPos({ top: 140, left: 24 });
+      return;
+    }
+    roomMenuBtnRef.current.measureInWindow((x, y, width, height) => {
+      const { width: winW, height: winH } = Dimensions.get('window');
+      const menuW = 196;
+      const menuH = 98;
+      const left = Math.max(8, Math.min(x + width - menuW, winW - menuW - 8));
+      const top = y + height + menuH + 8 <= winH
+        ? y + height + 4
+        : Math.max(8, y - menuH - 4);
+      setRoomMenuPos({ top, left });
+    });
+  };
+
+  const handleSaveRoomEdit = async () => {
+    if (!roomEditModal?.folderId) return;
+    const cleanName = String(roomEditModal.name || '').trim();
+    if (!cleanName) {
+      showHomeAlert(tHomeScreen('room.editEmptyWarn'));
+      return;
+    }
+    const targetFolderId = roomEditModal.folderId;
+    await db.renameCharacterFolder(targetFolderId, cleanName);
+    setActiveFolder((prev) => (prev && prev.id === targetFolderId ? { ...prev, name: cleanName } : prev));
+    setRoomEditModal(null);
+
+    const code = folderRooms[targetFolderId];
+    const record = folderRoomRecords[targetFolderId];
+    if (code && record?.ownerToken && roomServerAvailable) {
+      useRoomStore.getState().createRoom({
+        name: cleanName,
+        requestedCode: code,
+        ownerToken: record.ownerToken,
+      }).catch((err) => debugLog('room.rename:failed', { code, message: err?.message }));
+    }
+    await loadList();
+  };
+
   const handleCreate = () => {
     if (!bundledSettingActive) return;
     resetCharacter();
@@ -1329,7 +1373,33 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.title}>{tHomeScreen("title")}</Text>
         <Text style={styles.subtitle}>{tHomeScreen("subtitle")}</Text>
       </View>
-      {activeFolder && <View style={styles.folderHeader}><TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}><Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text></TouchableOpacity><Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text><Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>{!isGmMode && movingCharacterId && <View ref={rootDropRef} collapsable={false}><TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}><Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text></TouchableOpacity></View>}</View>}
+      {activeFolder && (
+        <View style={styles.folderHeader}>
+          <View style={styles.folderHeaderTopRow}>
+            <TouchableOpacity onPress={() => { setActiveFolder(null); setMovingCharacterId(null); }}>
+              <Text style={styles.folderBack}>← {tHomeScreen('folders.back')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              ref={roomMenuBtnRef}
+              style={styles.folderMenuButton}
+              onPress={openInsideRoomMenu}
+              hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+              accessibilityLabel={tHomeScreen('room.openMenu')}
+            >
+              <MaterialCommunityIcons name="dots-vertical" size={20} color="#f0e68c" />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.folderHeaderTitle}>{activeFolder.name}</Text>
+          <Text style={styles.folderHeaderCount}>{tHomeScreen('folders.characters')}: {getDisplayedFolderCount(activeFolder.id)}</Text>
+          {!isGmMode && movingCharacterId && (
+            <View ref={rootDropRef} collapsable={false}>
+              <TouchableOpacity style={styles.rootDropZone} onPress={() => handleMoveToFolder(null)}>
+                <Text style={styles.rootDropText}>{tHomeScreen('folders.back')}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
       {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
         <View style={styles.folderRoomBar}>
           <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
@@ -1735,6 +1805,73 @@ export default function HomeScreen({ navigation }) {
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setDesktopInstallVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={Boolean(roomMenuPos && activeFolder)}
+        transparent
+        animationType="none"
+        onRequestClose={() => setRoomMenuPos(null)}
+      >
+        <Pressable style={styles.characterActionBackdrop} onPress={() => setRoomMenuPos(null)}>
+          {roomMenuPos && activeFolder && (
+            <View style={[styles.characterActionMenu, roomMenuPos]}>
+              <TouchableOpacity
+                style={styles.characterActionItem}
+                onPress={() => {
+                  const target = activeFolder;
+                  setRoomMenuPos(null);
+                  setRoomEditModal({ folderId: target.id, name: target.name || '' });
+                }}
+              >
+                <MaterialCommunityIcons name="pencil-outline" size={19} color="#111827" />
+                <Text style={styles.characterActionText}>{tHomeScreen('room.edit')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.characterActionItem}
+                onPress={() => {
+                  const target = activeFolder;
+                  setRoomMenuPos(null);
+                  handleDeleteFolder(target);
+                }}
+              >
+                <MaterialCommunityIcons name="delete-outline" size={19} color="#b91c1c" />
+                <Text style={[styles.characterActionText, styles.characterActionDeleteText]}>
+                  {tHomeScreen('room.delete')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={Boolean(roomEditModal)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoomEditModal(null)}
+      >
+        <View style={styles.modalBackdropCenter}>
+          <View style={styles.roomEditCard}>
+            <Text style={styles.roomEditTitle}>{tHomeScreen('room.editTitle')}</Text>
+            <TextInput
+              style={styles.roomEditInput}
+              value={roomEditModal?.name || ''}
+              onChangeText={(val) => setRoomEditModal((prev) => (prev ? { ...prev, name: val } : null))}
+              placeholder={tHomeScreen('room.editPlaceholder')}
+              placeholderTextColor="#888888"
+              autoFocus
+              onSubmitEditing={handleSaveRoomEdit}
+            />
+            <View style={styles.roomEditButtonsRow}>
+              <TouchableOpacity style={styles.roomEditCancelBtn} onPress={() => setRoomEditModal(null)}>
+                <Text style={styles.roomEditCancelText}>{tHomeScreen('room.editCancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.roomEditSaveBtn} onPress={handleSaveRoomEdit}>
+                <Text style={styles.roomEditSaveText}>{tHomeScreen('room.editSave')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   View,
@@ -11,41 +11,92 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
 import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
+import { CONTAINER_KIND, normalizeRoomCodes } from '../../../../domain/lootTrade';
+import { buildGmRoomCharacterCards } from '../../../../src/room/roomCharacterSync';
 
 const IssueContainerModal = ({
   visible,
   container,
+  availableRooms = [],
+  roomRooms = {},
   roomName = '',
   roomCharacters = [],
   busy = false,
+  onSelectRoom,
   onConfirmIssue,
   onClose,
 }) => {
   useLocale();
+  const [selectedRoomCode, setSelectedRoomCode] = useState('');
   const [targetType, setTargetType] = useState('room');
   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
 
+  const candidateRooms = useMemo(() => {
+    if (!container) return [];
+    if (container.kind === CONTAINER_KIND.HUB) {
+      const codes = normalizeRoomCodes(container.roomCodes, container.roomCode);
+      if (codes.length > 0) {
+        return codes.map((code) => {
+          const found = availableRooms.find((r) => r.code === code);
+          return found || { code, name: roomName || container.roomName || code };
+        });
+      }
+    }
+    if (availableRooms.length > 0) return availableRooms;
+    if (container.roomCode) {
+      return [{ code: container.roomCode, name: roomName || container.roomName || container.roomCode }];
+    }
+    return [];
+  }, [container, availableRooms, roomName]);
+
+  useEffect(() => {
+    if (!visible || !container) return;
+    const preferred = candidateRooms.find((r) => r.code === container.roomCode)?.code
+      || candidateRooms[0]?.code
+      || '';
+    setSelectedRoomCode(preferred);
+    setTargetType('room');
+    if (preferred && onSelectRoom) {
+      onSelectRoom(preferred);
+    }
+  }, [visible, container?.id]);
+
+  const effectiveRoomCharacters = useMemo(() => {
+    if (!selectedRoomCode) return roomCharacters;
+    if (roomRooms && roomRooms[selectedRoomCode]) {
+      return buildGmRoomCharacterCards(roomRooms[selectedRoomCode]);
+    }
+    return roomCharacters;
+  }, [selectedRoomCode, roomRooms, roomCharacters]);
+
   useEffect(() => {
     if (!visible) return;
-    setTargetType('room');
-    setSelectedCharacterId(roomCharacters[0]?.id || null);
-  }, [visible, roomCharacters]);
+    if (
+      !selectedCharacterId
+      || !effectiveRoomCharacters.some((c) => c.id === selectedCharacterId)
+    ) {
+      setSelectedCharacterId(effectiveRoomCharacters[0]?.id || null);
+    }
+  }, [visible, effectiveRoomCharacters, selectedCharacterId]);
 
   if (!container) return null;
 
-  const canSubmit = !busy && (
-    targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId))
-  );
+  const canSubmit = !busy
+    && Boolean(selectedRoomCode)
+    && (targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
 
   const handleConfirm = () => {
     if (!canSubmit) return;
-    const pickedChar = roomCharacters.find((c) => c.id === selectedCharacterId) || null;
+    const pickedChar = effectiveRoomCharacters.find((c) => c.id === selectedCharacterId) || null;
     onConfirmIssue({
+      roomCode: selectedRoomCode,
       targetType,
       targetCharacterId: targetType === 'character' ? selectedCharacterId : null,
       targetCharacterName: targetType === 'character' ? (pickedChar?.name || null) : null,
     });
   };
+
+  const singleRoomObj = candidateRooms.length === 1 ? candidateRooms[0] : null;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -54,11 +105,39 @@ const IssueContainerModal = ({
           <Text style={styles.title}>
             {formatLootTrade(tLootTrade('issueModal.title'), { name: container.name })}
           </Text>
-          <Text style={styles.roomSub}>
-            {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
-              room: `${roomName || container.roomName || ''} (${formatRoomCodeForDisplay(container.roomCode)})`.trim(),
-            })}
-          </Text>
+
+          {candidateRooms.length === 0 ? (
+            <Text style={styles.emptyChars}>{tLootTrade('issueModal.noRoomsAvailable')}</Text>
+          ) : singleRoomObj ? (
+            <Text style={styles.roomSub}>
+              {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
+                room: `${singleRoomObj.name || ''} (${formatRoomCodeForDisplay(singleRoomObj.code)})`.trim(),
+              })}
+            </Text>
+          ) : (
+            <View style={styles.roomsPickerBlock}>
+              <Text style={styles.sectionTitle}>{tLootTrade('issueModal.selectRoomTitle')}</Text>
+              <View style={styles.roomChipsRow}>
+                {candidateRooms.map((r) => {
+                  const active = r.code === selectedRoomCode;
+                  return (
+                    <TouchableOpacity
+                      key={r.code}
+                      style={[styles.roomChip, active && styles.roomChipActive]}
+                      onPress={() => {
+                        setSelectedRoomCode(r.code);
+                        onSelectRoom?.(r.code);
+                      }}
+                    >
+                      <Text style={[styles.roomChipText, active && styles.roomChipTextActive]}>
+                        {`${r.name} (${formatRoomCodeForDisplay(r.code)})`}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>
 
@@ -81,8 +160,8 @@ const IssueContainerModal = ({
             style={[styles.optionCard, targetType === 'character' && styles.optionCardActive]}
             onPress={() => {
               setTargetType('character');
-              if (!selectedCharacterId && roomCharacters[0]?.id) {
-                setSelectedCharacterId(roomCharacters[0].id);
+              if (!selectedCharacterId && effectiveRoomCharacters[0]?.id) {
+                setSelectedCharacterId(effectiveRoomCharacters[0].id);
               }
             }}
           >
@@ -98,10 +177,10 @@ const IssueContainerModal = ({
 
           {targetType === 'character' && (
             <ScrollView style={styles.charList}>
-              {roomCharacters.length === 0 ? (
+              {effectiveRoomCharacters.length === 0 ? (
                 <Text style={styles.emptyChars}>{tLootTrade('issueModal.noCharactersInRoom')}</Text>
               ) : (
-                roomCharacters.map((char) => {
+                effectiveRoomCharacters.map((char) => {
                   const chosen = char.id === selectedCharacterId;
                   return (
                     <TouchableOpacity
@@ -173,6 +252,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 16,
+  },
+  roomsPickerBlock: {
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  roomChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  roomChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#555555',
+    backgroundColor: '#2a2a2a',
+  },
+  roomChipActive: {
+    borderColor: '#f0e68c',
+    backgroundColor: '#3a3a1e',
+  },
+  roomChipText: {
+    color: '#dddddd',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  roomChipTextActive: {
+    color: '#f0e68c',
+    fontWeight: '700',
   },
   sectionTitle: {
     color: '#e8e8e8',

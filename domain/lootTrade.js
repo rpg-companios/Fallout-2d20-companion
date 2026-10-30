@@ -245,6 +245,128 @@ export const normalizeHubLinks = (rawLinks = []) => {
 };
 
 /**
+ * Нормализация списка кодов комнат (локация может быть привязана сразу к нескольким комнатам).
+ */
+export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
+  const candidates = [];
+  if (Array.isArray(rawRoomCodes)) {
+    for (const c of rawRoomCodes) candidates.push(c);
+  } else if (typeof rawRoomCodes === 'string' && rawRoomCodes.trim()) {
+    candidates.push(rawRoomCodes);
+  }
+  if (fallbackRoomCode) candidates.push(fallbackRoomCode);
+
+  const seen = new Set();
+  const out = [];
+  for (const item of candidates) {
+    const code = String(item || '').trim().toUpperCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    out.push(code);
+  }
+  return out;
+};
+
+export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
+  [CONTAINER_KIND.HUB]: 0,
+  [CONTAINER_KIND.LOOT]: 1,
+  [CONTAINER_KIND.MERCHANT]: 2,
+});
+
+/**
+ * Сортировка карточек на главном экране «Добыча/Торговля»:
+ * 1) Локации ('hub') -> 2) Сундуки ('loot') -> 3) Торговцы ('merchant'),
+ * а внутри каждой группы — по алфавиту названия.
+ */
+export const sortContainersForRoot = (containers = []) => {
+  if (!Array.isArray(containers)) return [];
+  return [...containers].sort((a, b) => {
+    const rankA = CONTAINER_KIND_SORT_ORDER[a?.kind] ?? 99;
+    const rankB = CONTAINER_KIND_SORT_ORDER[b?.kind] ?? 99;
+    if (rankA !== rankB) return rankA - rankB;
+    const nameCmp = String(a?.name || '').localeCompare(String(b?.name || ''), 'ru', {
+      sensitivity: 'base',
+    });
+    if (nameCmp !== 0) return nameCmp;
+    return (Number(a?.createdAt) || 0) - (Number(b?.createdAt) || 0);
+  });
+};
+
+/**
+ * Список id всех локаций ('hub'), в которых числится данный контейнер/торговец.
+ */
+export const getHubIdsContainingChild = (childId, allContainers = []) => {
+  const targetId = String(childId || '').trim();
+  if (!targetId || !Array.isArray(allContainers)) return [];
+  const hubIds = [];
+  for (const c of allContainers) {
+    if (!c || c.kind !== CONTAINER_KIND.HUB) continue;
+    if ((c.links || []).some((lnk) => lnk?.containerId === targetId)) {
+      hubIds.push(c.id);
+    }
+  }
+  return hubIds;
+};
+
+/**
+ * Определяет, показывается ли карточка на корневом экране «Добыча/Торговля»:
+ * - все локации ('hub') всегда на корневом экране;
+ * - сундук/торговец показывается на корне, если он не привязан ни к одной локации
+ *   (защита от «потерянных» карточек) ИЛИ если Мастер явно вынес его на экран (inRoot === true).
+ */
+export const isContainerVisibleOnRoot = (container, allContainers = []) => {
+  if (!container) return false;
+  if (container.kind === CONTAINER_KIND.HUB) return true;
+  const parentHubIds = getHubIdsContainingChild(container.id, allContainers);
+  if (parentHubIds.length === 0) return true;
+  return container.inRoot === true;
+};
+
+/**
+ * Анализ последствий удаления локации ('hub'):
+ * - exclusiveChildren: сундуки/торговцы, которые числятся ТОЛЬКО в этой локации (и не вынесены на корень);
+ * - sharedChildren: сундуки/торговцы из этой локации, которые также есть в других локациях или на корне.
+ */
+export const analyzeHubDeletion = (hubId, allContainers = []) => {
+  const targetHubId = String(hubId || '').trim();
+  const list = Array.isArray(allContainers) ? allContainers : [];
+  const hub = list.find((c) => c && c.id === targetHubId && c.kind === CONTAINER_KIND.HUB);
+  if (!hub) {
+    return { exclusiveChildren: [], sharedChildren: [], allExclusive: false };
+  }
+
+  const otherHubs = list.filter(
+    (c) => c && c.kind === CONTAINER_KIND.HUB && c.id !== targetHubId,
+  );
+  const byId = new Map(
+    list
+      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .map((c) => [c.id, c]),
+  );
+
+  const exclusiveChildren = [];
+  const sharedChildren = [];
+  for (const link of normalizeHubLinks(hub.links)) {
+    const child = byId.get(link.containerId);
+    if (!child) continue;
+    const inOtherHub = otherHubs.some((other) => (
+      (other.links || []).some((l) => l?.containerId === child.id)
+    ));
+    if (inOtherHub || child.inRoot === true) {
+      sharedChildren.push(child);
+    } else {
+      exclusiveChildren.push(child);
+    }
+  }
+
+  return {
+    exclusiveChildren,
+    sharedChildren,
+    allExclusive: exclusiveChildren.length > 0 && sharedChildren.length === 0,
+  };
+};
+
+/**
  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
  * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
  */
@@ -302,13 +424,20 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   const links = kind === CONTAINER_KIND.HUB
     ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
     : [];
+  const roomCodes = normalizeRoomCodes(raw.roomCodes, raw.roomCode);
+  const primaryRoomCode = roomCodes[0] || '';
+  const inRoot = kind === CONTAINER_KIND.HUB
+    ? true
+    : (raw.inRoot === undefined ? undefined : Boolean(raw.inRoot));
 
   return {
     id: String(raw.id || makeContainerId(now)),
     kind,
     name: String(raw.name || '').trim(),
-    roomCode: String(raw.roomCode || '').trim(),
+    roomCode: primaryRoomCode,
+    roomCodes,
     roomName: String(raw.roomName || '').trim(),
+    inRoot,
     description: String(raw.description || '').trim(),
     caps: kind === CONTAINER_KIND.MERCHANT
       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
@@ -590,6 +719,7 @@ export const duplicateContainerEntity = (
       itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
     })),
     links: (normalized.links || []).map((lnk) => ({ ...lnk })),
+    roomCodes: [...(normalized.roomCodes || [])],
     createdAt: now,
     updatedAt: now,
   };

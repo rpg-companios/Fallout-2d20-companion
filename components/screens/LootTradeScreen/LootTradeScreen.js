@@ -10,6 +10,7 @@ import {
   TextInput,
   Dimensions,
   Platform,
+  PanResponder,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -29,14 +30,20 @@ import { formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
 import {
   CONTAINER_KIND,
+  CONTAINER_KIND_SORT_ORDER,
   addOrMergeContainerItem,
+  analyzeHubDeletion,
   buildHubSessionNodes,
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
+  getHubIdsContainingChild,
+  isContainerVisibleOnRoot,
   normalizeBuyDepreciationPercent,
   normalizeCapsAmount,
+  normalizeRoomCodes,
   normalizeSaleMarkupPercent,
   resolveQuantitySpec,
+  sortContainersForRoot,
 } from '../../../domain/lootTrade';
 import { getItemPrice, getItemWeight, resolveItem } from '../../../domain/resolveItem';
 import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
@@ -92,22 +99,63 @@ const ContainerCardCell = ({
   container,
   roomLabel,
   isLive,
+  isDropTarget = false,
+  canMoveToHub = false,
+  cardRefCallback,
   onOpen,
   onIssueOrClose,
+  onMoveToHub,
   onDuplicate,
   onEdit,
   onDelete,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
 }) => {
   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
   const isHub = container.kind === CONTAINER_KIND.HUB;
   const menuBtnRef = useRef(null);
   const [menuPos, setMenuPos] = useState(null);
 
+  const dragCallbacks = useRef({});
+  dragCallbacks.current = { container, onDragStart, onDragMove, onDragEnd };
+  const lastDragPoint = useRef({ pageX: 0, pageY: 0 });
+  const draggingRef = useRef(false);
+  const panResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false,
+    onShouldBlockNativeResponder: () => true,
+    onPanResponderGrant: (_evt, gesture) => {
+      draggingRef.current = true;
+      lastDragPoint.current = { pageX: gesture.x0, pageY: gesture.y0 };
+      dragCallbacks.current.onDragStart?.(
+        { pageX: gesture.x0, pageY: gesture.y0 },
+        dragCallbacks.current.container,
+      );
+    },
+    onPanResponderMove: (_evt, gesture) => {
+      if (gesture.moveX === 0 && gesture.moveY === 0) return;
+      lastDragPoint.current = { pageX: gesture.moveX, pageY: gesture.moveY };
+      dragCallbacks.current.onDragMove?.(lastDragPoint.current);
+    },
+    onPanResponderRelease: () => {
+      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
+      setTimeout(() => { draggingRef.current = false; }, 0);
+    },
+    onPanResponderTerminate: () => {
+      dragCallbacks.current.onDragEnd?.(lastDragPoint.current);
+      setTimeout(() => { draggingRef.current = false; }, 0);
+    },
+  })).current;
+
   const openMenu = (event) => {
     event?.stopPropagation?.();
     menuBtnRef.current?.measureInWindow((x, y, width, height) => {
       const { width: winW, height: winH } = Dimensions.get('window');
-      const menuH = 184;
+      const menuH = canMoveToHub ? 226 : 184;
       const left = Math.max(8, Math.min(x + width - MENU_WIDTH, winW - MENU_WIDTH - 8));
       const top = y + height + menuH + 8 <= winH
         ? y + height + 4
@@ -130,10 +178,23 @@ const ContainerCardCell = ({
 
   return (
     <TouchableOpacity
-      style={[styles.cardCell, isLive && styles.cardCellActive]}
-      onPress={onOpen}
+      ref={cardRefCallback}
+      style={[
+        styles.cardCell,
+        isLive && styles.cardCellActive,
+        isDropTarget && styles.cardCellDropTarget,
+      ]}
+      onPress={() => {
+        if (!draggingRef.current) onOpen();
+      }}
       activeOpacity={0.82}
     >
+      {!isHub && onDragStart && (
+        <View {...panResponder.panHandlers} style={styles.cardDragHandle}>
+          <MaterialCommunityIcons name="arrow-all" size={16} color="#1f1f1f" />
+        </View>
+      )}
+
       <View style={[
         styles.cardHero,
         isMerchant && styles.cardHeroMerchant,
@@ -149,11 +210,13 @@ const ContainerCardCell = ({
           size={34}
           color="#f0e68c"
         />
-        <View style={styles.cardRoomChip}>
-          <Text style={styles.cardRoomChipText} numberOfLines={1}>
-            {roomLabel || formatRoomCodeForDisplay(container.roomCode)}
-          </Text>
-        </View>
+        {isHub && Boolean(roomLabel) && (
+          <View style={styles.cardRoomChip}>
+            <Text style={styles.cardRoomChipText} numberOfLines={1}>
+              {roomLabel}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.cardBody}>
@@ -219,6 +282,16 @@ const ContainerCardCell = ({
                 </Text>
               </TouchableOpacity>
 
+              {canMoveToHub && onMoveToHub && (
+                <TouchableOpacity
+                  style={styles.actionMenuItem}
+                  onPress={() => runMenuAction(onMoveToHub)}
+                >
+                  <MaterialCommunityIcons name="map-marker-plus-outline" size={19} color="#d4af37" />
+                  <Text style={styles.actionMenuText}>{tLootTrade('card.moveToHub')}</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={styles.actionMenuItem}
                 onPress={() => runMenuAction(onDuplicate)}
@@ -264,12 +337,17 @@ export default function LootTradeScreen() {
   const [availableRooms, setAvailableRooms] = useState([]); // [{ folderId, name, code, ownerToken }]
   const [activeContainerId, setActiveContainerId] = useState(null);
 
-  // Модалки
+  // Модалки и перетаскивание в локации
   const [formModal, setFormModal] = useState(null); // { kind, initialContainer }
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogFeedback, setCatalogFeedback] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [hubPickerOpen, setHubPickerOpen] = useState(false);
+  const [moveToHubTarget, setMoveToHubTarget] = useState(null); // container для переноса через меню ⋮
+  const [movingContainerId, setMovingContainerId] = useState(null);
+  const [drag, setDrag] = useState(null); // { container, x, y }
+  const hubRefs = useRef({});
+  const hubDropBounds = useRef({});
   const [returnHubId, setReturnHubId] = useState(null);
   const [issueTargetContainer, setIssueTargetContainer] = useState(null);
   const [issueBusy, setIssueBusy] = useState(false);
@@ -337,14 +415,28 @@ export default function LootTradeScreen() {
     }
   }, [loading, activeContainerId, containers]);
 
-  const getActiveSessionForContainer = useCallback((cnt) => {
-    if (!cnt?.roomCode) return null;
-    const active = roomRooms[cnt.roomCode]?.activeSession;
-    if (!active || active.containerId !== cnt.id) return null;
-    return active;
+  const getActiveLiveEntriesForContainer = useCallback((cnt) => {
+    if (!cnt?.id) return [];
+    const matches = [];
+    for (const [code, roomState] of Object.entries(roomRooms || {})) {
+      const active = roomState?.activeSession;
+      if (active && active.containerId === cnt.id) {
+        matches.push({ roomCode: code, session: active });
+      }
+    }
+    return matches;
   }, [roomRooms]);
 
-  const activeLiveSession = activeContainer ? getActiveSessionForContainer(activeContainer) : null;
+  const getActiveSessionForContainer = useCallback((cnt) => {
+    const entries = getActiveLiveEntriesForContainer(cnt);
+    return entries[0]?.session || null;
+  }, [getActiveLiveEntriesForContainer]);
+
+  const activeLiveEntry = activeContainer
+    ? (getActiveLiveEntriesForContainer(activeContainer)[0] || null)
+    : null;
+  const activeLiveSession = activeLiveEntry?.session || null;
+  const activeLiveRoomCode = activeLiveEntry?.roomCode || activeContainer?.roomCode || '';
 
   const liveHubMerchants = useMemo(() => {
     if (!activeLiveSession || activeLiveSession.kind !== CONTAINER_KIND.HUB) return [];
@@ -422,13 +514,13 @@ export default function LootTradeScreen() {
     setContainers(freshList || []);
     void syncGmContainerToCloudIfEnabled(saved.id);
 
-    // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем
-    const live = getActiveSessionForContainer(saved);
-    if (live) {
+    // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
+    const liveEntries = getActiveLiveEntriesForContainer(saved);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
       try {
         if (saved.kind === CONTAINER_KIND.HUB) {
           await useRoomStore.getState().updateRoomSessionRates({
-            code: saved.roomCode,
+            code: liveCode,
             sessionId: live.sessionId,
             name: saved.name,
             description: saved.description,
@@ -436,7 +528,7 @@ export default function LootTradeScreen() {
           });
         } else {
           await useRoomStore.getState().updateRoomSessionRates({
-            code: saved.roomCode,
+            code: liveCode,
             sessionId: live.sessionId,
             name: saved.name,
             description: saved.description,
@@ -487,10 +579,37 @@ export default function LootTradeScreen() {
     return saved;
   };
 
-  const handleSaveContainerForm = async (draft, capsRollInfo) => {
+  const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
     const cleanDraft = { ...draft };
     delete cleanDraft.__isDuplicateDraft;
+
+    if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
+      cleanDraft.inRoot = false;
+    }
+
     const saved = await persistAndSyncContainer(cleanDraft);
+
+    if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
+      const targetHubSet = new Set(selectedHubIds);
+      const currentList = await db.getGmContainersList();
+      for (const item of currentList) {
+        if (item.kind !== CONTAINER_KIND.HUB) continue;
+        const hasLink = (item.links || []).some((l) => l.containerId === saved.id);
+        const shouldHaveLink = targetHubSet.has(item.id);
+        if (shouldHaveLink && !hasLink) {
+          await persistAndSyncContainer({
+            ...item,
+            links: [...(item.links || []), { containerId: saved.id, locked: false, lockLabel: '' }],
+          });
+        } else if (!shouldHaveLink && hasLink) {
+          await persistAndSyncContainer({
+            ...item,
+            links: (item.links || []).filter((l) => l.containerId !== saved.id),
+          });
+        }
+      }
+    }
+
     setFormModal(null);
     if (!activeContainerId && !draft.id) {
       setActiveContainerId(saved.id);
@@ -501,6 +620,90 @@ export default function LootTradeScreen() {
         unit: capsRollInfo.unit === 'cd' ? '{CD}' : 'd20',
         total: capsRollInfo.quantity,
       }));
+    }
+  };
+
+  const handleMoveCardIntoHub = async (cardId, hubId) => {
+    if (!cardId || !hubId) return;
+    const card = containers.find((c) => c.id === cardId);
+    const hub = containers.find((c) => c.id === hubId && c.kind === CONTAINER_KIND.HUB);
+    if (!card || !hub || card.kind === CONTAINER_KIND.HUB) return;
+
+    if (card.inRoot) {
+      await db.saveGmContainer({ ...card, inRoot: false });
+      void syncGmContainerToCloudIfEnabled(card.id);
+    }
+
+    const alreadyLinked = (hub.links || []).some((l) => l.containerId === card.id);
+    if (!alreadyLinked) {
+      await persistAndSyncContainer({
+        ...hub,
+        links: [...(hub.links || []), { containerId: card.id, locked: false, lockLabel: '' }],
+      });
+    } else {
+      await loadData();
+    }
+    setMovingContainerId(null);
+    setDrag(null);
+    hubDropBounds.current = {};
+  };
+
+  const handleMoveChildOutToRoot = async (childId) => {
+    if (!activeContainer || activeContainer.kind !== CONTAINER_KIND.HUB || !childId) return;
+    const otherHubIds = getHubIdsContainingChild(childId, containers)
+      .filter((hid) => hid !== activeContainer.id);
+    const child = containers.find((c) => c.id === childId);
+    if (child) {
+      const nextInRoot = otherHubIds.length > 0;
+      if (Boolean(child.inRoot) !== nextInRoot) {
+        await db.saveGmContainer({ ...child, inRoot: nextInRoot });
+        void syncGmContainerToCloudIfEnabled(child.id);
+      }
+    }
+    const nextLinks = (activeContainer.links || []).filter((l) => l.containerId !== childId);
+    await persistAndSyncContainer({ ...activeContainer, links: nextLinks });
+  };
+
+  const measureHubDropTargets = useCallback(() => {
+    const entries = Object.entries(hubRefs.current).map(([id, ref]) => new Promise((resolve) => {
+      if (!ref?.measureInWindow) {
+        resolve();
+        return;
+      }
+      ref.measureInWindow((x, y, width, height) => {
+        hubDropBounds.current[id] = { x, y, width, height };
+        resolve();
+      });
+    }));
+    return Promise.all(entries);
+  }, []);
+
+  const handleDragStart = async (point, card) => {
+    if (!card || card.kind === CONTAINER_KIND.HUB) return;
+    hubDropBounds.current = {};
+    setMovingContainerId(card.id);
+    setDrag({ container: card, x: point.pageX, y: point.pageY });
+    await measureHubDropTargets();
+  };
+
+  const handleDragMove = (point) => {
+    setDrag((cur) => (cur ? { ...cur, x: point.pageX, y: point.pageY } : null));
+  };
+
+  const handleDragEnd = async (point) => {
+    await measureHubDropTargets();
+    const hit = Object.entries(hubDropBounds.current).find(([, b]) => (
+      b
+      && point.pageX >= b.x
+      && point.pageX <= b.x + b.width
+      && point.pageY >= b.y
+      && point.pageY <= b.y + b.height
+    ));
+    if (hit && movingContainerId) {
+      await handleMoveCardIntoHub(movingContainerId, hit[0]);
+    } else {
+      setMovingContainerId(null);
+      setDrag(null);
     }
   };
 
@@ -519,7 +722,96 @@ export default function LootTradeScreen() {
     }
   };
 
+  const closeAllLiveSessionsForCard = async (card) => {
+    const liveEntries = getActiveLiveEntriesForContainer(card);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
+      await useRoomStore.getState().closeRoomSession({
+        code: liveCode,
+        sessionId: live.sessionId,
+      }).catch(() => {});
+    }
+  };
+
   const handleDeleteCard = async (container) => {
+    if (container.kind === CONTAINER_KIND.HUB) {
+      const { exclusiveChildren, sharedChildren, allExclusive } = analyzeHubDeletion(
+        container.id,
+        containers,
+      );
+
+      let decision = 'cancel';
+      if (exclusiveChildren.length > 0) {
+        const message = allExclusive
+          ? formatLootTrade(tLootTrade('detail.deleteHubAllExclusiveMessage'), {
+              name: container.name,
+              count: exclusiveChildren.length,
+            })
+          : formatLootTrade(tLootTrade('detail.deleteHubMixedMessage'), {
+              name: container.name,
+              exclusiveCount: exclusiveChildren.length,
+              sharedCount: sharedChildren.length,
+            });
+        decision = await new Promise((resolve) => {
+          showRawAlert({
+            title: tLootTrade('detail.deleteHubConfirmTitle'),
+            message,
+            buttons: [
+              { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve('cancel') },
+              { text: tLootTrade('detail.deleteHubMoveOutOnly'), onPress: () => resolve('moveOut') },
+              {
+                text: tLootTrade('detail.deleteHubWithChildren'),
+                style: 'destructive',
+                onPress: () => resolve('deleteAll'),
+              },
+            ],
+          });
+        });
+      } else {
+        const message = sharedChildren.length > 0
+          ? formatLootTrade(tLootTrade('detail.deleteHubSharedOnlyMessage'), {
+              name: container.name,
+              sharedCount: sharedChildren.length,
+            })
+          : formatLootTrade(tLootTrade('detail.deleteConfirmMessage'), { name: container.name });
+        const ok = await new Promise((resolve) => {
+          showRawAlert({
+            title: tLootTrade('detail.deleteHubConfirmTitle'),
+            message,
+            buttons: [
+              { text: tLootTrade('form.cancel'), style: 'cancel', onPress: () => resolve(false) },
+              { text: tLootTrade('card.delete'), style: 'destructive', onPress: () => resolve(true) },
+            ],
+          });
+        });
+        decision = ok ? 'deleteHubOnly' : 'cancel';
+      }
+
+      if (decision === 'cancel') return;
+
+      await closeAllLiveSessionsForCard(container);
+
+      if (decision === 'moveOut') {
+        for (const child of exclusiveChildren) {
+          await db.saveGmContainer({ ...child, inRoot: true });
+          void syncGmContainerToCloudIfEnabled(child.id);
+        }
+      } else if (decision === 'deleteAll') {
+        for (const child of exclusiveChildren) {
+          await closeAllLiveSessionsForCard(child);
+          await deleteGmContainerFromCloudIfEnabled(child.id);
+          await db.deleteGmContainer(child.id);
+          if (activeContainerId === child.id) setActiveContainerId(null);
+        }
+      }
+
+      await deleteGmContainerFromCloudIfEnabled(container.id);
+      await db.deleteGmContainer(container.id);
+      if (activeContainerId === container.id) setActiveContainerId(null);
+      if (returnHubId === container.id) setReturnHubId(null);
+      await loadData();
+      return;
+    }
+
     const confirmed = await new Promise((resolve) => {
       showRawAlert({
         title: tLootTrade('detail.deleteConfirmTitle'),
@@ -532,30 +824,22 @@ export default function LootTradeScreen() {
     });
     if (!confirmed) return;
 
-    const live = getActiveSessionForContainer(container);
-    if (live) {
-      await useRoomStore.getState().closeRoomSession({
-        code: container.roomCode,
-        sessionId: live.sessionId,
-      }).catch(() => {});
-    }
+    await closeAllLiveSessionsForCard(container);
     await deleteGmContainerFromCloudIfEnabled(container.id);
     await db.deleteGmContainer(container.id);
 
     // Если удалён дочерний контейнер/торговец, вычищаем ссылки на него из локаций
-    if (container.kind !== CONTAINER_KIND.HUB) {
-      const remainingList = await db.getGmContainersList();
-      for (const item of remainingList) {
-        if (
-          item.kind === CONTAINER_KIND.HUB
-          && (item.links || []).some((l) => l.containerId === container.id)
-        ) {
-          const cleaned = await db.saveGmContainer({
-            ...item,
-            links: item.links.filter((l) => l.containerId !== container.id),
-          });
-          void syncGmContainerToCloudIfEnabled(cleaned.id);
-        }
+    const remainingList = await db.getGmContainersList();
+    for (const item of remainingList) {
+      if (
+        item.kind === CONTAINER_KIND.HUB
+        && (item.links || []).some((l) => l.containerId === container.id)
+      ) {
+        const cleaned = await db.saveGmContainer({
+          ...item,
+          links: item.links.filter((l) => l.containerId !== container.id),
+        });
+        void syncGmContainerToCloudIfEnabled(cleaned.id);
       }
     }
 
@@ -565,15 +849,17 @@ export default function LootTradeScreen() {
   };
 
   const handleIssueOrClosePress = async (container) => {
-    const live = getActiveSessionForContainer(container);
-    if (live) {
-      try {
-        await useRoomStore.getState().closeRoomSession({
-          code: container.roomCode,
-          sessionId: live.sessionId,
-        });
-      } catch (e) {
-        debugLog('lootTrade.closeSession:failed', { message: e?.message });
+    const liveEntries = getActiveLiveEntriesForContainer(container);
+    if (liveEntries.length > 0) {
+      for (const { roomCode: liveCode, session: live } of liveEntries) {
+        try {
+          await useRoomStore.getState().closeRoomSession({
+            code: liveCode,
+            sessionId: live.sessionId,
+          });
+        } catch (e) {
+          debugLog('lootTrade.closeSession:failed', { message: e?.message });
+        }
       }
       return;
     }
@@ -586,22 +872,30 @@ export default function LootTradeScreen() {
       }
     }
 
-    try {
-      await ensureGmRoomConnected(container.roomCode);
-    } catch {
-      // Откроем окно, при подтверждении повторим подключение
+    const defaultCode = container.roomCode || availableRooms[0]?.code || '';
+    if (defaultCode) {
+      try {
+        await ensureGmRoomConnected(defaultCode);
+      } catch {
+        // Откроем окно, при подтверждении повторим подключение
+      }
     }
     setIssueTargetContainer(container);
   };
 
-  const handleConfirmIssue = async ({ targetType, targetCharacterId, targetCharacterName }) => {
+  const handleConfirmIssue = async ({ roomCode: chosenRoomCode, targetType, targetCharacterId, targetCharacterName }) => {
     if (!issueTargetContainer) return;
+    const effectiveRoomCode = chosenRoomCode || issueTargetContainer.roomCode || availableRooms[0]?.code || '';
+    if (!effectiveRoomCode) {
+      showRawAlert({ title: tLootTrade('issueModal.noRoomsAvailable') });
+      return;
+    }
     setIssueBusy(true);
     try {
-      await ensureGmRoomConnected(issueTargetContainer.roomCode);
+      await ensureGmRoomConnected(effectiveRoomCode);
       const isHub = issueTargetContainer.kind === CONTAINER_KIND.HUB;
       await useRoomStore.getState().openRoomSession({
-        code: issueTargetContainer.roomCode,
+        code: effectiveRoomCode,
         session: {
           containerId: issueTargetContainer.id,
           kind: issueTargetContainer.kind,
@@ -777,18 +1071,20 @@ export default function LootTradeScreen() {
     await loadData();
     void syncGmContainerToCloudIfEnabled(saved.id);
 
-    const live = getActiveSessionForContainer(saved);
-    if (live && live.kind === CONTAINER_KIND.HUB) {
-      try {
-        await ensureGmRoomConnected(saved.roomCode);
-        await useRoomStore.getState().updateRoomSessionRates({
-          code: saved.roomCode,
-          sessionId: live.sessionId,
-          nodeContainerId: childId,
-          locked: nextLocked,
-        });
-      } catch (error) {
-        debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
+    const liveEntries = getActiveLiveEntriesForContainer(saved);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
+      if (live && live.kind === CONTAINER_KIND.HUB) {
+        try {
+          await ensureGmRoomConnected(liveCode);
+          await useRoomStore.getState().updateRoomSessionRates({
+            code: liveCode,
+            sessionId: live.sessionId,
+            nodeContainerId: childId,
+            locked: nextLocked,
+          });
+        } catch (error) {
+          debugLog('lootTrade.toggleHubLock:failed', { message: error?.message });
+        }
       }
     }
   };
@@ -803,18 +1099,20 @@ export default function LootTradeScreen() {
     await loadData();
     void syncGmContainerToCloudIfEnabled(saved.id);
 
-    const live = getActiveSessionForContainer(saved);
-    if (live && live.kind === CONTAINER_KIND.HUB) {
-      try {
-        await ensureGmRoomConnected(saved.roomCode);
-        await useRoomStore.getState().updateRoomSessionRates({
-          code: saved.roomCode,
-          sessionId: live.sessionId,
-          nodeContainerId: childId,
-          lockLabel: cleanLabel,
-        });
-      } catch (error) {
-        debugLog('lootTrade.updateHubLockLabel:failed', { message: error?.message });
+    const liveEntries = getActiveLiveEntriesForContainer(saved);
+    for (const { roomCode: liveCode, session: live } of liveEntries) {
+      if (live && live.kind === CONTAINER_KIND.HUB) {
+        try {
+          await ensureGmRoomConnected(liveCode);
+          await useRoomStore.getState().updateRoomSessionRates({
+            code: liveCode,
+            sessionId: live.sessionId,
+            nodeContainerId: childId,
+            lockLabel: cleanLabel,
+          });
+        } catch (error) {
+          debugLog('lootTrade.updateHubLockLabel:failed', { message: error?.message });
+        }
       }
     }
   };
@@ -825,13 +1123,13 @@ export default function LootTradeScreen() {
     caps = normalizeCapsAmount(liveCapsInput, effectiveLiveMerchantNode?.caps ?? 0),
     resetPersonal = false,
   } = {}) => {
-    if (!activeContainer || !activeLiveSession || !effectiveLiveMerchantNode) return;
+    if (!activeContainer || !activeLiveSession || !activeLiveRoomCode || !effectiveLiveMerchantNode) return;
     const isHubSession = activeLiveSession.kind === CONTAINER_KIND.HUB;
     const targetNodeContainerId = isHubSession ? effectiveLiveMerchantNode.containerId : null;
     try {
-      await ensureGmRoomConnected(activeContainer.roomCode);
+      await ensureGmRoomConnected(activeLiveRoomCode);
       await useRoomStore.getState().updateRoomSessionRates({
-        code: activeContainer.roomCode,
+        code: activeLiveRoomCode,
         sessionId: activeLiveSession.sessionId,
         ...(targetNodeContainerId ? { nodeContainerId: targetNodeContainerId } : {}),
         targetCharacterId: rateScopeCharId,
@@ -908,11 +1206,42 @@ export default function LootTradeScreen() {
     label: getLocaleLabel({ code, displayLocale: locale, translate: tHomeScreen }),
   }));
 
+  const availableHubs = useMemo(
+    () => sortContainersForRoot(containers.filter((c) => c.kind === CONTAINER_KIND.HUB)),
+    [containers],
+  );
+
+  const rootVisibleContainers = useMemo(
+    () => sortContainersForRoot(containers.filter((c) => isContainerVisibleOnRoot(c, containers))),
+    [containers],
+  );
+
+  const formatSingleRoomName = useCallback((code, fallbackName = '') => {
+    if (!code) return '';
+    const rec = roomByCode[code];
+    return rec
+      ? `${rec.name} (${formatRoomCodeForDisplay(code)})`
+      : (fallbackName ? `${fallbackName} (${formatRoomCodeForDisplay(code)})` : formatRoomCodeForDisplay(code));
+  }, [roomByCode]);
+
+  const formatHubCardRoomLabel = useCallback((hub) => {
+    const codes = normalizeRoomCodes(hub.roomCodes, hub.roomCode);
+    if (codes.length === 0) return '';
+    const primary = formatSingleRoomName(codes[0], hub.roomName);
+    return codes.length > 1 ? `${primary} +${codes.length - 1}` : primary;
+  }, [formatSingleRoomName]);
+
+  const formatHubDetailRoomsLabel = useCallback((hub) => {
+    const codes = normalizeRoomCodes(hub.roomCodes, hub.roomCode);
+    if (codes.length === 0) return '';
+    return codes.map((code, idx) => formatSingleRoomName(code, idx === 0 ? hub.roomName : '')).join(', ');
+  }, [formatSingleRoomName]);
+
   const gridItems = [
+    { type: 'createHub', id: '__create_hub__' },
     { type: 'createLoot', id: '__create_loot__' },
     { type: 'createMerchant', id: '__create_merchant__' },
-    { type: 'createHub', id: '__create_hub__' },
-    ...containers.map((c) => ({ type: 'container', ...c })),
+    ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
   ];
 
   const rows = [];
@@ -930,8 +1259,8 @@ export default function LootTradeScreen() {
     ? buildGmRoomCharacterCards(roomRooms[issueTargetContainer.roomCode])
     : [];
 
-  const activeContainerRoomCharacters = activeContainer?.roomCode
-    ? buildGmRoomCharacterCards(roomRooms[activeContainer.roomCode])
+  const activeContainerRoomCharacters = activeLiveRoomCode
+    ? buildGmRoomCharacterCards(roomRooms[activeLiveRoomCode])
     : [];
 
   return (
@@ -987,6 +1316,10 @@ export default function LootTradeScreen() {
             <Text style={styles.subtitle}>{tLootTrade('subtitle')}</Text>
           </View>
 
+          {movingContainerId && (
+            <Text style={styles.moveHintBanner}>{tLootTrade('card.moveHint')}</Text>
+          )}
+
           {Boolean(rollBanner) && (
             <View style={[styles.rollBanner, { marginHorizontal: 16, marginTop: 8 }]}>
               <IconText style={styles.rollBannerText}>{withCdToken(rollBanner)}</IconText>
@@ -1000,6 +1333,16 @@ export default function LootTradeScreen() {
               rows.map((row, rIdx) => (
                 <View key={rIdx} style={styles.row}>
                   {row.map((cell) => {
+                    if (cell.type === 'createHub') {
+                      return (
+                        <ActionCell
+                          key={cell.id}
+                          iconName="map-marker-multiple"
+                          label={tLootTrade('actions.createHub')}
+                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
+                        />
+                      );
+                    }
                     if (cell.type === 'createLoot') {
                       return (
                         <ActionCell
@@ -1020,37 +1363,40 @@ export default function LootTradeScreen() {
                         />
                       );
                     }
-                    if (cell.type === 'createHub') {
-                      return (
-                        <ActionCell
-                          key={cell.id}
-                          iconName="map-marker-multiple"
-                          label={tLootTrade('actions.createHub')}
-                          onPress={() => setFormModal({ kind: CONTAINER_KIND.HUB, initialContainer: null })}
-                        />
-                      );
-                    }
                     if (cell.type === 'empty') {
                       return <View key={cell.id} style={styles.emptyCell} />;
                     }
-                    const roomRec = roomByCode[cell.roomCode];
-                    const roomLabel = roomRec
-                      ? `${roomRec.name} (${formatRoomCodeForDisplay(cell.roomCode)})`
-                      : (cell.roomName || formatRoomCodeForDisplay(cell.roomCode));
+                    const isHubCell = cell.kind === CONTAINER_KIND.HUB;
+                    const roomLabel = isHubCell ? formatHubCardRoomLabel(cell) : '';
                     return (
                       <ContainerCardCell
                         key={cell.id}
                         container={cell}
                         roomLabel={roomLabel}
-                        isLive={Boolean(getActiveSessionForContainer(cell))}
+                        isLive={getActiveLiveEntriesForContainer(cell).length > 0}
+                        isDropTarget={Boolean(isHubCell && movingContainerId)}
+                        canMoveToHub={!isHubCell && availableHubs.length > 0}
+                        cardRefCallback={isHubCell
+                          ? (node) => { hubRefs.current[cell.id] = node; }
+                          : undefined}
                         onOpen={() => {
+                          if (isHubCell && movingContainerId) {
+                            void handleMoveCardIntoHub(movingContainerId, cell.id);
+                            return;
+                          }
                           setReturnHubId(null);
                           setActiveContainerId(cell.id);
                         }}
                         onIssueOrClose={() => handleIssueOrClosePress(cell)}
+                        onMoveToHub={!isHubCell && availableHubs.length > 0
+                          ? () => setMoveToHubTarget(cell)
+                          : undefined}
                         onDuplicate={() => handleDuplicateCard(cell)}
                         onEdit={() => setFormModal({ kind: cell.kind, initialContainer: cell })}
                         onDelete={() => handleDeleteCard(cell)}
+                        onDragStart={!isHubCell && availableHubs.length > 0 ? handleDragStart : undefined}
+                        onDragMove={!isHubCell && availableHubs.length > 0 ? handleDragMove : undefined}
+                        onDragEnd={!isHubCell && availableHubs.length > 0 ? handleDragEnd : undefined}
                       />
                     );
                   })}
@@ -1058,6 +1404,20 @@ export default function LootTradeScreen() {
               ))
             )}
           </ScrollView>
+
+          {drag && (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.dragPreviewCard,
+                { left: drag.x - 59, top: drag.y - 22 },
+              ]}
+            >
+              <Text style={styles.dragPreviewText} numberOfLines={1}>
+                {drag.container.name}
+              </Text>
+            </View>
+          )}
         </>
       ) : (
         /* Детальный экран выбранного контейнера / торговца / локации */
@@ -1130,11 +1490,19 @@ export default function LootTradeScreen() {
               <Text style={styles.detailTitle}>{activeContainer.name}</Text>
             </View>
 
-            <Text style={styles.detailRoomText}>
-              {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
-                room: `${roomByCode[activeContainer.roomCode]?.name || activeContainer.roomName || ''} (${formatRoomCodeForDisplay(activeContainer.roomCode)})`.trim(),
-              })}
-            </Text>
+            {activeContainer.kind === CONTAINER_KIND.HUB ? (
+              <Text style={styles.detailRoomText}>
+                {formatLootTrade(tLootTrade('detail.roomsLabel'), {
+                  rooms: formatHubDetailRoomsLabel(activeContainer),
+                })}
+              </Text>
+            ) : Boolean(activeLiveEntry?.roomCode) && (
+              <Text style={styles.detailRoomText}>
+                {formatLootTrade(tLootTrade('issueModal.roomLabel'), {
+                  room: formatSingleRoomName(activeLiveEntry.roomCode),
+                })}
+              </Text>
+            )}
 
             {Boolean(activeContainer.description) && (
               <Text style={styles.detailDescText}>{activeContainer.description}</Text>
@@ -1366,89 +1734,118 @@ export default function LootTradeScreen() {
                 {(activeContainer.links || []).length === 0 ? (
                   <Text style={styles.emptyListText}>{tLootTrade('detail.emptyHubNodes')}</Text>
                 ) : (
-                  (activeContainer.links || []).map((link) => {
-                    const child = containers.find((c) => c.id === link.containerId);
-                    if (!child) return null;
-                    const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
-                    const childPieces = (child.items || []).reduce(
-                      (sum, it) => sum + (Number(it.quantity) || 0),
-                      0,
-                    );
-                    return (
-                      <View key={link.containerId} style={styles.hubChildRow}>
-                        <View style={styles.hubChildTopLine}>
-                          <View style={styles.itemRowMain}>
-                            <View style={styles.itemRowTitleLine}>
-                              <MaterialCommunityIcons
-                                name={childIsMerch ? 'sack' : 'treasure-chest'}
-                                size={18}
-                                color="#2b2b2b"
-                              />
-                              <Text style={styles.itemRowName}>{child.name}</Text>
+                  [...(activeContainer.links || [])]
+                    .sort((linkA, linkB) => {
+                      const childA = containers.find((c) => c.id === linkA.containerId);
+                      const childB = containers.find((c) => c.id === linkB.containerId);
+                      const orderA = CONTAINER_KIND_SORT_ORDER[childA?.kind] ?? 99;
+                      const orderB = CONTAINER_KIND_SORT_ORDER[childB?.kind] ?? 99;
+                      if (orderA !== orderB) return orderA - orderB;
+                      return String(childA?.name || '').localeCompare(String(childB?.name || ''), 'ru');
+                    })
+                    .map((link) => {
+                      const child = containers.find((c) => c.id === link.containerId);
+                      if (!child) return null;
+                      const childIsMerch = child.kind === CONTAINER_KIND.MERCHANT;
+                      const childPieces = (child.items || []).reduce(
+                        (sum, it) => sum + (Number(it.quantity) || 0),
+                        0,
+                      );
+                      const parentHubIds = getHubIdsContainingChild(child.id, containers);
+                      const sharedHubCount = parentHubIds.length;
+                      return (
+                        <View key={link.containerId} style={styles.hubChildRow}>
+                          <View style={styles.hubChildTopLine}>
+                            <View style={styles.itemRowMain}>
+                              <View style={styles.itemRowTitleLine}>
+                                <MaterialCommunityIcons
+                                  name={childIsMerch ? 'sack' : 'treasure-chest'}
+                                  size={18}
+                                  color="#2b2b2b"
+                                />
+                                <Text style={styles.itemRowName}>{child.name}</Text>
+                                {sharedHubCount > 1 && (
+                                  <Text style={styles.hubSharedBadgeText}>
+                                    {formatLootTrade(tLootTrade('detail.hubSharedBadge'), {
+                                      count: sharedHubCount,
+                                    })}
+                                  </Text>
+                                )}
+                              </View>
+                              <View style={styles.itemRowSub}>
+                                <Text style={styles.itemRowSubText}>
+                                  {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
+                                </Text>
+                                {childIsMerch && (
+                                  <IconText style={styles.itemRowSubText}>
+                                    {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
+                                  </IconText>
+                                )}
+                              </View>
                             </View>
-                            <View style={styles.itemRowSub}>
-                              <Text style={styles.itemRowSubText}>
-                                {formatLootTrade(tLootTrade('card.itemsCount'), { count: childPieces })}
-                              </Text>
-                              {childIsMerch && (
-                                <IconText style={styles.itemRowSubText}>
-                                  {formatLootTrade(tLootTrade('card.capsCount'), { caps: child.caps })}
-                                </IconText>
+
+                            <View style={styles.itemRowControls}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.hubLockChip,
+                                  link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
+                                ]}
+                                onPress={() => handleToggleHubChildLock(child.id)}
+                              >
+                                <Text
+                                  style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
+                                >
+                                  {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.itemRowSmallBtn}
+                                onPress={() => {
+                                  setReturnHubId(activeContainer.id);
+                                  setActiveContainerId(child.id);
+                                }}
+                              >
+                                <Text style={styles.itemRowSmallBtnText}>
+                                  {tLootTrade('detail.hubOpenChildCard')}
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={styles.itemRowSmallBtn}
+                                onPress={() => handleMoveChildOutToRoot(child.id)}
+                              >
+                                <Text style={styles.itemRowSmallBtnText}>
+                                  {tLootTrade('detail.hubMoveOutToRoot')}
+                                </Text>
+                              </TouchableOpacity>
+
+                              {(sharedHubCount > 1 || child.inRoot === true) && (
+                                <TouchableOpacity
+                                  style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
+                                  onPress={() => handleRemoveHubChild(child.id)}
+                                >
+                                  <Text style={styles.itemRowDeleteBtnText}>
+                                    {tLootTrade('detail.hubUnlinkChild')}
+                                  </Text>
+                                </TouchableOpacity>
                               )}
                             </View>
                           </View>
 
-                          <View style={styles.itemRowControls}>
-                            <TouchableOpacity
-                              style={[
-                                styles.hubLockChip,
-                                link.locked ? styles.hubLockChipLocked : styles.hubLockChipUnlocked,
-                              ]}
-                              onPress={() => handleToggleHubChildLock(child.id)}
-                            >
-                              <Text
-                                style={link.locked ? styles.hubLockChipTextLocked : styles.hubLockChipTextUnlocked}
-                              >
-                                {tLootTrade(link.locked ? 'detail.hubLockStateLocked' : 'detail.hubLockStateUnlocked')}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={styles.itemRowSmallBtn}
-                              onPress={() => {
-                                setReturnHubId(activeContainer.id);
-                                setActiveContainerId(child.id);
-                              }}
-                            >
-                              <Text style={styles.itemRowSmallBtnText}>
-                                {tLootTrade('detail.hubOpenChildCard')}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.itemRowSmallBtn, styles.itemRowDeleteBtn]}
-                              onPress={() => handleRemoveHubChild(child.id)}
-                            >
-                              <Text style={styles.itemRowDeleteBtnText}>
-                                {tLootTrade('detail.hubUnlinkChild')}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
+                          {link.locked && (
+                            <TextInput
+                              style={styles.hubLockNoteInput}
+                              defaultValue={link.lockLabel || ''}
+                              placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
+                              placeholderTextColor="#888888"
+                              onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+                              onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
+                            />
+                          )}
                         </View>
-
-                        {link.locked && (
-                          <TextInput
-                            style={styles.hubLockNoteInput}
-                            defaultValue={link.lockLabel || ''}
-                            placeholder={tLootTrade('detail.hubLockLabelPlaceholder')}
-                            placeholderTextColor="#888888"
-                            onEndEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
-                            onSubmitEditing={(e) => handleUpdateHubChildLockLabel(child.id, e.nativeEvent.text)}
-                          />
-                        )}
-                      </View>
-                    );
-                  })
+                      );
+                    })
                 )}
               </ScrollView>
             </>
@@ -1560,6 +1957,12 @@ export default function LootTradeScreen() {
         kind={formModal?.kind || CONTAINER_KIND.LOOT}
         initialContainer={formModal?.initialContainer || null}
         availableRooms={availableRooms}
+        availableHubs={availableHubs}
+        initialLinkedHubIds={
+          formModal?.initialContainer?.id
+            ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
+            : []
+        }
         onSave={handleSaveContainerForm}
         onClose={() => setFormModal(null)}
       />
@@ -1596,11 +1999,56 @@ export default function LootTradeScreen() {
         visible={Boolean(issueTargetContainer)}
         container={issueTargetContainer}
         roomName={issueTargetContainer ? (roomByCode[issueTargetContainer.roomCode]?.name || '') : ''}
+        availableRooms={availableRooms}
+        roomRooms={roomRooms}
         roomCharacters={issueRoomCharacters}
         busy={issueBusy}
+        onSelectRoom={(code) => {
+          void ensureGmRoomConnected(code).catch(() => {});
+        }}
         onConfirmIssue={handleConfirmIssue}
         onClose={() => setIssueTargetContainer(null)}
       />
+
+      {/* Модалка быстрого перемещения карточки в локацию через меню ⋮ */}
+      <Modal
+        visible={Boolean(moveToHubTarget)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMoveToHubTarget(null)}
+      >
+        <Pressable style={styles.movePickerOverlay} onPress={() => setMoveToHubTarget(null)}>
+          <Pressable style={styles.movePickerCard} onPress={(e) => e?.stopPropagation?.()}>
+            <Text style={styles.movePickerTitle}>
+              {tLootTrade('detail.moveToHubPickerTitle')}
+            </Text>
+            <ScrollView style={{ maxHeight: 280 }}>
+              {availableHubs.map((hub) => (
+                <TouchableOpacity
+                  key={hub.id}
+                  style={styles.movePickerRow}
+                  onPress={async () => {
+                    const target = moveToHubTarget;
+                    setMoveToHubTarget(null);
+                    if (target) {
+                      await handleMoveCardIntoHub(target.id, hub.id);
+                    }
+                  }}
+                >
+                  <MaterialCommunityIcons name="map-marker-multiple" size={20} color="#f0e68c" />
+                  <Text style={styles.movePickerRowText}>{hub.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.movePickerCancelBtn}
+              onPress={() => setMoveToHubTarget(null)}
+            >
+              <Text style={styles.movePickerCancelText}>{tLootTrade('form.cancel')}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
