@@ -327,7 +327,10 @@ const attachRoomWebSocketServer = (httpServer, {
 
   const handleUpgrade = (req, socket, head) => {
     wss.handleUpgrade(req, socket, head, (ws) => {
-      ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
+      ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+        || req.headers['x-real-ip']?.trim()
+        || req.socket.remoteAddress
+        || 'unknown';
       wss.emit('connection', ws, req);
     });
   };

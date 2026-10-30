@@ -1,0 +1,463 @@
+diff --git a/__tests__/room/replit-netangels-wss-475.test.js b/__tests__/room/replit-netangels-wss-475.test.js
+new file mode 100644
+index 0000000..d3965c0
+--- /dev/null
++++ b/__tests__/room/replit-netangels-wss-475.test.js
+@@ -0,0 +1,257 @@
++import fs from 'fs';
++import path from 'path';
++import WebSocket from 'ws';
++import { describe, it, expect, beforeEach, afterEach } from 'vitest';
++import {
++  DEFAULT_PRODUCTION_ROOM_SERVER_URL,
++  normalizeRoomServerUrl,
++  isLocalOrSandboxRoomHost,
++  resolveRoomServerUrl,
++  createRoomClient,
++} from '../../src/room/roomClient';
++import { MESSAGE } from '../../server/protocol.js';
++import { createRoomServer } from '../../server/roomServer.js';
++
++const waitFor = async (predicate, timeoutMs = 4000) => {
++  const started = Date.now();
++  while (Date.now() - started < timeoutMs) {
++    const val = await predicate();
++    if (val) return val;
++    await new Promise((r) => setTimeout(r, 20));
++  }
++  throw new Error('Timed out waiting for condition');
++};
++
++describe('Patch 475 — Shared wss://fallout2d20-companion.na4u.ru/ws for Replit & NetAngels', () => {
++  let prevEnv;
++
++  beforeEach(() => {
++    prevEnv = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++  });
++
++  afterEach(() => {
++    if (prevEnv === undefined) {
++      delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    } else {
++      process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnv;
++    }
++  });
++
++  it('points Replit deployments, NetAngels hosting, and React Native builds to wss://fallout2d20-companion.na4u.ru/ws', () => {
++    expect(DEFAULT_PRODUCTION_ROOM_SERVER_URL).toBe('wss://fallout2d20-companion.na4u.ru/ws');
++
++    // Replit static deployment (*.replit.app, *.repl.co) and Replit workspace (*.replit.dev)
++    expect(
++      resolveRoomServerUrl({
++        location: {
++          protocol: 'https:',
++          host: 'fallout-2d20-companion.replit.app',
++          hostname: 'fallout-2d20-companion.replit.app',
++        },
++      }),
++    ).toBe('wss://fallout2d20-companion.na4u.ru/ws');
++
++    expect(
++      resolveRoomServerUrl({
++        location: {
++          protocol: 'https:',
++          host: 'ab12cd34-00-xyz.picard.replit.dev',
++          hostname: 'ab12cd34-00-xyz.picard.replit.dev',
++        },
++      }),
++    ).toBe('wss://fallout2d20-companion.na4u.ru/ws');
++
++    // NetAngels production site
++    expect(
++      resolveRoomServerUrl({
++        location: {
++          protocol: 'https:',
++          host: 'fallout2d20-companion.na4u.ru',
++          hostname: 'fallout2d20-companion.na4u.ru',
++        },
++      }),
++    ).toBe('wss://fallout2d20-companion.na4u.ru/ws');
++
++    // Native Android/iOS APK
++    expect(
++      resolveRoomServerUrl({
++        location: null,
++        isReactNative: true,
++      }),
++    ).toBe('wss://fallout2d20-companion.na4u.ru/ws');
++
++    // Bare Node / Vitest environment stays offline unless EXPO_PUBLIC_ROOM_SERVER_URL is set
++    expect(
++      resolveRoomServerUrl({
++        location: null,
++        isReactNative: false,
++      }),
++    ).toBeNull();
++  });
++
++  it('preserves local/LAN/sandbox same-origin /ws and supports EXPO_PUBLIC_ROOM_SERVER_URL overrides', () => {
++    expect(isLocalOrSandboxRoomHost('localhost')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('127.0.0.1')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('192.168.1.25')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('10.0.0.5')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('172.20.4.8')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('5000-sandbox.e2b.app')).toBe(true);
++    expect(isLocalOrSandboxRoomHost('fallout-2d20-companion.replit.app')).toBe(false);
++    expect(isLocalOrSandboxRoomHost('fallout2d20-companion.na4u.ru')).toBe(false);
++
++    expect(
++      resolveRoomServerUrl({
++        location: { protocol: 'http:', host: 'localhost:5000', hostname: 'localhost' },
++      }),
++    ).toBe('ws://localhost:5000/ws');
++
++    expect(
++      resolveRoomServerUrl({
++        location: { protocol: 'https:', host: '5000-sandbox.e2b.app', hostname: '5000-sandbox.e2b.app' },
++      }),
++    ).toBe('wss://5000-sandbox.e2b.app/ws');
++
++    // Normalizes https://... with trailing slash to wss://.../ws
++    expect(normalizeRoomServerUrl('https://fallout2d20-companion.na4u.ru/')).toBe(
++      'wss://fallout2d20-companion.na4u.ru/ws',
++    );
++    expect(normalizeRoomServerUrl('http://localhost:5000')).toBe('ws://localhost:5000/ws');
++    expect(normalizeRoomServerUrl('ws://test.invalid/ws')).toBe('ws://test.invalid/ws');
++
++    expect(
++      resolveRoomServerUrl({
++        envUrl: 'same-origin',
++        location: { protocol: 'https:', host: 'custom.example.org', hostname: 'custom.example.org' },
++      }),
++    ).toBe('wss://custom.example.org/ws');
++
++    expect(
++      resolveRoomServerUrl({
++        envUrl: 'off',
++        location: { protocol: 'https:', host: 'fallout-2d20-companion.replit.app' },
++      }),
++    ).toBeNull();
++  });
++
++  it('keeps Replit configured for free static deployment while exchanging rooms and data cross-origin with NetAngels /ws', async () => {
++    const replitConfig = fs.readFileSync(path.resolve(process.cwd(), '.replit'), 'utf8');
++    expect(replitConfig).toContain('deploymentTarget = "static"');
++    expect(replitConfig).toContain('publicDir = "dist"');
++
++    const serverApp = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const started = await serverApp.start();
++    const wsUrl = `ws://127.0.0.1:${started.port}/ws`;
++
++    const replitGmMessages = [];
++    const netangelsPlayerMessages = [];
++
++    const replitGm = createRoomClient({
++      url: wsUrl,
++      clientId: 'replit-gm-475',
++      onStatus: () => {},
++      onMessage: (m) => replitGmMessages.push(m),
++      webSocketFactory: (u) =>
++        new WebSocket(u, {
++          headers: {
++            Origin: 'https://fallout-2d20-companion.replit.app',
++            'X-Real-IP': '198.51.100.10',
++          },
++        }),
++    });
++
++    const netangelsPlayer = createRoomClient({
++      url: wsUrl,
++      clientId: 'na4u-player-475',
++      onStatus: () => {},
++      onMessage: (m) => netangelsPlayerMessages.push(m),
++      webSocketFactory: (u) =>
++        new WebSocket(u, {
++          headers: {
++            Origin: 'https://fallout2d20-companion.na4u.ru',
++            'X-Forwarded-For': '203.0.113.77',
++          },
++        }),
++    });
++
++    try {
++      await waitFor(() => replitGm.getStatus() === 'online' && netangelsPlayer.getStatus() === 'online');
++
++      // 1. GM on Replit static site creates a room on fallout2d20-companion.na4u.ru
++      replitGm.send(MESSAGE.ROOM_CREATE, { name: 'Пустошь с Replit', requestId: 'req-create-475' }, null);
++      const created = await waitFor(() =>
++        replitGmMessages.find((m) => m.type === MESSAGE.ROOM_CREATED && m.payload?.requestId === 'req-create-475'),
++      );
++      const roomCode = created.payload.code;
++
++      replitGm.send(MESSAGE.ROOM_JOIN, { code: roomCode, name: 'GM Replit', role: 'gm', requestId: 'req-gm-join' }, roomCode);
++      await waitFor(() =>
++        replitGmMessages.find((m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'req-gm-join'),
++      );
++
++      // 2. Player on NetAngels joins the same room and publishes a character snapshot
++      netangelsPlayer.send(
++        MESSAGE.ROOM_JOIN,
++        { code: roomCode, name: 'Выживший NA4U', role: 'player', requestId: 'req-pl-join' },
++        roomCode,
++      );
++      await waitFor(() =>
++        netangelsPlayerMessages.find((m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'req-pl-join'),
++      );
++
++      netangelsPlayer.send(
++        MESSAGE.CHAR_PUBLISH,
++        {
++          code: roomCode,
++          characterId: 'char_cross_475',
++          revision: 1,
++          snapshot: { name: 'Курьер Шесть', level: 5, caps: 120 },
++        },
++        roomCode,
++      );
++
++      const snapshotSeenByReplitGm = await waitFor(() =>
++        replitGmMessages.find(
++          (m) => m.type === MESSAGE.CHAR_PUBLISH && m.payload?.characterId === 'char_cross_475',
++        ),
++      );
++      expect(snapshotSeenByReplitGm.payload.snapshot.name).toBe('Курьер Шесть');
++
++      // 3. GM on Replit issues a loot chest and Player on NetAngels receives it immediately
++      replitGm.send(
++        MESSAGE.SESSION_OPEN,
++        {
++          code: roomCode,
++          requestId: 'req-open-475',
++          session: {
++            containerId: 'cnt_replit_475',
++            kind: 'loot',
++            name: 'Посылка Мохаве',
++            targetType: 'room',
++            items: [
++              {
++                entryId: 'entry_475',
++                itemId: 'caps',
++                itemType: 'caps',
++                name: 'Крышки',
++                quantity: 75,
++              },
++            ],
++          },
++        },
++        roomCode,
++      );
++
++      const sessionSeenByPlayer = await waitFor(() =>
++        netangelsPlayerMessages.find(
++          (m) => m.type === MESSAGE.SESSION_STATE && m.payload?.session?.containerId === 'cnt_replit_475',
++        ),
++      );
++      expect(sessionSeenByPlayer.payload.session.items[0].quantity).toBe(75);
++    } finally {
++      replitGm.close();
++      netangelsPlayer.close();
++      await serverApp.close();
++    }
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 8cf0ea4..0fc2ba3 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,15 @@
+ # Changelog
++---
++## Shared room WebSocket server `wss://fallout2d20-companion.na4u.ru/ws` for Replit and NetAngels deployments (patch 475)
++
++Switched the room client (`src/room/roomClient.ts`) to route published builds —
++including Replit's free static deployment (`*.replit.app`), NetAngels hosting,
++and native mobile builds — through `wss://fallout2d20-companion.na4u.ru/ws`,
++while keeping same-origin `/ws` for local/LAN/sandbox development and honoring
++explicit `EXPO_PUBLIC_ROOM_SERVER_URL` overrides. Room creation, live character
++sync, and Loot/Trade sessions now work on Replit static deployments and share a
++single unified room registry with `fallout2d20-companion.na4u.ru`.
++
+ ---
+ ## Centralized Game Master («Admin») license gate and bilingual non-technical Admin & «Loot/Trade» guides (patch 474)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 761ab5b..a299f11 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,17 @@
+ # История изменений
+ 
++---
++## Единый WebSocket-сервер комнат `wss://fallout2d20-companion.na4u.ru/ws` для публикации на Replit и NetAngels (патч 475)
++
++Клиент комнат (`src/room/roomClient.ts`) переключён на боевой WebSocket-адрес
++`wss://fallout2d20-companion.na4u.ru/ws` для опубликованных сборок (включая
++бесплатный статический деплой на Replit `*.replit.app`, основной хостинг
++NetAngels и мобильную сборку), сохраняя локальный `/ws` для локальной
++разработки и песочниц и поддержку переопределения через
++`EXPO_PUBLIC_ROOM_SERVER_URL`. Создание комнат, синхронизация листов
++персонажей и сессии «Добычи/Торговли» теперь работают на статической публикации
++Replit и используют единый реестр комнат с `fallout2d20-companion.na4u.ru`.
++
+ ---
+ ## Единый лицензионный шлюз раздела Мастера («Админ») и двуязычное руководство по разделу Мастера и «Добыче/Торговле» (патч 474)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index cbf2899..d7af8b6 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "474"
++  "baseline": "475"
+ }
+diff --git a/public/version.json b/public/version.json
+index 400984f..bf4a24e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "474",
++  "version": "475",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 24bc9fb..5677e91 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -327,7 +327,10 @@ const attachRoomWebSocketServer = (httpServer, {
+ 
+   const handleUpgrade = (req, socket, head) => {
+     wss.handleUpgrade(req, socket, head, (ws) => {
+-      ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress || 'unknown';
++      ws.clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
++        || req.headers['x-real-ip']?.trim()
++        || req.socket.remoteAddress
++        || 'unknown';
+       wss.emit('connection', ws, req);
+     });
+   };
+diff --git a/src/room/roomClient.ts b/src/room/roomClient.ts
+index 60b25d4..96c4de4 100644
+--- a/src/room/roomClient.ts
++++ b/src/room/roomClient.ts
+@@ -44,16 +44,109 @@ const defaultReconnectDelay = (attempt: number) => (
+   Math.min(1000 * 2 ** attempt, MAX_RECONNECT_DELAY_MS)
+ );
+ 
+-/** Адрес комнатного сервера: env или тот же origin (wss на https). §3.9:
+- *  нечего вернуть → мастерского пространства нет (кнопка скрывается). */
+-export const resolveRoomServerUrl = (): string | null => {
+-  if (typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_ROOM_SERVER_URL) {
+-    return process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++/** Основной боевой WebSocket-сервер комнат на хостинге NetAngels.
++ *  Используется опубликованной статикой на Replit, основным сайтом и мобильной сборкой,
++ *  чтобы ведущие и игроки попадали в единый реестр комнат независимо от точки входа. */
++export const DEFAULT_PRODUCTION_ROOM_SERVER_URL = 'wss://fallout2d20-companion.na4u.ru/ws';
++
++/** Нормализует строковый адрес комнатного сервера (поддерживает ws/wss и http/https). */
++export const normalizeRoomServerUrl = (raw: string | undefined | null): string | null => {
++  const trimmed = String(raw ?? '').trim();
++  if (!trimmed) return null;
++
++  try {
++    const parsed = new URL(trimmed);
++    if (parsed.protocol === 'https:') parsed.protocol = 'wss:';
++    else if (parsed.protocol === 'http:') parsed.protocol = 'ws:';
++    if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') return null;
++    if (!parsed.pathname || parsed.pathname === '/') {
++      parsed.pathname = '/ws';
++    }
++    parsed.hash = '';
++    return parsed.toString();
++  } catch {
++    return trimmed;
++  }
++};
++
++/** Локальные адреса разработки и облачные dev-песочницы, где крутится собственный локальный /ws. */
++export const isLocalOrSandboxRoomHost = (hostnameRaw: string | undefined | null): boolean => {
++  const host = String(hostnameRaw ?? '').trim().toLowerCase().replace(/^\[|\]$/g, '');
++  if (!host) return false;
++  if (
++    host === 'localhost'
++    || host === '127.0.0.1'
++    || host === '0.0.0.0'
++    || host === '::1'
++    || host.endsWith('.localhost')
++    || host.endsWith('.local')
++    || host.endsWith('.e2b.app')
++    || host.endsWith('.e2b.dev')
++  ) {
++    return true;
+   }
+-  if (typeof window !== 'undefined' && window.location?.host) {
+-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+-    return `${protocol}//${window.location.host}/ws`;
++  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
++  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
++  const m172 = host.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
++  if (m172) {
++    const second = Number(m172[1]);
++    if (second >= 16 && second <= 31) return true;
+   }
++  return false;
++};
++
++export interface ResolveRoomServerOptions {
++  envUrl?: string;
++  location?: { protocol?: string; host?: string; hostname?: string } | null;
++  isReactNative?: boolean;
++}
++
++/** Адрес комнатного сервера:
++ *  1) явный EXPO_PUBLIC_ROOM_SERVER_URL (или 'same-origin' / 'off');
++ *  2) локальная разработка и песочницы -> свой origin (/ws);
++ *  3) боевые веб-площадки (Replit static, fallout2d20-companion.na4u.ru и др.) и Android/iOS -> единый wss на NetAngels;
++ *  4) голое окружение Node/Vitest без window -> null. */
++export const resolveRoomServerUrl = (options?: ResolveRoomServerOptions): string | null => {
++  const loc = options && 'location' in options
++    ? options.location
++    : (typeof window !== 'undefined' ? window.location : null);
++
++  const rawEnv = options && options.envUrl !== undefined
++    ? options.envUrl
++    : (typeof process !== 'undefined' ? process?.env?.EXPO_PUBLIC_ROOM_SERVER_URL : undefined);
++
++  if (typeof rawEnv === 'string' && rawEnv.trim().length > 0) {
++    const token = rawEnv.trim().toLowerCase();
++    if (token === 'off' || token === 'none' || token === 'disabled' || token === 'false') {
++      return null;
++    }
++    if (token === 'same-origin') {
++      if (loc?.host) {
++        const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
++        return `${protocol}//${loc.host}/ws`;
++      }
++      return null;
++    }
++    return normalizeRoomServerUrl(rawEnv);
++  }
++
++  if (loc?.host) {
++    const hostname = loc.hostname || loc.host.replace(/:\d+$/, '');
++    if (isLocalOrSandboxRoomHost(hostname)) {
++      const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
++      return `${protocol}//${loc.host}/ws`;
++    }
++    return DEFAULT_PRODUCTION_ROOM_SERVER_URL;
++  }
++
++  const isNative = options && options.isReactNative !== undefined
++    ? options.isReactNative
++    : (typeof navigator !== 'undefined' && (navigator as any)?.product === 'ReactNative');
++
++  if (isNative) {
++    return DEFAULT_PRODUCTION_ROOM_SERVER_URL;
++  }
++
+   return null;
+ };
+ 

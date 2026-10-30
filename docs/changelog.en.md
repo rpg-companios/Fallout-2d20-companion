@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Shared room WebSocket server `wss://fallout2d20-companion.na4u.ru/ws` for Replit and NetAngels deployments (patch 475)
+
+Switched the room client (`src/room/roomClient.ts`) to route published builds —
+including Replit's free static deployment (`*.replit.app`), NetAngels hosting,
+and native mobile builds — through `wss://fallout2d20-companion.na4u.ru/ws`,
+while keeping same-origin `/ws` for local/LAN/sandbox development and honoring
+explicit `EXPO_PUBLIC_ROOM_SERVER_URL` overrides. Room creation, live character
+sync, and Loot/Trade sessions now work on Replit static deployments and share a
+single unified room registry with `fallout2d20-companion.na4u.ru`.
+
+---
 ## Centralized Game Master («Admin») license gate and bilingual non-technical Admin & «Loot/Trade» guides (patch 474)
 
 Wired all Game Master mechanics (`domain/premium.js`,
