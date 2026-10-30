@@ -1,0 +1,1106 @@
+diff --git a/__tests__/lootTrade/hub-combobox-autocomplete-476.test.js b/__tests__/lootTrade/hub-combobox-autocomplete-476.test.js
+new file mode 100644
+index 0000000..111f6ec
+--- /dev/null
++++ b/__tests__/lootTrade/hub-combobox-autocomplete-476.test.js
+@@ -0,0 +1,218 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { describe, it, expect, beforeEach, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (s) => (Array.isArray(s) ? Object.assign({}, ...s.filter(Boolean)) : s || {}),
++    },
++    Modal: ({ visible, children, ...props }) =>
++      visible ? React.createElement('Modal', props, children) : null,
++    View: mk('View'),
++    Text: mk('Text'),
++    TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    KeyboardAvoidingView: mk('KeyboardAvoidingView'),
++    Image: mk('Image'),
++  };
++});
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: vi.fn(),
++}));
++
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++
++import { setCurrentLocale } from '../../i18n/locale';
++import { CONTAINER_KIND, matchHubSuggestions } from '../../domain/lootTrade';
++import ContainerFormModal from '../../components/screens/LootTradeScreen/modals/ContainerFormModal';
++
++const collectText = (node) => {
++  if (node == null) return '';
++  if (typeof node === 'string' || typeof node === 'number') return String(node);
++  if (Array.isArray(node)) return node.map(collectText).join('');
++  if (node.children) return node.children.map(collectText).join('');
++  return '';
++};
++
++describe('Patch 476 — Location combobox & inline autocomplete (New -> New Vegas) in Chest/Merchant form', () => {
++  beforeEach(() => {
++    setCurrentLocale('ru-RU');
++  });
++
++  it('ranks prefix, word-boundary, and substring Location matches and computes inline ghost completion', () => {
++    const hubs = [
++      { id: 'h_dc', name: 'Diamond City' },
++      { id: 'h_nv', name: 'New Vegas' },
++      { id: 'h_nr', name: 'New Reno' },
++      { id: 'h_gs', name: 'Goodsprings' },
++    ];
++
++    // Typing "New" immediately suggests "New Vegas" with ghost suffix " Vegas"
++    const resNew = matchHubSuggestions('New', hubs, []);
++    expect(resNew.bestMatch?.id).toBe('h_nv');
++    expect(resNew.ghostSuffix).toBe(' Vegas');
++    expect(resNew.matches.map((h) => h.id)).toEqual(['h_nv', 'h_nr']);
++
++    // Case-insensitive "new" still returns " Vegas" ghost suffix
++    const resLower = matchHubSuggestions('new', hubs, []);
++    expect(resLower.bestMatch?.name).toBe('New Vegas');
++    expect(resLower.ghostSuffix).toBe(' Vegas');
++
++    // Once "New Vegas" is already selected, typing "New" suggests "New Reno" next
++    const resNext = matchHubSuggestions('New', hubs, ['h_nv']);
++    expect(resNext.bestMatch?.id).toBe('h_nr');
++    expect(resNext.ghostSuffix).toBe(' Reno');
++
++    // Word-boundary match: typing "Vegas" finds "New Vegas"
++    const resWord = matchHubSuggestions('Vegas', hubs, []);
++    expect(resWord.bestMatch?.id).toBe('h_nv');
++    expect(resWord.ghostSuffix).toBe('');
++
++    // Exact match populates exactHub
++    const resExact = matchHubSuggestions('new vegas', hubs, []);
++    expect(resExact.exactHub?.id).toBe('h_nv');
++
++    // Empty query returns full list without ghost text
++    const resEmpty = matchHubSuggestions('', hubs, []);
++    expect(resEmpty.matches).toHaveLength(4);
++    expect(resEmpty.bestMatch).toBeNull();
++    expect(resEmpty.ghostSuffix).toBe('');
++  });
++
++  it('always renders the Location combobox (even when 0 Locations exist) and supports inline New -> New Vegas suggestion & save', () => {
++    const onSave = vi.fn();
++    let renderer;
++
++    // 1. Even with availableHubs = [], the Location input is visible (never hidden!)
++    act(() => {
++      renderer = TestRenderer.create(
++        React.createElement(ContainerFormModal, {
++          visible: true,
++          kind: CONTAINER_KIND.LOOT,
++          availableRooms: [{ code: 'GM-7Q3K9M', name: 'Мохаве' }],
++          availableHubs: [],
++          onSave,
++          onClose: () => {},
++        }),
++      );
++    });
++
++    const emptyHubInput = renderer.root.findByProps({ testID: 'hub-combobox-input' });
++    expect(emptyHubInput).toBeTruthy();
++
++    // 2. Rerender with existing Locations including "New Vegas"
++    const hubs = [
++      { id: 'hub_dc', name: 'Diamond City' },
++      { id: 'hub_nv', name: 'New Vegas' },
++    ];
++    act(() => {
++      renderer.update(
++        React.createElement(ContainerFormModal, {
++          visible: true,
++          kind: CONTAINER_KIND.MERCHANT,
++          availableRooms: [{ code: 'GM-7Q3K9M', name: 'Мохаве' }],
++          availableHubs: hubs,
++          onSave,
++          onClose: () => {},
++        }),
++      );
++    });
++
++    const nameInput = renderer.root.findByProps({ testID: 'container-form-name' });
++    const hubInput = renderer.root.findByProps({ testID: 'hub-combobox-input' });
++
++    act(() => {
++      nameInput.props.onChangeText('Оружейники');
++      hubInput.props.onChangeText('New');
++    });
++
++    // Inline ghost suffix " Vegas" and quick-suggest button "Подсказка: New Vegas ↵" appear immediately
++    const allRenderedText = collectText(renderer.toJSON());
++    expect(allRenderedText).toContain(' Vegas');
++    const quickSuggestBtn = renderer.root.findByProps({ testID: 'hub-quick-suggest' });
++    expect(collectText(quickSuggestBtn)).toContain('New Vegas');
++
++    // Accept suggestion via Enter/Tab key press
++    act(() => {
++      hubInput.props.onKeyPress({ nativeEvent: { key: 'Tab' }, preventDefault: () => {} });
++    });
++
++    // Save merchant and verify selectedHubIds === ['hub_nv']
++    const saveBtn = renderer.root.findByProps({ testID: 'container-form-save' });
++    act(() => {
++      saveBtn.props.onPress();
++    });
++
++    expect(onSave).toHaveBeenCalledTimes(1);
++    const [savedDraft, , selectedHubIds] = onSave.mock.calls[0];
++    expect(savedDraft.name).toBe('Оружейники');
++    expect(savedDraft.kind).toBe(CONTAINER_KIND.MERCHANT);
++    expect(selectedHubIds).toEqual(['hub_nv']);
++
++    act(() => {
++      renderer.unmount();
++    });
++  });
++
++  it('allows creating and binding a brand-new Location inline right from the Chest/Merchant form', async () => {
++    const onSave = vi.fn();
++    const onQuickCreateHub = vi.fn(async (hubName) => ({
++      id: 'hub_created_nv',
++      kind: CONTAINER_KIND.HUB,
++      name: hubName,
++    }));
++
++    let renderer;
++    act(() => {
++      renderer = TestRenderer.create(
++        React.createElement(ContainerFormModal, {
++          visible: true,
++          kind: CONTAINER_KIND.LOOT,
++          availableRooms: [{ code: 'GM-7Q3K9M', name: 'Мохаве' }],
++          availableHubs: [],
++          onQuickCreateHub,
++          onSave,
++          onClose: () => {},
++        }),
++      );
++    });
++
++    const nameInput = renderer.root.findByProps({ testID: 'container-form-name' });
++    const hubInput = renderer.root.findByProps({ testID: 'hub-combobox-input' });
++
++    act(() => {
++      nameInput.props.onChangeText('Тайник Курьера');
++      hubInput.props.onChangeText('New Vegas');
++    });
++
++    const createBtn = renderer.root.findByProps({ testID: 'hub-inline-create' });
++    expect(collectText(createBtn)).toContain('New Vegas');
++
++    await act(async () => {
++      await createBtn.props.onPress();
++    });
++
++    expect(onQuickCreateHub).toHaveBeenCalledWith('New Vegas');
++
++    const saveBtn = renderer.root.findByProps({ testID: 'container-form-save' });
++    act(() => {
++      saveBtn.props.onPress();
++    });
++
++    expect(onSave).toHaveBeenCalledTimes(1);
++    expect(onSave.mock.calls[0][2]).toEqual(['hub_created_nv']);
++
++    act(() => {
++      renderer.unmount();
++    });
++  });
++});
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 3b5f4cf..af0c3bb 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -585,13 +585,27 @@ export default function LootTradeScreen() {
+     return saved;
+   };
+ 
++  const handleQuickCreateHub = async (hubName) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return null;
++    const cleanHubName = String(hubName || '').trim();
++    if (!cleanHubName) return null;
++    const defaultRoomCode = availableRooms[0]?.code || '';
++    return persistAndSyncContainer({
++      kind: CONTAINER_KIND.HUB,
++      name: cleanHubName,
++      roomCode: defaultRoomCode,
++      roomCodes: defaultRoomCode ? [defaultRoomCode] : [],
++      links: [],
++    });
++  };
++
+   const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
+     if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+     const cleanDraft = { ...draft };
+     delete cleanDraft.__isDuplicateDraft;
+ 
+     if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
+-      cleanDraft.inRoot = false;
++      cleanDraft.inRoot = selectedHubIds.length === 0;
+     }
+ 
+     const saved = await persistAndSyncContainer(cleanDraft);
+@@ -619,6 +633,9 @@ export default function LootTradeScreen() {
+ 
+     setFormModal(null);
+     if (!activeContainerId && !draft.id) {
++      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
++        setReturnHubId(selectedHubIds[0]);
++      }
+       setActiveContainerId(saved.id);
+     }
+     if (capsRollInfo?.rolled) {
+@@ -1992,6 +2009,7 @@ export default function LootTradeScreen() {
+             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
+             : []
+         }
++        onQuickCreateHub={handleQuickCreateHub}
+         onSave={handleSaveContainerForm}
+         onClose={() => setFormModal(null)}
+       />
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 3a64273..6dd0c8e 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -1,4 +1,4 @@
+-import React, { useState, useEffect } from 'react';
++import React, { useState, useEffect, useMemo } from 'react';
+ import {
+   Modal,
+   View,
+@@ -11,7 +11,7 @@ import {
+   Platform,
+ } from 'react-native';
+ import { useLocale } from '../../../../i18n/locale';
+-import { tLootTrade } from '../logic/lootTradeI18n';
++import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
+ import IconText from '../../../lootTrade/LootTradeIconText';
+ import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
+ import {
+@@ -24,16 +24,20 @@ import {
+   normalizeRoomCodes,
+   normalizeSaleMarkupPercent,
+   normalizeBuyDepreciationPercent,
++  matchHubSuggestions,
+ } from '../../../../domain/lootTrade';
+ import { showRawAlert } from '../../../alerts/alertService';
+ 
++const EMPTY_ARRAY = Object.freeze([]);
++
+ const ContainerFormModal = ({
+   visible,
+   kind = CONTAINER_KIND.LOOT,
+   initialContainer = null,
+-  availableRooms = [],
+-  availableHubs = [],
+-  initialLinkedHubIds = [],
++  availableRooms = EMPTY_ARRAY,
++  availableHubs = EMPTY_ARRAY,
++  initialLinkedHubIds = EMPTY_ARRAY,
++  onQuickCreateHub = null,
+   onSave,
+   onClose,
+ }) => {
+@@ -43,10 +47,17 @@ const ContainerFormModal = ({
+   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
+   const isHub = effectiveKind === CONTAINER_KIND.HUB;
+   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
++  const initSessionKey = visible
++    ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
++    : '';
+ 
+   const [name, setName] = useState('');
+   const [selectedRoomCodes, setSelectedRoomCodes] = useState([]);
+   const [selectedHubIds, setSelectedHubIds] = useState([]);
++  const [extraCreatedHubs, setExtraCreatedHubs] = useState([]);
++  const [hubQuery, setHubQuery] = useState('');
++  const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
++  const [creatingHub, setCreatingHub] = useState(false);
+   const [description, setDescription] = useState('');
+   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+@@ -54,8 +65,12 @@ const ContainerFormModal = ({
+   const [buyDepreciation, setBuyDepreciation] = useState(String(DEFAULT_BUY_DEPRECIATION_PERCENT));
+ 
+   useEffect(() => {
+-    if (!visible) return;
++    if (!initSessionKey) return;
+     setName(initialContainer?.name || '');
++    setHubQuery('');
++    setHubDropdownOpen(false);
++    setCreatingHub(false);
++    setExtraCreatedHubs([]);
+     if (isHub) {
+       const existingCodes = normalizeRoomCodes(
+         initialContainer?.roomCodes,
+@@ -85,7 +100,29 @@ const ContainerFormModal = ({
+         ? initialContainer.buyDepreciationPercent
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+     ));
+-  }, [visible, initialContainer, availableRooms, isHub, initialLinkedHubIds]);
++    // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [initSessionKey]);
++
++  const combinedHubs = useMemo(() => {
++    const map = new Map();
++    for (const h of Array.isArray(availableHubs) ? availableHubs : []) {
++      if (h?.id) map.set(h.id, h);
++    }
++    for (const h of extraCreatedHubs) {
++      if (h?.id && !map.has(h.id)) map.set(h.id, h);
++    }
++    return Array.from(map.values());
++  }, [availableHubs, extraCreatedHubs]);
++
++  const hubSuggestion = useMemo(
++    () => matchHubSuggestions(hubQuery, combinedHubs, selectedHubIds),
++    [hubQuery, combinedHubs, selectedHubIds],
++  );
++
++  const selectedHubObjects = useMemo(
++    () => selectedHubIds.map((id) => combinedHubs.find((h) => h.id === id)).filter(Boolean),
++    [selectedHubIds, combinedHubs],
++  );
+ 
+   const toggleRoomCode = (code) => {
+     setSelectedRoomCodes((prev) => (
+@@ -93,10 +130,68 @@ const ContainerFormModal = ({
+     ));
+   };
+ 
+-  const toggleHubId = (hubId) => {
++  const selectHubById = (hubId) => {
++    if (!hubId) return;
++    setSelectedHubIds((prev) => (prev.includes(hubId) ? prev : [...prev, hubId]));
++    setHubQuery('');
++  };
++
++  const removeSelectedHub = (hubId) => {
++    setSelectedHubIds((prev) => prev.filter((id) => id !== hubId));
++  };
++
++  const toggleHubFromDropdown = (hubId) => {
+     setSelectedHubIds((prev) => (
+       prev.includes(hubId) ? prev.filter((id) => id !== hubId) : [...prev, hubId]
+     ));
++    setHubQuery('');
++  };
++
++  const acceptBestHubSuggestion = () => {
++    if (hubSuggestion.bestMatch) {
++      selectHubById(hubSuggestion.bestMatch.id);
++      return true;
++    }
++    if (hubSuggestion.exactHub) {
++      selectHubById(hubSuggestion.exactHub.id);
++      return true;
++    }
++    return false;
++  };
++
++  const handleHubInputKeyPress = (e) => {
++    const key = e?.nativeEvent?.key;
++    if (
++      (key === 'Tab' || key === 'Enter')
++      && hubQuery.trim().length > 0
++      && (hubSuggestion.bestMatch || hubSuggestion.exactHub)
++    ) {
++      e?.preventDefault?.();
++      acceptBestHubSuggestion();
++    } else if (key === 'Escape') {
++      setHubDropdownOpen(false);
++    }
++  };
++
++  const handleCreateHubInline = async () => {
++    const cleanHubName = hubQuery.trim();
++    if (!cleanHubName || creatingHub || typeof onQuickCreateHub !== 'function') return;
++    if (hubSuggestion.exactHub) {
++      selectHubById(hubSuggestion.exactHub.id);
++      return;
++    }
++    setCreatingHub(true);
++    try {
++      const created = await onQuickCreateHub(cleanHubName);
++      if (created?.id) {
++        setExtraCreatedHubs((prev) => [...prev, created]);
++        setSelectedHubIds((prev) => (prev.includes(created.id) ? prev : [...prev, created.id]));
++        setHubQuery('');
++        setHubDropdownOpen(false);
++      }
++    } finally {
++      setCreatingHub(false);
++    }
+   };
+ 
+   const stepCaps = (delta) => {
+@@ -117,6 +212,13 @@ const ContainerFormModal = ({
+       return;
+     }
+ 
++    let finalSelectedHubIds = selectedHubIds;
++    if (!isHub && hubQuery.trim().length > 0 && hubSuggestion.exactHub) {
++      if (!finalSelectedHubIds.includes(hubSuggestion.exactHub.id)) {
++        finalSelectedHubIds = [...finalSelectedHubIds, hubSuggestion.exactHub.id];
++      }
++    }
++
+     const primaryRoomCode = isHub ? (selectedRoomCodes[0] || '') : '';
+     const roomRecord = isHub
+       ? availableRooms.find((r) => r.code === primaryRoomCode)
+@@ -150,7 +252,7 @@ const ContainerFormModal = ({
+         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+       },
+       capsRollInfo,
+-      isHub ? null : selectedHubIds,
++      isHub ? null : finalSelectedHubIds,
+     );
+   };
+ 
+@@ -161,6 +263,21 @@ const ContainerFormModal = ({
+     titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
+   }
+ 
++  const trimmedHubQuery = hubQuery.trim();
++  const showGhostInline = Boolean(
++    !isHub
++    && hubSuggestion.ghostSuffix
++    && hubQuery.length > 0
++    && !/^\s/.test(hubQuery),
++  );
++  const showHubDropdown = !isHub && (hubDropdownOpen || trimmedHubQuery.length > 0);
++  const canCreateNewHubInline = Boolean(
++    !isHub
++    && trimmedHubQuery.length > 0
++    && !hubSuggestion.exactHub
++    && typeof onQuickCreateHub === 'function',
++  );
++
+   return (
+     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+       <KeyboardAvoidingView
+@@ -170,9 +287,14 @@ const ContainerFormModal = ({
+         <View style={styles.card}>
+           <Text style={styles.title}>{tLootTrade(titleKey)}</Text>
+ 
+-          <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
++          <ScrollView
++            style={styles.scroll}
++            contentContainerStyle={styles.scrollContent}
++            keyboardShouldPersistTaps="handled"
++          >
+             <Text style={styles.label}>{tLootTrade('form.nameLabel')}</Text>
+             <TextInput
++              testID="container-form-name"
+               style={styles.input}
+               value={name}
+               onChangeText={setName}
+@@ -211,28 +333,147 @@ const ContainerFormModal = ({
+                 )}
+               </>
+             ) : (
+-              availableHubs.length > 0 && (
+-                <>
+-                  <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
+-                  <View style={styles.roomChips}>
+-                    {availableHubs.map((hubItem) => {
+-                      const selected = selectedHubIds.includes(hubItem.id);
+-                      return (
+-                        <TouchableOpacity
+-                          key={hubItem.id}
+-                          style={[styles.roomChip, selected && styles.roomChipActive]}
+-                          onPress={() => toggleHubId(hubItem.id)}
+-                        >
+-                          <Text style={[styles.roomChipName, selected && styles.roomChipTextActive]}>
+-                            {hubItem.name}
+-                          </Text>
+-                        </TouchableOpacity>
+-                      );
+-                    })}
++              <>
++                <Text style={styles.label}>{tLootTrade('form.bindHubsLabel')}</Text>
++
++                {selectedHubObjects.length > 0 && (
++                  <View style={styles.selectedHubPills}>
++                    {selectedHubObjects.map((hubItem) => (
++                      <TouchableOpacity
++                        key={hubItem.id}
++                        style={styles.selectedHubPill}
++                        onPress={() => removeSelectedHub(hubItem.id)}
++                      >
++                        <Text style={styles.selectedHubPillText}>{hubItem.name}</Text>
++                        <Text style={styles.selectedHubPillRemove}>✕</Text>
++                      </TouchableOpacity>
++                    ))}
++                  </View>
++                )}
++
++                <View style={[styles.hubComboRow, showHubDropdown && styles.hubComboRowActive]}>
++                  <View style={styles.hubInputWrap}>
++                    {showGhostInline && (
++                      <View pointerEvents="none" style={styles.ghostOverlay}>
++                        <Text numberOfLines={1} style={styles.ghostTextLine}>
++                          <Text style={styles.ghostTypedTransparent}>{hubQuery}</Text>
++                          <Text style={styles.ghostCompletion}>{hubSuggestion.ghostSuffix}</Text>
++                        </Text>
++                      </View>
++                    )}
++                    <TextInput
++                      testID="hub-combobox-input"
++                      style={styles.hubComboInput}
++                      value={hubQuery}
++                      onChangeText={(val) => {
++                        setHubQuery(val);
++                        if (!hubDropdownOpen) setHubDropdownOpen(true);
++                      }}
++                      onFocus={() => setHubDropdownOpen(true)}
++                      onSubmitEditing={acceptBestHubSuggestion}
++                      onKeyPress={handleHubInputKeyPress}
++                      placeholder={tLootTrade('form.bindHubsPlaceholder')}
++                      placeholderTextColor="#8c8c8c"
++                    />
++                  </View>
++
++                  <TouchableOpacity
++                    testID="hub-combobox-toggle"
++                    style={styles.hubDropdownToggle}
++                    onPress={() => setHubDropdownOpen((prev) => !prev)}
++                  >
++                    <Text style={styles.hubDropdownToggleText}>
++                      {showHubDropdown ? '▴' : '▾'}
++                    </Text>
++                  </TouchableOpacity>
++                </View>
++
++                {trimmedHubQuery.length > 0 && hubSuggestion.bestMatch && (
++                  <TouchableOpacity
++                    testID="hub-quick-suggest"
++                    style={styles.quickSuggestBar}
++                    onPress={acceptBestHubSuggestion}
++                  >
++                    <Text style={styles.quickSuggestText}>
++                      {formatLootTrade(tLootTrade('form.bindHubsSuggestAction'), {
++                        name: hubSuggestion.bestMatch.name,
++                      })}
++                    </Text>
++                  </TouchableOpacity>
++                )}
++
++                {showHubDropdown && (
++                  <View style={styles.hubDropdownMenu}>
++                    <ScrollView
++                      style={styles.hubDropdownScroll}
++                      nestedScrollEnabled
++                      keyboardShouldPersistTaps="handled"
++                    >
++                      {combinedHubs.length === 0 && !canCreateNewHubInline ? (
++                        <Text style={styles.hubDropdownEmpty}>
++                          {tLootTrade('form.bindHubsEmptyList')}
++                        </Text>
++                      ) : (
++                        <>
++                          {hubSuggestion.matches.length === 0 && !canCreateNewHubInline && (
++                            <Text style={styles.hubDropdownEmpty}>
++                              {tLootTrade('form.bindHubsNoMatch')}
++                            </Text>
++                          )}
++
++                          {hubSuggestion.matches.map((hubItem) => {
++                            const selected = selectedHubIds.includes(hubItem.id);
++                            const isBest = Boolean(
++                              trimmedHubQuery.length > 0
++                              && hubSuggestion.bestMatch?.id === hubItem.id,
++                            );
++                            return (
++                              <TouchableOpacity
++                                key={hubItem.id}
++                                style={[
++                                  styles.hubDropdownItem,
++                                  isBest && styles.hubDropdownItemSuggested,
++                                  selected && styles.hubDropdownItemSelected,
++                                ]}
++                                onPress={() => toggleHubFromDropdown(hubItem.id)}
++                              >
++                                <Text
++                                  style={[
++                                    styles.hubDropdownItemText,
++                                    (selected || isBest) && styles.hubDropdownItemTextHighlight,
++                                  ]}
++                                >
++                                  {hubItem.name}
++                                </Text>
++                                <Text style={styles.hubDropdownItemMark}>
++                                  {selected ? '✓' : '+'}
++                                </Text>
++                              </TouchableOpacity>
++                            );
++                          })}
++
++                          {canCreateNewHubInline && (
++                            <TouchableOpacity
++                              testID="hub-inline-create"
++                              style={styles.hubDropdownCreateItem}
++                              disabled={creatingHub}
++                              onPress={handleCreateHubInline}
++                            >
++                              <Text style={styles.hubDropdownCreateText}>
++                                {formatLootTrade(tLootTrade('form.bindHubsCreateNew'), {
++                                  name: trimmedHubQuery,
++                                })}
++                              </Text>
++                            </TouchableOpacity>
++                          )}
++                        </>
++                      )}
++                    </ScrollView>
+                   </View>
+-                  <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
+-                </>
+-              )
++                )}
++
++                <Text style={styles.hintText}>{tLootTrade('form.bindHubsHint')}</Text>
++              </>
+             )}
+ 
+             <Text style={styles.label}>{tLootTrade('form.descriptionLabel')}</Text>
+@@ -309,7 +550,11 @@ const ContainerFormModal = ({
+           </ScrollView>
+ 
+           <View style={styles.footer}>
+-            <TouchableOpacity style={[styles.btn, styles.saveBtn]} onPress={handleSave}>
++            <TouchableOpacity
++              testID="container-form-save"
++              style={[styles.btn, styles.saveBtn]}
++              onPress={handleSave}
++            >
+               <Text style={styles.saveBtnText}>{tLootTrade('form.save')}</Text>
+             </TouchableOpacity>
+             <TouchableOpacity style={[styles.btn, styles.cancelBtn]} onPress={onClose}>
+@@ -334,7 +579,7 @@ const styles = StyleSheet.create({
+   card: {
+     width: '90%',
+     maxWidth: 520,
+-    maxHeight: '82%',
++    maxHeight: '84%',
+     backgroundColor: '#1f1f1f',
+     borderRadius: 5,
+     borderWidth: 1.5,
+@@ -412,6 +657,164 @@ const styles = StyleSheet.create({
+   roomChipTextActive: {
+     color: '#1a1a1a',
+   },
++  selectedHubPills: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 6,
++    marginBottom: 8,
++  },
++  selectedHubPill: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 6,
++    backgroundColor: '#3a3a1e',
++    borderWidth: 1,
++    borderColor: '#f0e68c',
++    borderRadius: 5,
++    paddingHorizontal: 10,
++    paddingVertical: 5,
++  },
++  selectedHubPillText: {
++    color: '#f0e68c',
++    fontSize: 13,
++    fontWeight: '700',
++  },
++  selectedHubPillRemove: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  hubComboRow: {
++    flexDirection: 'row',
++    alignItems: 'stretch',
++    backgroundColor: '#2a2a2a',
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    overflow: 'hidden',
++  },
++  hubComboRowActive: {
++    borderColor: '#d4af37',
++  },
++  hubInputWrap: {
++    flex: 1,
++    position: 'relative',
++    justifyContent: 'center',
++  },
++  ghostOverlay: {
++    position: 'absolute',
++    left: 0,
++    right: 0,
++    top: 0,
++    bottom: 0,
++    paddingHorizontal: 12,
++    justifyContent: 'center',
++  },
++  ghostTextLine: {
++    fontSize: 14,
++  },
++  ghostTypedTransparent: {
++    color: 'transparent',
++    fontSize: 14,
++  },
++  ghostCompletion: {
++    color: 'rgba(240, 230, 140, 0.5)',
++    fontSize: 14,
++  },
++  hubComboInput: {
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    color: '#f2f2f2',
++    fontSize: 14,
++    backgroundColor: 'transparent',
++  },
++  hubDropdownToggle: {
++    width: 40,
++    justifyContent: 'center',
++    alignItems: 'center',
++    borderLeftWidth: 1,
++    borderLeftColor: '#484848',
++    backgroundColor: '#252525',
++  },
++  hubDropdownToggleText: {
++    color: '#f0e68c',
++    fontSize: 14,
++    fontWeight: '700',
++  },
++  quickSuggestBar: {
++    marginTop: 5,
++    alignSelf: 'flex-start',
++    backgroundColor: '#33311b',
++    borderWidth: 1,
++    borderColor: '#d4af37',
++    borderRadius: 5,
++    paddingHorizontal: 10,
++    paddingVertical: 5,
++  },
++  quickSuggestText: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  hubDropdownMenu: {
++    marginTop: 5,
++    backgroundColor: '#242424',
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    borderRadius: 5,
++    overflow: 'hidden',
++  },
++  hubDropdownScroll: {
++    maxHeight: 170,
++  },
++  hubDropdownEmpty: {
++    color: '#9e9e9e',
++    fontSize: 12,
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    lineHeight: 16,
++  },
++  hubDropdownItem: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 12,
++    paddingVertical: 9,
++    borderBottomWidth: 1,
++    borderBottomColor: '#323232',
++  },
++  hubDropdownItemSuggested: {
++    backgroundColor: '#2f2d1c',
++  },
++  hubDropdownItemSelected: {
++    backgroundColor: '#3a3a1e',
++  },
++  hubDropdownItemText: {
++    color: '#eaeaea',
++    fontSize: 13,
++    fontWeight: '600',
++    flex: 1,
++    marginRight: 8,
++  },
++  hubDropdownItemTextHighlight: {
++    color: '#f0e68c',
++    fontWeight: '700',
++  },
++  hubDropdownItemMark: {
++    color: '#f0e68c',
++    fontSize: 14,
++    fontWeight: '700',
++  },
++  hubDropdownCreateItem: {
++    paddingHorizontal: 12,
++    paddingVertical: 10,
++    backgroundColor: '#2b2b1d',
++  },
++  hubDropdownCreateText: {
++    color: '#f0e68c',
++    fontSize: 13,
++    fontWeight: '700',
++  },
+   counterRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0fc2ba3..0dfa01b 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,15 @@
+ # Changelog
++---
++## Location combobox with inline autocomplete (`New` → `New Vegas`) in Chest & Merchant form (patch 476)
++
++Replaced the hidden chip-only Location selector in `ContainerFormModal.js` with
++an always-visible **«Bind to location (optional)»** combobox combining a
++dropdown of available Locations (`▾`) with live inline autocomplete
++(`matchHubSuggestions` in `domain/lootTrade.js`): typing e.g. `New` immediately
++displays the inline ghost completion ` Vegas` and quick-select action (`Tab` /
++`Enter` or tap), and if no matching Location exists yet, allows creating and
++linking a new Location in one tap right from the dropdown.
++
+ ---
+ ## Shared room WebSocket server `wss://fallout2d20-companion.na4u.ru/ws` for Replit and NetAngels deployments (patch 475)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a299f11..2ed5f9f 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,19 @@
+ # История изменений
+ 
++---
++## Строка выбора локации с автодополнением при вводе (`New` → `New Vegas`) в форме сундука и торговца (патч 476)
++
++В форме создания и редактирования контейнера добычи и торговца
++(`ContainerFormModal.js`) постоянным полем добавлена комбинированная строка
++**«Привязать к локации (необязательно)»** (раньше блок скрывался целиком, если
++локации ещё не были созданы, и не имел текстового поиска). Теперь строка всегда
++доступна и совмещает раскрывающийся список созданных локаций (`▾`) с живым
++автодополнением при наборе (`matchHubSuggestions` в `domain/lootTrade.js`): при
++вводе, например, `New` прямо в строке подсвечивается продолжение ` Vegas` и
++кнопка быстрого выбора (`Tab` / `Enter` или нажатие), а если введённой локации
++ещё нет — её можно создать и привязать в одно нажатие прямо из выпадающего
++списка.
++
+ ---
+ ## Единый WebSocket-сервер комнат `wss://fallout2d20-companion.na4u.ru/ws` для публикации на Replit и NetAngels (патч 475)
+ 
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index bd4f86b..9a74bd6 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -64,7 +64,7 @@ Long campaigns quickly accumulate dozens of stashes and shops. To keep the main
+ ### Room Binding & Shared Traders/Containers
+ - **Locations** can be bound to **one room or multiple rooms at once** — handy when different parties visit the same settlements across campaigns.
+ - **Loot containers and merchants** are not locked to a single room:
+-  - when creating one, you can optionally link it straight into one or more locations, or leave it on the main screen;
++  - when creating or editing one, there is always a **«Bind to location»** field: open the list of existing locations or start typing — the input immediately suggests matching locations inline (for example, typing `New` suggests `New Vegas`), and even lets you create a brand-new location on the spot; leave it empty to place the card on the main screen;
+   - on the main screen, drag any chest or merchant by the **four-way arrow handle** in its top-left corner onto a Location card (or use **`⋮` → «Move to location…»**);
+   - the same merchant or stash can belong to **multiple locations at the same time** (for example, a traveling caravan trader visiting several towns — marked with a shared badge `🔗 ×2` inside locations).
+ - Inside an opened location, use **«↗ To screen»** to bring a chest or merchant back out onto the main screen, or **«Unlink»** (when shared across multiple locations) to remove it only from the current location while keeping it in the others.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index a2efcd5..46e679a 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -64,7 +64,7 @@
+ ### Привязка к комнатам и общие объекты
+ - **Локации** привязываются к **одной или сразу нескольким комнатам** — удобно, если по одним и тем же местам Пустоши путешествуют разные группы игроков.
+ - **Сундуки и торговцы** не привязаны жёстко к одной комнате:
+-  - при создании их можно сразу поместить в одну или несколько локаций либо оставить на общем экране;
++  - при создании и редактировании всегда есть строка **«Привязать к локации»**: можно раскрыть список доступных локаций или начать вводить название с клавиатуры — строка сразу подскажет подходящую локацию (например, при вводе `New` предложит `New Vegas`), а если такой локации ещё нет, позволит создать её прямо на месте; если поле оставить пустым, карточка останется на общем экране;
+   - с общего экрана сундук или торговца можно **перетащить за значок стрелок** в левом верхнем углу карточки прямо на карточку нужной локации (либо выбрать **`⋮` → «В локацию…»**);
+   - один и тот же торговец или тайник может числиться **сразу в нескольких локациях** (например, бродячий караванщик на маршруте между поселениями — в списке локации он отмечается значком общей связи `🔗 ×2`).
+ - Внутри локации у каждой строки есть кнопка **«↗ На экран»** (возвращает объект обратно на общий экран), а если объект состоит сразу в нескольких локациях — кнопка **«Отвязать»** (убирает его только из текущей локации, оставляя в остальных).
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index 938bbe5..e162c9e 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -724,3 +724,107 @@ export const duplicateContainerEntity = (
+     updatedAt: now,
+   };
+ };
++
++const HUB_WORD_SPLIT_RE = /[\s\-–—_/.,()"«»[\]]+/;
++
++/**
++ * Подбор и ранжирование локаций ('hub') для строки выбора + автодополнения
++ * в форме создания/редактирования сундука или торговца.
++ *
++ * Приоритет совпадений:
++ *  0 — точное совпадение названия (без учёта регистра);
++ *  1 — префикс с начала строки (напр. "New" -> "New Vegas");
++ *  2 — префикс с начала любого слова (напр. "Vegas" -> "New Vegas");
++ *  3 — подстрока внутри названия.
++ * Внутри одного ранга ещё не выбранные локации идут выше уже выбранных,
++ * чтобы автоподсказка всегда предлагала следующее полезное действие.
++ */
++export const matchHubSuggestions = (
++  query = '',
++  availableHubs = [],
++  selectedHubIds = [],
++) => {
++  const hubs = (Array.isArray(availableHubs) ? availableHubs : []).filter(
++    (h) => h && h.id && String(h.name || '').trim().length > 0,
++  );
++  const selectedSet = new Set(Array.isArray(selectedHubIds) ? selectedHubIds : []);
++  const cleanQuery = String(query ?? '').replace(/^\s+/, '');
++  const trimmedQuery = cleanQuery.trim();
++
++  if (!trimmedQuery) {
++    return {
++      matches: hubs,
++      bestMatch: null,
++      ghostSuffix: '',
++      exactHub: null,
++    };
++  }
++
++  const lowerQuery = trimmedQuery.toLowerCase();
++  const lowerCleanQuery = cleanQuery.toLowerCase();
++
++  let exactHub = null;
++  const scored = [];
++
++  hubs.forEach((hub, index) => {
++    const rawName = String(hub.name || '').trim();
++    const lowerName = rawName.toLowerCase();
++
++    if (lowerName === lowerQuery && !exactHub) {
++      exactHub = hub;
++    }
++
++    let rank = -1;
++    if (lowerName === lowerQuery) {
++      rank = 0;
++    } else if (lowerName.startsWith(lowerCleanQuery) || lowerName.startsWith(lowerQuery)) {
++      rank = 1;
++    } else {
++      const words = lowerName.split(HUB_WORD_SPLIT_RE).filter(Boolean);
++      if (words.some((w) => w.startsWith(lowerQuery))) {
++        rank = 2;
++      } else if (lowerName.includes(lowerQuery)) {
++        rank = 3;
++      }
++    }
++
++    if (rank >= 0) {
++      scored.push({
++        hub,
++        rank,
++        alreadySelected: selectedSet.has(hub.id) ? 1 : 0,
++        index,
++      });
++    }
++  });
++
++  scored.sort((a, b) => {
++    if (a.alreadySelected !== b.alreadySelected) {
++      return a.alreadySelected - b.alreadySelected;
++    }
++    if (a.rank !== b.rank) {
++      return a.rank - b.rank;
++    }
++    return a.index - b.index;
++  });
++
++  const matches = scored.map((entry) => entry.hub);
++  const bestEntry = scored.find((entry) => entry.alreadySelected === 0) || null;
++  const bestMatch = bestEntry ? bestEntry.hub : null;
++
++  let ghostSuffix = '';
++  if (bestMatch) {
++    const bestName = String(bestMatch.name || '').trim();
++    if (bestName.toLowerCase().startsWith(lowerCleanQuery) && bestName.length > cleanQuery.length) {
++      ghostSuffix = bestName.slice(cleanQuery.length);
++    }
++  }
++
++  return {
++    matches,
++    bestMatch,
++    ghostSuffix,
++    exactHub,
++  };
++};
++
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 4e559bf..ddb9878 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -40,7 +40,12 @@
+     "roomsMultiLabel": "Room / rooms *",
+     "roomsMultiHint": "Select one or multiple rooms if different parties visit the same location.",
+     "bindHubsLabel": "Bind to location (optional)",
+-    "bindHubsHint": "Leave unselected to place on the main screen (you can drag it into a location later).",
++    "bindHubsPlaceholder": "Pick from list or type (e.g. New → New Vegas)...",
++    "bindHubsSuggestAction": "Suggestion: {name} ↵",
++    "bindHubsCreateNew": "+ Create new location «{name}»",
++    "bindHubsEmptyList": "No locations yet — type a name above to create one right away, or leave empty.",
++    "bindHubsNoMatch": "No matching locations found.",
++    "bindHubsHint": "Leave unselected to place on the main screen (you can drag it into a location anytime).",
+     "noRoomsHint": "Create a campaign room on the «Campaigns» tab first.",
+     "descriptionLabel": "Description (optional)",
+     "descriptionPlaceholder": "Short description shown to players...",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 9dafb77..85b303b 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -40,7 +40,12 @@
+     "roomsMultiLabel": "Комната / комнаты *",
+     "roomsMultiHint": "Можно выбрать сразу несколько комнат, если разные группы посещают одну и ту же локацию.",
+     "bindHubsLabel": "Привязать к локации (необязательно)",
+-    "bindHubsHint": "Если не выбирать — попадёт в общий список на экране, откуда карточку можно в любой момент перетащить в локацию.",
++    "bindHubsPlaceholder": "Выберите из списка или введите (напр. New → New Vegas)...",
++    "bindHubsSuggestAction": "Подсказка: {name} ↵",
++    "bindHubsCreateNew": "+ Создать новую локацию «{name}»",
++    "bindHubsEmptyList": "Локаций пока нет — введите название выше, чтобы сразу создать локацию, или оставьте поле пустым.",
++    "bindHubsNoMatch": "Среди созданных локаций совпадений нет.",
++    "bindHubsHint": "Если не выбирать — карточка попадёт в общий список на экране, откуда её всегда можно перетащить в локацию.",
+     "noRoomsHint": "Сначала создайте комнату на вкладке «Список кампаний».",
+     "descriptionLabel": "Описание (необязательно)",
+     "descriptionPlaceholder": "Короткое описание для игроков...",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index d7af8b6..189b0d1 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "475"
++  "baseline": "476"
+ }
+diff --git a/public/version.json b/public/version.json
+index bf4a24e..c17f0d3 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "475",
++  "version": "476",
+   "release": 4,
+   "notes": {
+     "ru-RU": [

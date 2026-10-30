@@ -585,13 +585,27 @@ export default function LootTradeScreen() {
     return saved;
   };
 
+  const handleQuickCreateHub = async (hubName) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return null;
+    const cleanHubName = String(hubName || '').trim();
+    if (!cleanHubName) return null;
+    const defaultRoomCode = availableRooms[0]?.code || '';
+    return persistAndSyncContainer({
+      kind: CONTAINER_KIND.HUB,
+      name: cleanHubName,
+      roomCode: defaultRoomCode,
+      roomCodes: defaultRoomCode ? [defaultRoomCode] : [],
+      links: [],
+    });
+  };
+
   const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
     if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
     const cleanDraft = { ...draft };
     delete cleanDraft.__isDuplicateDraft;
 
     if (cleanDraft.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds)) {
-      cleanDraft.inRoot = false;
+      cleanDraft.inRoot = selectedHubIds.length === 0;
     }
 
     const saved = await persistAndSyncContainer(cleanDraft);
@@ -619,6 +633,9 @@ export default function LootTradeScreen() {
 
     setFormModal(null);
     if (!activeContainerId && !draft.id) {
+      if (saved.kind !== CONTAINER_KIND.HUB && Array.isArray(selectedHubIds) && selectedHubIds.length > 0) {
+        setReturnHubId(selectedHubIds[0]);
+      }
       setActiveContainerId(saved.id);
     }
     if (capsRollInfo?.rolled) {
@@ -1992,6 +2009,7 @@ export default function LootTradeScreen() {
             ? getHubIdsContainingChild(formModal.initialContainer.id, containers)
             : []
         }
+        onQuickCreateHub={handleQuickCreateHub}
         onSave={handleSaveContainerForm}
         onClose={() => setFormModal(null)}
       />

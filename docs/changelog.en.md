@@ -1,5 +1,16 @@
 # Changelog
 ---
+## Location combobox with inline autocomplete (`New` → `New Vegas`) in Chest & Merchant form (patch 476)
+
+Replaced the hidden chip-only Location selector in `ContainerFormModal.js` with
+an always-visible **«Bind to location (optional)»** combobox combining a
+dropdown of available Locations (`▾`) with live inline autocomplete
+(`matchHubSuggestions` in `domain/lootTrade.js`): typing e.g. `New` immediately
+displays the inline ghost completion ` Vegas` and quick-select action (`Tab` /
+`Enter` or tap), and if no matching Location exists yet, allows creating and
+linking a new Location in one tap right from the dropdown.
+
+---
 ## Shared room WebSocket server `wss://fallout2d20-companion.na4u.ru/ws` for Replit and NetAngels deployments (patch 475)
 
 Switched the room client (`src/room/roomClient.ts`) to route published builds —
