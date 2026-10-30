@@ -44,6 +44,11 @@ import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllChara
 import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
 import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
 import { debugLog } from '../../../src/debug/falloutDebug';
+import {
+  FEATURE_IDS,
+  guardAdminAction,
+  useAdminAccess,
+} from '../../../src/premium/adminAccessGate';
 import styles from '../../../styles/HomeScreen.styles';
 import SettingsModal from '../../settings/SettingsModal';
 // 446 (владелец, 2026-10-25): окно «Игровой сеттинг» скрыто в UI — установка
@@ -518,8 +523,10 @@ export default function HomeScreen({ navigation }) {
   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
   const setSharedTabUiMode = useUiModeStore((state) => state.setTabUiMode);
   const uiMode = tabUiMode || storeUiMode;
-  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
-  const isGmMode = uiMode === 'gm';
+  const { adminLicensed, gmCampaignsLicensed } = useAdminAccess();
+  const rawAdminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+  const adminScreenEnabled = Boolean(rawAdminScreenEnabled && adminLicensed);
+  const isGmMode = uiMode === 'gm' && adminLicensed;
   const roomServerAvailable = isRoomServerConfigured();
   const roomRooms = useRoomStore((state) => state.rooms);
   const roomStatus = useRoomStore((state) => state.status);
@@ -709,6 +716,10 @@ export default function HomeScreen({ navigation }) {
     // Режим мастера: папка — это серверная комната (§1 плана gm-rooms).
     // Сначала комната на сервере, потом локальная папка со штампом;
     // при сбое сети папку не создаём — сироты «папка без комнаты» не нужны.
+    if (!guardAdminAction(FEATURE_IDS.GM_CAMPAIGNS)) {
+      setFolderDraftVisible(false);
+      return;
+    }
     try {
       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
       await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
@@ -799,6 +810,9 @@ export default function HomeScreen({ navigation }) {
 
   const handleToggleUiMode = () => {
     const nextMode = isGmMode ? 'user' : 'gm';
+    if (nextMode === 'gm' && !guardAdminAction(FEATURE_IDS.ADMIN_ACCESS)) {
+      return;
+    }
     if (isGmMode) {
       Object.values(folderRoomRecords).forEach((record) => {
         if (record?.code) {
@@ -830,7 +844,7 @@ export default function HomeScreen({ navigation }) {
   // Мастер держит свои комнаты открытыми (presence игроков + приём снапшотов) и
   // прозрачно перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
   useEffect(() => {
-    if (!isGmMode || !roomServerAvailable) return undefined;
+    if (!isGmMode || !gmCampaignsLicensed || !roomServerAvailable) return undefined;
 
     const ensureGmRooms = () => {
       if (useRoomStore.getState().status === 'connecting') return;

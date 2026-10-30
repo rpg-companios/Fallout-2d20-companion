@@ -1,0 +1,1475 @@
+diff --git a/App.js b/App.js
+index 0723095..716ae10 100644
+--- a/App.js
++++ b/App.js
+@@ -37,6 +37,10 @@ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen
+ import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
+ import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
+ import useUiModeStore from './src/room/uiModeStore';
++import {
++  enforceAdminModeEntitlement,
++  useAdminAccess,
++} from './src/premium/adminAccessGate';
+ // Side-effect: сеттинг регистрирует расширение состояния (поле сейва
+ // survival + миграцию v22→v23) в реестре движка ДО монтирования
+ // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
+@@ -80,9 +84,17 @@ function App() {
+   const storeUiMode = useAppSettingsStore(selectUiMode);
+   const tabUiMode = useUiModeStore((s) => s.tabUiMode);
+   const gmInspectingCharacter = useUiModeStore((s) => s.gmInspectingCharacter);
+-  const isGmMode = (tabUiMode || storeUiMode) === 'gm';
++  const { adminLicensed, gmLootTradeLicensed } = useAdminAccess();
++  const rawIsGmMode = (tabUiMode || storeUiMode) === 'gm';
++  const isGmMode = rawIsGmMode && adminLicensed;
+   const locale = useLocale();
+   useModuleLocale();
++
++  useEffect(() => {
++    if (rawIsGmMode && !adminLicensed) {
++      enforceAdminModeEntitlement();
++    }
++  }, [rawIsGmMode, adminLicensed]);
+   const activeSettingId = useSettingPackStore(selectActiveSettingId);
+   // Модульные экраны (Character, Equipment, Inventory, Perks) рендерятся только
+   // когда юзер **явно выбрал** активный модуль (activeSettingId !== null), а не
+@@ -271,7 +283,7 @@ function App() {
+                         ),
+                       }}
+                     />
+-                    {isGmMode ? (
++                    {(isGmMode && gmLootTradeLicensed) ? (
+                       <Tab.Screen
+                         name={TAB_ROUTES.LOOT_TRADE}
+                         component={LootTradeScreen}
+diff --git a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+index 5af48dd..c51c40f 100644
+--- a/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
++++ b/__tests__/lootTrade/gm-containers-db-cloud-ui-468.test.js
+@@ -118,6 +118,8 @@ describe('Патч 468 — локальная БД gm_containers, облачна
+     const newFiles = [
+       'domain/ammoFoundTable.js',
+       'domain/lootTrade.js',
++      'domain/premium.js',
++      'src/premium/adminAccessGate.js',
+       'src/lootTrade/grantCharacterItems.js',
+       'src/lootTrade/gmSessionPersistence.js',
+       'styles/LootTradeScreen.styles.js',
+diff --git a/__tests__/premium/admin-access-gate-474.test.js b/__tests__/premium/admin-access-gate-474.test.js
+new file mode 100644
+index 0000000..1e69e2c
+--- /dev/null
++++ b/__tests__/premium/admin-access-gate-474.test.js
+@@ -0,0 +1,355 @@
++import fs from 'fs';
++import path from 'path';
++import WebSocket from 'ws';
++import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
++
++const alertCalls = [];
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++  Alert: { alert: vi.fn() },
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: (payload) => {
++    alertCalls.push(payload);
++  },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++import * as db from '../../db/Database.web.js';
++import { setCurrentLocale } from '../../i18n/locale';
++import {
++  FEATURE_IDS,
++  ADMIN_FEATURE_IDS,
++  ADMIN_LICENSE_ERROR,
++  OPEN_BETA_BY_DEFAULT,
++  getEntitlement,
++  setEntitlement,
++  resetEntitlementToDefault,
++  activateAdminLicense,
++  subscribeEntitlement,
++  isAdminLicensed,
++  isGmCampaignsLicensed,
++  isGmLootTradeLicensed,
++  assertAdminFeature,
++} from '../../domain/premium';
++import {
++  guardAdminAction,
++  enforceAdminModeEntitlement,
++} from '../../src/premium/adminAccessGate';
++import { CONTAINER_KIND } from '../../domain/lootTrade';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import { useUiModeStore } from '../../src/room/uiModeStore';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import { createRoomClient } from '../../src/room/roomClient';
++import { MESSAGE } from '../../server/protocol.js';
++import { createRoomServer } from '../../server/roomServer.js';
++
++const waitFor = async (predicate, timeoutMs = 4000) => {
++  const started = Date.now();
++  while (Date.now() - started < timeoutMs) {
++    const val = await predicate();
++    if (val) return val;
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('Timed out waiting for condition');
++};
++
++describe('Patch 474 — Centralized Admin license gate & bilingual non-technical guides', () => {
++  let serverApp = null;
++  let wsUrl = '';
++
++  beforeEach(async () => {
++    alertCalls.length = 0;
++    resetEntitlementToDefault();
++    setCurrentLocale('ru-RU');
++    useAppSettingsStore.getState().setValue('uiMode', 'user');
++    useUiModeStore.getState().setTabUiMode('user');
++
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++
++    await db.initDatabase();
++
++    serverApp = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const started = await serverApp.start();
++    wsUrl = `ws://127.0.0.1:${started.port}/ws`;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++  });
++
++  afterEach(async () => {
++    resetEntitlementToDefault();
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    if (serverApp) {
++      await serverApp.close();
++      serverApp = null;
++    }
++  });
++
++  it('keeps all Admin & GM Loot/Trade mechanics open by default in open-beta mode', () => {
++    expect(OPEN_BETA_BY_DEFAULT).toBe(true);
++    expect(getEntitlement().plan).toBe('open-beta');
++    expect(isAdminLicensed()).toBe(true);
++    expect(isGmCampaignsLicensed()).toBe(true);
++    expect(isGmLootTradeLicensed()).toBe(true);
++
++    for (const featureId of ADMIN_FEATURE_IDS) {
++      expect(() => assertAdminFeature(featureId)).not.toThrow();
++    }
++
++    const fn = vi.fn();
++    expect(guardAdminAction(FEATURE_IDS.ADMIN_ACCESS, fn)).toBe(true);
++    expect(fn).toHaveBeenCalledTimes(1);
++    expect(alertCalls).toHaveLength(0);
++  });
++
++  it('blocks all Admin UI actions, GM room operations, and GM container mutations when switched to free plan, while preserving saved data', async () => {
++    // 1. Save a GM container while open-beta is active
++    const savedChest = await db.saveGmContainer({
++      id: 'cnt_license_keep_474',
++      kind: CONTAINER_KIND.LOOT,
++      name: 'Запас Смотрителя',
++      items: [
++        {
++          id: 'line_474_1',
++          itemId: 'caps',
++          itemType: 'currency',
++          name: 'Крышки',
++          quantity: 55,
++        },
++      ],
++    });
++    expect((await db.getGmContainersList()).some((c) => c.id === 'cnt_license_keep_474')).toBe(true);
++
++    // 2. Switch user into GM mode first, then revoke open-beta entitlement -> free mode
++    useAppSettingsStore.getState().setValue('uiMode', 'gm');
++    useUiModeStore.getState().setTabUiMode('gm');
++
++    const events = [];
++    const unsubscribe = subscribeEntitlement((next) => events.push(next.plan));
++
++    setEntitlement({
++      plan: 'free',
++      allFeatures: false,
++      features: [],
++      expiresAt: null,
++    });
++    unsubscribe();
++
++    expect(events).toEqual(['free']);
++    expect(isAdminLicensed()).toBe(false);
++    expect(isGmCampaignsLicensed()).toBe(false);
++    expect(isGmLootTradeLicensed()).toBe(false);
++
++    // 3. enforceAdminModeEntitlement resets UI modes back to 'user'
++    expect(enforceAdminModeEntitlement()).toBe(true);
++    expect(useAppSettingsStore.getState().getSettingValue('uiMode')).toBe('user');
++    expect(useUiModeStore.getState().tabUiMode).toBe('user');
++
++    // 4. guardAdminAction blocks callback and shows localized RU & EN alerts
++    setCurrentLocale('ru-RU');
++    const blockedFn = vi.fn();
++    expect(guardAdminAction(FEATURE_IDS.ADMIN_ACCESS, blockedFn)).toBe(false);
++    expect(blockedFn).not.toHaveBeenCalled();
++    expect(alertCalls.at(-1)?.title).toBe('Требуется лицензия Мастера');
++
++    setCurrentLocale('en-EN');
++    expect(guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE, blockedFn)).toBe(false);
++    expect(alertCalls.at(-1)?.title).toBe('Game Master License Required');
++
++    // 5. GM store & DB operations reject with ADMIN_LICENSE_REQUIRED
++    await expect(useRoomStore.getState().createRoom({ name: 'Закрытая кампания' })).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++    await expect(useRoomStore.getState().joinRoom({ code: 'GM-7Q3K9M', role: 'gm' })).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++    await expect(
++      useRoomStore.getState().openRoomSession({
++        code: 'GM-7Q3K9M',
++        session: { containerId: 's1', kind: CONTAINER_KIND.LOOT, name: 'Тайник', items: [] },
++      }),
++    ).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++    await expect(
++      useRoomStore.getState().updateRoomSessionRates({ code: 'GM-7Q3K9M', caps: 100 }),
++    ).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++    await expect(
++      useRoomStore.getState().closeRoomSession({ code: 'GM-7Q3K9M', sessionId: 's1' }),
++    ).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++
++    await expect(db.saveGmContainer(savedChest)).rejects.toMatchObject({ code: ADMIN_LICENSE_ERROR });
++    await expect(db.duplicateGmContainer('cnt_license_keep_474')).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++    await expect(db.deleteGmContainer('cnt_license_keep_474')).rejects.toMatchObject({
++      code: ADMIN_LICENSE_ERROR,
++    });
++
++    // 6. Activating permanent non-expiring license restores full access and keeps previously saved containers intact
++    const activated = activateAdminLicense({
++      keyId: 'POS-GM-PERMANENT-001',
++      accountSubHash: 'gm-sub-hash-001',
++    });
++    expect(activated.plan).toBe('licensed');
++    expect(activated.expiresAt).toBeNull();
++    expect(isAdminLicensed()).toBe(true);
++    expect(isGmCampaignsLicensed()).toBe(true);
++    expect(isGmLootTradeLicensed()).toBe(true);
++
++    const restoredList = await db.getGmContainersList();
++    expect(restoredList.find((c) => c.id === 'cnt_license_keep_474')?.items?.[0]?.quantity).toBe(55);
++    await db.deleteGmContainer('cnt_license_keep_474');
++  });
++
++  it('keeps all Player room connection and Loot/Trade actions completely free when local Admin entitlement is disabled', async () => {
++    // Remote licensed GM creates room & joins as GM via raw WS client
++    const gmMessages = [];
++    const remoteGm = createRoomClient({
++      url: wsUrl,
++      clientId: 'gm-remote-474',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => gmMessages.push(m),
++    });
++
++    try {
++      await waitFor(() => remoteGm.getStatus() === 'online');
++      remoteGm.send(
++        MESSAGE.ROOM_CREATE,
++        { name: 'Комната Ведущего', requestId: 'create-474' },
++        null,
++      );
++      const createdMsg = await waitFor(() =>
++        gmMessages.find((m) => m.type === MESSAGE.ROOM_CREATED && m.payload?.requestId === 'create-474'),
++      );
++      const roomCode = createdMsg.payload.code;
++
++      remoteGm.send(
++        MESSAGE.ROOM_JOIN,
++        { code: roomCode, name: 'GM', role: 'gm', requestId: 'gm-join-474' },
++        roomCode,
++      );
++      await waitFor(() =>
++        gmMessages.find((m) => m.type === MESSAGE.ROOM_STATE && m.payload?.requestId === 'gm-join-474'),
++      );
++
++      // Local device is a FREE player without Admin license
++      setEntitlement({
++        plan: 'free',
++        allFeatures: false,
++        features: [],
++        expiresAt: null,
++      });
++      expect(isAdminLicensed()).toBe(false);
++
++      // Free player joins GM's room via roomStore without error
++      await useRoomStore.getState().joinRoom({ code: roomCode, name: 'Выживший', role: 'player' });
++      expect(useRoomStore.getState().rooms[roomCode]?.joined).toBe(true);
++
++      // Remote GM opens a loot session for the room
++      remoteGm.send(
++        MESSAGE.SESSION_OPEN,
++        {
++          code: roomCode,
++          requestId: 'open-474',
++          session: {
++            containerId: 'cnt_free_player_474',
++            kind: 'loot',
++            name: 'Ящик у дороги',
++            targetType: 'room',
++            items: [
++              {
++                entryId: 'line_stim_474',
++                itemId: 'chem_stimpak',
++                itemType: 'chem',
++                name: 'Стимулятор',
++                quantity: 2,
++              },
++            ],
++          },
++        },
++        roomCode,
++      );
++
++      await waitFor(() => useRoomStore.getState().rooms[roomCode]?.activeSession?.containerId === 'cnt_free_player_474');
++      const activeSession = useRoomStore.getState().rooms[roomCode].activeSession;
++
++      // Free player takes 1 item and closes their window — both succeed without license error
++      const takeRes = await useRoomStore.getState().takeFromLootSession({
++        code: roomCode,
++        sessionId: activeSession.sessionId,
++        characterId: 'char_player_1',
++        takes: [{ entryId: 'line_stim_474', quantity: 1 }],
++      });
++      expect(takeRes?.session?.items?.[0]?.quantity).toBe(1);
++
++      const closeRes = await useRoomStore.getState().playerCloseRoomSession({
++        code: roomCode,
++        sessionId: activeSession.sessionId,
++      });
++      expect(closeRes).toBeTruthy();
++    } finally {
++      remoteGm.close();
++    }
++  });
++
++  it('ships complete RU and EN guides without technical code/protocol jargon', () => {
++    const ruPath = path.resolve(process.cwd(), 'docs/guides/admin-and-loot-trade.ru.md');
++    const enPath = path.resolve(process.cwd(), 'docs/guides/admin-and-loot-trade.en.md');
++
++    expect(fs.existsSync(ruPath)).toBe(true);
++    expect(fs.existsSync(enPath)).toBe(true);
++
++    const ruText = fs.readFileSync(ruPath, 'utf8');
++    const enText = fs.readFileSync(enPath, 'utf8');
++
++    expect(ruText.length).toBeGreaterThan(2500);
++    expect(enText.length).toBeGreaterThan(2500);
++
++    // Core user-facing mechanics covered in both languages
++    expect(ruText).toContain('Список кампаний');
++    expect(ruText).toContain('Добыча/Торговля');
++    expect(ruText).toContain('Локации');
++    expect(ruText).toContain('GM-XXX-XXX');
++    expect(ruText).toContain('🔒');
++
++    expect(enText).toContain('Campaigns');
++    expect(enText).toContain('Loot/Trade');
++    expect(enText).toContain('Locations');
++    expect(enText).toContain('GM-XXX-XXX');
++    expect(enText).toContain('🔒');
++
++    // Free of developer / protocol jargon
++    const forbiddenJargon = [
++      'WebSocket',
++      'SQLite',
++      'JSON',
++      'roomStore',
++      'useUiModeStore',
++      'appDataFolder',
++      'sanitizeSessionForMember',
++      'Zustand',
++    ];
++    for (const term of forbiddenJargon) {
++      expect(ruText).not.toContain(term);
++      expect(enText).not.toContain(term);
++    }
++  });
++});
+diff --git a/components/cloudSync/googleDriveSync.js b/components/cloudSync/googleDriveSync.js
+index b174543..0cf2e11 100644
+--- a/components/cloudSync/googleDriveSync.js
++++ b/components/cloudSync/googleDriveSync.js
+@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import * as db from '../../db';
+ import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
++import { isGmLootTradeLicensed } from '../../domain/premium';
+ import { normalizeContainerEntity } from '../../domain/lootTrade';
+ import { getActiveModuleId } from '../../domain/moduleLocale';
+ import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
+@@ -291,6 +292,9 @@ const parseGmContainerCloudPayload = (rawText) => {
+ };
+ 
+ const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
++  if (!isGmLootTradeLicensed()) {
++    return { uploaded: 0, downloaded: 0 };
++  }
+   const localContainers = typeof db.getGmContainersList === 'function'
+     ? await db.getGmContainersList()
+     : [];
+@@ -764,7 +768,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
+ 
+ // Фоновая выгрузка контейнера/торговца Мастера в Google Drive (если облако уже включено).
+ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
+-  if (!ensureWeb() || !containerId) return;
++  if (!ensureWeb() || !containerId || !isGmLootTradeLicensed()) return;
+ 
+   try {
+     const configured = await isCloudSyncConfigured();
+@@ -801,6 +805,7 @@ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
+ // Удаление контейнера/торговца Мастера из Google Drive при локальном удалении.
+ export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
+   if (!ensureWeb() || !containerId) return { removed: false, reason: 'not-web' };
++  if (!isGmLootTradeLicensed()) return { removed: false, reason: 'unlicensed' };
+ 
+   try {
+     const configured = await isCloudSyncConfigured();
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index aeb5d2d..e40865e 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -44,6 +44,11 @@ import { deleteCharacterFromCloudIfEnabled, openCloudFolderInDrive, syncAllChara
+ import { showAlert as showCatalogAlert, showRawAlert, confirmAlert } from '../../alerts/alertService';
+ import { forcePwaUpdate } from '../../../src/utils/forcePwaUpdate';
+ import { debugLog } from '../../../src/debug/falloutDebug';
++import {
++  FEATURE_IDS,
++  guardAdminAction,
++  useAdminAccess,
++} from '../../../src/premium/adminAccessGate';
+ import styles from '../../../styles/HomeScreen.styles';
+ import SettingsModal from '../../settings/SettingsModal';
+ // 446 (владелец, 2026-10-25): окно «Игровой сеттинг» скрыто в UI — установка
+@@ -518,8 +523,10 @@ export default function HomeScreen({ navigation }) {
+   const tabUiMode = useUiModeStore((state) => state.tabUiMode);
+   const setSharedTabUiMode = useUiModeStore((state) => state.setTabUiMode);
+   const uiMode = tabUiMode || storeUiMode;
+-  const adminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
+-  const isGmMode = uiMode === 'gm';
++  const { adminLicensed, gmCampaignsLicensed } = useAdminAccess();
++  const rawAdminScreenEnabled = useAppSettingsStore(selectAdminScreenEnabled);
++  const adminScreenEnabled = Boolean(rawAdminScreenEnabled && adminLicensed);
++  const isGmMode = uiMode === 'gm' && adminLicensed;
+   const roomServerAvailable = isRoomServerConfigured();
+   const roomRooms = useRoomStore((state) => state.rooms);
+   const roomStatus = useRoomStore((state) => state.status);
+@@ -709,6 +716,10 @@ export default function HomeScreen({ navigation }) {
+     // Режим мастера: папка — это серверная комната (§1 плана gm-rooms).
+     // Сначала комната на сервере, потом локальная папка со штампом;
+     // при сбое сети папку не создаём — сироты «папка без комнаты» не нужны.
++    if (!guardAdminAction(FEATURE_IDS.GM_CAMPAIGNS)) {
++      setFolderDraftVisible(false);
++      return;
++    }
+     try {
+       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
+       await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
+@@ -799,6 +810,9 @@ export default function HomeScreen({ navigation }) {
+ 
+   const handleToggleUiMode = () => {
+     const nextMode = isGmMode ? 'user' : 'gm';
++    if (nextMode === 'gm' && !guardAdminAction(FEATURE_IDS.ADMIN_ACCESS)) {
++      return;
++    }
+     if (isGmMode) {
+       Object.values(folderRoomRecords).forEach((record) => {
+         if (record?.code) {
+@@ -830,7 +844,7 @@ export default function HomeScreen({ navigation }) {
+   // Мастер держит свои комнаты открытыми (presence игроков + приём снапшотов) и
+   // прозрачно перепривязывает их тем же кодом и ownerToken после перезапуска сервера (§3.3).
+   useEffect(() => {
+-    if (!isGmMode || !roomServerAvailable) return undefined;
++    if (!isGmMode || !gmCampaignsLicensed || !roomServerAvailable) return undefined;
+ 
+     const ensureGmRooms = () => {
+       if (useRoomStore.getState().status === 'connecting') return;
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 0e2898e..3b5f4cf 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -59,6 +59,11 @@ import {
+   showRawAlert,
+ } from '../../alerts/alertService';
+ import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPersistence';
++import {
++  FEATURE_IDS,
++  guardAdminAction,
++  useAdminAccess,
++} from '../../../src/premium/adminAccessGate';
+ import { debugLog } from '../../../src/debug/falloutDebug';
+ import styles from '../../../styles/LootTradeScreen.styles';
+ import homeStyles from '../../../styles/HomeScreen.styles';
+@@ -328,6 +333,7 @@ const ContainerCardCell = ({
+ export default function LootTradeScreen() {
+   const locale = useLocale();
+   const moduleLocale = useModuleLocale();
++  const { gmLootTradeLicensed } = useAdminAccess();
+   const setSettingValue = useAppSettingsStore((s) => s.setValue);
+   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
+   const roomRooms = useRoomStore((s) => s.rooms);
+@@ -580,6 +586,7 @@ export default function LootTradeScreen() {
+   };
+ 
+   const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+     const cleanDraft = { ...draft };
+     delete cleanDraft.__isDuplicateDraft;
+ 
+@@ -849,6 +856,7 @@ export default function LootTradeScreen() {
+   };
+ 
+   const handleIssueOrClosePress = async (container) => {
++    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
+     const liveEntries = getActiveLiveEntriesForContainer(container);
+     if (liveEntries.length > 0) {
+       for (const { roomCode: liveCode, session: live } of liveEntries) {
+@@ -1263,6 +1271,27 @@ export default function LootTradeScreen() {
+     ? buildGmRoomCharacterCards(roomRooms[activeLiveRoomCode])
+     : [];
+ 
++  if (!gmLootTradeLicensed) {
++    return (
++      <View style={styles.container}>
++        <View style={styles.topBar}>
++          <View />
++          <View style={styles.headerCenter}>
++            <Pressable style={styles.adminButton} onPress={handleExitGmMode}>
++              <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#f0e68c" />
++              <Text style={styles.adminButtonText}>{tHomeScreen('gm.exit')}</Text>
++            </Pressable>
++          </View>
++          <View />
++        </View>
++        <View style={styles.titleContainer}>
++          <Text style={styles.title}>{tHomeScreen('gm.licenseRequiredTitle')}</Text>
++          <Text style={styles.subtitle}>{tHomeScreen('gm.licenseRequiredMessage')}</Text>
++        </View>
++      </View>
++    );
++  }
++
+   return (
+     <View style={styles.container}>
+       {/* Верхняя шапка Мастера */}
+diff --git a/components/settings/SettingsModal.js b/components/settings/SettingsModal.js
+index 713d6ca..06a0cff 100644
+--- a/components/settings/SettingsModal.js
++++ b/components/settings/SettingsModal.js
+@@ -29,6 +29,11 @@ import {
+   useLocale,
+   useModuleLocale,
+ } from '../../i18n/locale';
++import {
++  FEATURE_IDS,
++  guardAdminAction,
++  useAdminAccess,
++} from '../../src/premium/adminAccessGate';
+ 
+ const resolvePath = (dictionary, key) => {
+   let current = dictionary;
+@@ -227,6 +232,8 @@ const FreeNumberRow = ({ setting, min, max }) => {
+ const SettingRow = ({ setting }) => {
+   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
+   const setValue = useAppSettingsStore((state) => state.setValue);
++  const { adminLicensed } = useAdminAccess();
++  const isAdminScreenToggle = setting.id === 'adminScreenEnabled';
+ 
+   if (setting.type === 'number') {
+     const min = setting.min ?? 0;
+@@ -283,10 +290,21 @@ const SettingRow = ({ setting }) => {
+   return (
+     <View style={[styles.row, styles.settingRow]}>
+       <View style={styles.text}>
+-        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
++        <Text style={styles.label}>
++          {tSetting(setting, setting.labelKey)}
++          {isAdminScreenToggle && !adminLicensed ? ` 🔒 (${tHomeScreen('gm.licenseBadgeLocked')})` : ''}
++        </Text>
+         <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
+       </View>
+-      <Switch value={Boolean(value)} onValueChange={(nextValue) => setValue(setting.id, nextValue)} />
++      <Switch
++        value={isAdminScreenToggle ? Boolean(value && adminLicensed) : Boolean(value)}
++        onValueChange={(nextValue) => {
++          if (isAdminScreenToggle && nextValue && !guardAdminAction(FEATURE_IDS.ADMIN_ACCESS)) {
++            return;
++          }
++          setValue(setting.id, nextValue);
++        }}
++      />
+     </View>
+   );
+ };
+diff --git a/db/Database.js b/db/Database.js
+index 6ff3bd1..03f7a6d 100644
+--- a/db/Database.js
++++ b/db/Database.js
+@@ -13,6 +13,7 @@ import {
+   normalizeContainerEntity,
+   duplicateContainerEntity,
+ } from '../domain/lootTrade';
++import { assertAdminFeature, FEATURE_IDS } from '../domain/premium';
+ import {
+   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
+   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
+@@ -453,6 +454,7 @@ const rowToGmContainer = (row) => {
+ };
+ 
+ export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const now = Date.now();
+   const existing = rawContainer?.id
+     ? await getFirst('SELECT created_at, updated_at FROM gm_containers WHERE id = ?', [rawContainer.id])
+@@ -480,10 +482,12 @@ export async function getGmContainersList() {
+ }
+ 
+ export async function deleteGmContainer(id) {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   await runQuery('DELETE FROM gm_containers WHERE id = ?', [id]);
+ }
+ 
+ export async function duplicateGmContainer(id, copySuffix = 'копия') {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const source = await getGmContainerById(id);
+   if (!source) throw new Error(`GM container not found: ${id}`);
+   const all = await getGmContainersList();
+diff --git a/db/Database.web.js b/db/Database.web.js
+index 34610a0..562a56b 100644
+--- a/db/Database.web.js
++++ b/db/Database.web.js
+@@ -13,6 +13,7 @@ import {
+   normalizeContainerEntity,
+   duplicateContainerEntity,
+ } from '../domain/lootTrade';
++import { assertAdminFeature, FEATURE_IDS } from '../domain/premium';
+ import {
+   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
+   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
+@@ -404,6 +405,7 @@ const rowToGmContainer = (row) => {
+ };
+ 
+ export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const now = Date.now();
+   const existing = rawContainer?.id
+     ? await getFirst('SELECT created_at, updated_at FROM gm_containers WHERE id = ?', [rawContainer.id])
+@@ -431,10 +433,12 @@ export async function getGmContainersList() {
+ }
+ 
+ export async function deleteGmContainer(id) {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   await runQuery('DELETE FROM gm_containers WHERE id = ?', [id]);
+ }
+ 
+ export async function duplicateGmContainer(id, copySuffix = 'копия') {
++  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+   const source = await getGmContainerById(id);
+   if (!source) throw new Error(`GM container not found: ${id}`);
+   const all = await getGmContainersList();
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index d37e29b..8cf0ea4 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,19 @@
+ # Changelog
++---
++## Centralized Game Master («Admin») license gate and bilingual non-technical Admin & «Loot/Trade» guides (patch 474)
++
++Wired all Game Master mechanics (`domain/premium.js`,
++`src/premium/adminAccessGate.js`) — Admin mode entry, Settings toggle, campaign
++room management, local & Google Drive container persistence, and live Location /
++Loot / Merchant sessions — through a single entitlement gate (`adminAccess`,
++`gmCampaigns`, `gmLootTrade`). Open-beta mode remains active right now
++(`OPEN_BETA_BY_DEFAULT = true`) so every feature stays unlocked, while future
++transition to permanent non-expiring GM licenses requires no scattered UI/store
++refactoring; player room connections, loot taking, and bartering remain free.
++Added plain-language Russian and English user guides
++(`docs/guides/admin-and-loot-trade.ru.md` and
++`docs/guides/admin-and-loot-trade.en.md`).
++
+ ---
+ ## New GM «Loot/Trade» screen, Google Drive container sync, and live room loot & two-pane merchant sessions (patch 468)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 2264045..761ab5b 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,21 @@
+ # История изменений
+ 
++---
++## Единый лицензионный шлюз раздела Мастера («Админ») и двуязычное руководство по разделу Мастера и «Добыче/Торговле» (патч 474)
++
++Подготовлен централизованный механизм платного доступа ко всем функциям Мастера
++(`domain/premium.js`, `src/premium/adminAccessGate.js`): переключение в режим
++«Админ», переключатель в Настройках, управление комнатами кампаний, хранение,
++облачная синхронизация и сетевая выдача локаций, сундуков и торговцев проведены
++через единый реестр прав (`adminAccess`, `gmCampaigns`, `gmLootTrade`). Сейчас
++включён режим открытого бета-теста (`OPEN_BETA_BY_DEFAULT = true`), поэтому все
++механики остаются полностью доступными, а в будущем для перевода раздела Мастера
++на бессрочную лицензию достаточно выключить этот флаг без переписывания экранов
++и сторов; подключение игроков к комнатам и участие в раздаче добычи и торговле
++остаются полностью бесплатными. Также добавлены подробные нетехнические
++руководства на русском и английском языках
++(`docs/guides/admin-and-loot-trade.ru.md` и `docs/guides/admin-and-loot-trade.en.md`).
++
+ ---
+ ## Новый экран администратора «Добыча/Торговля», синхронизация с Google Drive и сетевая выдача добычи и лавок торговцев (патч 468)
+ 
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+new file mode 100644
+index 0000000..bd4f86b
+--- /dev/null
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -0,0 +1,133 @@
++# Game Master («Admin») & «Loot/Trade» Guide
++
++This guide explains how to run campaigns in Game Master mode, connect players to rooms, organize settlements, stashes, and merchants, and hand out loot or run live trading sessions at the table.
++
++---
++
++## 1. Enabling Game Master Mode & Switching Views
++
++By default, the app opens in **«User»** mode for managing your own personal characters. To unlock Game Master tools:
++
++1. On the main screen, open **`☰` → «Settings»**.
++2. Turn on the **«Admin screen»** switch.
++3. An **«Admin»** button will appear in the top header of the main screen.
++
++### «User» Mode vs. «Admin» Mode
++- **«User» mode** — your personal characters and personal folders. Characters created here never mix into the Game Master view on their own.
++- **«Admin» mode** — the Game Master workspace with two bottom tabs:
++  1. **«Campaigns»** — online campaign rooms and live cards of connected player characters.
++  2. **«Loot/Trade»** — locations, loot containers, and merchants.
++- Tap **«User»** in the top bar anytime to return to your personal characters.
++- *Desktop tip:* you can keep two browser tabs open side by side — one in «Admin» mode to run the session, and another in «User» mode to preview things through a player's eyes.
++
++---
++
++## 2. «Campaigns» Tab (Rooms & Connecting Players)
++
++### Creating a Campaign Room (Game Master)
++1. Switch to **«Admin»** mode and stay on the **«Campaigns»** tab.
++2. Tap the create-room tile, enter a campaign name, and confirm.
++3. An **invite code** formatted like `GM-XXX-XXX` will appear — copy it and share it with your players.
++4. Inside an opened room, tap **`⋮`** in the room header anytime to:
++   - **«Edit»** — fix a typo or rename the campaign (the invite code stays the same and the new title updates live for connected players);
++   - **«Delete»** — remove the campaign room.
++
++### Connecting a Character (Player)
++1. In **«User»** mode, tap **`⋮`** on the character card you are playing and select **«Server»**.
++2. Enter the `GM-XXX-XXX` invite code from your Game Master and tap **«Connect»**.
++3. A network badge appears in the top-right corner of the character card:
++   - **green** — the Game Master is online and the room is active;
++   - **dim** — the Game Master is currently offline (no need to re-enter the code: your character reconnects automatically whenever the room is open).
++4. Moving a character between your personal folders never resets its room connection.
++
++### What the Game Master Sees Inside a Room
++- Every character connected to the room appears as a card inside that campaign room.
++- Whenever a player updates health, caps, gear, or stats and saves their sheet, the card updates automatically for the Game Master.
++- Tapping any player card opens that character's full sheet in read-only inspection mode (stats, equipment, inventory, and perks), with a button to return to the room.
++
++---
++
++## 3. «Loot/Trade» Tab & Keeping Long Campaigns Organized
++
++The second tab is where the Game Master prepares places, stashes, and traders. Everything is stored on the Game Master's device and backed up to their Google Drive cloud (via the cloud sync icon in the top-left corner).
++
++Cards on the main screen always follow a clear, fixed order:
++1. **Locations**
++2. **Loot Containers (Chests)**
++3. **Merchants**
++
++### Locations (Nested «Matryoshka» Organization)
++Long campaigns quickly accumulate dozens of stashes and shops. To keep the main screen clean and uncluttered:
++- create **Locations** (such as *«Diamond City»*, *«Red Rocket»*, or *«Vault 81»*);
++- place loot containers and merchants inside them — packed cards disappear from the main screen and live neatly as a compact text list inside their location.
++
++### Room Binding & Shared Traders/Containers
++- **Locations** can be bound to **one room or multiple rooms at once** — handy when different parties visit the same settlements across campaigns.
++- **Loot containers and merchants** are not locked to a single room:
++  - when creating one, you can optionally link it straight into one or more locations, or leave it on the main screen;
++  - on the main screen, drag any chest or merchant by the **four-way arrow handle** in its top-left corner onto a Location card (or use **`⋮` → «Move to location…»**);
++  - the same merchant or stash can belong to **multiple locations at the same time** (for example, a traveling caravan trader visiting several towns — marked with a shared badge `🔗 ×2` inside locations).
++- Inside an opened location, use **«↗ To screen»** to bring a chest or merchant back out onto the main screen, or **«Unlink»** (when shared across multiple locations) to remove it only from the current location while keeping it in the others.
++
++### Smart Check When Deleting a Location
++When deleting a location, the app checks every chest and merchant inside it:
++- if any of them exist **only inside this location**, you get a clear warning with a choice: **«Move to screen»** (keep them on the main screen) or **«Delete all»** (delete them along with the location);
++- chests and merchants that are also linked to **other locations** are never deleted and remain untouched in those other places.
++
++---
++
++## 4. Stocking Chests & Configuring Merchants
++
++Open any chest or merchant card and tap **«+ Add item»** to browse and search the full equipment catalog (including a dedicated Caps entry for chests).
++
++### Rolling Item Quantities on the Spot
++- **Regular items & caps:** choose exact pieces (**`pcs`**), Fallout Combat Dice (**`CD`**), or twenty-sided dice (**`d20`**). As soon as you press «Save», the dice are rolled automatically and the resulting total is placed into the container.
++- **Ammunition:** ammo is always added by **number of packs**. For each pack, the app automatically rolls the tabletop rulebook's found-ammo formula.
++
++### Merchant Pricing & Caps Limit
++Each merchant has three core economy settings:
++1. **Merchant Caps** — how many caps the trader currently carries (entered manually or rolled with dice). A merchant cannot pay players more caps than they have in their pouch.
++2. **Sale Markup (`%`)** — how much higher (or lower, if negative) than base value this merchant sells goods in general.
++3. **Buyback Markdown (`%`)** — how much below base value the merchant buys items from players (defaults to `50`, entered as a plain positive number without a minus sign).
++
++**Item-specific specialization:** any individual item in a shop can also have its own item markup (`%`), which **adds together** with the merchant's general sale markup.
++*Example:* a clinic doctor can have `0%` general markup on everyday bandages, plus `+40%` item markup on scarce Stimpaks.
++
++> **Game Master's secret:** players only ever see the final cap prices in the trade window — the merchant's markup and markdown percentages stay hidden. Meanwhile, the active character's relevant perks (such as Cap Collector discounts or extra found-item bonuses) apply automatically.
++
++---
++
++## 5. Issuing to Players, Live Controls & Locks
++
++Tap **`⋮` → «Issue»** on a card (or the **«Issue»** button inside its detail view):
++1. Pick the **campaign room** (if more than one is available).
++2. Choose who receives it:
++   - **Entire room** — opens simultaneously for everyone in the room;
++   - **Single character** — opens privately only for that character's player (great for solo scouting or private deals).
++
++Issued cards display an active **«ISSUED»** badge for the Game Master.
++
++### Player Experience
++- A window for the chest, merchant, or location pops up automatically. If the targeted character isn't currently loaded, a quick banner lets the player open that character and the window in one tap.
++- Players can tap **«Minimize»** anytime to collapse the window into a small pill, check their inventory, weight, or stats, and expand it right back.
++
++#### Loot Containers
++- Room-wide chests work in real time on a **first-come, first-served** basis: as soon as one player takes an item, everyone else sees the updated count immediately.
++- Clicking **«Close»** closes the chest window for that player without interrupting teammates who are still browsing it.
++- Once the very last item is taken, the chest closes automatically and asks the Game Master: **«Container is empty. Delete it?»**.
++
++#### Merchants (Two-Pane Barter Buffer)
++- The trade window shows the merchant's stock alongside the character's inventory.
++- Trading uses a **staged buffer**: items selected to buy or offered for sale appear in *grey italics* on the opposite side while the player's cap balance and the merchant's remaining caps update live at the top.
++- Nothing is final until confirmed — players can freely adjust quantities or take items back out of the offer before completing the deal.
++
++#### Locations & Locks (`🔒` / `🔓`)
++- When a **Location** is issued, players see the list of stashes and merchants at that site.
++- Players can step into any unlocked chest or shop, close that nested window to return to the location list, or minimize the whole location. The outer location window stays open for the party until the Game Master closes the scene.
++- The Game Master can put a **Lock (`🔒`)** on any chest or shop in a location and write a note (such as *«Lockpick — Difficulty 2»* or *«Requires Overseer's Key»*). Players see the locked entry and its requirement in the list, but cannot peek inside until they overcome the obstacle in play and the Game Master flips the lock to **«Unlocked» (`🔓`)**.
++
++### Live Scene Controls for the Game Master
++While a chest, merchant, or location is active, the Game Master has a **live control panel** inside the card:
++- after a good barter roll or Charisma check, adjust sale markup, buyback markdown, or caps **live on the fly** — either for the whole party or **personally for one specific character**;
++- toggle locks (`🔒` / `🔓`) inside an active location with instant updates on players' screens;
++- every item taken, bought, or sold and every cap spent is saved straight back into the Game Master's cards automatically.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+new file mode 100644
+index 0000000..a2efcd5
+--- /dev/null
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -0,0 +1,133 @@
++# Руководство по разделу Мастера («Админ») и экрану «Добыча/Торговля»
++
++Это руководство объясняет, как вести кампанию в режиме Мастера, объединять игроков в комнаты, организовывать поселения, тайники и лавки торговцев, а также раздавать находки и проводить торговлю прямо во время игры.
++
++---
++
++## 1. Включение раздела Мастера и два режима работы
++
++По умолчанию приложение открывается в обычном режиме **«Пользователь»** — для ведения своих персонажей. Чтобы открыть инструменты ведущего:
++
++1. На главном экране откройте меню **`☰` → «Настройки»**.
++2. Включите переключатель **«Экран администратора»**.
++3. В верхней части главного экрана появится кнопка **«Админ»**.
++
++### Чем отличаются режимы «Пользователь» и «Админ»
++- **Режим «Пользователь»** — ваши личные персонажи и личные каталоги. Персонажи, созданные здесь, никогда сами не попадают в окна ведущего.
++- **Режим «Админ»** — рабочее место ведущего с двумя нижними вкладками:
++  1. **«Список кампаний»** — комнаты для партий и карточки подключённых игроков.
++  2. **«Добыча/Торговля»** — локации, сундуки с находками и торговцы.
++- Переключаться обратно к своим личным персонажам можно в любой момент кнопкой **«Пользователь»** в верхней шапке.
++- *Совет для игры за компьютером:* можно держать открытыми две вкладки браузера рядом — в одной вести кампанию в режиме «Админ», а в другой открыть режим «Пользователь» и смотреть на всё глазами игрока.
++
++---
++
++## 2. Вкладка «Список кампаний» (комнаты и подключение игроков)
++
++### Как ведущему создать комнату кампании
++1. Перейдите в режим **«Админ»** на вкладку **«Список кампаний»**.
++2. Нажмите плитку создания комнаты, введите название кампании и подтвердите.
++3. На экране появится **код приглашения** вида `GM-XXX-XXX` — скопируйте его и отправьте игрокам.
++4. Зайдя внутрь открытой комнаты, ведущий может нажать кнопку **`⋮`** в заголовке комнаты, чтобы:
++   - **«Редактировать»** — исправить опечатку или сменить название кампании (код комнаты сохранится, и у всех подключённых игроков название обновится само);
++   - **«Удалить»** — удалить комнату кампании.
++
++### Как игроку подключить своего персонажа
++1. В обычном режиме **«Пользователь»** игрок нажимает **`⋮`** на карточке нужного персонажа и выбирает **«Сервер»**.
++2. Вводит код комнаты `GM-XXX-XXX`, полученный от ведущего, и нажимает **«Подключиться»**.
++3. На карточке персонажа в правом верхнем углу появляется значок сети:
++   - **зелёный** — ведущий в сети и комната открыта;
++   - **бледный** — ведущий сейчас не в сети (вводить код заново не нужно: как только комната снова откроется, персонаж переподключится сам).
++4. Игрок может свободно раскладывать своих персонажей по личным папкам — связь с комнатой ведущего при этом не сбрасывается.
++
++### Что видит ведущий внутри комнаты
++- Внутри комнаты отображаются карточки всех подключённых к ней персонажей.
++- Когда игрок меняет снаряжение, здоровье, крышки или характеристики и сохраняет лист, карточка у ведущего обновляется автоматически.
++- Нажав на карточку персонажа в комнате, ведущий может открыть его лист для просмотра (вкладки характеристик, снаряжения, инвентаря и способностей), а затем вернуться обратно к списку группы.
++
++---
++
++## 3. Вкладка «Добыча/Торговля» и порядок в долгих кампаниях
++
++Во второй вкладке ведущего готовятся и хранятся все места, тайники и торговцы. Они сохраняются на устройстве ведущего и синхронизируются с его облаком Google Диска (кнопка со значком облака в левом верхнем углу).
++
++На главном экране раздела соблюдается строгий порядок:
++1. **Локации**
++2. **Сундуки (контейнеры добычи)**
++3. **Торговцы**
++
++### Зачем нужны Локации («принцип матрёшки»)
++В долгой кампании накапливаются десятки тайников и лавок. Чтобы они не превращали общий экран в бесконечную ленту:
++- создавайте **Локации** (например, *«Даймонд-Сити»*, *«Красная Ракета»*, *«Убежище 81»*);
++- вкладывайте в них сундуки и торговцев — упакованные в локацию карточки убираются с общего экрана внутрь этой локации, а внутри локации отображаются аккуратным текстовым списком.
++
++### Привязка к комнатам и общие объекты
++- **Локации** привязываются к **одной или сразу нескольким комнатам** — удобно, если по одним и тем же местам Пустоши путешествуют разные группы игроков.
++- **Сундуки и торговцы** не привязаны жёстко к одной комнате:
++  - при создании их можно сразу поместить в одну или несколько локаций либо оставить на общем экране;
++  - с общего экрана сундук или торговца можно **перетащить за значок стрелок** в левом верхнем углу карточки прямо на карточку нужной локации (либо выбрать **`⋮` → «В локацию…»**);
++  - один и тот же торговец или тайник может числиться **сразу в нескольких локациях** (например, бродячий караванщик на маршруте между поселениями — в списке локации он отмечается значком общей связи `🔗 ×2`).
++- Внутри локации у каждой строки есть кнопка **«↗ На экран»** (возвращает объект обратно на общий экран), а если объект состоит сразу в нескольких локациях — кнопка **«Отвязать»** (убирает его только из текущей локации, оставляя в остальных).
++
++### Умная проверка при удалении локации
++Если вы решите удалить локацию, приложение проверит все вложенные в неё сундуки и торговцев:
++- если какие-то из них находятся **только в этой локации**, появится предупреждение и выбор: **«Вынести на экран»** (сохранить их на общем экране) или **«Удалить всё»** (удалить локацию вместе с ними);
++- торговцы и сундуки, которые параллельно привязаны к **другим локациям**, никогда не удаляются и остаются на своих местах в других поселениях.
++
++---
++
++## 4. Наполнение сундуков и настройка торговцев
++
++Откройте карточку сундука или торговца и нажмите **«+ Добавить предмет»** — откроется полный каталог снаряжения с поиском и разделами (включая отдельную строку для добавления крышек в сундук).
++
++### Как задаётся количество находок
++- **Обычные предметы и крышки:** при добавлении можно выбрать точные штуки (**`шт.`**), боевые кости Fallout (**`CD`**) или двадцатигранные кости (**`d20`**). При нажатии «Сохранить» бросок выполняется сразу, и в список ложится готовое итоговое количество.
++- **Патроны:** для любых боеприпасов указывается только **количество пачек**. За каждую пачку приложение само разыгрывает число патронов по правилам настольной книги.
++
++### Как устроены цены и кошелёк торговца
++При создании или редактировании торговца задаются три параметра:
++1. **Запас крышек торговца** — сколько крышек есть у него в кассе (можно ввести числом или разыграть костями). Торговец не сможет заплатить игроку больше, чем лежит у него в кошельке.
++2. **Общая наценка продажи (`%`)** — на сколько процентов дороже (или дешевле, если со знаком минус) базовой цены этот торговец продаёт свои товары.
++3. **Обесценивание закупки (`%`)** — на сколько процентов дешевле базовой цены торговец скупает вещи у игроков (по умолчанию `50`, вводится обычным положительным числом без знака минус).
++
++**Узкая специализация на отдельных товарах:** у каждой позиции в лавке можно дополнительно указать собственную наценку товара (`%`). Она **складывается** с общей наценкой торговца.
++*Пример:* у врача общая наценка лавки `0%` (обычные бинты и вода идут по номиналу), но на редкие стимуляторы стоит индивидуальная наценка `+40%`.
++
++> **Тайна ведущего:** игроки в окне торговли видят только итоговую цену покупки и скупки в крышках. Проценты наценки и обесценивания им никогда не показываются. При этом способности самого персонажа (например, скидка и бонус от «Коллекционера крышек» или дополнительные находки) учитываются для открытого персонажа автоматически.
++
++---
++
++## 5. Выдача игрокам, живая торговля и замки
++
++Нажмите **`⋮` → «Выдать»** на карточке (или кнопку **«Выдать»** внутри неё):
++1. Выберите **комнату** (если их несколько).
++2. Выберите, кому открыть доступ:
++   - **Всей комнате** — окно появится сразу у всех игроков этой комнаты;
++   - **Одному персонажу** — окно откроется только у владельца выбранного персонажа (например, для тайного обыска или личного разговора с торговцем).
++
++Активная карточка у ведущего отмечается плашкой **«ВЫДАН»**.
++
++### Как это выглядит у игроков
++- Поверх экрана у игрока появляется окно находки, лавки или локации. Если нужный персонаж у игрока ещё не открыт, появится компактная кнопка, которая сама загрузит этого персонажа и откроет окно.
++- В любой момент окно можно нажать **«Свернуть»**, чтобы свободно заглянуть в свой лист персонажа, оружие или вес снаряжения, а затем развернуть обратно одним нажатием.
++
++#### Сундук с добычей
++- Если сундук выдан на всю группу, он работает в реальном времени по принципу **«кто первый взял — того и вещь»**: как только один игрок забирает предмет, у остальных количество тут же уменьшается.
++- Любой игрок может закрыть окно сундука у себя кнопкой **«Закрыть»** — для остальных участников, которые ещё осматривают сундук, сессия продолжится.
++- Когда из сундука заберут последний предмет, раздача завершится сама, а у ведущего появится вопрос: **«Контейнер пуст. Хотите удалить?»**.
++
++#### Торговец (обмен через буфер)
++- Окно торговли разделено на две половины: товары торговца и инвентарь персонажа.
++- Сделка идёт через **временный буфер**: когда игрок выбирает товары для покупки или предлагает свои вещи на продажу, они отображаются в противоположном списке *серым курсивом*, а сверху пересчитывается итоговый баланс крышек игрока и остаток крышек у торговца.
++- Пока сделка не подтверждена, любую позицию можно передумать и вернуть обратно одним нажатием. После подтверждения вещи и крышки сразу переходят между персонажем и карточкой торговца у ведущего.
++
++#### Локация и замки (`🔒` / `🔓`)
++- Когда ведущий выдаёт **Локацию**, игроки видят список всех мест, тайников и торговцев внутри неё.
++- Игрок может заходить в открытые сундуки и лавки локации, закрывать их и возвращаться обратно к списку локации. Само внешнее окно локации у игроков не имеет кнопки полного закрытия (только «Свернуть») и остаётся доступным всей группе, пока ведущий сам не завершит сцену.
++- Любой сундук или лавку в локации ведущий может пометить **замком (`🔒`)** и подписать условие (например: *«Взлом — сложность 2»* или *«Нужен ключ смотрителя»*). Запертая строка видна игрокам в списке локации с подписью, но заглянуть внутрь нельзя, пока персонаж не справится с замком в игре и ведущий не переключит замок в положение **«Открыто» (`🔓`)**.
++
++### Живое управление для ведущего прямо во время сцены
++Пока сундук, торговец или локация выданы игрокам, внутри карточки у ведущего открыта **живая панель управления**:
++- если персонаж удачно поторговался или прошёл проверку Харизмы, ведущий может **прямо на ходу** сдвинуть процент наценки или скупки — как для всей группы сразу, так и **персонально для одного конкретного персонажа**;
++- в выданной локации ведущий одним нажатием отпирает и запирает замки (`🔒` / `🔓`) — у игроков доступ открывается мгновенно без переоткрытия окна;
++- все купленные и проданные предметы, потраченные крышки и забранные находки автоматически сохраняются обратно в карточки ведущего.
+diff --git a/domain/premium.js b/domain/premium.js
+index feb7156..ee93360 100644
+--- a/domain/premium.js
++++ b/domain/premium.js
+@@ -19,9 +19,31 @@
+ /** Идентификаторы движковых фич. */
+ export const FEATURE_IDS = Object.freeze({
+   CUSTOM_AVATAR: 'customAvatar',
++  // Раздел Мастера («Админ») и все его механики:
++  ADMIN_ACCESS: 'adminAccess',
++  GM_CAMPAIGNS: 'gmCampaigns',
++  GM_LOOT_TRADE: 'gmLootTrade',
+ });
+ 
++/** Все премиальные фичи раздела «Админ», открываемые лицензией Мастера. */
++export const ADMIN_FEATURE_IDS = Object.freeze([
++  FEATURE_IDS.ADMIN_ACCESS,
++  FEATURE_IDS.GM_CAMPAIGNS,
++  FEATURE_IDS.GM_LOOT_TRADE,
++]);
++
++/** Код ошибки при попытке вызвать механику Мастера без активной лицензии. */
++export const ADMIN_LICENSE_ERROR = 'ADMIN_LICENSE_REQUIRED';
++
++/**
++ * Единственный рубильник режима по умолчанию:
++ * - true  (сейчас, открытый доступ): без введённой лицензии активен план 'open-beta' и доступно всё;
++ * - false (будущий платный режим): без лицензии активен план 'free', а раздел «Админ» ждёт лицензию.
++ */
++export const OPEN_BETA_BY_DEFAULT = true;
++
+ const featuresById = new Map();
++const entitlementListeners = new Set();
+ 
+ /**
+  * Зарегистрировать фичи (движок или модуль сеттинга).
+@@ -48,15 +70,45 @@ export function listFeatures() {
+   return Array.from(featuresById.values());
+ }
+ 
++const makeDefaultEntitlement = () => (
++  OPEN_BETA_BY_DEFAULT
++    ? Object.freeze({
++        plan: 'open-beta',
++        allFeatures: true,
++        features: null,
++        expiresAt: null,
++      })
++    : Object.freeze({
++        plan: 'free',
++        allFeatures: false,
++        features: Object.freeze([]),
++        expiresAt: null,
++      })
++);
++
+ // Текущее право доступа. До подключения провайдера лицензий — открытый
+ // доступ (open beta): фича обкатывается массово, включение платности
+-// станет заменой этого объекта, не авралом с кодом (этап 3 дизайна).
+-let entitlement = Object.freeze({
+-  plan: 'open-beta',
+-  allFeatures: true,
+-  features: null,
+-  expiresAt: null,
+-});
++// станет заменой OPEN_BETA_BY_DEFAULT / вызовом setEntitlement, не авралом с кодом.
++let entitlement = makeDefaultEntitlement();
++
++const notifyEntitlementListeners = () => {
++  entitlementListeners.forEach((listener) => {
++    try {
++      listener(entitlement);
++    } catch {
++      // ошибка подписчика не должна ломать смену права
++    }
++  });
++};
++
++/** Подписка на изменение права доступа (возвращает функцию отписки). */
++export function subscribeEntitlement(listener) {
++  if (typeof listener !== 'function') return () => {};
++  entitlementListeners.add(listener);
++  return () => {
++    entitlementListeners.delete(listener);
++  };
++}
+ 
+ /** Текущее право (иммутабельное). */
+ export function getEntitlement() {
+@@ -65,12 +117,42 @@ export function getEntitlement() {
+ 
+ /**
+  * Заменить право (вызовет будущий провайдер лицензий; тесты — тоже).
+- * null/undefined возвращает open-beta.
++ * null/undefined возвращает дефолтное право (open-beta при OPEN_BETA_BY_DEFAULT = true).
+  */
+ export function setEntitlement(next) {
+   entitlement = next
+     ? Object.freeze({ plan: 'unknown', allFeatures: false, features: null, expiresAt: null, ...next })
+-    : Object.freeze({ plan: 'open-beta', allFeatures: true, features: null, expiresAt: null });
++    : makeDefaultEntitlement();
++  notifyEntitlementListeners();
++}
++
++/** Сбрасывает право доступа к дефолтному состоянию движка (open-beta при OPEN_BETA_BY_DEFAULT = true). */
++export function resetEntitlementToDefault() {
++  setEntitlement(null);
++}
++
++/**
++ * Удобный хелпер активации бессрочной лицензии Мастера (1 лицензия = 1 Google-аккаунт,
++ * без ограничения по времени и числу устройств).
++ */
++export function activateAdminLicense({
++  accountSubHash = null,
++  keyId = null,
++  extraFeatures = [FEATURE_IDS.CUSTOM_AVATAR],
++} = {}) {
++  const mergedFeatures = Array.from(new Set([
++    ...ADMIN_FEATURE_IDS,
++    ...(Array.isArray(extraFeatures) ? extraFeatures : []),
++  ]));
++  setEntitlement({
++    plan: 'licensed',
++    allFeatures: false,
++    features: Object.freeze(mergedFeatures),
++    expiresAt: null,
++    accountSubHash,
++    keyId,
++  });
++  return entitlement;
+ }
+ 
+ /**
+@@ -90,9 +172,52 @@ export function isFeatureAvailable(featureId) {
+   return Array.isArray(e.features) && e.features.includes(featureId);
+ }
+ 
+-// Движковая регистрация: кастомный аватар — первая премиум-фича.
+-// UI (кнопка на фото, пикер) появится позже; синк и кэш уже в коде
+-// (components/cloudSync/avatarSync.js, db/avatarCache.js).
++// Движковая регистрация: кастомный аватар + раздел Мастера («Админ»).
+ registerFeatures([
+   { id: FEATURE_IDS.CUSTOM_AVATAR, premium: true },
++  { id: FEATURE_IDS.ADMIN_ACCESS, premium: true, group: 'admin' },
++  { id: FEATURE_IDS.GM_CAMPAIGNS, premium: true, group: 'admin' },
++  { id: FEATURE_IDS.GM_LOOT_TRADE, premium: true, group: 'admin' },
+ ]);
++
++/** Доступен ли сам вход в раздел Мастера («Админ»). */
++export function isAdminLicensed() {
++  return isFeatureAvailable(FEATURE_IDS.ADMIN_ACCESS);
++}
++
++/** Доступно ли управление комнатами кампаний Мастера («Список кампаний»). */
++export function isGmCampaignsLicensed() {
++  return isAdminLicensed() && isFeatureAvailable(FEATURE_IDS.GM_CAMPAIGNS);
++}
++
++/** Доступен ли раздел «Добыча/Торговля» и выдача локаций/сундуков/торговцев. */
++export function isGmLootTradeLicensed() {
++  return isAdminLicensed() && isFeatureAvailable(FEATURE_IDS.GM_LOOT_TRADE);
++}
++
++/**
++ * Создаёт типизированную ошибку отсутствия лицензии Мастера.
++ *
++ * @param {string} [featureId]
++ * @returns {Error & { code: string, featureId: string }}
++ */
++export function createAdminLicenseError(featureId) {
++  const resolvedFeatureId = featureId || FEATURE_IDS.ADMIN_ACCESS;
++  const err = /** @type {Error & { code: string, featureId: string }} */ (new Error(ADMIN_LICENSE_ERROR));
++  err.code = ADMIN_LICENSE_ERROR;
++  err.featureId = resolvedFeatureId;
++  return err;
++}
++
++/**
++ * Жёсткая проверка для сторов и сервисов Мастера: бросает ADMIN_LICENSE_REQUIRED,
++ * если раздел Мастера или указанная фича сейчас не открыты лицензией.
++ *
++ * @param {string} [featureId]
++ */
++export function assertAdminFeature(featureId) {
++  const resolvedFeatureId = featureId || FEATURE_IDS.ADMIN_ACCESS;
++  if (!isAdminLicensed() || !isFeatureAvailable(resolvedFeatureId)) {
++    throw createAdminLicenseError(resolvedFeatureId);
++  }
++}
+diff --git a/i18n/en-EN/screens/home/screen.json b/i18n/en-EN/screens/home/screen.json
+index a53f672..8c9f75c 100644
+--- a/i18n/en-EN/screens/home/screen.json
++++ b/i18n/en-EN/screens/home/screen.json
+@@ -172,7 +172,10 @@
+   "subtitle": "Positronium",
+   "gm": {
+     "enter": "Admin",
+-    "exit": "User"
++    "exit": "User",
++    "licenseRequiredTitle": "Game Master License Required",
++    "licenseRequiredMessage": "The «Admin» section (campaign rooms, locations, loot containers, and merchants) requires a Game Master license. Player room connections and character sheets are always free.",
++    "licenseBadgeLocked": "Game Master license"
+   },
+   "server": {
+     "menuItem": "Server",
+diff --git a/i18n/ru-RU/screens/home/screen.json b/i18n/ru-RU/screens/home/screen.json
+index e862f8d..0a94037 100644
+--- a/i18n/ru-RU/screens/home/screen.json
++++ b/i18n/ru-RU/screens/home/screen.json
+@@ -172,7 +172,10 @@
+   "subtitle": "Positronium",
+   "gm": {
+     "enter": "Админ",
+-    "exit": "Пользователь"
++    "exit": "Пользователь",
++    "licenseRequiredTitle": "Требуется лицензия Мастера",
++    "licenseRequiredMessage": "Раздел «Админ» (комнаты кампаний, локации, сундуки добычи и торговцы) доступен по лицензии Мастера. Подключение игроков к комнатам и листы персонажей всегда бесплатны.",
++    "licenseBadgeLocked": "По лицензии Мастера"
+   },
+   "server": {
+     "menuItem": "Сервер",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 6364f65..cbf2899 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "473"
++  "baseline": "474"
+ }
+diff --git a/public/version.json b/public/version.json
+index f417af7..400984f 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "473",
++  "version": "474",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index 00e61ec..d623b49 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -19,6 +19,7 @@ import {
+   formatLootTrade,
+ } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
+ import { debugLog } from '../debug/falloutDebug';
++import { isGmLootTradeLicensed } from '../../domain/premium';
+ 
+ const gmContainerSyncListeners = new Set();
+ const promptedEmptySessionIds = new Set();
+@@ -43,6 +44,7 @@ export const resetPromptedEmptySessionsForTests = () => {
+ export const startGmSessionPersistence = () => {
+   return onRoomSessionState(async (envelope) => {
+     try {
++      if (!isGmLootTradeLicensed()) return;
+       const code = envelope?.roomCode;
+       if (!code) return;
+       const room = useRoomStore.getState().rooms[code];
+diff --git a/src/premium/adminAccessGate.js b/src/premium/adminAccessGate.js
+new file mode 100644
+index 0000000..fa81819
+--- /dev/null
++++ b/src/premium/adminAccessGate.js
+@@ -0,0 +1,127 @@
++// src/premium/adminAccessGate.js
++// Единый UI- и стор-шлюз доступа к разделу Мастера («Админ») и всем его механикам (патч 474).
++//
++// Чистые функции и реестр фич живут в domain/premium.js (OPEN_BETA_BY_DEFAULT = true),
++// а здесь собраны реактивный хук для экранов, UI-уведомление и мягкий возврат из 'gm' в 'user'.
++
++import { useEffect, useState } from 'react';
++import {
++  ADMIN_FEATURE_IDS,
++  ADMIN_LICENSE_ERROR,
++  FEATURE_IDS,
++  OPEN_BETA_BY_DEFAULT,
++  activateAdminLicense,
++  assertAdminFeature,
++  createAdminLicenseError,
++  getEntitlement,
++  isAdminLicensed,
++  isFeatureAvailable,
++  isGmCampaignsLicensed,
++  isGmLootTradeLicensed,
++  resetEntitlementToDefault,
++  setEntitlement,
++  subscribeEntitlement,
++} from '../../domain/premium';
++import useAppSettingsStore from '../store/appSettingsStore';
++import useUiModeStore from '../room/uiModeStore';
++import { showRawAlert } from '../../components/alerts/alertService';
++import { tHomeScreen } from '../../components/screens/HomeScreen/logic/homeScreenI18n';
++
++export {
++  ADMIN_FEATURE_IDS,
++  ADMIN_LICENSE_ERROR,
++  FEATURE_IDS,
++  OPEN_BETA_BY_DEFAULT,
++  activateAdminLicense,
++  assertAdminFeature,
++  createAdminLicenseError,
++  isAdminLicensed,
++  isGmCampaignsLicensed,
++  isGmLootTradeLicensed,
++  resetEntitlementToDefault,
++  setEntitlement,
++};
++
++/** Показывает локализованное окно о том, что раздел Мастера требует лицензию. */
++export const showAdminLicenseRequiredAlert = () => {
++  showRawAlert({
++    title: tHomeScreen('gm.licenseRequiredTitle'),
++    message: tHomeScreen('gm.licenseRequiredMessage'),
++  });
++};
++
++/**
++ * UI-страж действия Мастера: возвращает true (и вызывает callback, если передан),
++ * когда действие разрешено; если лицензии нет — показывает уведомление (если !silent)
++ * и возвращает false.
++ *
++ * @param {string} [featureId]
++ * @param {Function | { silent?: boolean }} [callbackOrOptions]
++ * @param {{ silent?: boolean }} [maybeOptions]
++ * @returns {boolean}
++ */
++export const guardAdminAction = (
++  featureId,
++  callbackOrOptions,
++  maybeOptions = {},
++) => {
++  const resolvedFeatureId = featureId || FEATURE_IDS.ADMIN_ACCESS;
++  const callback = typeof callbackOrOptions === 'function' ? callbackOrOptions : null;
++  const options = (callbackOrOptions && typeof callbackOrOptions === 'object')
++    ? callbackOrOptions
++    : maybeOptions;
++  const silent = Boolean(options?.silent);
++
++  if (isAdminLicensed() && isFeatureAvailable(resolvedFeatureId)) {
++    if (callback) callback();
++    return true;
++  }
++  if (!silent) {
++    showAdminLicenseRequiredAlert();
++  }
++  return false;
++};
++
++/**
++ * Мягкий возврат в режим «Пользователь», если у пользователя в хранилище оставался
++ * режим 'gm', но лицензия Мастера не активна. Сохранённые комнаты и контейнеры в БД
++ * не затрагиваются и сразу снова появятся после ввода лицензии.
++ */
++export const enforceAdminModeEntitlement = () => {
++  if (isAdminLicensed()) return false;
++
++  let switched = false;
++  const uiState = useUiModeStore.getState();
++  if (uiState.tabUiMode === 'gm' || uiState.gmInspectingCharacter) {
++    uiState.setTabUiMode('user');
++    switched = true;
++  }
++
++  const settingsState = useAppSettingsStore.getState();
++  if (settingsState.getSettingValue?.('uiMode') === 'gm') {
++    settingsState.setValue('uiMode', 'user');
++    switched = true;
++  }
++  return switched;
++};
++
++/**
++ * Реактивный хук доступа к разделу Мастера для React-компонентов
++ * (App, HomeScreen, SettingsModal, LootTradeScreen).
++ */
++export const useAdminAccess = () => {
++  const [, setRevision] = useState(0);
++
++  useEffect(() => (
++    subscribeEntitlement(() => {
++      setRevision((n) => n + 1);
++    })
++  ), []);
++
++  return {
++    entitlement: getEntitlement(),
++    adminLicensed: isAdminLicensed(),
++    gmCampaignsLicensed: isGmCampaignsLicensed(),
++    gmLootTradeLicensed: isGmLootTradeLicensed(),
++  };
++};
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index dc90aa5..0a75976 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -19,6 +19,7 @@ import {
+   type RoomSnapshotEntry,
+ } from './roomProtocol';
+ import { debugLog } from '../debug/falloutDebug';
++import { assertAdminFeature, FEATURE_IDS } from '../../domain/premium';
+ 
+ const CLIENT_ID_STORAGE_KEY = 'room_client_id';
+ const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
+@@ -420,6 +421,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     },
+ 
+     createRoom: async ({ name, prefix, requestedCode, ownerToken }) => {
++      assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
+       const payload: Record<string, unknown> = { name, prefix };
+       if (requestedCode) payload.requestedCode = requestedCode;
+       if (ownerToken) payload.ownerToken = ownerToken;
+@@ -445,6 +447,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     },
+ 
+     joinRoom: async ({ code, name, role = 'player' }) => {
++      if (role === 'gm') {
++        assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
++      }
+       const existing = get().rooms[code];
+       if (existing && existing.joined !== false && existing.role === role) {
+         return {
+@@ -556,6 +561,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     },
+ 
+     openRoomSession: async ({ code, session }) => {
++      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_OPEN,
+         { code, session },
+@@ -565,6 +571,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     },
+ 
+     updateRoomSessionRates: async ({ code, ...rest }) => {
++      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_UPDATE_RATES,
+         { code, ...rest },
+@@ -574,6 +581,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     },
+ 
+     closeRoomSession: async ({ code, sessionId = null }) => {
++      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       await sendRequest(
+         ROOM_MESSAGE.SESSION_CLOSE,
+         { code, sessionId },

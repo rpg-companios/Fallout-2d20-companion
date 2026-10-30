@@ -59,6 +59,11 @@ import {
   showRawAlert,
 } from '../../alerts/alertService';
 import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPersistence';
+import {
+  FEATURE_IDS,
+  guardAdminAction,
+  useAdminAccess,
+} from '../../../src/premium/adminAccessGate';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
@@ -328,6 +333,7 @@ const ContainerCardCell = ({
 export default function LootTradeScreen() {
   const locale = useLocale();
   const moduleLocale = useModuleLocale();
+  const { gmLootTradeLicensed } = useAdminAccess();
   const setSettingValue = useAppSettingsStore((s) => s.setValue);
   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
   const roomRooms = useRoomStore((s) => s.rooms);
@@ -580,6 +586,7 @@ export default function LootTradeScreen() {
   };
 
   const handleSaveContainerForm = async (draft, capsRollInfo, selectedHubIds = null) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
     const cleanDraft = { ...draft };
     delete cleanDraft.__isDuplicateDraft;
 
@@ -849,6 +856,7 @@ export default function LootTradeScreen() {
   };
 
   const handleIssueOrClosePress = async (container) => {
+    if (!guardAdminAction(FEATURE_IDS.GM_LOOT_TRADE)) return;
     const liveEntries = getActiveLiveEntriesForContainer(container);
     if (liveEntries.length > 0) {
       for (const { roomCode: liveCode, session: live } of liveEntries) {
@@ -1262,6 +1270,27 @@ export default function LootTradeScreen() {
   const activeContainerRoomCharacters = activeLiveRoomCode
     ? buildGmRoomCharacterCards(roomRooms[activeLiveRoomCode])
     : [];
+
+  if (!gmLootTradeLicensed) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <View />
+          <View style={styles.headerCenter}>
+            <Pressable style={styles.adminButton} onPress={handleExitGmMode}>
+              <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#f0e68c" />
+              <Text style={styles.adminButtonText}>{tHomeScreen('gm.exit')}</Text>
+            </Pressable>
+          </View>
+          <View />
+        </View>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>{tHomeScreen('gm.licenseRequiredTitle')}</Text>
+          <Text style={styles.subtitle}>{tHomeScreen('gm.licenseRequiredMessage')}</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

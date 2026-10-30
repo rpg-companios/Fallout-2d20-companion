@@ -19,6 +19,7 @@ import {
   formatLootTrade,
 } from '../../components/screens/LootTradeScreen/logic/lootTradeI18n';
 import { debugLog } from '../debug/falloutDebug';
+import { isGmLootTradeLicensed } from '../../domain/premium';
 
 const gmContainerSyncListeners = new Set();
 const promptedEmptySessionIds = new Set();
@@ -43,6 +44,7 @@ export const resetPromptedEmptySessionsForTests = () => {
 export const startGmSessionPersistence = () => {
   return onRoomSessionState(async (envelope) => {
     try {
+      if (!isGmLootTradeLicensed()) return;
       const code = envelope?.roomCode;
       if (!code) return;
       const room = useRoomStore.getState().rooms[code];

@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
+import { isGmLootTradeLicensed } from '../../domain/premium';
 import { normalizeContainerEntity } from '../../domain/lootTrade';
 import { getActiveModuleId } from '../../domain/moduleLocale';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
@@ -291,6 +292,9 @@ const parseGmContainerCloudPayload = (rawText) => {
 };
 
 const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+  if (!isGmLootTradeLicensed()) {
+    return { uploaded: 0, downloaded: 0 };
+  }
   const localContainers = typeof db.getGmContainersList === 'function'
     ? await db.getGmContainersList()
     : [];
@@ -764,7 +768,7 @@ export const syncCharacterToCloudIfEnabled = async (characterId) => {
 
 // Фоновая выгрузка контейнера/торговца Мастера в Google Drive (если облако уже включено).
 export const syncGmContainerToCloudIfEnabled = async (containerId) => {
-  if (!ensureWeb() || !containerId) return;
+  if (!ensureWeb() || !containerId || !isGmLootTradeLicensed()) return;
 
   try {
     const configured = await isCloudSyncConfigured();
@@ -801,6 +805,7 @@ export const syncGmContainerToCloudIfEnabled = async (containerId) => {
 // Удаление контейнера/торговца Мастера из Google Drive при локальном удалении.
 export const deleteGmContainerFromCloudIfEnabled = async (containerId) => {
   if (!ensureWeb() || !containerId) return { removed: false, reason: 'not-web' };
+  if (!isGmLootTradeLicensed()) return { removed: false, reason: 'unlicensed' };
 
   try {
     const configured = await isCloudSyncConfigured();

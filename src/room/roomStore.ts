@@ -19,6 +19,7 @@ import {
   type RoomSnapshotEntry,
 } from './roomProtocol';
 import { debugLog } from '../debug/falloutDebug';
+import { assertAdminFeature, FEATURE_IDS } from '../../domain/premium';
 
 const CLIENT_ID_STORAGE_KEY = 'room_client_id';
 const TAB_SESSION_STORAGE_KEY = 'room_tab_session_id';
@@ -420,6 +421,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     },
 
     createRoom: async ({ name, prefix, requestedCode, ownerToken }) => {
+      assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
       const payload: Record<string, unknown> = { name, prefix };
       if (requestedCode) payload.requestedCode = requestedCode;
       if (ownerToken) payload.ownerToken = ownerToken;
@@ -445,6 +447,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     },
 
     joinRoom: async ({ code, name, role = 'player' }) => {
+      if (role === 'gm') {
+        assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
+      }
       const existing = get().rooms[code];
       if (existing && existing.joined !== false && existing.role === role) {
         return {
@@ -556,6 +561,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     },
 
     openRoomSession: async ({ code, session }) => {
+      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_OPEN,
         { code, session },
@@ -565,6 +571,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     },
 
     updateRoomSessionRates: async ({ code, ...rest }) => {
+      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_UPDATE_RATES,
         { code, ...rest },
@@ -574,6 +581,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
     },
 
     closeRoomSession: async ({ code, sessionId = null }) => {
+      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
       await sendRequest(
         ROOM_MESSAGE.SESSION_CLOSE,
         { code, sessionId },

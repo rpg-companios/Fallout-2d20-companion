@@ -37,6 +37,10 @@ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen
 import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
 import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
 import useUiModeStore from './src/room/uiModeStore';
+import {
+  enforceAdminModeEntitlement,
+  useAdminAccess,
+} from './src/premium/adminAccessGate';
 // Side-effect: сеттинг регистрирует расширение состояния (поле сейва
 // survival + миграцию v22→v23) в реестре движка ДО монтирования
 // CharacterProvider и загрузки сейвов. См. modules/fallout/survival/index.js.
@@ -80,9 +84,17 @@ function App() {
   const storeUiMode = useAppSettingsStore(selectUiMode);
   const tabUiMode = useUiModeStore((s) => s.tabUiMode);
   const gmInspectingCharacter = useUiModeStore((s) => s.gmInspectingCharacter);
-  const isGmMode = (tabUiMode || storeUiMode) === 'gm';
+  const { adminLicensed, gmLootTradeLicensed } = useAdminAccess();
+  const rawIsGmMode = (tabUiMode || storeUiMode) === 'gm';
+  const isGmMode = rawIsGmMode && adminLicensed;
   const locale = useLocale();
   useModuleLocale();
+
+  useEffect(() => {
+    if (rawIsGmMode && !adminLicensed) {
+      enforceAdminModeEntitlement();
+    }
+  }, [rawIsGmMode, adminLicensed]);
   const activeSettingId = useSettingPackStore(selectActiveSettingId);
   // Модульные экраны (Character, Equipment, Inventory, Perks) рендерятся только
   // когда юзер **явно выбрал** активный модуль (activeSettingId !== null), а не
@@ -271,7 +283,7 @@ function App() {
                         ),
                       }}
                     />
-                    {isGmMode ? (
+                    {(isGmMode && gmLootTradeLicensed) ? (
                       <Tab.Screen
                         name={TAB_ROUTES.LOOT_TRADE}
                         component={LootTradeScreen}
