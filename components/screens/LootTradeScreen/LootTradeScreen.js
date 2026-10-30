@@ -58,7 +58,10 @@ import {
   showAlert as showCatalogAlert,
   showRawAlert,
 } from '../../alerts/alertService';
-import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPersistence';
+import {
+  flushPendingEmptyLootPrompts,
+  subscribeGmContainerUpdates,
+} from '../../../src/lootTrade/gmSessionPersistence';
 import {
   FEATURE_IDS,
   guardAdminAction,
@@ -337,6 +340,7 @@ export default function LootTradeScreen() {
   const setSettingValue = useAppSettingsStore((s) => s.setValue);
   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
   const roomRooms = useRoomStore((s) => s.rooms);
+  const roomStatus = useRoomStore((s) => s.status);
 
   const [loading, setLoading] = useState(true);
   const [containers, setContainers] = useState([]);
@@ -392,17 +396,43 @@ export default function LootTradeScreen() {
     }
   }, []);
 
+  const returnHubIdRef = useRef(null);
+  returnHubIdRef.current = returnHubId;
+
   useFocusEffect(
     useCallback(() => {
       useUiModeStore.getState().setGmInspectingCharacter(false);
       loadData();
+      void flushPendingEmptyLootPrompts();
     }, [loadData]),
   );
 
   useEffect(() => {
-    return subscribeGmContainerUpdates(() => {
+    return subscribeGmContainerUpdates((updatedContainerId, meta) => {
+      if (meta?.emptied && updatedContainerId) {
+        setActiveContainerId((currentId) => {
+          if (currentId !== updatedContainerId) return currentId;
+          const backHub = returnHubIdRef.current;
+          setReturnHubId(null);
+          return backHub && backHub !== updatedContainerId ? backHub : null;
+        });
+      }
       loadData();
     });
+  }, [loadData]);
+
+  // Мгновенная синхронизация между вкладками одного браузера (localStorage WebAdapter)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.addEventListener) {
+      return undefined;
+    }
+    const handleStorage = (event) => {
+      if (!event?.key || event.key === 'fallout_db_gm_containers') {
+        loadData();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [loadData]);
 
   const roomByCode = useMemo(
@@ -493,13 +523,19 @@ export default function LootTradeScreen() {
     }, 4500);
   };
 
-  const ensureGmRoomConnected = async (roomCode) => {
+  const ensureGmRoomConnected = useCallback(async (roomCode) => {
+    if (!roomCode) return;
     const store = useRoomStore.getState();
     const record = roomByCode[roomCode];
     const current = store.rooms[roomCode];
     if (current && current.joined !== false && current.role === 'gm') return;
     try {
-      await store.joinRoom({ code: roomCode, name: 'GM', role: 'gm' });
+      await store.joinRoom({
+        code: roomCode,
+        name: 'GM',
+        role: 'gm',
+        ownerToken: record?.ownerToken,
+      });
     } catch (err) {
       if (err?.message === 'ROOM_NOT_FOUND' && record?.ownerToken) {
         await store.createRoom({
@@ -507,12 +543,35 @@ export default function LootTradeScreen() {
           requestedCode: roomCode,
           ownerToken: record.ownerToken,
         });
-        await store.joinRoom({ code: roomCode, name: 'GM', role: 'gm' });
+        await store.joinRoom({
+          code: roomCode,
+          name: 'GM',
+          role: 'gm',
+          ownerToken: record.ownerToken,
+        });
         return;
       }
       throw err;
     }
-  };
+  }, [roomByCode]);
+
+  // Держим комнаты Мастера подключёнными прямо с экрана «Добыча/Торговля»,
+  // чтобы даже при переподключении сокета или старте сразу на этой вкладке
+  // Мастер всегда получал живые события взятия лута и сделок игроков.
+  useEffect(() => {
+    if (!gmLootTradeLicensed || availableRooms.length === 0) return undefined;
+    const syncRooms = () => {
+      if (useRoomStore.getState().status === 'connecting') return;
+      availableRooms.forEach((r) => {
+        if (r?.code) {
+          ensureGmRoomConnected(r.code).catch(() => {});
+        }
+      });
+    };
+    syncRooms();
+    const timer = setInterval(syncRooms, 4000);
+    return () => clearInterval(timer);
+  }, [gmLootTradeLicensed, availableRooms, ensureGmRoomConnected, roomStatus]);
 
   const persistAndSyncContainer = async (nextContainer) => {
     const saved = await db.saveGmContainer(nextContainer);
@@ -881,6 +940,7 @@ export default function LootTradeScreen() {
           await useRoomStore.getState().closeRoomSession({
             code: liveCode,
             sessionId: live.sessionId,
+            ownerToken: roomByCode[liveCode]?.ownerToken,
           });
         } catch (e) {
           debugLog('lootTrade.closeSession:failed', { message: e?.message });
@@ -918,23 +978,26 @@ export default function LootTradeScreen() {
     setIssueBusy(true);
     try {
       await ensureGmRoomConnected(effectiveRoomCode);
-      const isHub = issueTargetContainer.kind === CONTAINER_KIND.HUB;
+      const freshSource = (await db.getGmContainerById(issueTargetContainer.id)) || issueTargetContainer;
+      const freshAllContainers = await db.getGmContainersList();
+      const isHub = freshSource.kind === CONTAINER_KIND.HUB;
       await useRoomStore.getState().openRoomSession({
         code: effectiveRoomCode,
+        ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
         session: {
-          containerId: issueTargetContainer.id,
-          kind: issueTargetContainer.kind,
-          name: issueTargetContainer.name,
-          description: issueTargetContainer.description,
+          containerId: freshSource.id,
+          kind: freshSource.kind,
+          name: freshSource.name,
+          description: freshSource.description,
           targetType,
           targetCharacterId,
           targetCharacterName,
-          caps: issueTargetContainer.caps,
-          saleMarkupPercent: issueTargetContainer.saleMarkupPercent,
-          buyDepreciationPercent: issueTargetContainer.buyDepreciationPercent,
+          caps: freshSource.caps,
+          saleMarkupPercent: freshSource.saleMarkupPercent,
+          buyDepreciationPercent: freshSource.buyDepreciationPercent,
           characterOverrides: {},
-          items: isHub ? [] : issueTargetContainer.items,
-          ...(isHub ? { nodes: buildHubSessionNodes(issueTargetContainer, containers) } : {}),
+          items: isHub ? [] : freshSource.items,
+          ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
         },
       });
       setIssueTargetContainer(null);

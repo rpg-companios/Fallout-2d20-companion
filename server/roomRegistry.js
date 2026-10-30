@@ -45,6 +45,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     members: new Map(), // clientId -> { clientId, name, role, ws }
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
+    lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
     createdAt: now(),
     emptySince: null,
   });
@@ -63,6 +64,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
+    lastClosedSession: room.lastClosedSession || null,
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -118,7 +120,15 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return { room, rebound: false };
   };
 
-  const joinRoom = ({ code, clientId, ip = 'unknown', name = '', role = 'player', ws = null }) => {
+  const joinRoom = ({
+    code,
+    clientId,
+    ip = 'unknown',
+    name = '',
+    role = 'player',
+    ownerToken = null,
+    ws = null,
+  }) => {
     if (!touchRateLog(ipJoinLog, ip || 'unknown', 60 * 1000, limits.MAX_JOINS_PER_IP_PER_MINUTE)) {
       return { error: ERROR_CODE.RATE_LIMITED };
     }
@@ -126,6 +136,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
     if (!room.members.has(clientId) && room.members.size >= limits.MAX_MEMBERS_PER_ROOM) {
       return { error: ERROR_CODE.ROOM_FULL };
+    }
+    if (ownerToken && room.ownerToken && String(ownerToken) === room.ownerToken) {
+      room.ownerClientId = clientId;
     }
     // Повторный вход того же clientId — переподключение: запись заменяется.
     room.members.set(clientId, {
@@ -154,9 +167,16 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return false;
   };
 
-  const leaveRoom = ({ code, clientId }) => {
+  const leaveRoom = ({ code, clientId, expectedWs = null }) => {
     const room = rooms.get(code);
     if (!room) return { room: null, left: false, closedSession: null, closedReason: null };
+    const currentMember = room.members.get(clientId);
+    if (!currentMember) {
+      return { room, left: false, closedSession: null, closedReason: null };
+    }
+    if (expectedWs && currentMember.ws && currentMember.ws !== expectedWs) {
+      return { room, left: false, closedSession: null, closedReason: null };
+    }
     const left = room.members.delete(clientId);
     if (room.members.size === 0) room.emptySince = now();
 
@@ -179,6 +199,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           ? 'loot_emptied'
           : 'player_closed';
         room.activeSession = null;
+        room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
       }
     }
 
@@ -218,38 +239,66 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     return room ? roomSnapshot(room) : null;
   };
 
+  const rebindOwnerIfTokenMatches = (room, clientId, ownerToken) => {
+    if (room && ownerToken && room.ownerToken && String(ownerToken) === room.ownerToken) {
+      room.ownerClientId = clientId;
+    }
+  };
+
+  const ensureOwnerMemberWs = (room, clientId, ws) => {
+    if (!room || !clientId || !ws) return;
+    const prev = room.members.get(clientId);
+    room.members.set(clientId, {
+      clientId,
+      name: prev?.name || 'GM',
+      role: 'gm',
+      ws,
+    });
+    room.emptySince = null;
+  };
+
   /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
-  const openSession = ({ code, clientId, session }) => {
+  const openSession = ({ code, clientId, session, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
     const normalized = normalizeActiveSession(session, now());
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+    ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
+    room.lastClosedSession = null;
     return { room, session: normalized };
   };
 
   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
-  const updateSession = ({ code, clientId, payload }) => {
+  const updateSession = ({ code, clientId, payload, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
     const result = applySessionUpdate(room.activeSession, payload, now());
     if (result.error) return result;
+    ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = result.session;
     return { room, session: result.session };
   };
 
   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
-  const closeSession = ({ code, clientId, sessionId = null }) => {
+  const closeSession = ({ code, clientId, sessionId = null, ownerToken = null, ws = null }) => {
     const room = rooms.get(code);
     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    ensureOwnerMemberWs(room, clientId, ws);
     const previous = room.activeSession;
     if (sessionId && previous && previous.sessionId !== String(sessionId)) {
       return { room, session: previous };
     }
     room.activeSession = null;
+    if (previous) {
+      room.lastClosedSession = { session: previous, closedReason: 'gm_closed', closedAt: now() };
+    }
     return { room, session: null, closedSession: previous };
   };
 
@@ -288,6 +337,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
         ? 'loot_emptied'
         : 'player_closed';
       room.activeSession = null;
+      room.lastClosedSession = { session: closedSession, closedReason, closedAt: now() };
       return {
         room,
         session: null,
@@ -337,6 +387,11 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
           closedByClientIds: [...closedSet],
         };
         room.activeSession = null;
+        room.lastClosedSession = {
+          session: closedSession,
+          closedReason: 'loot_emptied',
+          closedAt: now(),
+        };
         return {
           room,
           granted: result.granted,

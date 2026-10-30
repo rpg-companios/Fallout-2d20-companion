@@ -408,6 +408,23 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
   return nodes;
 };
 
+const deduplicateContainerItems = (rawItems, now = Date.now()) => {
+  if (!Array.isArray(rawItems)) return [];
+  const seenEntryIds = new Set();
+  const out = [];
+  rawItems.forEach((item, idx) => {
+    const normalized = normalizeContainerItem(item, now + idx);
+    if (!normalized) return;
+    let entryId = normalized.entryId;
+    if (!entryId || seenEntryIds.has(entryId)) {
+      entryId = makeEntryId(now + idx);
+    }
+    seenEntryIds.add(entryId);
+    out.push(entryId === normalized.entryId ? normalized : { ...normalized, entryId });
+  });
+  return out;
+};
+
 /**
  * Нормализация контейнера добычи, торговца или локации ('hub').
  */
@@ -418,9 +435,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
 
   const items = kind === CONTAINER_KIND.HUB
     ? []
-    : (Array.isArray(raw.items)
-        ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
-        : []);
+    : deduplicateContainerItems(raw.items, now);
   const links = kind === CONTAINER_KIND.HUB
     ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
     : [];

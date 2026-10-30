@@ -8,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
 import { debugLog } from './src/debug/falloutDebug';
 import { startWebVersionWatcher } from './src/web/versionGuard';
+import { startWebPagerScrollGuard } from './src/web/pagerScrollGuard';
 
 // Высокоприоритетная предзагрузка шрифта в <head> (453): браузер начинает
 // скачивать .ttf сразу с приоритетом high, не дожидаясь первого layout текста.
@@ -149,6 +150,7 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
 
 if (Platform.OS === 'web' && typeof window !== 'undefined') {
   startWebVersionWatcher();
+  startWebPagerScrollGuard();
 }
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

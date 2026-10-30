@@ -154,7 +154,11 @@ export const syncBoundCharacterToRoom = async (
   const snapshot = await buildLocalCharacterRoomSnapshot(characterId);
   if (!snapshot) return false;
   const store = useRoomStore.getState();
-  await store.joinRoom({ code, name: snapshot.name, role: 'player' });
+  const currentRoom = store.rooms[code];
+  // Не понижаем роль комнаты с 'gm' на 'player', если в этой вкладке открыт режим Мастера
+  if (!currentRoom || currentRoom.joined === false) {
+    await store.joinRoom({ code, name: snapshot.name, role: 'player' });
+  }
   await store.publishCharacter({
     code,
     characterId,
@@ -167,11 +171,23 @@ export const syncBoundCharacterToRoom = async (
 /**
  * Если персонаж привязан к комнате и комната уже активна/доступна, пушит
  * свежий снапшот после локального сохранения (автосейв / ручной сейв).
+ * Вкладка Мастера (когда он не инспектирует лист персонажа) не перехватывает
+ * соединение в роли игрока при фоновых тиках локального стора.
  */
 export const pushSavedCharacterToBoundRoomIfAny = async (
   characterId: string,
 ): Promise<void> => {
   try {
+    const [{ default: useUiModeStore }, { default: useAppSettingsStore }] = await Promise.all([
+      import('./uiModeStore'),
+      import('../store/appSettingsStore'),
+    ]);
+    const uiState = useUiModeStore.getState();
+    const effectiveMode = uiState.tabUiMode || useAppSettingsStore.getState().getSettingValue?.('uiMode');
+    if (effectiveMode === 'gm' && !uiState.gmInspectingCharacter) {
+      return;
+    }
+
     const db = await import('../../db');
     const binding = await (db as any).getCharacterRoomBinding?.(characterId);
     const code = binding?.code;

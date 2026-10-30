@@ -107,16 +107,29 @@ const normalizeCharacterOverrides = (raw) => {
   return out;
 };
 
+const normalizeSessionItemsList = (rawItems, now = Date.now(), baseIdx = 0) => {
+  if (!Array.isArray(rawItems)) return [];
+  const seenEntryIds = new Set();
+  const out = [];
+  rawItems.forEach((raw, idx) => {
+    const normalized = normalizeSessionItem(raw, now, baseIdx + idx);
+    if (!normalized) return;
+    let entryId = normalized.entryId;
+    if (!entryId || seenEntryIds.has(entryId)) {
+      entryId = makeEntryId(now, baseIdx + idx);
+    }
+    seenEntryIds.add(entryId);
+    out.push(entryId === normalized.entryId ? normalized : { ...normalized, entryId });
+  });
+  return out;
+};
+
 const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
   const containerId = String(raw.containerId || raw.id || '').trim();
   if (!containerId) return null;
   const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
-  const items = Array.isArray(raw.items)
-    ? raw.items
-        .map((item, idx) => normalizeSessionItem(item, now, nodeIdx * 1000 + idx))
-        .filter(Boolean)
-    : [];
+  const items = normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
   return {
     containerId,
     kind,
@@ -184,9 +197,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
 
   const items = kind === 'hub'
     ? []
-    : (Array.isArray(raw.items)
-        ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
-        : []);
+    : normalizeSessionItemsList(raw.items, now, 0);
   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
   const closedByClientIds = Array.isArray(raw.closedByClientIds)
     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
@@ -399,9 +410,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
           targetNode.lockLabel = String(payload.lockLabel || '').trim();
         }
         if (Array.isArray(payload.nodeItems)) {
-          targetNode.items = payload.nodeItems
-            .map((item, itemIdx) => normalizeSessionItem(item, now, itemIdx))
-            .filter(Boolean);
+          targetNode.items = normalizeSessionItemsList(payload.nodeItems, now, 0);
         }
         if (targetNode.kind === 'merchant') {
           applyMerchantRatePatch(targetNode, payload);
@@ -414,9 +423,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
   }
 
   if (Array.isArray(payload.items)) {
-    next.items = payload.items
-      .map((item, idx) => normalizeSessionItem(item, now, idx))
-      .filter(Boolean);
+    next.items = normalizeSessionItemsList(payload.items, now, 0);
   }
 
   if (payload.name !== undefined && String(payload.name).trim()) {
@@ -441,7 +448,7 @@ const deductLootItems = (itemsList, takes) => {
     const entryId = String(req?.entryId || '');
     const wanted = Math.floor(Number(req?.quantity) || 0);
     if (!entryId || wanted <= 0) continue;
-    const idx = nextItems.findIndex((entry) => entry.entryId === entryId);
+    const idx = nextItems.findIndex((entry) => entry.entryId === entryId && entry.quantity > 0);
     if (idx < 0) continue;
     const current = nextItems[idx];
     const actual = Math.min(wanted, current.quantity);
