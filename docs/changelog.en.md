@@ -1,5 +1,22 @@
 # Changelog
 ---
+## Reliable GM chest emptying & auto-close when a player clicks "Take All" (patch 478)
+
+Fixed a desynchronization where clicking "Take All" closed the player's loot
+modal and granted items to inventory while the GM's container could stay open
+with all items intact:
+
+- prevented background character autosave from downgrading a GM tab's room role
+  (`role: 'gm' -> 'player'`);
+- rebound `ownerClientId` via `ownerToken` directly on `ROOM_JOIN` /
+  `SESSION_OPEN` when a room stays alive in server memory, and guaranteed the
+  GM's live socket in `room.members`;
+- persisted emptied loot containers even across single-device Admin/User mode
+  switches, added cross-tab `storage` sync, auto-closed the GM's open detail
+  view when emptied, deduplicated legacy item `entryId`s, and added automatic
+  `SESSION_CLOSE` self-healing against older WS server builds.
+
+---
 ## Compact merchant caps stepper without `±10`, white d20 die icon, and full-button-height Combat Die icon (patch 477)
 
 Removed the overflowing `−10` and `+10` caps stepper buttons in the Merchant

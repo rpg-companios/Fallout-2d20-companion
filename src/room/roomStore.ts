@@ -65,6 +65,7 @@ interface RoomStoreState {
     code: string;
     name: string;
     role?: 'gm' | 'player';
+    ownerToken?: string;
   }) => Promise<JoinRoomResult>;
   leaveRoom: (input: { code: string }) => Promise<void>;
   publishCharacter: (input: {
@@ -80,9 +81,11 @@ interface RoomStoreState {
   openRoomSession: (input: {
     code: string;
     session: Record<string, unknown>;
+    ownerToken?: string;
   }) => Promise<ActiveLootTradeSession>;
   updateRoomSessionRates: (input: {
     code: string;
+    ownerToken?: string;
     sessionId?: string;
     targetCharacterId?: string | null;
     resetCharacterOverride?: boolean;
@@ -104,6 +107,7 @@ interface RoomStoreState {
   closeRoomSession: (input: {
     code: string;
     sessionId?: string | null;
+    ownerToken?: string;
   }) => Promise<void>;
   playerCloseRoomSession: (input: {
     code: string;
@@ -446,7 +450,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       return { code, name: roomName || name, ownerToken: issuedToken };
     },
 
-    joinRoom: async ({ code, name, role = 'player' }) => {
+    joinRoom: async ({ code, name, role = 'player', ownerToken }) => {
       if (role === 'gm') {
         assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
       }
@@ -463,7 +467,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
       joiningCodes.add(code);
       try {
-        const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, { code, name, role }, code);
+        const joinPayload: Record<string, unknown> = { code, name, role };
+        if (ownerToken) joinPayload.ownerToken = ownerToken;
+        const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, joinPayload, code);
         const payloadRooms = response.payload;
         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
@@ -560,31 +566,37 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       }
     },
 
-    openRoomSession: async ({ code, session }) => {
+    openRoomSession: async ({ code, session, ownerToken }) => {
       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+      const reqPayload: Record<string, unknown> = { code, session };
+      if (ownerToken) reqPayload.ownerToken = ownerToken;
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_OPEN,
-        { code, session },
+        reqPayload,
         code,
       );
       return response.payload?.session as ActiveLootTradeSession;
     },
 
-    updateRoomSessionRates: async ({ code, ...rest }) => {
+    updateRoomSessionRates: async ({ code, ownerToken, ...rest }) => {
       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+      const reqPayload: Record<string, unknown> = { code, ...rest };
+      if (ownerToken) reqPayload.ownerToken = ownerToken;
       const response = await sendRequest(
         ROOM_MESSAGE.SESSION_UPDATE_RATES,
-        { code, ...rest },
+        reqPayload,
         code,
       );
       return response.payload?.session as ActiveLootTradeSession;
     },
 
-    closeRoomSession: async ({ code, sessionId = null }) => {
+    closeRoomSession: async ({ code, sessionId = null, ownerToken }) => {
       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+      const reqPayload: Record<string, unknown> = { code, sessionId };
+      if (ownerToken) reqPayload.ownerToken = ownerToken;
       await sendRequest(
         ROOM_MESSAGE.SESSION_CLOSE,
-        { code, sessionId },
+        reqPayload,
         code,
       );
     },

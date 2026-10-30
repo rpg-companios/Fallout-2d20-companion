@@ -3,9 +3,10 @@
 // предметы из контейнера добычи или совершают сделку с торговцем, обновлённый
 // остаток предметов и касса торговца сразу сохраняются в локальную БД Мастера
 // и фоном отправляются в Google Drive — даже если Мастер в этот момент смотрит
-// другую вкладку («Список кампаний» или лист персонажа).
-// Если из контейнера добычи забрали весь лут — раздача закрывается автоматически,
-// а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
+// другую вкладку («Список кампаний» или лист персонажа) или проверяет раздачу
+// из режима Пользователя на том же устройстве.
+// Если из контейнера добычи забрали весь лут — раздача и открытый экран контейнера
+// закрываются автоматически, а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
 
 import * as db from '../../db';
 import useRoomStore, { onRoomSessionState } from '../room/roomStore';
@@ -23,6 +24,10 @@ import { isGmLootTradeLicensed } from '../../domain/premium';
 
 const gmContainerSyncListeners = new Set();
 const promptedEmptySessionIds = new Set();
+const emptiedSessionIds = new Set();
+const sessionRevisionById = new Map();
+const pendingEmptyPrompts = new Map();
+let persistenceChain = Promise.resolve();
 
 export const subscribeGmContainerUpdates = (listener) => {
   gmContainerSyncListeners.add(listener);
@@ -31,29 +36,155 @@ export const subscribeGmContainerUpdates = (listener) => {
   };
 };
 
-export const notifyGmContainerUpdated = (containerId) => {
+export const notifyGmContainerUpdated = (containerId, meta = {}) => {
   gmContainerSyncListeners.forEach((fn) => {
-    try { fn(containerId); } catch { /* ignore */ }
+    try { fn(containerId, meta); } catch { /* ignore */ }
   });
 };
 
 export const resetPromptedEmptySessionsForTests = () => {
   promptedEmptySessionIds.clear();
+  emptiedSessionIds.clear();
+  sessionRevisionById.clear();
+  pendingEmptyPrompts.clear();
+  persistenceChain = Promise.resolve();
+};
+
+const showEmptyContainerDeleteAlert = ({
+  containerId,
+  containerName,
+  roomCode = '',
+  hubSessionId = null,
+}) => {
+  showRawAlert({
+    title: tLootTrade('detail.emptyLootPromptTitle'),
+    message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
+      name: containerName,
+    }),
+    buttons: [
+      { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
+      {
+        text: tLootTrade('card.delete'),
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            try {
+              await deleteGmContainerFromCloudIfEnabled(containerId);
+              await db.deleteGmContainer(containerId);
+              const allNow = await db.getGmContainersList();
+              for (const item of allNow) {
+                if (
+                  item.kind === 'hub'
+                  && (item.links || []).some((l) => l.containerId === containerId)
+                ) {
+                  const prunedLinks = item.links.filter(
+                    (l) => l.containerId !== containerId,
+                  );
+                  await db.saveGmContainer({ ...item, links: prunedLinks });
+                  void syncGmContainerToCloudIfEnabled(item.id);
+                }
+              }
+              if (roomCode && hubSessionId) {
+                const liveNow = useRoomStore.getState().rooms[roomCode]?.activeSession;
+                if (liveNow && liveNow.sessionId === hubSessionId && liveNow.kind === 'hub') {
+                  const prunedNodes = (liveNow.nodes || []).filter(
+                    (n) => n.containerId !== containerId,
+                  );
+                  await useRoomStore.getState().updateRoomSessionRates({
+                    code: roomCode,
+                    sessionId: liveNow.sessionId,
+                    nodes: prunedNodes,
+                  }).catch(() => {});
+                }
+              }
+              notifyGmContainerUpdated(containerId, { deleted: true });
+            } catch (err) {
+              debugLog('gm.sessionPersistence.deleteEmpty:failed', {
+                message: err?.message || String(err),
+              });
+            }
+          })();
+        },
+      },
+    ],
+  });
+};
+
+export const flushPendingEmptyLootPrompts = async () => {
+  if (pendingEmptyPrompts.size === 0) return;
+  const entries = [...pendingEmptyPrompts.values()];
+  pendingEmptyPrompts.clear();
+  for (const item of entries) {
+    try {
+      const current = await db.getGmContainerById(item.containerId);
+      if (current && current.kind === 'loot' && (current.items || []).length === 0) {
+        notifyGmContainerUpdated(current.id, { emptied: true });
+        showEmptyContainerDeleteAlert({
+          containerId: current.id,
+          containerName: current.name,
+          roomCode: item.roomCode,
+          hubSessionId: item.hubSessionId,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+};
+
+const resolveLocalRoomOwnership = async (code) => {
+  try {
+    const ownedRows = await db.getFolderRooms();
+    const hit = Array.isArray(ownedRows)
+      ? ownedRows.find((r) => r?.code === code && Boolean(r?.owner_token))
+      : null;
+    return hit ? String(hit.owner_token) : null;
+  } catch {
+    return null;
+  }
 };
 
 export const startGmSessionPersistence = () => {
-  return onRoomSessionState(async (envelope) => {
-    try {
+  return onRoomSessionState((envelope) => {
+    persistenceChain = persistenceChain
+      .then(() => handleRoomSessionEnvelope(envelope))
+      .catch((error) => {
+        debugLog('gm.sessionPersistence:failed', {
+          message: error?.message || String(error),
+        });
+      });
+    return persistenceChain;
+  });
+};
+
+const handleRoomSessionEnvelope = async (envelope) => {
+  try {
       if (!isGmLootTradeLicensed()) return;
       const code = envelope?.roomCode;
       if (!code) return;
       const room = useRoomStore.getState().rooms[code];
-      if (!room || room.role !== 'gm') return;
+      const isGmRoomInStore = Boolean(room && room.role === 'gm');
+      const localOwnerToken = isGmRoomInStore ? null : await resolveLocalRoomOwnership(code);
+      if (!isGmRoomInStore && !localOwnerToken) return;
 
       const closedReason = envelope?.payload?.closedReason || null;
       const emptiedNodeContainerId = envelope?.payload?.emptiedNodeContainerId || null;
       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
       if (!session?.containerId) return;
+
+      const incomingRev = Number(session.revision) || 0;
+      if (session.sessionId) {
+        if (emptiedSessionIds.has(session.sessionId)) {
+          return;
+        }
+        const prevRev = sessionRevisionById.get(session.sessionId) || 0;
+        if (incomingRev > 0 && incomingRev < prevRev) {
+          return;
+        }
+        if (incomingRev > prevRev) {
+          sessionRevisionById.set(session.sessionId, incomingRev);
+        }
+      }
 
       const existing = await db.getGmContainerById(session.containerId);
       if (!existing) return;
@@ -98,7 +229,10 @@ export const startGmSessionPersistence = () => {
           void syncGmContainerToCloudIfEnabled(childExisting.id);
         }
 
-        notifyGmContainerUpdated(existing.id);
+        notifyGmContainerUpdated(
+          emptiedNodeContainerId || existing.id,
+          emptiedNodeContainerId ? { emptied: true, hubId: existing.id } : {},
+        );
         void syncGmContainerToCloudIfEnabled(existing.id);
 
         if (emptiedNodeContainerId) {
@@ -110,64 +244,55 @@ export const startGmSessionPersistence = () => {
             && !promptedEmptySessionIds.has(emptiedKey)
           ) {
             promptedEmptySessionIds.add(emptiedKey);
-            showRawAlert({
-              title: tLootTrade('detail.emptyLootPromptTitle'),
-              message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
-                name: emptiedChild.name,
-              }),
-              buttons: [
-                { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
-                {
-                  text: tLootTrade('card.delete'),
-                  style: 'destructive',
-                  onPress: () => {
-                    void (async () => {
-                      try {
-                        await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
-                        await db.deleteGmContainer(emptiedChild.id);
-                        const allNow = await db.getGmContainersList();
-                        for (const item of allNow) {
-                          if (
-                            item.kind === 'hub'
-                            && (item.links || []).some((l) => l.containerId === emptiedChild.id)
-                          ) {
-                            const prunedLinks = item.links.filter(
-                              (l) => l.containerId !== emptiedChild.id,
-                            );
-                            await db.saveGmContainer({ ...item, links: prunedLinks });
-                            void syncGmContainerToCloudIfEnabled(item.id);
-                          }
-                        }
-                        const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
-                        if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
-                          const prunedNodes = (liveNow.nodes || []).filter(
-                            (n) => n.containerId !== emptiedChild.id,
-                          );
-                          await useRoomStore.getState().updateRoomSessionRates({
-                            code,
-                            sessionId: liveNow.sessionId,
-                            nodes: prunedNodes,
-                          }).catch(() => {});
-                        }
-                        notifyGmContainerUpdated(emptiedChild.id);
-                      } catch (err) {
-                        debugLog('gm.sessionPersistence.deleteEmptyHubChild:failed', {
-                          message: err?.message || String(err),
-                        });
-                      }
-                    })();
-                  },
-                },
-              ],
-            });
+            if (isGmRoomInStore) {
+              showEmptyContainerDeleteAlert({
+                containerId: emptiedChild.id,
+                containerName: emptiedChild.name,
+                roomCode: code,
+                hubSessionId: session.sessionId,
+              });
+            } else {
+              pendingEmptyPrompts.set(emptiedChild.id, {
+                containerId: emptiedChild.id,
+                roomCode: code,
+                hubSessionId: session.sessionId,
+              });
+            }
           }
         }
         return;
       }
 
+      const hadItemsBefore = Array.isArray(existing.items) && existing.items.length > 0;
+      const nextItems = Array.isArray(session.items) ? session.items : existing.items;
+      const isNowEmptyLoot = existing.kind === 'loot'
+        && session.kind === 'loot'
+        && Array.isArray(nextItems)
+        && nextItems.length === 0;
+
+      let effectiveClosedReason = closedReason;
+      let shouldSendAutoCloseToServer = false;
+      const liveSessionStillOpen = Boolean(envelope?.payload?.session);
+
+      // Защита от зависшей открытой раздачи пустого сундука (например, при работе со старым WS-сервером
+      // или когда ни один другой игрок больше не смотрит в опустевший сундук):
+      if (!effectiveClosedReason && liveSessionStillOpen && isNowEmptyLoot && hadItemsBefore) {
+        const closedSet = new Set(Array.isArray(session.closedByClientIds) ? session.closedByClientIds : []);
+        const serverTracksClosedClients = Array.isArray(session.closedByClientIds) && closedSet.size > 0;
+        const unclosedPlayersCount = (room?.members || []).filter(
+          (m) => m?.role === 'player' && !closedSet.has(m.clientId),
+        ).length;
+        const waitingForOtherPlayers = serverTracksClosedClients && unclosedPlayersCount > 0;
+
+        if (!waitingForOtherPlayers) {
+          effectiveClosedReason = 'loot_emptied';
+          shouldSendAutoCloseToServer = isGmRoomInStore;
+        }
+      }
+
       const nextContainer = {
         ...existing,
-        items: Array.isArray(session.items) ? session.items : existing.items,
+        items: nextItems,
         caps: existing.kind === 'merchant' && session.caps !== undefined
           ? session.caps
           : existing.caps,
@@ -180,63 +305,51 @@ export const startGmSessionPersistence = () => {
       };
 
       await db.saveGmContainer(nextContainer);
-      notifyGmContainerUpdated(existing.id);
+
+      const isEmptiedLootClose = effectiveClosedReason === 'loot_emptied' && existing.kind === 'loot';
+      if (isEmptiedLootClose && session.sessionId) {
+        emptiedSessionIds.add(session.sessionId);
+      }
+
+      if (shouldSendAutoCloseToServer) {
+        const ownerToken = localOwnerToken || await resolveLocalRoomOwnership(code);
+        void useRoomStore.getState().closeRoomSession({
+          code,
+          sessionId: session.sessionId,
+          ...(ownerToken ? { ownerToken } : {}),
+        }).catch(() => {});
+      }
+
+      notifyGmContainerUpdated(
+        existing.id,
+        isEmptiedLootClose ? { emptied: true } : {},
+      );
 
       const promptKey = String(session.sessionId || `${code}:${existing.id}:${session.revision || 0}`);
-      if (
-        closedReason === 'loot_emptied'
-        && existing.kind === 'loot'
-        && !promptedEmptySessionIds.has(promptKey)
-      ) {
+      if (isEmptiedLootClose && !promptedEmptySessionIds.has(promptKey)) {
         promptedEmptySessionIds.add(promptKey);
         void syncGmContainerToCloudIfEnabled(existing.id);
-        showRawAlert({
-          title: tLootTrade('detail.emptyLootPromptTitle'),
-          message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
-            name: existing.name,
-          }),
-          buttons: [
-            { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
-            {
-              text: tLootTrade('card.delete'),
-              style: 'destructive',
-              onPress: () => {
-                void (async () => {
-                  try {
-                    await deleteGmContainerFromCloudIfEnabled(existing.id);
-                    await db.deleteGmContainer(existing.id);
-                    const allNow = await db.getGmContainersList();
-                    for (const item of allNow) {
-                      if (
-                        item.kind === 'hub'
-                        && (item.links || []).some((l) => l.containerId === existing.id)
-                      ) {
-                        const prunedLinks = item.links.filter(
-                          (l) => l.containerId !== existing.id,
-                        );
-                        await db.saveGmContainer({ ...item, links: prunedLinks });
-                        void syncGmContainerToCloudIfEnabled(item.id);
-                      }
-                    }
-                    notifyGmContainerUpdated(existing.id);
-                  } catch (err) {
-                    debugLog('gm.sessionPersistence.deleteEmpty:failed', {
-                      message: err?.message || String(err),
-                    });
-                  }
-                })();
-              },
-            },
-          ],
-        });
+        if (isGmRoomInStore) {
+          showEmptyContainerDeleteAlert({
+            containerId: existing.id,
+            containerName: existing.name,
+            roomCode: code,
+            hubSessionId: null,
+          });
+        } else {
+          pendingEmptyPrompts.set(existing.id, {
+            containerId: existing.id,
+            roomCode: code,
+            hubSessionId: null,
+          });
+        }
         return;
       }
 
       void syncGmContainerToCloudIfEnabled(existing.id);
-    } catch (error) {
-      debugLog('gm.sessionPersistence:failed', {
-        message: error?.message || String(error),
-      });
-    }
-  });
+  } catch (error) {
+    debugLog('gm.sessionPersistence:failed', {
+      message: error?.message || String(error),
+    });
+  }
 };

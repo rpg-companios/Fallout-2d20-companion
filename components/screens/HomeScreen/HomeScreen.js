@@ -722,7 +722,7 @@ export default function HomeScreen({ navigation }) {
     }
     try {
       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
-      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
+      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm', ownerToken }).catch(() => {});
       const folder = await db.createCharacterFolder(name);
       await db.upsertFolderRoom(folder.id, code, ownerToken);
       setFolderName('');
@@ -855,7 +855,12 @@ export default function HomeScreen({ navigation }) {
         const current = store.rooms[code];
         if (current && current.joined !== false && current.role === 'gm') return;
         const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
-        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
+        store.joinRoom({
+          code,
+          name: 'GM',
+          role: 'gm',
+          ownerToken: record.ownerToken,
+        }).catch(async (err) => {
           if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
             try {
               await store.createRoom({
@@ -863,7 +868,12 @@ export default function HomeScreen({ navigation }) {
                 requestedCode: code,
                 ownerToken: record.ownerToken,
               });
-              await store.joinRoom({ code, name: 'GM', role: 'gm' });
+              await store.joinRoom({
+                code,
+                name: 'GM',
+                role: 'gm',
+                ownerToken: record.ownerToken,
+              });
             } catch {
               // Сервер временно недоступен — повторим по таймеру / при переподключении.
             }

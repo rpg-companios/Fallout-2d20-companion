@@ -1,0 +1,1533 @@
+diff --git a/__tests__/lootTrade/loot-take-all-gm-sync-478.test.js b/__tests__/lootTrade/loot-take-all-gm-sync-478.test.js
+new file mode 100644
+index 0000000..fd7d1ad
+--- /dev/null
++++ b/__tests__/lootTrade/loot-take-all-gm-sync-478.test.js
+@@ -0,0 +1,417 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++
++const alertCalls = [];
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: (opts) => {
++    alertCalls.push(opts);
++  },
++  showAlert: vi.fn(),
++  showConfirm: vi.fn(),
++  showPrompt: vi.fn(),
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteCharacterFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncGmContainerToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteGmContainerFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncAllCharactersWithCloud: vi.fn().mockResolvedValue({ uploaded: 0, downloaded: 0 }),
++  openCloudFolderInDrive: vi.fn().mockResolvedValue(undefined),
++}));
++
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import useAppSettingsStore from '../../src/store/appSettingsStore';
++import {
++  pushSavedCharacterToBoundRoomIfAny,
++  syncBoundCharacterToRoom,
++} from '../../src/room/roomCharacterSync';
++import * as db from '../../db';
++import {
++  flushPendingEmptyLootPrompts,
++  resetPromptedEmptySessionsForTests,
++  startGmSessionPersistence,
++  subscribeGmContainerUpdates,
++} from '../../src/lootTrade/gmSessionPersistence';
++import { setCurrentLocale } from '../../i18n/locale';
++
++const makeWaitMsg = () => (box, pred, timeoutMs = 4000) => new Promise((resolve, reject) => {
++  const started = Date.now();
++  const timer = setInterval(() => {
++    const idx = box.findIndex(pred);
++    if (idx >= 0) {
++      const [hit] = box.splice(idx, 1);
++      clearInterval(timer);
++      resolve(hit);
++      return;
++    }
++    if (Date.now() - started > timeoutMs) {
++      clearInterval(timer);
++      reject(new Error('timeout waiting WS message'));
++    }
++  }, 12);
++});
++
++describe('Патч 478 — синхронизация Мастера при «Забрать всё» из контейнера добычи', () => {
++  beforeEach(async () => {
++    setCurrentLocale('ru-RU');
++    alertCalls.length = 0;
++    resetPromptedEmptySessionsForTests();
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(null);
++    useRoomStore.setState({ status: 'offline', clientId: null, rooms: {}, lastError: null });
++    useUiModeStore.setState({ tabUiMode: null, gmInspectingCharacter: false });
++    if (typeof localStorage !== 'undefined') localStorage.clear();
++    await db.initDatabase();
++  });
++
++  it('когда Мастер переоткрыл вкладку (новый clientId с ownerToken) и раздал старый сундук из памяти (даже с дублирующимися entryId): «Забрать всё» опустошает и закрывает контейнер у Мастера', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const waitMsg = makeWaitMsg();
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    // 1. Первоначально комната была создана старой вкладкой Мастера, и к ней подключился игрок
++    const oldGmBox = [];
++    const oldGm = createRoomClient({
++      url: wsUrl,
++      clientId: 'gm-device:old-tab',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => oldGmBox.push(m),
++    });
++    const playerBox = [];
++    const player = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-device:tab1',
++      webSocketFactory: (u) => new WebSocket(u),
++      onStatus: () => {},
++      onMessage: (m) => playerBox.push(m),
++    });
++
++    const updateEvents = [];
++    const unsubUpdates = subscribeGmContainerUpdates((id, meta) => {
++      updateEvents.push({ id, meta });
++    });
++
++    let stopPersistence = () => {};
++
++    try {
++      oldGm.send(ROOM_MESSAGE.ROOM_CREATE, { name: 'Мохаве', requestId: 'c1' }, null);
++      const createdMsg = await waitMsg(oldGmBox, (m) => m.type === ROOM_MESSAGE.ROOM_CREATED);
++      const roomCode = createdMsg.payload.code;
++      const ownerToken = createdMsg.payload.ownerToken;
++      await db.upsertFolderRoom('folder_gm_1', roomCode, ownerToken);
++
++      player.send(ROOM_MESSAGE.ROOM_JOIN, { code: roomCode, name: 'Курьер', role: 'player', requestId: 'pj1' }, roomCode);
++      await waitMsg(playerBox, (m) => m.type === ROOM_MESSAGE.ROOM_STATE && m.payload?.requestId === 'pj1');
++
++      // Старая вкладка Мастера закрылась, но комната жива в памяти сервера из-за игрока!
++      oldGm.close();
++      await new Promise((r) => setTimeout(r, 40));
++
++      // 2. Мастер открывает новую вкладку (новый clientId) и раздаёт старый контейнер из памяти
++      setRoomClientFactoryForTests((input) => createRoomClient({
++        ...input,
++        clientId: 'gm-device:new-tab',
++        webSocketFactory: (u) => new WebSocket(u),
++      }));
++      stopPersistence = startGmSessionPersistence();
++
++      await useRoomStore.getState().joinRoom({
++        code: roomCode,
++        name: 'GM',
++        role: 'gm',
++        ownerToken,
++      });
++
++      // Контейнер из старой памяти (в т.ч. с одинаковыми entryId у двух позиций)
++      const legacyContainer = await db.saveGmContainer({
++        id: 'cnt_legacy_468',
++        kind: 'loot',
++        name: 'Старый сейф из памяти',
++        roomCode,
++        items: [
++          { entryId: 'ent_same', itemId: 'chem_stimpak', itemType: 'chems', name: 'Стимулятор', quantity: 3, cost: 40, weight: 0 },
++          { entryId: 'ent_same', itemId: 'ammo_10mm', itemType: 'ammo', name: 'Патрон 10 мм', quantity: 12, cost: 2, weight: 0 },
++        ],
++      });
++      // Дедупликация гарантирует уникальные entryId для всех позиций
++      expect(new Set(legacyContainer.items.map((it) => it.entryId)).size).toBe(2);
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code: roomCode,
++        ownerToken,
++        session: {
++          containerId: legacyContainer.id,
++          kind: 'loot',
++          name: legacyContainer.name,
++          targetType: 'room',
++          items: legacyContainer.items,
++        },
++      });
++
++      const playerOpenMsg = await waitMsg(
++        playerBox,
++        (m) => m.type === ROOM_MESSAGE.SESSION_STATE && m.payload?.session?.sessionId === opened.sessionId,
++      );
++      const sessionItems = playerOpenMsg.payload.session.items;
++      expect(sessionItems).toHaveLength(2);
++
++      // 3. Персонаж нажимает «Забрать всё» (отправляя все позиции разом)
++      player.send(
++        ROOM_MESSAGE.SESSION_LOOT_TAKE,
++        {
++          code: roomCode,
++          sessionId: opened.sessionId,
++          characterId: 'char_courier',
++          takes: sessionItems.map((it) => ({ entryId: it.entryId, quantity: it.quantity })),
++          requestId: 'take-all-now',
++        },
++        roomCode,
++      );
++
++      const takeRes = await waitMsg(
++        playerBox,
++        (m) => m.type === ROOM_MESSAGE.SESSION_LOOT_TAKE && m.payload?.requestId === 'take-all-now',
++      );
++      expect(takeRes.payload.granted).toHaveLength(2);
++      expect(takeRes.payload.session).toBeNull();
++      expect(takeRes.payload.closedReason).toBe('loot_emptied');
++
++      await new Promise((r) => setTimeout(r, 90));
++
++      // У Мастера раздача закрыта, в БД 0 предметов, пришёл сигнал { emptied: true } для закрытия экрана контейнера
++      expect(useRoomStore.getState().rooms[roomCode]?.activeSession).toBeNull();
++      const updatedContainer = await db.getGmContainerById(legacyContainer.id);
++      expect(updatedContainer.items).toEqual([]);
++      expect(updateEvents.some((ev) => ev.id === legacyContainer.id && ev.meta?.emptied === true)).toBe(true);
++      expect(alertCalls.some((a) => a.title === 'Контейнер пуст. Хотите удалить?')).toBe(true);
++    } finally {
++      unsubUpdates();
++      stopPersistence();
++      oldGm.close();
++      player.close();
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      await app.close();
++    }
++  });
++
++  it('фоновая синхронизация привязанного персонажа не затирает роль Мастера (role: gm -> player) во вкладке Админа', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      clientId: 'gm-tab-protect',
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Стол Мастера' });
++      await useRoomStore.getState().joinRoom({
++        code: created.code,
++        name: 'GM',
++        role: 'gm',
++        ownerToken: created.ownerToken,
++      });
++
++      await db.saveCharacter('char_local_1', 'Рейнджер', 3, 'ncr_citizen', { level: 3 });
++      await db.setCharacterRoomBinding('char_local_1', created.code);
++
++      // В режиме Мастера (без инспекции листа) фоновый автосейв вообще не должен лезть в комнату как игрок
++      useUiModeStore.setState({ tabUiMode: 'gm', gmInspectingCharacter: false });
++      useAppSettingsStore.getState().setValue('uiMode', 'gm');
++      await pushSavedCharacterToBoundRoomIfAny('char_local_1');
++      expect(useRoomStore.getState().rooms[created.code]?.role).toBe('gm');
++
++      // Даже прямой вызов syncBoundCharacterToRoom при открытой GM-комнате сохраняет role === 'gm'
++      await syncBoundCharacterToRoom('char_local_1', created.code);
++      expect(useRoomStore.getState().rooms[created.code]?.role).toBe('gm');
++    } finally {
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      await app.close();
++    }
++  });
++
++  it('проверка на одном устройстве (Админ -> раздал -> вышел в Пользователя -> Забрать всё -> вернулся в Админа): сундук сразу пустеет и предлагает удаление при возврате', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    setRoomClientFactoryForTests((input) => createRoomClient({
++      ...input,
++      clientId: 'single-device-user',
++      webSocketFactory: (u) => new WebSocket(u),
++    }));
++    const stopPersistence = startGmSessionPersistence();
++
++    try {
++      // 1. В режиме Мастера создаём комнату и сундук, раздаём на всю комнату
++      const created = await useRoomStore.getState().createRoom({ name: 'Соло-тест' });
++      await db.upsertFolderRoom('f_solo', created.code, created.ownerToken);
++      await useRoomStore.getState().joinRoom({
++        code: created.code,
++        name: 'GM',
++        role: 'gm',
++        ownerToken: created.ownerToken,
++      });
++
++      const chest = await db.saveGmContainer({
++        id: 'cnt_solo_switch',
++        kind: 'loot',
++        name: 'Ящик у дороги',
++        items: [
++          { entryId: 'e_solo_1', itemId: 'chem_radaway', itemType: 'chems', name: 'Антирадин', quantity: 2, cost: 60, weight: 0 },
++        ],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code: created.code,
++        ownerToken: created.ownerToken,
++        session: {
++          containerId: chest.id,
++          kind: 'loot',
++          name: chest.name,
++          targetType: 'room',
++          items: chest.items,
++        },
++      });
++
++      // 2. Переключаемся на этом же устройстве в режим Пользователя (leaveRoom -> joinRoom role: 'player')
++      await useRoomStore.getState().leaveRoom({ code: created.code });
++      await useRoomStore.getState().joinRoom({
++        code: created.code,
++        name: 'Выживший',
++        role: 'player',
++      });
++      expect(useRoomStore.getState().rooms[created.code]?.role).toBe('player');
++
++      // 3. Персонажем забираем всё разом
++      const takeRes = await useRoomStore.getState().takeFromLootSession({
++        code: created.code,
++        sessionId: opened.sessionId,
++        characterId: 'char_solo',
++        takes: [{ entryId: 'e_solo_1', quantity: 2 }],
++      });
++      expect(takeRes.granted).toHaveLength(1);
++
++      await new Promise((r) => setTimeout(r, 80));
++
++      // В локальной БД Мастера сундук УЖЕ пуст (предметы не остались лежать!)
++      const chestAfterTake = await db.getGmContainerById(chest.id);
++      expect(chestAfterTake.items).toEqual([]);
++
++      // 4. Возвращаемся на экран Мастера «Добыча/Торговля» — всплывает отложенный вопрос удаления пустого сундука
++      await flushPendingEmptyLootPrompts();
++      expect(alertCalls.some((a) => a.title === 'Контейнер пуст. Хотите удалить?')).toBe(true);
++    } finally {
++      stopPersistence();
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      await app.close();
++    }
++  });
++
++  it('самовосстановление Мастера при работе со старым WS-сервером (где пустой сундук не прислал loot_emptied): раздача гасится автоматически, а сундук очищается', async () => {
++    const app = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await app.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    const prevEnvUrl = process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    let injectedOnMessage = null;
++    setRoomClientFactoryForTests((input) => {
++      injectedOnMessage = input.onMessage;
++      return createRoomClient({
++        ...input,
++        clientId: 'gm-legacy-server-guard',
++        webSocketFactory: (u) => new WebSocket(u),
++      });
++    });
++    const stopPersistence = startGmSessionPersistence();
++
++    try {
++      const created = await useRoomStore.getState().createRoom({ name: 'Старый сервер' });
++      await db.upsertFolderRoom('f_legacy_srv', created.code, created.ownerToken);
++      await useRoomStore.getState().joinRoom({
++        code: created.code,
++        name: 'GM',
++        role: 'gm',
++        ownerToken: created.ownerToken,
++      });
++
++      const chest = await db.saveGmContainer({
++        id: 'cnt_legacy_srv_1',
++        kind: 'loot',
++        name: 'Сундук 468',
++        items: [
++          { entryId: 'e_old_1', itemId: 'chem_stimpak', itemType: 'chems', name: 'Стимулятор', quantity: 4, cost: 40, weight: 0 },
++        ],
++      });
++
++      const opened = await useRoomStore.getState().openRoomSession({
++        code: created.code,
++        ownerToken: created.ownerToken,
++        session: {
++          containerId: chest.id,
++          kind: 'loot',
++          name: chest.name,
++          targetType: 'room',
++          items: chest.items,
++        },
++      });
++
++      // Имитируем ответ старого сервера v468 после «Забрать всё»: items: [], но session не null и без closedByClientIds
++      injectedOnMessage({
++        v: 1,
++        type: ROOM_MESSAGE.SESSION_STATE,
++        roomCode: created.code,
++        clientId: 'gm-legacy-server-guard',
++        ts: Date.now(),
++        payload: {
++          session: {
++            ...opened,
++            items: [],
++            revision: opened.revision + 1,
++          },
++        },
++      });
++
++      await new Promise((r) => setTimeout(r, 90));
++
++      // Мастер сам отправил SESSION_CLOSE, погасил раздачу, очистил сундук в БД и показал запрос удаления
++      expect(useRoomStore.getState().rooms[created.code]?.activeSession).toBeNull();
++      const updated = await db.getGmContainerById(chest.id);
++      expect(updated.items).toEqual([]);
++      expect(alertCalls.some((a) => a.title === 'Контейнер пуст. Хотите удалить?')).toBe(true);
++    } finally {
++      stopPersistence();
++      if (prevEnvUrl === undefined) delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++      else process.env.EXPO_PUBLIC_ROOM_SERVER_URL = prevEnvUrl;
++      await app.close();
++    }
++  });
++});
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index e40865e..fb1c5f1 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -722,7 +722,7 @@ export default function HomeScreen({ navigation }) {
+     }
+     try {
+       const { code, ownerToken } = await useRoomStore.getState().createRoom({ name });
+-      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm' }).catch(() => {});
++      await useRoomStore.getState().joinRoom({ code, name: 'GM', role: 'gm', ownerToken }).catch(() => {});
+       const folder = await db.createCharacterFolder(name);
+       await db.upsertFolderRoom(folder.id, code, ownerToken);
+       setFolderName('');
+@@ -855,7 +855,12 @@ export default function HomeScreen({ navigation }) {
+         const current = store.rooms[code];
+         if (current && current.joined !== false && current.role === 'gm') return;
+         const savedTitle = folders.find((item) => item.id === folderId)?.name || code;
+-        store.joinRoom({ code, name: 'GM', role: 'gm' }).catch(async (err) => {
++        store.joinRoom({
++          code,
++          name: 'GM',
++          role: 'gm',
++          ownerToken: record.ownerToken,
++        }).catch(async (err) => {
+           if (err?.message === 'ROOM_NOT_FOUND' && record.ownerToken) {
+             try {
+               await store.createRoom({
+@@ -863,7 +868,12 @@ export default function HomeScreen({ navigation }) {
+                 requestedCode: code,
+                 ownerToken: record.ownerToken,
+               });
+-              await store.joinRoom({ code, name: 'GM', role: 'gm' });
++              await store.joinRoom({
++                code,
++                name: 'GM',
++                role: 'gm',
++                ownerToken: record.ownerToken,
++              });
+             } catch {
+               // Сервер временно недоступен — повторим по таймеру / при переподключении.
+             }
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index af0c3bb..da992cd 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -58,7 +58,10 @@ import {
+   showAlert as showCatalogAlert,
+   showRawAlert,
+ } from '../../alerts/alertService';
+-import { subscribeGmContainerUpdates } from '../../../src/lootTrade/gmSessionPersistence';
++import {
++  flushPendingEmptyLootPrompts,
++  subscribeGmContainerUpdates,
++} from '../../../src/lootTrade/gmSessionPersistence';
+ import {
+   FEATURE_IDS,
+   guardAdminAction,
+@@ -337,6 +340,7 @@ export default function LootTradeScreen() {
+   const setSettingValue = useAppSettingsStore((s) => s.setValue);
+   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
+   const roomRooms = useRoomStore((s) => s.rooms);
++  const roomStatus = useRoomStore((s) => s.status);
+ 
+   const [loading, setLoading] = useState(true);
+   const [containers, setContainers] = useState([]);
+@@ -392,19 +396,45 @@ export default function LootTradeScreen() {
+     }
+   }, []);
+ 
++  const returnHubIdRef = useRef(null);
++  returnHubIdRef.current = returnHubId;
++
+   useFocusEffect(
+     useCallback(() => {
+       useUiModeStore.getState().setGmInspectingCharacter(false);
+       loadData();
++      void flushPendingEmptyLootPrompts();
+     }, [loadData]),
+   );
+ 
+   useEffect(() => {
+-    return subscribeGmContainerUpdates(() => {
++    return subscribeGmContainerUpdates((updatedContainerId, meta) => {
++      if (meta?.emptied && updatedContainerId) {
++        setActiveContainerId((currentId) => {
++          if (currentId !== updatedContainerId) return currentId;
++          const backHub = returnHubIdRef.current;
++          setReturnHubId(null);
++          return backHub && backHub !== updatedContainerId ? backHub : null;
++        });
++      }
+       loadData();
+     });
+   }, [loadData]);
+ 
++  // Мгновенная синхронизация между вкладками одного браузера (localStorage WebAdapter)
++  useEffect(() => {
++    if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.addEventListener) {
++      return undefined;
++    }
++    const handleStorage = (event) => {
++      if (!event?.key || event.key === 'fallout_db_gm_containers') {
++        loadData();
++      }
++    };
++    window.addEventListener('storage', handleStorage);
++    return () => window.removeEventListener('storage', handleStorage);
++  }, [loadData]);
++
+   const roomByCode = useMemo(
+     () => Object.fromEntries(availableRooms.map((r) => [r.code, r])),
+     [availableRooms],
+@@ -493,13 +523,19 @@ export default function LootTradeScreen() {
+     }, 4500);
+   };
+ 
+-  const ensureGmRoomConnected = async (roomCode) => {
++  const ensureGmRoomConnected = useCallback(async (roomCode) => {
++    if (!roomCode) return;
+     const store = useRoomStore.getState();
+     const record = roomByCode[roomCode];
+     const current = store.rooms[roomCode];
+     if (current && current.joined !== false && current.role === 'gm') return;
+     try {
+-      await store.joinRoom({ code: roomCode, name: 'GM', role: 'gm' });
++      await store.joinRoom({
++        code: roomCode,
++        name: 'GM',
++        role: 'gm',
++        ownerToken: record?.ownerToken,
++      });
+     } catch (err) {
+       if (err?.message === 'ROOM_NOT_FOUND' && record?.ownerToken) {
+         await store.createRoom({
+@@ -507,12 +543,35 @@ export default function LootTradeScreen() {
+           requestedCode: roomCode,
+           ownerToken: record.ownerToken,
+         });
+-        await store.joinRoom({ code: roomCode, name: 'GM', role: 'gm' });
++        await store.joinRoom({
++          code: roomCode,
++          name: 'GM',
++          role: 'gm',
++          ownerToken: record.ownerToken,
++        });
+         return;
+       }
+       throw err;
+     }
+-  };
++  }, [roomByCode]);
++
++  // Держим комнаты Мастера подключёнными прямо с экрана «Добыча/Торговля»,
++  // чтобы даже при переподключении сокета или старте сразу на этой вкладке
++  // Мастер всегда получал живые события взятия лута и сделок игроков.
++  useEffect(() => {
++    if (!gmLootTradeLicensed || availableRooms.length === 0) return undefined;
++    const syncRooms = () => {
++      if (useRoomStore.getState().status === 'connecting') return;
++      availableRooms.forEach((r) => {
++        if (r?.code) {
++          ensureGmRoomConnected(r.code).catch(() => {});
++        }
++      });
++    };
++    syncRooms();
++    const timer = setInterval(syncRooms, 4000);
++    return () => clearInterval(timer);
++  }, [gmLootTradeLicensed, availableRooms, ensureGmRoomConnected, roomStatus]);
+ 
+   const persistAndSyncContainer = async (nextContainer) => {
+     const saved = await db.saveGmContainer(nextContainer);
+@@ -881,6 +940,7 @@ export default function LootTradeScreen() {
+           await useRoomStore.getState().closeRoomSession({
+             code: liveCode,
+             sessionId: live.sessionId,
++            ownerToken: roomByCode[liveCode]?.ownerToken,
+           });
+         } catch (e) {
+           debugLog('lootTrade.closeSession:failed', { message: e?.message });
+@@ -918,23 +978,26 @@ export default function LootTradeScreen() {
+     setIssueBusy(true);
+     try {
+       await ensureGmRoomConnected(effectiveRoomCode);
+-      const isHub = issueTargetContainer.kind === CONTAINER_KIND.HUB;
++      const freshSource = (await db.getGmContainerById(issueTargetContainer.id)) || issueTargetContainer;
++      const freshAllContainers = await db.getGmContainersList();
++      const isHub = freshSource.kind === CONTAINER_KIND.HUB;
+       await useRoomStore.getState().openRoomSession({
+         code: effectiveRoomCode,
++        ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+         session: {
+-          containerId: issueTargetContainer.id,
+-          kind: issueTargetContainer.kind,
+-          name: issueTargetContainer.name,
+-          description: issueTargetContainer.description,
++          containerId: freshSource.id,
++          kind: freshSource.kind,
++          name: freshSource.name,
++          description: freshSource.description,
+           targetType,
+           targetCharacterId,
+           targetCharacterName,
+-          caps: issueTargetContainer.caps,
+-          saleMarkupPercent: issueTargetContainer.saleMarkupPercent,
+-          buyDepreciationPercent: issueTargetContainer.buyDepreciationPercent,
++          caps: freshSource.caps,
++          saleMarkupPercent: freshSource.saleMarkupPercent,
++          buyDepreciationPercent: freshSource.buyDepreciationPercent,
+           characterOverrides: {},
+-          items: isHub ? [] : issueTargetContainer.items,
+-          ...(isHub ? { nodes: buildHubSessionNodes(issueTargetContainer, containers) } : {}),
++          items: isHub ? [] : freshSource.items,
++          ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
+         },
+       });
+       setIssueTargetContainer(null);
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5415399..290a3f6 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,21 @@
+ # Changelog
++---
++## Reliable GM chest emptying & auto-close when a player clicks "Take All" (patch 478)
++
++Fixed a desynchronization where clicking "Take All" closed the player's loot
++modal and granted items to inventory while the GM's container could stay open
++with all items intact:
++
++- prevented background character autosave from downgrading a GM tab's room role
++  (`role: 'gm' -> 'player'`);
++- rebound `ownerClientId` via `ownerToken` directly on `ROOM_JOIN` /
++  `SESSION_OPEN` when a room stays alive in server memory, and guaranteed the
++  GM's live socket in `room.members`;
++- persisted emptied loot containers even across single-device Admin/User mode
++  switches, added cross-tab `storage` sync, auto-closed the GM's open detail
++  view when emptied, deduplicated legacy item `entryId`s, and added automatic
++  `SESSION_CLOSE` self-healing against older WS server builds.
++
+ ---
+ ## Compact merchant caps stepper without `±10`, white d20 die icon, and full-button-height Combat Die icon (patch 477)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c81c7fe..1ccc034 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,23 @@
+ # История изменений
+ 
++---
++## Надёжная очистка и закрытие сундука у Мастера при «Забрать всё» игроком (патч 478)
++
++Исправлена рассинхронизация, из-за которой после нажатия игроком «Забрать всё»
++окно у персонажа закрывалось и предметы уходили в инвентарь, но у Мастера
++контейнер мог оставаться открытым со старыми предметами:
++
++- исключено перехватывание роли комнаты Мастера (`role: 'gm' → 'player'`)
++  фоновым автосейвом привязанного локального персонажа;
++- перепривязка `ownerClientId` по `ownerToken` выполняется прямо при входе
++  Мастера в уже живую комнату (`ROOM_JOIN` / `SESSION_OPEN`), а живой сокет
++  Мастера гарантированно регистрируется в `room.members`;
++- опустошение сундука сохраняется в `gm_containers` даже при проверке на одном
++  устройстве с переключением «Админ ↔ Пользователь», синхронизируется между
++  вкладками браузера (`storage`), автоматически закрывает открытый экран
++  опустевшего контейнера у Мастера и самовосстанавливается даже при ответе от
++  старой ревизии WS-сервера, дедуплицируя старые `entryId` позиций из памяти.
++
+ ---
+ ## Компактный ряд кассы торговца без `±10`, белая иконка 20-гранника и полноразмерная иконка боевого кубика в кнопке (патч 477)
+ 
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index e162c9e..fbae777 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -408,6 +408,23 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+   return nodes;
+ };
+ 
++const deduplicateContainerItems = (rawItems, now = Date.now()) => {
++  if (!Array.isArray(rawItems)) return [];
++  const seenEntryIds = new Set();
++  const out = [];
++  rawItems.forEach((item, idx) => {
++    const normalized = normalizeContainerItem(item, now + idx);
++    if (!normalized) return;
++    let entryId = normalized.entryId;
++    if (!entryId || seenEntryIds.has(entryId)) {
++      entryId = makeEntryId(now + idx);
++    }
++    seenEntryIds.add(entryId);
++    out.push(entryId === normalized.entryId ? normalized : { ...normalized, entryId });
++  });
++  return out;
++};
++
+ /**
+  * Нормализация контейнера добычи, торговца или локации ('hub').
+  */
+@@ -418,9 +435,7 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+ 
+   const items = kind === CONTAINER_KIND.HUB
+     ? []
+-    : (Array.isArray(raw.items)
+-        ? raw.items.map((item, idx) => normalizeContainerItem(item, now + idx)).filter(Boolean)
+-        : []);
++    : deduplicateContainerItems(raw.items, now);
+   const links = kind === CONTAINER_KIND.HUB
+     ? normalizeHubLinks(raw.links).filter((lnk) => lnk.containerId !== String(raw.id || ''))
+     : [];
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index f845cb9..055b4e9 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "477"
++  "baseline": "478"
+ }
+diff --git a/public/version.json b/public/version.json
+index 3229abc..75cba97 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "477",
++  "version": "478",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 69387df..6fcc792 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -107,16 +107,29 @@ const normalizeCharacterOverrides = (raw) => {
+   return out;
+ };
+ 
++const normalizeSessionItemsList = (rawItems, now = Date.now(), baseIdx = 0) => {
++  if (!Array.isArray(rawItems)) return [];
++  const seenEntryIds = new Set();
++  const out = [];
++  rawItems.forEach((raw, idx) => {
++    const normalized = normalizeSessionItem(raw, now, baseIdx + idx);
++    if (!normalized) return;
++    let entryId = normalized.entryId;
++    if (!entryId || seenEntryIds.has(entryId)) {
++      entryId = makeEntryId(now, baseIdx + idx);
++    }
++    seenEntryIds.add(entryId);
++    out.push(entryId === normalized.entryId ? normalized : { ...normalized, entryId });
++  });
++  return out;
++};
++
+ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+   if (!raw || typeof raw !== 'object') return null;
+   const containerId = String(raw.containerId || raw.id || '').trim();
+   if (!containerId) return null;
+   const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
+-  const items = Array.isArray(raw.items)
+-    ? raw.items
+-        .map((item, idx) => normalizeSessionItem(item, now, nodeIdx * 1000 + idx))
+-        .filter(Boolean)
+-    : [];
++  const items = normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+   return {
+     containerId,
+     kind,
+@@ -184,9 +197,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+ 
+   const items = kind === 'hub'
+     ? []
+-    : (Array.isArray(raw.items)
+-        ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
+-        : []);
++    : normalizeSessionItemsList(raw.items, now, 0);
+   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
+   const closedByClientIds = Array.isArray(raw.closedByClientIds)
+     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
+@@ -399,9 +410,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+           targetNode.lockLabel = String(payload.lockLabel || '').trim();
+         }
+         if (Array.isArray(payload.nodeItems)) {
+-          targetNode.items = payload.nodeItems
+-            .map((item, itemIdx) => normalizeSessionItem(item, now, itemIdx))
+-            .filter(Boolean);
++          targetNode.items = normalizeSessionItemsList(payload.nodeItems, now, 0);
+         }
+         if (targetNode.kind === 'merchant') {
+           applyMerchantRatePatch(targetNode, payload);
+@@ -414,9 +423,7 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+   }
+ 
+   if (Array.isArray(payload.items)) {
+-    next.items = payload.items
+-      .map((item, idx) => normalizeSessionItem(item, now, idx))
+-      .filter(Boolean);
++    next.items = normalizeSessionItemsList(payload.items, now, 0);
+   }
+ 
+   if (payload.name !== undefined && String(payload.name).trim()) {
+@@ -441,7 +448,7 @@ const deductLootItems = (itemsList, takes) => {
+     const entryId = String(req?.entryId || '');
+     const wanted = Math.floor(Number(req?.quantity) || 0);
+     if (!entryId || wanted <= 0) continue;
+-    const idx = nextItems.findIndex((entry) => entry.entryId === entryId);
++    const idx = nextItems.findIndex((entry) => entry.entryId === entryId && entry.quantity > 0);
+     if (idx < 0) continue;
+     const current = nextItems[idx];
+     const actual = Math.min(wanted, current.quantity);
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index c68258f..fe4e653 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -118,7 +118,15 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, rebound: false };
+   };
+ 
+-  const joinRoom = ({ code, clientId, ip = 'unknown', name = '', role = 'player', ws = null }) => {
++  const joinRoom = ({
++    code,
++    clientId,
++    ip = 'unknown',
++    name = '',
++    role = 'player',
++    ownerToken = null,
++    ws = null,
++  }) => {
+     if (!touchRateLog(ipJoinLog, ip || 'unknown', 60 * 1000, limits.MAX_JOINS_PER_IP_PER_MINUTE)) {
+       return { error: ERROR_CODE.RATE_LIMITED };
+     }
+@@ -127,6 +135,9 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!room.members.has(clientId) && room.members.size >= limits.MAX_MEMBERS_PER_ROOM) {
+       return { error: ERROR_CODE.ROOM_FULL };
+     }
++    if (ownerToken && room.ownerToken && String(ownerToken) === room.ownerToken) {
++      room.ownerClientId = clientId;
++    }
+     // Повторный вход того же clientId — переподключение: запись заменяется.
+     room.members.set(clientId, {
+       clientId,
+@@ -218,33 +229,57 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return room ? roomSnapshot(room) : null;
+   };
+ 
++  const rebindOwnerIfTokenMatches = (room, clientId, ownerToken) => {
++    if (room && ownerToken && room.ownerToken && String(ownerToken) === room.ownerToken) {
++      room.ownerClientId = clientId;
++    }
++  };
++
++  const ensureOwnerMemberWs = (room, clientId, ws) => {
++    if (!room || !clientId || !ws) return;
++    const prev = room.members.get(clientId);
++    room.members.set(clientId, {
++      clientId,
++      name: prev?.name || 'GM',
++      role: 'gm',
++      ws,
++    });
++    room.emptySince = null;
++  };
++
+   /** Открыть сессию добычи или торговли в комнате (только владелец комнаты). */
+-  const openSession = ({ code, clientId, session }) => {
++  const openSession = ({ code, clientId, session, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+     const normalized = normalizeActiveSession(session, now());
+     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
++    ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = normalized;
+     return { room, session: normalized };
+   };
+ 
+   /** Живое обновление процентов/кассы/содержимого открытой сессии (только владелец). */
+-  const updateSession = ({ code, clientId, payload }) => {
++  const updateSession = ({ code, clientId, payload, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+     const result = applySessionUpdate(room.activeSession, payload, now());
+     if (result.error) return result;
++    ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = result.session;
+     return { room, session: result.session };
+   };
+ 
+   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
+-  const closeSession = ({ code, clientId, sessionId = null }) => {
++  const closeSession = ({ code, clientId, sessionId = null, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+     if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+     if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
++    ensureOwnerMemberWs(room, clientId, ws);
+     const previous = room.activeSession;
+     if (sessionId && previous && previous.sessionId !== String(sessionId)) {
+       return { room, session: previous };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 5677e91..a8fa532 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -436,6 +436,7 @@ const attachRoomWebSocketServer = (httpServer, {
+             ip: ws.clientIp,
+             name: payload.name,
+             role: payload.role,
++            ownerToken: payload.ownerToken || null,
+             ws,
+           });
+           if (result.error) {
+@@ -541,11 +542,14 @@ const attachRoomWebSocketServer = (httpServer, {
+             code: canonical,
+             clientId,
+             session: payload.session,
++            ownerToken: payload.ownerToken || null,
++            ws,
+           });
+           if (result.error) {
+             sendError(ws, clientId, result.error, payload.requestId, canonical);
+             break;
+           }
++          ws.meta.rooms.add(canonical);
+           sendEnvelope(
+             ws,
+             MESSAGE.SESSION_STATE,
+@@ -572,11 +576,14 @@ const attachRoomWebSocketServer = (httpServer, {
+             code: canonical,
+             clientId,
+             payload,
++            ownerToken: payload.ownerToken || null,
++            ws,
+           });
+           if (result.error) {
+             sendError(ws, clientId, result.error, payload.requestId, canonical);
+             break;
+           }
++          ws.meta.rooms.add(canonical);
+           sendEnvelope(
+             ws,
+             MESSAGE.SESSION_STATE,
+@@ -603,11 +610,14 @@ const attachRoomWebSocketServer = (httpServer, {
+             code: canonical,
+             clientId,
+             sessionId: payload.sessionId || null,
++            ownerToken: payload.ownerToken || null,
++            ws,
+           });
+           if (result.error) {
+             sendError(ws, clientId, result.error, payload.requestId, canonical);
+             break;
+           }
++          ws.meta.rooms.add(canonical);
+           const closePayload = {
+             session: result.session,
+             closedContainerId: result.closedSession?.containerId || null,
+diff --git a/src/lootTrade/gmSessionPersistence.js b/src/lootTrade/gmSessionPersistence.js
+index d623b49..90726a5 100644
+--- a/src/lootTrade/gmSessionPersistence.js
++++ b/src/lootTrade/gmSessionPersistence.js
+@@ -3,9 +3,10 @@
+ // предметы из контейнера добычи или совершают сделку с торговцем, обновлённый
+ // остаток предметов и касса торговца сразу сохраняются в локальную БД Мастера
+ // и фоном отправляются в Google Drive — даже если Мастер в этот момент смотрит
+-// другую вкладку («Список кампаний» или лист персонажа).
+-// Если из контейнера добычи забрали весь лут — раздача закрывается автоматически,
+-// а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
++// другую вкладку («Список кампаний» или лист персонажа) или проверяет раздачу
++// из режима Пользователя на том же устройстве.
++// Если из контейнера добычи забрали весь лут — раздача и открытый экран контейнера
++// закрываются автоматически, а Мастеру показывается вопрос «Контейнер пуст. Хотите удалить?».
+ 
+ import * as db from '../../db';
+ import useRoomStore, { onRoomSessionState } from '../room/roomStore';
+@@ -23,6 +24,10 @@ import { isGmLootTradeLicensed } from '../../domain/premium';
+ 
+ const gmContainerSyncListeners = new Set();
+ const promptedEmptySessionIds = new Set();
++const emptiedSessionIds = new Set();
++const sessionRevisionById = new Map();
++const pendingEmptyPrompts = new Map();
++let persistenceChain = Promise.resolve();
+ 
+ export const subscribeGmContainerUpdates = (listener) => {
+   gmContainerSyncListeners.add(listener);
+@@ -31,30 +36,156 @@ export const subscribeGmContainerUpdates = (listener) => {
+   };
+ };
+ 
+-export const notifyGmContainerUpdated = (containerId) => {
++export const notifyGmContainerUpdated = (containerId, meta = {}) => {
+   gmContainerSyncListeners.forEach((fn) => {
+-    try { fn(containerId); } catch { /* ignore */ }
++    try { fn(containerId, meta); } catch { /* ignore */ }
+   });
+ };
+ 
+ export const resetPromptedEmptySessionsForTests = () => {
+   promptedEmptySessionIds.clear();
++  emptiedSessionIds.clear();
++  sessionRevisionById.clear();
++  pendingEmptyPrompts.clear();
++  persistenceChain = Promise.resolve();
+ };
+ 
+-export const startGmSessionPersistence = () => {
+-  return onRoomSessionState(async (envelope) => {
++const showEmptyContainerDeleteAlert = ({
++  containerId,
++  containerName,
++  roomCode = '',
++  hubSessionId = null,
++}) => {
++  showRawAlert({
++    title: tLootTrade('detail.emptyLootPromptTitle'),
++    message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
++      name: containerName,
++    }),
++    buttons: [
++      { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
++      {
++        text: tLootTrade('card.delete'),
++        style: 'destructive',
++        onPress: () => {
++          void (async () => {
++            try {
++              await deleteGmContainerFromCloudIfEnabled(containerId);
++              await db.deleteGmContainer(containerId);
++              const allNow = await db.getGmContainersList();
++              for (const item of allNow) {
++                if (
++                  item.kind === 'hub'
++                  && (item.links || []).some((l) => l.containerId === containerId)
++                ) {
++                  const prunedLinks = item.links.filter(
++                    (l) => l.containerId !== containerId,
++                  );
++                  await db.saveGmContainer({ ...item, links: prunedLinks });
++                  void syncGmContainerToCloudIfEnabled(item.id);
++                }
++              }
++              if (roomCode && hubSessionId) {
++                const liveNow = useRoomStore.getState().rooms[roomCode]?.activeSession;
++                if (liveNow && liveNow.sessionId === hubSessionId && liveNow.kind === 'hub') {
++                  const prunedNodes = (liveNow.nodes || []).filter(
++                    (n) => n.containerId !== containerId,
++                  );
++                  await useRoomStore.getState().updateRoomSessionRates({
++                    code: roomCode,
++                    sessionId: liveNow.sessionId,
++                    nodes: prunedNodes,
++                  }).catch(() => {});
++                }
++              }
++              notifyGmContainerUpdated(containerId, { deleted: true });
++            } catch (err) {
++              debugLog('gm.sessionPersistence.deleteEmpty:failed', {
++                message: err?.message || String(err),
++              });
++            }
++          })();
++        },
++      },
++    ],
++  });
++};
++
++export const flushPendingEmptyLootPrompts = async () => {
++  if (pendingEmptyPrompts.size === 0) return;
++  const entries = [...pendingEmptyPrompts.values()];
++  pendingEmptyPrompts.clear();
++  for (const item of entries) {
+     try {
++      const current = await db.getGmContainerById(item.containerId);
++      if (current && current.kind === 'loot' && (current.items || []).length === 0) {
++        notifyGmContainerUpdated(current.id, { emptied: true });
++        showEmptyContainerDeleteAlert({
++          containerId: current.id,
++          containerName: current.name,
++          roomCode: item.roomCode,
++          hubSessionId: item.hubSessionId,
++        });
++      }
++    } catch {
++      // ignore
++    }
++  }
++};
++
++const resolveLocalRoomOwnership = async (code) => {
++  try {
++    const ownedRows = await db.getFolderRooms();
++    const hit = Array.isArray(ownedRows)
++      ? ownedRows.find((r) => r?.code === code && Boolean(r?.owner_token))
++      : null;
++    return hit ? String(hit.owner_token) : null;
++  } catch {
++    return null;
++  }
++};
++
++export const startGmSessionPersistence = () => {
++  return onRoomSessionState((envelope) => {
++    persistenceChain = persistenceChain
++      .then(() => handleRoomSessionEnvelope(envelope))
++      .catch((error) => {
++        debugLog('gm.sessionPersistence:failed', {
++          message: error?.message || String(error),
++        });
++      });
++    return persistenceChain;
++  });
++};
++
++const handleRoomSessionEnvelope = async (envelope) => {
++  try {
+       if (!isGmLootTradeLicensed()) return;
+       const code = envelope?.roomCode;
+       if (!code) return;
+       const room = useRoomStore.getState().rooms[code];
+-      if (!room || room.role !== 'gm') return;
++      const isGmRoomInStore = Boolean(room && room.role === 'gm');
++      const localOwnerToken = isGmRoomInStore ? null : await resolveLocalRoomOwnership(code);
++      if (!isGmRoomInStore && !localOwnerToken) return;
+ 
+       const closedReason = envelope?.payload?.closedReason || null;
+       const emptiedNodeContainerId = envelope?.payload?.emptiedNodeContainerId || null;
+       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
+       if (!session?.containerId) return;
+ 
++      const incomingRev = Number(session.revision) || 0;
++      if (session.sessionId) {
++        if (emptiedSessionIds.has(session.sessionId)) {
++          return;
++        }
++        const prevRev = sessionRevisionById.get(session.sessionId) || 0;
++        if (incomingRev > 0 && incomingRev < prevRev) {
++          return;
++        }
++        if (incomingRev > prevRev) {
++          sessionRevisionById.set(session.sessionId, incomingRev);
++        }
++      }
++
+       const existing = await db.getGmContainerById(session.containerId);
+       if (!existing) return;
+ 
+@@ -98,7 +229,10 @@ export const startGmSessionPersistence = () => {
+           void syncGmContainerToCloudIfEnabled(childExisting.id);
+         }
+ 
+-        notifyGmContainerUpdated(existing.id);
++        notifyGmContainerUpdated(
++          emptiedNodeContainerId || existing.id,
++          emptiedNodeContainerId ? { emptied: true, hubId: existing.id } : {},
++        );
+         void syncGmContainerToCloudIfEnabled(existing.id);
+ 
+         if (emptiedNodeContainerId) {
+@@ -110,64 +244,55 @@ export const startGmSessionPersistence = () => {
+             && !promptedEmptySessionIds.has(emptiedKey)
+           ) {
+             promptedEmptySessionIds.add(emptiedKey);
+-            showRawAlert({
+-              title: tLootTrade('detail.emptyLootPromptTitle'),
+-              message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
+-                name: emptiedChild.name,
+-              }),
+-              buttons: [
+-                { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
+-                {
+-                  text: tLootTrade('card.delete'),
+-                  style: 'destructive',
+-                  onPress: () => {
+-                    void (async () => {
+-                      try {
+-                        await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
+-                        await db.deleteGmContainer(emptiedChild.id);
+-                        const allNow = await db.getGmContainersList();
+-                        for (const item of allNow) {
+-                          if (
+-                            item.kind === 'hub'
+-                            && (item.links || []).some((l) => l.containerId === emptiedChild.id)
+-                          ) {
+-                            const prunedLinks = item.links.filter(
+-                              (l) => l.containerId !== emptiedChild.id,
+-                            );
+-                            await db.saveGmContainer({ ...item, links: prunedLinks });
+-                            void syncGmContainerToCloudIfEnabled(item.id);
+-                          }
+-                        }
+-                        const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
+-                        if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
+-                          const prunedNodes = (liveNow.nodes || []).filter(
+-                            (n) => n.containerId !== emptiedChild.id,
+-                          );
+-                          await useRoomStore.getState().updateRoomSessionRates({
+-                            code,
+-                            sessionId: liveNow.sessionId,
+-                            nodes: prunedNodes,
+-                          }).catch(() => {});
+-                        }
+-                        notifyGmContainerUpdated(emptiedChild.id);
+-                      } catch (err) {
+-                        debugLog('gm.sessionPersistence.deleteEmptyHubChild:failed', {
+-                          message: err?.message || String(err),
+-                        });
+-                      }
+-                    })();
+-                  },
+-                },
+-              ],
+-            });
++            if (isGmRoomInStore) {
++              showEmptyContainerDeleteAlert({
++                containerId: emptiedChild.id,
++                containerName: emptiedChild.name,
++                roomCode: code,
++                hubSessionId: session.sessionId,
++              });
++            } else {
++              pendingEmptyPrompts.set(emptiedChild.id, {
++                containerId: emptiedChild.id,
++                roomCode: code,
++                hubSessionId: session.sessionId,
++              });
++            }
+           }
+         }
+         return;
+       }
+ 
++      const hadItemsBefore = Array.isArray(existing.items) && existing.items.length > 0;
++      const nextItems = Array.isArray(session.items) ? session.items : existing.items;
++      const isNowEmptyLoot = existing.kind === 'loot'
++        && session.kind === 'loot'
++        && Array.isArray(nextItems)
++        && nextItems.length === 0;
++
++      let effectiveClosedReason = closedReason;
++      let shouldSendAutoCloseToServer = false;
++      const liveSessionStillOpen = Boolean(envelope?.payload?.session);
++
++      // Защита от зависшей открытой раздачи пустого сундука (например, при работе со старым WS-сервером
++      // или когда ни один другой игрок больше не смотрит в опустевший сундук):
++      if (!effectiveClosedReason && liveSessionStillOpen && isNowEmptyLoot && hadItemsBefore) {
++        const closedSet = new Set(Array.isArray(session.closedByClientIds) ? session.closedByClientIds : []);
++        const serverTracksClosedClients = Array.isArray(session.closedByClientIds) && closedSet.size > 0;
++        const unclosedPlayersCount = (room?.members || []).filter(
++          (m) => m?.role === 'player' && !closedSet.has(m.clientId),
++        ).length;
++        const waitingForOtherPlayers = serverTracksClosedClients && unclosedPlayersCount > 0;
++
++        if (!waitingForOtherPlayers) {
++          effectiveClosedReason = 'loot_emptied';
++          shouldSendAutoCloseToServer = isGmRoomInStore;
++        }
++      }
++
+       const nextContainer = {
+         ...existing,
+-        items: Array.isArray(session.items) ? session.items : existing.items,
++        items: nextItems,
+         caps: existing.kind === 'merchant' && session.caps !== undefined
+           ? session.caps
+           : existing.caps,
+@@ -180,63 +305,51 @@ export const startGmSessionPersistence = () => {
+       };
+ 
+       await db.saveGmContainer(nextContainer);
+-      notifyGmContainerUpdated(existing.id);
++
++      const isEmptiedLootClose = effectiveClosedReason === 'loot_emptied' && existing.kind === 'loot';
++      if (isEmptiedLootClose && session.sessionId) {
++        emptiedSessionIds.add(session.sessionId);
++      }
++
++      if (shouldSendAutoCloseToServer) {
++        const ownerToken = localOwnerToken || await resolveLocalRoomOwnership(code);
++        void useRoomStore.getState().closeRoomSession({
++          code,
++          sessionId: session.sessionId,
++          ...(ownerToken ? { ownerToken } : {}),
++        }).catch(() => {});
++      }
++
++      notifyGmContainerUpdated(
++        existing.id,
++        isEmptiedLootClose ? { emptied: true } : {},
++      );
+ 
+       const promptKey = String(session.sessionId || `${code}:${existing.id}:${session.revision || 0}`);
+-      if (
+-        closedReason === 'loot_emptied'
+-        && existing.kind === 'loot'
+-        && !promptedEmptySessionIds.has(promptKey)
+-      ) {
++      if (isEmptiedLootClose && !promptedEmptySessionIds.has(promptKey)) {
+         promptedEmptySessionIds.add(promptKey);
+         void syncGmContainerToCloudIfEnabled(existing.id);
+-        showRawAlert({
+-          title: tLootTrade('detail.emptyLootPromptTitle'),
+-          message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
+-            name: existing.name,
+-          }),
+-          buttons: [
+-            { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
+-            {
+-              text: tLootTrade('card.delete'),
+-              style: 'destructive',
+-              onPress: () => {
+-                void (async () => {
+-                  try {
+-                    await deleteGmContainerFromCloudIfEnabled(existing.id);
+-                    await db.deleteGmContainer(existing.id);
+-                    const allNow = await db.getGmContainersList();
+-                    for (const item of allNow) {
+-                      if (
+-                        item.kind === 'hub'
+-                        && (item.links || []).some((l) => l.containerId === existing.id)
+-                      ) {
+-                        const prunedLinks = item.links.filter(
+-                          (l) => l.containerId !== existing.id,
+-                        );
+-                        await db.saveGmContainer({ ...item, links: prunedLinks });
+-                        void syncGmContainerToCloudIfEnabled(item.id);
+-                      }
+-                    }
+-                    notifyGmContainerUpdated(existing.id);
+-                  } catch (err) {
+-                    debugLog('gm.sessionPersistence.deleteEmpty:failed', {
+-                      message: err?.message || String(err),
+-                    });
+-                  }
+-                })();
+-              },
+-            },
+-          ],
+-        });
++        if (isGmRoomInStore) {
++          showEmptyContainerDeleteAlert({
++            containerId: existing.id,
++            containerName: existing.name,
++            roomCode: code,
++            hubSessionId: null,
++          });
++        } else {
++          pendingEmptyPrompts.set(existing.id, {
++            containerId: existing.id,
++            roomCode: code,
++            hubSessionId: null,
++          });
++        }
+         return;
+       }
+ 
+       void syncGmContainerToCloudIfEnabled(existing.id);
+-    } catch (error) {
+-      debugLog('gm.sessionPersistence:failed', {
+-        message: error?.message || String(error),
+-      });
+-    }
+-  });
++  } catch (error) {
++    debugLog('gm.sessionPersistence:failed', {
++      message: error?.message || String(error),
++    });
++  }
+ };
+diff --git a/src/room/roomCharacterSync.ts b/src/room/roomCharacterSync.ts
+index 60eb5c2..5842fa0 100644
+--- a/src/room/roomCharacterSync.ts
++++ b/src/room/roomCharacterSync.ts
+@@ -154,7 +154,11 @@ export const syncBoundCharacterToRoom = async (
+   const snapshot = await buildLocalCharacterRoomSnapshot(characterId);
+   if (!snapshot) return false;
+   const store = useRoomStore.getState();
+-  await store.joinRoom({ code, name: snapshot.name, role: 'player' });
++  const currentRoom = store.rooms[code];
++  // Не понижаем роль комнаты с 'gm' на 'player', если в этой вкладке открыт режим Мастера
++  if (!currentRoom || currentRoom.joined === false) {
++    await store.joinRoom({ code, name: snapshot.name, role: 'player' });
++  }
+   await store.publishCharacter({
+     code,
+     characterId,
+@@ -167,11 +171,23 @@ export const syncBoundCharacterToRoom = async (
+ /**
+  * Если персонаж привязан к комнате и комната уже активна/доступна, пушит
+  * свежий снапшот после локального сохранения (автосейв / ручной сейв).
++ * Вкладка Мастера (когда он не инспектирует лист персонажа) не перехватывает
++ * соединение в роли игрока при фоновых тиках локального стора.
+  */
+ export const pushSavedCharacterToBoundRoomIfAny = async (
+   characterId: string,
+ ): Promise<void> => {
+   try {
++    const [{ default: useUiModeStore }, { default: useAppSettingsStore }] = await Promise.all([
++      import('./uiModeStore'),
++      import('../store/appSettingsStore'),
++    ]);
++    const uiState = useUiModeStore.getState();
++    const effectiveMode = uiState.tabUiMode || useAppSettingsStore.getState().getSettingValue?.('uiMode');
++    if (effectiveMode === 'gm' && !uiState.gmInspectingCharacter) {
++      return;
++    }
++
+     const db = await import('../../db');
+     const binding = await (db as any).getCharacterRoomBinding?.(characterId);
+     const code = binding?.code;
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 0a75976..7652ad6 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -65,6 +65,7 @@ interface RoomStoreState {
+     code: string;
+     name: string;
+     role?: 'gm' | 'player';
++    ownerToken?: string;
+   }) => Promise<JoinRoomResult>;
+   leaveRoom: (input: { code: string }) => Promise<void>;
+   publishCharacter: (input: {
+@@ -80,9 +81,11 @@ interface RoomStoreState {
+   openRoomSession: (input: {
+     code: string;
+     session: Record<string, unknown>;
++    ownerToken?: string;
+   }) => Promise<ActiveLootTradeSession>;
+   updateRoomSessionRates: (input: {
+     code: string;
++    ownerToken?: string;
+     sessionId?: string;
+     targetCharacterId?: string | null;
+     resetCharacterOverride?: boolean;
+@@ -104,6 +107,7 @@ interface RoomStoreState {
+   closeRoomSession: (input: {
+     code: string;
+     sessionId?: string | null;
++    ownerToken?: string;
+   }) => Promise<void>;
+   playerCloseRoomSession: (input: {
+     code: string;
+@@ -446,7 +450,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       return { code, name: roomName || name, ownerToken: issuedToken };
+     },
+ 
+-    joinRoom: async ({ code, name, role = 'player' }) => {
++    joinRoom: async ({ code, name, role = 'player', ownerToken }) => {
+       if (role === 'gm') {
+         assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
+       }
+@@ -463,7 +467,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
+       joiningCodes.add(code);
+       try {
+-        const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, { code, name, role }, code);
++        const joinPayload: Record<string, unknown> = { code, name, role };
++        if (ownerToken) joinPayload.ownerToken = ownerToken;
++        const response = await sendRequest(ROOM_MESSAGE.ROOM_JOIN, joinPayload, code);
+         const payloadRooms = response.payload;
+         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
+@@ -560,31 +566,37 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       }
+     },
+ 
+-    openRoomSession: async ({ code, session }) => {
++    openRoomSession: async ({ code, session, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
++      const reqPayload: Record<string, unknown> = { code, session };
++      if (ownerToken) reqPayload.ownerToken = ownerToken;
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_OPEN,
+-        { code, session },
++        reqPayload,
+         code,
+       );
+       return response.payload?.session as ActiveLootTradeSession;
+     },
+ 
+-    updateRoomSessionRates: async ({ code, ...rest }) => {
++    updateRoomSessionRates: async ({ code, ownerToken, ...rest }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
++      const reqPayload: Record<string, unknown> = { code, ...rest };
++      if (ownerToken) reqPayload.ownerToken = ownerToken;
+       const response = await sendRequest(
+         ROOM_MESSAGE.SESSION_UPDATE_RATES,
+-        { code, ...rest },
++        reqPayload,
+         code,
+       );
+       return response.payload?.session as ActiveLootTradeSession;
+     },
+ 
+-    closeRoomSession: async ({ code, sessionId = null }) => {
++    closeRoomSession: async ({ code, sessionId = null, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
++      const reqPayload: Record<string, unknown> = { code, sessionId };
++      if (ownerToken) reqPayload.ownerToken = ownerToken;
+       await sendRequest(
+         ROOM_MESSAGE.SESSION_CLOSE,
+-        { code, sessionId },
++        reqPayload,
+         code,
+       );
+     },

@@ -436,6 +436,7 @@ const attachRoomWebSocketServer = (httpServer, {
             ip: ws.clientIp,
             name: payload.name,
             role: payload.role,
+            ownerToken: payload.ownerToken || null,
             ws,
           });
           if (result.error) {
@@ -541,11 +542,14 @@ const attachRoomWebSocketServer = (httpServer, {
             code: canonical,
             clientId,
             session: payload.session,
+            ownerToken: payload.ownerToken || null,
+            ws,
           });
           if (result.error) {
             sendError(ws, clientId, result.error, payload.requestId, canonical);
             break;
           }
+          ws.meta.rooms.add(canonical);
           sendEnvelope(
             ws,
             MESSAGE.SESSION_STATE,
@@ -572,11 +576,14 @@ const attachRoomWebSocketServer = (httpServer, {
             code: canonical,
             clientId,
             payload,
+            ownerToken: payload.ownerToken || null,
+            ws,
           });
           if (result.error) {
             sendError(ws, clientId, result.error, payload.requestId, canonical);
             break;
           }
+          ws.meta.rooms.add(canonical);
           sendEnvelope(
             ws,
             MESSAGE.SESSION_STATE,
@@ -603,11 +610,14 @@ const attachRoomWebSocketServer = (httpServer, {
             code: canonical,
             clientId,
             sessionId: payload.sessionId || null,
+            ownerToken: payload.ownerToken || null,
+            ws,
           });
           if (result.error) {
             sendError(ws, clientId, result.error, payload.requestId, canonical);
             break;
           }
+          ws.meta.rooms.add(canonical);
           const closePayload = {
             session: result.session,
             closedContainerId: result.closedSession?.containerId || null,
