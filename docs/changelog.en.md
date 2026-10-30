@@ -1,5 +1,20 @@
 # Changelog
 ---
+## Centralized Game Master («Admin») license gate and bilingual non-technical Admin & «Loot/Trade» guides (patch 474)
+
+Wired all Game Master mechanics (`domain/premium.js`,
+`src/premium/adminAccessGate.js`) — Admin mode entry, Settings toggle, campaign
+room management, local & Google Drive container persistence, and live Location /
+Loot / Merchant sessions — through a single entitlement gate (`adminAccess`,
+`gmCampaigns`, `gmLootTrade`). Open-beta mode remains active right now
+(`OPEN_BETA_BY_DEFAULT = true`) so every feature stays unlocked, while future
+transition to permanent non-expiring GM licenses requires no scattered UI/store
+refactoring; player room connections, loot taking, and bartering remain free.
+Added plain-language Russian and English user guides
+(`docs/guides/admin-and-loot-trade.ru.md` and
+`docs/guides/admin-and-loot-trade.en.md`).
+
+---
 ## New GM «Loot/Trade» screen, Google Drive container sync, and live room loot & two-pane merchant sessions (patch 468)
 
 Added the «Loot/Trade» bottom tab in Admin mode alongside «Campaigns», featuring

@@ -172,7 +172,10 @@
   "subtitle": "Positronium",
   "gm": {
     "enter": "Admin",
-    "exit": "User"
+    "exit": "User",
+    "licenseRequiredTitle": "Game Master License Required",
+    "licenseRequiredMessage": "The «Admin» section (campaign rooms, locations, loot containers, and merchants) requires a Game Master license. Player room connections and character sheets are always free.",
+    "licenseBadgeLocked": "Game Master license"
   },
   "server": {
     "menuItem": "Server",

@@ -118,6 +118,8 @@ describe('Патч 468 — локальная БД gm_containers, облачна
     const newFiles = [
       'domain/ammoFoundTable.js',
       'domain/lootTrade.js',
+      'domain/premium.js',
+      'src/premium/adminAccessGate.js',
       'src/lootTrade/grantCharacterItems.js',
       'src/lootTrade/gmSessionPersistence.js',
       'styles/LootTradeScreen.styles.js',

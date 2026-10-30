@@ -29,6 +29,11 @@ import {
   useLocale,
   useModuleLocale,
 } from '../../i18n/locale';
+import {
+  FEATURE_IDS,
+  guardAdminAction,
+  useAdminAccess,
+} from '../../src/premium/adminAccessGate';
 
 const resolvePath = (dictionary, key) => {
   let current = dictionary;
@@ -227,6 +232,8 @@ const FreeNumberRow = ({ setting, min, max }) => {
 const SettingRow = ({ setting }) => {
   const value = useAppSettingsStore((state) => state.getSettingValue(setting.id));
   const setValue = useAppSettingsStore((state) => state.setValue);
+  const { adminLicensed } = useAdminAccess();
+  const isAdminScreenToggle = setting.id === 'adminScreenEnabled';
 
   if (setting.type === 'number') {
     const min = setting.min ?? 0;
@@ -283,10 +290,21 @@ const SettingRow = ({ setting }) => {
   return (
     <View style={[styles.row, styles.settingRow]}>
       <View style={styles.text}>
-        <Text style={styles.label}>{tSetting(setting, setting.labelKey)}</Text>
+        <Text style={styles.label}>
+          {tSetting(setting, setting.labelKey)}
+          {isAdminScreenToggle && !adminLicensed ? ` 🔒 (${tHomeScreen('gm.licenseBadgeLocked')})` : ''}
+        </Text>
         <Text style={styles.description}>{tSetting(setting, setting.descriptionKey)}</Text>
       </View>
-      <Switch value={Boolean(value)} onValueChange={(nextValue) => setValue(setting.id, nextValue)} />
+      <Switch
+        value={isAdminScreenToggle ? Boolean(value && adminLicensed) : Boolean(value)}
+        onValueChange={(nextValue) => {
+          if (isAdminScreenToggle && nextValue && !guardAdminAction(FEATURE_IDS.ADMIN_ACCESS)) {
+            return;
+          }
+          setValue(setting.id, nextValue);
+        }}
+      />
     </View>
   );
 };

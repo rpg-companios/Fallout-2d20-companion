@@ -13,6 +13,7 @@ import {
   normalizeContainerEntity,
   duplicateContainerEntity,
 } from '../domain/lootTrade';
+import { assertAdminFeature, FEATURE_IDS } from '../domain/premium';
 import {
   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
   catalogGetWeaponMods, catalogGetWeaponModById, catalogGetModsForWeaponSlot, catalogGetSlotsForWeapon,
@@ -404,6 +405,7 @@ const rowToGmContainer = (row) => {
 };
 
 export async function saveGmContainer(rawContainer, { preserveUpdatedAt = false } = {}) {
+  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
   const now = Date.now();
   const existing = rawContainer?.id
     ? await getFirst('SELECT created_at, updated_at FROM gm_containers WHERE id = ?', [rawContainer.id])
@@ -431,10 +433,12 @@ export async function getGmContainersList() {
 }
 
 export async function deleteGmContainer(id) {
+  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
   await runQuery('DELETE FROM gm_containers WHERE id = ?', [id]);
 }
 
 export async function duplicateGmContainer(id, copySuffix = 'копия') {
+  assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
   const source = await getGmContainerById(id);
   if (!source) throw new Error(`GM container not found: ${id}`);
   const all = await getGmContainersList();
