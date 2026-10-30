@@ -44,16 +44,109 @@ const defaultReconnectDelay = (attempt: number) => (
   Math.min(1000 * 2 ** attempt, MAX_RECONNECT_DELAY_MS)
 );
 
-/** Адрес комнатного сервера: env или тот же origin (wss на https). §3.9:
- *  нечего вернуть → мастерского пространства нет (кнопка скрывается). */
-export const resolveRoomServerUrl = (): string | null => {
-  if (typeof process !== 'undefined' && process?.env?.EXPO_PUBLIC_ROOM_SERVER_URL) {
-    return process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
+/** Основной боевой WebSocket-сервер комнат на хостинге NetAngels.
+ *  Используется опубликованной статикой на Replit, основным сайтом и мобильной сборкой,
+ *  чтобы ведущие и игроки попадали в единый реестр комнат независимо от точки входа. */
+export const DEFAULT_PRODUCTION_ROOM_SERVER_URL = 'wss://fallout2d20-companion.na4u.ru/ws';
+
+/** Нормализует строковый адрес комнатного сервера (поддерживает ws/wss и http/https). */
+export const normalizeRoomServerUrl = (raw: string | undefined | null): string | null => {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:') parsed.protocol = 'wss:';
+    else if (parsed.protocol === 'http:') parsed.protocol = 'ws:';
+    if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') return null;
+    if (!parsed.pathname || parsed.pathname === '/') {
+      parsed.pathname = '/ws';
+    }
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return trimmed;
   }
-  if (typeof window !== 'undefined' && window.location?.host) {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/ws`;
+};
+
+/** Локальные адреса разработки и облачные dev-песочницы, где крутится собственный локальный /ws. */
+export const isLocalOrSandboxRoomHost = (hostnameRaw: string | undefined | null): boolean => {
+  const host = String(hostnameRaw ?? '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host) return false;
+  if (
+    host === 'localhost'
+    || host === '127.0.0.1'
+    || host === '0.0.0.0'
+    || host === '::1'
+    || host.endsWith('.localhost')
+    || host.endsWith('.local')
+    || host.endsWith('.e2b.app')
+    || host.endsWith('.e2b.dev')
+  ) {
+    return true;
   }
+  if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  const m172 = host.match(/^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  if (m172) {
+    const second = Number(m172[1]);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
+};
+
+export interface ResolveRoomServerOptions {
+  envUrl?: string;
+  location?: { protocol?: string; host?: string; hostname?: string } | null;
+  isReactNative?: boolean;
+}
+
+/** Адрес комнатного сервера:
+ *  1) явный EXPO_PUBLIC_ROOM_SERVER_URL (или 'same-origin' / 'off');
+ *  2) локальная разработка и песочницы -> свой origin (/ws);
+ *  3) боевые веб-площадки (Replit static, fallout2d20-companion.na4u.ru и др.) и Android/iOS -> единый wss на NetAngels;
+ *  4) голое окружение Node/Vitest без window -> null. */
+export const resolveRoomServerUrl = (options?: ResolveRoomServerOptions): string | null => {
+  const loc = options && 'location' in options
+    ? options.location
+    : (typeof window !== 'undefined' ? window.location : null);
+
+  const rawEnv = options && options.envUrl !== undefined
+    ? options.envUrl
+    : (typeof process !== 'undefined' ? process?.env?.EXPO_PUBLIC_ROOM_SERVER_URL : undefined);
+
+  if (typeof rawEnv === 'string' && rawEnv.trim().length > 0) {
+    const token = rawEnv.trim().toLowerCase();
+    if (token === 'off' || token === 'none' || token === 'disabled' || token === 'false') {
+      return null;
+    }
+    if (token === 'same-origin') {
+      if (loc?.host) {
+        const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${loc.host}/ws`;
+      }
+      return null;
+    }
+    return normalizeRoomServerUrl(rawEnv);
+  }
+
+  if (loc?.host) {
+    const hostname = loc.hostname || loc.host.replace(/:\d+$/, '');
+    if (isLocalOrSandboxRoomHost(hostname)) {
+      const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${protocol}//${loc.host}/ws`;
+    }
+    return DEFAULT_PRODUCTION_ROOM_SERVER_URL;
+  }
+
+  const isNative = options && options.isReactNative !== undefined
+    ? options.isReactNative
+    : (typeof navigator !== 'undefined' && (navigator as any)?.product === 'ReactNative');
+
+  if (isNative) {
+    return DEFAULT_PRODUCTION_ROOM_SERVER_URL;
+  }
+
   return null;
 };
 
