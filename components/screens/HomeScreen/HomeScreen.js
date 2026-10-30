@@ -100,6 +100,10 @@ import {
   buildGmRoomCharacterCards,
   syncBoundCharacterToRoom,
 } from '../../../src/room/roomCharacterSync';
+import GmRoomCharacterCard from '../../gm/GmRoomCharacterCard';
+import GmCommandModal from '../../gm/GmCommandModal';
+import { subscribePlayerDirectiveApplied } from '../../gm/PlayerDirectiveOverlay';
+import { formatGm, tGm } from '../../../modules/fallout/gm/gmI18n';
 
 const TAB_UI_MODE_STORAGE_KEY = 'positronium_tab_ui_mode';
 const readTabUiMode = () => {
@@ -548,6 +552,7 @@ export default function HomeScreen({ navigation }) {
   const [copiedCode, setCopiedCode] = useState(null);
   const [roomMenuPos, setRoomMenuPos] = useState(null);
   const [roomEditModal, setRoomEditModal] = useState(null); // { folderId, name }
+  const [gmCommandModal, setGmCommandModal] = useState({ visible: false, targetCharacter: null, busy: false });
   const roomMenuBtnRef = useRef(null);
   const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
 
@@ -709,6 +714,15 @@ export default function HomeScreen({ navigation }) {
       loadList();
     }, [loadList])
   );
+
+  // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
+  // сразу перечитываем список, чтобы уровень на карточке обновился живьём.
+  useEffect(() => {
+    if (isGmMode) return undefined;
+    return subscribePlayerDirectiveApplied(() => {
+      loadList();
+    });
+  }, [isGmMode, loadList]);
 
   const handleCreateFolder = async () => {
     const name = folderName.trim();
@@ -1101,14 +1115,38 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const handleOpenRoomCharacter = async (roomCard) => {
-    if (!bundledSettingActive || !roomCard?.snapshotPayload) return;
-    const ok = await savesModule.loadCharacterFromRoomSnapshot(roomCard.snapshotPayload);
-    if (ok) {
-      useUiModeStore.getState().setGmInspectingCharacter(true);
-      setTimeout(() => {
-        navigation.navigate('CharacterTab');
-      }, 0);
+  // В режиме Мастера персонажи игроков отображаются строго readonly через карточки
+  // со спойлерами и не загружаются в локальный characterStore / игроцкую навигацию.
+  const handleSendGmCommand = async (directiveInput) => {
+    if (!activeFolder) return;
+    const roomCode = folderRooms[activeFolder.id];
+    if (!roomCode) return;
+    if (!guardAdminAction(FEATURE_IDS.GM_CAMPAIGNS)) return;
+
+    const record = folderRoomRecords[activeFolder.id];
+    const currentRoomCards = buildGmRoomCharacterCards(roomRooms[roomCode]);
+    const targetCharacterIds = directiveInput.targetType === 'character' && directiveInput.targetCharacterId
+      ? [directiveInput.targetCharacterId]
+      : currentRoomCards.map((c) => c.id);
+
+    setGmCommandModal((prev) => ({ ...prev, busy: true }));
+    try {
+      await useRoomStore.getState().sendGmDirective({
+        code: roomCode,
+        ownerToken: record?.ownerToken,
+        kind: directiveInput.kind,
+        amount: directiveInput.amount,
+        mode: directiveInput.mode,
+        note: directiveInput.note,
+        targetType: directiveInput.targetType,
+        targetCharacterId: directiveInput.targetCharacterId,
+        targetCharacterIds,
+      });
+      setGmCommandModal({ visible: false, targetCharacter: null, busy: false });
+    } catch (error) {
+      debugLog('gm.sendDirective:failed', { message: error?.message || String(error) });
+      setGmCommandModal((prev) => ({ ...prev, busy: false }));
+      showHomeAlert(tHomeScreen('server.unavailable'));
     }
   };
 
@@ -1297,6 +1335,12 @@ export default function HomeScreen({ navigation }) {
   const gmRoomCharacterCards = activeGmRoomCode
     ? buildGmRoomCharacterCards(roomRooms[activeGmRoomCode])
     : [];
+  const activeGmDirectives = activeGmRoomCode
+    ? (roomRooms[activeGmRoomCode]?.directives || [])
+    : [];
+  const latestGmDirective = activeGmDirectives.length > 0
+    ? activeGmDirectives[activeGmDirectives.length - 1]
+    : null;
   const displayedCharacters = isGmMode
     ? (activeGmRoomCode ? gmRoomCharacterCards : [])
     : characters;
@@ -1445,13 +1489,57 @@ export default function HomeScreen({ navigation }) {
       )}
       {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
         <View style={styles.folderRoomBar}>
-          <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
-            <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
-            <Text style={styles.folderRoomBarText}>{formatRoomCodeForDisplay(folderRooms[activeFolder.id])}</Text>
-            <Text style={styles.folderRoomBarPlayers}>
-              {tHomeScreen('room.players')}: {(roomRooms[folderRooms[activeFolder.id]]?.members || []).filter((member) => member.role === 'player').length}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.gmRoomActionsRow}>
+            <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
+              <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
+              <Text style={styles.folderRoomBarText}>{formatRoomCodeForDisplay(folderRooms[activeFolder.id])}</Text>
+              <Text style={styles.folderRoomBarPlayers}>
+                {tHomeScreen('room.players')}: {(roomRooms[folderRooms[activeFolder.id]]?.members || []).filter((member) => member.role === 'player').length}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.gmRoomRightGroup}>
+              {latestGmDirective ? (() => {
+                const total = Array.isArray(latestGmDirective.targetCharacterIds)
+                  ? latestGmDirective.targetCharacterIds.length
+                  : 0;
+                const acked = Array.isArray(latestGmDirective.ackedByCharacterIds)
+                  ? latestGmDirective.ackedByCharacterIds.length
+                  : 0;
+                const done = total > 0 && acked >= total;
+                return (
+                  <View style={[styles.gmDeliveryPill, done && styles.gmDeliveryPillDone]}>
+                    <MaterialCommunityIcons
+                      name={done ? 'check-circle-outline' : 'clock-outline'}
+                      size={13}
+                      color={done ? '#4ade80' : '#f0e68c'}
+                    />
+                    <Text style={[styles.gmDeliveryPillText, done && styles.gmDeliveryPillTextDone]}>
+                      {formatGm(
+                        tGm(done ? 'roomBar.deliveryDone' : 'roomBar.deliveryBadge', locale),
+                        { acked, total },
+                      )}
+                    </Text>
+                  </View>
+                );
+              })() : null}
+
+              <TouchableOpacity
+                testID="gm-room-group-command-btn"
+                style={styles.gmGroupCommandBtn}
+                onPress={() => setGmCommandModal({ visible: true, targetCharacter: null, busy: false })}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="lightning-bolt" size={15} color="#1a1a1a" />
+                <Text style={styles.gmGroupCommandBtnText}>
+                  {tGm('roomBar.groupCommand', locale)}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <Text style={styles.gmReadonlyHint}>
+            {tGm('roomBar.readonlyHint', locale)}
+          </Text>
         </View>
       )}
       {movingCharacterId && !activeFolder && <Text pointerEvents="none" style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
@@ -1462,6 +1550,28 @@ export default function HomeScreen({ navigation }) {
       >
         {loading ? (
           <ActivityIndicator size="large" color="#d4af37" style={styles.loader} />
+        ) : activeGmRoomCode ? (
+          displayedCharacters.length === 0 ? (
+            <View style={styles.gmEmptyRoomCard}>
+              <Text style={styles.gmEmptyRoomText}>
+                {tGm('roomBar.emptyPlayers', locale)}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.gmCardsListWrap}>
+              {displayedCharacters.map((cardItem) => (
+                <GmRoomCharacterCard
+                  key={cardItem.id}
+                  characterCard={cardItem}
+                  onOpenCommand={(targetCard) => setGmCommandModal({
+                    visible: true,
+                    targetCharacter: targetCard,
+                    busy: false,
+                  })}
+                />
+              ))}
+            </View>
+          )
         ) : (
           rows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
@@ -1498,27 +1608,6 @@ export default function HomeScreen({ navigation }) {
                 }
                 if (item.type === 'empty') {
                   return <EmptyCell key={item.id} id={item.id} />;
-                }
-                if (isGmMode) {
-                  return (
-                    <CharacterCell
-                      key={item.id}
-                      character={item}
-                      deleteActionPlacement="menu"
-                      onPress={() => handleOpenRoomCharacter(item)}
-                      onDelete={() => {}}
-                      onDownload={() => {}}
-                      onDuplicate={() => {}}
-                      onServer={() => {}}
-                      serverAvailable={false}
-                      serverBound
-                      serverOnline={Boolean(item.playerOnline)}
-                      readOnlyRoomCard
-                      onDragStart={() => {}}
-                      onDragMove={() => {}}
-                      onDragEnd={() => {}}
-                    />
-                  );
                 }
                 const boundCode = roomBindings[item.id];
                 const isBoundOnline = boundCode
@@ -1927,6 +2016,16 @@ export default function HomeScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      <GmCommandModal
+        visible={gmCommandModal.visible}
+        targetCharacter={gmCommandModal.targetCharacter}
+        roomCharactersCount={displayedCharacters.length}
+        recentDirectives={activeGmDirectives}
+        busy={gmCommandModal.busy}
+        onClose={() => setGmCommandModal({ visible: false, targetCharacter: null, busy: false })}
+        onSubmit={handleSendGmCommand}
+      />
     </View>
   );
 }

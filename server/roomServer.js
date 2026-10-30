@@ -527,16 +527,73 @@ const attachRoomWebSocketServer = (httpServer, {
 
         case MESSAGE.GM_DIRECTIVE: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
-          const room = canonical && registry.getRoom(canonical);
-          if (!room) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId, canonical); break; }
-          if (!registry.isOwner(canonical, clientId)) {
-            sendError(ws, clientId, ERROR_CODE.NOT_ROOM_OWNER, payload.requestId, canonical);
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
             break;
           }
-          broadcastToRoom(room, clientId, MESSAGE.GM_DIRECTIVE, {
-            ...payload,
-            fromClientId: clientId,
-            fromName: room.members.get(clientId)?.name,
+          const result = registry.issueDirective({
+            code: canonical,
+            clientId,
+            ownerToken: payload.ownerToken || null,
+            directive: payload,
+            ws,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          ws.meta.rooms.add(canonical);
+          sendEnvelope(
+            ws,
+            MESSAGE.GM_DIRECTIVE_STATE,
+            {
+              directive: result.directive,
+              directives: result.directives,
+              requestId: payload.requestId || null,
+            },
+            canonical,
+            clientId,
+          );
+          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE, {
+            ...result.directive,
+          });
+          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE_STATE, {
+            directive: result.directive,
+            directives: result.directives,
+          });
+          break;
+        }
+
+        case MESSAGE.GM_DIRECTIVE_ACK: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.ackDirective({
+            code: canonical,
+            clientId,
+            directiveId: payload.directiveId,
+            characterId: payload.characterId,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(
+            ws,
+            MESSAGE.GM_DIRECTIVE_STATE,
+            {
+              directive: result.directive,
+              directives: result.directives,
+              requestId: payload.requestId || null,
+            },
+            canonical,
+            clientId,
+          );
+          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE_STATE, {
+            directive: result.directive,
+            directives: result.directives,
           });
           break;
         }

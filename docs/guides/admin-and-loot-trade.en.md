@@ -40,10 +40,15 @@ By default, the app opens in **«User»** mode for managing your own personal ch
    - **dim** — the Game Master is currently offline (no need to re-enter the code: your character reconnects automatically whenever the room is open).
 4. Moving a character between your personal folders never resets its room connection.
 
-### What the Game Master Sees Inside a Room
-- Every character connected to the room appears as a card inside that campaign room.
-- Whenever a player updates health, caps, gear, or stats and saves their sheet, the card updates automatically for the Game Master.
-- Tapping any player card opens that character's full sheet in read-only inspection mode (stats, equipment, inventory, and perks), with a button to return to the room.
+### What the Game Master Sees Inside a Room & Party Commands
+- The Game Master's workspace has its own swipeable sections completely separate from player character sheets.
+- Every character connected to the room appears as a **live read-only summary card** (players stay in full control of their own sheets):
+  - the card header always shows level, health, radiation, defense, initiative, melee bonus, Luck points, carry weight, and caps;
+  - you can expand independent **spoilers** right in place for one or several party members at once: **«S.P.E.C.I.A.L. & Skills»** (with ready-made check Target Numbers), **«Zone DR & Status»**, **«Weapons & Ammo»**, and **«Perks, Trait & Inventory»**;
+  - whenever a player updates health, gear, ammo, or stats on their sheet, the numbers in the Game Master's open spoilers update automatically.
+- **Game Master Commands:** use **«Party Command»** in the room bar (or **«Command»** on an individual character card) to affect characters cleanly:
+  - grant a **Level Up** (for example, **«+1 level»** to everyone — players receive a notice and manually spend their new skill points and pick their perk on their own sheets), grant or deduct caps, restore Luck points, heal/rest, or adjust radiation;
+  - if a player's phone screen was asleep when the command was sent, the room holds the command until they reconnect and applies it once, showing live delivery progress in the room header.
 
 ---
 

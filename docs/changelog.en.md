@@ -1,5 +1,12 @@
 # Changelog
 ---
+## Dedicated GM Workspace Navigator (`navbar2`), read-only character spoiler cards & queued GM commands (patch 481)
+
+- **Dedicated GM Navigator (`GmWorkspaceNavigator` / `navbar2`):** separated the Game Master's swipeable section navigator (`Campaigns`, `Loot/Trade`, and an extensible registry for future GM tabs) from the Player's character sheet tabs in `App.js`, never mounting player sheet screens or overwriting the local `characterStore` in GM mode.
+- **Read-only character spoiler cards inside rooms:** connected room characters now render live read-only summary cards (HP, radiation, defense, initiative, melee bonus, Luck points, carry weight, caps) with 4 independent spoilers (`S.P.E.C.I.A.L. & Skills` with check Target Numbers, `Zone DR & Status`, `Weapons & Ammo`, `Perks, Trait & Inventory`).
+- **GM Commands with queued delivery & acks (`gm.directive` / `gm.directiveAck` / `gm.directiveState`):** added party-wide and per-character commands (`+1 Level` unlocking manual skill & perk selection on the player's device, grant/deduct caps, restore Luck points, heal/rest, and adjust radiation respecting immunities), including server-side delivery queuing for sleeping phones and a live delivery badge in the room header.
+
+---
 ## Restore clicks on the "Loot/Trade" screen after switching tabs (patch 480)
 
 Removed `inert` attribute toggling in `src/web/pagerScrollGuard.ts`: because

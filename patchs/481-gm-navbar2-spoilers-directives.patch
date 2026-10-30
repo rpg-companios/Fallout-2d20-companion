@@ -1,0 +1,4564 @@
+diff --git a/App.js b/App.js
+index 71dc55a..495a6b6 100644
+--- a/App.js
++++ b/App.js
+@@ -29,11 +29,12 @@ import useCharacterStore from './src/store/characterStore';
+ import { debugLog } from './src/debug/falloutDebug';
+ 
+ import HomeScreen from './components/screens/HomeScreen/HomeScreen';
+-import LootTradeScreen from './components/screens/LootTradeScreen/LootTradeScreen';
+ import CharacterScreen from './modules/fallout/screens/CharacterScreen/CharacterScreen';
+ import EquipmentScreen from './modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen';
+ import InventoryScreen from './components/screens/InventoryScreen/InventoryScreen';
+ import PerksAndTraitsScreen from './modules/fallout/screens/PerksAndTraitsScreen/PerksAndTraitsScreen';
++import GmWorkspaceNavigator from './components/gm/GmWorkspaceNavigator';
++import PlayerDirectiveOverlay from './components/gm/PlayerDirectiveOverlay';
+ import PlayerLootTradeOverlay from './components/lootTrade/PlayerLootTradeOverlay';
+ import { startGmSessionPersistence } from './src/lootTrade/gmSessionPersistence';
+ import useUiModeStore from './src/room/uiModeStore';
+@@ -84,7 +85,6 @@ function App() {
+   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
+   const storeUiMode = useAppSettingsStore(selectUiMode);
+   const tabUiMode = useUiModeStore((s) => s.tabUiMode);
+-  const gmInspectingCharacter = useUiModeStore((s) => s.gmInspectingCharacter);
+   const { adminLicensed, gmLootTradeLicensed } = useAdminAccess();
+   const rawIsGmMode = (tabUiMode || storeUiMode) === 'gm';
+   const isGmMode = rawIsGmMode && adminLicensed;
+@@ -97,16 +97,14 @@ function App() {
+     }
+   }, [rawIsGmMode, adminLicensed]);
+   const activeSettingId = useSettingPackStore(selectActiveSettingId);
+-  // Модульные экраны (Character, Equipment, Inventory, Perks) рендерятся только
+-  // когда юзер **явно выбрал** активный модуль (activeSettingId !== null), а не
+-  // автоматически при загрузке. См. docs/module-lifecycle-plan.md.
+-  // Раньше условием был bundledSettingActive, что монтировало все экраны
+-  // сразу при загрузке стора и приводило к крэшу "Cannot update a component
+-  // (CharacterScreen) while rendering a different component (CharacterProvider)".
++  // Модульные экраны Игрока (Character, Equipment, Inventory, Perks) монтируются
++  // ТОЛЬКО в пространстве Игрока (!isGmMode) и когда выбран активный модуль.
++  // В режиме Мастера работает свой отдельный навигатор GmWorkspaceNavigator (navbar2)
++  // со свайпами между разделами Мастера, а персонажи комнаты просматриваются readonly.
+   const moduleTabsActive = activeSettingId != null;
+-  const characterSheetTabsActive = moduleTabsActive && (!isGmMode || gmInspectingCharacter);
++  const characterSheetTabsActive = !isGmMode && moduleTabsActive;
+   const navTopologyKey = isGmMode
+-    ? (characterSheetTabsActive ? 'gm-inspect' : 'gm')
++    ? `gm-navbar2:${gmLootTradeLicensed ? 'full' : 'campaigns'}`
+     : (moduleTabsActive ? 'fallout' : 'empty');
+ 
+   useEffect(() => {
+@@ -244,107 +242,99 @@ function App() {
+                 imageStyle={{ opacity: 0.3 }}
+               >
+                 <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+-                  <Tab.Navigator
+-                    tabBarPosition="bottom"
+-                    initialRouteName={TAB_ROUTES.HOME}
+-                    screenOptions={({ route }) => ({
+-                      tabBarIcon: ({ focused, color }) => {
+-                        let iconName;
+-                        if (route.name === TAB_ROUTES.HOME) {
+-                          iconName = isGmMode
+-                            ? (focused ? 'albums' : 'albums-outline')
+-                            : (focused ? 'people' : 'people-outline');
+-                        } else if (route.name === TAB_ROUTES.LOOT_TRADE) {
+-                          iconName = focused ? 'cube' : 'cube-outline';
+-                        } else if (route.name === TAB_ROUTES.CHARACTER) {
+-                          iconName = focused ? 'person' : 'person-outline';
+-                        } else if (route.name === TAB_ROUTES.EQUIPMENT) {
+-                          iconName = focused ? 'shield' : 'shield-outline';
+-                        } else if (route.name === TAB_ROUTES.INVENTORY) {
+-                          iconName = focused ? 'briefcase' : 'briefcase-outline';
+-                        } else if (route.name === TAB_ROUTES.PERKS) {
+-                          iconName = focused ? 'star' : 'star-outline';
+-                        }
+-                        return <Ionicons name={iconName} size={16} color={color} />;
+-                      },
+-                      tabBarStyle: {
+-                        backgroundColor: '#1a1a1a',
+-                        borderTopColor: '#5a5a5a',
+-                      },
+-                      tabBarActiveTintColor: '#f0e68c',
+-                      tabBarInactiveTintColor: 'gray',
+-                      tabBarShowIcon: true,
+-                      tabBarIndicatorStyle: { backgroundColor: '#f0e68c', height: 2 },
+-                      swipeEnabled: true,
+-                      animationEnabled: true,
+-                      style: { backgroundColor: 'transparent' },
+-                    })}
+-                  >
+-                    <Tab.Screen
+-                      name={TAB_ROUTES.HOME}
+-                      component={HomeScreen}
+-                      options={{
+-                        tabBarLabel: ({ focused, color }) => (
+-                          <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
+-                            {isGmMode ? tApp('tabs.gmCampaigns') : tApp('tabs.home')}
+-                          </Text>
+-                        ),
+-                      }}
++                  {isGmMode ? (
++                    <GmWorkspaceNavigator
++                      gmLootTradeLicensed={gmLootTradeLicensed}
++                      campaignsLabel={tApp('tabs.gmCampaigns')}
++                      lootTradeLabel={tApp('tabs.gmLootTrade')}
+                     />
+-                    {(isGmMode && gmLootTradeLicensed) ? (
++                  ) : (
++                    <Tab.Navigator
++                      id="PlayerNavbar"
++                      tabBarPosition="bottom"
++                      initialRouteName={TAB_ROUTES.HOME}
++                      screenOptions={({ route }) => ({
++                        tabBarIcon: ({ focused, color }) => {
++                          let iconName;
++                          if (route.name === TAB_ROUTES.HOME) {
++                            iconName = focused ? 'people' : 'people-outline';
++                          } else if (route.name === TAB_ROUTES.CHARACTER) {
++                            iconName = focused ? 'person' : 'person-outline';
++                          } else if (route.name === TAB_ROUTES.EQUIPMENT) {
++                            iconName = focused ? 'shield' : 'shield-outline';
++                          } else if (route.name === TAB_ROUTES.INVENTORY) {
++                            iconName = focused ? 'briefcase' : 'briefcase-outline';
++                          } else if (route.name === TAB_ROUTES.PERKS) {
++                            iconName = focused ? 'star' : 'star-outline';
++                          }
++                          return <Ionicons name={iconName} size={16} color={color} />;
++                        },
++                        tabBarStyle: {
++                          backgroundColor: '#1a1a1a',
++                          borderTopColor: '#5a5a5a',
++                        },
++                        tabBarActiveTintColor: '#f0e68c',
++                        tabBarInactiveTintColor: 'gray',
++                        tabBarShowIcon: true,
++                        tabBarIndicatorStyle: { backgroundColor: '#f0e68c', height: 2 },
++                        swipeEnabled: true,
++                        animationEnabled: true,
++                        style: { backgroundColor: 'transparent' },
++                      })}
++                    >
+                       <Tab.Screen
+-                        name={TAB_ROUTES.LOOT_TRADE}
+-                        component={LootTradeScreen}
++                        name={TAB_ROUTES.HOME}
++                        component={HomeScreen}
+                         options={{
+-                          tabBarLabel: ({ focused, color }) => (
++                          tabBarLabel: ({ color }) => (
+                             <Text style={{ color, fontSize: 11, textAlign: 'center' }}>
+-                              {tApp('tabs.gmLootTrade')}
++                              {tApp('tabs.home')}
+                             </Text>
+                           ),
+                         }}
+                       />
+-                    ) : null}
+-                    {characterSheetTabsActive ? (
+-                      <>
+-                        <Tab.Screen
+-                          name={TAB_ROUTES.CHARACTER}
+-                          component={CharacterScreen}
+-                          options={{
+-                            tabBarLabel: ({ focused, color }) => (
+-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
+-                            ),
+-                          }}
+-                        />
+-                        <Tab.Screen
+-                          name={TAB_ROUTES.EQUIPMENT}
+-                          component={EquipmentScreen}
+-                          options={{
+-                            tabBarLabel: ({ focused, color }) => (
+-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
+-                            ),
+-                          }}
+-                        />
+-                        <Tab.Screen
+-                          name={TAB_ROUTES.INVENTORY}
+-                          component={InventoryScreen}
+-                          options={{
+-                            tabBarLabel: ({ focused, color }) => (
+-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
+-                            ),
+-                          }}
+-                        />
+-                        <Tab.Screen
+-                          name={TAB_ROUTES.PERKS}
+-                          component={PerksAndTraitsScreen}
+-                          options={{
+-                            tabBarLabel: ({ focused, color }) => (
+-                              <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
+-                            ),
+-                          }}
+-                        />
+-                      </>
+-                    ) : null}
+-                  </Tab.Navigator>
++                      {characterSheetTabsActive ? (
++                        <>
++                          <Tab.Screen
++                            name={TAB_ROUTES.CHARACTER}
++                            component={CharacterScreen}
++                            options={{
++                              tabBarLabel: ({ color }) => (
++                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.character')}</Text>
++                              ),
++                            }}
++                          />
++                          <Tab.Screen
++                            name={TAB_ROUTES.EQUIPMENT}
++                            component={EquipmentScreen}
++                            options={{
++                              tabBarLabel: ({ color }) => (
++                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.equipment')}</Text>
++                              ),
++                            }}
++                          />
++                          <Tab.Screen
++                            name={TAB_ROUTES.INVENTORY}
++                            component={InventoryScreen}
++                            options={{
++                              tabBarLabel: ({ color }) => (
++                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.inventory')}</Text>
++                              ),
++                            }}
++                          />
++                          <Tab.Screen
++                            name={TAB_ROUTES.PERKS}
++                            component={PerksAndTraitsScreen}
++                            options={{
++                              tabBarLabel: ({ color }) => (
++                                <Text style={{ color, fontSize: 11, textAlign: 'center' }}>{tApp('tabs.perks')}</Text>
++                              ),
++                            }}
++                          />
++                        </>
++                      ) : null}
++                    </Tab.Navigator>
++                  )}
+                 </SafeAreaView>
+               </ImageBackground>
+             </View>
+@@ -352,6 +342,7 @@ function App() {
+           {/* Диалог выбора Ядерного блока силовой брони (план §5.1/§5.4) — поверх любых экранов */}
+           <FusionCoreChoiceModal />
+           <PlayerLootTradeOverlay />
++          <PlayerDirectiveOverlay />
+           <AlertHost />
+           <UpdateNoticeModal />
+           <SurvivalClock />
+diff --git a/__tests__/room/gm-navbar2-spoilers-directives-481.test.js b/__tests__/room/gm-navbar2-spoilers-directives-481.test.js
+new file mode 100644
+index 0000000..d0ea2d3
+--- /dev/null
++++ b/__tests__/room/gm-navbar2-spoilers-directives-481.test.js
+@@ -0,0 +1,504 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
++import WebSocket from 'ws';
++
++vi.mock('react-native', () => ({
++  Platform: { OS: 'web' },
++  StyleSheet: {
++    create: (s) => s,
++    flatten: (s) => (Array.isArray(s) ? Object.assign({}, ...s.filter(Boolean)) : (s || {})),
++  },
++  View: 'View',
++  Text: 'Text',
++  Image: 'Image',
++  TouchableOpacity: 'TouchableOpacity',
++  ScrollView: 'ScrollView',
++  Modal: 'Modal',
++  Pressable: 'Pressable',
++  TextInput: 'TextInput',
++}));
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: 'MaterialCommunityIcons',
++  Ionicons: 'Ionicons',
++  FontAwesome5: 'FontAwesome5',
++}));
++
++vi.mock('@react-navigation/material-top-tabs', () => ({
++  createMaterialTopTabNavigator: () => ({
++    Navigator: 'Navigator',
++    Screen: 'Screen',
++  }),
++}));
++
++vi.mock('../../db', () => import('../../db/Database.web.js'));
++vi.mock('../../db/Database', () => import('../../db/Database.web.js'));
++
++const alertsLog = [];
++vi.mock('../../components/alerts/alertService', () => ({
++  showRawAlert: (payload) => { alertsLog.push(payload); },
++  showAlert: (id) => { alertsLog.push({ id }); },
++  confirmAlert: vi.fn().mockResolvedValue(true),
++}));
++
++vi.mock('../../components/cloudSync/googleDriveSync', () => ({
++  syncCharacterToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteCharacterFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncGmContainerToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteGmContainerFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncGmRoomToCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  deleteGmRoomFromCloudIfEnabled: vi.fn().mockResolvedValue({ ok: true }),
++  syncAllCharactersWithCloud: vi.fn().mockResolvedValue({ uploaded: 0, downloaded: 0 }),
++  openCloudFolderInDrive: vi.fn().mockResolvedValue(undefined),
++}));
++
++import * as db from '../../db/Database.web.js';
++import { createRoomServer } from '../../server/roomServer.js';
++import { createRoomClient } from '../../src/room/roomClient';
++import { ROOM_MESSAGE } from '../../src/room/roomProtocol';
++import useRoomStore, {
++  resetRoomClientForTests,
++  setRoomClientFactoryForTests,
++} from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import useCharacterStore from '../../src/store/characterStore';
++import { extractGmCharacterSummary } from '../../modules/fallout/gm/gmCharacterSummary';
++import { GM_DIRECTIVE_KIND } from '../../modules/fallout/gm/gmDirectives';
++import {
++  processPendingDirectivesForPlayer,
++  resetAppliedDirectivesForTests,
++} from '../../components/gm/PlayerDirectiveOverlay';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++function createWsAdapter(url) {
++  const raw = new WebSocket(url);
++  const adapter = {
++    get readyState() { return raw.readyState; },
++    onopen: null,
++    onmessage: null,
++    onclose: null,
++    onerror: null,
++    send: (data) => raw.send(data),
++    close: () => raw.close(),
++  };
++  raw.on('open', () => {
++    adapter.onopen?.();
++  });
++  raw.on('message', (buf) => {
++    adapter.onmessage?.({ data: buf.toString('utf8') });
++  });
++  raw.on('close', () => {
++    adapter.onclose?.();
++  });
++  raw.on('error', (err) => {
++    adapter.onerror?.(err);
++  });
++  return adapter;
++}
++
++const waitUntil = async (predicate, timeoutMs = 4000) => {
++  const deadline = Date.now() + timeoutMs;
++  while (Date.now() < deadline) {
++    if (await predicate()) return;
++    await new Promise((r) => setTimeout(r, 25));
++  }
++  throw new Error('Timeout waiting for condition');
++};
++
++describe('Патч 481: отдельный навигатор Мастера (navbar2), readonly-карточки со спойлерами и команды с ack-очередью', () => {
++  let serverInstance = null;
++
++  beforeEach(async () => {
++    alertsLog.length = 0;
++    if (typeof window !== 'undefined' && window.localStorage) {
++      window.localStorage.clear();
++    }
++    await db.initDatabase();
++    await resetAppliedDirectivesForTests();
++  });
++
++  afterEach(async () => {
++    if (serverInstance) {
++      await serverInstance.close();
++      serverInstance = null;
++    }
++    delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
++  });
++
++  it('App.js и HomeScreen.js разводят навигатор Игрока и navbar2 Мастера без загрузки чужого листа в characterStore', () => {
++    const appSrc = fs.readFileSync(path.join(ROOT, 'App.js'), 'utf8');
++    expect(appSrc).toContain('\x3cGmWorkspaceNavigator');
++    expect(appSrc).toContain('\x3cPlayerDirectiveOverlay />');
++    expect(appSrc).toContain('const characterSheetTabsActive = !isGmMode && moduleTabsActive;');
++
++    const gmNavSrc = fs.readFileSync(path.join(ROOT, 'components/gm/GmWorkspaceNavigator.js'), 'utf8');
++    expect(gmNavSrc).toContain('id="GmNavbar2"');
++    expect(gmNavSrc).toContain('swipeEnabled: true');
++    expect(gmNavSrc).toContain('GM_TAB_ROUTES');
++
++    const homeSrc = fs.readFileSync(path.join(ROOT, 'components/screens/HomeScreen/HomeScreen.js'), 'utf8');
++    expect(homeSrc).toContain('\x3cGmRoomCharacterCard');
++    expect(homeSrc).toContain('\x3cGmCommandModal');
++    expect(homeSrc).not.toContain('loadCharacterFromRoomSnapshot');
++  });
++
++  it('extractGmCharacterSummary строит readonly-сводку со статами, ПП навыков, бронёй по зонам, оружием и патронами, не трогая useCharacterStore', () => {
++    useCharacterStore.getState().resetCharacterStore();
++    useCharacterStore.getState().setCharacterName('Локальный Герой Игрока');
++    useCharacterStore.getState().setLevel(7);
++
++    const snapshotPayload = {
++      characterId: 'char_vault_1',
++      name: 'Нейт',
++      level: 6,
++      originName: 'vaultDweller',
++      updatedAt: Date.now(),
++      avatarDataUrl: null,
++      data: {
++        schemaVersion: 22,
++        characterName: 'Нейт',
++        level: 6,
++        origin: { id: 'vaultDweller' },
++        caps: 140,
++        currentHealth: 11,
++        radiation: 2,
++        luckPoints: 5,
++        attributes: [
++          { name: 'STR', value: 5 },
++          { name: 'PER', value: 7 },
++          { name: 'END', value: 6 },
++          { name: 'CHA', value: 5 },
++          { name: 'INT', value: 6 },
++          { name: 'AGI', value: 8 },
++          { name: 'LCK', value: 6 },
++        ],
++        skills: [
++          { name: 'SMALL_GUNS', value: 3 },
++          { name: 'MEDICINE', value: 2 },
++        ],
++        selectedSkills: ['SMALL_GUNS'],
++        selectedPerks: [{ id: 'gunNut', rank: 2 }],
++        equippedArmor: {
++          head: { armor: null, clothing: null },
++          body: {
++            armor: { id: 'armor_leather_chest', physicalDamageRating: 1, energyDamageRating: 2, radiationDamageRating: 0, name: 'Кожаный нагрудник' },
++            clothing: { id: 'cloth_vault_jumpsuit', physicalDamageRating: 0, energyDamageRating: 1, radiationDamageRating: 2, name: 'Комбинезон Убежища' },
++          },
++          leftArm: { armor: null, clothing: null },
++          rightArm: { armor: null, clothing: null },
++          leftLeg: { armor: null, clothing: null },
++          rightLeg: { armor: null, clothing: null },
++        },
++        equippedWeapons: [
++          { id: 'weapon_10mm_pistol', name: '10-мм пистолет', damage: 4, fireRate: 2, range: 'C', ammoId: 'ammo_10mm' },
++        ],
++        equipment: {
++          items: [
++            { id: 'weapon_10mm_pistol', name: '10-мм пистолет', weight: 2, quantity: 1, equipped: true },
++            { id: 'ammo_10mm', type: 'ammo', name: '10-мм патроны', weight: 0, quantity: 24 },
++            { id: 'chem_stimpak', itemType: 'chem', name: 'Стимулятор', weight: 0.5, quantity: 3 },
++          ],
++        },
++      },
++    };
++
++    const summary = extractGmCharacterSummary(snapshotPayload, {
++      locale: 'ru-RU',
++      moduleLocale: 'ru-RU',
++    });
++
++    // Локальный characterStore остался полностью нетронутым!
++    expect(useCharacterStore.getState().characterName).toBe('Локальный Герой Игрока');
++    expect(useCharacterStore.getState().level).toBe(7);
++
++    expect(summary.name).toBe('Нейт');
++    expect(summary.level).toBe(6);
++    // maxHealth = END(6) + LCK(6) + (6 - 1) = 17; с радиацией 2 потолок = 15
++    expect(summary.vitals.maxHealth).toBe(17);
++    expect(summary.vitals.effectiveMaxHealth).toBe(15);
++    expect(summary.vitals.currentHealth).toBe(11);
++    expect(summary.vitals.radiation).toBe(2);
++    expect(summary.vitals.initiative).toBe(15); // PER 7 + AGI 8
++    expect(summary.vitals.defense).toBe(1); // AGI 8 -> 1
++    expect(summary.vitals.caps).toBe(140);
++
++    const smallGuns = summary.skills.find((s) => s.key === 'SMALL_GUNS');
++    expect(smallGuns.tagged).toBe(true);
++    expect(smallGuns.rank).toBe(3);
++    expect(smallGuns.tn).toBe(11); // AGI 8 + rank 3
++
++    const torsoZone = summary.armorZones.find((z) => z.key === 'body');
++    expect(torsoZone.phys).toBe(1);
++    expect(torsoZone.energy).toBe(2);
++    expect(torsoZone.rad).toBe(2);
++
++    expect(summary.weapons).toHaveLength(1);
++    expect(summary.weapons[0].ammoCount).toBe(24);
++    expect(summary.perks).toHaveLength(1);
++    expect(summary.perks[0].rank).toBe(2);
++
++    // Сводка Робота (Мистер Помощник — иммунитеты к радиации/яду и зоны корпуса робота)
++    const robotSummary = extractGmCharacterSummary({
++      characterId: 'char_bot_1',
++      name: 'Кодсворт',
++      level: 4,
++      data: {
++        schemaVersion: 22,
++        characterName: 'Кодсворт',
++        level: 4,
++        origin: { id: 'misterHandy' },
++        equippedRobotSlots: {
++          optics: { armor: { physicalDamageRating: 2, energyDamageRating: 1 } },
++          body: { armor: { physicalDamageRating: 3, energyDamageRating: 2 } },
++        },
++      },
++    }, { locale: 'ru-RU', moduleLocale: 'ru-RU' });
++    expect(robotSummary.isRobot).toBe(true);
++    expect(robotSummary.immunities.length).toBeGreaterThanOrEqual(2);
++    expect(robotSummary.armorZones.length).toBeGreaterThanOrEqual(4);
++  });
++
++  it('команда Мастера «+1 уровень всем» доставляется онлайн-игроку сразу, а «уснувшему» телефону — при реконнекте ровно 1 раз с ack', async () => {
++    serverInstance = createRoomServer({ port: 0, host: '127.0.0.1', distDir: '/nonexistent' });
++    const { port } = await serverInstance.start();
++    const wsUrl = `ws://127.0.0.1:${port}/ws`;
++    process.env.EXPO_PUBLIC_ROOM_SERVER_URL = wsUrl;
++
++    const gmMessages = [];
++    const gmWs = createRoomClient({
++      url: wsUrl,
++      clientId: 'gm-master-481',
++      onStatus: () => {},
++      onMessage: (msg) => { gmMessages.push(msg); },
++      webSocketFactory: createWsAdapter,
++    });
++
++    gmWs.send(ROOM_MESSAGE.ROOM_CREATE, { name: 'Кампания Пустоши', requestId: 'req-create' }, null);
++    await waitUntil(() => gmMessages.some((m) => m.payload?.requestId === 'req-create'));
++    const createdMsg = gmMessages.find((m) => m.payload?.requestId === 'req-create');
++    const roomCode = createdMsg.payload.code;
++    const ownerToken = createdMsg.payload.ownerToken;
++
++    gmWs.send(ROOM_MESSAGE.ROOM_JOIN, {
++      code: roomCode,
++      name: 'GM',
++      role: 'gm',
++      ownerToken,
++      requestId: 'req-gm-join',
++    }, roomCode);
++    await waitUntil(() => gmMessages.some((m) => m.payload?.requestId === 'req-gm-join'));
++
++    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++
++    useCharacterStore.getState().resetCharacterStore();
++    useCharacterStore.setState({
++      currentCharacterId: 'char_online_1',
++      characterName: 'Пайпер',
++      level: 2,
++      currency: 30,
++      attributesSaved: true,
++      skillsSaved: true,
++      isSaved: true,
++    });
++    await db.saveCharacter('char_online_1', 'Пайпер', 2, 'survivor', {
++      characterName: 'Пайпер',
++      level: 2,
++      origin: { id: 'survivor' },
++      caps: 30,
++      attributesSaved: true,
++      skillsSaved: true,
++      attributes: [
++        { name: 'STR', value: 5 }, { name: 'PER', value: 6 }, { name: 'END', value: 5 },
++        { name: 'CHA', value: 7 }, { name: 'INT', value: 6 }, { name: 'AGI', value: 6 }, { name: 'LCK', value: 5 },
++      ],
++    });
++    await db.setCharacterRoomBinding('char_online_1', roomCode);
++
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(({ url, onStatus, onMessage }) => (
++      createRoomClient({
++        url,
++        clientId: 'player-device-1:t-p1',
++        onStatus,
++        onMessage,
++        webSocketFactory: createWsAdapter,
++      })
++    ));
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++
++    await useRoomStore.getState().joinRoom({ code: roomCode, name: 'Пайпер', role: 'player' });
++    await useRoomStore.getState().publishCharacter({
++      code: roomCode,
++      characterId: 'char_online_1',
++      revision: 1,
++      snapshot: {
++        characterId: 'char_online_1',
++        name: 'Пайпер',
++        level: 2,
++        originName: 'survivor',
++        updatedAt: Date.now(),
++        avatarDataUrl: null,
++        data: { characterName: 'Пайпер', level: 2, caps: 30 },
++      },
++    });
++
++    // Второй игрок («спящий телефон») сначала зарегистрировал снапшот и отключился до команды Мастера
++    const sleeperMsgs = [];
++    const sleeperWs1 = createRoomClient({
++      url: wsUrl,
++      clientId: 'player-sleeper-2',
++      onStatus: () => {},
++      onMessage: (m) => { sleeperMsgs.push(m); },
++      webSocketFactory: createWsAdapter,
++    });
++    sleeperWs1.send(ROOM_MESSAGE.ROOM_JOIN, { code: roomCode, name: 'Ник', role: 'player', requestId: 's-join-1' }, roomCode);
++    await waitUntil(() => sleeperMsgs.some((m) => m.payload?.requestId === 's-join-1'));
++    sleeperWs1.send(ROOM_MESSAGE.CHAR_PUBLISH, {
++      characterId: 'char_sleeper_2',
++      revision: 1,
++      snapshot: {
++        characterId: 'char_sleeper_2',
++        name: 'Ник',
++        level: 4,
++        originName: 'synth',
++        updatedAt: Date.now(),
++        avatarDataUrl: null,
++        data: { characterName: 'Ник', level: 4, origin: { id: 'synth' }, caps: 50 },
++      },
++    }, roomCode);
++    await waitUntil(() => gmMessages.some((m) => m.type === ROOM_MESSAGE.CHAR_PUBLISH && m.payload?.characterId === 'char_sleeper_2'));
++    sleeperWs1.close();
++
++    // Попытка обычного игрока выпустить директиву отклоняется сервером (NOT_ROOM_OWNER)
++    const rogueMsgs = [];
++    const rogueWs = createRoomClient({
++      url: wsUrl,
++      clientId: 'rogue-player-99',
++      onStatus: () => {},
++      onMessage: (m) => { rogueMsgs.push(m); },
++      webSocketFactory: createWsAdapter,
++    });
++    rogueWs.send(ROOM_MESSAGE.ROOM_JOIN, { code: roomCode, name: 'Читер', role: 'player', requestId: 'r-join' }, roomCode);
++    await waitUntil(() => rogueMsgs.some((m) => m.payload?.requestId === 'r-join'));
++    rogueWs.send(ROOM_MESSAGE.GM_DIRECTIVE, {
++      code: roomCode,
++      ownerToken: 'wrong-token',
++      directiveId: 'dir_rogue_99',
++      kind: GM_DIRECTIVE_KIND.CAPS_DELTA,
++      amount: 9999,
++      requestId: 'r-dir',
++    }, roomCode);
++    await waitUntil(() => rogueMsgs.some((m) => m.type === ROOM_MESSAGE.ERROR && m.payload?.requestId === 'r-dir'));
++    expect(rogueMsgs.find((m) => m.type === ROOM_MESSAGE.ERROR && m.payload?.requestId === 'r-dir').payload.code).toBe('NOT_ROOM_OWNER');
++    rogueWs.close();
++
++    // Мастер отправляет команду «+1 уровень всем» с комментарием
++    gmWs.send(ROOM_MESSAGE.GM_DIRECTIVE, {
++      code: roomCode,
++      ownerToken,
++      directiveId: 'dir_lvlup_all_1',
++      kind: GM_DIRECTIVE_KIND.LEVEL_GRANT,
++      amount: 1,
++      note: 'За спасение каравана',
++      targetType: 'room',
++      targetCharacterIds: ['char_online_1', 'char_sleeper_2'],
++      requestId: 'req-dir-1',
++    }, roomCode);
++
++    await waitUntil(() => (useRoomStore.getState().rooms[roomCode]?.directives || []).length === 1);
++
++    // 1. Онлайн-игрок (Пайпер) мгновенно применяет команду: ур. 2 -> 3, skillsSaved -> false, отправляет ack!
++    const appliedOnline = await processPendingDirectivesForPlayer();
++    expect(appliedOnline).toHaveLength(1);
++    expect(useCharacterStore.getState().level).toBe(3);
++    expect(useCharacterStore.getState().skillsSaved).toBe(false);
++    expect(alertsLog.some((a) => String(a.message || '').includes('3') && String(a.message || '').includes('За спасение каравана'))).toBe(true);
++
++    // Повторный вызов НЕ применяет команду второй раз (дедупликация!)
++    const duplicateTry = await processPendingDirectivesForPlayer();
++    expect(duplicateTry).toHaveLength(0);
++    expect(useCharacterStore.getState().level).toBe(3);
++
++    // У Мастера счётчик доставки стал 1/2 (Пайпер подтвердила, Ник ещё спит)
++    await waitUntil(() => gmMessages.some(
++      (m) => m.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
++        && m.payload?.directive?.directiveId === 'dir_lvlup_all_1'
++        && (m.payload?.directive?.ackedByCharacterIds || []).includes('char_online_1'),
++    ));
++
++    // 2. Теперь «просыпается» телефон второго игрока (Ника), причём лист Ника лежит в SQLite (не открыт в сторе)
++    await db.setCharacterRoomBinding('char_online_1', null);
++    await db.saveCharacter('char_sleeper_2', 'Ник', 4, 'synth', {
++      characterName: 'Ник',
++      level: 4,
++      origin: { id: 'synth' },
++      caps: 50,
++      attributesSaved: true,
++      skillsSaved: true,
++      attributes: [
++        { name: 'STR', value: 5 }, { name: 'PER', value: 7 }, { name: 'END', value: 5 },
++        { name: 'CHA', value: 5 }, { name: 'INT', value: 8 }, { name: 'AGI', value: 6 }, { name: 'LCK', value: 4 },
++      ],
++    });
++    await db.setCharacterRoomBinding('char_sleeper_2', roomCode);
++    useCharacterStore.getState().resetCharacterStore(); // Ник сидит на главном экране, стор пуст
++
++    resetRoomClientForTests();
++    setRoomClientFactoryForTests(({ url, onStatus, onMessage }) => (
++      createRoomClient({
++        url,
++        clientId: 'player-sleeper-2:reconnected',
++        onStatus,
++        onMessage,
++        webSocketFactory: createWsAdapter,
++      })
++    ));
++    useRoomStore.setState({ status: 'offline', rooms: {}, lastError: null });
++
++    const joinRes = await useRoomStore.getState().joinRoom({ code: roomCode, name: 'Ник', role: 'player' });
++    expect((joinRes.directives || []).some((d) => d.directiveId === 'dir_lvlup_all_1')).toBe(true);
++
++    const appliedSleeper = await processPendingDirectivesForPlayer();
++    expect(appliedSleeper).toHaveLength(1);
++
++    const updatedNickRow = await db.loadCharacterById('char_sleeper_2');
++    expect(updatedNickRow.level).toBe(5);
++    expect(updatedNickRow.data.level).toBe(5);
++    expect(updatedNickRow.data.skillsSaved).toBe(false);
++
++    // И Мастер получает финальный статус доставки 2/2 И обновлённый снапшот Ника 5-го уровня!
++    await waitUntil(() => gmMessages.some(
++      (m) => m.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
++        && m.payload?.directive?.directiveId === 'dir_lvlup_all_1'
++        && (m.payload?.directive?.ackedByCharacterIds || []).length === 2,
++    ));
++    await waitUntil(() => gmMessages.some(
++      (m) => m.type === ROOM_MESSAGE.CHAR_PUBLISH
++        && m.payload?.characterId === 'char_sleeper_2'
++        && m.payload?.snapshot?.level === 5,
++    ));
++
++    // 3. Проверка иммунитета к радиации у синта при адресной команде rad.adjust (+3 рад)
++    gmWs.send(ROOM_MESSAGE.GM_DIRECTIVE, {
++      code: roomCode,
++      ownerToken,
++      directiveId: 'dir_rad_synth_1',
++      kind: GM_DIRECTIVE_KIND.RAD_ADJUST,
++      amount: 3,
++      targetType: 'character',
++      targetCharacterId: 'char_sleeper_2',
++      requestId: 'req-dir-rad',
++    }, roomCode);
++
++    await waitUntil(() => (useRoomStore.getState().rooms[roomCode]?.directives || []).some((d) => d.directiveId === 'dir_rad_synth_1'));
++    await processPendingDirectivesForPlayer();
++
++    const nickAfterRad = await db.loadCharacterById('char_sleeper_2');
++    expect(nickAfterRad.data.radiation || 0).toBe(0);
++
++    gmWs.close();
++    resetRoomClientForTests();
++  });
++});
+diff --git a/components/gm/GmCommandModal.js b/components/gm/GmCommandModal.js
+new file mode 100644
+index 0000000..95f45c5
+--- /dev/null
++++ b/components/gm/GmCommandModal.js
+@@ -0,0 +1,531 @@
++import React, { useEffect, useState } from 'react';
++import {
++  Modal,
++  View,
++  Text,
++  TouchableOpacity,
++  TextInput,
++  ScrollView,
++  Pressable,
++  Platform,
++  StyleSheet,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import IconText from '../lootTrade/LootTradeIconText';
++import { useLocale } from '../../i18n/locale';
++import {
++  GM_DIRECTIVE_CATALOG,
++  GM_DIRECTIVE_KIND,
++  formatDirectiveBadgeLabel,
++} from '../../modules/fallout/gm/gmDirectives';
++import { formatGm, tGm } from '../../modules/fallout/gm/gmI18n';
++
++export default function GmCommandModal({
++  visible,
++  targetCharacter = null, // null -> вся группа комнаты
++  roomCharactersCount = 0,
++  recentDirectives = [],
++  busy = false,
++  onClose,
++  onSubmit,
++}) {
++  const locale = useLocale();
++  const [selectedKind, setSelectedKind] = useState(GM_DIRECTIVE_KIND.LEVEL_GRANT);
++  const [amountInput, setAmountInput] = useState('1');
++  const [healMode, setHealMode] = useState('full');
++  const [note, setNote] = useState('');
++
++  const sessionKey = visible
++    ? `${targetCharacter?.id || 'room'}`
++    : 'closed';
++
++  useEffect(() => {
++    if (sessionKey === 'closed') return;
++    setSelectedKind(GM_DIRECTIVE_KIND.LEVEL_GRANT);
++    setAmountInput('1');
++    setHealMode('full');
++    setNote('');
++  }, [sessionKey]);
++
++  const activeSpec = GM_DIRECTIVE_CATALOG.find((c) => c.kind === selectedKind)
++    || GM_DIRECTIVE_CATALOG[0];
++
++  const handleSelectKind = (spec) => {
++    setSelectedKind(spec.kind);
++    if (spec.kind === GM_DIRECTIVE_KIND.HP_HEAL) {
++      setHealMode('full');
++      setAmountInput('5');
++    } else {
++      setAmountInput(String(spec.defaultAmount || 1));
++    }
++  };
++
++  const stepAmount = (delta) => {
++    const parsed = parseInt(amountInput, 10);
++    const base = Number.isFinite(parsed) ? parsed : (activeSpec.defaultAmount || 1);
++    const next = activeSpec.allowNegative
++      ? base + delta
++      : Math.max(1, base + delta);
++    setAmountInput(String(next));
++  };
++
++  const handleConfirm = () => {
++    if (busy) return;
++    let parsedAmount = parseInt(amountInput, 10);
++    if (!Number.isFinite(parsedAmount)) {
++      parsedAmount = activeSpec.defaultAmount || 1;
++    }
++    if (!activeSpec.allowNegative && activeSpec.hasAmountInput) {
++      parsedAmount = Math.max(1, parsedAmount);
++    }
++    if (selectedKind === GM_DIRECTIVE_KIND.HP_HEAL && healMode === 'full') {
++      parsedAmount = 0;
++    }
++    onSubmit?.({
++      kind: selectedKind,
++      amount: parsedAmount,
++      mode: selectedKind === GM_DIRECTIVE_KIND.HP_HEAL ? healMode : null,
++      note: note.trim(),
++      targetType: targetCharacter?.id ? 'character' : 'room',
++      targetCharacterId: targetCharacter?.id || null,
++    });
++  };
++
++  const recentSlice = Array.isArray(recentDirectives)
++    ? [...recentDirectives].slice(-3).reverse()
++    : [];
++
++  return (
++    <Modal
++      visible={Boolean(visible)}
++      transparent
++      animationType={Platform.OS === 'web' ? 'none' : 'fade'}
++      onRequestClose={onClose}
++    >
++      <Pressable style={styles.backdrop} onPress={onClose}>
++        <Pressable style={styles.modalOuter} onPress={() => {}}>
++          <View style={styles.modalInner}>
++            <View style={styles.header}>
++              <Text style={styles.headerTitle}>
++                {targetCharacter?.id
++                  ? formatGm(tGm('commands.modalTitleCharacter', locale), { name: targetCharacter.name })
++                  : tGm('commands.modalTitleRoom', locale)}
++              </Text>
++              <TouchableOpacity onPress={onClose} style={styles.closeIconBtn}>
++                <MaterialCommunityIcons name="close" size={20} color="#d4d4d4" />
++              </TouchableOpacity>
++            </View>
++
++            <ScrollView style={styles.scrollBody} keyboardShouldPersistTaps="handled">
++              <View style={styles.bodyPadding}>
++                <Text style={styles.targetBanner}>
++                  {targetCharacter?.id
++                    ? formatGm(tGm('commands.targetCharLabel', locale), { name: targetCharacter.name })
++                    : formatGm(tGm('commands.targetRoomLabel', locale), { count: roomCharactersCount })}
++                </Text>
++
++                <Text style={styles.sectionLabel}>
++                  {tGm('commands.selectCommandLabel', locale)}
++                </Text>
++
++                <View style={styles.commandList}>
++                  {GM_DIRECTIVE_CATALOG.map((spec) => {
++                    const active = spec.kind === selectedKind;
++                    return (
++                      <TouchableOpacity
++                        key={spec.kind}
++                        testID={`gm-directive-kind-${spec.kind}`}
++                        style={[styles.kindBtn, active && styles.kindBtnActive]}
++                        onPress={() => handleSelectKind(spec)}
++                        activeOpacity={0.75}
++                      >
++                        <MaterialCommunityIcons
++                          name={spec.icon}
++                          size={18}
++                          color={active ? '#f0e68c' : '#bdbdbd'}
++                        />
++                        <Text style={[styles.kindBtnText, active && styles.kindBtnTextActive]}>
++                          {tGm(`commands.kinds.${spec.kind}.title`, locale)}
++                        </Text>
++                      </TouchableOpacity>
++                    );
++                  })}
++                </View>
++
++                <Text style={styles.hintText}>
++                  {tGm(`commands.kinds.${selectedKind}.hint`, locale)}
++                </Text>
++
++                {selectedKind === GM_DIRECTIVE_KIND.HP_HEAL ? (
++                  <View style={styles.modeRow}>
++                    {['full', 'amount'].map((mKey) => {
++                      const active = healMode === mKey;
++                      return (
++                        <TouchableOpacity
++                          key={mKey}
++                          style={[styles.presetBtn, active && styles.presetBtnActive]}
++                          onPress={() => setHealMode(mKey)}
++                        >
++                          <Text style={[styles.presetBtnText, active && styles.presetBtnTextActive]}>
++                            {tGm(
++                              mKey === 'full'
++                                ? 'commands.kinds.hp.heal.modeFull'
++                                : 'commands.kinds.hp.heal.modeAmount',
++                              locale,
++                            )}
++                          </Text>
++                        </TouchableOpacity>
++                      );
++                    })}
++                  </View>
++                ) : null}
++
++                {activeSpec.hasAmountInput && (selectedKind !== GM_DIRECTIVE_KIND.HP_HEAL || healMode === 'amount') ? (
++                  <View style={styles.amountBlock}>
++                    <Text style={styles.sectionLabel}>
++                      {tGm('commands.amountLabel', locale)}
++                    </Text>
++                    <View style={styles.stepperRow}>
++                      <TouchableOpacity style={styles.stepBtn} onPress={() => stepAmount(-1)}>
++                        <Text style={styles.stepBtnText}>−</Text>
++                      </TouchableOpacity>
++                      <TextInput
++                        testID="gm-directive-amount-input"
++                        style={styles.amountInput}
++                        value={amountInput}
++                        onChangeText={setAmountInput}
++                        keyboardType="numbers-and-punctuation"
++                      />
++                      <TouchableOpacity style={styles.stepBtn} onPress={() => stepAmount(1)}>
++                        <Text style={styles.stepBtnText}>+</Text>
++                      </TouchableOpacity>
++                    </View>
++
++                    {activeSpec.presets.length > 0 ? (
++                      <View style={styles.presetsRow}>
++                        {activeSpec.presets.map((val) => {
++                          const active = String(val) === String(amountInput);
++                          return (
++                            <TouchableOpacity
++                              key={String(val)}
++                              style={[styles.presetBtn, active && styles.presetBtnActive]}
++                              onPress={() => setAmountInput(String(val))}
++                            >
++                              <Text style={[styles.presetBtnText, active && styles.presetBtnTextActive]}>
++                                {val > 0 ? `+${val}` : `${val}`}
++                              </Text>
++                            </TouchableOpacity>
++                          );
++                        })}
++                      </View>
++                    ) : null}
++                  </View>
++                ) : null}
++
++                <Text style={styles.sectionLabel}>
++                  {tGm('commands.noteLabel', locale)}
++                </Text>
++                <TextInput
++                  testID="gm-directive-note-input"
++                  style={styles.noteInput}
++                  value={note}
++                  onChangeText={setNote}
++                  placeholder={tGm('commands.notePlaceholder', locale)}
++                  placeholderTextColor="#7a7a7a"
++                  maxLength={240}
++                />
++
++                {recentSlice.length > 0 ? (
++                  <View style={styles.recentBox}>
++                    <Text style={styles.recentHeader}>
++                      {tGm('commands.recentTitle', locale)}
++                    </Text>
++                    {recentSlice.map((dir) => {
++                      const total = Array.isArray(dir.targetCharacterIds) ? dir.targetCharacterIds.length : 0;
++                      const acked = Array.isArray(dir.ackedByCharacterIds) ? dir.ackedByCharacterIds.length : 0;
++                      return (
++                        <View key={dir.directiveId} style={styles.recentRow}>
++                          <IconText style={styles.recentLabel}>
++                            {formatDirectiveBadgeLabel(dir, locale)}
++                          </IconText>
++                          <Text style={styles.recentAck}>
++                            {formatGm(tGm('commands.recentDelivery', locale), { acked, total })}
++                          </Text>
++                        </View>
++                      );
++                    })}
++                  </View>
++                ) : null}
++              </View>
++            </ScrollView>
++
++            <View style={styles.footer}>
++              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={busy}>
++                <Text style={styles.cancelBtnText}>
++                  {tGm('commands.cancelBtn', locale)}
++                </Text>
++              </TouchableOpacity>
++              <TouchableOpacity
++                testID="gm-directive-submit-btn"
++                style={[styles.submitBtn, busy && styles.submitBtnDisabled]}
++                onPress={handleConfirm}
++                disabled={busy}
++              >
++                <Text style={styles.submitBtnText}>
++                  {tGm('commands.sendBtn', locale)}
++                </Text>
++              </TouchableOpacity>
++            </View>
++          </View>
++        </Pressable>
++      </Pressable>
++    </Modal>
++  );
++}
++
++const styles = StyleSheet.create({
++  backdrop: {
++    flex: 1,
++    backgroundColor: 'rgba(0, 0, 0, 0.72)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    padding: 18,
++  },
++  modalOuter: {
++    width: '100%',
++    maxWidth: 480,
++    maxHeight: '90%',
++    backgroundColor: '#232323',
++    borderWidth: 1,
++    borderColor: '#6b6335',
++    borderRadius: 5,
++    overflow: 'hidden',
++  },
++  modalInner: {
++    flexShrink: 1,
++  },
++  header: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 16,
++    paddingVertical: 12,
++    backgroundColor: '#1b1b1b',
++    borderBottomWidth: 1,
++    borderBottomColor: '#444444',
++  },
++  headerTitle: {
++    color: '#f0e68c',
++    fontSize: 16,
++    fontWeight: '700',
++    flex: 1,
++  },
++  closeIconBtn: {
++    padding: 4,
++  },
++  scrollBody: {
++    flexGrow: 0,
++  },
++  bodyPadding: {
++    padding: 16,
++  },
++  targetBanner: {
++    color: '#dcdcdc',
++    backgroundColor: '#2d2d2d',
++    borderWidth: 1,
++    borderColor: '#4a4a4a',
++    borderRadius: 5,
++    paddingHorizontal: 10,
++    paddingVertical: 7,
++    fontSize: 13,
++    fontWeight: '600',
++    marginBottom: 12,
++  },
++  sectionLabel: {
++    color: '#cfcfcf',
++    fontSize: 12,
++    fontWeight: '700',
++    marginBottom: 6,
++    marginTop: 6,
++  },
++  commandList: {
++    gap: 6,
++  },
++  kindBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++    paddingHorizontal: 12,
++    paddingVertical: 9,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#4d4d4d',
++    backgroundColor: '#2b2b2b',
++  },
++  kindBtnActive: {
++    borderColor: '#f0e68c',
++    backgroundColor: '#36341f',
++  },
++  kindBtnText: {
++    color: '#e0e0e0',
++    fontSize: 13,
++    fontWeight: '600',
++  },
++  kindBtnTextActive: {
++    color: '#f0e68c',
++    fontWeight: '700',
++  },
++  hintText: {
++    color: '#a3a3a3',
++    fontSize: 12,
++    lineHeight: 17,
++    marginTop: 8,
++    marginBottom: 8,
++  },
++  modeRow: {
++    flexDirection: 'row',
++    gap: 8,
++    marginBottom: 8,
++  },
++  amountBlock: {
++    marginBottom: 8,
++  },
++  stepperRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    gap: 10,
++  },
++  stepBtn: {
++    width: 40,
++    height: 40,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#666666',
++    backgroundColor: '#2e2e2e',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  stepBtnText: {
++    color: '#f0e68c',
++    fontSize: 20,
++    fontWeight: '700',
++  },
++  amountInput: {
++    width: 104,
++    height: 40,
++    backgroundColor: '#191919',
++    borderWidth: 1,
++    borderColor: '#777777',
++    borderRadius: 5,
++    color: '#f5f5f5',
++    fontSize: 17,
++    fontWeight: '700',
++    textAlign: 'center',
++  },
++  presetsRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    justifyContent: 'center',
++    gap: 8,
++    marginTop: 8,
++  },
++  presetBtn: {
++    paddingHorizontal: 12,
++    paddingVertical: 6,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#555555',
++    backgroundColor: '#2b2b2b',
++  },
++  presetBtnActive: {
++    borderColor: '#f0e68c',
++    backgroundColor: '#3a3820',
++  },
++  presetBtnText: {
++    color: '#dcdcdc',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  presetBtnTextActive: {
++    color: '#f0e68c',
++  },
++  noteInput: {
++    backgroundColor: '#191919',
++    borderWidth: 1,
++    borderColor: '#555555',
++    borderRadius: 5,
++    color: '#f5f5f5',
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++    fontSize: 13,
++  },
++  recentBox: {
++    marginTop: 14,
++    padding: 10,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#3e3e3e',
++    backgroundColor: '#1b1b1b',
++    gap: 5,
++  },
++  recentHeader: {
++    color: '#a3a3a3',
++    fontSize: 11,
++    fontWeight: '700',
++    marginBottom: 2,
++  },
++  recentRow: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    alignItems: 'center',
++  },
++  recentLabel: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '600',
++  },
++  recentAck: {
++    color: '#9ca3af',
++    fontSize: 11,
++  },
++  footer: {
++    flexDirection: 'row',
++    justifyContent: 'flex-end',
++    gap: 10,
++    paddingHorizontal: 16,
++    paddingVertical: 12,
++    backgroundColor: '#1b1b1b',
++    borderTopWidth: 1,
++    borderTopColor: '#444444',
++  },
++  cancelBtn: {
++    paddingHorizontal: 14,
++    paddingVertical: 9,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#555555',
++    backgroundColor: '#2c2c2c',
++  },
++  cancelBtnText: {
++    color: '#dcdcdc',
++    fontSize: 13,
++    fontWeight: '600',
++  },
++  submitBtn: {
++    paddingHorizontal: 16,
++    paddingVertical: 9,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#d4af37',
++    backgroundColor: '#f0e68c',
++  },
++  submitBtnDisabled: {
++    opacity: 0.6,
++  },
++  submitBtnText: {
++    color: '#1a1a1a',
++    fontSize: 13,
++    fontWeight: '700',
++  },
++});
+diff --git a/components/gm/GmRoomCharacterCard.js b/components/gm/GmRoomCharacterCard.js
+new file mode 100644
+index 0000000..46f0cfa
+--- /dev/null
++++ b/components/gm/GmRoomCharacterCard.js
+@@ -0,0 +1,797 @@
++import React, { useMemo, useState } from 'react';
++import {
++  View,
++  Text,
++  TouchableOpacity,
++  Image,
++  StyleSheet,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import IconText from '../lootTrade/LootTradeIconText';
++import { useLocale, useModuleLocale } from '../../i18n/locale';
++import { extractGmCharacterSummary } from '../../modules/fallout/gm/gmCharacterSummary';
++import { formatGm, tGm } from '../../modules/fallout/gm/gmI18n';
++
++const DEFAULT_AVATAR = require('../../assets/bg1.png');
++
++const SPOILER_KEYS = [
++  'specialAndSkills',
++  'armorAndConditions',
++  'weaponsAndAmmo',
++  'perksAndInventory',
++];
++
++export default function GmRoomCharacterCard({
++  characterCard,
++  onOpenCommand,
++}) {
++  const locale = useLocale();
++  const moduleLocale = useModuleLocale();
++
++  const [openMap, setOpenMap] = useState({
++    specialAndSkills: false,
++    armorAndConditions: false,
++    weaponsAndAmmo: false,
++    perksAndInventory: false,
++  });
++
++  const summary = useMemo(
++    () => extractGmCharacterSummary(characterCard?.snapshotPayload, { locale, moduleLocale }),
++    [characterCard?.snapshotPayload, locale, moduleLocale],
++  );
++
++  const toggleSection = (key) => {
++    setOpenMap((prev) => ({ ...prev, [key]: !prev[key] }));
++  };
++
++  const anyOpen = SPOILER_KEYS.some((k) => openMap[k]);
++  const toggleAll = () => {
++    const nextVal = !anyOpen;
++    setOpenMap({
++      specialAndSkills: nextVal,
++      armorAndConditions: nextVal,
++      weaponsAndAmmo: nextVal,
++      perksAndInventory: nextVal,
++    });
++  };
++
++  const avatarSource = summary.avatarDataUrl
++    ? { uri: summary.avatarDataUrl }
++    : (summary.originImage || DEFAULT_AVATAR);
++
++  const online = Boolean(characterCard?.playerOnline);
++  const { vitals } = summary;
++
++  return (
++    <View style={styles.card} testID={`gm-char-card-${summary.id}`}>
++      {/* Шапка карточки: портрет, имя, происхождение, уровень, сеть и кнопка команды */}
++      <View style={styles.headerRow}>
++        <Image source={avatarSource} style={styles.avatar} resizeMode="cover" />
++
++        <View style={styles.titleBlock}>
++          <View style={styles.nameRow}>
++            <Text style={styles.nameText} numberOfLines={1}>
++              {summary.name}
++            </Text>
++            <View style={[styles.onlineBadge, online ? styles.onlineBadgeActive : styles.onlineBadgeIdle]}>
++              <MaterialCommunityIcons
++                name="server-network"
++                size={13}
++                color={online ? '#16a34a' : '#9ca3af'}
++              />
++              <Text style={[styles.onlineText, online && styles.onlineTextActive]}>
++                {tGm(online ? 'card.online' : 'card.offline', locale)}
++              </Text>
++            </View>
++          </View>
++
++          <Text style={styles.subtitleText} numberOfLines={1}>
++            {summary.originLabel} · {formatGm(tGm('card.levelShort', locale), { level: summary.level })}
++          </Text>
++        </View>
++
++        <View style={styles.headerActions}>
++          {onOpenCommand ? (
++            <TouchableOpacity
++              testID={`gm-char-command-${summary.id}`}
++              style={styles.commandBtn}
++              onPress={() => onOpenCommand(characterCard)}
++              activeOpacity={0.75}
++            >
++              <MaterialCommunityIcons name="lightning-bolt" size={15} color="#1a1a1a" />
++              <Text style={styles.commandBtnText}>
++                {tGm('card.commandBtn', locale)}
++              </Text>
++            </TouchableOpacity>
++          ) : null}
++
++          <TouchableOpacity
++            testID={`gm-char-toggle-all-${summary.id}`}
++            style={styles.expandAllBtn}
++            onPress={toggleAll}
++            activeOpacity={0.75}
++          >
++            <MaterialCommunityIcons
++              name={anyOpen ? 'unfold-less-horizontal' : 'unfold-more-horizontal'}
++              size={16}
++              color="#f0e68c"
++            />
++          </TouchableOpacity>
++        </View>
++      </View>
++
++      {/* Полоса ключевых боевых и ресурсных показателей */}
++      <View style={styles.vitalsGrid}>
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.hp', locale)}</Text>
++          <Text style={styles.vitalValue}>
++            {vitals.currentHealth}/{vitals.effectiveMaxHealth}
++          </Text>
++        </View>
++
++        {vitals.radiation > 0 ? (
++          <View style={[styles.vitalPill, styles.vitalPillRad]}>
++            <Text style={styles.vitalLabel}>{tGm('card.vitals.rad', locale)}</Text>
++            <Text style={[styles.vitalValue, styles.vitalValueRad]}>
++              ☢ {vitals.radiation}
++            </Text>
++          </View>
++        ) : null}
++
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.defense', locale)}</Text>
++          <Text style={styles.vitalValue}>{vitals.defense}</Text>
++        </View>
++
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.initiative', locale)}</Text>
++          <Text style={styles.vitalValue}>{vitals.initiative}</Text>
++        </View>
++
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.melee', locale)}</Text>
++          <IconText style={styles.vitalValue}>{vitals.meleeBonus}</IconText>
++        </View>
++
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.luck', locale)}</Text>
++          <Text style={styles.vitalValue}>
++            {vitals.luckPoints}/{vitals.maxLuckPoints}
++          </Text>
++        </View>
++
++        <View style={[styles.vitalPill, vitals.isOverencumbered && styles.vitalPillWarn]}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.weight', locale)}</Text>
++          <Text style={[styles.vitalValue, vitals.isOverencumbered && styles.vitalValueWarn]}>
++            {vitals.totalWeight}/{vitals.maxCarryWeight}
++          </Text>
++        </View>
++
++        <View style={styles.vitalPill}>
++          <Text style={styles.vitalLabel}>{tGm('card.vitals.caps', locale)}</Text>
++          <IconText style={styles.vitalValue}>{`${vitals.caps} {CAP}`}</IconText>
++        </View>
++      </View>
++
++      {/* Спойлер 1: S.P.E.C.I.A.L. и Навыки */}
++      <View style={styles.spoilerSection}>
++        <TouchableOpacity
++          testID={`gm-spoiler-special-${summary.id}`}
++          style={styles.spoilerHeader}
++          onPress={() => toggleSection('specialAndSkills')}
++          activeOpacity={0.75}
++        >
++          <Text style={styles.spoilerTitle}>
++            {tGm('card.spoilers.specialAndSkills', locale)}
++          </Text>
++          <MaterialCommunityIcons
++            name={openMap.specialAndSkills ? 'chevron-up' : 'chevron-down'}
++            size={20}
++            color="#f0e68c"
++          />
++        </TouchableOpacity>
++
++        {openMap.specialAndSkills ? (
++          <View style={styles.spoilerBody}>
++            <View style={styles.specialRow}>
++              {summary.attributes.map((attr) => (
++                <View key={attr.key} style={styles.specialCell}>
++                  <Text style={styles.specialLabel}>{attr.label}</Text>
++                  <Text style={styles.specialValue}>{attr.value}</Text>
++                </View>
++              ))}
++            </View>
++
++            <View style={styles.tableHeaderRow}>
++              <Text style={[styles.tableHeaderCell, styles.skillNameCol]}>
++                {tGm('card.skillsTable.skill', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.skillSmallCol]}>
++                {tGm('card.skillsTable.attr', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.skillSmallCol]}>
++                {tGm('card.skillsTable.rank', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.skillSmallCol]}>
++                {tGm('card.skillsTable.tn', locale)}
++              </Text>
++            </View>
++
++            {summary.skills.map((sk, idx) => (
++              <View
++                key={sk.key}
++                style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
++              >
++                <Text style={[styles.tableCell, styles.skillNameCol, sk.tagged && styles.taggedSkillText]}>
++                  {sk.tagged ? `★ ${sk.label}` : sk.label}
++                </Text>
++                <Text style={[styles.tableCellMuted, styles.skillSmallCol]}>
++                  {sk.attrLabel}
++                </Text>
++                <Text style={[styles.tableCell, styles.skillSmallCol]}>
++                  {sk.rank}
++                </Text>
++                <Text style={[styles.tableCellHighlight, styles.skillSmallCol]}>
++                  {sk.tn}
++                </Text>
++              </View>
++            ))}
++          </View>
++        ) : null}
++      </View>
++
++      {/* Спойлер 2: Защита по зонам и состояния */}
++      <View style={styles.spoilerSection}>
++        <TouchableOpacity
++          testID={`gm-spoiler-armor-${summary.id}`}
++          style={styles.spoilerHeader}
++          onPress={() => toggleSection('armorAndConditions')}
++          activeOpacity={0.75}
++        >
++          <Text style={styles.spoilerTitle}>
++            {tGm('card.spoilers.armorAndConditions', locale)}
++          </Text>
++          <MaterialCommunityIcons
++            name={openMap.armorAndConditions ? 'chevron-up' : 'chevron-down'}
++            size={20}
++            color="#f0e68c"
++          />
++        </TouchableOpacity>
++
++        {openMap.armorAndConditions ? (
++          <View style={styles.spoilerBody}>
++            <View style={styles.tableHeaderRow}>
++              <Text style={[styles.tableHeaderCell, styles.zoneNameCol]}>
++                {tGm('card.armorTable.zone', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.zoneSmallCol]}>
++                {tGm('card.armorTable.hitRoll', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.zoneSmallCol]}>
++                {tGm('card.armorTable.phys', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.zoneSmallCol]}>
++                {tGm('card.armorTable.energy', locale)}
++              </Text>
++              <Text style={[styles.tableHeaderCell, styles.zoneSmallCol]}>
++                {tGm('card.armorTable.rad', locale)}
++              </Text>
++            </View>
++
++            {summary.armorZones.map((z, idx) => (
++              <View
++                key={z.key}
++                style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
++              >
++                <View style={styles.zoneNameCol}>
++                  <Text style={styles.tableCell}>{z.zone}</Text>
++                  {z.itemName ? (
++                    <Text style={styles.zoneSubItem} numberOfLines={1}>
++                      {z.itemName}{z.paHp ? ` (${z.paHp})` : ''}
++                    </Text>
++                  ) : null}
++                </View>
++                <Text style={[styles.tableCellMuted, styles.zoneSmallCol]}>{z.hitRoll}</Text>
++                <Text style={[styles.tableCell, styles.zoneSmallCol]}>{z.phys}</Text>
++                <Text style={[styles.tableCell, styles.zoneSmallCol]}>{z.energy}</Text>
++                <Text style={[styles.tableCell, styles.zoneSmallCol]}>{z.rad}</Text>
++              </View>
++            ))}
++
++            {summary.immunities.length > 0 ? (
++              <View style={styles.metaLine}>
++                <Text style={styles.metaLabel}>{tGm('card.status.immunities', locale)}: </Text>
++                <Text style={styles.metaValue}>{summary.immunities.join(', ')}</Text>
++              </View>
++            ) : null}
++
++            <View style={styles.metaLine}>
++              <Text style={styles.metaLabel}>{tGm('card.status.conditions', locale)}: </Text>
++              <Text style={styles.metaValue}>
++                {summary.conditions.length > 0
++                  ? summary.conditions.join(', ')
++                  : tGm('card.status.noConditions', locale)}
++              </Text>
++            </View>
++
++            {summary.survival ? (
++              <View style={styles.metaLine}>
++                <Text style={styles.metaLabel}>{tGm('card.status.survival', locale)}: </Text>
++                <Text style={styles.metaValue}>
++                  {`${tGm('card.status.food', locale)}: ${summary.survival.food} · ${tGm('card.status.water', locale)}: ${summary.survival.water} · ${tGm('card.status.sleep', locale)}: ${summary.survival.sleep}`}
++                </Text>
++              </View>
++            ) : null}
++          </View>
++        ) : null}
++      </View>
++
++      {/* Спойлер 3: Оружие и боезапас */}
++      <View style={styles.spoilerSection}>
++        <TouchableOpacity
++          testID={`gm-spoiler-weapons-${summary.id}`}
++          style={styles.spoilerHeader}
++          onPress={() => toggleSection('weaponsAndAmmo')}
++          activeOpacity={0.75}
++        >
++          <Text style={styles.spoilerTitle}>
++            {tGm('card.spoilers.weaponsAndAmmo', locale)} ({summary.weapons.length})
++          </Text>
++          <MaterialCommunityIcons
++            name={openMap.weaponsAndAmmo ? 'chevron-up' : 'chevron-down'}
++            size={20}
++            color="#f0e68c"
++          />
++        </TouchableOpacity>
++
++        {openMap.weaponsAndAmmo ? (
++          <View style={styles.spoilerBody}>
++            {summary.weapons.length === 0 ? (
++              <Text style={styles.emptyHint}>{tGm('card.weapons.empty', locale)}</Text>
++            ) : (
++              <>
++                <View style={styles.tableHeaderRow}>
++                  <Text style={[styles.tableHeaderCell, styles.weaponNameCol]}>
++                    {tGm('card.spoilers.weaponsAndAmmo', locale)}
++                  </Text>
++                  <Text style={[styles.tableHeaderCell, styles.weaponSmallCol]}>
++                    {tGm('card.weapons.damage', locale)}
++                  </Text>
++                  <Text style={[styles.tableHeaderCell, styles.weaponSmallCol]}>
++                    {tGm('card.weapons.fireRate', locale)}
++                  </Text>
++                  <Text style={[styles.tableHeaderCell, styles.weaponSmallCol]}>
++                    {tGm('card.weapons.ammo', locale)}
++                  </Text>
++                </View>
++
++                {summary.weapons.map((w, idx) => (
++                  <View
++                    key={w.key}
++                    style={[styles.tableRow, idx % 2 === 1 && styles.tableRowAlt]}
++                  >
++                    <View style={styles.weaponNameCol}>
++                      <Text style={styles.tableCell}>{w.name}</Text>
++                      {w.ammoLabel ? (
++                        <Text style={styles.zoneSubItem} numberOfLines={1}>{w.ammoLabel}</Text>
++                      ) : null}
++                    </View>
++                    <IconText style={[styles.tableCell, styles.weaponSmallCol]}>
++                      {w.damage}
++                    </IconText>
++                    <Text style={[styles.tableCell, styles.weaponSmallCol]}>
++                      {w.fireRate}
++                    </Text>
++                    <Text
++                      style={[
++                        styles.tableCellHighlight,
++                        styles.weaponSmallCol,
++                        w.ammoCount === 0 && styles.vitalValueWarn,
++                      ]}
++                    >
++                      {w.ammoCount != null ? String(w.ammoCount) : tGm('card.weapons.noAmmoNeeded', locale)}
++                    </Text>
++                  </View>
++                ))}
++              </>
++            )}
++          </View>
++        ) : null}
++      </View>
++
++      {/* Спойлер 4: Перки, черта и инвентарь */}
++      <View style={styles.spoilerSection}>
++        <TouchableOpacity
++          testID={`gm-spoiler-perks-${summary.id}`}
++          style={styles.spoilerHeader}
++          onPress={() => toggleSection('perksAndInventory')}
++          activeOpacity={0.75}
++        >
++          <Text style={styles.spoilerTitle}>
++            {tGm('card.spoilers.perksAndInventory', locale)} ({summary.perks.length} / {summary.inventory.length})
++          </Text>
++          <MaterialCommunityIcons
++            name={openMap.perksAndInventory ? 'chevron-up' : 'chevron-down'}
++            size={20}
++            color="#f0e68c"
++          />
++        </TouchableOpacity>
++
++        {openMap.perksAndInventory ? (
++          <View style={styles.spoilerBody}>
++            <View style={styles.metaLine}>
++              <Text style={styles.metaLabel}>{tGm('card.perks.trait', locale)}: </Text>
++              <Text style={styles.metaValue}>
++                {summary.traitLabel || tGm('card.perks.noTrait', locale)}
++              </Text>
++            </View>
++
++            <Text style={styles.subBlockHeader}>{tGm('card.perks.perksTitle', locale)}</Text>
++            {summary.perks.length === 0 ? (
++              <Text style={styles.emptyHint}>{tGm('card.perks.noPerks', locale)}</Text>
++            ) : (
++              <View style={styles.chipWrap}>
++                {summary.perks.map((p) => (
++                  <View key={p.key} style={styles.perkChip}>
++                    <Text style={styles.perkChipText}>
++                      {p.name}
++                      {p.rank > 1 ? ` (${formatGm(tGm('card.perks.rankSuffix', locale), { rank: p.rank })})` : ''}
++                    </Text>
++                  </View>
++                ))}
++              </View>
++            )}
++
++            <Text style={[styles.subBlockHeader, { marginTop: 10 }]}>
++              {tGm('card.perks.inventoryTitle', locale)}
++            </Text>
++            {summary.inventory.length === 0 ? (
++              <Text style={styles.emptyHint}>{tGm('card.perks.emptyInventory', locale)}</Text>
++            ) : (
++              <View style={styles.inventoryList}>
++                {summary.inventory.map((it) => (
++                  <View key={it.name} style={styles.inventoryItemRow}>
++                    <Text style={styles.inventoryItemName} numberOfLines={1}>
++                      {it.equipped ? `• ${it.name}` : it.name}
++                    </Text>
++                    <Text style={styles.inventoryItemQty}>×{it.quantity}</Text>
++                  </View>
++                ))}
++              </View>
++            )}
++          </View>
++        ) : null}
++      </View>
++    </View>
++  );
++}
++
++const styles = StyleSheet.create({
++  card: {
++    backgroundColor: '#222222',
++    borderWidth: 1,
++    borderColor: '#525252',
++    borderRadius: 5,
++    padding: 12,
++    marginBottom: 12,
++  },
++  headerRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 10,
++  },
++  avatar: {
++    width: 48,
++    height: 48,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#666666',
++    backgroundColor: '#161616',
++  },
++  titleBlock: {
++    flex: 1,
++    minWidth: 0,
++  },
++  nameRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    flexWrap: 'wrap',
++    gap: 8,
++  },
++  nameText: {
++    color: '#f5f5f5',
++    fontSize: 16,
++    fontWeight: '700',
++    flexShrink: 1,
++  },
++  onlineBadge: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 4,
++    paddingHorizontal: 7,
++    paddingVertical: 2,
++    borderRadius: 5,
++    borderWidth: 1,
++  },
++  onlineBadgeActive: {
++    backgroundColor: 'rgba(22, 163, 74, 0.14)',
++    borderColor: '#16a34a',
++  },
++  onlineBadgeIdle: {
++    backgroundColor: '#2b2b2b',
++    borderColor: '#555555',
++  },
++  onlineText: {
++    color: '#9ca3af',
++    fontSize: 11,
++    fontWeight: '600',
++  },
++  onlineTextActive: {
++    color: '#4ade80',
++  },
++  subtitleText: {
++    color: '#c7c7c7',
++    fontSize: 13,
++    marginTop: 2,
++  },
++  headerActions: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 6,
++  },
++  commandBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 4,
++    backgroundColor: '#f0e68c',
++    borderColor: '#d4af37',
++    borderWidth: 1,
++    borderRadius: 5,
++    paddingHorizontal: 10,
++    paddingVertical: 6,
++  },
++  commandBtnText: {
++    color: '#1a1a1a',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  expandAllBtn: {
++    width: 32,
++    height: 32,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    backgroundColor: '#2d2d2d',
++    alignItems: 'center',
++    justifyContent: 'center',
++  },
++  vitalsGrid: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 6,
++    marginTop: 10,
++    marginBottom: 4,
++  },
++  vitalPill: {
++    backgroundColor: '#191919',
++    borderWidth: 1,
++    borderColor: '#444444',
++    borderRadius: 5,
++    paddingHorizontal: 8,
++    paddingVertical: 4,
++    minWidth: 68,
++  },
++  vitalPillRad: {
++    borderColor: '#a16207',
++    backgroundColor: '#292011',
++  },
++  vitalPillWarn: {
++    borderColor: '#dc2626',
++    backgroundColor: '#2e1616',
++  },
++  vitalLabel: {
++    color: '#9ca3af',
++    fontSize: 10,
++    fontWeight: '600',
++  },
++  vitalValue: {
++    color: '#f5f5f5',
++    fontSize: 13,
++    fontWeight: '700',
++    marginTop: 1,
++  },
++  vitalValueRad: {
++    color: '#facc15',
++  },
++  vitalValueWarn: {
++    color: '#f87171',
++  },
++  spoilerSection: {
++    marginTop: 8,
++    borderWidth: 1,
++    borderColor: '#3f3f3f',
++    borderRadius: 5,
++    backgroundColor: '#1b1b1b',
++    overflow: 'hidden',
++  },
++  spoilerHeader: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    paddingHorizontal: 10,
++    paddingVertical: 8,
++    backgroundColor: '#282828',
++  },
++  spoilerTitle: {
++    color: '#f0e68c',
++    fontSize: 13,
++    fontWeight: '700',
++  },
++  spoilerBody: {
++    padding: 10,
++  },
++  specialRow: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 6,
++    marginBottom: 10,
++  },
++  specialCell: {
++    flex: 1,
++    minWidth: 40,
++    backgroundColor: '#262626',
++    borderWidth: 1,
++    borderColor: '#525252',
++    borderRadius: 5,
++    paddingVertical: 5,
++    alignItems: 'center',
++  },
++  specialLabel: {
++    color: '#b0b0b0',
++    fontSize: 10,
++    fontWeight: '700',
++  },
++  specialValue: {
++    color: '#f0e68c',
++    fontSize: 15,
++    fontWeight: '700',
++    marginTop: 1,
++  },
++  tableHeaderRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    paddingVertical: 5,
++    paddingHorizontal: 6,
++    backgroundColor: '#2c2c2c',
++    borderRadius: 4,
++    marginBottom: 2,
++  },
++  tableHeaderCell: {
++    color: '#bdbdbd',
++    fontSize: 11,
++    fontWeight: '700',
++  },
++  tableRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    paddingVertical: 5,
++    paddingHorizontal: 6,
++  },
++  tableRowAlt: {
++    backgroundColor: '#232323',
++  },
++  tableCell: {
++    color: '#e5e5e5',
++    fontSize: 12,
++  },
++  tableCellMuted: {
++    color: '#9ca3af',
++    fontSize: 11,
++  },
++  tableCellHighlight: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  taggedSkillText: {
++    color: '#f0e68c',
++    fontWeight: '700',
++  },
++  skillNameCol: {
++    flex: 1,
++    paddingRight: 6,
++  },
++  skillSmallCol: {
++    width: 48,
++    textAlign: 'center',
++  },
++  zoneNameCol: {
++    flex: 1,
++    paddingRight: 6,
++  },
++  zoneSmallCol: {
++    width: 44,
++    textAlign: 'center',
++  },
++  zoneSubItem: {
++    color: '#9ca3af',
++    fontSize: 11,
++    marginTop: 1,
++  },
++  weaponNameCol: {
++    flex: 1,
++    paddingRight: 6,
++  },
++  weaponSmallCol: {
++    width: 58,
++    textAlign: 'center',
++  },
++  metaLine: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    marginTop: 6,
++  },
++  metaLabel: {
++    color: '#b0b0b0',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  metaValue: {
++    color: '#ececec',
++    fontSize: 12,
++    flexShrink: 1,
++  },
++  subBlockHeader: {
++    color: '#d4d4d4',
++    fontSize: 12,
++    fontWeight: '700',
++    marginTop: 6,
++    marginBottom: 4,
++  },
++  chipWrap: {
++    flexDirection: 'row',
++    flexWrap: 'wrap',
++    gap: 6,
++  },
++  perkChip: {
++    backgroundColor: '#2b2a1e',
++    borderWidth: 1,
++    borderColor: '#7a7238',
++    borderRadius: 5,
++    paddingHorizontal: 8,
++    paddingVertical: 4,
++  },
++  perkChipText: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '600',
++  },
++  inventoryList: {
++    gap: 3,
++  },
++  inventoryItemRow: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    alignItems: 'center',
++    paddingVertical: 3,
++    paddingHorizontal: 6,
++    backgroundColor: '#232323',
++    borderRadius: 4,
++  },
++  inventoryItemName: {
++    color: '#e5e5e5',
++    fontSize: 12,
++    flex: 1,
++    marginRight: 8,
++  },
++  inventoryItemQty: {
++    color: '#f0e68c',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  emptyHint: {
++    color: '#8c8c8c',
++    fontSize: 12,
++    fontStyle: 'italic',
++  },
++});
+diff --git a/components/gm/GmWorkspaceNavigator.js b/components/gm/GmWorkspaceNavigator.js
+new file mode 100644
+index 0000000..65c561a
+--- /dev/null
++++ b/components/gm/GmWorkspaceNavigator.js
+@@ -0,0 +1,121 @@
++import React, { useMemo } from 'react';
++import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
++import { Ionicons } from '@expo/vector-icons';
++import { Text, StyleSheet } from 'react-native';
++import HomeScreen from '../screens/HomeScreen/HomeScreen';
++import LootTradeScreen from '../screens/LootTradeScreen/LootTradeScreen';
++import { tApp } from '../../i18n/appI18n';
++
++// Отдельный навигатор пространства Мастера (navbar2):
++// - полностью изолирован от вкладок листа персонажа Игрока;
++// - сохраняет привычное горизонтальное перелистывание (swipeEnabled: true);
++// - строится по расширяемому реестру разделов Мастера (кампании, добыча/торговля
++//   и будущие экраны ведущего без пересборки игроцкого навигатора).
++const GmTab = createMaterialTopTabNavigator();
++
++export const GM_TAB_ROUTES = Object.freeze({
++  CAMPAIGNS: 'GmCampaignsTab',
++  LOOT_TRADE: 'GmLootTradeTab',
++});
++
++export function buildGmWorkspaceSections({ gmLootTradeLicensed = true } = {}) {
++  const sections = [
++    {
++      name: GM_TAB_ROUTES.CAMPAIGNS,
++      component: HomeScreen,
++      labelKey: 'tabs.gmCampaigns',
++      activeIcon: 'albums',
++      inactiveIcon: 'albums-outline',
++    },
++  ];
++  if (gmLootTradeLicensed) {
++    sections.push({
++      name: GM_TAB_ROUTES.LOOT_TRADE,
++      component: LootTradeScreen,
++      labelKey: 'tabs.gmLootTrade',
++      activeIcon: 'cube',
++      inactiveIcon: 'cube-outline',
++    });
++  }
++  return sections;
++}
++
++export default function GmWorkspaceNavigator({
++  gmLootTradeLicensed = true,
++  campaignsLabel,
++  lootTradeLabel,
++}) {
++  const sections = useMemo(
++    () => buildGmWorkspaceSections({ gmLootTradeLicensed }),
++    [gmLootTradeLicensed],
++  );
++
++  const iconByRoute = useMemo(
++    () => Object.fromEntries(sections.map((s) => [s.name, s])),
++    [sections],
++  );
++
++  const resolveSectionLabel = (section) => {
++    if (section.name === GM_TAB_ROUTES.CAMPAIGNS && campaignsLabel) return campaignsLabel;
++    if (section.name === GM_TAB_ROUTES.LOOT_TRADE && lootTradeLabel) return lootTradeLabel;
++    return tApp(section.labelKey);
++  };
++
++  return (
++    <GmTab.Navigator
++      id="GmNavbar2"
++      initialRouteName={GM_TAB_ROUTES.CAMPAIGNS}
++      tabBarPosition="bottom"
++      screenOptions={({ route }) => ({
++        tabBarIcon: ({ focused, color }) => {
++          const meta = iconByRoute[route.name];
++          const iconName = focused ? meta?.activeIcon : meta?.inactiveIcon;
++          return <Ionicons name={iconName || 'grid-outline'} size={16} color={color} />;
++        },
++        tabBarStyle: styles.navbar2,
++        tabBarActiveTintColor: '#f0e68c',
++        tabBarInactiveTintColor: '#9ca3af',
++        tabBarShowIcon: true,
++        tabBarIndicatorStyle: styles.indicator,
++        swipeEnabled: true,
++        animationEnabled: true,
++        style: styles.sceneContainer,
++      })}
++    >
++      {sections.map((section) => (
++        <GmTab.Screen
++          key={section.name}
++          name={section.name}
++          component={section.component}
++          options={{
++            tabBarLabel: ({ color }) => (
++              <Text style={[styles.tabLabel, { color }]}>
++                {resolveSectionLabel(section)}
++              </Text>
++            ),
++          }}
++        />
++      ))}
++    </GmTab.Navigator>
++  );
++}
++
++const styles = StyleSheet.create({
++  navbar2: {
++    backgroundColor: '#171717',
++    borderTopWidth: 1,
++    borderTopColor: '#6b6335',
++  },
++  indicator: {
++    backgroundColor: '#f0e68c',
++    height: 2,
++  },
++  sceneContainer: {
++    backgroundColor: 'transparent',
++  },
++  tabLabel: {
++    fontSize: 11,
++    textAlign: 'center',
++    fontWeight: '600',
++  },
++});
+diff --git a/components/gm/PlayerDirectiveOverlay.js b/components/gm/PlayerDirectiveOverlay.js
+new file mode 100644
+index 0000000..bb7601d
+--- /dev/null
++++ b/components/gm/PlayerDirectiveOverlay.js
+@@ -0,0 +1,228 @@
++import { useEffect, useCallback } from 'react';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import * as db from '../../db';
++import * as savesModule from '../../src/saves/characterSaves';
++import useCharacterStore from '../../src/store/characterStore';
++import useAppSettingsStore, { selectUiMode } from '../../src/store/appSettingsStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import useRoomStore, { onRoomDirective } from '../../src/room/roomStore';
++import { syncBoundCharacterToRoom } from '../../src/room/roomCharacterSync';
++import { syncCharacterToCloudIfEnabled } from '../cloudSync/googleDriveSync';
++import { showRawAlert } from '../alerts/alertService';
++import { getCurrentLocale } from '../../i18n/locale';
++import {
++  applyDirectiveToLiveCharacterStore,
++  applyDirectiveToStoredCharacterRow,
++} from '../../modules/fallout/gm/gmDirectives';
++import { formatGm, tGm } from '../../modules/fallout/gm/gmI18n';
++import { debugLog } from '../../src/debug/falloutDebug';
++
++const APPLIED_DIRECTIVES_STORAGE_KEY = 'positronium_applied_gm_directives_v1';
++const MAX_APPLIED_LOG = 200;
++
++const appliedMemorySet = new Set();
++let storageHydrated = false;
++let processingChain = Promise.resolve();
++const directiveAppliedListeners = new Set();
++
++export const subscribePlayerDirectiveApplied = (listener) => {
++  directiveAppliedListeners.add(listener);
++  return () => { directiveAppliedListeners.delete(listener); };
++};
++
++export const resetAppliedDirectivesForTests = async () => {
++  appliedMemorySet.clear();
++  storageHydrated = false;
++  try {
++    await AsyncStorage.removeItem(APPLIED_DIRECTIVES_STORAGE_KEY);
++  } catch {
++    // ignore
++  }
++};
++
++const hydrateAppliedDirectivesOnce = async () => {
++  if (storageHydrated) return;
++  storageHydrated = true;
++  try {
++    const raw = await AsyncStorage.getItem(APPLIED_DIRECTIVES_STORAGE_KEY);
++    if (!raw) return;
++    const parsed = JSON.parse(raw);
++    if (Array.isArray(parsed)) {
++      parsed.forEach((key) => {
++        if (typeof key === 'string' && key) appliedMemorySet.add(key);
++      });
++    }
++  } catch {
++    // ignore storage errors
++  }
++};
++
++const markDirectiveApplied = async (dedupeKey) => {
++  appliedMemorySet.add(dedupeKey);
++  try {
++    const list = [...appliedMemorySet].slice(-MAX_APPLIED_LOG);
++    await AsyncStorage.setItem(APPLIED_DIRECTIVES_STORAGE_KEY, JSON.stringify(list));
++  } catch {
++    // ignore storage errors
++  }
++};
++
++const doesDirectiveTargetCharacter = (directive, characterId) => {
++  if (!directive?.directiveId || !characterId) return false;
++  if (Array.isArray(directive.ackedByCharacterIds) && directive.ackedByCharacterIds.includes(characterId)) {
++    return false;
++  }
++  if (directive.targetType === 'character') {
++    return directive.targetCharacterId === characterId;
++  }
++  if (Array.isArray(directive.targetCharacterIds) && directive.targetCharacterIds.length > 0) {
++    return directive.targetCharacterIds.includes(characterId);
++  }
++  return true;
++};
++
++/**
++ * Единая точка обработки входящих команд Мастера на стороне Игрока
++ * (можно вызывать напрямую в интеграционных тестах и из фонового оверлея App.js).
++ */
++export const processPendingDirectivesForPlayer = async () => {
++  const uiState = useUiModeStore.getState();
++  const appUiMode = selectUiMode(useAppSettingsStore.getState());
++  if ((uiState.tabUiMode || appUiMode) === 'gm') return [];
++
++  await hydrateAppliedDirectivesOnce();
++
++  let bindingRows = [];
++  try {
++    bindingRows = await db.getCharacterRoomBindings();
++  } catch {
++    return [];
++  }
++  if (!Array.isArray(bindingRows) || bindingRows.length === 0) return [];
++
++  const roomStateMap = useRoomStore.getState().rooms || {};
++  const locale = getCurrentLocale();
++  const appliedResults = [];
++
++  for (const binding of bindingRows) {
++    const characterId = binding?.character_id;
++    const roomCode = binding?.code;
++    if (!characterId || !roomCode) continue;
++
++    const room = roomStateMap[roomCode];
++    if (!room || room.role === 'gm') continue;
++
++    const directives = Array.isArray(room.directives) ? room.directives : [];
++    for (const directive of directives) {
++      if (!doesDirectiveTargetCharacter(directive, characterId)) continue;
++      const dedupeKey = `${roomCode}:${directive.directiveId}:${characterId}`;
++      if (appliedMemorySet.has(dedupeKey)) {
++        // Даже если применили ранее до обрыва связи — повторяем ack серверу.
++        useRoomStore.getState().ackGmDirective({
++          code: roomCode,
++          directiveId: directive.directiveId,
++          characterId,
++        }).catch(() => {});
++        continue;
++      }
++
++      let characterName = '—';
++      let summaryLine = '';
++
++      if (useCharacterStore.getState().currentCharacterId === characterId) {
++        characterName = useCharacterStore.getState().characterName || '—';
++        summaryLine = applyDirectiveToLiveCharacterStore(directive, useCharacterStore, locale);
++        await savesModule.saveCharacter(characterName);
++      } else {
++        const row = await db.loadCharacterById(characterId);
++        if (!row) continue;
++        characterName = row.name || '—';
++        const res = applyDirectiveToStoredCharacterRow(directive, row, locale);
++        summaryLine = res.summaryLine;
++        await db.saveCharacter(
++          row.id,
++          row.name,
++          res.nextLevel,
++          row.originName ?? row.origin_name ?? null,
++          res.nextData,
++        );
++        void syncCharacterToCloudIfEnabled(row.id).catch(() => {});
++      }
++
++      await markDirectiveApplied(dedupeKey);
++
++      try {
++        await useRoomStore.getState().ackGmDirective({
++          code: roomCode,
++          directiveId: directive.directiveId,
++          characterId,
++        });
++      } catch (ackErr) {
++        debugLog('gmDirective.ack:failed', { message: ackErr?.message });
++      }
++
++      try {
++        await syncBoundCharacterToRoom(characterId, roomCode);
++      } catch (syncErr) {
++        debugLog('gmDirective.syncSnapshot:failed', { message: syncErr?.message });
++      }
++
++      if (summaryLine) {
++        const noteBlock = directive.note
++          ? `\n\n${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
++          : '';
++        showRawAlert({
++          title: formatGm(tGm('commands.playerAlert.title', locale), { character: characterName }),
++          message: `${summaryLine}${noteBlock}`,
++        });
++      }
++
++      const appliedItem = {
++        roomCode,
++        characterId,
++        directiveId: directive.directiveId,
++        kind: directive.kind,
++        summaryLine,
++      };
++      appliedResults.push(appliedItem);
++      directiveAppliedListeners.forEach((fn) => {
++        try { fn(appliedItem); } catch { /* ignore */ }
++      });
++    }
++  }
++
++  return appliedResults;
++};
++
++export const enqueuePendingDirectivesCheck = () => {
++  processingChain = processingChain
++    .catch(() => {})
++    .then(() => processPendingDirectivesForPlayer());
++  return processingChain;
++};
++
++export default function PlayerDirectiveOverlay() {
++  const storeUiMode = useAppSettingsStore(selectUiMode);
++  const tabUiMode = useUiModeStore((s) => s.tabUiMode);
++  const isGmMode = (tabUiMode || storeUiMode) === 'gm';
++  const roomStatus = useRoomStore((s) => s.status);
++  const rooms = useRoomStore((s) => s.rooms);
++
++  const triggerCheck = useCallback(() => {
++    if (isGmMode) return;
++    void enqueuePendingDirectivesCheck();
++  }, [isGmMode]);
++
++  useEffect(() => {
++    triggerCheck();
++  }, [triggerCheck, roomStatus, rooms]);
++
++  useEffect(() => {
++    if (isGmMode) return undefined;
++    return onRoomDirective(() => {
++      void enqueuePendingDirectivesCheck();
++    });
++  }, [isGmMode]);
++
++  return null;
++}
+diff --git a/components/screens/HomeScreen/HomeScreen.js b/components/screens/HomeScreen/HomeScreen.js
+index e2da0c7..2746542 100644
+--- a/components/screens/HomeScreen/HomeScreen.js
++++ b/components/screens/HomeScreen/HomeScreen.js
+@@ -100,6 +100,10 @@ import {
+   buildGmRoomCharacterCards,
+   syncBoundCharacterToRoom,
+ } from '../../../src/room/roomCharacterSync';
++import GmRoomCharacterCard from '../../gm/GmRoomCharacterCard';
++import GmCommandModal from '../../gm/GmCommandModal';
++import { subscribePlayerDirectiveApplied } from '../../gm/PlayerDirectiveOverlay';
++import { formatGm, tGm } from '../../../modules/fallout/gm/gmI18n';
+ 
+ const TAB_UI_MODE_STORAGE_KEY = 'positronium_tab_ui_mode';
+ const readTabUiMode = () => {
+@@ -548,6 +552,7 @@ export default function HomeScreen({ navigation }) {
+   const [copiedCode, setCopiedCode] = useState(null);
+   const [roomMenuPos, setRoomMenuPos] = useState(null);
+   const [roomEditModal, setRoomEditModal] = useState(null); // { folderId, name }
++  const [gmCommandModal, setGmCommandModal] = useState({ visible: false, targetCharacter: null, busy: false });
+   const roomMenuBtnRef = useRef(null);
+   const publishedRevisionsRef = useRef({}); // `${code}:${charId}` -> updatedAt
+ 
+@@ -710,6 +715,15 @@ export default function HomeScreen({ navigation }) {
+     }, [loadList])
+   );
+ 
++  // Если игрок находится на списке персонажей, а Мастер прислал команду (+1 ур. и т.д.),
++  // сразу перечитываем список, чтобы уровень на карточке обновился живьём.
++  useEffect(() => {
++    if (isGmMode) return undefined;
++    return subscribePlayerDirectiveApplied(() => {
++      loadList();
++    });
++  }, [isGmMode, loadList]);
++
+   const handleCreateFolder = async () => {
+     const name = folderName.trim();
+     if (!name) return;
+@@ -1101,14 +1115,38 @@ export default function HomeScreen({ navigation }) {
+     }
+   };
+ 
+-  const handleOpenRoomCharacter = async (roomCard) => {
+-    if (!bundledSettingActive || !roomCard?.snapshotPayload) return;
+-    const ok = await savesModule.loadCharacterFromRoomSnapshot(roomCard.snapshotPayload);
+-    if (ok) {
+-      useUiModeStore.getState().setGmInspectingCharacter(true);
+-      setTimeout(() => {
+-        navigation.navigate('CharacterTab');
+-      }, 0);
++  // В режиме Мастера персонажи игроков отображаются строго readonly через карточки
++  // со спойлерами и не загружаются в локальный characterStore / игроцкую навигацию.
++  const handleSendGmCommand = async (directiveInput) => {
++    if (!activeFolder) return;
++    const roomCode = folderRooms[activeFolder.id];
++    if (!roomCode) return;
++    if (!guardAdminAction(FEATURE_IDS.GM_CAMPAIGNS)) return;
++
++    const record = folderRoomRecords[activeFolder.id];
++    const currentRoomCards = buildGmRoomCharacterCards(roomRooms[roomCode]);
++    const targetCharacterIds = directiveInput.targetType === 'character' && directiveInput.targetCharacterId
++      ? [directiveInput.targetCharacterId]
++      : currentRoomCards.map((c) => c.id);
++
++    setGmCommandModal((prev) => ({ ...prev, busy: true }));
++    try {
++      await useRoomStore.getState().sendGmDirective({
++        code: roomCode,
++        ownerToken: record?.ownerToken,
++        kind: directiveInput.kind,
++        amount: directiveInput.amount,
++        mode: directiveInput.mode,
++        note: directiveInput.note,
++        targetType: directiveInput.targetType,
++        targetCharacterId: directiveInput.targetCharacterId,
++        targetCharacterIds,
++      });
++      setGmCommandModal({ visible: false, targetCharacter: null, busy: false });
++    } catch (error) {
++      debugLog('gm.sendDirective:failed', { message: error?.message || String(error) });
++      setGmCommandModal((prev) => ({ ...prev, busy: false }));
++      showHomeAlert(tHomeScreen('server.unavailable'));
+     }
+   };
+ 
+@@ -1297,6 +1335,12 @@ export default function HomeScreen({ navigation }) {
+   const gmRoomCharacterCards = activeGmRoomCode
+     ? buildGmRoomCharacterCards(roomRooms[activeGmRoomCode])
+     : [];
++  const activeGmDirectives = activeGmRoomCode
++    ? (roomRooms[activeGmRoomCode]?.directives || [])
++    : [];
++  const latestGmDirective = activeGmDirectives.length > 0
++    ? activeGmDirectives[activeGmDirectives.length - 1]
++    : null;
+   const displayedCharacters = isGmMode
+     ? (activeGmRoomCode ? gmRoomCharacterCards : [])
+     : characters;
+@@ -1445,13 +1489,57 @@ export default function HomeScreen({ navigation }) {
+       )}
+       {isGmMode && activeFolder && folderRooms[activeFolder.id] && (
+         <View style={styles.folderRoomBar}>
+-          <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
+-            <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
+-            <Text style={styles.folderRoomBarText}>{formatRoomCodeForDisplay(folderRooms[activeFolder.id])}</Text>
+-            <Text style={styles.folderRoomBarPlayers}>
+-              {tHomeScreen('room.players')}: {(roomRooms[folderRooms[activeFolder.id]]?.members || []).filter((member) => member.role === 'player').length}
+-            </Text>
+-          </TouchableOpacity>
++          <View style={styles.gmRoomActionsRow}>
++            <TouchableOpacity style={styles.folderRoomBarButton} onPress={() => setRoomDialog({ code: folderRooms[activeFolder.id] })}>
++              <MaterialCommunityIcons name="server-network" size={16} color="#f0e68c" />
++              <Text style={styles.folderRoomBarText}>{formatRoomCodeForDisplay(folderRooms[activeFolder.id])}</Text>
++              <Text style={styles.folderRoomBarPlayers}>
++                {tHomeScreen('room.players')}: {(roomRooms[folderRooms[activeFolder.id]]?.members || []).filter((member) => member.role === 'player').length}
++              </Text>
++            </TouchableOpacity>
++
++            <View style={styles.gmRoomRightGroup}>
++              {latestGmDirective ? (() => {
++                const total = Array.isArray(latestGmDirective.targetCharacterIds)
++                  ? latestGmDirective.targetCharacterIds.length
++                  : 0;
++                const acked = Array.isArray(latestGmDirective.ackedByCharacterIds)
++                  ? latestGmDirective.ackedByCharacterIds.length
++                  : 0;
++                const done = total > 0 && acked >= total;
++                return (
++                  <View style={[styles.gmDeliveryPill, done && styles.gmDeliveryPillDone]}>
++                    <MaterialCommunityIcons
++                      name={done ? 'check-circle-outline' : 'clock-outline'}
++                      size={13}
++                      color={done ? '#4ade80' : '#f0e68c'}
++                    />
++                    <Text style={[styles.gmDeliveryPillText, done && styles.gmDeliveryPillTextDone]}>
++                      {formatGm(
++                        tGm(done ? 'roomBar.deliveryDone' : 'roomBar.deliveryBadge', locale),
++                        { acked, total },
++                      )}
++                    </Text>
++                  </View>
++                );
++              })() : null}
++
++              <TouchableOpacity
++                testID="gm-room-group-command-btn"
++                style={styles.gmGroupCommandBtn}
++                onPress={() => setGmCommandModal({ visible: true, targetCharacter: null, busy: false })}
++                activeOpacity={0.75}
++              >
++                <MaterialCommunityIcons name="lightning-bolt" size={15} color="#1a1a1a" />
++                <Text style={styles.gmGroupCommandBtnText}>
++                  {tGm('roomBar.groupCommand', locale)}
++                </Text>
++              </TouchableOpacity>
++            </View>
++          </View>
++          <Text style={styles.gmReadonlyHint}>
++            {tGm('roomBar.readonlyHint', locale)}
++          </Text>
+         </View>
+       )}
+       {movingCharacterId && !activeFolder && <Text pointerEvents="none" style={styles.moveHint}>{tHomeScreen('folders.moving')}: {tHomeScreen('folders.moveHint')}</Text>}
+@@ -1462,6 +1550,28 @@ export default function HomeScreen({ navigation }) {
+       >
+         {loading ? (
+           <ActivityIndicator size="large" color="#d4af37" style={styles.loader} />
++        ) : activeGmRoomCode ? (
++          displayedCharacters.length === 0 ? (
++            <View style={styles.gmEmptyRoomCard}>
++              <Text style={styles.gmEmptyRoomText}>
++                {tGm('roomBar.emptyPlayers', locale)}
++              </Text>
++            </View>
++          ) : (
++            <View style={styles.gmCardsListWrap}>
++              {displayedCharacters.map((cardItem) => (
++                <GmRoomCharacterCard
++                  key={cardItem.id}
++                  characterCard={cardItem}
++                  onOpenCommand={(targetCard) => setGmCommandModal({
++                    visible: true,
++                    targetCharacter: targetCard,
++                    busy: false,
++                  })}
++                />
++              ))}
++            </View>
++          )
+         ) : (
+           rows.map((row, rowIndex) => (
+             <View key={rowIndex} style={styles.row}>
+@@ -1499,27 +1609,6 @@ export default function HomeScreen({ navigation }) {
+                 if (item.type === 'empty') {
+                   return <EmptyCell key={item.id} id={item.id} />;
+                 }
+-                if (isGmMode) {
+-                  return (
+-                    <CharacterCell
+-                      key={item.id}
+-                      character={item}
+-                      deleteActionPlacement="menu"
+-                      onPress={() => handleOpenRoomCharacter(item)}
+-                      onDelete={() => {}}
+-                      onDownload={() => {}}
+-                      onDuplicate={() => {}}
+-                      onServer={() => {}}
+-                      serverAvailable={false}
+-                      serverBound
+-                      serverOnline={Boolean(item.playerOnline)}
+-                      readOnlyRoomCard
+-                      onDragStart={() => {}}
+-                      onDragMove={() => {}}
+-                      onDragEnd={() => {}}
+-                    />
+-                  );
+-                }
+                 const boundCode = roomBindings[item.id];
+                 const isBoundOnline = boundCode
+                   ? isRoomAvailableWithGm(roomRooms[boundCode], roomStatus)
+@@ -1927,6 +2016,16 @@ export default function HomeScreen({ navigation }) {
+           </View>
+         </View>
+       </Modal>
++
++      <GmCommandModal
++        visible={gmCommandModal.visible}
++        targetCharacter={gmCommandModal.targetCharacter}
++        roomCharactersCount={displayedCharacters.length}
++        recentDirectives={activeGmDirectives}
++        busy={gmCommandModal.busy}
++        onClose={() => setGmCommandModal({ visible: false, targetCharacter: null, busy: false })}
++        onSubmit={handleSendGmCommand}
++      />
+     </View>
+   );
+ }
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 2ffcb64..b387970 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,11 @@
+ # Changelog
++---
++## Dedicated GM Workspace Navigator (`navbar2`), read-only character spoiler cards & queued GM commands (patch 481)
++
++- **Dedicated GM Navigator (`GmWorkspaceNavigator` / `navbar2`):** separated the Game Master's swipeable section navigator (`Campaigns`, `Loot/Trade`, and an extensible registry for future GM tabs) from the Player's character sheet tabs in `App.js`, never mounting player sheet screens or overwriting the local `characterStore` in GM mode.
++- **Read-only character spoiler cards inside rooms:** connected room characters now render live read-only summary cards (HP, radiation, defense, initiative, melee bonus, Luck points, carry weight, caps) with 4 independent spoilers (`S.P.E.C.I.A.L. & Skills` with check Target Numbers, `Zone DR & Status`, `Weapons & Ammo`, `Perks, Trait & Inventory`).
++- **GM Commands with queued delivery & acks (`gm.directive` / `gm.directiveAck` / `gm.directiveState`):** added party-wide and per-character commands (`+1 Level` unlocking manual skill & perk selection on the player's device, grant/deduct caps, restore Luck points, heal/rest, and adjust radiation respecting immunities), including server-side delivery queuing for sleeping phones and a live delivery badge in the room header.
++
+ ---
+ ## Restore clicks on the "Loot/Trade" screen after switching tabs (patch 480)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8db46b7..cf5f74a 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,12 @@
+ # История изменений
+ 
++---
++## Отдельный навигатор Мастера (`navbar2`), readonly-карточки персонажей со спойлерами и команды Мастера с очередью доставки (патч 481)
++
++- **Собственный навигатор пространства Мастера (`GmWorkspaceNavigator` / `navbar2`):** в `App.js` рабочее пространство Мастера полностью отделено от вкладок листа персонажа Игрока с сохранением горизонтального перелистывания разделов Мастера (`Список кампаний`, `Добыча/Торговля` и расширяемый реестр будущих экранов ведущего) без монтирования игроцких экранов и без перезаписи локального `characterStore`.
++- **Readonly-карточки персонажей со спойлерами в комнате:** внутри комнаты Мастера карточки подключённых героев показывают живую сводку показателей (ОЗ, радиация, защита, инициатива, бонус ББ, удача, переносимый вес, крышки) и 4 независимых спойлера (`S.P.E.C.I.A.L. и Навыки` с расчётом порогов проверок, `Защита по зонам и состояния`, `Оружие и боезапас`, `Перки, черта и инвентарь`), обновляемых в реальном времени по мере правок игрока.
++- **Команды Мастера (`gm.directive` / `gm.directiveAck` / `gm.directiveState`):** добавлена отправка команд всей группе или отдельному персонажу (`+1 уровень` с разблокировкой ручного распределения навыков и перка игроком, выдача/списание крышек, восстановление очков Удачи, исцеление/отдых, изменение радиации с учётом иммунитетов), включая очередь на сервере для «уснувших» телефонов и живой индикатор доставки в шапке комнаты.
++
+ ---
+ ## Исправление кликов на экране «Добыча/Торговля» после переключения вкладки (патч 480)
+ 
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 9a74bd6..a916069 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -40,10 +40,15 @@ By default, the app opens in **«User»** mode for managing your own personal ch
+    - **dim** — the Game Master is currently offline (no need to re-enter the code: your character reconnects automatically whenever the room is open).
+ 4. Moving a character between your personal folders never resets its room connection.
+ 
+-### What the Game Master Sees Inside a Room
+-- Every character connected to the room appears as a card inside that campaign room.
+-- Whenever a player updates health, caps, gear, or stats and saves their sheet, the card updates automatically for the Game Master.
+-- Tapping any player card opens that character's full sheet in read-only inspection mode (stats, equipment, inventory, and perks), with a button to return to the room.
++### What the Game Master Sees Inside a Room & Party Commands
++- The Game Master's workspace has its own swipeable sections completely separate from player character sheets.
++- Every character connected to the room appears as a **live read-only summary card** (players stay in full control of their own sheets):
++  - the card header always shows level, health, radiation, defense, initiative, melee bonus, Luck points, carry weight, and caps;
++  - you can expand independent **spoilers** right in place for one or several party members at once: **«S.P.E.C.I.A.L. & Skills»** (with ready-made check Target Numbers), **«Zone DR & Status»**, **«Weapons & Ammo»**, and **«Perks, Trait & Inventory»**;
++  - whenever a player updates health, gear, ammo, or stats on their sheet, the numbers in the Game Master's open spoilers update automatically.
++- **Game Master Commands:** use **«Party Command»** in the room bar (or **«Command»** on an individual character card) to affect characters cleanly:
++  - grant a **Level Up** (for example, **«+1 level»** to everyone — players receive a notice and manually spend their new skill points and pick their perk on their own sheets), grant or deduct caps, restore Luck points, heal/rest, or adjust radiation;
++  - if a player's phone screen was asleep when the command was sent, the room holds the command until they reconnect and applies it once, showing live delivery progress in the room header.
+ 
+ ---
+ 
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 46e679a..0699039 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -40,10 +40,15 @@
+    - **бледный** — ведущий сейчас не в сети (вводить код заново не нужно: как только комната снова откроется, персонаж переподключится сам).
+ 4. Игрок может свободно раскладывать своих персонажей по личным папкам — связь с комнатой ведущего при этом не сбрасывается.
+ 
+-### Что видит ведущий внутри комнаты
+-- Внутри комнаты отображаются карточки всех подключённых к ней персонажей.
+-- Когда игрок меняет снаряжение, здоровье, крышки или характеристики и сохраняет лист, карточка у ведущего обновляется автоматически.
+-- Нажав на карточку персонажа в комнате, ведущий может открыть его лист для просмотра (вкладки характеристик, снаряжения, инвентаря и способностей), а затем вернуться обратно к списку группы.
++### Что видит ведущий внутри комнаты и как влиять на группу
++- Пространство ведущего полностью отделено от листов игроков и листается свайпами между собственными разделами Мастера.
++- Внутри комнаты отображаются **живые карточки-сводки** всех подключённых персонажей (только для чтения — сам лист остаётся в руках игрока):
++  - в шапке карточки всегда видны уровень, здоровье, радиация, защита, инициатива, бонус ближнего боя, очки удачи, загруженность и крышки;
++  - прямо на месте можно раскрыть независимые **спойлеры** сразу у одного или нескольких героев: **«S.P.E.C.I.A.L. и Навыки»** (с готовыми порогами проверок), **«Защита по зонам и состояния»**, **«Оружие и боезапас»**, **«Перки, черта и инвентарь»**;
++  - как только игрок меняет что-то у себя в листе, цифры в открытых спойлерах у ведущего обновляются сами.
++- **Команды ведущего:** чтобы наградить группу или повлиять на героев, нажмите **«Команда группе»** в шапке комнаты (или кнопку **«Команда»** на карточке конкретного персонажа):
++  - можно повысить уровень (например, **«+1 уровень»** всем — после чего игроки у себя на телефонах сами вручную распределят навыки и выберут новый перк), выдать или списать крышки, восстановить очки Удачи, провести отдых/исцеление или изменить радиацию;
++  - если у кого-то из игроков телефон в этот момент погас, команда дождётся его возвращения в комнату и применится ровно один раз, а ведущий видит счётчик доставки прямо в шапке комнаты.
+ 
+ ---
+ 
+diff --git a/modules/fallout/gm/gmCharacterSummary.js b/modules/fallout/gm/gmCharacterSummary.js
+new file mode 100644
+index 0000000..c0030e6
+--- /dev/null
++++ b/modules/fallout/gm/gmCharacterSummary.js
+@@ -0,0 +1,563 @@
++// modules/fallout/gm/gmCharacterSummary.js
++// Чистый readonly-ридер сетевого снапшота персонажа для карточек со спойлерами
++// в комнате Мастера. НЕ трогает useCharacterStore и локальную БД — работает
++// исключительно по данным snapshotPayload из roomStore.
++
++import { migrateCharacterState } from '../../../src/store/migrations';
++import { restoreSaveData } from '../../../domain/saveSlimming';
++import { resolveItem } from '../../../domain/resolveItem';
++import { getEquipmentCatalog } from '../../../i18n/equipmentCatalog';
++import { getCurrentLocale, getCurrentModuleLocale } from '../../../i18n/locale';
++import { findEnrichedOrigin, isRobotCharacter } from '../../../domain/origins';
++import { findTraitById, tTrait } from '../../../domain/traits';
++import {
++  ALL_SKILL_KEYS,
++  CANONICAL_ATTRIBUTE_KEYS,
++  createInitialAttributes,
++  getAttributeValue,
++  getCanonicalAttributeKey,
++} from '../../../domain/characterCreation';
++import { migrateSkillsToCanonical } from '../../../domain/skillCanonical';
++import { resolveBodyPlan } from '../../../domain/bodyplan';
++import { getRobotSlotKeys, getBuiltinWeaponsFromSlots } from '../../../domain/robotEquip';
++import { getRobotSlotDamageResistance } from '../../../domain/robotDamageResistance';
++import { getSlotHitRange } from '../../../domain/robotSlots';
++import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
++import {
++  getTimedAttributeModifiers,
++  getTimedDamageResistanceBonus,
++  getTimedDefenseBonus,
++  getTimedMaxHpBonus,
++} from '../../../domain/effects';
++import {
++  applyFrameAttributeModifiers,
++  hasFrame,
++  suppressesLayerAt,
++} from '../../../domain/powerArmor';
++import {
++  PA_FRAME_CATALOG,
++  calculateCarryWeight,
++  calculateDefense,
++  calculateInitiative,
++  calculateMaxHealth,
++  calculateMeleeBonus,
++  calculateRobotCarryWeight,
++} from '../logic/derivedStats';
++import dataPowerArmor from '../data/equipment/powerArmor.json';
++import ruPerksData from '../i18n/ru-RU/data/perks/perks.json';
++import enPerksData from '../i18n/en-EN/data/perks/perks.json';
++import { CHARACTER_DICTIONARIES } from '../screens/CharacterScreen/logic/characterScreenI18n';
++import { tWeaponsAndArmorScreen } from '../screens/WeaponsAndArmorScreen/weaponsAndArmorScreenI18n';
++import { tGm } from './gmI18n';
++
++const PA_CATALOG_BY_ID = Object.fromEntries(
++  Object.values(dataPowerArmor || {})
++    .flatMap((set) => set?.pieces || [])
++    .map((piece) => [piece.id, piece]),
++);
++
++const PERKS_BY_LOCALE = {
++  'ru-RU': new Map((ruPerksData || []).map((p) => [p.id, p])),
++  'en-EN': new Map((enPerksData || []).map((p) => [p.id, p])),
++};
++
++// Канонический атрибут по умолчанию для каждого навыка Fallout 2d20
++export const SKILL_DEFAULT_ATTRIBUTE = Object.freeze({
++  ATHLETICS: 'STR',
++  BARTER: 'CHA',
++  BIG_GUNS: 'END',
++  ENERGY_WEAPONS: 'PER',
++  EXPLOSIVES: 'PER',
++  LOCKPICK: 'PER',
++  MEDICINE: 'INT',
++  MELEE_WEAPONS: 'STR',
++  PILOT: 'PER',
++  REPAIR: 'INT',
++  SCIENCE: 'INT',
++  SMALL_GUNS: 'AGI',
++  SNEAK: 'AGI',
++  SPEECH: 'CHA',
++  SURVIVAL: 'END',
++  THROWING: 'AGI',
++  UNARMED: 'STR',
++});
++
++const HUMANOID_ZONE_KEYS = ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'];
++
++const safeResolveItem = (item, catalog) => {
++  if (!item || !catalog) return item;
++  try {
++    return resolveItem(item, catalog) || item;
++  } catch {
++    return item;
++  }
++};
++
++const hydrateSnapshotDataReadonly = (rawData, moduleLocale) => {
++  if (!rawData || typeof rawData !== 'object') return {};
++  let migrated = rawData;
++  try {
++    migrated = migrateCharacterState(rawData);
++  } catch {
++    migrated = rawData;
++  }
++  let catalog = null;
++  try {
++    catalog = getEquipmentCatalog(moduleLocale);
++  } catch {
++    catalog = null;
++  }
++  if (!catalog) return { data: migrated, catalog: null };
++  try {
++    const restored = restoreSaveData(migrated, {
++      resolve: (item) => safeResolveItem(item, catalog),
++    });
++    return { data: restored, catalog };
++  } catch {
++    return { data: migrated, catalog };
++  }
++};
++
++const buildAttributesList = (rawAttributes, equippedPowerArmor, timedEffects) => {
++  const baseMap = {};
++  for (const entry of createInitialAttributes()) {
++    baseMap[entry.name] = entry.value;
++  }
++  if (Array.isArray(rawAttributes)) {
++    for (const attr of rawAttributes) {
++      const key = getCanonicalAttributeKey(attr?.name);
++      if (key && Number.isFinite(Number(attr?.value))) {
++        baseMap[key] = Number(attr.value);
++      }
++    }
++  } else if (rawAttributes && typeof rawAttributes === 'object') {
++    for (const [k, v] of Object.entries(rawAttributes)) {
++      const key = getCanonicalAttributeKey(k);
++      const num = typeof v === 'object' ? Number(v?.total ?? v?.base ?? v?.value) : Number(v);
++      if (key && Number.isFinite(num)) {
++        baseMap[key] = num;
++      }
++    }
++  }
++
++  let list = CANONICAL_ATTRIBUTE_KEYS.map((key) => ({
++    name: key,
++    value: baseMap[key] ?? 4,
++  }));
++
++  try {
++    if (hasFrame(equippedPowerArmor) && PA_FRAME_CATALOG) {
++      list = applyFrameAttributeModifiers(list, equippedPowerArmor, PA_FRAME_CATALOG);
++    }
++  } catch {
++    // ignore malformed PA frame
++  }
++
++  try {
++    const timedMods = getTimedAttributeModifiers(timedEffects || []);
++    if (timedMods && typeof timedMods === 'object') {
++      list = list.map((attr) => ({
++        ...attr,
++        value: Math.max(1, attr.value + (Number(timedMods[attr.name]) || 0)),
++      }));
++    }
++  } catch {
++    // ignore malformed timed effects
++  }
++
++  return list;
++};
++
++const normalizeTaggedSkillSet = (data) => {
++  const rawTagged = [
++    ...(Array.isArray(data?.selectedSkills) ? data.selectedSkills : []),
++    ...(Array.isArray(data?.extraTaggedSkills) ? data.extraTaggedSkills : []),
++    ...(Array.isArray(data?.forcedSelectedSkills) ? data.forcedSelectedSkills : []),
++  ];
++  const migrated = migrateSkillsToCanonical({
++    skills: [],
++    selectedSkills: rawTagged,
++  });
++  return new Set(migrated?.selectedSkills || rawTagged);
++};
++
++const buildSkillsRows = (data, effectiveAttributes, locale) => {
++  const rankByKey = {};
++  for (const key of ALL_SKILL_KEYS) rankByKey[key] = 0;
++
++  let normalizedSkills = Array.isArray(data?.skills) ? data.skills : [];
++  try {
++    const res = migrateSkillsToCanonical({ skills: normalizedSkills });
++    if (Array.isArray(res?.skills)) normalizedSkills = res.skills;
++  } catch {
++    // keep raw array
++  }
++
++  for (const entry of normalizedSkills) {
++    const key = entry?.name;
++    if (key && Object.hasOwn(rankByKey, key)) {
++      rankByKey[key] = Math.max(0, Number(entry?.value ?? entry?.total ?? entry?.base) || 0);
++    }
++  }
++
++  const taggedSet = normalizeTaggedSkillSet(data);
++  const skillDict = CHARACTER_DICTIONARIES[locale]?.skillsCatalog || CHARACTER_DICTIONARIES['ru-RU']?.skillsCatalog || {};
++
++  return ALL_SKILL_KEYS.map((key) => {
++    const attrKey = SKILL_DEFAULT_ATTRIBUTE[key] || 'INT';
++    const attrVal = getAttributeValue(effectiveAttributes, attrKey);
++    const rank = rankByKey[key] ?? 0;
++    const tagged = taggedSet.has(key);
++    return {
++      key,
++      label: skillDict[key] || key,
++      attrKey,
++      attrLabel: tGm(`card.attributes.${attrKey}`, locale),
++      rank,
++      tagged,
++      tn: attrVal + rank,
++    };
++  });
++};
++
++const computeTotalInventoryWeight = (items = []) => {
++  let sum = 0;
++  for (const item of items) {
++    if (!item) continue;
++    const w = Number(item.weight);
++    if (!Number.isFinite(w) || w <= 0) continue;
++    const qty = Math.max(1, Number(item.quantity ?? item.count) || 1);
++    sum += w * qty;
++  }
++  return Math.round(sum * 10) / 10;
++};
++
++export const extractGmCharacterSummary = (
++  snapshotPayload,
++  {
++    locale = getCurrentLocale(),
++    moduleLocale = getCurrentModuleLocale(),
++  } = {},
++) => {
++  const rawPayload = snapshotPayload || {};
++  const { data, catalog } = hydrateSnapshotDataReadonly(rawPayload.data || {}, moduleLocale);
++
++  const level = Math.max(1, Number(data?.level ?? rawPayload.level) || 1);
++  const name = String(data?.characterName || rawPayload.name || '—');
++
++  const originId = typeof data?.origin === 'string'
++    ? data.origin
++    : (data?.origin?.id || rawPayload.originName || null);
++  let resolvedOrigin = null;
++  if (originId) {
++    try {
++      resolvedOrigin = findEnrichedOrigin(originId);
++    } catch {
++      resolvedOrigin = null;
++    }
++  }
++  const originLabel = resolvedOrigin?.name || rawPayload.originName || (originId ? String(originId) : '—');
++  const originImage = resolvedOrigin?.image || null;
++
++  const traitId = (typeof data?.trait === 'string' ? data.trait : data?.trait?.id)
++    || (Array.isArray(resolvedOrigin?.traitIds) && resolvedOrigin.traitIds.length === 1 ? resolvedOrigin.traitIds[0] : null);
++  let resolvedTrait = data?.trait && typeof data.trait === 'object' ? data.trait : null;
++  if (traitId) {
++    try {
++      resolvedTrait = findTraitById(traitId) || resolvedTrait;
++    } catch {
++      // keep raw
++    }
++  }
++  let traitLabel = null;
++  if (resolvedTrait?.id) {
++    try {
++      traitLabel = tTrait(resolvedTrait.id, 'name') || resolvedTrait.name || resolvedTrait.id;
++    } catch {
++      traitLabel = resolvedTrait.name || resolvedTrait.id;
++    }
++  } else if (resolvedTrait?.name) {
++    traitLabel = resolvedTrait.name;
++  }
++
++  const timedEffects = Array.isArray(data?.activeTimedEffects) ? data.activeTimedEffects : [];
++  const effectiveAttributes = buildAttributesList(data?.attributes, data?.equippedPowerArmor, timedEffects);
++
++  const isRobot = Boolean(
++    isRobotCharacter({ origin: resolvedOrigin || (originId ? { id: originId } : null), trait: resolvedTrait })
++    || (data?.equippedRobotSlots && Object.keys(data.equippedRobotSlots).length > 0),
++  );
++
++  const maxHealth = calculateMaxHealth(effectiveAttributes, level) + (Number(getTimedMaxHpBonus(timedEffects)) || 0);
++  const radiation = Math.max(0, Number(data?.radiation) || 0);
++  const effectiveMaxHealth = Math.max(0, maxHealth - radiation);
++  const currentHealth = data?.currentHealth != null
++    ? Math.max(0, Number(data.currentHealth) || 0)
++    : effectiveMaxHealth;
++
++  const initiative = calculateInitiative(effectiveAttributes);
++  const defense = calculateDefense(effectiveAttributes) + (Number(getTimedDefenseBonus(timedEffects)) || 0);
++  const meleeBonus = calculateMeleeBonus(effectiveAttributes, resolvedTrait);
++  const maxLuckPoints = getAttributeValue(effectiveAttributes, 'LCK');
++  const luckPoints = data?.luckPoints != null
++    ? Math.max(0, Number(data.luckPoints) || 0)
++    : maxLuckPoints;
++
++  const allItems = Array.isArray(data?.equipment?.items) ? data.equipment.items : [];
++  const totalWeight = computeTotalInventoryWeight(allItems);
++  const maxCarryWeight = isRobot
++    ? calculateRobotCarryWeight(data?.equippedRobotSlots || {}, resolvedTrait)
++    : calculateCarryWeight(effectiveAttributes, resolvedTrait, data || {});
++  const isOverencumbered = totalWeight > maxCarryWeight;
++
++  const caps = Math.max(0, Math.floor(Number(data?.caps ?? data?.currency) || 0));
++
++  const attributes = effectiveAttributes.map((attr) => ({
++    key: attr.name,
++    label: tGm(`card.attributes.${attr.name}`, locale),
++    value: attr.value,
++  }));
++
++  const skills = buildSkillsRows(data, effectiveAttributes, locale);
++
++  // Иммунитеты
++  const charImmunityCtx = {
++    origin: resolvedOrigin || (originId ? { id: originId } : null),
++    trait: resolvedTrait,
++  };
++  const radImmune = Boolean(isRobot || hasRadiationImmunity(charImmunityCtx));
++  const poisonImmune = Boolean(isRobot || hasPoisonImmunity(charImmunityCtx));
++  const immunities = [];
++  if (radImmune) immunities.push(tGm('card.status.radImmunity', locale));
++  if (poisonImmune) immunities.push(tGm('card.status.poisonImmunity', locale));
++
++  // Защита по зонам
++  const timedDR = getTimedDamageResistanceBonus(timedEffects) || {};
++  const armorZones = [];
++  if (isRobot && data?.equippedRobotSlots) {
++    const bodyPlan = resolveBodyPlan({ origin: resolvedOrigin || { id: originId } });
++    const slotKeys = getRobotSlotKeys(bodyPlan);
++    for (const slotKey of slotKeys) {
++      const slotData = data.equippedRobotSlots[slotKey] || {};
++      const dr = getRobotSlotDamageResistance(slotData);
++      const hitRange = bodyPlan ? getSlotHitRange(bodyPlan, slotKey) : null;
++      const zoneTitle = tWeaponsAndArmorScreen(`robotSlot.slotNames.${slotKey}`) || slotKey;
++      armorZones.push({
++        key: slotKey,
++        zone: zoneTitle !== `robotSlot.slotNames.${slotKey}` ? zoneTitle : slotKey,
++        hitRoll: hitRange ? `${hitRange.from}–${hitRange.to}` : '—',
++        phys: dr.physical || 0,
++        energy: dr.energy || 0,
++        rad: radImmune ? '∞' : (dr.radiation || 0),
++        paHp: null,
++        itemName: safeResolveItem(slotData?.limb, catalog)?.name || null,
++      });
++    }
++  } else {
++    const equippedArmor = data?.equippedArmor || {};
++    const equippedPA = data?.equippedPowerArmor || null;
++    for (const zoneKey of HUMANOID_ZONE_KEYS) {
++      if (equippedPA && suppressesLayerAt(equippedPA, zoneKey)) {
++        const paPiece = equippedPA.pieces?.[zoneKey];
++        const paCat = paPiece ? PA_CATALOG_BY_ID[paPiece.catalogId] : null;
++        const paLocalized = paPiece
++          ? (catalog?.powerArmorList || []).find((p) => p.id === paPiece.catalogId)
++          : null;
++        armorZones.push({
++          key: zoneKey,
++          zone: tGm(`card.armorTable.zones.${zoneKey}`, locale),
++          hitRoll: tGm(`card.armorTable.hitRolls.${zoneKey}`, locale),
++          phys: Number(paCat?.physicalDamageRating || 0) + (Number(timedDR.physical) || 0),
++          energy: Number(paCat?.energyDamageRating || 0) + (Number(timedDR.energy) || 0),
++          rad: radImmune ? '∞' : (Number(paCat?.radiationDamageRating || 0) + (Number(timedDR.radiation) || 0)),
++          paHp: paPiece && paCat?.hp ? `${paPiece.hpCurrent ?? paCat.hp}/${paCat.hp}` : null,
++          itemName: paLocalized?.name || paPiece?.catalogId || null,
++        });
++      } else {
++        const slot = equippedArmor[zoneKey] || {};
++        const modArmor = safeResolveItem(slot.armor, catalog);
++        const modCloth = safeResolveItem(slot.clothing, catalog);
++        const phys = Math.max(Number(modArmor?.physicalDamageRating || 0), Number(modCloth?.physicalDamageRating || 0))
++          + (Number(timedDR.physical) || 0);
++        const energy = Math.max(Number(modArmor?.energyDamageRating || 0), Number(modCloth?.energyDamageRating || 0))
++          + (Number(timedDR.energy) || 0);
++        const rad = Math.max(Number(modArmor?.radiationDamageRating || 0), Number(modCloth?.radiationDamageRating || 0))
++          + (Number(timedDR.radiation) || 0);
++        armorZones.push({
++          key: zoneKey,
++          zone: tGm(`card.armorTable.zones.${zoneKey}`, locale),
++          hitRoll: tGm(`card.armorTable.hitRolls.${zoneKey}`, locale),
++          phys,
++          energy,
++          rad: radImmune ? '∞' : rad,
++          paHp: null,
++          itemName: modArmor?.name || modCloth?.name || null,
++        });
++      }
++    }
++  }
++
++  // Состояния и выживание
++  const conditionLabels = [];
++  for (const cond of Array.isArray(data?.conditions) ? data.conditions : []) {
++    if (!cond) continue;
++    const label = typeof cond === 'string' ? cond : (cond.name || cond.label || cond.id);
++    if (label) conditionLabels.push(String(label));
++  }
++  for (const eff of timedEffects) {
++    const label = eff?.name || eff?.sourceName || eff?.label || eff?.id;
++    if (label) conditionLabels.push(String(label));
++  }
++
++  let survivalSummary = null;
++  if (!isRobot && data?.survival && typeof data.survival === 'object') {
++    const s = data.survival;
++    const foodTxt = s.food != null ? tWeaponsAndArmorScreen(`survival.food.${s.food}`) : null;
++    const waterTxt = s.water != null ? tWeaponsAndArmorScreen(`survival.water.${s.water}`) : null;
++    const sleepTxt = s.sleep != null ? tWeaponsAndArmorScreen(`survival.sleep.${s.sleep}`) : null;
++    if (foodTxt || waterTxt || sleepTxt) {
++      survivalSummary = {
++        food: foodTxt && !foodTxt.startsWith('survival.') ? foodTxt : String(s.food ?? 0),
++        water: waterTxt && !waterTxt.startsWith('survival.') ? waterTxt : String(s.water ?? 0),
++        sleep: sleepTxt && !sleepTxt.startsWith('survival.') ? sleepTxt : String(s.sleep ?? 0),
++      };
++    }
++  }
++
++  // Боезапас по id/имени патрона
++  const ammoQtyByKey = new Map();
++  for (const item of allItems) {
++    if (!item) continue;
++    const isAmmo = item.type === 'ammo' || item.itemType === 'ammo' || String(item.id || '').startsWith('ammo_');
++    if (!isAmmo) continue;
++    const qty = Math.max(0, Number(item.quantity ?? item.count) || 0);
++    const idKey = item.id || item.itemId || item.code;
++    if (idKey) ammoQtyByKey.set(String(idKey), (ammoQtyByKey.get(String(idKey)) || 0) + qty);
++    if (item.name) ammoQtyByKey.set(String(item.name), (ammoQtyByKey.get(String(item.name)) || 0) + qty);
++  }
++
++  // Экипированное оружие
++  const rawWeapons = [];
++  if (Array.isArray(data?.equippedWeapons) && data.equippedWeapons.length > 0) {
++    rawWeapons.push(...data.equippedWeapons.filter(Boolean));
++  } else {
++    rawWeapons.push(...allItems.filter((it) => it?.equipped && (it?.damage !== undefined || it?.weaponId)));
++  }
++  if (isRobot && data?.equippedRobotSlots) {
++    try {
++      const robotWeapons = getBuiltinWeaponsFromSlots(data.equippedRobotSlots) || [];
++      for (const rw of robotWeapons) {
++        if (rw && !rawWeapons.some((w) => (w.id || w.weaponId) === (rw.id || rw.weaponId))) {
++          rawWeapons.push(rw);
++        }
++      }
++    } catch {
++      // ignore
++    }
++  }
++
++  const weapons = rawWeapons.map((w, idx) => {
++    const resolved = safeResolveItem(w, catalog) || w;
++    const dmgRaw = typeof resolved?.damage === 'object'
++      ? (resolved.damage?.total ?? resolved.damage?.base ?? 0)
++      : (resolved?.damage ?? resolved?.damageRating ?? 0);
++    const fireRateRaw = typeof resolved?.fireRate === 'object'
++      ? (resolved.fireRate?.total ?? resolved.fireRate?.base ?? null)
++      : (resolved?.fireRate ?? null);
++    const ammoKey = resolved?.ammoId || resolved?.ammo || null;
++    let ammoCount = null;
++    if (ammoKey && ammoKey !== 'none' && ammoKey !== '—') {
++      const ammoCatalogEntry = (catalog?.ammo || []).find((a) => a.id === ammoKey || a.name === ammoKey);
++      const countById = ammoQtyByKey.get(String(ammoKey));
++      const countByName = ammoCatalogEntry?.name ? ammoQtyByKey.get(ammoCatalogEntry.name) : undefined;
++      ammoCount = countById ?? countByName ?? 0;
++    }
++    return {
++      key: `${resolved?.id || resolved?.weaponId || 'w'}_${idx}`,
++      name: resolved?.name || w?.name || '—',
++      damage: `${Number(dmgRaw) || 0} {CD}`,
++      fireRate: fireRateRaw != null && fireRateRaw !== '' ? String(fireRateRaw) : '—',
++      range: resolved?.range ? String(resolved.range) : '—',
++      ammoCount,
++      ammoLabel: ammoKey && ammoKey !== 'none'
++        ? ((catalog?.ammo || []).find((a) => a.id === ammoKey)?.name || String(ammoKey))
++        : null,
++    };
++  });
++
++  // Перки и группированный инвентарь
++  const perksMap = PERKS_BY_LOCALE[moduleLocale] || PERKS_BY_LOCALE['ru-RU'];
++  const perksAgg = new Map();
++  for (const entry of Array.isArray(data?.selectedPerks) ? data.selectedPerks : []) {
++    if (!entry) continue;
++    const id = typeof entry === 'string' ? entry : (entry.id || entry.perkId);
++    const rankVal = typeof entry === 'object'
++      ? (Number(entry.rank ?? entry.ranks ?? entry.count ?? entry.currentRank) || 1)
++      : 1;
++    const mapKey = id || String(entry?.name || Math.random());
++    const localized = id ? perksMap.get(id) : null;
++    const prev = perksAgg.get(mapKey);
++    if (prev) {
++      prev.rank += rankVal;
++    } else {
++      perksAgg.set(mapKey, {
++        key: `${id || 'perk'}_${perksAgg.size}`,
++        id: id || '',
++        name: localized?.name || entry?.name || id || '—',
++        rank: rankVal,
++      });
++    }
++  }
++  const perks = [...perksAgg.values()];
++
++  const groupedInvMap = new Map();
++  for (const item of allItems) {
++    if (!item) continue;
++    const resolved = safeResolveItem(item, catalog) || item;
++    const itemName = String(resolved?.name || item?.name || item?.id || '').trim();
++    if (!itemName) continue;
++    const qty = Math.max(1, Number(item.quantity ?? item.count) || 1);
++    const prev = groupedInvMap.get(itemName) || { name: itemName, quantity: 0, equipped: false };
++    prev.quantity += qty;
++    if (item.equipped) prev.equipped = true;
++    groupedInvMap.set(itemName, prev);
++  }
++  const inventory = [...groupedInvMap.values()].sort((a, b) => (
++    Number(b.equipped) - Number(a.equipped) || a.name.localeCompare(b.name)
++  ));
++
++  return {
++    id: String(rawPayload.characterId || ''),
++    name,
++    level,
++    originLabel,
++    originImage,
++    avatarDataUrl: rawPayload.avatarDataUrl || null,
++    isRobot,
++    vitals: {
++      currentHealth,
++      effectiveMaxHealth,
++      maxHealth,
++      radiation,
++      defense,
++      initiative,
++      meleeBonus,
++      luckPoints,
++      maxLuckPoints,
++      totalWeight,
++      maxCarryWeight,
++      isOverencumbered,
++      caps,
++    },
++    attributes,
++    skills,
++    armorZones,
++    immunities,
++    conditions: conditionLabels,
++    survival: survivalSummary,
++    weapons,
++    traitLabel,
++    perks,
++    inventory,
++  };
++};
+diff --git a/modules/fallout/gm/gmDirectives.js b/modules/fallout/gm/gmDirectives.js
+new file mode 100644
+index 0000000..ab60b3c
+--- /dev/null
++++ b/modules/fallout/gm/gmDirectives.js
+@@ -0,0 +1,239 @@
++// modules/fallout/gm/gmDirectives.js
++// Каталог команд Мастера сеттинга Fallout 2d20 и чистые функции их применения
++// на стороне клиента Игрока (как к открытому в characterStore листу, так и к
++// сохранённому в локальной SQLite/WebAdapter персонажу, если сейчас открыт
++// другой экран или другой персонаж).
++
++import { getCurrentLocale } from '../../../i18n/locale';
++import { selectLegacyAttributes } from '../../../src/store/selectors';
++import { getAttributeValue } from '../../../domain/characterCreation';
++import { findEnrichedOrigin, isRobotCharacter } from '../../../domain/origins';
++import { findTraitById } from '../../../domain/traits';
++import { hasRadiationImmunity } from '../../../domain/immunities';
++import { calculateMaxHealth } from '../logic/derivedStats';
++import { formatGm, tGm } from './gmI18n';
++
++export const GM_DIRECTIVE_KIND = Object.freeze({
++  LEVEL_GRANT: 'level.grant',
++  CAPS_GRANT: 'caps.grant',
++  LUCK_RESTORE: 'luck.restore',
++  HP_HEAL: 'hp.heal',
++  RAD_ADJUST: 'rad.adjust',
++});
++
++export const GM_DIRECTIVE_CATALOG = Object.freeze([
++  {
++    kind: GM_DIRECTIVE_KIND.LEVEL_GRANT,
++    icon: 'chevron-double-up',
++    defaultAmount: 1,
++    presets: [1, 2],
++    hasAmountInput: true,
++    allowNegative: false,
++  },
++  {
++    kind: GM_DIRECTIVE_KIND.CAPS_GRANT,
++    icon: 'circle-multiple-outline',
++    defaultAmount: 25,
++    presets: [10, 25, 50, 100],
++    hasAmountInput: true,
++    allowNegative: true,
++  },
++  {
++    kind: GM_DIRECTIVE_KIND.LUCK_RESTORE,
++    icon: 'clover',
++    defaultAmount: 0,
++    presets: [],
++    hasAmountInput: false,
++    allowNegative: false,
++  },
++  {
++    kind: GM_DIRECTIVE_KIND.HP_HEAL,
++    icon: 'heart-plus-outline',
++    defaultAmount: 0,
++    defaultMode: 'full',
++    presets: [2, 5, 10],
++    hasAmountInput: true,
++    allowNegative: false,
++  },
++  {
++    kind: GM_DIRECTIVE_KIND.RAD_ADJUST,
++    icon: 'radioactive',
++    defaultAmount: 1,
++    presets: [1, 2, -1, -2],
++    hasAmountInput: true,
++    allowNegative: true,
++  },
++]);
++
++export const formatDirectiveBadgeLabel = (directive, locale = getCurrentLocale()) => {
++  if (!directive?.kind) return '';
++  const amount = Number(directive.amount) || 0;
++  if (directive.kind === GM_DIRECTIVE_KIND.HP_HEAL && (directive.mode === 'full' || amount <= 0)) {
++    return tGm('commands.kinds.hp.heal.fullShort', locale);
++  }
++  const tpl = tGm(`commands.kinds.${directive.kind}.short`, locale);
++  return formatGm(tpl, {
++    amount: Math.abs(amount) || 1,
++    sign: amount < 0 ? '−' : '+',
++  });
++};
++
++const isCharacterRadImmune = (originLike, traitLike, robotSlots = null) => {
++  const originId = typeof originLike === 'string' ? originLike : originLike?.id;
++  let resolvedOrigin = originLike && typeof originLike === 'object' ? originLike : null;
++  if (originId && !resolvedOrigin?.bodyPlan) {
++    try { resolvedOrigin = findEnrichedOrigin(originId) || resolvedOrigin; } catch { /* ignore */ }
++  }
++  const traitId = (typeof traitLike === 'string' ? traitLike : traitLike?.id)
++    || (Array.isArray(resolvedOrigin?.traitIds) && resolvedOrigin.traitIds.length === 1 ? resolvedOrigin.traitIds[0] : null);
++  let resolvedTrait = traitLike && typeof traitLike === 'object' ? traitLike : null;
++  if (traitId && !resolvedTrait?.modifiers) {
++    try { resolvedTrait = findTraitById(traitId) || resolvedTrait; } catch { /* ignore */ }
++  }
++  const ctx = { origin: resolvedOrigin || (originId ? { id: originId } : null), trait: resolvedTrait };
++  if (isRobotCharacter(ctx) || (robotSlots && Object.keys(robotSlots).length > 0)) return true;
++  return Boolean(hasRadiationImmunity(ctx));
++};
++
++/**
++ * Применяет директиву Мастера к активному персонажу в `useCharacterStore`.
++ * Возвращает локализованное сообщение для показа игроку.
++ */
++export const applyDirectiveToLiveCharacterStore = (directive, useCharacterStore, locale = getCurrentLocale()) => {
++  const state = useCharacterStore.getState();
++  const kind = directive?.kind;
++  const rawAmount = Number(directive?.amount);
++  let summaryLine = '';
++
++  if (kind === GM_DIRECTIVE_KIND.LEVEL_GRANT) {
++    const delta = Math.max(1, Math.min(20, Math.floor(rawAmount || 1)));
++    const nextLevel = Math.max(1, (Number(state.level) || 1) + delta);
++    if (state.attributesSaved) {
++      state.setSkillsSaved(false);
++    }
++    state.setLevel(nextLevel);
++    summaryLine = formatGm(tGm('commands.playerAlert.levelUp', locale), {
++      delta,
++      level: nextLevel,
++    });
++  } else if (kind === GM_DIRECTIVE_KIND.CAPS_GRANT) {
++    const delta = Math.trunc(rawAmount || 0);
++    const prevCaps = Math.max(0, Math.floor(Number(state.currency) || 0));
++    const nextCaps = Math.max(0, prevCaps + delta);
++    state.setCurrency(nextCaps);
++    summaryLine = delta >= 0
++      ? formatGm(tGm('commands.playerAlert.capsAdded', locale), { delta, total: nextCaps })
++      : formatGm(tGm('commands.playerAlert.capsSpent', locale), { delta: Math.abs(delta), total: nextCaps });
++  } else if (kind === GM_DIRECTIVE_KIND.LUCK_RESTORE) {
++    const attrs = selectLegacyAttributes({ attributes: state.attributes });
++    const maxLuck = Math.max(0, getAttributeValue(attrs, 'LCK'));
++    state.setLuckPoints(maxLuck);
++    summaryLine = formatGm(tGm('commands.playerAlert.luckRestored', locale), {
++      luck: maxLuck,
++      max: maxLuck,
++    });
++  } else if (kind === GM_DIRECTIVE_KIND.HP_HEAL) {
++    const attrs = selectLegacyAttributes({ attributes: state.attributes });
++    const maxHp = calculateMaxHealth(attrs, state.level || 1);
++    const rad = Math.max(0, Number(state.radiation) || 0);
++    const ceiling = Math.max(0, maxHp - rad);
++    if (directive?.mode === 'full' || !(rawAmount > 0)) {
++      const nextHp = Math.max(Number(state.currentHealth) || 0, ceiling);
++      state.setCurrentHealth(nextHp);
++      summaryLine = formatGm(tGm('commands.playerAlert.hpHealed', locale), { hp: nextHp, max: ceiling });
++    } else {
++      const healAmt = Math.max(1, Math.floor(rawAmount));
++      state.healCharacter(healAmt, ceiling);
++      const nextHp = useCharacterStore.getState().currentHealth;
++      summaryLine = formatGm(tGm('commands.playerAlert.hpHealed', locale), { hp: nextHp, max: ceiling });
++    }
++  } else if (kind === GM_DIRECTIVE_KIND.RAD_ADJUST) {
++    const delta = Math.trunc(rawAmount || 0);
++    const immune = isCharacterRadImmune(state.origin, state.trait, state.robot?.slots);
++    if (delta > 0 && immune) {
++      summaryLine = formatGm(tGm('commands.playerAlert.radImmune', locale), { delta });
++    } else {
++      const prevRad = Math.max(0, Number(state.radiation) || 0);
++      const nextRad = Math.max(0, prevRad + delta);
++      state.setRadiation(nextRad);
++      summaryLine = formatGm(tGm('commands.playerAlert.radChanged', locale), { rad: nextRad });
++    }
++  }
++
++  return summaryLine;
++};
++
++/**
++ * Применяет директиву Мастера напрямую к сохранённой строке персонажа из БД
++ * (когда персонаж привязан к комнате, но сейчас не открыт в characterStore).
++ */
++export const applyDirectiveToStoredCharacterRow = (directive, row, locale = getCurrentLocale()) => {
++  const data = row?.data && typeof row.data === 'object'
++    ? JSON.parse(JSON.stringify(row.data))
++    : {};
++  const kind = directive?.kind;
++  const rawAmount = Number(directive?.amount);
++  let nextLevel = Math.max(1, Number(data.level ?? row?.level) || 1);
++  let summaryLine = '';
++
++  const attrs = Array.isArray(data.attributes) ? data.attributes : [];
++
++  if (kind === GM_DIRECTIVE_KIND.LEVEL_GRANT) {
++    const delta = Math.max(1, Math.min(20, Math.floor(rawAmount || 1)));
++    nextLevel += delta;
++    data.level = nextLevel;
++    if (data.attributesSaved) {
++      data.skillsSaved = false;
++    }
++    summaryLine = formatGm(tGm('commands.playerAlert.levelUp', locale), {
++      delta,
++      level: nextLevel,
++    });
++  } else if (kind === GM_DIRECTIVE_KIND.CAPS_GRANT) {
++    const delta = Math.trunc(rawAmount || 0);
++    const prevCaps = Math.max(0, Math.floor(Number(data.caps ?? data.currency) || 0));
++    const nextCaps = Math.max(0, prevCaps + delta);
++    data.caps = nextCaps;
++    summaryLine = delta >= 0
++      ? formatGm(tGm('commands.playerAlert.capsAdded', locale), { delta, total: nextCaps })
++      : formatGm(tGm('commands.playerAlert.capsSpent', locale), { delta: Math.abs(delta), total: nextCaps });
++  } else if (kind === GM_DIRECTIVE_KIND.LUCK_RESTORE) {
++    const maxLuck = Math.max(0, getAttributeValue(attrs, 'LCK'));
++    data.luckPoints = maxLuck;
++    summaryLine = formatGm(tGm('commands.playerAlert.luckRestored', locale), {
++      luck: maxLuck,
++      max: maxLuck,
++    });
++  } else if (kind === GM_DIRECTIVE_KIND.HP_HEAL) {
++    const maxHp = calculateMaxHealth(attrs, nextLevel);
++    const rad = Math.max(0, Number(data.radiation) || 0);
++    const ceiling = Math.max(0, maxHp - rad);
++    const prevHp = data.currentHealth != null ? Number(data.currentHealth) : ceiling;
++    let nextHp = prevHp;
++    if (directive?.mode === 'full' || !(rawAmount > 0)) {
++      nextHp = Math.max(prevHp, ceiling);
++    } else {
++      const healAmt = Math.max(1, Math.floor(rawAmount));
++      nextHp = prevHp > ceiling ? prevHp : Math.min(ceiling, prevHp + healAmt);
++    }
++    data.currentHealth = nextHp;
++    summaryLine = formatGm(tGm('commands.playerAlert.hpHealed', locale), { hp: nextHp, max: ceiling });
++  } else if (kind === GM_DIRECTIVE_KIND.RAD_ADJUST) {
++    const delta = Math.trunc(rawAmount || 0);
++    const immune = isCharacterRadImmune(data.origin, data.trait, data.equippedRobotSlots);
++    if (delta > 0 && immune) {
++      summaryLine = formatGm(tGm('commands.playerAlert.radImmune', locale), { delta });
++    } else {
++      const prevRad = Math.max(0, Number(data.radiation) || 0);
++      const nextRad = Math.max(0, prevRad + delta);
++      data.radiation = nextRad;
++      summaryLine = formatGm(tGm('commands.playerAlert.radChanged', locale), { rad: nextRad });
++    }
++  }
++
++  return {
++    nextLevel,
++    nextData: data,
++    summaryLine,
++  };
++};
+diff --git a/modules/fallout/gm/gmI18n.js b/modules/fallout/gm/gmI18n.js
+new file mode 100644
+index 0000000..e86f43d
+--- /dev/null
++++ b/modules/fallout/gm/gmI18n.js
+@@ -0,0 +1,337 @@
++// modules/fallout/gm/gmI18n.js
++// Двуязычный словарь пространства Мастера (RU / EN):
++// readonly-карточки персонажей со спойлерами и команды Мастера.
++
++import { getCurrentLocale } from '../../../i18n/locale';
++
++export const GM_DICTIONARIES = {
++  'ru-RU': {
++    roomBar: {
++      groupCommand: 'Команда группе',
++      deliveryBadge: 'Команда: {acked}/{total}',
++      deliveryDone: 'Доставлено ({acked}/{total})',
++      readonlyHint: 'Только просмотр · влияние на персонажей через команды и добычу',
++      emptyPlayers: 'В этой комнате пока нет подключённых персонажей. Передайте адрес комнаты игрокам — их карточки со сводкой появятся здесь автоматически.',
++    },
++    card: {
++      levelShort: 'Ур. {level}',
++      online: 'В сети',
++      offline: 'Не в сети',
++      commandBtn: 'Команда',
++      expandAll: 'Раскрыть всё',
++      collapseAll: 'Свернуть всё',
++      vitals: {
++        hp: 'ОЗ',
++        rad: 'Рад',
++        defense: 'Защита',
++        initiative: 'Иниц.',
++        melee: 'Бонус ББ',
++        luck: 'Удача',
++        weight: 'Груз',
++        caps: 'Крышки',
++      },
++      spoilers: {
++        specialAndSkills: 'S.P.E.C.I.A.L. и Навыки',
++        armorAndConditions: 'Защита по зонам и состояния',
++        weaponsAndAmmo: 'Оружие и боезапас',
++        perksAndInventory: 'Перки, черта и инвентарь',
++      },
++      attributes: {
++        STR: 'СИЛ',
++        PER: 'ВОС',
++        END: 'ВЫН',
++        CHA: 'ХАР',
++        INT: 'ИНТ',
++        AGI: 'ЛОВ',
++        LCK: 'УДЧ',
++      },
++      skillsTable: {
++        skill: 'Навык',
++        attr: 'Атр.',
++        rank: 'Ранг',
++        tn: 'ПП',
++      },
++      armorTable: {
++        zone: 'Зона',
++        hitRoll: 'Куб',
++        phys: 'ФУ',
++        energy: 'ЭУ',
++        rad: 'РУ',
++        paHp: 'ОЗ СБ',
++        none: '—',
++        zones: {
++          head: 'Голова',
++          body: 'Торс',
++          leftArm: 'Л. рука',
++          rightArm: 'П. рука',
++          leftLeg: 'Л. нога',
++          rightLeg: 'П. нога',
++        },
++        hitRolls: {
++          head: '1–2',
++          body: '3–8',
++          leftArm: '9–11',
++          rightArm: '12–14',
++          leftLeg: '15–17',
++          rightLeg: '18–20',
++        },
++      },
++      status: {
++        immunities: 'Иммунитеты',
++        radImmunity: 'Радиация',
++        poisonImmunity: 'Яд',
++        conditions: 'Состояния и эффекты',
++        noConditions: 'Активных состояний и эффектов нет',
++        survival: 'Выживание',
++        food: 'Сытость',
++        water: 'Жажда',
++        sleep: 'Сон',
++      },
++      weapons: {
++        empty: 'Оружие не экипировано',
++        damage: 'Урон',
++        fireRate: 'СТР',
++        range: 'Дист.',
++        ammo: 'Патроны',
++        noAmmoNeeded: 'Б/Б',
++      },
++      perks: {
++        trait: 'Черта',
++        noTrait: '—',
++        perksTitle: 'Перки',
++        noPerks: 'Перки ещё не выбраны',
++        rankSuffix: 'р.{rank}',
++        inventoryTitle: 'Инвентарь',
++        emptyInventory: 'Инвентарь пуст',
++      },
++    },
++    commands: {
++      modalTitleRoom: 'Команда всей группе',
++      modalTitleCharacter: 'Команда: {name}',
++      targetRoomLabel: 'Получатели: все персонажи комнаты ({count})',
++      targetCharLabel: 'Получатель: {name}',
++      selectCommandLabel: 'Действие Мастера',
++      amountLabel: 'Значение',
++      noteLabel: 'Комментарий Мастера (необязательно)',
++      notePlaceholder: 'Например: За зачистку Супер-Дупер Марта',
++      sendBtn: 'Отправить команду',
++      cancelBtn: 'Отмена',
++      recentTitle: 'Последние команды в комнате',
++      recentDelivery: '{acked}/{total} получено',
++      kinds: {
++        'level.grant': {
++          title: 'Повысить уровень',
++          short: '+{amount} ур.',
++          hint: 'Поднимает уровень и открывает распределение навыков — игроки сами вручную раскидывают навыки и выбирают перк.',
++        },
++        'caps.grant': {
++          title: 'Выдать крышки',
++          short: '{sign}{amount} {CAP}',
++          hint: 'Начисляет (или списывает со знаком минус) крышки в кошелёк персонажа.',
++        },
++        'luck.restore': {
++          title: 'Восстановить очки Удачи',
++          short: 'Удача: макс.',
++          hint: 'Восстанавливает текущие очки Удачи до показателя атрибута УДЧ (начало новой сессии или вехи).',
++        },
++        'hp.heal': {
++          title: 'Исцеление / Отдых (ОЗ)',
++          short: 'ОЗ +{amount}',
++          fullShort: 'Полный отдых (ОЗ)',
++          modeFull: 'Полностью',
++          modeAmount: 'На число',
++          hint: 'Восстанавливает здоровье персонажа с учётом текущего потолка радиации.',
++        },
++        'rad.adjust': {
++          title: 'Изменить радиацию',
++          short: 'Рад {sign}{amount}',
++          hint: 'Добавляет радиацию (положительное число) или снимает её (отрицательное). Иммунитет учитывается автоматически.',
++        },
++      },
++      playerAlert: {
++        title: 'Команда Мастера — {character}',
++        levelUp: 'Ваш уровень повышен на +{delta} (теперь уровень {level})!\nОткройте лист персонажа, чтобы вручную распределить очки навыков и выбрать новый перк.',
++        capsAdded: 'Получено крышек: +{delta} (всего: {total}).',
++        capsSpent: 'Списано крышек: −{delta} (осталось: {total}).',
++        luckRestored: 'Очки Удачи восстановлены до максимума ({luck}/{max}).',
++        hpHealed: 'Здоровье восстановлено: {hp}/{max} ОЗ.',
++        radImmune: 'Источник радиации (+{delta} рад) не подействовал благодаря вашему иммунитету.',
++        radChanged: 'Уровень радиации изменён: теперь {rad} рад.',
++        notePrefix: 'Сообщение Мастера: «{note}»',
++      },
++    },
++  },
++  'en-EN': {
++    roomBar: {
++      groupCommand: 'Party Command',
++      deliveryBadge: 'Command: {acked}/{total}',
++      deliveryDone: 'Delivered ({acked}/{total})',
++      readonlyHint: 'Read-only view · affect characters via commands and loot/trade',
++      emptyPlayers: 'No characters are connected to this room yet. Share the room code with your players — their live summary cards will appear here automatically.',
++    },
++    card: {
++      levelShort: 'Lv. {level}',
++      online: 'Online',
++      offline: 'Offline',
++      commandBtn: 'Command',
++      expandAll: 'Expand all',
++      collapseAll: 'Collapse all',
++      vitals: {
++        hp: 'HP',
++        rad: 'Rad',
++        defense: 'Defense',
++        initiative: 'Init.',
++        melee: 'Melee',
++        luck: 'Luck',
++        weight: 'Weight',
++        caps: 'Caps',
++      },
++      spoilers: {
++        specialAndSkills: 'S.P.E.C.I.A.L. & Skills',
++        armorAndConditions: 'Zone DR & Status',
++        weaponsAndAmmo: 'Weapons & Ammo',
++        perksAndInventory: 'Perks, Trait & Inventory',
++      },
++      attributes: {
++        STR: 'STR',
++        PER: 'PER',
++        END: 'END',
++        CHA: 'CHA',
++        INT: 'INT',
++        AGI: 'AGI',
++        LCK: 'LCK',
++      },
++      skillsTable: {
++        skill: 'Skill',
++        attr: 'Attr.',
++        rank: 'Rank',
++        tn: 'TN',
++      },
++      armorTable: {
++        zone: 'Location',
++        hitRoll: 'd20',
++        phys: 'Phys',
++        energy: 'Eng',
++        rad: 'Rad',
++        paHp: 'PA HP',
++        none: '—',
++        zones: {
++          head: 'Head',
++          body: 'Torso',
++          leftArm: 'L. Arm',
++          rightArm: 'R. Arm',
++          leftLeg: 'L. Leg',
++          rightLeg: 'R. Leg',
++        },
++        hitRolls: {
++          head: '1–2',
++          body: '3–8',
++          leftArm: '9–11',
++          rightArm: '12–14',
++          leftLeg: '15–17',
++          rightLeg: '18–20',
++        },
++      },
++      status: {
++        immunities: 'Immunities',
++        radImmunity: 'Radiation',
++        poisonImmunity: 'Poison',
++        conditions: 'Conditions & Effects',
++        noConditions: 'No active conditions or effects',
++        survival: 'Survival',
++        food: 'Hunger',
++        water: 'Thirst',
++        sleep: 'Sleep',
++      },
++      weapons: {
++        empty: 'No weapons equipped',
++        damage: 'Dmg',
++        fireRate: 'FR',
++        range: 'Range',
++        ammo: 'Ammo',
++        noAmmoNeeded: 'Melee',
++      },
++      perks: {
++        trait: 'Trait',
++        noTrait: '—',
++        perksTitle: 'Perks',
++        noPerks: 'No perks selected yet',
++        rankSuffix: 'r.{rank}',
++        inventoryTitle: 'Inventory',
++        emptyInventory: 'Inventory is empty',
++      },
++    },
++    commands: {
++      modalTitleRoom: 'Command to Entire Party',
++      modalTitleCharacter: 'Command: {name}',
++      targetRoomLabel: 'Recipients: all room characters ({count})',
++      targetCharLabel: 'Recipient: {name}',
++      selectCommandLabel: 'GM Action',
++      amountLabel: 'Value',
++      noteLabel: 'GM Note (optional)',
++      notePlaceholder: 'E.g. Cleared Super-Duper Mart',
++      sendBtn: 'Send Command',
++      cancelBtn: 'Cancel',
++      recentTitle: 'Recent Room Commands',
++      recentDelivery: '{acked}/{total} received',
++      kinds: {
++        'level.grant': {
++          title: 'Grant Level Up',
++          short: '+{amount} lv.',
++          hint: 'Increases character level and unlocks skill allocation — players manually distribute their new skill points and pick a perk.',
++        },
++        'caps.grant': {
++          title: 'Grant / Deduct Caps',
++          short: '{sign}{amount} {CAP}',
++          hint: 'Adds (or subtracts with a minus sign) caps directly to the character wallet.',
++        },
++        'luck.restore': {
++          title: 'Restore Luck Points',
++          short: 'Luck: Max',
++          hint: 'Refills current Luck Points up to the character LCK attribute (session start or milestone).',
++        },
++        'hp.heal': {
++          title: 'Heal / Rest (HP)',
++          short: 'HP +{amount}',
++          fullShort: 'Full Rest (HP)',
++          modeFull: 'Full',
++          modeAmount: 'By amount',
++          hint: 'Restores character Health up to their radiation-adjusted maximum.',
++        },
++        'rad.adjust': {
++          title: 'Adjust Radiation',
++          short: 'Rad {sign}{amount}',
++          hint: 'Adds radiation (positive) or removes it (negative). Radiation immunity is respected automatically.',
++        },
++      },
++      playerAlert: {
++        title: 'GM Command — {character}',
++        levelUp: 'Your level increased by +{delta} (now Level {level})!\nOpen your character sheet to manually spend your skill points and choose a new perk.',
++        capsAdded: 'Received caps: +{delta} (total: {total}).',
++        capsSpent: 'Spent caps: −{delta} (remaining: {total}).',
++        luckRestored: 'Luck Points restored to maximum ({luck}/{max}).',
++        hpHealed: 'Health restored: {hp}/{max} HP.',
++        radImmune: 'Radiation exposure (+{delta} rad) had no effect thanks to your immunity.',
++        radChanged: 'Radiation updated: now {rad} rad.',
++        notePrefix: 'GM Note: "{note}"',
++      },
++    },
++  },
++};
++
++export const tGm = (path, localeOverride = null) => {
++  const loc = localeOverride || getCurrentLocale();
++  const dict = GM_DICTIONARIES[loc] || GM_DICTIONARIES['ru-RU'];
++  let cur = dict;
++  for (const part of String(path).split('.')) {
++    cur = cur?.[part];
++    if (cur === undefined) return path;
++  }
++  return cur;
++};
++
++export const formatGm = (template, vars = {}) => (
++  String(template ?? '').replace(/\{(\w+)\}/g, (_, key) => (
++    vars[key] !== undefined && vars[key] !== null ? String(vars[key]) : ''
++  ))
++);
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 0d7ce39..ba081e3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "480"
++  "baseline": "481"
+ }
+diff --git a/public/version.json b/public/version.json
+index cfef670..d6067f1 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "480",
++  "version": "481",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/server/protocol.js b/server/protocol.js
+index d7b5870..9ec476a 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -21,6 +21,8 @@ const MESSAGE = Object.freeze({
+   CHAR_PUBLISH: 'char.publish',
+   CHAR_FOCUS: 'char.focus',
+   GM_DIRECTIVE: 'gm.directive',
++  GM_DIRECTIVE_ACK: 'gm.directiveAck',
++  GM_DIRECTIVE_STATE: 'gm.directiveState',
+   // Выдача контейнеров добычи и торговли Мастером (патч 468):
+   SESSION_OPEN: 'session.open',
+   SESSION_STATE: 'session.state',
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index cd3e988..cf4a106 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -46,10 +46,19 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
+     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
++    directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
+     createdAt: now(),
+     emptySince: null,
+   });
+ 
++  const cloneDirectives = (directives) => (
++    (directives || []).map((entry) => ({
++      ...entry,
++      targetCharacterIds: [...(entry.targetCharacterIds || [])],
++      ackedByCharacterIds: [...(entry.ackedByCharacterIds || [])],
++    }))
++  );
++
+   const roomSnapshot = (room) => ({
+     code: room.code,
+     name: room.name,
+@@ -65,6 +74,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     })),
+     activeSession: room.activeSession || null,
+     lastClosedSession: room.lastClosedSession || null,
++    directives: cloneDirectives(room.directives),
+   });
+ 
+   const countOwnedRooms = (ownerClientId) => (
+@@ -431,6 +441,96 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     return { room, committed: result.committed, session: result.session };
+   };
+ 
++  /** Отправить команду Мастера группе или выбранному персонажу (с очередью для офлайн-телефонов). */
++  const issueDirective = ({ code, clientId, ownerToken = null, directive = {}, ws = null }) => {
++    const room = rooms.get(code);
++    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
++    const kind = String(directive?.kind || '').trim();
++    if (!kind) return { error: ERROR_CODE.BAD_MESSAGE };
++
++    ensureOwnerMemberWs(room, clientId, ws);
++
++    const directiveId = String(directive?.directiveId || '').trim() || crypto.randomUUID();
++    const existing = room.directives.find((d) => d.directiveId === directiveId);
++    if (existing) {
++      return {
++        room,
++        directive: { ...existing },
++        directives: cloneDirectives(room.directives),
++      };
++    }
++
++    const targetType = directive?.targetType === 'character' ? 'character' : 'room';
++    const targetCharacterId = targetType === 'character' && directive?.targetCharacterId
++      ? String(directive.targetCharacterId)
++      : null;
++
++    let targetCharacterIds = [];
++    if (targetType === 'character') {
++      if (targetCharacterId) targetCharacterIds = [targetCharacterId];
++    } else if (Array.isArray(directive?.targetCharacterIds) && directive.targetCharacterIds.length > 0) {
++      targetCharacterIds = [...new Set(
++        directive.targetCharacterIds.map((id) => String(id || '').trim()).filter(Boolean),
++      )];
++    } else {
++      targetCharacterIds = [...room.lastSnapshots.keys()];
++    }
++
++    const rawAmount = Number(directive?.amount);
++    const entry = {
++      directiveId,
++      kind,
++      amount: Number.isFinite(rawAmount) ? rawAmount : 1,
++      mode: directive?.mode ? String(directive.mode) : null,
++      note: String(directive?.note || '').trim().slice(0, 240),
++      targetType,
++      targetCharacterId,
++      targetCharacterIds,
++      ackedByCharacterIds: [],
++      fromClientId: clientId,
++      fromName: room.members.get(clientId)?.name || 'GM',
++      createdAt: now(),
++    };
++
++    room.directives.push(entry);
++    if (room.directives.length > 20) {
++      room.directives.splice(0, room.directives.length - 20);
++    }
++
++    return {
++      room,
++      directive: { ...entry },
++      directives: cloneDirectives(room.directives),
++    };
++  };
++
++  /** Подтверждение применения команды Мастера конкретным персонажем игрока. */
++  const ackDirective = ({ code, clientId, directiveId, characterId }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const cleanDirectiveId = String(directiveId || '').trim();
++    const cleanCharId = String(characterId || '').trim();
++    if (!cleanDirectiveId || !cleanCharId) return { error: ERROR_CODE.BAD_MESSAGE };
++
++    const entry = room.directives.find((d) => d.directiveId === cleanDirectiveId);
++    if (entry) {
++      if (!entry.ackedByCharacterIds.includes(cleanCharId)) {
++        entry.ackedByCharacterIds.push(cleanCharId);
++      }
++      if (entry.targetType === 'room' && !entry.targetCharacterIds.includes(cleanCharId)) {
++        entry.targetCharacterIds.push(cleanCharId);
++      }
++    }
++
++    return {
++      room,
++      directive: entry ? { ...entry } : null,
++      directives: cloneDirectives(room.directives),
++    };
++  };
++
+   /** Чистка комнат, опустевших дольше TTL (пустые = 0 подключённых членов). */
+   const sweep = () => {
+     const removed = [];
+@@ -460,6 +560,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     playerCloseSession,
+     lootTake,
+     tradeCommit,
++    issueDirective,
++    ackDirective,
+     sweep,
+     _rooms: rooms, // диагностика/тесты
+   };
+diff --git a/server/roomServer.js b/server/roomServer.js
+index 5f852c5..d65208b 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -527,16 +527,73 @@ const attachRoomWebSocketServer = (httpServer, {
+ 
+         case MESSAGE.GM_DIRECTIVE: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+-          const room = canonical && registry.getRoom(canonical);
+-          if (!room) { sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId, canonical); break; }
+-          if (!registry.isOwner(canonical, clientId)) {
+-            sendError(ws, clientId, ERROR_CODE.NOT_ROOM_OWNER, payload.requestId, canonical);
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+             break;
+           }
+-          broadcastToRoom(room, clientId, MESSAGE.GM_DIRECTIVE, {
+-            ...payload,
+-            fromClientId: clientId,
+-            fromName: room.members.get(clientId)?.name,
++          const result = registry.issueDirective({
++            code: canonical,
++            clientId,
++            ownerToken: payload.ownerToken || null,
++            directive: payload,
++            ws,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          ws.meta.rooms.add(canonical);
++          sendEnvelope(
++            ws,
++            MESSAGE.GM_DIRECTIVE_STATE,
++            {
++              directive: result.directive,
++              directives: result.directives,
++              requestId: payload.requestId || null,
++            },
++            canonical,
++            clientId,
++          );
++          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE, {
++            ...result.directive,
++          });
++          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE_STATE, {
++            directive: result.directive,
++            directives: result.directives,
++          });
++          break;
++        }
++
++        case MESSAGE.GM_DIRECTIVE_ACK: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.ackDirective({
++            code: canonical,
++            clientId,
++            directiveId: payload.directiveId,
++            characterId: payload.characterId,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          sendEnvelope(
++            ws,
++            MESSAGE.GM_DIRECTIVE_STATE,
++            {
++              directive: result.directive,
++              directives: result.directives,
++              requestId: payload.requestId || null,
++            },
++            canonical,
++            clientId,
++          );
++          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE_STATE, {
++            directive: result.directive,
++            directives: result.directives,
+           });
+           break;
+         }
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 1a70ede..8d812d3 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -18,6 +18,8 @@ export const ROOM_MESSAGE = {
+   CHAR_PUBLISH: 'char.publish',
+   CHAR_FOCUS: 'char.focus',
+   GM_DIRECTIVE: 'gm.directive',
++  GM_DIRECTIVE_ACK: 'gm.directiveAck',
++  GM_DIRECTIVE_STATE: 'gm.directiveState',
+   SESSION_OPEN: 'session.open',
+   SESSION_STATE: 'session.state',
+   SESSION_UPDATE_RATES: 'session.updateRates',
+@@ -123,3 +125,19 @@ export interface RoomSnapshotEntry {
+   fromClientId: string;
+   fromName?: string;
+ }
++
++export interface RoomDirectiveEntry {
++  directiveId: string;
++  kind: string;
++  amount: number;
++  mode?: string | null;
++  note: string;
++  targetType: 'room' | 'character';
++  targetCharacterId: string | null;
++  targetCharacterIds: string[];
++  ackedByCharacterIds: string[];
++  fromClientId?: string;
++  fromName?: string;
++  createdAt: number;
++}
++
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 8cae1e5..80379f7 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -14,6 +14,7 @@ import {
+ import {
+   ROOM_MESSAGE,
+   type ActiveLootTradeSession,
++  type RoomDirectiveEntry,
+   type RoomEnvelope,
+   type RoomMember,
+   type RoomSnapshotEntry,
+@@ -33,6 +34,7 @@ export interface RoomStateEntry {
+   joined?: boolean;
+   snapshots?: Record<string, RoomSnapshotEntry>;
+   activeSession?: ActiveLootTradeSession | null;
++  directives?: RoomDirectiveEntry[];
+ }
+ 
+ interface CreateRoomResult {
+@@ -47,6 +49,7 @@ interface JoinRoomResult {
+   members: RoomMember[];
+   snapshots: RoomSnapshotEntry[];
+   activeSession?: ActiveLootTradeSession | null;
++  directives?: RoomDirectiveEntry[];
+ }
+ 
+ interface RoomStoreState {
+@@ -138,6 +141,29 @@ interface RoomStoreState {
+     sellItems: Array<Record<string, unknown>>;
+     nodeContainerId?: string | null;
+   }) => Promise<{ committed: any; session: ActiveLootTradeSession }>;
++  sendGmDirective: (input: {
++    code: string;
++    ownerToken?: string;
++    directiveId?: string;
++    kind: string;
++    amount?: number;
++    mode?: string | null;
++    note?: string;
++    targetType?: 'room' | 'character';
++    targetCharacterId?: string | null;
++    targetCharacterIds?: string[];
++  }) => Promise<{
++    directive: RoomDirectiveEntry;
++    directives: RoomDirectiveEntry[];
++  }>;
++  ackGmDirective: (input: {
++    code: string;
++    directiveId: string;
++    characterId: string;
++  }) => Promise<{
++    directive: RoomDirectiveEntry | null;
++    directives: RoomDirectiveEntry[];
++  }>;
+ }
+ 
+ // ── Внутреннее состояние соединения (не в стейт-дереве: не для рендера) ──
+@@ -152,6 +178,7 @@ const pendingRequests = new Map<string, {
+ const joiningCodes = new Set<string>();
+ const publishListeners = new Set<(message: RoomEnvelope) => void>();
+ const sessionListeners = new Set<(message: RoomEnvelope) => void>();
++const directiveListeners = new Set<(message: RoomEnvelope) => void>();
+ 
+ const getWebTabSessionSuffix = (): string => {
+   if (typeof window === 'undefined') return '';
+@@ -219,6 +246,12 @@ export const onRoomSessionState = (listener: (message: RoomEnvelope) => void) =>
+   return () => { sessionListeners.delete(listener); };
+ };
+ 
++/** Подписка на входящие команды Мастера и их статусы доставки (gm.directive / gm.directiveState). */
++export const onRoomDirective = (listener: (message: RoomEnvelope) => void) => {
++  directiveListeners.add(listener);
++  return () => { directiveListeners.delete(listener); };
++};
++
+ /** Точка подмены клиента для тестов (мок-транспорт вместо настоящего ws). */
+ let clientFactory: ((input: { url: string; clientId: string; onStatus: any; onMessage: any }) => RoomClient) | null = null;
+ export const setRoomClientFactoryForTests = (
+@@ -255,6 +288,37 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     });
+   };
+ 
++  const applyDirectiveEnvelopeToStore = (message: RoomEnvelope) => {
++    const code = message.roomCode;
++    if (!code || !message.payload) return;
++    const current = get().rooms[code];
++    if (current) {
++      let nextDirectives = Array.isArray(current.directives) ? [...current.directives] : [];
++      if (Array.isArray(message.payload.directives)) {
++        nextDirectives = message.payload.directives as RoomDirectiveEntry[];
++      } else if (message.payload.directiveId) {
++        const incoming = message.payload as RoomDirectiveEntry;
++        const idx = nextDirectives.findIndex((d) => d.directiveId === incoming.directiveId);
++        if (idx >= 0) nextDirectives[idx] = incoming;
++        else nextDirectives.push(incoming);
++      }
++      set({
++        rooms: {
++          ...get().rooms,
++          [code]: {
++            ...current,
++            directives: nextDirectives,
++          },
++        },
++      });
++    }
++    directiveListeners.forEach((listener) => {
++      try { listener(message); } catch (error) {
++        debugLog('room.directiveListener:failed', { message: (error as Error)?.message });
++      }
++    });
++  };
++
+   const handleMessage = (message: RoomEnvelope) => {
+     const requestId = message?.payload?.requestId;
+     if (message.type === ROOM_MESSAGE.ERROR) {
+@@ -284,6 +348,12 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     ) {
+       applySessionEnvelopeToStore(message);
+     }
++    if (
++      message.type === ROOM_MESSAGE.GM_DIRECTIVE
++      || message.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
++    ) {
++      applyDirectiveEnvelopeToStore(message);
++    }
+     if (requestId && pendingRequests.has(requestId)) {
+       const pending = pendingRequests.get(requestId)!;
+       pendingRequests.delete(requestId);
+@@ -443,6 +513,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             joined: Boolean(prev?.joined && requestedCode),
+             snapshots: prev?.snapshots || {},
+             activeSession: prev?.activeSession ?? null,
++            directives: prev?.directives || [],
+           },
+         },
+       });
+@@ -462,6 +533,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           members: existing.members,
+           snapshots: Object.values(existing.snapshots || {}),
+           activeSession: existing.activeSession ?? null,
++          directives: existing.directives || [],
+         };
+       }
+       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
+@@ -473,6 +545,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         const payloadRooms = response.payload;
+         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
++        const directives = Array.isArray(payloadRooms.directives)
++          ? (payloadRooms.directives as RoomDirectiveEntry[])
++          : [];
+         const lastClosedEntry = payloadRooms.lastClosedSession as {
+           session?: ActiveLootTradeSession | null;
+           closedReason?: string | null;
+@@ -488,9 +563,25 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               joined: true,
+               snapshots: snapshotsMap,
+               activeSession,
++              directives,
+             },
+           },
+         });
++        if (directives.length > 0) {
++          const directiveEnvelope: RoomEnvelope = {
++            v: 1,
++            type: ROOM_MESSAGE.GM_DIRECTIVE_STATE,
++            roomCode: code,
++            clientId: get().clientId || '',
++            ts: Date.now(),
++            payload: { directives },
++          };
++          directiveListeners.forEach((listener) => {
++            try { listener(directiveEnvelope); } catch (error) {
++              debugLog('room.directiveListener:failed', { message: (error as Error)?.message });
++            }
++          });
++        }
+         if (activeSession || lastClosedEntry?.session) {
+           const syntheticEnvelope: RoomEnvelope = {
+             v: 1,
+@@ -519,6 +610,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           members: payloadRooms.members || [],
+           snapshots: Object.values(snapshotsMap),
+           activeSession,
++          directives,
+         };
+       } finally {
+         joiningCodes.delete(code);
+@@ -705,6 +797,57 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         session: response.payload?.session as ActiveLootTradeSession,
+       };
+     },
++
++    sendGmDirective: async ({
++      code,
++      ownerToken,
++      directiveId,
++      kind,
++      amount = 1,
++      mode = null,
++      note = '',
++      targetType = 'room',
++      targetCharacterId = null,
++      targetCharacterIds,
++    }) => {
++      assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
++      const response = await sendRequest(
++        ROOM_MESSAGE.GM_DIRECTIVE,
++        {
++          code,
++          kind,
++          amount,
++          ...(mode ? { mode } : {}),
++          ...(note ? { note } : {}),
++          targetType,
++          ...(targetCharacterId ? { targetCharacterId } : {}),
++          ...(Array.isArray(targetCharacterIds) ? { targetCharacterIds } : {}),
++          ...(directiveId ? { directiveId } : {}),
++          ...(ownerToken ? { ownerToken } : {}),
++        },
++        code,
++      );
++      return {
++        directive: response.payload?.directive as RoomDirectiveEntry,
++        directives: (response.payload?.directives || []) as RoomDirectiveEntry[],
++      };
++    },
++
++    ackGmDirective: async ({ code, directiveId, characterId }) => {
++      const response = await sendRequest(
++        ROOM_MESSAGE.GM_DIRECTIVE_ACK,
++        {
++          code,
++          directiveId,
++          characterId,
++        },
++        code,
++      );
++      return {
++        directive: (response.payload?.directive || null) as RoomDirectiveEntry | null,
++        directives: (response.payload?.directives || []) as RoomDirectiveEntry[],
++      };
++    },
+   };
+ });
+ 
+diff --git a/styles/HomeScreen.styles.js b/styles/HomeScreen.styles.js
+index 95c34cc..f3f5129 100644
+--- a/styles/HomeScreen.styles.js
++++ b/styles/HomeScreen.styles.js
+@@ -451,6 +451,84 @@ const styles = StyleSheet.create({
+   serverModalButtonTextSecondary: { color: '#111827' },
+   serverModalPlayersTitle: { marginTop: 10, fontSize: 12, fontWeight: '700', color: '#374151' },
+   serverModalPlayer: { fontSize: 13, color: '#111827', marginTop: 2 },
++  gmRoomActionsRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'space-between',
++    flexWrap: 'wrap',
++    gap: 8,
++    width: '100%',
++  },
++  gmRoomRightGroup: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 8,
++  },
++  gmDeliveryPill: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 4,
++    paddingHorizontal: 8,
++    paddingVertical: 4,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#5a5a5a',
++    backgroundColor: '#232323',
++  },
++  gmDeliveryPillDone: {
++    borderColor: '#16a34a',
++    backgroundColor: 'rgba(22, 163, 74, 0.14)',
++  },
++  gmDeliveryPillText: {
++    color: '#d4d4d4',
++    fontSize: 11,
++    fontWeight: '600',
++  },
++  gmDeliveryPillTextDone: {
++    color: '#4ade80',
++  },
++  gmGroupCommandBtn: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    gap: 5,
++    backgroundColor: '#f0e68c',
++    borderWidth: 1,
++    borderColor: '#d4af37',
++    borderRadius: 5,
++    paddingHorizontal: 11,
++    paddingVertical: 6,
++  },
++  gmGroupCommandBtnText: {
++    color: '#1a1a1a',
++    fontSize: 12,
++    fontWeight: '700',
++  },
++  gmReadonlyHint: {
++    color: '#9ca3af',
++    fontSize: 11,
++    marginTop: 5,
++    textAlign: 'left',
++  },
++  gmCardsListWrap: {
++    paddingHorizontal: 6,
++    paddingTop: 4,
++    paddingBottom: 16,
++  },
++  gmEmptyRoomCard: {
++    backgroundColor: '#1f1f1f',
++    borderWidth: 1,
++    borderColor: '#525252',
++    borderRadius: 5,
++    padding: 18,
++    marginHorizontal: 6,
++    marginTop: 8,
++  },
++  gmEmptyRoomText: {
++    color: '#cfcfcf',
++    fontSize: 13,
++    lineHeight: 19,
++    textAlign: 'center',
++  },
+ });
+ 
+ export default styles;

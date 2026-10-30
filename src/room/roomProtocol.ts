@@ -18,6 +18,8 @@ export const ROOM_MESSAGE = {
   CHAR_PUBLISH: 'char.publish',
   CHAR_FOCUS: 'char.focus',
   GM_DIRECTIVE: 'gm.directive',
+  GM_DIRECTIVE_ACK: 'gm.directiveAck',
+  GM_DIRECTIVE_STATE: 'gm.directiveState',
   SESSION_OPEN: 'session.open',
   SESSION_STATE: 'session.state',
   SESSION_UPDATE_RATES: 'session.updateRates',
@@ -123,3 +125,19 @@ export interface RoomSnapshotEntry {
   fromClientId: string;
   fromName?: string;
 }
+
+export interface RoomDirectiveEntry {
+  directiveId: string;
+  kind: string;
+  amount: number;
+  mode?: string | null;
+  note: string;
+  targetType: 'room' | 'character';
+  targetCharacterId: string | null;
+  targetCharacterIds: string[];
+  ackedByCharacterIds: string[];
+  fromClientId?: string;
+  fromName?: string;
+  createdAt: number;
+}
+
