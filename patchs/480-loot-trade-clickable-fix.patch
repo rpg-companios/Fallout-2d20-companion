@@ -1,0 +1,324 @@
+diff --git a/__tests__/screens/loot-trade-clickable-480.test.js b/__tests__/screens/loot-trade-clickable-480.test.js
+new file mode 100644
+index 0000000..6fdbfea
+--- /dev/null
++++ b/__tests__/screens/loot-trade-clickable-480.test.js
+@@ -0,0 +1,53 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { describe, expect, it } from 'vitest';
++import { sanitizeRootPagerDom } from '../../src/web/pagerScrollGuard';
++
++const ROOT = path.resolve(__dirname, '../..');
++
++describe('Патч 480: вкладка «Добыча/Торговля» полностью кликабельна (без залипания inert при снятии aria-hidden)', () => {
++  it('pagerScrollGuard никогда не выставляет inert при переключении вкладки (когда react-native-web удаляет aria-hidden) и снимает любой залипший inert', () => {
++    const src = fs.readFileSync(path.join(ROOT, 'src/web/pagerScrollGuard.ts'), 'utf8');
++    expect(src).not.toContain('el.inert = true');
++    expect(src).not.toContain("setAttribute('inert'");
++
++    const attrs = new Map([['aria-hidden', 'true'], ['inert', '']]);
++    const lootScene = {
++      nodeType: 1,
++      tagName: 'DIV',
++      style: { overflowX: 'hidden' },
++      scrollLeft: 0,
++      inert: true,
++      getAttribute: (k) => (attrs.has(k) ? attrs.get(k) : null),
++      setAttribute: (k, v) => { attrs.set(k, String(v)); },
++      removeAttribute: (k) => { attrs.delete(k); },
++      hasAttribute: (k) => attrs.has(k),
++    };
++    const pagerDiv = {
++      nodeType: 1,
++      tagName: 'DIV',
++      style: { overflowX: 'hidden' },
++      scrollLeft: 500,
++    };
++
++    // react-native-web при переключении на вкладку «Добыча/Торговля» удаляет aria-hidden целиком:
++    lootScene.removeAttribute('aria-hidden');
++
++    const root = {
++      querySelectorAll(sel) {
++        if (sel === '[inert]') return lootScene.hasAttribute('inert') || lootScene.inert ? [lootScene] : [];
++        if (sel === 'div') return [pagerDiv, lootScene];
++        return [];
++      },
++    };
++    const fakeWin = {
++      getComputedStyle: (el) => ({ overflowX: el.style.overflowX || 'visible' }),
++    };
++
++    sanitizeRootPagerDom(root, fakeWin);
++
++    expect(pagerDiv.scrollLeft).toBe(0);
++    expect(lootScene.inert).toBe(false);
++    expect(lootScene.hasAttribute('inert')).toBe(false);
++  });
++});
+diff --git a/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js b/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js
+index 444a417..e297cb7 100644
+--- a/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js
++++ b/__tests__/screens/pager-scroll-and-replit-pwa-sync-479.test.js
+@@ -79,7 +79,7 @@ describe('Патч 479: защита от 50%-смещения экрана пр
+     delete process.env.EXPO_PUBLIC_ROOM_SERVER_URL;
+   });
+ 
+-  it('pagerScrollGuard блокирует 50%-смещение scrollLeft на overflow:hidden пейджере и помечает скрытые вкладки inert', () => {
++  it('pagerScrollGuard блокирует 50%-смещение scrollLeft на overflow:hidden пейджере без блокировки кликов (без inert)', () => {
+     // Имитация DOM-дерева TabView в режиме Админа (2 вкладки шириной по 1000px -> лента 2000px)
+     const makeEl = (tag, { overflowX = 'visible', scrollLeft = 0, attrs = {}, parent = null } = {}) => {
+       const attrMap = new Map(Object.entries(attrs));
+@@ -95,16 +95,6 @@ describe('Патч 479: защита от 50%-смещения экрана пр
+         setAttribute: (k, v) => { attrMap.set(k, String(v)); },
+         removeAttribute: (k) => { attrMap.delete(k); },
+         hasAttribute: (k) => attrMap.has(k),
+-        closest(selector) {
+-          if (selector === '[aria-hidden="true"]') {
+-            let cur = this;
+-            while (cur) {
+-              if (cur.getAttribute?.('aria-hidden') === 'true') return cur;
+-              cur = cur.parentElement;
+-            }
+-          }
+-          return null;
+-        },
+       };
+       if (parent) parent.children.push(el);
+       return el;
+@@ -127,7 +117,7 @@ describe('Патч 479: защита от 50%-смещения экрана пр
+       return acc;
+     };
+     root.querySelectorAll = (sel) => {
+-      if (sel === '[aria-hidden]') return collectAll(root, (n) => n.hasAttribute('aria-hidden'));
++      if (sel === '[inert]') return collectAll(root, (n) => n.hasAttribute('inert') || n.inert);
+       if (sel === 'div') return collectAll(root, (n) => n.tagName === 'DIV');
+       return [];
+     };
+@@ -136,18 +126,18 @@ describe('Патч 479: защита от 50%-смещения экрана пр
+       getComputedStyle: (el) => ({ overflowX: el.style.overflowX || 'visible' }),
+     };
+ 
+-    // 1. sanitizeRootPagerDom сбрасывает 50%-смещение (500 -> 0), ставит inert на скрытую вкладку
++    // 1. sanitizeRootPagerDom сбрасывает 50%-смещение (500 -> 0), НЕ ставит inert ни на одну вкладку
+     //    и НЕ трогает легитимный горизонтальный ScrollView (overflow-x: auto -> 180).
+     const fixedCount = sanitizeRootPagerDom(root, fakeWin);
+     expect(fixedCount).toBe(1);
+     expect(pagerDiv.scrollLeft).toBe(0);
+     expect(userHorizontalScroll.scrollLeft).toBe(180);
+-    expect(lootScene.inert).toBe(true);
+-    expect(lootScene.getAttribute('inert')).toBe('');
++    expect(lootScene.inert).toBe(false);
++    expect(lootScene.hasAttribute('inert')).toBe(false);
+     expect(homeScene.inert).toBe(false);
+ 
+-    // 2. installSafeProgrammaticFocus передаёт { preventScroll: true } для узлов внутри пейджера,
+-    //    блокирует фокус внутрь скрытой вкладки [aria-hidden="true"] и гасит случайный сдвиг браузера.
++    // 2. installSafeProgrammaticFocus передаёт { preventScroll: true } для узлов внутри пейджера
++    //    и гасит случайный сдвиг браузера без блокировки самого фокуса.
+     const focusCalls = [];
+     function FakeHTMLElement() {}
+     FakeHTMLElement.prototype.focus = function mockNativeFocus(opts) {
+@@ -164,12 +154,13 @@ describe('Патч 479: защита от 50%-смещения экрана пр
+     installSafeProgrammaticFocus(fakeWin);
+ 
+     hiddenLootBtn.focus();
+-    expect(focusCalls).toHaveLength(0);
++    expect(focusCalls).toHaveLength(1);
++    expect(focusCalls[0].opts).toEqual({ preventScroll: true });
+     expect(pagerDiv.scrollLeft).toBe(0);
+ 
+     homeBtn.focus();
+-    expect(focusCalls).toHaveLength(1);
+-    expect(focusCalls[0].opts).toEqual({ preventScroll: true });
++    expect(focusCalls).toHaveLength(2);
++    expect(focusCalls[1].opts).toEqual({ preventScroll: true });
+     expect(pagerDiv.scrollLeft).toBe(0);
+ 
+     // 3. Даже если браузер напрямую сдвинул scrollLeft во время события, clampHiddenOverflowAncestors мгновенно возвращает 0
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5c0c94a..2ffcb64 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,14 @@
+ # Changelog
++---
++## Restore clicks on the "Loot/Trade" screen after switching tabs (patch 480)
++
++Removed `inert` attribute toggling in `src/web/pagerScrollGuard.ts`: because
++`react-native-web` removes `aria-hidden` completely when focusing the
++"Loot/Trade" tab instead of setting `aria-hidden="false"`, `inert` remained on
++the tab wrapper and blocked presses on Location/Chest/Merchant creation buttons
++and saved container cards. Horizontal 50%-shift protection remains active via
++`scrollLeft = 0` clamping and `{ preventScroll: true }`.
++
+ ---
+ ## Fix 50% horizontal screen shift on Admin cloud sync & PWA ↔ Replit reconnect reconciliation (patch 479)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 821d1e8..8db46b7 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,16 @@
+ # История изменений
+ 
++---
++## Исправление кликов на экране «Добыча/Торговля» после переключения вкладки (патч 480)
++
++Убрана установка атрибута `inert` в `src/web/pagerScrollGuard.ts`: в
++`react-native-web` при переходе на вкладку «Добыча/Торговля» атрибут
++`aria-hidden` удалялся с DOM-узла целиком (а не переключался в `"false"`), из-за
++чего `inert` оставался на экране и блокировал нажатия на кнопки создания локации,
++сундука, торговца и открытие сохранённых карточек. Защита от 50%-смещения
++пейджера сохранена полностью через удержание `scrollLeft = 0` и
++`{ preventScroll: true }`.
++
+ ---
+ ## Защита от 50%-смещения экрана при облачной синхронизации в «Админе» и кросс-браузерная сверка PWA ↔ Replit (патч 479)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 213c3d3..0d7ce39 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "479"
++  "baseline": "480"
+ }
+diff --git a/public/version.json b/public/version.json
+index 56c7478..cfef670 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,5 +1,5 @@
+ {
+-  "version": "479",
++  "version": "480",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
+diff --git a/src/web/pagerScrollGuard.ts b/src/web/pagerScrollGuard.ts
+index 986ea69..4c58c1e 100644
+--- a/src/web/pagerScrollGuard.ts
++++ b/src/web/pagerScrollGuard.ts
+@@ -1,24 +1,17 @@
+ // src/web/pagerScrollGuard.ts
+ // Защита горизонтального пейджера вкладок (@react-navigation/material-top-tabs /
+-// react-native-tab-view) от нативного смещения scrollLeft на Web и в PWA (патч 479).
++// react-native-tab-view) от нативного смещения scrollLeft на Web и в PWA (патчи 479–480).
+ //
+-// Причина бага «интерфейс смещается на 50% в сторону при синхронизации в админке,
+-// видно по 50% соседних экранов, навигация не работает»:
+-// - TabView рендерит общий контейнер <div style="overflow: hidden"> шириной W,
+-//   внутри которого лежат:
+-//   1) горизонтальная лента экранов шириной N*W (в админке N=2 -> 2*W:
+-//      [0..W] «Список компаний» и [W..2W] «Добыча/Торговля», оба смонтированы);
+-//   2) нижняя панель вкладок TabBar шириной W ([0..W]).
+-// - Во время облачной синхронизации открываются/закрываются модалки (меню, прогресс,
+-//   окно Google OAuth / вкладка Drive, итоговый AlertHost). ModalFocusTrap в
+-//   react-native-web вызывает UIManager.focus(node) -> node.focus() БЕЗ
+-//   { preventScroll: true }, а скрытая соседняя вкладка помечена только
+-//   aria-hidden="true" (без inert).
+-// - Браузер центрирует сфокусированный контейнер шириной 2*W (или узел соседней
+-//   вкладки) внутри overflow: hidden, выставляя scrollLeft = (2*W - W)/2 = 0.5*W (50%)!
+-//   Из-за этого одновременно уезжают и экраны, и нижний TabBar, а смена режима
+-//   Админ <-> Пользователь без перемонтирования NavigationContainer не сбрасывает
+-//   DOM-свойство scrollLeft.
++// Важное правило (патч 480):
++// НЕЛЬЗЯ выставлять HTML-атрибут `inert` на узлы вкладок по `[aria-hidden="true"]`!
++// В react-native-web при переключении вкладки `aria-hidden={false}` полностью УДАЛЯЕТ
++// атрибут `aria-hidden` с DOM-узла (а не ставит `"false"`), из-за чего `inert`
++// оставался висеть на вкладке «Добыча/Торговля» навсегда и блокировал все клики.
++//
++// Для полной защиты от 50%-смещения достаточно и безопасно ТОЛЬКО удерживать
++// `scrollLeft = 0` у контейнеров с `overflow-x: hidden | clip` и передавать
++// `{ preventScroll: true }` при программном `focus()` без аргументов — это вообще не
++// меняет атрибуты DOM и никак не влияет на клики, ввод или события указателя.
+ 
+ const EDITABLE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
+ 
+@@ -59,8 +52,8 @@ export const clampHiddenOverflowAncestors = (
+ 
+ /**
+  * Проходит по поддереву (например, #root после возврата из окна OAuth / смены фокуса)
+- * и сбрасывает застрявший scrollLeft у всех overflow-x: hidden контейнеров, а также
+- * синхронизирует атрибут inert со скрытыми вкладками [aria-hidden="true"].
++ * и сбрасывает застрявший scrollLeft у всех overflow-x: hidden контейнеров, не меняя
++ * никаких DOM-атрибутов и не блокируя события клика (и снимая случайный inert, если был).
+  */
+ export const sanitizeRootPagerDom = (
+   root: ParentNode | null | undefined,
+@@ -69,17 +62,11 @@ export const sanitizeRootPagerDom = (
+   if (!win || !root || typeof (root as Element).querySelectorAll !== 'function') return 0;
+   let fixed = 0;
+ 
+-  const hiddenNodes = (root as Element).querySelectorAll('[aria-hidden]');
+-  hiddenNodes.forEach((node) => {
++  const inertNodes = (root as Element).querySelectorAll('[inert]');
++  inertNodes.forEach((node) => {
+     const el = node as HTMLElement & { inert?: boolean };
+-    const isHidden = el.getAttribute('aria-hidden') === 'true';
+-    if (isHidden) {
+-      el.inert = true;
+-      el.setAttribute('inert', '');
+-    } else if (el.hasAttribute('inert') || el.inert) {
+-      el.inert = false;
+-      el.removeAttribute('inert');
+-    }
++    el.inert = false;
++    el.removeAttribute('inert');
+   });
+ 
+   const allDivs = (root as Element).querySelectorAll('div');
+@@ -104,10 +91,9 @@ const hasHiddenOverflowAncestor = (el: HTMLElement, win: Window): boolean => {
+ 
+ /**
+  * Оборачивает HTMLElement.prototype.focus так, чтобы программный вызов focus()
+- * без аргументов (как в react-native-web ModalFocusTrap / UIManager.focus):
+- * 1) не переводил фокус внутрь скрытой соседней вкладки [aria-hidden="true"];
+- * 2) передавал { preventScroll: true }, если элемент находится внутри overflow-x: hidden пейджера;
+- * 3) гарантированно удерживал scrollLeft = 0 на скрытых горизонтальных обёртках.
++ * без аргументов (как в react-native-web ModalFocusTrap / UIManager.focus)
++ * передавал { preventScroll: true }, если элемент находится внутри overflow-x: hidden
++ * пейджера, и гарантированно удерживал scrollLeft = 0 без блокировки самого фокуса.
+  */
+ export const installSafeProgrammaticFocus = (
+   win: (Window & { HTMLElement?: typeof HTMLElement }) | undefined =
+@@ -126,9 +112,6 @@ export const installSafeProgrammaticFocus = (
+ 
+   proto.focus = function safeFocus(this: HTMLElement, options?: FocusOptions) {
+     try {
+-      if (typeof this.closest === 'function' && this.closest('[aria-hidden="true"]')) {
+-        return;
+-      }
+       if (options === undefined && !EDITABLE_TAGS.has(this.tagName) && hasHiddenOverflowAncestor(this, win)) {
+         nativeFocus.call(this, { preventScroll: true });
+       } else {
+@@ -166,27 +149,4 @@ export const startWebPagerScrollGuard = (): void => {
+   window.addEventListener('focus', onWindowRestore);
+   window.addEventListener('resize', onWindowRestore);
+   document.addEventListener('visibilitychange', onWindowRestore);
+-
+-  if (typeof MutationObserver === 'function') {
+-    const startObserver = () => {
+-      const root = getRoot();
+-      if (!root) return;
+-      sanitizeRootPagerDom(root, window);
+-      const observer = new MutationObserver(() => {
+-        sanitizeRootPagerDom(root, window);
+-      });
+-      observer.observe(root, {
+-        subtree: true,
+-        childList: true,
+-        attributes: true,
+-        attributeFilter: ['aria-hidden'],
+-      });
+-    };
+-
+-    if (document.readyState === 'loading') {
+-      document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+-    } else {
+-      startObserver();
+-    }
+-  }
+ };

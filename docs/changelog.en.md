@@ -1,5 +1,15 @@
 # Changelog
 ---
+## Restore clicks on the "Loot/Trade" screen after switching tabs (patch 480)
+
+Removed `inert` attribute toggling in `src/web/pagerScrollGuard.ts`: because
+`react-native-web` removes `aria-hidden` completely when focusing the
+"Loot/Trade" tab instead of setting `aria-hidden="false"`, `inert` remained on
+the tab wrapper and blocked presses on Location/Chest/Merchant creation buttons
+and saved container cards. Horizontal 50%-shift protection remains active via
+`scrollLeft = 0` clamping and `{ preventScroll: true }`.
+
+---
 ## Fix 50% horizontal screen shift on Admin cloud sync & PWA ↔ Replit reconnect reconciliation (patch 479)
 
 Fixed the 50% horizontal layout shift triggered during Google Drive sync in Admin
