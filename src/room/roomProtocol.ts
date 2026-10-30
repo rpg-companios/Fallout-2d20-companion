@@ -39,6 +39,7 @@ export const ROOM_ERROR = {
   UNKNOWN_TYPE: 'UNKNOWN_TYPE',
   SESSION_NOT_ACTIVE: 'SESSION_NOT_ACTIVE',
   SESSION_FORBIDDEN: 'SESSION_FORBIDDEN',
+  CONTAINER_LOCKED: 'CONTAINER_LOCKED',
   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
@@ -56,10 +57,28 @@ export interface ActiveLootTradeItem {
   itemSnapshot?: Record<string, unknown> | null;
 }
 
+export interface ActiveHubChildNode {
+  containerId: string;
+  kind: 'loot' | 'merchant';
+  name: string;
+  description: string;
+  locked: boolean;
+  lockLabel: string;
+  hasItemsHint?: boolean;
+  caps: number;
+  saleMarkupPercent: number;
+  buyDepreciationPercent: number;
+  characterOverrides: Record<string, {
+    saleMarkupPercent?: number;
+    buyDepreciationPercent?: number;
+  }>;
+  items: ActiveLootTradeItem[];
+}
+
 export interface ActiveLootTradeSession {
   sessionId: string;
   containerId: string;
-  kind: 'loot' | 'merchant';
+  kind: 'loot' | 'merchant' | 'hub';
   name: string;
   description: string;
   targetType: 'room' | 'character';
@@ -73,6 +92,7 @@ export interface ActiveLootTradeSession {
     buyDepreciationPercent?: number;
   }>;
   items: ActiveLootTradeItem[];
+  nodes?: ActiveHubChildNode[];
   closedByClientIds?: string[];
   revision: number;
   openedAt: number;

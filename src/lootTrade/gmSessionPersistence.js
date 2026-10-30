@@ -49,11 +49,114 @@ export const startGmSessionPersistence = () => {
       if (!room || room.role !== 'gm') return;
 
       const closedReason = envelope?.payload?.closedReason || null;
+      const emptiedNodeContainerId = envelope?.payload?.emptiedNodeContainerId || null;
       const session = envelope?.payload?.session || envelope?.payload?.closedSession;
       if (!session?.containerId) return;
 
       const existing = await db.getGmContainerById(session.containerId);
       if (!existing) return;
+
+      if (session.kind === 'hub' && existing.kind === 'hub') {
+        const nodes = Array.isArray(session.nodes) ? session.nodes : [];
+        const nodeById = new Map(nodes.map((n) => [n.containerId, n]));
+
+        // Синхронизируем флаги замков/подписей локации
+        const updatedLinks = (existing.links || []).map((lnk) => {
+          const liveNode = nodeById.get(lnk.containerId);
+          if (!liveNode) return lnk;
+          return {
+            ...lnk,
+            locked: Boolean(liveNode.locked),
+            lockLabel: liveNode.lockLabel !== undefined ? String(liveNode.lockLabel || '') : lnk.lockLabel,
+          };
+        });
+        await db.saveGmContainer({
+          ...existing,
+          links: updatedLinks,
+        });
+
+        // Синхронизируем каждый дочерний контейнер и каждого торговца локации в БД и Облако
+        for (const node of nodes) {
+          if (!node?.containerId) continue;
+          const childExisting = await db.getGmContainerById(node.containerId);
+          if (!childExisting) continue;
+          await db.saveGmContainer({
+            ...childExisting,
+            items: Array.isArray(node.items) ? node.items : childExisting.items,
+            caps: childExisting.kind === 'merchant' && node.caps !== undefined
+              ? node.caps
+              : childExisting.caps,
+            saleMarkupPercent: childExisting.kind === 'merchant' && node.saleMarkupPercent !== undefined
+              ? node.saleMarkupPercent
+              : childExisting.saleMarkupPercent,
+            buyDepreciationPercent: childExisting.kind === 'merchant' && node.buyDepreciationPercent !== undefined
+              ? node.buyDepreciationPercent
+              : childExisting.buyDepreciationPercent,
+          });
+          void syncGmContainerToCloudIfEnabled(childExisting.id);
+        }
+
+        notifyGmContainerUpdated(existing.id);
+        void syncGmContainerToCloudIfEnabled(existing.id);
+
+        if (emptiedNodeContainerId) {
+          const emptiedKey = `hub:${session.sessionId}:${emptiedNodeContainerId}:${session.revision || 0}`;
+          const emptiedChild = await db.getGmContainerById(emptiedNodeContainerId);
+          if (
+            emptiedChild
+            && emptiedChild.kind === 'loot'
+            && !promptedEmptySessionIds.has(emptiedKey)
+          ) {
+            promptedEmptySessionIds.add(emptiedKey);
+            showRawAlert({
+              title: tLootTrade('detail.emptyLootPromptTitle'),
+              message: formatLootTrade(tLootTrade('detail.emptyLootPromptMessage'), {
+                name: emptiedChild.name,
+              }),
+              buttons: [
+                { text: tLootTrade('detail.emptyLootKeep'), style: 'cancel' },
+                {
+                  text: tLootTrade('card.delete'),
+                  style: 'destructive',
+                  onPress: () => {
+                    void (async () => {
+                      try {
+                        await deleteGmContainerFromCloudIfEnabled(emptiedChild.id);
+                        await db.deleteGmContainer(emptiedChild.id);
+                        const freshHub = await db.getGmContainerById(existing.id);
+                        if (freshHub && freshHub.kind === 'hub') {
+                          const prunedLinks = (freshHub.links || []).filter(
+                            (l) => l.containerId !== emptiedChild.id,
+                          );
+                          await db.saveGmContainer({ ...freshHub, links: prunedLinks });
+                          void syncGmContainerToCloudIfEnabled(freshHub.id);
+                          const liveNow = useRoomStore.getState().rooms[code]?.activeSession;
+                          if (liveNow && liveNow.sessionId === session.sessionId && liveNow.kind === 'hub') {
+                            const prunedNodes = (liveNow.nodes || []).filter(
+                              (n) => n.containerId !== emptiedChild.id,
+                            );
+                            await useRoomStore.getState().updateRoomSessionRates({
+                              code,
+                              sessionId: liveNow.sessionId,
+                              nodes: prunedNodes,
+                            }).catch(() => {});
+                          }
+                        }
+                        notifyGmContainerUpdated(emptiedChild.id);
+                      } catch (err) {
+                        debugLog('gm.sessionPersistence.deleteEmptyHubChild:failed', {
+                          message: err?.message || String(err),
+                        });
+                      }
+                    })();
+                  },
+                },
+              ],
+            });
+          }
+        }
+        return;
+      }
 
       const nextContainer = {
         ...existing,

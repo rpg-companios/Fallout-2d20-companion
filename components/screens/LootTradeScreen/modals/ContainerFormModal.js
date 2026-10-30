@@ -36,7 +36,9 @@ const ContainerFormModal = ({
 }) => {
   useLocale();
 
-  const isMerchant = (initialContainer?.kind || kind) === CONTAINER_KIND.MERCHANT;
+  const effectiveKind = initialContainer?.kind || kind;
+  const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
+  const isHub = effectiveKind === CONTAINER_KIND.HUB;
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
 
   const [name, setName] = useState('');
@@ -103,7 +105,9 @@ const ContainerFormModal = ({
 
     onSave({
       ...(initialContainer || {}),
-      kind: isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT,
+      kind: isHub
+        ? CONTAINER_KIND.HUB
+        : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
       name: cleanName,
       roomCode,
       roomName: roomRecord?.name || initialContainer?.roomName || roomCode,
@@ -114,9 +118,12 @@ const ContainerFormModal = ({
     }, capsRollInfo);
   };
 
-  const titleKey = isMerchant
-    ? (isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle')
-    : (isEditing ? 'form.editLootTitle' : 'form.createLootTitle');
+  let titleKey = isEditing ? 'form.editLootTitle' : 'form.createLootTitle';
+  if (isHub) {
+    titleKey = isEditing ? 'form.editHubTitle' : 'form.createHubTitle';
+  } else if (isMerchant) {
+    titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
+  }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

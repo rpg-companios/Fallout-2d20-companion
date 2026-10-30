@@ -107,27 +107,100 @@ const normalizeCharacterOverrides = (raw) => {
   return out;
 };
 
+const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const containerId = String(raw.containerId || raw.id || '').trim();
+  if (!containerId) return null;
+  const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
+  const items = Array.isArray(raw.items)
+    ? raw.items
+        .map((item, idx) => normalizeSessionItem(item, now, nodeIdx * 1000 + idx))
+        .filter(Boolean)
+    : [];
+  return {
+    containerId,
+    kind,
+    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
+    description: String(raw.description || '').trim(),
+    locked: Boolean(raw.locked),
+    lockLabel: String(raw.lockLabel || '').trim(),
+    caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
+    saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
+    buyDepreciationPercent: kind === 'merchant'
+      ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
+      : 50,
+    characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+    items,
+  };
+};
+
+const normalizeHubSessionNodes = (rawNodes, now = Date.now()) => {
+  if (!Array.isArray(rawNodes)) return [];
+  const seen = new Set();
+  const out = [];
+  rawNodes.forEach((raw, idx) => {
+    const node = normalizeHubSessionNode(raw, now, idx);
+    if (!node || seen.has(node.containerId)) return;
+    seen.add(node.containerId);
+    out.push(node);
+  });
+  return out;
+};
+
+/**
+ * Скрывает содержимое и кассу запертых (locked: true) вложенных контейнеров/торговцев
+ * от игроков по WebSocket. Мастер получает полное состояние без купюр.
+ */
+const sanitizeSessionForMember = (session, { isGm = false } = {}) => {
+  if (!session || isGm || session.kind !== 'hub') return session;
+  return {
+    ...session,
+    nodes: (session.nodes || []).map((node) => {
+      if (!node.locked) return node;
+      return {
+        ...node,
+        items: [],
+        caps: 0,
+        saleMarkupPercent: 0,
+        buyDepreciationPercent: 50,
+        characterOverrides: {},
+        hasItemsHint: Array.isArray(node.items) && node.items.length > 0,
+      };
+    }),
+  };
+};
+
 const normalizeActiveSession = (raw, now = Date.now()) => {
   if (!raw || typeof raw !== 'object') return null;
-  const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
+  let kind = 'loot';
+  if (raw.kind === 'merchant') kind = 'merchant';
+  else if (raw.kind === 'hub') kind = 'hub';
+
   const targetType = raw.targetType === 'character' ? 'character' : 'room';
   const targetCharacterId = targetType === 'character' && raw.targetCharacterId
     ? String(raw.targetCharacterId)
     : null;
   if (targetType === 'character' && !targetCharacterId) return null;
 
-  const items = Array.isArray(raw.items)
-    ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
-    : [];
+  const items = kind === 'hub'
+    ? []
+    : (Array.isArray(raw.items)
+        ? raw.items.map((item, idx) => normalizeSessionItem(item, now, idx)).filter(Boolean)
+        : []);
+  const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
   const closedByClientIds = Array.isArray(raw.closedByClientIds)
     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
     : [];
+
+  const defaultName = kind === 'hub'
+    ? 'Локация'
+    : (kind === 'merchant' ? 'Торговец' : 'Контейнер');
 
   return {
     sessionId: String(raw.sessionId || `ses_${now}_${Math.random().toString(36).slice(2, 8)}`),
     containerId: String(raw.containerId || ''),
     kind,
-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
+    name: String(raw.name || '').trim() || defaultName,
     description: String(raw.description || '').trim(),
     targetType,
     targetCharacterId,
@@ -139,6 +212,7 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
     items,
+    nodes,
     closedByClientIds,
     revision: Math.max(1, Math.floor(Number(raw.revision) || 1)),
     openedAt: Number(raw.openedAt) || now,
@@ -207,8 +281,52 @@ const isCharacterAllowed = (session, characterId) => {
   return Boolean(characterId && session.targetCharacterId === String(characterId));
 };
 
+const applyMerchantRatePatch = (target, payload = {}) => {
+  if (payload.caps !== undefined) {
+    target.caps = normalizeCapsAmount(payload.caps, target.caps);
+  }
+  const targetCharId = payload.targetCharacterId ? String(payload.targetCharacterId) : null;
+  if (targetCharId) {
+    if (payload.resetCharacterOverride) {
+      delete target.characterOverrides[targetCharId];
+    } else {
+      const prev = target.characterOverrides[targetCharId] || {};
+      const updatedOv = { ...prev };
+      if (payload.saleMarkupPercent !== undefined) {
+        updatedOv.saleMarkupPercent = normalizeSaleMarkupPercent(
+          payload.saleMarkupPercent,
+          target.saleMarkupPercent,
+        );
+      }
+      if (payload.buyDepreciationPercent !== undefined) {
+        updatedOv.buyDepreciationPercent = normalizeBuyDepreciationPercent(
+          payload.buyDepreciationPercent,
+          target.buyDepreciationPercent,
+        );
+      }
+      target.characterOverrides[targetCharId] = updatedOv;
+    }
+  } else {
+    if (payload.saleMarkupPercent !== undefined) {
+      target.saleMarkupPercent = normalizeSaleMarkupPercent(
+        payload.saleMarkupPercent,
+        target.saleMarkupPercent,
+      );
+    }
+    if (payload.buyDepreciationPercent !== undefined) {
+      target.buyDepreciationPercent = normalizeBuyDepreciationPercent(
+        payload.buyDepreciationPercent,
+        target.buyDepreciationPercent,
+      );
+    }
+    if (payload.resetAllCharacterOverrides) {
+      target.characterOverrides = {};
+    }
+  }
+};
+
 /**
- * Живое обновление процентов/кассы/содержимого открытой сессии Мастером.
+ * Живое обновление процентов/кассы/содержимого/замков открытой сессии Мастером.
  */
 const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
   if (!session) return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
@@ -219,13 +337,81 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
   const next = {
     ...session,
     characterOverrides: { ...(session.characterOverrides || {}) },
-    items: session.items.map((item) => ({ ...item })),
+    items: (session.items || []).map((item) => ({ ...item })),
+    nodes: Array.isArray(session.nodes)
+      ? session.nodes.map((node) => ({
+          ...node,
+          characterOverrides: { ...(node.characterOverrides || {}) },
+          items: (node.items || []).map((item) => ({ ...item })),
+        }))
+      : [],
     closedByClientIds: Array.isArray(session.closedByClientIds)
       ? [...session.closedByClientIds]
       : [],
     revision: session.revision + 1,
     updatedAt: now,
   };
+
+  if (next.kind === 'hub') {
+    if (payload.name !== undefined && String(payload.name).trim()) {
+      next.name = String(payload.name).trim();
+    }
+    if (payload.description !== undefined) {
+      next.description = String(payload.description || '').trim();
+    }
+
+    if (Array.isArray(payload.nodes)) {
+      // Сохраняем живые characterOverrides уже открытых торговцев при обновлении списка узлов
+      const prevById = new Map(next.nodes.map((n) => [n.containerId, n]));
+      next.nodes = normalizeHubSessionNodes(payload.nodes, now).map((node) => {
+        const prev = prevById.get(node.containerId);
+        if (prev && node.kind === 'merchant') {
+          return {
+            ...node,
+            characterOverrides: Object.keys(node.characterOverrides || {}).length > 0
+              ? node.characterOverrides
+              : { ...(prev.characterOverrides || {}) },
+          };
+        }
+        return node;
+      });
+    }
+
+    if (payload.nodeContainerId) {
+      const nodeId = String(payload.nodeContainerId);
+      const idx = next.nodes.findIndex((n) => n.containerId === nodeId);
+      if (idx >= 0) {
+        const targetNode = {
+          ...next.nodes[idx],
+          characterOverrides: { ...(next.nodes[idx].characterOverrides || {}) },
+          items: (next.nodes[idx].items || []).map((item) => ({ ...item })),
+        };
+        if (payload.nodeName !== undefined && String(payload.nodeName).trim()) {
+          targetNode.name = String(payload.nodeName).trim();
+        }
+        if (payload.nodeDescription !== undefined) {
+          targetNode.description = String(payload.nodeDescription || '').trim();
+        }
+        if (payload.locked !== undefined) {
+          targetNode.locked = Boolean(payload.locked);
+        }
+        if (payload.lockLabel !== undefined) {
+          targetNode.lockLabel = String(payload.lockLabel || '').trim();
+        }
+        if (Array.isArray(payload.nodeItems)) {
+          targetNode.items = payload.nodeItems
+            .map((item, itemIdx) => normalizeSessionItem(item, now, itemIdx))
+            .filter(Boolean);
+        }
+        if (targetNode.kind === 'merchant') {
+          applyMerchantRatePatch(targetNode, payload);
+        }
+        next.nodes[idx] = targetNode;
+      }
+    }
+
+    return { session: next };
+  }
 
   if (Array.isArray(payload.items)) {
     next.items = payload.items
@@ -241,70 +427,14 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
   }
 
   if (next.kind === 'merchant') {
-    if (payload.caps !== undefined) {
-      next.caps = normalizeCapsAmount(payload.caps, next.caps);
-    }
-
-    const targetCharId = payload.targetCharacterId ? String(payload.targetCharacterId) : null;
-    if (targetCharId) {
-      if (payload.resetCharacterOverride) {
-        delete next.characterOverrides[targetCharId];
-      } else {
-        const prev = next.characterOverrides[targetCharId] || {};
-        const updatedOv = { ...prev };
-        if (payload.saleMarkupPercent !== undefined) {
-          updatedOv.saleMarkupPercent = normalizeSaleMarkupPercent(
-            payload.saleMarkupPercent,
-            next.saleMarkupPercent,
-          );
-        }
-        if (payload.buyDepreciationPercent !== undefined) {
-          updatedOv.buyDepreciationPercent = normalizeBuyDepreciationPercent(
-            payload.buyDepreciationPercent,
-            next.buyDepreciationPercent,
-          );
-        }
-        next.characterOverrides[targetCharId] = updatedOv;
-      }
-    } else {
-      if (payload.saleMarkupPercent !== undefined) {
-        next.saleMarkupPercent = normalizeSaleMarkupPercent(
-          payload.saleMarkupPercent,
-          next.saleMarkupPercent,
-        );
-      }
-      if (payload.buyDepreciationPercent !== undefined) {
-        next.buyDepreciationPercent = normalizeBuyDepreciationPercent(
-          payload.buyDepreciationPercent,
-          next.buyDepreciationPercent,
-        );
-      }
-      if (payload.resetAllCharacterOverrides) {
-        next.characterOverrides = {};
-      }
-    }
+    applyMerchantRatePatch(next, payload);
   }
 
   return { session: next };
 };
 
-/**
- * Атомарное взятие предметов игроком из контейнера добычи.
- */
-const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
-  if (!session || session.kind !== 'loot') {
-    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
-  }
-  if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
-    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
-  }
-  const characterId = String(payload.characterId || '');
-  if (!isCharacterAllowed(session, characterId)) {
-    return { error: ERROR_CODE.SESSION_FORBIDDEN };
-  }
-
-  const takes = Array.isArray(payload.takes) ? payload.takes : [];
-  const nextItems = session.items.map((entry) => ({ ...entry }));
+const deductLootItems = (itemsList, takes) => {
+  const nextItems = (itemsList || []).map((entry) => ({ ...entry }));
   const granted = [];
 
   for (const req of takes) {
@@ -323,7 +453,69 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
     current.quantity -= actual;
   }
 
-  const remaining = nextItems.filter((entry) => entry.quantity > 0);
+  return {
+    granted,
+    remaining: nextItems.filter((entry) => entry.quantity > 0),
+  };
+};
+
+/**
+ * Атомарное взятие предметов игроком из контейнера добычи (или вложенного узла локации).
+ */
+const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
+  if (!session || (session.kind !== 'loot' && session.kind !== 'hub')) {
+    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  }
+  if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
+    return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+  }
+  const characterId = String(payload.characterId || '');
+  if (!isCharacterAllowed(session, characterId)) {
+    return { error: ERROR_CODE.SESSION_FORBIDDEN };
+  }
+
+  const takes = Array.isArray(payload.takes) ? payload.takes : [];
+
+  if (session.kind === 'hub') {
+    const nodeId = String(payload.nodeContainerId || '');
+    const nodeIdx = (session.nodes || []).findIndex(
+      (n) => n.containerId === nodeId && n.kind === 'loot',
+    );
+    if (nodeIdx < 0) {
+      return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+    }
+    const targetNode = session.nodes[nodeIdx];
+    if (targetNode.locked) {
+      return { error: ERROR_CODE.CONTAINER_LOCKED, session };
+    }
+
+    const hadItemsBefore = Array.isArray(targetNode.items) && targetNode.items.length > 0;
+    const { granted, remaining } = deductLootItems(targetNode.items, takes);
+    const nextNodes = session.nodes.map((node, idx) => (
+      idx === nodeIdx ? { ...node, items: remaining } : node
+    ));
+    const emptiedNodeContainerId = (hadItemsBefore || granted.length > 0) && remaining.length === 0
+      ? targetNode.containerId
+      : null;
+
+    const nextSession = {
+      ...session,
+      nodes: nextNodes,
+      closedByClientIds: Array.isArray(session.closedByClientIds)
+        ? [...session.closedByClientIds]
+        : [],
+      revision: session.revision + 1,
+      updatedAt: now,
+    };
+
+    return {
+      granted,
+      emptiedNodeContainerId,
+      session: nextSession,
+    };
+  }
+
+  const { granted, remaining } = deductLootItems(session.items, takes);
   const nextSession = {
     ...session,
     items: remaining,
@@ -336,15 +528,16 @@ const applyAtomicLootTake = (session, payload = {}, now = Date.now()) => {
 
   return {
     granted,
+    emptiedNodeContainerId: null,
     session: nextSession,
   };
 };
 
 /**
- * Атомарная бартерная сделка игрока с торговцем.
+ * Атомарная бартерная сделка игрока с торговцем (или вложенным торговцем локации).
  */
 const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
-  if (!session || session.kind !== 'merchant') {
+  if (!session || (session.kind !== 'merchant' && session.kind !== 'hub')) {
     return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
   }
   if (payload.sessionId && String(payload.sessionId) !== session.sessionId) {
@@ -355,18 +548,34 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
     return { error: ERROR_CODE.SESSION_FORBIDDEN };
   }
 
+  let merchantTarget = session;
+  let hubNodeIdx = -1;
+  if (session.kind === 'hub') {
+    const nodeId = String(payload.nodeContainerId || '');
+    hubNodeIdx = (session.nodes || []).findIndex(
+      (n) => n.containerId === nodeId && n.kind === 'merchant',
+    );
+    if (hubNodeIdx < 0) {
+      return { error: ERROR_CODE.SESSION_NOT_ACTIVE };
+    }
+    merchantTarget = session.nodes[hubNodeIdx];
+    if (merchantTarget.locked) {
+      return { error: ERROR_CODE.CONTAINER_LOCKED, session };
+    }
+  }
+
   const buyRequests = Array.isArray(payload.buyItems) ? payload.buyItems : [];
   const sellRequests = Array.isArray(payload.sellItems) ? payload.sellItems : [];
   if (buyRequests.length === 0 && sellRequests.length === 0) {
     return { error: ERROR_CODE.BAD_MESSAGE };
   }
 
-  const rates = getEffectiveMerchantRates(session, characterId);
+  const rates = getEffectiveMerchantRates(merchantTarget, characterId);
   const capCollectorPercent = clampNumber(payload.perkCapCollectorPercent, 0, 100, 0);
   const playerCapsAvailable = normalizeCapsAmount(payload.playerCapsAvailable, 0);
   const acceptCapShortfall = Boolean(payload.acceptCapShortfall);
 
-  const nextItems = session.items.map((entry) => ({ ...entry }));
+  const nextItems = merchantTarget.items.map((entry) => ({ ...entry }));
   const boughtEntries = [];
   let totalBuyCost = 0;
 
@@ -432,17 +641,17 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
     return { error: ERROR_CODE.TRADE_NOT_ENOUGH_PLAYER_CAPS, session };
   }
 
-  if (merchantOwes > session.caps && !acceptCapShortfall) {
+  if (merchantOwes > merchantTarget.caps && !acceptCapShortfall) {
     return {
       error: ERROR_CODE.TRADE_NOT_ENOUGH_MERCHANT_CAPS,
-      merchantCaps: session.caps,
+      merchantCaps: merchantTarget.caps,
       owedCaps: merchantOwes,
       session,
     };
   }
 
-  const actualMerchantPayout = Math.min(merchantOwes, session.caps);
-  const nextMerchantCaps = session.caps + playerOwes - actualMerchantPayout;
+  const actualMerchantPayout = Math.min(merchantOwes, merchantTarget.caps);
+  const nextMerchantCaps = merchantTarget.caps + playerOwes - actualMerchantPayout;
   const playerCapsDelta = actualMerchantPayout - playerOwes;
 
   // 3. Применяем изменения к ассортименту торговца (проданные игроком вещи ложатся в лавку).
@@ -451,16 +660,32 @@ const applyAtomicTradeCommit = (session, payload = {}, now = Date.now()) => {
     addOrMergeSessionItem(remaining, sold.entry, now);
   }
 
-  const nextSession = {
-    ...session,
-    caps: nextMerchantCaps,
-    items: remaining,
-    revision: session.revision + 1,
-    updatedAt: now,
-  };
+  const nextSession = session.kind === 'hub'
+    ? {
+        ...session,
+        nodes: session.nodes.map((node, idx) => (
+          idx === hubNodeIdx
+            ? {
+                ...node,
+                caps: nextMerchantCaps,
+                items: remaining,
+              }
+            : node
+        )),
+        revision: session.revision + 1,
+        updatedAt: now,
+      }
+    : {
+        ...session,
+        caps: nextMerchantCaps,
+        items: remaining,
+        revision: session.revision + 1,
+        updatedAt: now,
+      };
 
   return {
     committed: {
+      nodeContainerId: session.kind === 'hub' ? merchantTarget.containerId : null,
       boughtEntries,
       soldItems: soldItems.map((s) => ({
         clientItemId: s.clientItemId,
@@ -483,6 +708,7 @@ module.exports = {
   normalizeBuyDepreciationPercent,
   normalizeCapsAmount,
   normalizeActiveSession,
+  sanitizeSessionForMember,
   getEffectiveMerchantRates,
   computeMerchantSellPriceToPlayer,
   computeMerchantBuybackPriceFromPlayer,
