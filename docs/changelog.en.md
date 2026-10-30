@@ -1,5 +1,14 @@
 # Changelog
 ---
+## Compact merchant caps stepper without `±10`, white d20 die icon, and full-button-height Combat Die icon (patch 477)
+
+Removed the overflowing `−10` and `+10` caps stepper buttons in the Merchant
+modal (`ContainerFormModal.js`, keeping `− / input / +`), replaced plain `d20`
+text with a white 20-sided die icon (`dice-d20`), and sized the Combat Die
+(`CD`) icon vertically equal to the button height (also unified across
+`ContainerItemConfigModal.js`).
+
+---
 ## Location combobox with inline autocomplete (`New` → `New Vegas`) in Chest & Merchant form (patch 476)
 
 Replaced the hidden chip-only Location selector in `ContainerFormModal.js` with

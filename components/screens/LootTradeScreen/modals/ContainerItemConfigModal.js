@@ -9,9 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
-import IconText, { withCdToken } from '../../../lootTrade/LootTradeIconText';
+import IconText, { CdIcon, withCdToken } from '../../../lootTrade/LootTradeIconText';
 import {
   QUANTITY_UNIT,
   isAmmoItem,
@@ -199,21 +200,30 @@ const ContainerItemConfigModal = ({
 
               <Text style={styles.label}>{tLootTrade('itemConfig.unitLabel')}</Text>
               <View style={styles.unitRow}>
-                {[
-                  [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
-                  [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
-                  [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
-                ].map(([uKey, uLabel]) => (
-                  <TouchableOpacity
-                    key={uKey}
-                    style={[styles.unitBtn, unit === uKey && styles.unitBtnActive]}
-                    onPress={() => setUnit(uKey)}
-                  >
-                    <IconText style={[styles.unitBtnText, unit === uKey && styles.unitBtnTextActive]}>
-                      {uLabel}
-                    </IconText>
-                  </TouchableOpacity>
-                ))}
+                {[QUANTITY_UNIT.PCS, QUANTITY_UNIT.CD, QUANTITY_UNIT.D20].map((uKey) => {
+                  const active = unit === uKey;
+                  return (
+                    <TouchableOpacity
+                      key={uKey}
+                      style={[
+                        styles.unitBtn,
+                        uKey === QUANTITY_UNIT.CD && styles.unitBtnCd,
+                        active && styles.unitBtnActive,
+                      ]}
+                      onPress={() => setUnit(uKey)}
+                    >
+                      {uKey === QUANTITY_UNIT.CD ? (
+                        <CdIcon size={38} />
+                      ) : uKey === QUANTITY_UNIT.D20 ? (
+                        <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
+                      ) : (
+                        <Text style={[styles.unitBtnText, active && styles.unitBtnTextActive]}>
+                          {tLootTrade('itemConfig.unitPcs')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               {unit === QUANTITY_UNIT.CD && (
                 <IconText style={styles.hint}>{tLootTrade('itemConfig.diceHintCd')}</IconText>
@@ -374,19 +384,28 @@ const styles = StyleSheet.create({
   },
   unitRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   unitBtn: {
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    minWidth: 58,
+    height: 40,
+    paddingHorizontal: 14,
+    paddingVertical: 0,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  unitBtnCd: {
+    paddingHorizontal: 9,
   },
   unitBtnActive: {
-    backgroundColor: '#f0e68c',
-    borderColor: '#d4af37',
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
   },
   unitBtnText: {
     color: '#e0e0e0',
@@ -394,7 +413,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   unitBtnTextActive: {
-    color: '#1a1a1a',
+    color: '#f0e68c',
   },
   hint: {
     color: '#b0b0b0',

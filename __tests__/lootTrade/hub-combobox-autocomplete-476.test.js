@@ -28,6 +28,11 @@ vi.mock('../../components/alerts/alertService', () => ({
   showRawAlert: vi.fn(),
 }));
 
+vi.mock('@expo/vector-icons', () => ({
+  MaterialCommunityIcons: ({ name, size, color, ...props }) =>
+    React.createElement('MaterialCommunityIcons', { name, size, color, ...props }),
+}));
+
 vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
 vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
 

@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
 import { tLootTrade, formatLootTrade } from '../logic/lootTradeI18n';
-import IconText from '../../../lootTrade/LootTradeIconText';
+import IconText, { CdIcon } from '../../../lootTrade/LootTradeIconText';
 import { formatRoomCodeForDisplay } from '../../../../src/room/roomCode';
 import {
   CONTAINER_KIND,
@@ -490,42 +491,55 @@ const ContainerFormModal = ({
               <>
                 <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
                 <View style={styles.counterRow}>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-10)}>
-                    <Text style={styles.stepBtnText}>−10</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(-1)}>
+                  <TouchableOpacity
+                    testID="merchant-caps-minus"
+                    style={styles.stepBtn}
+                    onPress={() => stepCaps(-1)}
+                  >
                     <Text style={styles.stepBtnText}>−</Text>
                   </TouchableOpacity>
                   <TextInput
+                    testID="merchant-caps-input"
                     style={styles.counterInput}
                     value={capsCount}
                     onChangeText={setCapsCount}
                     keyboardType="number-pad"
                   />
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(1)}>
+                  <TouchableOpacity
+                    testID="merchant-caps-plus"
+                    style={styles.stepBtn}
+                    onPress={() => stepCaps(1)}
+                  >
                     <Text style={styles.stepBtnText}>+</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.stepBtn} onPress={() => stepCaps(10)}>
-                    <Text style={styles.stepBtnText}>+10</Text>
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.unitSegments}>
-                  {[
-                    [QUANTITY_UNIT.PCS, tLootTrade('itemConfig.unitPcs')],
-                    [QUANTITY_UNIT.CD, tLootTrade('itemConfig.unitCd')],
-                    [QUANTITY_UNIT.D20, tLootTrade('itemConfig.unitD20')],
-                  ].map(([uKey, uLabel]) => (
-                    <TouchableOpacity
-                      key={uKey}
-                      style={[styles.unitSeg, capsUnit === uKey && styles.unitSegActive]}
-                      onPress={() => setCapsUnit(uKey)}
-                    >
-                      <IconText style={[styles.unitSegText, capsUnit === uKey && styles.unitSegTextActive]}>
-                        {uLabel}
-                      </IconText>
-                    </TouchableOpacity>
-                  ))}
+                  {[QUANTITY_UNIT.PCS, QUANTITY_UNIT.CD, QUANTITY_UNIT.D20].map((uKey) => {
+                    const active = capsUnit === uKey;
+                    return (
+                      <TouchableOpacity
+                        key={uKey}
+                        testID={`merchant-unit-${uKey}`}
+                        style={[
+                          styles.unitSeg,
+                          uKey === QUANTITY_UNIT.CD && styles.unitSegCd,
+                          active && styles.unitSegActive,
+                        ]}
+                        onPress={() => setCapsUnit(uKey)}
+                      >
+                        {uKey === QUANTITY_UNIT.CD ? (
+                          <CdIcon size={38} />
+                        ) : uKey === QUANTITY_UNIT.D20 ? (
+                          <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.unitSegText, active && styles.unitSegTextActive]}>
+                            {tLootTrade('itemConfig.unitPcs')}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
                 <Text style={styles.label}>{tLootTrade('form.saleMarkupLabel')}</Text>
@@ -819,23 +833,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
     marginVertical: 4,
   },
   stepBtn: {
     backgroundColor: '#2e2e2e',
-    minWidth: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 5,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
     borderWidth: 1,
     borderColor: '#666666',
   },
   stepBtnText: {
     color: '#f0e68c',
-    fontSize: 15,
+    fontSize: 20,
     fontWeight: '700',
   },
   counterInput: {
@@ -843,38 +856,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
-    width: 96,
-    height: 38,
+    width: 108,
+    height: 40,
     textAlign: 'center',
     color: '#f5f5f5',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   unitSegments: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    alignItems: 'center',
+    gap: 10,
     marginTop: 8,
   },
   unitSeg: {
+    minWidth: 58,
+    height: 40,
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 0,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     backgroundColor: '#2a2a2a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  unitSegCd: {
+    paddingHorizontal: 9,
   },
   unitSegActive: {
-    backgroundColor: '#f0e68c',
-    borderColor: '#d4af37',
+    backgroundColor: '#3a3a1e',
+    borderColor: '#f0e68c',
   },
   unitSegText: {
     color: '#dcdcdc',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   unitSegTextActive: {
-    color: '#1a1a1a',
+    color: '#f0e68c',
   },
   footer: {
     flexDirection: 'row',
