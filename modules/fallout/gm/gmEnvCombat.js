@@ -10,7 +10,7 @@ import { getCurrentLocale } from '../../../i18n/locale';
 import { rollDie, rollMultipleCombatDice } from '../../../domain/diceRollsLogic';
 import { isSkillTagged, resolveD20Check } from '../../../domain/d20Checks';
 import { findEnrichedOrigin, isRobotCharacter } from '../../../domain/origins';
-import { findTraitById } from '../../../domain/traits';
+import { findTraitById, hasTraitEffect } from '../../../domain/traits';
 import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
 import { createEmptyEquippedArmor } from '../../../domain/equippedArmor';
 import { getPieceDR, hasFrame } from '../../../domain/powerArmor';
@@ -41,16 +41,8 @@ export const WEATHER_CONDITIONS = Object.freeze([
   { key: 'cold', icon: 'snowflake-alert', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 3 },
   { key: 'dustStorm', icon: 'weather-windy', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
   { key: 'denseFog', icon: 'weather-fog', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 2 },
-  { key: 'radStorm', icon: 'weather-lightning-rainy', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3 },
-  { key: 'acidRain', icon: 'weather-pouring', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3 },
-]);
-
-export const RADIATION_PRESETS = Object.freeze([
-  { key: 'dirtyWater', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'once', defaultIntervals: 1, resistMode: 'minBody' },
-  { key: 'background', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 3, resistMode: 'minBody' },
-  { key: 'barrel', defaultValue: 3, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3, resistMode: 'minBody' },
-  { key: 'radBurst', defaultValue: 5, defaultMode: 'cd', defaultUnit: 'once', defaultIntervals: 1, resistMode: 'zone' },
-  { key: 'custom', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3, resistMode: 'minBody' },
+  { key: 'radStorm', icon: 'weather-lightning-rainy', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
+  { key: 'acidRain', icon: 'weather-pouring', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
 ]);
 
 export const ATTACK_FAIL_OUTCOMES = Object.freeze([
@@ -267,6 +259,13 @@ export const computeRadiationExposure = (charData = {}, rawAmount = 0, {
   };
 };
 
+const resolveGhoulRadiationHealing = (charData, amount, remainder = 0) => {
+  const { resolvedTrait } = resolveCharacterImmunityContext(charData);
+  if (!hasTraitEffect(resolvedTrait, 'radiation_healing')) return { heal: 0, remainder: 0 };
+  const total = Math.max(0, Number(amount) || 0) + Math.max(0, Number(remainder) || 0);
+  return { heal: Math.floor(total / 3), remainder: total % 3 };
+};
+
 // ── Множители погоды для системы выживания (жара → вода, холод → еда) ──
 
 export const getWeatherSurvivalMultipliers = (effectsDictOrArray) => {
@@ -351,30 +350,23 @@ export const buildPeriodicTimedEffect = ({
   category,
   conditionKey,
   title,
-  valueMode = 'fixed',
   value = 1,
   durationUnit = 'scenes',
   totalIntervals = 1,
-  radResistMode = 'minBody',
-  hitZone = 'body',
-  shelterProtected = true,
   locale = getCurrentLocale(),
 }) => {
-  const valLabel = valueMode === 'cd' ? `${value} {CD}` : `${value}`;
+  const valLabel = `${value}`;
   const unitShort = tGm(`envCombat.duration.shortUnits.${durationUnit}`, locale) || durationUnit;
   const gmPeriodic = {
     category,
     conditionKey,
     title,
-    valueMode,
+    valueMode: 'fixed',
     value: Math.max(1, Math.floor(Number(value) || 1)),
     durationUnit,
     totalIntervals: Math.max(1, Math.floor(Number(totalIntervals) || 1)),
     completedIntervals: 0,
     progressMinutes: 0,
-    radResistMode,
-    hitZone,
-    shelterProtected: Boolean(shelterProtected),
   };
   const effectId = category === 'weather'
     ? `gm-weather-${conditionKey}`
@@ -396,16 +388,18 @@ export const buildPeriodicTimedEffect = ({
 // ── Применение одиночного тика Погоды или Радиации к мутабельному контексту персонажа ──
 
 const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
-  const { category, conditionKey, valueMode = 'fixed', value = 1, radResistMode = 'minBody', hitZone = 'body', shelterProtected = true } = spec;
-  const { amount } = evaluateStrengthAmount({ valueMode, value });
+  const { category, conditionKey, value = 1 } = spec;
+  const amount = Math.max(0, Math.floor(Number(value) || 0));
 
   if (category === 'radiation' || (category === 'weather' && conditionKey === 'radStorm')) {
-    const exp = computeRadiationExposure(ctx.charData, amount, {
-      resistMode: category === 'weather' ? 'minBody' : radResistMode,
-      hitZone,
-    });
+    const exp = computeRadiationExposure(ctx.charData, amount, { resistMode: 'minBody' });
     if (exp.immune) {
-      return tGm('envCombat.radiation.previewImmune', locale);
+      const healing = resolveGhoulRadiationHealing(ctx.charData, amount, spec.radiationHealingRemainder);
+      spec.radiationHealingRemainder = healing.remainder;
+      if (healing.heal > 0) ctx.healHp?.(healing.heal);
+      return healing.heal > 0
+        ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
+        : tGm('envCombat.radiation.immuneResult', locale);
     }
     if (exp.netRad > 0) {
       ctx.addRadiation(exp.netRad);
@@ -419,7 +413,7 @@ const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
   if (category === 'weather') {
     const imm = resolveCharacterImmunityContext(ctx.charData);
     const bodyDR = getCharacterZoneDR(ctx.charData, 'body');
-    if (shelterProtected && bodyDR.sealed && (conditionKey === 'heat' || conditionKey === 'cold' || conditionKey === 'acidRain' || conditionKey === 'dustStorm')) {
+    if (bodyDR.sealed && (conditionKey === 'heat' || conditionKey === 'cold' || conditionKey === 'acidRain' || conditionKey === 'dustStorm')) {
       return '0 (защищено герметичной бронёй)';
     }
     if (conditionKey === 'heat' || conditionKey === 'cold') {
@@ -428,7 +422,7 @@ const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
       return `+${Math.max(1, amount)} усталости`;
     }
     if (conditionKey === 'acidRain') {
-      if (imm.poisonImmune && shelterProtected) return '0 (иммунитет)';
+      if (imm.poisonImmune) return '0 (иммунитет)';
       const dr = Math.max(0, Number(bodyDR.energy) || 0);
       const netDmg = Math.max(0, amount - dr);
       if (netDmg > 0) ctx.damageHp(netDmg);
@@ -516,7 +510,7 @@ export const advancePeriodicEffectsArray = (effectsList = [], ctx, {
       continue;
     }
 
-    const valLabel = gp.valueMode === 'cd' ? `${gp.value} {CD}` : `${gp.value}`;
+    const valLabel = `${gp.value}`;
     nextEffects.push({
       ...eff,
       gmPeriodic: gp,
@@ -649,6 +643,9 @@ export const tickGmPeriodicEffectsForStore = (store, { scenes = 0, gameMinutes =
     damageHp: (dmg) => {
       if (dmg > 0) store.damageCharacter(dmg);
     },
+    healHp: (heal) => {
+      if (heal > 0) store.healCharacter(heal);
+    },
     addRadiation: (rad) => {
       if (rad > 0) store.addRadiation(rad);
     },
@@ -736,6 +733,7 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
       const detail = applySingleHazardTick({
         charData,
         damageHp: (d) => d > 0 && store.damageCharacter(d),
+        healHp: (h) => h > 0 && store.healCharacter(h),
         addRadiation: (r) => r > 0 && store.addRadiation(r),
         addWeatherFatigue: (src, amt) => {
           const surv = store.stateExtensions?.survival;
@@ -753,11 +751,9 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
       category: 'weather',
       conditionKey: condKey,
       title,
-      valueMode: p.valueMode || 'fixed',
       value: p.value ?? 1,
       durationUnit,
       totalIntervals: p.totalIntervals ?? 1,
-      shelterProtected: p.shelterProtected !== false,
       locale,
     });
     syncTimedEffectsToStore([...cur, eff], store);
@@ -768,16 +764,19 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
   }
 
   if (kind === ENV_DIRECTIVE_KIND.RADIATION_APPLY) {
-    const presetKey = p.presetKey || 'custom';
-    const title = p.customTitle || tGm(`envCombat.radiation.presets.${presetKey}`, locale);
+    const presetKey = 'radiation';
+    const title = p.customTitle || tGm('envCombat.radiation.genericTitle', locale);
     const durationUnit = p.durationUnit || 'once';
     if (durationUnit === 'once') {
-      const { amount } = evaluateStrengthAmount({ valueMode: p.valueMode || 'fixed', value: p.value ?? 1 });
-      const exp = computeRadiationExposure(charData, amount, {
-        resistMode: p.radResistMode || 'minBody',
-        hitZone: p.hitZone || 'body',
-      });
-      if (exp.immune) return tGm('envCombat.radiation.previewImmune', locale);
+      const amount = Math.max(0, Math.floor(Number(p.value ?? 1) || 0));
+      const exp = computeRadiationExposure(charData, amount, { resistMode: 'minBody' });
+      if (exp.immune) {
+        const healing = resolveGhoulRadiationHealing(charData, amount);
+        if (healing.heal > 0) store.healCharacter(healing.heal);
+        return healing.heal > 0
+          ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
+          : tGm('envCombat.radiation.immuneResult', locale);
+      }
       if (exp.netRad > 0) store.addRadiation(exp.netRad);
       return formatGm(tGm('envCombat.playerAlerts.radAppliedOnce', locale), {
         rad: exp.netRad,
@@ -789,16 +788,13 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
       category: 'radiation',
       conditionKey: presetKey,
       title,
-      valueMode: p.valueMode || 'fixed',
       value: p.value ?? 1,
       durationUnit,
       totalIntervals: p.totalIntervals ?? 1,
-      radResistMode: p.radResistMode || 'minBody',
-      hitZone: p.hitZone || 'body',
       locale,
     });
     syncTimedEffectsToStore([...cur, eff], store);
-    const valStr = p.valueMode === 'cd' ? `${p.value} {CD}` : String(p.value ?? 1);
+    const valStr = String(p.value ?? 1);
     return formatGm(tGm('envCombat.playerAlerts.radPeriodicStarted', locale), {
       title,
       val: valStr,
@@ -1051,7 +1047,7 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
     const title = p.customTitle || tGm(`envCombat.weather.conditions.${condKey}.title`, locale);
     const durationUnit = p.durationUnit || 'hours';
     if (durationUnit === 'once') {
-      const detail = applySingleHazardTick({ charData: data, damageHp, addRadiation, addWeatherFatigue }, { ...p, category: 'weather', conditionKey: condKey }, locale);
+      const detail = applySingleHazardTick({ charData: data, damageHp, healHp, addRadiation, addWeatherFatigue }, { ...p, category: 'weather', conditionKey: condKey }, locale);
       summaryLine = formatGm(tGm('envCombat.playerAlerts.weatherApplied', locale), { title, details: detail });
     } else {
       const filtered = getEffectsArr().filter(
@@ -1061,25 +1057,28 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
         category: 'weather',
         conditionKey: condKey,
         title,
-        valueMode: p.valueMode || 'fixed',
         value: p.value ?? 1,
         durationUnit,
         totalIntervals: p.totalIntervals ?? 1,
-        shelterProtected: p.shelterProtected !== false,
         locale,
       });
       setEffectsArr([...filtered, eff]);
       summaryLine = formatGm(tGm('envCombat.playerAlerts.weatherApplied', locale), { title, details: eff.effectLabel });
     }
   } else if (kind === ENV_DIRECTIVE_KIND.RADIATION_APPLY) {
-    const presetKey = p.presetKey || 'custom';
-    const title = p.customTitle || tGm(`envCombat.radiation.presets.${presetKey}`, locale);
+    const presetKey = 'radiation';
+    const title = p.customTitle || tGm('envCombat.radiation.genericTitle', locale);
     const durationUnit = p.durationUnit || 'once';
     if (durationUnit === 'once') {
-      const { amount } = evaluateStrengthAmount({ valueMode: p.valueMode || 'fixed', value: p.value ?? 1 });
-      const exp = computeRadiationExposure(data, amount, { resistMode: p.radResistMode || 'minBody', hitZone: p.hitZone || 'body' });
-      if (exp.immune) summaryLine = tGm('envCombat.radiation.previewImmune', locale);
-      else {
+      const amount = Math.max(0, Math.floor(Number(p.value ?? 1) || 0));
+      const exp = computeRadiationExposure(data, amount, { resistMode: 'minBody' });
+      if (exp.immune) {
+        const healing = resolveGhoulRadiationHealing(data, amount);
+        if (healing.heal > 0) healHp(healing.heal);
+        summaryLine = healing.heal > 0
+          ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
+          : tGm('envCombat.radiation.immuneResult', locale);
+      } else {
         if (exp.netRad > 0) addRadiation(exp.netRad);
         summaryLine = formatGm(tGm('envCombat.playerAlerts.radAppliedOnce', locale), { rad: exp.netRad, blocked: exp.blocked });
       }
@@ -1088,18 +1087,15 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
         category: 'radiation',
         conditionKey: presetKey,
         title,
-        valueMode: p.valueMode || 'fixed',
         value: p.value ?? 1,
         durationUnit,
         totalIntervals: p.totalIntervals ?? 1,
-        radResistMode: p.radResistMode || 'minBody',
-        hitZone: p.hitZone || 'body',
         locale,
       });
       setEffectsArr([...getEffectsArr(), eff]);
       summaryLine = formatGm(tGm('envCombat.playerAlerts.radPeriodicStarted', locale), {
         title,
-        val: p.valueMode === 'cd' ? `${p.value} {CD}` : String(p.value ?? 1),
+        val: String(p.value ?? 1),
         n: p.totalIntervals ?? 1,
         unit: tGm(`envCombat.duration.shortUnits.${durationUnit}`, locale),
       });
@@ -1221,7 +1217,7 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
   } else if (kind === ENV_DIRECTIVE_KIND.TIME_ADVANCE) {
     const res = advancePeriodicEffectsArray(
       getEffectsArr(),
-      { charData: data, damageHp, addRadiation, addWeatherFatigue },
+      { charData: data, damageHp, healHp, addRadiation, addWeatherFatigue },
       { scenes: p.scenes || 0, gameMinutes: p.gameMinutes || 0, locale },
     );
     setEffectsArr(res.effects);

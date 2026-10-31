@@ -1,0 +1,1541 @@
+diff --git a/__tests__/room/gm-environment-combat-482.test.js b/__tests__/room/gm-environment-combat-482.test.js
+index 196d964..d945bdd 100644
+--- a/__tests__/room/gm-environment-combat-482.test.js
++++ b/__tests__/room/gm-environment-combat-482.test.js
+@@ -221,6 +221,19 @@ describe('Патч 482: экран Мастера «Окружающая сре
+     expect(remaining).toHaveLength(2);
+   });
+ 
++  it('новый экран использует общие карточки и сохраняет радиацию/увечья без расчёта и привязки к первому персонажу', () => {
++    const screen = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/EnvCombatScreen.js'), 'utf8');
++    const modal = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js'), 'utf8');
++    expect(screen).toContain('styles.topBar');
++    expect(screen).toContain('styles.cardCell');
++    expect(screen).not.toContain('tabletopResultTitle');
++    expect(modal).toContain('intervalOnly: true');
++    expect(modal).toContain("presetPayload.zoneKey = 'auto'");
++    expect(modal).not.toContain('RADIATION_PRESETS');
++    expect(modal).not.toContain('shelterProtected');
++    expect(modal).not.toContain('rollHitZoneForCharacter');
++  });
++
+   it('Погода и Радиация применяют эффект ровно в конце каждого из N промежутков (сцены и часы) с учётом наименьшего СУ рад. и иммунитетов', () => {
+     // 1. Проверка фонового СУ рад. (наименьшее по всем 6 зонам тела) и иммунитетов
+     const unsealedHero = {
+@@ -327,6 +340,59 @@ describe('Патч 482: экран Мастера «Окружающая сре
+       .toHaveLength(0);
+   });
+ 
++  it('радиация разрешается на стороне персонажа: герметичная броня защищает, а гули лечатся от дозы', () => {
++    const attrs = [
++      { name: 'STR', value: 5 }, { name: 'PER', value: 5 }, { name: 'END', value: 5 },
++      { name: 'CHA', value: 5 }, { name: 'INT', value: 5 }, { name: 'AGI', value: 5 }, { name: 'LCK', value: 5 },
++    ];
++    const sealedArmor = Object.fromEntries(
++      ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'].map((slot) => [
++        slot,
++        { armor: null, clothing: { radiationDamageRating: 10 } },
++      ]),
++    );
++    const armoredRow = {
++      id: 'char_armored',
++      data: {
++        level: 1, origin: { id: 'vaultDweller', characterType: 'human' }, attributes: attrs,
++        currentHealth: 10, radiation: 0, equippedArmor: sealedArmor,
++      },
++    };
++    const protectedResult = applyEnvCombatDirectiveToStoredRow({
++      kind: ENV_DIRECTIVE_KIND.WEATHER_APPLY,
++      envPayload: { conditionKey: 'acidRain', value: 5, valueMode: 'fixed', durationUnit: 'once', shelterProtected: false },
++    }, armoredRow, 'en-EN');
++    expect(protectedResult.nextData.currentHealth).toBe(10);
++
++    const ghoulRow = {
++      id: 'char_ghoul',
++      data: {
++        level: 1,
++        origin: { id: 'ghoul', characterType: 'human' },
++        trait: { id: 'ghoul-necrotic-posthuman' },
++        attributes: attrs,
++        currentHealth: 5,
++        radiation: 0,
++      },
++    };
++    const started = applyEnvCombatDirectiveToStoredRow({
++      kind: ENV_DIRECTIVE_KIND.RADIATION_APPLY,
++      envPayload: { valueMode: 'fixed', value: 1, durationUnit: 'scenes', totalIntervals: 3 },
++    }, ghoulRow, 'en-EN');
++    let row = { ...ghoulRow, data: started.nextData };
++    expect(row.data.currentHealth).toBe(5);
++    expect(row.data.radiation).toBe(0);
++    for (let i = 0; i < 3; i += 1) {
++      const tick = applyEnvCombatDirectiveToStoredRow({
++        kind: ENV_DIRECTIVE_KIND.TIME_ADVANCE,
++        envPayload: { scenes: 1 },
++      }, row, 'en-EN');
++      row = { ...row, data: tick.nextData };
++    }
++    expect(row.data.currentHealth).toBe(6);
++    expect(row.data.radiation).toBe(0);
++  });
++
+   it('Увечья адаптируются под слоты робота, проходят 2 стадии лечения (активное → стабилизировано → зажило во сне) и не стираются Аддиктолом', () => {
+     const robotZones = getCharacterZonesForInjury({
+       origin: { id: 'misterHandy', characterType: 'robot', bodyPlan: 'misterHandy' },
+diff --git a/components/screens/EnvCombatScreen/EnvCombatScreen.js b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+index b624322..4c75190 100644
+--- a/components/screens/EnvCombatScreen/EnvCombatScreen.js
++++ b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+@@ -22,7 +22,7 @@ import {
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import * as db from '../../../db';
+-import { SUPPORTED_LOCALES, setCurrentLocale, useLocale } from '../../../i18n/locale';
++import { SUPPORTED_LOCALES, useLocale } from '../../../i18n/locale';
+ import { getLocaleLabel } from '../HomeScreen/logic/localeLabel';
+ import { tHomeScreen } from '../HomeScreen/logic/homeScreenI18n';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+@@ -39,15 +39,10 @@ import {
+   isEnvEntryVisibleInFolder,
+   sortEnvEntries,
+ } from '../../../domain/envCombatPresets';
+-import {
+-  ENV_DIRECTIVE_KIND,
+-  evaluateStrengthAmount,
+-  rollHitZoneForCharacter,
+-} from '../../../modules/fallout/gm/gmEnvCombat';
++import { ENV_DIRECTIVE_KIND } from '../../../modules/fallout/gm/gmEnvCombat';
+ import { formatGm, tGm } from '../../../modules/fallout/gm/gmI18n';
+ import {
+   deleteGmEnvEntryFromCloudIfEnabled,
+-  openCloudFolderInDrive,
+   syncAllCharactersWithCloud,
+   syncGmEnvEntryToCloudIfEnabled,
+ } from '../../cloudSync/googleDriveSync';
+@@ -62,22 +57,22 @@ const NUM_COLS = 3;
+ const MENU_WIDTH = 230;
+ 
+ const MECHANIC_TILE_META = Object.freeze({
+-  [ENV_MECHANIC_TYPE.WEATHER]: { icon: 'weather-lightning-rainy', color: '#38bdf8' },
+-  [ENV_MECHANIC_TYPE.RADIATION]: { icon: 'radioactive', color: '#4ade80' },
+-  [ENV_MECHANIC_TYPE.INJURY]: { icon: 'bone', color: '#f87171' },
+-  [ENV_MECHANIC_TYPE.ATTACK_FAIL]: { icon: 'pistol', color: '#fbbf24' },
++  [ENV_MECHANIC_TYPE.WEATHER]: { icon: 'weather-lightning-rainy' },
++  [ENV_MECHANIC_TYPE.RADIATION]: { icon: 'radioactive' },
++  [ENV_MECHANIC_TYPE.INJURY]: { icon: 'bone' },
++  [ENV_MECHANIC_TYPE.ATTACK_FAIL]: { icon: 'pistol' },
+ });
+ 
+ const formatPresetFormulaBadge = (preset, locale) => {
+   const p = preset?.payload || {};
+   if (preset?.mechanicType === ENV_MECHANIC_TYPE.WEATHER || preset?.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
+-    const val = p.valueMode === 'cd' ? `${p.value ?? 1} {CD}` : `${p.value ?? 1}`;
++    const val = `${p.value ?? 1}`;
+     const u = p.durationUnit || 'once';
+     if (u === 'once') return `${val} · ${tGm('envCombat.duration.shortUnits.once', locale)}`;
+     return `${val} × ${p.totalIntervals ?? 1} ${tGm(`envCombat.duration.shortUnits.${u}`, locale)}`;
+   }
+   if (preset?.mechanicType === ENV_MECHANIC_TYPE.INJURY) {
+-    return p.zoneKey ? `${p.zoneKey}` : 'd20';
++    return !p.zoneKey || p.zoneKey === 'auto' ? 'd20' : `${p.zoneKey}`;
+   }
+   if (preset?.mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL) {
+     return tGm(`envCombat.attackFail.outcomes.${p.outcome || 'weaponJam'}.title`, locale);
+@@ -103,6 +98,7 @@ export default function EnvCombatScreen() {
+     translate: tHomeScreen,
+   });
+   const setUiMode = useAppSettingsStore((s) => s.setUiMode);
++  const setSettingValue = useAppSettingsStore((s) => s.setValue);
+   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
+   const roomsMap = useRoomStore((s) => s.rooms);
+   const sendGmDirective = useRoomStore((s) => s.sendGmDirective);
+@@ -114,7 +110,6 @@ export default function EnvCombatScreen() {
+   const [currentFolderId, setCurrentFolderId] = useState(null);
+ 
+   const [syncing, setSyncing] = useState(false);
+-  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+ 
+   // Модалка механики
+   const [activeMechanic, setActiveMechanic] = useState(null); // { mechanicType, initialPayload?, initialPresetMeta? }
+@@ -233,31 +228,27 @@ export default function EnvCombatScreen() {
+   const dispatchEnvDirective = async ({ kind, targetCharacterId = null, envPayload = {} }) => {
+     if (!guardAdminAction(FEATURE_IDS.GM_ENV_COMBAT)) return;
+ 
++    if (!selectedRoomCode || !activeRoom || activeRoom.joined === false) {
++      showRawAlert({ title: tGm('envCombat.screenTitle', locale), message: tGm('envCombat.requiresLiveRoom', locale) });
++      return;
++    }
++    if ((kind === ENV_DIRECTIVE_KIND.INJURY_APPLY || kind === ENV_DIRECTIVE_KIND.ATTACK_FAIL)
++      && selectedTargetId === 'all') {
++      showRawAlert({
++        title: tGm('envCombat.screenTitle', locale),
++        message: kind === ENV_DIRECTIVE_KIND.INJURY_APPLY
++          ? tGm('envCombat.injury.chooseCharacterFirst', locale)
++          : tGm('envCombat.chooseCharacterFirst', locale),
++      });
++      return;
++    }
++
+     const effectiveTarget = targetCharacterId
+       ? { targetType: 'character', targetCharacterId }
+       : (selectedTargetId === 'all'
+           ? { targetType: 'all', targetCharacterId: null }
+           : { targetType: 'character', targetCharacterId: selectedTargetId });
+ 
+-    // Настольный режим (офлайн без комнаты): показываем расчёт на экране Ведущего
+-    if (!selectedRoomCode || !activeRoom) {
+-      const lines = [];
+-      if (envPayload.valueMode) {
+-        const rolled = evaluateStrengthAmount({ valueMode: envPayload.valueMode, value: envPayload.value ?? 1 });
+-        lines.push(`${tGm('envCombat.valueMode.label', locale)}: ${rolled.amount}${rolled.rolls ? ` [${rolled.rolls.join(', ')}]` : ''}`);
+-      }
+-      if (kind === ENV_DIRECTIVE_KIND.INJURY_APPLY) {
+-        const z = rollHitZoneForCharacter({}, locale);
+-        lines.push(`d20 = ${z.roll} → ${z.zone?.label || envPayload.zoneKey}`);
+-      }
+-      showRawAlert({
+-        title: tGm('envCombat.tabletopResultTitle', locale),
+-        message: lines.join('\n') || 'OK',
+-      });
+-      setActiveMechanic(null);
+-      return;
+-    }
+-
+     try {
+       await sendGmDirective({
+         code: selectedRoomCode,
+@@ -311,6 +302,14 @@ export default function EnvCombatScreen() {
+ 
+   const handleApplySavedPreset = (preset) => {
+     const p = { ...(preset.payload || {}), customTitle: preset.name };
++    if (preset.mechanicType === ENV_MECHANIC_TYPE.WEATHER || preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
++      p.valueMode = 'fixed';
++      if (preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
++        delete p.presetKey;
++        delete p.radResistMode;
++        delete p.hitZone;
++      }
++    }
+     const kind = preset.mechanicType === ENV_MECHANIC_TYPE.WEATHER
+       ? ENV_DIRECTIVE_KIND.WEATHER_APPLY
+       : preset.mechanicType === ENV_MECHANIC_TYPE.RADIATION
+@@ -443,55 +442,53 @@ export default function EnvCombatScreen() {
+ 
+   return (
+     <View style={styles.container}>
+-      {/* Верхняя шапка в едином стиле с «Добыча/Торговля» и «Список кампаний» */}
+-      <View style={homeStyles.headerBar}>
+-        <View style={{ flex: 1 }}>
+-          <Text style={homeStyles.headerTitle} numberOfLines={1}>
+-            {tGm('envCombat.screenTitle', locale)}
+-          </Text>
+-          <Text style={localStyles.headerSubtitle} numberOfLines={1}>
+-            {tGm('envCombat.screenSubtitle', locale)}
+-          </Text>
++      {/* Верхняя шапка — тот же каркас, что на экране «Добыча/Торговля» */}
++      <View style={styles.topBar}>
++        <TouchableOpacity
++          style={styles.syncIconButton}
++          onPress={handleSyncCloud}
++          disabled={syncing}
++          accessibilityLabel={tHomeScreen('cloud.sync')}
++        >
++          {syncing ? (
++            <ActivityIndicator size="small" color="#f0e68c" />
++          ) : (
++            <MaterialCommunityIcons name="cloud-sync-outline" size={20} color="#f0e68c" />
++          )}
++        </TouchableOpacity>
++
++        <View style={styles.headerCenter}>
++          <Pressable style={styles.adminButton} onPress={handleToggleExitGm}>
++            <MaterialCommunityIcons name="shield-crown-outline" size={18} color="#f0e68c" />
++            <Text style={styles.adminButtonText}>{tHomeScreen('gm.exit')}</Text>
++          </Pressable>
+         </View>
+ 
+-        <View style={homeStyles.headerActions}>
+-          <TouchableOpacity
+-            style={homeStyles.iconBtn}
+-            onPress={handleSyncCloud}
+-            disabled={syncing}
+-            accessibilityLabel={tHomeScreen('cloud.sync')}
+-          >
+-            {syncing ? (
+-              <ActivityIndicator size="small" color="#f0e68c" />
+-            ) : (
+-              <MaterialCommunityIcons name="cloud-sync-outline" size={20} color="#f0e68c" />
+-            )}
+-          </TouchableOpacity>
+-
+-          <TouchableOpacity
+-            style={homeStyles.iconBtn}
+-            onPress={() => openCloudFolderInDrive().catch(() => {})}
+-            accessibilityLabel="Google Drive"
+-          >
+-            <MaterialCommunityIcons name="google-drive" size={20} color="#d1d5db" />
+-          </TouchableOpacity>
+-
+-          <TouchableOpacity
+-            style={homeStyles.langBtn}
+-            onPress={() => setLanguageMenuOpen(true)}
+-          >
+-            <Text style={homeStyles.langBtnText}>{localeLabel(locale)}</Text>
+-          </TouchableOpacity>
+-
+-          <TouchableOpacity
+-            style={[homeStyles.adminButton, homeStyles.adminButtonActive]}
+-            onPress={handleToggleExitGm}
+-          >
+-            <MaterialCommunityIcons name="account-cog" size={20} color="#111827" />
+-          </TouchableOpacity>
++        <View style={homeStyles.languageContainer}>
++          {SUPPORTED_LOCALES.map((code, idx) => (
++            <Pressable
++              key={code}
++              style={[
++                homeStyles.langSegment,
++                idx === 0 && homeStyles.langSegmentLeft,
++                idx === SUPPORTED_LOCALES.length - 1 && homeStyles.langSegmentRight,
++                locale === code && homeStyles.langSegmentActive,
++              ]}
++              onPress={() => setSettingValue('language', code)}
++            >
++              <Text style={[homeStyles.langSegmentText, locale === code && homeStyles.langSegmentTextActive]}>
++                {localeLabel(code)}
++              </Text>
++            </Pressable>
++          ))}
+         </View>
+       </View>
+ 
++      <View style={styles.titleContainer}>
++        <Text style={styles.title}>{tGm('envCombat.screenTitle', locale)}</Text>
++        <Text style={styles.subtitle}>{tGm('envCombat.screenSubtitle', locale)}</Text>
++      </View>
++
+       {/* Панель выбора комнаты, получателя и продвижения времени */}
+       <View style={localStyles.targetBar}>
+         <View style={localStyles.targetRow}>
+@@ -590,20 +587,22 @@ export default function EnvCombatScreen() {
+                 <TouchableOpacity
+                   key={tile.mechanicType}
+                   testID={`env-tile-${tile.mechanicType}`}
+-                  style={[styles.cardCell, localStyles.mechanicTile]}
++                  style={styles.cardCell}
+                   activeOpacity={0.8}
+                   onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
+                 >
+-                  <View style={localStyles.tileTopRow}>
+-                    <MaterialCommunityIcons name={meta.icon} size={26} color={meta.color} />
++                  <View style={styles.cardHero}>
++                    <MaterialCommunityIcons name={meta.icon} size={34} color="#f0e68c" />
+                     {tile.badge ? (
+-                      <View style={localStyles.activePillBadge}>
+-                        <Text style={localStyles.activePillText}>{tile.badge}</Text>
++                      <View style={styles.cardLiveBadge}>
++                        <Text style={styles.cardLiveBadgeText}>{tile.badge}</Text>
+                       </View>
+                     ) : null}
+                   </View>
+-                  <Text style={styles.cardName} numberOfLines={1}>{tile.title}</Text>
+-                  <Text style={localStyles.tileDesc} numberOfLines={3}>{tile.subtitle}</Text>
++                  <View style={styles.cardBody}>
++                    <Text style={styles.cardTitle} numberOfLines={2}>{tile.title}</Text>
++                    <Text style={styles.cardDesc} numberOfLines={3}>{tile.subtitle}</Text>
++                  </View>
+                 </TouchableOpacity>
+               );
+             })}
+@@ -659,7 +658,7 @@ export default function EnvCombatScreen() {
+                 <TouchableOpacity
+                   key={entry.id}
+                   testID={`env-saved-${entry.id}`}
+-                  style={[styles.cardCell, isFolder && localStyles.folderCard]}
++                  style={styles.cardCell}
+                   activeOpacity={0.82}
+                   onPress={() => {
+                     if (isFolder) {
+@@ -669,39 +668,40 @@ export default function EnvCombatScreen() {
+                     }
+                   }}
+                 >
+-                  <View style={localStyles.tileTopRow}>
++                  <View style={[styles.cardHero, isFolder && styles.cardHeroHub]}>
+                     <MaterialCommunityIcons
+                       name={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
+-                      size={24}
+-                      color={isFolder ? '#f0e68c' : (meta?.color || '#f0e68c')}
++                      size={34}
++                      color="#f0e68c"
+                     />
+                     <TouchableOpacity
+                       ref={(r) => { menuRefs.current[entry.id] = r; }}
+-                      style={localStyles.dotsBtn}
++                      style={[styles.cardActionButton, localStyles.savedCardMenuButton]}
+                       onPress={(e) => {
+                         e?.stopPropagation?.();
+                         openEntryMenu(entry);
+                       }}
+                     >
+-                      <MaterialCommunityIcons name="dots-vertical" size={18} color="#d1d5db" />
++                      <MaterialCommunityIcons name="dots-vertical" size={18} color="#f0e68c" />
+                     </TouchableOpacity>
+                   </View>
+ 
+-                  <Text style={styles.cardName} numberOfLines={2}>{entry.name}</Text>
+-                  {entry.description ? (
+-                    <Text style={localStyles.tileDesc} numberOfLines={2}>{entry.description}</Text>
+-                  ) : null}
+-
+-                  <View style={{ marginTop: 'auto', paddingTop: 6 }}>
+-                    {isFolder ? (
+-                      <Text style={localStyles.formulaBadge}>
+-                        {formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })}
+-                      </Text>
+-                    ) : (
+-                      <IconText style={localStyles.formulaBadge}>
+-                        {formatPresetFormulaBadge(entry, locale)}
+-                      </IconText>
+-                    )}
++                  <View style={styles.cardBody}>
++                    <Text style={styles.cardTitle} numberOfLines={2}>{entry.name}</Text>
++                    {entry.description ? (
++                      <Text style={styles.cardDesc} numberOfLines={2}>{entry.description}</Text>
++                    ) : null}
++                    <View style={{ marginTop: 'auto', paddingTop: 6 }}>
++                      {isFolder ? (
++                        <Text style={styles.cardMeta}>
++                          {formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })}
++                        </Text>
++                      ) : (
++                        <IconText style={styles.cardMeta}>
++                          {formatPresetFormulaBadge(entry, locale)}
++                        </IconText>
++                      )}
++                    </View>
+                   </View>
+                 </TouchableOpacity>
+               );
+@@ -967,32 +967,6 @@ export default function EnvCombatScreen() {
+         </View>
+       </Modal>
+ 
+-      {/* Меню выбора языка */}
+-      <Modal
+-        visible={languageMenuOpen}
+-        transparent
+-        animationType="fade"
+-        onRequestClose={() => setLanguageMenuOpen(false)}
+-      >
+-        <Pressable style={localStyles.menuBackdrop} onPress={() => setLanguageMenuOpen(false)}>
+-          <View style={[localStyles.modalCard, { maxWidth: 260, alignSelf: 'center', marginTop: 80 }]}>
+-            {SUPPORTED_LOCALES.map((loc) => (
+-              <TouchableOpacity
+-                key={loc}
+-                style={localStyles.folderPickRow}
+-                onPress={() => {
+-                  setCurrentLocale(loc);
+-                  setLanguageMenuOpen(false);
+-                }}
+-              >
+-                <Text style={[localStyles.folderPickText, loc === locale && { color: '#f0e68c', fontWeight: '700' }]}>
+-                  {localeLabel(loc)}
+-                </Text>
+-              </TouchableOpacity>
+-            ))}
+-          </View>
+-        </Pressable>
+-      </Modal>
+ 
+       {/* Модалка настройки 4 механик */}
+       <EnvMechanicModal
+@@ -1003,7 +977,7 @@ export default function EnvCombatScreen() {
+         folders={folders}
+         roomCharacters={roomCharacters}
+         selectedTargetId={selectedTargetId}
+-        hasLiveRoom={Boolean(selectedRoomCode && activeRoom)}
++        hasLiveRoom={Boolean(selectedRoomCode && activeRoom && activeRoom.joined !== false)}
+         onClose={() => setActiveMechanic(null)}
+         onDispatchDirective={dispatchEnvDirective}
+         onSavePresetTile={handleSavePresetFromModal}
+@@ -1013,11 +987,6 @@ export default function EnvCombatScreen() {
+ }
+ 
+ const localStyles = StyleSheet.create({
+-  headerSubtitle: {
+-    color: '#9ca3af',
+-    fontSize: 11,
+-    marginTop: 1,
+-  },
+   targetBar: {
+     backgroundColor: 'rgba(24, 27, 32, 0.94)',
+     borderBottomWidth: 1,
+@@ -1126,48 +1095,12 @@ const localStyles = StyleSheet.create({
+     fontSize: 12,
+     fontWeight: '700',
+   },
+-  mechanicTile: {
+-    minHeight: 118,
+-    justifyContent: 'flex-start',
+-  },
+-  folderCard: {
+-    borderColor: 'rgba(240, 230, 140, 0.5)',
+-    backgroundColor: 'rgba(38, 43, 50, 0.96)',
+-  },
+-  tileTopRow: {
+-    flexDirection: 'row',
+-    alignItems: 'center',
+-    justifyContent: 'space-between',
+-    width: '100%',
+-    marginBottom: 6,
+-  },
+-  tileDesc: {
+-    color: '#9ca3af',
+-    fontSize: 11,
+-    lineHeight: 15,
+-    marginTop: 3,
+-  },
+-  activePillBadge: {
+-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+-    borderWidth: 1,
+-    borderColor: '#ef4444',
+-    borderRadius: 4,
+-    paddingHorizontal: 6,
+-    paddingVertical: 2,
+-  },
+-  activePillText: {
+-    color: '#fca5a5',
+-    fontSize: 10,
+-    fontWeight: '700',
+-  },
+-  formulaBadge: {
+-    color: '#f0e68c',
+-    fontSize: 11,
+-    fontWeight: '700',
+-  },
+-  dotsBtn: {
+-    padding: 4,
+-    borderRadius: 4,
++  savedCardMenuButton: {
++    top: 4,
++    right: 4,
++    bottom: undefined,
++    backgroundColor: 'rgba(36,36,36,0.88)',
++    borderColor: '#d4af37',
+   },
+   emptyHint: {
+     color: '#9ca3af',
+diff --git a/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js b/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
+index 38df698..b008ece 100644
+--- a/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
++++ b/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
+@@ -6,8 +6,8 @@ import React, { useEffect, useMemo, useState } from 'react';
+ import {
+   Modal,
+   ScrollView,
+-  StyleSheet,
+   Switch,
++  StyleSheet,
+   Text,
+   TextInput,
+   TouchableOpacity,
+@@ -21,15 +21,11 @@ import {
+   ATTACK_FAIL_OUTCOMES,
+   DURATION_UNITS,
+   ENV_DIRECTIVE_KIND,
+-  RADIATION_PRESETS,
+   WEATHER_CONDITIONS,
+-  computeRadiationExposure,
+   describeInjuryEffect,
+-  evaluateStrengthAmount,
+   getCharacterZonesForInjury,
+   resolveCharacterImmunityContext,
+   rollCdValue,
+-  rollHitZoneForCharacter,
+ } from '../../../../modules/fallout/gm/gmEnvCombat';
+ import { formatGm, tGm } from '../../../../modules/fallout/gm/gmI18n';
+ 
+@@ -71,17 +67,13 @@ export default function EnvMechanicModal({
+ 
+   // Общие поля силы и длительности (для Погоды и Радиации, а также урона Взрыва/Рикошета)
+   const [conditionKey, setConditionKey] = useState('heat');
+-  const [radPresetKey, setRadPresetKey] = useState('dirtyWater');
+-  const [radResistMode, setRadResistMode] = useState('minBody');
+   const [valueMode, setValueMode] = useState('fixed');
+   const [value, setValue] = useState(2);
+   const [durationUnit, setDurationUnit] = useState('scenes');
+   const [totalIntervals, setTotalIntervals] = useState(3);
+-  const [shelterProtected, setShelterProtected] = useState(true);
+ 
+   // Зона попадания / увечья
+-  const [zoneKey, setZoneKey] = useState('body');
+-  const [rolledD20Info, setRolledD20Info] = useState('');
++  const [zoneKey, setZoneKey] = useState('auto');
+   const [bleedDice, setBleedDice] = useState(1);
+ 
+   // Провал атаки
+@@ -92,7 +84,7 @@ export default function EnvMechanicModal({
+   const [ricochetTargetMode, setRicochetTargetMode] = useState('self');
+   const [ricochetChosenCharId, setRicochetChosenCharId] = useState('');
+ 
+-  // Настольный бросок {CD} и форма сохранения пресета
++  // Настройка значений и форма сохранения пресета
+   const [rolledCdLine, setRolledCdLine] = useState('');
+   const [savePanelOpen, setSavePanelOpen] = useState(false);
+   const [presetName, setPresetName] = useState('');
+@@ -101,13 +93,13 @@ export default function EnvMechanicModal({
+ 
+   const primaryCharacter = useMemo(() => {
+     if (selectedTargetId && selectedTargetId !== 'all') {
+-      return roomCharacters.find((c) => c.characterId === selectedTargetId) || roomCharacters[0] || null;
++      return roomCharacters.find((c) => c.characterId === selectedTargetId) || null;
+     }
+-    return roomCharacters[0] || null;
++    return null;
+   }, [roomCharacters, selectedTargetId]);
+ 
+   const charZones = useMemo(
+-    () => getCharacterZonesForInjury(primaryCharacter?.snapshot || {}, locale),
++    () => (primaryCharacter ? getCharacterZonesForInjury(primaryCharacter.snapshot || {}, locale) : []),
+     [primaryCharacter, locale],
+   );
+ 
+@@ -143,29 +135,22 @@ export default function EnvMechanicModal({
+   useEffect(() => {
+     if (!visible) return;
+     setRolledCdLine('');
+-    setRolledD20Info('');
+     const p = initialPayload || {};
+ 
+     if (mechanicType === ENV_MECHANIC_TYPE.WEATHER) {
+       const def = WEATHER_CONDITIONS.find((c) => c.key === (p.conditionKey || 'heat')) || WEATHER_CONDITIONS[0];
+       setConditionKey(def.key);
+-      setValueMode(p.valueMode || def.defaultMode);
++      setValueMode('fixed');
+       setValue(p.value ?? def.defaultValue);
+       setDurationUnit(p.durationUnit || def.defaultUnit);
+       setTotalIntervals(p.totalIntervals ?? def.defaultIntervals);
+-      setShelterProtected(p.shelterProtected !== false);
+     } else if (mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
+-      const def = RADIATION_PRESETS.find((r) => r.key === (p.presetKey || 'dirtyWater')) || RADIATION_PRESETS[0];
+-      setRadPresetKey(def.key);
+-      setRadResistMode(p.radResistMode || def.resistMode);
+-      setValueMode(p.valueMode || def.defaultMode);
+-      setValue(p.value ?? def.defaultValue);
+-      setDurationUnit(p.durationUnit || def.defaultUnit);
+-      setTotalIntervals(p.totalIntervals ?? def.defaultIntervals);
+-      setZoneKey(p.hitZone || 'body');
++      setValueMode('fixed');
++      setValue(p.value ?? 3);
++      setDurationUnit(p.durationUnit && p.durationUnit !== 'once' ? p.durationUnit : 'scenes');
++      setTotalIntervals(p.totalIntervals ?? 3);
+     } else if (mechanicType === ENV_MECHANIC_TYPE.INJURY) {
+-      const firstZ = charZones[0]?.key || 'body';
+-      setZoneKey(p.zoneKey && charZones.some((z) => z.key === p.zoneKey) ? p.zoneKey : firstZ);
++      setZoneKey(p.zoneKey && charZones.some((z) => z.key === p.zoneKey) ? p.zoneKey : 'auto');
+       setBleedDice(p.bleedDice ?? 1);
+     } else if (mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL) {
+       setAttackOutcome(p.outcome || 'weaponJam');
+@@ -176,7 +161,7 @@ export default function EnvMechanicModal({
+       setExplodeRepairable(p.repairable !== false);
+       setRicochetTargetMode(p.ricochetTargetMode || 'self');
+       setRicochetChosenCharId(p.ricochetChosenCharId || roomCharacters[0]?.characterId || '');
+-      setZoneKey(p.hitZone || 'body');
++      setZoneKey(p.hitZone || 'auto');
+     }
+ 
+     if (initialPresetMeta) {
+@@ -190,7 +175,7 @@ export default function EnvMechanicModal({
+       setPresetFolderId(null);
+       setSavePanelOpen(false);
+     }
+-  }, [visible, mechanicType, initialPayload, initialPresetMeta]);
++  }, [visible, mechanicType, initialPayload, initialPresetMeta, charZones]);
+ 
+   useEffect(() => {
+     if (targetWeapons.length > 0 && !targetWeapons.some((w) => w.id === selectedWeaponId)) {
+@@ -202,21 +187,12 @@ export default function EnvMechanicModal({
+ 
+   const selectWeatherCond = (cond) => {
+     setConditionKey(cond.key);
+-    setValueMode(cond.defaultMode);
++    setValueMode('fixed');
+     setValue(cond.defaultValue);
+     setDurationUnit(cond.defaultUnit);
+     setTotalIntervals(cond.defaultIntervals);
+   };
+ 
+-  const selectRadPreset = (rp) => {
+-    setRadPresetKey(rp.key);
+-    setRadResistMode(rp.resistMode);
+-    setValueMode(rp.defaultMode);
+-    setValue(rp.defaultValue);
+-    setDurationUnit(rp.defaultUnit);
+-    setTotalIntervals(rp.defaultIntervals);
+-  };
+-
+   const handleRollCdPreview = () => {
+     const res = rollCdValue(value);
+     setRolledCdLine(formatGm(tGm('envCombat.valueMode.rolledResult', locale), {
+@@ -225,17 +201,6 @@ export default function EnvMechanicModal({
+     }));
+   };
+ 
+-  const handleRollZoneD20 = () => {
+-    const r = rollHitZoneForCharacter(primaryCharacter?.snapshot || {}, locale);
+-    if (r.zone) {
+-      setZoneKey(r.zone.key);
+-      setRolledD20Info(formatGm(tGm('envCombat.injury.rolledZone', locale), {
+-        roll: r.roll,
+-        zone: r.zone.label,
+-      }));
+-    }
+-  };
+-
+   const handleRandomAttackOutcome = () => {
+     const idx = Math.floor(Math.random() * ATTACK_FAIL_OUTCOMES.length);
+     setAttackOutcome(ATTACK_FAIL_OUTCOMES[idx].key);
+@@ -249,18 +214,14 @@ export default function EnvMechanicModal({
+         value,
+         durationUnit,
+         totalIntervals: durationUnit === 'once' ? 1 : totalIntervals,
+-        shelterProtected,
+       };
+     }
+     if (mechanicType === ENV_MECHANIC_TYPE.RADIATION) {
+       return {
+-        presetKey: radPresetKey,
+-        radResistMode,
+-        hitZone: zoneKey,
+-        valueMode,
++        valueMode: 'fixed',
+         value,
+         durationUnit,
+-        totalIntervals: durationUnit === 'once' ? 1 : totalIntervals,
++        totalIntervals,
+       };
+     }
+     if (mechanicType === ENV_MECHANIC_TYPE.INJURY) {
+@@ -281,7 +242,7 @@ export default function EnvMechanicModal({
+       repairable: explodeRepairable,
+       ricochetTargetMode,
+       ricochetChosenCharId: ricochetChosenCharId || null,
+-      hitZone: zoneKey,
++      hitZone: zoneKey === 'auto' ? null : zoneKey,
+     };
+   };
+ 
+@@ -292,7 +253,9 @@ export default function EnvMechanicModal({
+     return ENV_DIRECTIVE_KIND.ATTACK_FAIL;
+   };
+ 
++  const requiresCharacter = mechanicType === ENV_MECHANIC_TYPE.INJURY || mechanicType === ENV_MECHANIC_TYPE.ATTACK_FAIL;
+   const handleApply = () => {
++    if (!hasLiveRoom || (requiresCharacter && !primaryCharacter)) return;
+     const envPayload = buildCurrentEnvPayload();
+     if (presetName.trim()) {
+       envPayload.customTitle = presetName.trim();
+@@ -320,27 +283,29 @@ export default function EnvMechanicModal({
+     const defaultName = mechanicType === ENV_MECHANIC_TYPE.WEATHER
+       ? tGm(`envCombat.weather.conditions.${conditionKey}.title`, locale)
+       : mechanicType === ENV_MECHANIC_TYPE.RADIATION
+-        ? tGm(`envCombat.radiation.presets.${radPresetKey}`, locale)
++        ? tGm('envCombat.radiation.modalTitle', locale)
+         : mechanicType === ENV_MECHANIC_TYPE.INJURY
+-          ? `${tGm('envCombat.tiles.injury.title', locale)}: ${charZones.find((z) => z.key === zoneKey)?.label || zoneKey}`
++          ? tGm('envCombat.tiles.injury.title', locale)
+           : tGm(`envCombat.attackFail.outcomes.${attackOutcome}.title`, locale);
++    const presetPayload = buildCurrentEnvPayload();
++    if (mechanicType === ENV_MECHANIC_TYPE.INJURY) presetPayload.zoneKey = 'auto';
+     onSavePresetTile?.({
+       id: initialPresetMeta?.id || undefined,
+       mechanicType,
+       name: presetName.trim() || defaultName,
+       description: presetDesc.trim(),
+       parentFolderId: presetFolderId || null,
+-      payload: buildCurrentEnvPayload(),
++      payload: presetPayload,
+     });
+     setSavePanelOpen(false);
+   };
+ 
+-  const renderStrengthAndDuration = ({ showDuration = true } = {}) => {
++  const renderStrengthAndDuration = ({ showDuration = true, fixedOnly = false, intervalOnly = false, valueLabel = null, stepperLabel = null } = {}) => {
+     const valSummary = valueMode === 'cd' ? `${value} {CD}` : `${value}`;
+     return (
+       <View style={styles.blockBox}>
+-        <IconText style={styles.sectionLabel}>{tGm('envCombat.valueMode.label', locale)}</IconText>
+-        <View style={styles.chipsRow}>
++        <IconText style={styles.sectionLabel}>{valueLabel || tGm('envCombat.valueMode.label', locale)}</IconText>
++        {!fixedOnly ? <View style={styles.chipsRow}>
+           {['fixed', 'cd'].map((m) => {
+             const active = valueMode === m;
+             return (
+@@ -363,9 +328,9 @@ export default function EnvMechanicModal({
+               </IconText>
+             </TouchableOpacity>
+           ) : null}
+-        </View>
++        </View> : null}
+         <StepperRow
+-          label={valueMode === 'cd' ? `{CD}` : '#'}
++          label={stepperLabel || (valueMode === 'cd' ? `{CD}` : '#')}
+           value={value}
+           min={1}
+           max={30}
+@@ -379,7 +344,7 @@ export default function EnvMechanicModal({
+               {tGm('envCombat.duration.label', locale)}
+             </Text>
+             <View style={styles.chipsRow}>
+-              {DURATION_UNITS.map((u) => {
++              {DURATION_UNITS.filter((u) => !intervalOnly || u !== 'once').map((u) => {
+                 const active = durationUnit === u;
+                 return (
+                   <TouchableOpacity
+@@ -394,7 +359,7 @@ export default function EnvMechanicModal({
+                 );
+               })}
+             </View>
+-            {durationUnit !== 'once' ? (
++            {durationUnit !== 'once' || intervalOnly ? (
+               <>
+                 <StepperRow
+                   label={tGm('envCombat.duration.intervalsLabel', locale)}
+@@ -470,19 +435,7 @@ export default function EnvMechanicModal({
+                   })}
+                 </View>
+ 
+-                {renderStrengthAndDuration({ showDuration: true })}
+-
+-                <View style={styles.switchRow}>
+-                  <Text style={styles.fieldLabel}>
+-                    {tGm('envCombat.weather.shelterProtectedLabel', locale)}
+-                  </Text>
+-                  <Switch
+-                    value={shelterProtected}
+-                    onValueChange={setShelterProtected}
+-                    trackColor={{ false: '#374151', true: '#a16207' }}
+-                    thumbColor={shelterProtected ? '#f0e68c' : '#9ca3af'}
+-                  />
+-                </View>
++                {renderStrengthAndDuration({ showDuration: true, fixedOnly: true })}
+ 
+                 {hasLiveRoom ? (
+                   <View style={styles.inlineBtnsRow}>
+@@ -509,146 +462,71 @@ export default function EnvMechanicModal({
+               </>
+             ) : null}
+ 
+-            {/* 2. РАДИАЦИЯ */}
++            {/* 2. РАДИАЦИЯ: задаётся только урон за тик и его интервал/длительность */}
+             {mechanicType === ENV_MECHANIC_TYPE.RADIATION ? (
+               <>
+-                <Text style={styles.sectionLabel}>{tGm('envCombat.radiation.presetsLabel', locale)}</Text>
+-                <View style={styles.chipsRow}>
+-                  {RADIATION_PRESETS.map((rp) => {
+-                    const active = radPresetKey === rp.key;
+-                    return (
+-                      <TouchableOpacity
+-                        key={rp.key}
+-                        style={[styles.chip, active && styles.chipActive]}
+-                        onPress={() => selectRadPreset(rp)}
+-                      >
+-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+-                          {tGm(`envCombat.radiation.presets.${rp.key}`, locale)}
+-                        </Text>
+-                      </TouchableOpacity>
+-                    );
+-                  })}
+-                </View>
+-
+-                <Text style={[styles.sectionLabel, { marginTop: 8 }]}>
+-                  {tGm('envCombat.radiation.resistModeLabel', locale)}
++                {renderStrengthAndDuration({
++                  showDuration: true,
++                  fixedOnly: true,
++                  intervalOnly: true,
++                  valueLabel: tGm('envCombat.radiation.damagePerInterval', locale),
++                  stepperLabel: tGm('envCombat.radiation.damageLabel', locale),
++                })}
++                <Text style={styles.hintText}>
++                  {tGm('envCombat.radiation.resolvedOnCharacter', locale)}
+                 </Text>
+-                <View style={styles.chipsRow}>
+-                  {['minBody', 'zone', 'direct'].map((rm) => {
+-                    const active = radResistMode === rm;
+-                    return (
+-                      <TouchableOpacity
+-                        key={rm}
+-                        style={[styles.chip, active && styles.chipActive]}
+-                        onPress={() => setRadResistMode(rm)}
+-                      >
+-                        <Text style={[styles.chipText, active && styles.chipTextActive]}>
+-                          {tGm(`envCombat.radiation.resistModes.${rm}`, locale)}
+-                        </Text>
+-                      </TouchableOpacity>
+-                    );
+-                  })}
+-                </View>
+-
+-                {radResistMode === 'zone' ? (
+-                  <View style={styles.blockBox}>
+-                    <View style={styles.chipsRow}>
+-                      {charZones.map((z) => {
+-                        const active = zoneKey === z.key;
+-                        return (
+-                          <TouchableOpacity
+-                            key={z.key}
+-                            style={[styles.chip, active && styles.chipActive]}
+-                            onPress={() => setZoneKey(z.key)}
+-                          >
+-                            <Text style={[styles.chipText, active && styles.chipTextActive]}>
+-                              {z.label} ({z.hitRangeLabel})
+-                            </Text>
+-                          </TouchableOpacity>
+-                        );
+-                      })}
+-                      <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
+-                        <MaterialCommunityIcons name="dice-d20" size={17} color="#ffffff" />
+-                        <Text style={styles.diceBtnText}>{tGm('envCombat.radiation.rollZoneBtn', locale)}</Text>
+-                      </TouchableOpacity>
+-                    </View>
+-                    {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
+-                  </View>
+-                ) : null}
+-
+-                {renderStrengthAndDuration({ showDuration: true })}
+-
+-                {roomCharacters.length > 0 ? (
+-                  <View style={styles.blockBox}>
+-                    <Text style={styles.sectionLabel}>{tGm('envCombat.radiation.previewTitle', locale)}</Text>
+-                    {roomCharacters
+-                      .filter((c) => selectedTargetId === 'all' || c.characterId === selectedTargetId)
+-                      .map((c) => {
+-                        const estRaw = valueMode === 'cd' ? value : value;
+-                        const exp = computeRadiationExposure(c.snapshot || {}, estRaw, {
+-                          resistMode: radResistMode,
+-                          hitZone: zoneKey,
+-                        });
+-                        return (
+-                          <View key={c.characterId} style={styles.previewRow}>
+-                            <Text style={styles.previewName}>{c.name || '—'}</Text>
+-                            <Text style={[styles.previewVal, exp.immune && { color: '#4ade80' }]}>
+-                              {exp.immune
+-                                ? tGm('envCombat.radiation.previewImmune', locale)
+-                                : formatGm(tGm('envCombat.radiation.previewRow', locale), {
+-                                    dr: exp.dr,
+-                                    net: valueMode === 'cd' ? `max(${value}CD − ${exp.dr})` : exp.netRad,
+-                                  })}
+-                            </Text>
+-                          </View>
+-                        );
+-                      })}
+-                  </View>
+-                ) : null}
+               </>
+             ) : null}
+ 
+             {/* 3. УВЕЧЬЕ */}
+             {mechanicType === ENV_MECHANIC_TYPE.INJURY ? (
+               <>
++                {!primaryCharacter ? (
++                  <Text style={styles.hintText}>{tGm('envCombat.injury.chooseCharacterFirst', locale)}</Text>
++                ) : null}
+                 {targetIsRobot ? (
+                   <Text style={styles.robotHint}>{tGm('envCombat.injury.robotAdaptedHint', locale)}</Text>
+                 ) : null}
+ 
+                 <View style={styles.chipsRow}>
+-                  <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
+-                    <MaterialCommunityIcons name="dice-d20" size={18} color="#ffffff" />
+-                    <Text style={styles.diceBtnText}>{tGm('envCombat.injury.rollD20Btn', locale)}</Text>
++                  <TouchableOpacity
++                    style={[styles.chip, zoneKey === 'auto' && styles.chipActive]}
++                    onPress={() => setZoneKey('auto')}
++                  >
++                    <Text style={[styles.chipText, zoneKey === 'auto' && styles.chipTextActive]}>
++                      {tGm('envCombat.injury.autoZone', locale)}
++                    </Text>
+                   </TouchableOpacity>
+-                  {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
+                 </View>
+ 
+-                <View style={styles.optionGrid}>
+-                  {charZones.map((z) => {
+-                    const active = zoneKey === z.key;
+-                    const effectDesc = describeInjuryEffect(
+-                      z.key,
+-                      { isRobotZone: z.isRobotZone, bleedDice, stage: 'active' },
+-                      locale,
+-                    );
+-                    return (
+-                      <TouchableOpacity
+-                        key={z.key}
+-                        style={[styles.optionCard, active && styles.optionCardActive]}
+-                        onPress={() => setZoneKey(z.key)}
+-                      >
+-                        <View style={styles.optionHeader}>
+-                          <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>
+-                            {z.label} (d20: {z.hitRangeLabel})
+-                          </Text>
+-                        </View>
+-                        <IconText style={styles.optionDesc}>{effectDesc}</IconText>
+-                      </TouchableOpacity>
+-                    );
+-                  })}
+-                </View>
++                {primaryCharacter ? (
++                  <View style={styles.optionGrid}>
++                    {charZones.map((z) => {
++                      const active = zoneKey === z.key;
++                      const effectDesc = describeInjuryEffect(
++                        z.key,
++                        { isRobotZone: z.isRobotZone, bleedDice, stage: 'active' },
++                        locale,
++                      );
++                      return (
++                        <TouchableOpacity
++                          key={z.key}
++                          style={[styles.optionCard, active && styles.optionCardActive]}
++                          onPress={() => setZoneKey(z.key)}
++                        >
++                          <View style={styles.optionHeader}>
++                            <Text style={[styles.optionTitle, active && styles.optionTitleActive]}>
++                              {z.label} (d20: {z.hitRangeLabel})
++                            </Text>
++                          </View>
++                          <IconText style={styles.optionDesc}>{effectDesc}</IconText>
++                        </TouchableOpacity>
++                      );
++                    })}
++                  </View>
++                ) : null}
+ 
+-                {['body', 'torso', 'chassis', 'hull'].includes(String(zoneKey).toLowerCase()) ? (
++                {zoneKey === 'auto' || ['body', 'torso', 'chassis', 'hull'].includes(String(zoneKey).toLowerCase()) ? (
+                   <View style={styles.blockBox}>
+                     <StepperRow
+                       label={tGm('envCombat.injury.bleedLabel', locale)}
+@@ -660,17 +538,19 @@ export default function EnvMechanicModal({
+                   </View>
+                 ) : null}
+ 
+-                {hasLiveRoom ? (
++                {hasLiveRoom && primaryCharacter ? (
+                   <View style={styles.inlineBtnsRow}>
+-                    <TouchableOpacity
+-                      style={styles.ghostDangerBtn}
+-                      onPress={() => onDispatchDirective?.({
+-                        kind: ENV_DIRECTIVE_KIND.INJURY_CLEAR,
+-                        envPayload: { zoneKey },
+-                      })}
+-                    >
+-                      <Text style={styles.ghostDangerText}>{tGm('envCombat.injury.clearZoneBtn', locale)}</Text>
+-                    </TouchableOpacity>
++                    {zoneKey !== 'auto' ? (
++                      <TouchableOpacity
++                        style={styles.ghostDangerBtn}
++                        onPress={() => onDispatchDirective?.({
++                          kind: ENV_DIRECTIVE_KIND.INJURY_CLEAR,
++                          envPayload: { zoneKey },
++                        })}
++                      >
++                        <Text style={styles.ghostDangerText}>{tGm('envCombat.injury.clearZoneBtn', locale)}</Text>
++                      </TouchableOpacity>
++                    ) : null}
+                     <TouchableOpacity
+                       style={styles.ghostDangerBtn}
+                       onPress={() => onDispatchDirective?.({
+@@ -847,13 +727,6 @@ export default function EnvMechanicModal({
+                           })}
+                         </View>
+                       ) : null}
+-                      <View style={[styles.chipsRow, { marginTop: 8 }]}>
+-                        <TouchableOpacity style={styles.diceBtn} onPress={handleRollZoneD20}>
+-                          <MaterialCommunityIcons name="dice-d20" size={17} color="#ffffff" />
+-                          <Text style={styles.diceBtnText}>{tGm('envCombat.radiation.rollZoneBtn', locale)}</Text>
+-                        </TouchableOpacity>
+-                        {rolledD20Info ? <Text style={styles.rolledInfo}>{rolledD20Info}</Text> : null}
+-                      </View>
+                     </View>
+                     {renderStrengthAndDuration({ showDuration: false })}
+                   </>
+@@ -921,6 +794,15 @@ export default function EnvMechanicModal({
+             ) : null}
+           </ScrollView>
+ 
++          {!hasLiveRoom ? (
++            <Text style={styles.hintText}>{tGm('envCombat.requiresLiveRoom', locale)}</Text>
++          ) : (requiresCharacter && !primaryCharacter ? (
++            <Text style={styles.hintText}>
++              {mechanicType === ENV_MECHANIC_TYPE.INJURY
++                ? tGm('envCombat.injury.chooseCharacterFirst', locale)
++                : tGm('envCombat.chooseCharacterFirst', locale)}
++            </Text>
++          ) : null)}
+           <View style={styles.footerRow}>
+             <TouchableOpacity
+               style={styles.secondaryBtn}
+@@ -931,10 +813,12 @@ export default function EnvMechanicModal({
+                 {tGm('envCombat.presetModal.saveAsTileBtn', locale)}
+               </Text>
+             </TouchableOpacity>
+-            <TouchableOpacity style={styles.primaryBtn} onPress={handleApply}>
+-              <Text style={styles.primaryBtnText}>
+-                {hasLiveRoom ? tGm('envCombat.applyBtn', locale) : tGm('envCombat.rollTabletopBtn', locale)}
+-              </Text>
++            <TouchableOpacity
++              style={[styles.primaryBtn, (!hasLiveRoom || (requiresCharacter && !primaryCharacter)) && { opacity: 0.45 }]}
++              onPress={handleApply}
++              disabled={!hasLiveRoom || (requiresCharacter && !primaryCharacter)}
++            >
++              <Text style={styles.primaryBtnText}>{tGm('envCombat.applyBtn', locale)}</Text>
+             </TouchableOpacity>
+           </View>
+         </View>
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index ae086e1..04e8abf 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,12 @@
+ # Changelog
++---
++## Environment/Combat card redesign and manual exposure effects (patch 484)
++
++- Aligned the screen header and cards with the Character and Loot/Trade sections: vector icons, matching header structure and card borders; RU/EN selection now persists in settings.
++- Radiation is configured manually as damage per tick, interval count, and interval unit (for example, 3 damage per scene for 3 scenes). Removed source categories, protection-mode selection, and GM-side outcome previews. Effects require a connected room; protection and immunity resolve on the character side.
++- Sealed armor is automatically respected by weather effects on the character. Ghouls remain radiation-immune and recover 1 HP for each 3 points of radiation damage received.
++- Injuries apply to one selected character. Injury presets save a character-neutral zone; body or chassis locations are selected/adapted for the actual target when applied, including robots.
++
+ ---
+ ## Fix opening the GM "Environment/Combat" tab (patch 483)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 64b4763..1df802d 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,13 @@
+ # История изменений
+ 
++---
++## Переработка карточек и ручные воздействия в «Окружающая среда/бой» (патч 484)
++
++- Карточки и шапка экрана приведены к единому стилю с разделами персонажа и «Добыча/Торговля»: векторные значки, общая структура заголовка и рамок; переключение RU/EN сохраняется в настройках.
++- Радиация задаётся вручную: урон за тик, число интервалов и их единица (например, 3 урона за сцену в течение 3 сцен). Убраны источники, выбор режима защиты и расчёт результата на экране Мастера; эффекты применяются в подключённой комнате, а защита и иммунитет обрабатываются на стороне персонажа.
++- Герметичная броня автоматически учитывается на персонаже для погодных эффектов. У гулей радиационный иммунитет сохраняется, а каждые 3 пункта полученного радиационного урона восстанавливают 1 ОЗ.
++- Увечье применяется к выбранному персонажу. Пресеты увечий сохраняют нейтральную зону, а при применении зона тела или корпуса выбирается и адаптируется по фактическому персонажу, включая робота.
++
+ ---
+ ## Исправление входа во вкладку «Окружающая среда/бой» в режиме Мастера (патч 483)
+ 
+diff --git a/modules/fallout/gm/gmEnvCombat.js b/modules/fallout/gm/gmEnvCombat.js
+index 421d942..e7b3174 100644
+--- a/modules/fallout/gm/gmEnvCombat.js
++++ b/modules/fallout/gm/gmEnvCombat.js
+@@ -10,7 +10,7 @@ import { getCurrentLocale } from '../../../i18n/locale';
+ import { rollDie, rollMultipleCombatDice } from '../../../domain/diceRollsLogic';
+ import { isSkillTagged, resolveD20Check } from '../../../domain/d20Checks';
+ import { findEnrichedOrigin, isRobotCharacter } from '../../../domain/origins';
+-import { findTraitById } from '../../../domain/traits';
++import { findTraitById, hasTraitEffect } from '../../../domain/traits';
+ import { hasPoisonImmunity, hasRadiationImmunity } from '../../../domain/immunities';
+ import { createEmptyEquippedArmor } from '../../../domain/equippedArmor';
+ import { getPieceDR, hasFrame } from '../../../domain/powerArmor';
+@@ -41,16 +41,8 @@ export const WEATHER_CONDITIONS = Object.freeze([
+   { key: 'cold', icon: 'snowflake-alert', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 3 },
+   { key: 'dustStorm', icon: 'weather-windy', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
+   { key: 'denseFog', icon: 'weather-fog', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 2 },
+-  { key: 'radStorm', icon: 'weather-lightning-rainy', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3 },
+-  { key: 'acidRain', icon: 'weather-pouring', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3 },
+-]);
+-
+-export const RADIATION_PRESETS = Object.freeze([
+-  { key: 'dirtyWater', defaultValue: 2, defaultMode: 'cd', defaultUnit: 'once', defaultIntervals: 1, resistMode: 'minBody' },
+-  { key: 'background', defaultValue: 1, defaultMode: 'fixed', defaultUnit: 'hours', defaultIntervals: 3, resistMode: 'minBody' },
+-  { key: 'barrel', defaultValue: 3, defaultMode: 'cd', defaultUnit: 'scenes', defaultIntervals: 3, resistMode: 'minBody' },
+-  { key: 'radBurst', defaultValue: 5, defaultMode: 'cd', defaultUnit: 'once', defaultIntervals: 1, resistMode: 'zone' },
+-  { key: 'custom', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3, resistMode: 'minBody' },
++  { key: 'radStorm', icon: 'weather-lightning-rainy', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
++  { key: 'acidRain', icon: 'weather-pouring', defaultValue: 2, defaultMode: 'fixed', defaultUnit: 'scenes', defaultIntervals: 3 },
+ ]);
+ 
+ export const ATTACK_FAIL_OUTCOMES = Object.freeze([
+@@ -267,6 +259,13 @@ export const computeRadiationExposure = (charData = {}, rawAmount = 0, {
+   };
+ };
+ 
++const resolveGhoulRadiationHealing = (charData, amount, remainder = 0) => {
++  const { resolvedTrait } = resolveCharacterImmunityContext(charData);
++  if (!hasTraitEffect(resolvedTrait, 'radiation_healing')) return { heal: 0, remainder: 0 };
++  const total = Math.max(0, Number(amount) || 0) + Math.max(0, Number(remainder) || 0);
++  return { heal: Math.floor(total / 3), remainder: total % 3 };
++};
++
+ // ── Множители погоды для системы выживания (жара → вода, холод → еда) ──
+ 
+ export const getWeatherSurvivalMultipliers = (effectsDictOrArray) => {
+@@ -351,30 +350,23 @@ export const buildPeriodicTimedEffect = ({
+   category,
+   conditionKey,
+   title,
+-  valueMode = 'fixed',
+   value = 1,
+   durationUnit = 'scenes',
+   totalIntervals = 1,
+-  radResistMode = 'minBody',
+-  hitZone = 'body',
+-  shelterProtected = true,
+   locale = getCurrentLocale(),
+ }) => {
+-  const valLabel = valueMode === 'cd' ? `${value} {CD}` : `${value}`;
++  const valLabel = `${value}`;
+   const unitShort = tGm(`envCombat.duration.shortUnits.${durationUnit}`, locale) || durationUnit;
+   const gmPeriodic = {
+     category,
+     conditionKey,
+     title,
+-    valueMode,
++    valueMode: 'fixed',
+     value: Math.max(1, Math.floor(Number(value) || 1)),
+     durationUnit,
+     totalIntervals: Math.max(1, Math.floor(Number(totalIntervals) || 1)),
+     completedIntervals: 0,
+     progressMinutes: 0,
+-    radResistMode,
+-    hitZone,
+-    shelterProtected: Boolean(shelterProtected),
+   };
+   const effectId = category === 'weather'
+     ? `gm-weather-${conditionKey}`
+@@ -396,16 +388,18 @@ export const buildPeriodicTimedEffect = ({
+ // ── Применение одиночного тика Погоды или Радиации к мутабельному контексту персонажа ──
+ 
+ const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
+-  const { category, conditionKey, valueMode = 'fixed', value = 1, radResistMode = 'minBody', hitZone = 'body', shelterProtected = true } = spec;
+-  const { amount } = evaluateStrengthAmount({ valueMode, value });
++  const { category, conditionKey, value = 1 } = spec;
++  const amount = Math.max(0, Math.floor(Number(value) || 0));
+ 
+   if (category === 'radiation' || (category === 'weather' && conditionKey === 'radStorm')) {
+-    const exp = computeRadiationExposure(ctx.charData, amount, {
+-      resistMode: category === 'weather' ? 'minBody' : radResistMode,
+-      hitZone,
+-    });
++    const exp = computeRadiationExposure(ctx.charData, amount, { resistMode: 'minBody' });
+     if (exp.immune) {
+-      return tGm('envCombat.radiation.previewImmune', locale);
++      const healing = resolveGhoulRadiationHealing(ctx.charData, amount, spec.radiationHealingRemainder);
++      spec.radiationHealingRemainder = healing.remainder;
++      if (healing.heal > 0) ctx.healHp?.(healing.heal);
++      return healing.heal > 0
++        ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
++        : tGm('envCombat.radiation.immuneResult', locale);
+     }
+     if (exp.netRad > 0) {
+       ctx.addRadiation(exp.netRad);
+@@ -419,7 +413,7 @@ const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
+   if (category === 'weather') {
+     const imm = resolveCharacterImmunityContext(ctx.charData);
+     const bodyDR = getCharacterZoneDR(ctx.charData, 'body');
+-    if (shelterProtected && bodyDR.sealed && (conditionKey === 'heat' || conditionKey === 'cold' || conditionKey === 'acidRain' || conditionKey === 'dustStorm')) {
++    if (bodyDR.sealed && (conditionKey === 'heat' || conditionKey === 'cold' || conditionKey === 'acidRain' || conditionKey === 'dustStorm')) {
+       return '0 (защищено герметичной бронёй)';
+     }
+     if (conditionKey === 'heat' || conditionKey === 'cold') {
+@@ -428,7 +422,7 @@ const applySingleHazardTick = (ctx, spec, locale = getCurrentLocale()) => {
+       return `+${Math.max(1, amount)} усталости`;
+     }
+     if (conditionKey === 'acidRain') {
+-      if (imm.poisonImmune && shelterProtected) return '0 (иммунитет)';
++      if (imm.poisonImmune) return '0 (иммунитет)';
+       const dr = Math.max(0, Number(bodyDR.energy) || 0);
+       const netDmg = Math.max(0, amount - dr);
+       if (netDmg > 0) ctx.damageHp(netDmg);
+@@ -516,7 +510,7 @@ export const advancePeriodicEffectsArray = (effectsList = [], ctx, {
+       continue;
+     }
+ 
+-    const valLabel = gp.valueMode === 'cd' ? `${gp.value} {CD}` : `${gp.value}`;
++    const valLabel = `${gp.value}`;
+     nextEffects.push({
+       ...eff,
+       gmPeriodic: gp,
+@@ -649,6 +643,9 @@ export const tickGmPeriodicEffectsForStore = (store, { scenes = 0, gameMinutes =
+     damageHp: (dmg) => {
+       if (dmg > 0) store.damageCharacter(dmg);
+     },
++    healHp: (heal) => {
++      if (heal > 0) store.healCharacter(heal);
++    },
+     addRadiation: (rad) => {
+       if (rad > 0) store.addRadiation(rad);
+     },
+@@ -736,6 +733,7 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
+       const detail = applySingleHazardTick({
+         charData,
+         damageHp: (d) => d > 0 && store.damageCharacter(d),
++        healHp: (h) => h > 0 && store.healCharacter(h),
+         addRadiation: (r) => r > 0 && store.addRadiation(r),
+         addWeatherFatigue: (src, amt) => {
+           const surv = store.stateExtensions?.survival;
+@@ -753,11 +751,9 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
+       category: 'weather',
+       conditionKey: condKey,
+       title,
+-      valueMode: p.valueMode || 'fixed',
+       value: p.value ?? 1,
+       durationUnit,
+       totalIntervals: p.totalIntervals ?? 1,
+-      shelterProtected: p.shelterProtected !== false,
+       locale,
+     });
+     syncTimedEffectsToStore([...cur, eff], store);
+@@ -768,16 +764,19 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
+   }
+ 
+   if (kind === ENV_DIRECTIVE_KIND.RADIATION_APPLY) {
+-    const presetKey = p.presetKey || 'custom';
+-    const title = p.customTitle || tGm(`envCombat.radiation.presets.${presetKey}`, locale);
++    const presetKey = 'radiation';
++    const title = p.customTitle || tGm('envCombat.radiation.genericTitle', locale);
+     const durationUnit = p.durationUnit || 'once';
+     if (durationUnit === 'once') {
+-      const { amount } = evaluateStrengthAmount({ valueMode: p.valueMode || 'fixed', value: p.value ?? 1 });
+-      const exp = computeRadiationExposure(charData, amount, {
+-        resistMode: p.radResistMode || 'minBody',
+-        hitZone: p.hitZone || 'body',
+-      });
+-      if (exp.immune) return tGm('envCombat.radiation.previewImmune', locale);
++      const amount = Math.max(0, Math.floor(Number(p.value ?? 1) || 0));
++      const exp = computeRadiationExposure(charData, amount, { resistMode: 'minBody' });
++      if (exp.immune) {
++        const healing = resolveGhoulRadiationHealing(charData, amount);
++        if (healing.heal > 0) store.healCharacter(healing.heal);
++        return healing.heal > 0
++          ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
++          : tGm('envCombat.radiation.immuneResult', locale);
++      }
+       if (exp.netRad > 0) store.addRadiation(exp.netRad);
+       return formatGm(tGm('envCombat.playerAlerts.radAppliedOnce', locale), {
+         rad: exp.netRad,
+@@ -789,16 +788,13 @@ export const applyEnvCombatDirectiveToStore = (directive, store, locale = getCur
+       category: 'radiation',
+       conditionKey: presetKey,
+       title,
+-      valueMode: p.valueMode || 'fixed',
+       value: p.value ?? 1,
+       durationUnit,
+       totalIntervals: p.totalIntervals ?? 1,
+-      radResistMode: p.radResistMode || 'minBody',
+-      hitZone: p.hitZone || 'body',
+       locale,
+     });
+     syncTimedEffectsToStore([...cur, eff], store);
+-    const valStr = p.valueMode === 'cd' ? `${p.value} {CD}` : String(p.value ?? 1);
++    const valStr = String(p.value ?? 1);
+     return formatGm(tGm('envCombat.playerAlerts.radPeriodicStarted', locale), {
+       title,
+       val: valStr,
+@@ -1051,7 +1047,7 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
+     const title = p.customTitle || tGm(`envCombat.weather.conditions.${condKey}.title`, locale);
+     const durationUnit = p.durationUnit || 'hours';
+     if (durationUnit === 'once') {
+-      const detail = applySingleHazardTick({ charData: data, damageHp, addRadiation, addWeatherFatigue }, { ...p, category: 'weather', conditionKey: condKey }, locale);
++      const detail = applySingleHazardTick({ charData: data, damageHp, healHp, addRadiation, addWeatherFatigue }, { ...p, category: 'weather', conditionKey: condKey }, locale);
+       summaryLine = formatGm(tGm('envCombat.playerAlerts.weatherApplied', locale), { title, details: detail });
+     } else {
+       const filtered = getEffectsArr().filter(
+@@ -1061,25 +1057,28 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
+         category: 'weather',
+         conditionKey: condKey,
+         title,
+-        valueMode: p.valueMode || 'fixed',
+         value: p.value ?? 1,
+         durationUnit,
+         totalIntervals: p.totalIntervals ?? 1,
+-        shelterProtected: p.shelterProtected !== false,
+         locale,
+       });
+       setEffectsArr([...filtered, eff]);
+       summaryLine = formatGm(tGm('envCombat.playerAlerts.weatherApplied', locale), { title, details: eff.effectLabel });
+     }
+   } else if (kind === ENV_DIRECTIVE_KIND.RADIATION_APPLY) {
+-    const presetKey = p.presetKey || 'custom';
+-    const title = p.customTitle || tGm(`envCombat.radiation.presets.${presetKey}`, locale);
++    const presetKey = 'radiation';
++    const title = p.customTitle || tGm('envCombat.radiation.genericTitle', locale);
+     const durationUnit = p.durationUnit || 'once';
+     if (durationUnit === 'once') {
+-      const { amount } = evaluateStrengthAmount({ valueMode: p.valueMode || 'fixed', value: p.value ?? 1 });
+-      const exp = computeRadiationExposure(data, amount, { resistMode: p.radResistMode || 'minBody', hitZone: p.hitZone || 'body' });
+-      if (exp.immune) summaryLine = tGm('envCombat.radiation.previewImmune', locale);
+-      else {
++      const amount = Math.max(0, Math.floor(Number(p.value ?? 1) || 0));
++      const exp = computeRadiationExposure(data, amount, { resistMode: 'minBody' });
++      if (exp.immune) {
++        const healing = resolveGhoulRadiationHealing(data, amount);
++        if (healing.heal > 0) healHp(healing.heal);
++        summaryLine = healing.heal > 0
++          ? formatGm(tGm('envCombat.radiation.immuneHealed', locale), { heal: healing.heal })
++          : tGm('envCombat.radiation.immuneResult', locale);
++      } else {
+         if (exp.netRad > 0) addRadiation(exp.netRad);
+         summaryLine = formatGm(tGm('envCombat.playerAlerts.radAppliedOnce', locale), { rad: exp.netRad, blocked: exp.blocked });
+       }
+@@ -1088,18 +1087,15 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
+         category: 'radiation',
+         conditionKey: presetKey,
+         title,
+-        valueMode: p.valueMode || 'fixed',
+         value: p.value ?? 1,
+         durationUnit,
+         totalIntervals: p.totalIntervals ?? 1,
+-        radResistMode: p.radResistMode || 'minBody',
+-        hitZone: p.hitZone || 'body',
+         locale,
+       });
+       setEffectsArr([...getEffectsArr(), eff]);
+       summaryLine = formatGm(tGm('envCombat.playerAlerts.radPeriodicStarted', locale), {
+         title,
+-        val: p.valueMode === 'cd' ? `${p.value} {CD}` : String(p.value ?? 1),
++        val: String(p.value ?? 1),
+         n: p.totalIntervals ?? 1,
+         unit: tGm(`envCombat.duration.shortUnits.${durationUnit}`, locale),
+       });
+@@ -1221,7 +1217,7 @@ export const applyEnvCombatDirectiveToStoredRow = (directive, row, locale = getC
+   } else if (kind === ENV_DIRECTIVE_KIND.TIME_ADVANCE) {
+     const res = advancePeriodicEffectsArray(
+       getEffectsArr(),
+-      { charData: data, damageHp, addRadiation, addWeatherFatigue },
++      { charData: data, damageHp, healHp, addRadiation, addWeatherFatigue },
+       { scenes: p.scenes || 0, gameMinutes: p.gameMinutes || 0, locale },
+     );
+     setEffectsArr(res.effects);
+diff --git a/modules/fallout/gm/gmI18n.js b/modules/fallout/gm/gmI18n.js
+index 8e0281a..20491fd 100644
+--- a/modules/fallout/gm/gmI18n.js
++++ b/modules/fallout/gm/gmI18n.js
+@@ -268,7 +268,6 @@ export const GM_DICTIONARIES = {
+         modalTitle: 'Погодное условие',
+         clearAllBtn: 'Снять всю погоду',
+         clearThisBtn: 'Снять это условие',
+-        shelterProtectedLabel: 'Учитывать герметичную СБ / защиту от среды',
+         conditions: {
+           heat: {
+             title: 'Сильная жара',
+@@ -298,29 +297,17 @@ export const GM_DICTIONARIES = {
+       },
+       radiation: {
+         modalTitle: 'Воздействие радиации',
+-        presetsLabel: 'Источник облучения',
+-        presets: {
+-          dirtyWater: 'Грязная вода / брод',
+-          background: 'Фоновая зона',
+-          barrel: 'Бочка / реактор',
+-          radBurst: 'Рад-всплеск',
+-          custom: 'Свой источник',
+-        },
+-        resistModeLabel: 'Режим учёта защиты',
+-        resistModes: {
+-          minBody: 'Фоновое (наименьшее СУ рад. по телу)',
+-          zone: 'В конкретную зону (или d20)',
+-          direct: 'Напрямую (игнорировать броню)',
+-        },
+-        rollZoneBtn: 'Зона d20',
+-        previewTitle: 'Предпросмотр по персонажам',
+-        previewImmune: 'Иммунитет (0 рад)',
+-        previewRow: 'СУ рад: {dr} → итог за тик: +{net} рад',
++        damagePerInterval: 'Урон радиацией за промежуток',
++        damageLabel: 'Урон',
++        genericTitle: 'Воздействие радиации',
++        resolvedOnCharacter: 'Сопротивление и иммунитет определяются на листе персонажа при каждом тике.',
++        immuneResult: 'Иммунитет: радиация не добавлена.',
++        immuneHealed: 'Иммунитет к радиации: восстановлено {heal} ОЗ.',
+       },
+       injury: {
+         modalTitle: 'Увечье зоны тела / узла корпуса',
+-        rollD20Btn: 'Бросить d20 зоны',
+-        rolledZone: 'Бросок d20 = {roll} → {zone}',
++        autoZone: 'Определить зону на персонаже (d20)',
++        chooseCharacterFirst: 'Для применения увечья выберите одного персонажа в строке «Получатель».',
+         robotAdaptedHint: 'Цель — робот: зоны автоматически адаптированы под его корпус.',
+         bleedLabel: 'Кровотечение / утечка торса ({CD} за интервал)',
+         clearZoneBtn: 'Вылечить выбранную зону',
+@@ -387,8 +374,8 @@ export const GM_DICTIONARIES = {
+         },
+       },
+       applyBtn: 'Применить',
+-      rollTabletopBtn: 'Рассчитать за столом',
+-      tabletopResultTitle: 'Расчёт за столом',
++      requiresLiveRoom: 'Для применения нужен подключённый зал. Настройку можно сохранить пресетом.',
++      chooseCharacterFirst: 'Выберите одного персонажа в строке «Получатель» для применения эффекта.',
+       weaponBadges: {
+         jammed: 'Заклинило',
+         clearJamBtn: 'Устранить осечку',
+@@ -693,7 +680,6 @@ export const GM_DICTIONARIES = {
+         modalTitle: 'Weather Condition',
+         clearAllBtn: 'Clear All Weather',
+         clearThisBtn: 'Clear This Condition',
+-        shelterProtectedLabel: 'Respect sealed PA / hazard protection',
+         conditions: {
+           heat: {
+             title: 'Extreme Heat',
+@@ -723,29 +709,17 @@ export const GM_DICTIONARIES = {
+       },
+       radiation: {
+         modalTitle: 'Radiation Exposure',
+-        presetsLabel: 'Radiation Source',
+-        presets: {
+-          dirtyWater: 'Dirty Water / Wade',
+-          background: 'Ambient Zone',
+-          barrel: 'Waste Barrel / Reactor',
+-          radBurst: 'Rad Burst',
+-          custom: 'Custom Source',
+-        },
+-        resistModeLabel: 'Protection Mode',
+-        resistModes: {
+-          minBody: 'Ambient (lowest Rad DR across body)',
+-          zone: 'Specific Hit Location (or d20)',
+-          direct: 'Direct (ignore armor)',
+-        },
+-        rollZoneBtn: 'Roll d20',
+-        previewTitle: 'Character Preview',
+-        previewImmune: 'Immune (0 rad)',
+-        previewRow: 'Rad DR: {dr} → net per tick: +{net} rad',
++        damagePerInterval: 'Radiation damage per interval',
++        damageLabel: 'Damage',
++        genericTitle: 'Radiation exposure',
++        resolvedOnCharacter: 'Resistance and immunity are resolved on the character sheet at each tick.',
++        immuneResult: 'Radiation immunity: no radiation was added.',
++        immuneHealed: 'Radiation immunity: restored {heal} HP.',
+       },
+       injury: {
+         modalTitle: 'Body Location / Chassis Injury',
+-        rollD20Btn: 'Roll d20 Location',
+-        rolledZone: 'd20 roll = {roll} → {zone}',
++        autoZone: 'Roll the hit location on the character (d20)',
++        chooseCharacterFirst: 'Select one character in the Recipient row before applying an injury.',
+         robotAdaptedHint: 'Target is a robot: locations automatically adapted to its chassis.',
+         bleedLabel: 'Torso Bleed / Leak ({CD} per interval)',
+         clearZoneBtn: 'Heal Selected Location',
+@@ -812,8 +786,8 @@ export const GM_DICTIONARIES = {
+         },
+       },
+       applyBtn: 'Apply',
+-      rollTabletopBtn: 'Calculate at Table',
+-      tabletopResultTitle: 'Tabletop Calculation',
++      requiresLiveRoom: 'A connected room is required to apply this effect. You can still save it as a preset.',
++      chooseCharacterFirst: 'Select one character in the Recipient row before applying this effect.',
+       weaponBadges: {
+         jammed: 'Jammed',
+         clearJamBtn: 'Clear Jam',
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index ebb63ce..517d67d 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "483"
++  "baseline": "484"
+ }

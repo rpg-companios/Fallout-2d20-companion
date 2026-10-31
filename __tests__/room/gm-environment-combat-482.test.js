@@ -221,6 +221,19 @@ describe('Патч 482: экран Мастера «Окружающая сре�
     expect(remaining).toHaveLength(2);
   });
 
+  it('новый экран использует общие карточки и сохраняет радиацию/увечья без расчёта и привязки к первому персонажу', () => {
+    const screen = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/EnvCombatScreen.js'), 'utf8');
+    const modal = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js'), 'utf8');
+    expect(screen).toContain('styles.topBar');
+    expect(screen).toContain('styles.cardCell');
+    expect(screen).not.toContain('tabletopResultTitle');
+    expect(modal).toContain('intervalOnly: true');
+    expect(modal).toContain("presetPayload.zoneKey = 'auto'");
+    expect(modal).not.toContain('RADIATION_PRESETS');
+    expect(modal).not.toContain('shelterProtected');
+    expect(modal).not.toContain('rollHitZoneForCharacter');
+  });
+
   it('Погода и Радиация применяют эффект ровно в конце каждого из N промежутков (сцены и часы) с учётом наименьшего СУ рад. и иммунитетов', () => {
     // 1. Проверка фонового СУ рад. (наименьшее по всем 6 зонам тела) и иммунитетов
     const unsealedHero = {
@@ -325,6 +338,59 @@ describe('Патч 482: экран Мастера «Окружающая сре�
     expect(Object.values(useCharacterStore.getState().effects)
       .filter((effect) => effect.active !== false && effect.effectType === 'gmPeriodic' && effect.gmPeriodic?.category === 'weather'))
       .toHaveLength(0);
+  });
+
+  it('радиация разрешается на стороне персонажа: герметичная броня защищает, а гули лечатся от дозы', () => {
+    const attrs = [
+      { name: 'STR', value: 5 }, { name: 'PER', value: 5 }, { name: 'END', value: 5 },
+      { name: 'CHA', value: 5 }, { name: 'INT', value: 5 }, { name: 'AGI', value: 5 }, { name: 'LCK', value: 5 },
+    ];
+    const sealedArmor = Object.fromEntries(
+      ['head', 'body', 'leftArm', 'rightArm', 'leftLeg', 'rightLeg'].map((slot) => [
+        slot,
+        { armor: null, clothing: { radiationDamageRating: 10 } },
+      ]),
+    );
+    const armoredRow = {
+      id: 'char_armored',
+      data: {
+        level: 1, origin: { id: 'vaultDweller', characterType: 'human' }, attributes: attrs,
+        currentHealth: 10, radiation: 0, equippedArmor: sealedArmor,
+      },
+    };
+    const protectedResult = applyEnvCombatDirectiveToStoredRow({
+      kind: ENV_DIRECTIVE_KIND.WEATHER_APPLY,
+      envPayload: { conditionKey: 'acidRain', value: 5, valueMode: 'fixed', durationUnit: 'once', shelterProtected: false },
+    }, armoredRow, 'en-EN');
+    expect(protectedResult.nextData.currentHealth).toBe(10);
+
+    const ghoulRow = {
+      id: 'char_ghoul',
+      data: {
+        level: 1,
+        origin: { id: 'ghoul', characterType: 'human' },
+        trait: { id: 'ghoul-necrotic-posthuman' },
+        attributes: attrs,
+        currentHealth: 5,
+        radiation: 0,
+      },
+    };
+    const started = applyEnvCombatDirectiveToStoredRow({
+      kind: ENV_DIRECTIVE_KIND.RADIATION_APPLY,
+      envPayload: { valueMode: 'fixed', value: 1, durationUnit: 'scenes', totalIntervals: 3 },
+    }, ghoulRow, 'en-EN');
+    let row = { ...ghoulRow, data: started.nextData };
+    expect(row.data.currentHealth).toBe(5);
+    expect(row.data.radiation).toBe(0);
+    for (let i = 0; i < 3; i += 1) {
+      const tick = applyEnvCombatDirectiveToStoredRow({
+        kind: ENV_DIRECTIVE_KIND.TIME_ADVANCE,
+        envPayload: { scenes: 1 },
+      }, row, 'en-EN');
+      row = { ...row, data: tick.nextData };
+    }
+    expect(row.data.currentHealth).toBe(6);
+    expect(row.data.radiation).toBe(0);
   });
 
   it('Увечья адаптируются под слоты робота, проходят 2 стадии лечения (активное → стабилизировано → зажило во сне) и не стираются Аддиктолом', () => {
