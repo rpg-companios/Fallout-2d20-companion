@@ -226,10 +226,23 @@ describe('Патч 482: экран Мастера «Окружающая сре�
     const modal = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js'), 'utf8');
     const adminTile = fs.readFileSync(path.join(ROOT, 'components/admin/AdminTile.js'), 'utf8');
     expect(adminTile).toContain("borderStyle: 'dashed'");
+    expect(adminTile).toContain("iconColor = '#5a5a5a'");
     expect(adminTile).toContain('backgroundColor: \'rgba(255,255,255,0.92)\'');
     expect(adminTile).not.toContain('cardHero');
     expect(screen).toContain('styles.topBar');
     expect(screen).toContain('<AdminTile');
+    expect(screen).toContain('iconColor="#5a5a5a"');
+    expect(screen).not.toContain('savedSectionTitle');
+    expect(screen).not.toContain('tilesSectionTitle');
+    expect(screen).not.toContain('sectionTitle');
+    expect(screen).not.toContain('savedHeaderRow');
+    const gridDefinition = screen.slice(
+      screen.indexOf('const tileGridRows ='),
+      screen.indexOf('  return (', screen.indexOf('const tileGridRows =')),
+    );
+    expect(gridDefinition.indexOf('...baseTiles.map')).toBeLessThan(
+      gridDefinition.indexOf("{ type: 'newFolder' }"),
+    );
     expect(screen).not.toContain('tile.subtitle');
     expect(screen).not.toContain('tabletopResultTitle');
     expect(modal).toContain('intervalOnly: true');

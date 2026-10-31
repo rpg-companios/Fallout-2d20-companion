@@ -16,7 +16,7 @@ import {
  */
 export default function AdminTile({
   iconName,
-  iconColor = '#333333',
+  iconColor = '#5a5a5a',
   label,
   detail,
   onPress,

@@ -425,18 +425,11 @@ export default function EnvCombatScreen() {
     },
   ];
 
-  const savedGridCells = useMemo(() => {
-    const cells = [];
-    if (!currentFolderId) {
-      cells.push({ type: 'newFolder' });
-    }
-    visibleSavedEntries.forEach((entry) => {
-      cells.push({ type: 'entry', entry });
-    });
-    return chunkIntoRows(cells, NUM_COLS);
-  }, [visibleSavedEntries, currentFolderId]);
-
-  const baseTileRows = useMemo(() => chunkIntoRows(baseTiles, NUM_COLS), [locale, roomHazardCounts]);
+  const tileGridRows = chunkIntoRows([
+    ...baseTiles.map((tile) => ({ type: 'mechanic', tile })),
+    ...(!currentFolderId ? [{ type: 'newFolder' }] : []),
+    ...visibleSavedEntries.map((entry) => ({ type: 'entry', entry })),
+  ], NUM_COLS);
 
   return (
     <View style={styles.container}>
@@ -574,51 +567,41 @@ export default function EnvCombatScreen() {
 
       {/* Основное полотно плиток */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
-        {/* Раздел 1: 4 базовые плитки конструктора */}
-        <Text style={localStyles.sectionTitle}>{tGm('envCombat.tilesSectionTitle', locale)}</Text>
-        {baseTileRows.map((row, rIdx) => (
-          <View key={`base-row-${rIdx}`} style={styles.row}>
-            {row.map((tile, cIdx) => {
-              if (!tile) return <View key={`empty-base-${cIdx}`} style={styles.emptyCell} />;
-              const meta = MECHANIC_TILE_META[tile.mechanicType];
-              return (
-                <AdminTile
-                  key={tile.mechanicType}
-                  testID={`env-tile-${tile.mechanicType}`}
-                  iconName={meta.icon}
-                  label={tile.title}
-                  badge={tile.badge}
-                  onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
-                />
-              );
-            })}
-          </View>
-        ))}
-
-        {/* Раздел 2: Папки и сохранённые плитки состояний */}
-        <View style={localStyles.savedHeaderRow}>
-          <Text style={localStyles.sectionTitle}>
-            {currentFolder
-              ? `📁 ${currentFolder.name}`
-              : tGm('envCombat.savedSectionTitle', locale)}
-          </Text>
-          {currentFolder ? (
+        {currentFolder ? (
+          <View style={localStyles.folderContext}>
+            <Text style={localStyles.folderContextTitle}>{currentFolder.name}</Text>
             <TouchableOpacity
               style={localStyles.backBtn}
               onPress={() => setCurrentFolderId(null)}
             >
               <Text style={localStyles.backBtnText}>{tGm('envCombat.backToRoot', locale)}</Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
         {currentFolder?.description ? (
           <Text style={localStyles.folderHeaderDesc}>{currentFolder.description}</Text>
         ) : null}
 
-        {savedGridCells.map((row, rIdx) => (
-          <View key={`saved-row-${rIdx}`} style={styles.row}>
+        {tileGridRows.map((row, rIdx) => (
+          <View key={`tile-row-${rIdx}`} style={styles.row}>
             {row.map((cell, cIdx) => {
-              if (!cell) return <View key={`saved-empty-${cIdx}`} style={styles.emptyCell} />;
+              if (!cell) return <View key={`tile-empty-${cIdx}`} style={styles.emptyCell} />;
+
+              if (cell.type === 'mechanic') {
+                const { tile } = cell;
+                const meta = MECHANIC_TILE_META[tile.mechanicType];
+                return (
+                  <AdminTile
+                    key={tile.mechanicType}
+                    testID={`env-tile-${tile.mechanicType}`}
+                    iconName={meta.icon}
+                    iconColor="#5a5a5a"
+                    label={tile.title}
+                    badge={tile.badge}
+                    onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
+                  />
+                );
+              }
 
               if (cell.type === 'newFolder') {
                 return (
@@ -626,6 +609,7 @@ export default function EnvCombatScreen() {
                     key="create-folder-cell"
                     testID="env-create-folder-tile"
                     iconName="folder-plus-outline"
+                    iconColor="#5a5a5a"
                     label={tGm('envCombat.newFolderBtn', locale)}
                     onPress={() => setFolderModal({ mode: 'create', name: '', description: '' })}
                   />
@@ -642,7 +626,7 @@ export default function EnvCombatScreen() {
                   key={entry.id}
                   testID={`env-saved-${entry.id}`}
                   iconName={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
-                  iconColor={isFolder ? '#8a6d1d' : '#333333'}
+                  iconColor="#5a5a5a"
                   label={entry.name}
                   detail={isFolder
                     ? formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })
@@ -1012,19 +996,16 @@ const localStyles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  sectionTitle: {
-    color: '#f0e68c',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  savedHeaderRow: {
+  folderContext: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 10,
+  },
+  folderContextTitle: {
+    color: '#5a5a5a',
+    fontSize: 14,
+    fontWeight: '700',
   },
   folderHeaderDesc: {
     color: '#9ca3af',
