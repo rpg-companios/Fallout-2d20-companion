@@ -136,6 +136,71 @@ describe('roomServer: create/join/presence', () => {
     });
   });
 
+  it('peer.assist ставит лечение соседа в общую очередь, доставляет его цели и фиксирует ack', async () => {
+    await withServer(async (port) => {
+      const gm = makeClient(port, 'gm-peer');
+      const medic = makeClient(port, 'player-medic');
+      const wounded = makeClient(port, 'player-wounded');
+
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Полевая помощь' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await medic.send(MESSAGE.ROOM_JOIN, { code, name: 'Доктор Ли', role: 'player' });
+      await medic.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await wounded.send(MESSAGE.ROOM_JOIN, { code, name: 'Рейнджер', role: 'player' });
+      await wounded.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+
+      await wounded.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'wounded-char',
+        revision: 1,
+        snapshot: { characterId: 'wounded-char', name: 'Рейнджер', data: { currentHealth: 2 } },
+      }, code);
+      // Ожидаем, пока сервер зарегистрирует снапшот цели.
+      await gm.waitFor((m) => m.type === MESSAGE.CHAR_PUBLISH && m.payload.characterId === 'wounded-char');
+
+      const peerRequest = await medic.send(MESSAGE.PEER_ASSIST, {
+        code,
+        targetCharacterId: 'wounded-char',
+        fromCharacterName: 'Доктор Ли',
+        envPayload: {
+          item: { id: 'chem_stimpak', name: 'Стимулятор', healAmount: 4 },
+          firstAidBonusHp: 7,
+          stabilizeInjury: true,
+        },
+      }, code);
+      const queued = await medic.waitFor((m) => (
+        m.type === MESSAGE.GM_DIRECTIVE_STATE && m.payload.requestId === peerRequest
+      ));
+      expect(queued.payload.directive).toMatchObject({
+        kind: 'peer.consumable',
+        originRole: 'peer',
+        targetCharacterId: 'wounded-char',
+      });
+      expect(queued.payload.directive.envPayload.firstAidBonusHp).toBe(7);
+
+      const delivered = await wounded.waitFor((m) => (
+        m.type === MESSAGE.GM_DIRECTIVE && m.payload.directiveId === queued.payload.directive.directiveId
+      ));
+      expect(delivered.payload.kind).toBe('peer.consumable');
+      expect(delivered.payload.fromName).toBe('Доктор Ли');
+
+      const ackRequest = await wounded.send(MESSAGE.GM_DIRECTIVE_ACK, {
+        code,
+        directiveId: queued.payload.directive.directiveId,
+        characterId: 'wounded-char',
+      }, code);
+      const acked = await wounded.waitFor((m) => (
+        m.type === MESSAGE.GM_DIRECTIVE_STATE && m.payload.requestId === ackRequest
+      ));
+      expect(acked.payload.directive.ackedByCharacterIds).toContain('wounded-char');
+      gm.close();
+      medic.close();
+      wounded.close();
+    });
+  });
+
   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
     await withServer(async (port) => {
       const gm = makeClient(port, 'gm-1');

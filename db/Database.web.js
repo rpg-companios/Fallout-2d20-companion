@@ -13,6 +13,11 @@ import {
   normalizeContainerEntity,
   duplicateContainerEntity,
 } from '../domain/lootTrade';
+import {
+  GM_ENV_ENTRY_KIND,
+  duplicateGmEnvEntry,
+  normalizeGmEnvEntry,
+} from '../domain/envCombatPresets';
 import { assertAdminFeature, FEATURE_IDS } from '../domain/premium';
 import {
   catalogGetWeapons, catalogGetWeaponById, catalogSearchWeapons, catalogGetWeaponByName,
@@ -448,4 +453,86 @@ export async function duplicateGmContainer(id, copySuffix = 'копия') {
     now: Date.now(),
   });
   return saveGmContainer(duplicate);
+}
+
+// ─── Сохранённые плитки и папки «Окружающая среда/бой» (патч 482) ───────────
+
+const rowToGmEnvEntry = (row) => {
+  if (!row) return null;
+  let parsed = {};
+  try {
+    parsed = typeof row.data === 'string' ? JSON.parse(row.data) : (row.data || {});
+  } catch {
+    parsed = {};
+  }
+  return normalizeGmEnvEntry({
+    ...parsed,
+    id: row.id || parsed.id,
+    kind: row.kind || parsed.kind,
+    category: row.category || parsed.category,
+    name: row.name || parsed.name,
+    folderId: row.folder_id || parsed.folderId || null,
+    createdAt: Number(row.created_at) || Number(parsed.createdAt) || Date.now(),
+    updatedAt: Number(row.updated_at) || Number(parsed.updatedAt) || Date.now(),
+  });
+};
+
+export async function saveGmEnvEntry(rawEntry, { preserveUpdatedAt = false } = {}) {
+  assertAdminFeature(FEATURE_IDS.GM_ENV_COMBAT);
+  const now = Date.now();
+  const existing = rawEntry?.id
+    ? await getFirst('SELECT created_at, updated_at FROM gm_env_entries WHERE id = ?', [rawEntry.id])
+    : null;
+  const createdAt = Number(existing?.created_at) || Number(rawEntry?.createdAt) || now;
+  const updatedAt = preserveUpdatedAt && Number(rawEntry?.updatedAt) > 0
+    ? Number(rawEntry.updatedAt)
+    : now;
+  const normalized = normalizeGmEnvEntry({ ...rawEntry, createdAt, updatedAt }, now);
+  await runQuery(
+    'INSERT OR REPLACE INTO gm_env_entries (id, kind, category, name, folder_id, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [normalized.id, normalized.kind, normalized.category, normalized.name, normalized.folderId || '', JSON.stringify(normalized), normalized.createdAt, normalized.updatedAt],
+  );
+  return normalized;
+}
+
+export async function getGmEnvEntryById(id) {
+  const row = await getFirst('SELECT * FROM gm_env_entries WHERE id = ?', [id]);
+  return rowToGmEnvEntry(row);
+}
+
+export async function getGmEnvEntriesList() {
+  const rows = await getAll('SELECT * FROM gm_env_entries ORDER BY created_at DESC');
+  return rows.map(rowToGmEnvEntry).filter(Boolean);
+}
+
+export const listGmEnvEntries = getGmEnvEntriesList;
+
+export async function deleteGmEnvEntry(id, { deleteChildren = false } = {}) {
+  assertAdminFeature(FEATURE_IDS.GM_ENV_COMBAT);
+  const existing = await getGmEnvEntryById(id);
+  if (existing?.kind === GM_ENV_ENTRY_KIND.FOLDER) {
+    const all = await getGmEnvEntriesList();
+    const children = all.filter((entry) => entry.kind === GM_ENV_ENTRY_KIND.PRESET && entry.folderId === id);
+    for (const child of children) {
+      if (deleteChildren) {
+        await runQuery('DELETE FROM gm_env_entries WHERE id = ?', [child.id]);
+      } else {
+        await saveGmEnvEntry({ ...child, folderId: null });
+      }
+    }
+  }
+  await runQuery('DELETE FROM gm_env_entries WHERE id = ?', [id]);
+}
+
+export async function duplicateGmEnvEntryById(id, copySuffix = 'копия') {
+  assertAdminFeature(FEATURE_IDS.GM_ENV_COMBAT);
+  const source = await getGmEnvEntryById(id);
+  if (!source) throw new Error(`GM env entry not found: ${id}`);
+  const all = await getGmEnvEntriesList();
+  const duplicate = duplicateGmEnvEntry(source, {
+    existingNames: all.map((item) => item.name),
+    copySuffix,
+    now: Date.now(),
+  });
+  return saveGmEnvEntry(duplicate);
 }

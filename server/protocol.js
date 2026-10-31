@@ -23,6 +23,7 @@ const MESSAGE = Object.freeze({
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',
+  PEER_ASSIST: 'peer.assist',
   // Выдача контейнеров добычи и торговли Мастером (патч 468):
   SESSION_OPEN: 'session.open',
   SESSION_STATE: 'session.state',

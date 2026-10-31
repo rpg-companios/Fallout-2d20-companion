@@ -51,11 +51,21 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     emptySince: null,
   });
 
+  const sanitizeEnvPayload = (raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    try {
+      return JSON.parse(JSON.stringify(raw));
+    } catch {
+      return null;
+    }
+  };
+
   const cloneDirectives = (directives) => (
     (directives || []).map((entry) => ({
       ...entry,
       targetCharacterIds: [...(entry.targetCharacterIds || [])],
       ackedByCharacterIds: [...(entry.ackedByCharacterIds || [])],
+      envPayload: entry.envPayload ? sanitizeEnvPayload(entry.envPayload) : null,
     }))
   );
 
@@ -482,6 +492,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     const entry = {
       directiveId,
       kind,
+      originRole: 'gm',
       amount: Number.isFinite(rawAmount) ? rawAmount : 1,
       mode: directive?.mode ? String(directive.mode) : null,
       note: String(directive?.note || '').trim().slice(0, 240),
@@ -491,6 +502,58 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       ackedByCharacterIds: [],
       fromClientId: clientId,
       fromName: room.members.get(clientId)?.name || 'GM',
+      envPayload: sanitizeEnvPayload(directive?.envPayload),
+      createdAt: now(),
+    };
+
+    room.directives.push(entry);
+    if (room.directives.length > 20) {
+      room.directives.splice(0, room.directives.length - 20);
+    }
+
+    return {
+      room,
+      directive: { ...entry },
+      directives: cloneDirectives(room.directives),
+    };
+  };
+
+  /** Применение предмета / помощи одним игроком комнаты к соседу по комнате (строго peer.consumable). */
+  const issuePeerAssist = ({ code, clientId, payload = {} }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const targetCharacterId = String(payload?.targetCharacterId || '').trim();
+    if (!targetCharacterId || !room.lastSnapshots.has(targetCharacterId)) {
+      return { error: ERROR_CODE.BAD_MESSAGE };
+    }
+    const envPayload = sanitizeEnvPayload(payload?.envPayload);
+    if (!envPayload || !envPayload.item) {
+      return { error: ERROR_CODE.BAD_MESSAGE };
+    }
+    const directiveId = String(payload?.directiveId || '').trim() || crypto.randomUUID();
+    const existing = room.directives.find((d) => d.directiveId === directiveId);
+    if (existing) {
+      return {
+        room,
+        directive: { ...existing },
+        directives: cloneDirectives(room.directives),
+      };
+    }
+    const fromName = String(payload?.fromCharacterName || room.members.get(clientId)?.name || 'Player').trim().slice(0, 80);
+    const entry = {
+      directiveId,
+      kind: 'peer.consumable',
+      originRole: 'peer',
+      amount: 1,
+      mode: null,
+      note: String(payload?.note || '').trim().slice(0, 240),
+      targetType: 'character',
+      targetCharacterId,
+      targetCharacterIds: [targetCharacterId],
+      ackedByCharacterIds: [],
+      fromClientId: clientId,
+      fromName,
+      envPayload,
       createdAt: now(),
     };
 
@@ -561,6 +624,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lootTake,
     tradeCommit,
     issueDirective,
+    issuePeerAssist,
     ackDirective,
     sweep,
     _rooms: rooms, // диагностика/тесты

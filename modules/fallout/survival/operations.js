@@ -16,10 +16,13 @@ import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { debugLog } from '../../../src/debug/falloutDebug';
 import { advanceHours, consumeDrink, consumeFood, fatigueHpLossFromEvents, rest, wait } from './survival';
-// 406: перки выживания — верблюд (доп. ступень), омолодившийся (скорость
-// лестниц), естественная стойкость (сон в пустоши без болезни).
+import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../../../src/store/effectsSync';
+import { healStabilizedInjuriesInEffectsArray, getWeatherSurvivalMultipliers } from '../gm/gmEnvCombat';
+
+// 406 + 482: перки выживания и погодные множители (жара → вода, холод → еда).
 const survivalPerkOptions = (item = null) => {
-  const perkBonuses = useCharacterStore.getState().perkBonuses || {};
+  const storeState = useCharacterStore.getState();
+  const perkBonuses = storeState.perkBonuses || {};
   let extraWaterSteps = Math.max(0, Number(perkBonuses.dromedaryExtraWaterStep) || 0);
   // 409: «Кровосос» — пакет крови и так напиток, по книге он дополнительно
   // поднимает Жажду на ступень (сверка с notepad: '+1 ступень при пакете').
@@ -27,9 +30,18 @@ const survivalPerkOptions = (item = null) => {
     && perkBonuses.bloodPackDrinkIds.includes(item.id)) {
     extraWaterSteps += 1;
   }
+  const weatherRates = getWeatherSurvivalMultipliers(storeState.effects);
+  let ladderAccRates = perkBonuses.ladderAccRates ? { ...perkBonuses.ladderAccRates } : null;
+  if (weatherRates) {
+    ladderAccRates = {
+      food: (ladderAccRates?.food ?? 1) * (weatherRates.food ?? 1),
+      water: (ladderAccRates?.water ?? 1) * (weatherRates.water ?? 1),
+      sleep: ladderAccRates?.sleep ?? 1,
+    };
+  }
   return {
     extraWaterSteps,
-    ladderAccRates: perkBonuses.ladderAccRates || null,
+    ladderAccRates,
     sleepOnGroundDiseaseImmune: Boolean(perkBonuses.sleepOnGroundDiseaseImmune),
   };
 };
@@ -107,6 +119,17 @@ export const sleepSurvival = ({ place, hours }) => {
   // Мост контуров (§5): сон двигает таймеры эффектов как N × 12 сцен.
   const { expired } = advanceEffectsByGameHours(hours);
 
+  // Патч 482: стабилизированные увечья полностью заживают после сна/отдыха.
+  let injuriesHealed = [];
+  if (Number(hours) > 0) {
+    const freshStore = useCharacterStore.getState();
+    const healedRes = healStabilizedInjuriesInEffectsArray(effectsDictToLegacyArray(freshStore.effects));
+    if (healedRes.healedZones.length > 0) {
+      syncTimedEffectsToStore(healedRes.effects, freshStore);
+      injuriesHealed = healedRes.healedZones;
+    }
+  }
+
   // Сон в пустоши — проверка заболевания (sleepOnGround, §7).
   // 406: Естественная стойкость — «сон на земле» не проверяется на болезнь.
   const diseaseRiskResult = place === 'wasteland'
@@ -120,6 +143,7 @@ export const sleepSurvival = ({ place, hours }) => {
     fatigueAfter: result.state.fatigue.reduce((sum, f) => sum + f.amount, 0),
     bedRestCompleted: result.bedRestCompleted,
     bedRestHealed,
+    injuriesHealed,
     diseaseRiskResult,
     effectsExpired: expired.length,
   });
@@ -129,6 +153,7 @@ export const sleepSurvival = ({ place, hours }) => {
     result,
     bedRestCompleted: result.bedRestCompleted,
     bedRestHealed,
+    injuriesHealed,
     diseaseRiskResult,
     effectsExpired: expired,
   };

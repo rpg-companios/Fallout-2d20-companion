@@ -40,8 +40,9 @@ export const SAVE_STATE_FIELDS = new Set([
   // моды и подпись стопки
   'appliedMods', 'stackKey',
   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
-  // прочность / заряды / HP
+  // прочность / заряды / HP / состояния отказа атаки (патч 482)
   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
+  'jammed', 'forceBroken', 'unrepairable',
   'equipInstanceId', 'uniqueId', 'charges', 'hpCurrent',
   // мета отображения / роботов
   'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', 'installedWeapons',

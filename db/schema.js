@@ -81,4 +81,16 @@ export const CREATE_TABLES = [
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
+
+  // Сохранённые состояния (плитки) и папки экрана «Окружающая среда/бой» (патч 482).
+  `CREATE TABLE IF NOT EXISTS gm_env_entries (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    category TEXT NOT NULL,
+    name TEXT NOT NULL,
+    folder_id TEXT,
+    data TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 ];

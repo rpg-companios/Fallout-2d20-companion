@@ -25,6 +25,12 @@ export const legacyEffectToStore = (effect) => ({
   // без него effectDiseaseRank считал любую болезнь рангом 1 — антибиотик
   // и «Сопротивляться» лечили многоранговые болезни с одной попытки.
   rank: effect.rank,
+  // Патч 482: увечья зон тела и периодические эффекты погоды/радиации
+  injuryZone: effect.injuryZone,
+  injuryStage: effect.injuryStage,
+  isRobotZone: effect.isRobotZone,
+  bleedDice: effect.bleedDice,
+  gmPeriodic: effect.gmPeriodic,
 });
 
 export const storeEffectToLegacy = (effect) => ({
@@ -44,6 +50,11 @@ export const storeEffectToLegacy = (effect) => ({
   effectType: effect.effectType,
   conditionId: effect.conditionId,
   rank: effect.rank,
+  injuryZone: effect.injuryZone,
+  injuryStage: effect.injuryStage,
+  isRobotZone: effect.isRobotZone,
+  bleedDice: effect.bleedDice,
+  gmPeriodic: effect.gmPeriodic,
 });
 
 export const legacyEffectsArrayToStore = (effectsArray = []) => {
