@@ -1,5 +1,13 @@
 # Changelog
 ---
+## Fix opening the GM "Environment/Combat" tab (patch 483)
+
+Fixed an error when opening the GM's third tab: the screen incorrectly destructured
+`useLocale()` and passed an empty locale to the language-label formatter. It now
+reads the locale as a string and switches languages through the standard
+`setCurrentLocale` function.
+
+---
 ## Environment/Combat, saved state presets, and room-neighbor First Aid (patch 482)
 
 - Added the GM workspace’s third tab, **Environment/Combat**, with separate Weather, Radiation, Injury, and Attack Failure tiles, room/recipient selection, room-wide time advancement, and tabletop-only calculation.

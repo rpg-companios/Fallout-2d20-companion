@@ -1,0 +1,88 @@
+diff --git a/components/screens/EnvCombatScreen/EnvCombatScreen.js b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+index a9975e2..b624322 100644
+--- a/components/screens/EnvCombatScreen/EnvCombatScreen.js
++++ b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+@@ -22,7 +22,7 @@ import {
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useFocusEffect } from '@react-navigation/native';
+ import * as db from '../../../db';
+-import { SUPPORTED_LOCALES, useLocale } from '../../../i18n/locale';
++import { SUPPORTED_LOCALES, setCurrentLocale, useLocale } from '../../../i18n/locale';
+ import { getLocaleLabel } from '../HomeScreen/logic/localeLabel';
+ import { tHomeScreen } from '../HomeScreen/logic/homeScreenI18n';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+@@ -96,7 +96,12 @@ const chunkIntoRows = (items, cols = NUM_COLS) => {
+ };
+ 
+ export default function EnvCombatScreen() {
+-  const { locale, setLocale } = useLocale();
++  const locale = useLocale();
++  const localeLabel = (code) => getLocaleLabel({
++    code,
++    displayLocale: locale,
++    translate: tHomeScreen,
++  });
+   const setUiMode = useAppSettingsStore((s) => s.setUiMode);
+   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
+   const roomsMap = useRoomStore((s) => s.rooms);
+@@ -475,7 +480,7 @@ export default function EnvCombatScreen() {
+             style={homeStyles.langBtn}
+             onPress={() => setLanguageMenuOpen(true)}
+           >
+-            <Text style={homeStyles.langBtnText}>{getLocaleLabel(locale)}</Text>
++            <Text style={homeStyles.langBtnText}>{localeLabel(locale)}</Text>
+           </TouchableOpacity>
+ 
+           <TouchableOpacity
+@@ -981,7 +986,7 @@ export default function EnvCombatScreen() {
+                 }}
+               >
+                 <Text style={[localStyles.folderPickText, loc === locale && { color: '#f0e68c', fontWeight: '700' }]}>
+-                  {getLocaleLabel(loc)}
++                  {localeLabel(loc)}
+                 </Text>
+               </TouchableOpacity>
+             ))}
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 5b9cbb8..ae086e1 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,12 @@
+ # Changelog
++---
++## Fix opening the GM "Environment/Combat" tab (patch 483)
++
++Fixed an error when opening the GM's third tab: the screen incorrectly destructured
++`useLocale()` and passed an empty locale to the language-label formatter. It now
++reads the locale as a string and switches languages through the standard
++`setCurrentLocale` function.
++
+ ---
+ ## Environment/Combat, saved state presets, and room-neighbor First Aid (patch 482)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index c7c2f37..64b4763 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,12 @@
+ # История изменений
+ 
++---
++## Исправление входа во вкладку «Окружающая среда/бой» в режиме Мастера (патч 483)
++
++Исправлена ошибка при открытии третьей вкладки Мастера: экран неверно разбирал
++результат `useLocale()` и передавал пустой язык в форматирование подписи. Теперь
++локаль читается как строка, а смена языка использует штатный `setCurrentLocale`.
++
+ ---
+ ## Окружающая среда/бой, сохранённые пресеты и Первая помощь соседу по комнате (патч 482)
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index bd13d10..ebb63ce 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "482"
++  "baseline": "483"
+ }

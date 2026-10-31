@@ -22,7 +22,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import * as db from '../../../db';
-import { SUPPORTED_LOCALES, useLocale } from '../../../i18n/locale';
+import { SUPPORTED_LOCALES, setCurrentLocale, useLocale } from '../../../i18n/locale';
 import { getLocaleLabel } from '../HomeScreen/logic/localeLabel';
 import { tHomeScreen } from '../HomeScreen/logic/homeScreenI18n';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
@@ -96,7 +96,12 @@ const chunkIntoRows = (items, cols = NUM_COLS) => {
 };
 
 export default function EnvCombatScreen() {
-  const { locale, setLocale } = useLocale();
+  const locale = useLocale();
+  const localeLabel = (code) => getLocaleLabel({
+    code,
+    displayLocale: locale,
+    translate: tHomeScreen,
+  });
   const setUiMode = useAppSettingsStore((s) => s.setUiMode);
   const setTabUiMode = useUiModeStore((s) => s.setTabUiMode);
   const roomsMap = useRoomStore((s) => s.rooms);
@@ -475,7 +480,7 @@ export default function EnvCombatScreen() {
             style={homeStyles.langBtn}
             onPress={() => setLanguageMenuOpen(true)}
           >
-            <Text style={homeStyles.langBtnText}>{getLocaleLabel(locale)}</Text>
+            <Text style={homeStyles.langBtnText}>{localeLabel(locale)}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -981,7 +986,7 @@ export default function EnvCombatScreen() {
                 }}
               >
                 <Text style={[localStyles.folderPickText, loc === locale && { color: '#f0e68c', fontWeight: '700' }]}>
-                  {getLocaleLabel(loc)}
+                  {localeLabel(loc)}
                 </Text>
               </TouchableOpacity>
             ))}
