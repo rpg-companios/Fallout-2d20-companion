@@ -16,6 +16,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocale } from '../../../../i18n/locale';
 import IconText from '../../../lootTrade/LootTradeIconText';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import { ENV_MECHANIC_TYPE } from '../../../../domain/envCombatPresets';
 import {
   ATTACK_FAIL_OUTCOMES,
@@ -680,7 +681,7 @@ export default function EnvMechanicModal({
                           thumbColor={explodeRepairable ? '#f0e68c' : '#fca5a5'}
                         />
                       </View>
-                      <Text style={[styles.hintText, !explodeRepairable && { color: '#fca5a5' }]}>
+                      <Text style={[styles.hintText, !explodeRepairable && { color: ADMIN_MODAL_PALETTE.danger }]}>
                         {tGm(explodeRepairable ? 'envCombat.attackFail.repairableYesHint' : 'envCombat.attackFail.repairableNoHint', locale)}
                       </Text>
                     </View>
@@ -808,8 +809,8 @@ export default function EnvMechanicModal({
               style={styles.secondaryBtn}
               onPress={() => setSavePanelOpen((v) => !v)}
             >
-              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color="#f0e68c" />
-              <Text style={[styles.secondaryBtnText, { color: '#f0e68c' }]}>
+              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color={ADMIN_MODAL_PALETTE.accent} />
+              <Text style={[styles.secondaryBtnText, { color: ADMIN_MODAL_PALETTE.text }]}>
                 {tGm('envCombat.presetModal.saveAsTileBtn', locale)}
               </Text>
             </TouchableOpacity>
@@ -830,7 +831,7 @@ export default function EnvMechanicModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.78)',
+    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 12,
@@ -839,10 +840,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 640,
     maxHeight: '92%',
-    backgroundColor: '#1f2328',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.42)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 14,
   },
   headerRow: {
@@ -851,10 +852,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151',
+    borderBottomColor: ADMIN_MODAL_PALETTE.border,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 17,
     fontWeight: '700',
     flex: 1,
@@ -873,15 +874,15 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   optionCard: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     padding: 10,
   },
   optionCardActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: 'rgba(240, 230, 140, 0.1)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   optionHeader: {
     flexDirection: 'row',
@@ -890,34 +891,34 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   optionTitle: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     flex: 1,
   },
   optionTitleActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
   },
   optionDesc: {
-    color: '#9ca3af',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     lineHeight: 16,
   },
   blockBox: {
-    backgroundColor: '#181b20',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#374151',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
     padding: 10,
     gap: 7,
   },
   sectionLabel: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   fieldLabel: {
-    color: '#d1d5db',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
   chipsRow: {
@@ -931,35 +932,35 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   chipActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   chipText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   diceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#374151',
-    borderColor: '#6b7280',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   diceBtnText: {
-    color: '#ffffff',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -978,36 +979,36 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 5,
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 17,
     fontWeight: '700',
   },
   stepValue: {
-    color: '#ffffff',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 15,
     fontWeight: '700',
     minWidth: 28,
     textAlign: 'center',
   },
   rolledInfo: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   robotHint: {
-    color: '#60a5fa',
+    color: '#1d4ed8',
     fontSize: 12,
     fontWeight: '600',
   },
   hintText: {
-    color: '#9ca3af',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -1022,15 +1023,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 3,
     borderBottomWidth: 1,
-    borderBottomColor: '#272c33',
+    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
   previewName: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   previewVal: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
   },
   inlineBtnsRow: {
@@ -1048,24 +1049,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239,68,68,0.1)',
   },
   ghostDangerText: {
-    color: '#fca5a5',
+    color: ADMIN_MODAL_PALETTE.danger,
     fontSize: 12,
     fontWeight: '600',
   },
   savePresetBox: {
-    backgroundColor: '#181b20',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 10,
     gap: 8,
   },
   input: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    color: '#f9fafb',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1076,7 +1077,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#374151',
+    borderTopColor: ADMIN_MODAL_PALETTE.border,
     gap: 8,
   },
   secondaryBtn: {
@@ -1087,11 +1088,11 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   secondaryBtnText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1099,10 +1100,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 5,
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
   },
   primaryBtnText: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 13,
     fontWeight: '700',
   },

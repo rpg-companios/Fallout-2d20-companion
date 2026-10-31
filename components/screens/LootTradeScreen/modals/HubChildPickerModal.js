@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import {
   Modal,
   View,
@@ -71,7 +72,7 @@ const HubChildPickerModal = ({
                         <MaterialCommunityIcons
                           name={isMerch ? 'sack' : 'treasure-chest'}
                           size={18}
-                          color="#f0e68c"
+                          color={ADMIN_MODAL_PALETTE.accent}
                         />
                         <Text style={styles.rowName}>{item.name}</Text>
                       </View>
@@ -116,21 +117,21 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 560,
     maxHeight: '80%',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     paddingHorizontal: 24,
     paddingVertical: 22,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
   hint: {
-    color: '#b0b0b0',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   emptyText: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 13,
     textAlign: 'center',
     paddingVertical: 24,
@@ -158,8 +159,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#484848',
-    backgroundColor: '#2a2a2a',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   rowInfo: {
     flex: 1,
@@ -170,32 +171,32 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowName: {
-    color: '#f0f0f0',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
     flexShrink: 1,
   },
   rowMeta: {
-    color: '#b5b5b5',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     marginTop: 3,
   },
   addBtn: {
-    backgroundColor: '#3a3a1e',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     borderRadius: 5,
     paddingHorizontal: 13,
     paddingVertical: 8,
   },
   addBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   closeBtn: {
     marginTop: 16,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeBtnText: {
-    color: '#e0e0e0',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },

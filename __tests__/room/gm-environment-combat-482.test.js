@@ -224,8 +224,13 @@ describe('Патч 482: экран Мастера «Окружающая сре�
   it('новый экран использует общие карточки и сохраняет радиацию/увечья без расчёта и привязки к первому персонажу', () => {
     const screen = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/EnvCombatScreen.js'), 'utf8');
     const modal = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js'), 'utf8');
+    const adminTile = fs.readFileSync(path.join(ROOT, 'components/admin/AdminTile.js'), 'utf8');
+    expect(adminTile).toContain("borderStyle: 'dashed'");
+    expect(adminTile).toContain('backgroundColor: \'rgba(255,255,255,0.92)\'');
+    expect(adminTile).not.toContain('cardHero');
     expect(screen).toContain('styles.topBar');
-    expect(screen).toContain('styles.cardCell');
+    expect(screen).toContain('<AdminTile');
+    expect(screen).not.toContain('tile.subtitle');
     expect(screen).not.toContain('tabletopResultTitle');
     expect(modal).toContain('intervalOnly: true');
     expect(modal).toContain("presetPayload.zoneKey = 'auto'");

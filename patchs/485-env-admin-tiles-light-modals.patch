@@ -1,0 +1,2160 @@
+diff --git a/__tests__/lootTrade/loot-trade-refinements-469.test.js b/__tests__/lootTrade/loot-trade-refinements-469.test.js
+index 31f8f04..770b007 100644
+--- a/__tests__/lootTrade/loot-trade-refinements-469.test.js
++++ b/__tests__/lootTrade/loot-trade-refinements-469.test.js
+@@ -271,24 +271,23 @@ describe('Патч 469 — доработки «Добычи/Торговли»
+     }
+   });
+ 
+-  it('все модалки «Добычи/Торговли» используют серо-жёлтую палитру приложения, а модалка лута игрока имеет увеличенные отступы и воздух', () => {
++  it('админ-модалки «Добычи/Торговли» используют общую светлую палитру, а модалка лута игрока сохраняет увеличенные отступы', () => {
+     const modalFiles = [
+       'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
+       'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js',
+       'components/screens/LootTradeScreen/modals/ContainerCatalogModal.js',
+       'components/screens/LootTradeScreen/modals/IssueContainerModal.js',
+-      'components/lootTrade/PlayerLootTradeOverlay.js',
++      'components/screens/LootTradeScreen/modals/HubChildPickerModal.js',
++      'components/screens/EnvCombatScreen/EnvCombatScreen.js',
++      'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js',
++      'components/gm/GmCommandModal.js',
+     ];
+ 
+     for (const relPath of modalFiles) {
+       const src = fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
+-      expect(src).toContain('#1f1f1f');
+-      expect(src).toContain('#f0e68c');
+-      // Никаких сине-сланцевых и ярко-зелёных цветов в новых модалках
+-      expect(src).not.toContain('#111827');
+-      expect(src).not.toContain('#1f2937');
+-      expect(src).not.toContain('#2e7d32');
+-      expect(src).not.toContain('#15803d');
++      expect(src).toContain('ADMIN_MODAL_PALETTE.surface');
++      expect(src).toContain('ADMIN_MODAL_PALETTE.accent');
++      expect(src).not.toContain("backgroundColor: '#1f1f1f'");
+     }
+ 
+     // Модалка настройки предмета использует режим пачек для патронов без выбора шт./CD/d20
+diff --git a/__tests__/lootTrade/merchant-modal-controls-477.test.js b/__tests__/lootTrade/merchant-modal-controls-477.test.js
+index ed1ddb6..2f05402 100644
+--- a/__tests__/lootTrade/merchant-modal-controls-477.test.js
++++ b/__tests__/lootTrade/merchant-modal-controls-477.test.js
+@@ -48,12 +48,12 @@ const collectText = (node) => {
+   return '';
+ };
+ 
+-describe('Patch 477 — Merchant modal controls: no ±10 buttons, white dice-d20 icon, and full-height CD icon', () => {
++describe('Patch 477 — Merchant modal controls: no ±10 buttons, dark dice-d20 icon, and full-height CD icon', () => {
+   beforeEach(() => {
+     setCurrentLocale('ru-RU');
+   });
+ 
+-  it('removes −10 and +10 caps buttons, keeps − and +, renders full-height CdIcon and white dice-d20 icon', () => {
++  it('removes −10 and +10 caps buttons, keeps − and +, renders full-height CdIcon and dark dice-d20 icon', () => {
+     const onSave = vi.fn();
+     let renderer;
+ 
+@@ -110,12 +110,12 @@ describe('Patch 477 — Merchant modal controls: no ±10 buttons, white dice-d20
+     expect(cdImgStyle.height).toBe(38);
+     expect(cdImgStyle.width).toBe(38);
+ 
+-    // D20 button renders white MaterialCommunityIcons dice-d20 instead of "d20" text
++    // D20 button renders a dark MaterialCommunityIcons dice-d20 icon instead of "d20" text
+     const d20Btn = renderer.root.findByProps({ testID: `merchant-unit-${QUANTITY_UNIT.D20}` });
+     expect(collectText(d20Btn)).not.toContain('d20');
+     const d20Icon = d20Btn.findByType('MaterialCommunityIcons');
+     expect(d20Icon.props.name).toBe('dice-d20');
+-    expect(d20Icon.props.color).toBe('#ffffff');
++    expect(d20Icon.props.color).toBe('#111111');
+ 
+     // Selecting D20 and saving rolls d20 caps cleanly
+     const nameInput = renderer.root.findByProps({ testID: 'container-form-name' });
+diff --git a/__tests__/room/gm-environment-combat-482.test.js b/__tests__/room/gm-environment-combat-482.test.js
+index d945bdd..9ca0600 100644
+--- a/__tests__/room/gm-environment-combat-482.test.js
++++ b/__tests__/room/gm-environment-combat-482.test.js
+@@ -224,8 +224,13 @@ describe('Патч 482: экран Мастера «Окружающая сре
+   it('новый экран использует общие карточки и сохраняет радиацию/увечья без расчёта и привязки к первому персонажу', () => {
+     const screen = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/EnvCombatScreen.js'), 'utf8');
+     const modal = fs.readFileSync(path.join(ROOT, 'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js'), 'utf8');
++    const adminTile = fs.readFileSync(path.join(ROOT, 'components/admin/AdminTile.js'), 'utf8');
++    expect(adminTile).toContain("borderStyle: 'dashed'");
++    expect(adminTile).toContain('backgroundColor: \'rgba(255,255,255,0.92)\'');
++    expect(adminTile).not.toContain('cardHero');
+     expect(screen).toContain('styles.topBar');
+-    expect(screen).toContain('styles.cardCell');
++    expect(screen).toContain('<AdminTile');
++    expect(screen).not.toContain('tile.subtitle');
+     expect(screen).not.toContain('tabletopResultTitle');
+     expect(modal).toContain('intervalOnly: true');
+     expect(modal).toContain("presetPayload.zoneKey = 'auto'");
+diff --git a/components/admin/AdminTile.js b/components/admin/AdminTile.js
+new file mode 100644
+index 0000000..bce7b25
+--- /dev/null
++++ b/components/admin/AdminTile.js
+@@ -0,0 +1,135 @@
++import React from 'react';
++import {
++  MaterialCommunityIcons,
++} from '@expo/vector-icons';
++import {
++  StyleSheet,
++  Text,
++  TouchableOpacity,
++  View,
++} from 'react-native';
++
++/**
++ * Shared flat tile for the character manager and GM workspace.
++ * Keep it to an icon, a short title, and optional compact metadata—no split
++ * hero/description panel. This is the standard surface for future admin tiles.
++ */
++export default function AdminTile({
++  iconName,
++  iconColor = '#333333',
++  label,
++  detail,
++  onPress,
++  onActionPress,
++  actionRef,
++  actionIcon = 'dots-vertical',
++  badge,
++  testID,
++  disabled = false,
++  active = false,
++}) {
++  return (
++    <TouchableOpacity
++      testID={testID}
++      style={[styles.tile, active && styles.tileActive, disabled && styles.tileDisabled]}
++      onPress={onPress}
++      disabled={disabled}
++      activeOpacity={0.75}
++    >
++      {badge ? (
++        <View style={styles.badge}>
++          <Text style={styles.badgeText}>{badge}</Text>
++        </View>
++      ) : null}
++      {onActionPress ? (
++        <TouchableOpacity
++          ref={actionRef}
++          style={styles.actionButton}
++          onPress={(event) => {
++            event?.stopPropagation?.();
++            onActionPress(event);
++          }}
++          accessibilityRole="button"
++        >
++          <MaterialCommunityIcons name={actionIcon} size={17} color="#ffffff" />
++        </TouchableOpacity>
++      ) : null}
++      <MaterialCommunityIcons name={iconName} size={40} color={iconColor} />
++      <Text style={styles.label} numberOfLines={2}>{label}</Text>
++      {detail ? <Text style={styles.detail} numberOfLines={1}>{detail}</Text> : null}
++    </TouchableOpacity>
++  );
++}
++
++const styles = StyleSheet.create({
++  tile: {
++    flex: 1,
++    margin: 5,
++    aspectRatio: 0.75,
++    borderWidth: 2,
++    borderStyle: 'dashed',
++    borderColor: '#5a5a5a',
++    borderRadius: 8,
++    backgroundColor: 'rgba(255,255,255,0.92)',
++    justifyContent: 'center',
++    alignItems: 'center',
++    padding: 8,
++    overflow: 'hidden',
++  },
++  tileActive: {
++    borderColor: '#111111',
++    backgroundColor: '#f0f7e8',
++  },
++  tileDisabled: {
++    opacity: 0.5,
++  },
++  label: {
++    marginTop: 8,
++    color: '#111111',
++    fontSize: 12,
++    fontWeight: '700',
++    lineHeight: 16,
++    textAlign: 'center',
++  },
++  detail: {
++    marginTop: 6,
++    paddingHorizontal: 7,
++    paddingVertical: 3,
++    maxWidth: '100%',
++    borderRadius: 4,
++    backgroundColor: '#222222',
++    color: '#ffffff',
++    fontSize: 10,
++    fontWeight: '600',
++    textAlign: 'center',
++  },
++  badge: {
++    position: 'absolute',
++    top: 5,
++    left: 5,
++    minWidth: 22,
++    minHeight: 22,
++    paddingHorizontal: 5,
++    borderRadius: 11,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: '#111111',
++  },
++  badgeText: {
++    color: '#ffffff',
++    fontSize: 10,
++    fontWeight: '700',
++  },
++  actionButton: {
++    position: 'absolute',
++    top: 5,
++    right: 5,
++    zIndex: 2,
++    width: 28,
++    height: 28,
++    borderRadius: 14,
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: '#111111',
++  },
++});
+diff --git a/components/admin/adminModalTheme.js b/components/admin/adminModalTheme.js
+new file mode 100644
+index 0000000..e05d682
+--- /dev/null
++++ b/components/admin/adminModalTheme.js
+@@ -0,0 +1,16 @@
++export const ADMIN_MODAL_PALETTE = Object.freeze({
++  backdrop: 'rgba(0,0,0,0.56)',
++  surface: '#f4f4f4',
++  surfaceRaised: '#ffffff',
++  surfaceMuted: '#e9e9e9',
++  accent: '#111111',
++  accentText: '#ffffff',
++  text: '#111111',
++  mutedText: '#555555',
++  border: '#333333',
++  borderMuted: '#b7b7b7',
++  selected: '#e8f0fb',
++  selectedBorder: '#111111',
++  gold: '#d4af37',
++  danger: '#b42318',
++});
+diff --git a/components/gm/GmCommandModal.js b/components/gm/GmCommandModal.js
+index 95f45c5..6a671a2 100644
+--- a/components/gm/GmCommandModal.js
++++ b/components/gm/GmCommandModal.js
+@@ -1,4 +1,5 @@
+ import React, { useEffect, useState } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -112,7 +113,7 @@ export default function GmCommandModal({
+                   : tGm('commands.modalTitleRoom', locale)}
+               </Text>
+               <TouchableOpacity onPress={onClose} style={styles.closeIconBtn}>
+-                <MaterialCommunityIcons name="close" size={20} color="#d4d4d4" />
++                <MaterialCommunityIcons name="close" size={20} color={ADMIN_MODAL_PALETTE.text} />
+               </TouchableOpacity>
+             </View>
+ 
+@@ -142,7 +143,7 @@ export default function GmCommandModal({
+                         <MaterialCommunityIcons
+                           name={spec.icon}
+                           size={18}
+-                          color={active ? '#f0e68c' : '#bdbdbd'}
++                          color={active ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
+                         />
+                         <Text style={[styles.kindBtnText, active && styles.kindBtnTextActive]}>
+                           {tGm(`commands.kinds.${spec.kind}.title`, locale)}
+@@ -286,7 +287,7 @@ export default function GmCommandModal({
+ const styles = StyleSheet.create({
+   backdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
++    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 18,
+@@ -295,7 +296,7 @@ const styles = StyleSheet.create({
+     width: '100%',
+     maxWidth: 480,
+     maxHeight: '90%',
+-    backgroundColor: '#232323',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderWidth: 1,
+     borderColor: '#6b6335',
+     borderRadius: 5,
+@@ -310,12 +311,12 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingHorizontal: 16,
+     paddingVertical: 12,
+-    backgroundColor: '#1b1b1b',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#444444',
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
+   headerTitle: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 16,
+     fontWeight: '700',
+     flex: 1,
+@@ -330,10 +331,10 @@ const styles = StyleSheet.create({
+     padding: 16,
+   },
+   targetBanner: {
+-    color: '#dcdcdc',
+-    backgroundColor: '#2d2d2d',
++    color: ADMIN_MODAL_PALETTE.text,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+-    borderColor: '#4a4a4a',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+     borderRadius: 5,
+     paddingHorizontal: 10,
+     paddingVertical: 7,
+@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
+     marginBottom: 12,
+   },
+   sectionLabel: {
+-    color: '#cfcfcf',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+     marginBottom: 6,
+@@ -359,24 +360,24 @@ const styles = StyleSheet.create({
+     paddingVertical: 9,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4d4d4d',
+-    backgroundColor: '#2b2b2b',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   kindBtnActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#36341f',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   kindBtnText: {
+-    color: '#e0e0e0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+   kindBtnTextActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+   },
+   hintText: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     lineHeight: 17,
+     marginTop: 8,
+@@ -402,23 +403,23 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#666666',
+-    backgroundColor: '#2e2e2e',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   stepBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 20,
+     fontWeight: '700',
+   },
+   amountInput: {
+     width: 104,
+     height: 40,
+-    backgroundColor: '#191919',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderWidth: 1,
+     borderColor: '#777777',
+     borderRadius: 5,
+-    color: '#f5f5f5',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 17,
+     fontWeight: '700',
+     textAlign: 'center',
+@@ -436,26 +437,26 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#555555',
+-    backgroundColor: '#2b2b2b',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   presetBtnActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#3a3820',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   presetBtnText: {
+-    color: '#dcdcdc',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   presetBtnTextActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+   },
+   noteInput: {
+-    backgroundColor: '#191919',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderWidth: 1,
+     borderColor: '#555555',
+     borderRadius: 5,
+-    color: '#f5f5f5',
++    color: ADMIN_MODAL_PALETTE.text,
+     paddingHorizontal: 10,
+     paddingVertical: 8,
+     fontSize: 13,
+@@ -465,12 +466,12 @@ const styles = StyleSheet.create({
+     padding: 10,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#3e3e3e',
+-    backgroundColor: '#1b1b1b',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     gap: 5,
+   },
+   recentHeader: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+     fontWeight: '700',
+     marginBottom: 2,
+@@ -481,12 +482,12 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+   },
+   recentLabel: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   recentAck: {
+-    color: '#9ca3af',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+   },
+   footer: {
+@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
+     gap: 10,
+     paddingHorizontal: 16,
+     paddingVertical: 12,
+-    backgroundColor: '#1b1b1b',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderTopWidth: 1,
+     borderTopColor: '#444444',
+   },
+@@ -505,10 +506,10 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#555555',
+-    backgroundColor: '#2c2c2c',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   cancelBtnText: {
+-    color: '#dcdcdc',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+@@ -518,13 +519,13 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#d4af37',
+-    backgroundColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   submitBtnDisabled: {
+     opacity: 0.6,
+   },
+   submitBtnText: {
+-    color: '#1a1a1a',
++    color: ADMIN_MODAL_PALETTE.accentText,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+diff --git a/components/screens/EnvCombatScreen/EnvCombatScreen.js b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+index 4c75190..de6e410 100644
+--- a/components/screens/EnvCombatScreen/EnvCombatScreen.js
++++ b/components/screens/EnvCombatScreen/EnvCombatScreen.js
+@@ -51,6 +51,8 @@ import { FEATURE_IDS, guardAdminAction } from '../../../src/premium/adminAccessG
+ import styles from '../../../styles/LootTradeScreen.styles';
+ import homeStyles from '../../../styles/HomeScreen.styles';
+ import IconText from '../../lootTrade/LootTradeIconText';
++import AdminTile from '../../admin/AdminTile';
++import { ADMIN_MODAL_PALETTE } from '../../admin/adminModalTheme';
+ import EnvMechanicModal from './modals/EnvMechanicModal';
+ 
+ const NUM_COLS = 3;
+@@ -400,7 +402,6 @@ export default function EnvCombatScreen() {
+     {
+       mechanicType: ENV_MECHANIC_TYPE.WEATHER,
+       title: tGm('envCombat.tiles.weather.title', locale),
+-      subtitle: tGm('envCombat.tiles.weather.subtitle', locale),
+       badge: roomHazardCounts.weather > 0
+         ? formatGm(tGm('envCombat.tiles.weather.activeBadge', locale), { count: roomHazardCounts.weather })
+         : null,
+@@ -408,13 +409,11 @@ export default function EnvCombatScreen() {
+     {
+       mechanicType: ENV_MECHANIC_TYPE.RADIATION,
+       title: tGm('envCombat.tiles.radiation.title', locale),
+-      subtitle: tGm('envCombat.tiles.radiation.subtitle', locale),
+       badge: null,
+     },
+     {
+       mechanicType: ENV_MECHANIC_TYPE.INJURY,
+       title: tGm('envCombat.tiles.injury.title', locale),
+-      subtitle: tGm('envCombat.tiles.injury.subtitle', locale),
+       badge: roomHazardCounts.injuries > 0
+         ? formatGm(tGm('envCombat.tiles.injury.activeBadge', locale), { count: roomHazardCounts.injuries })
+         : null,
+@@ -422,7 +421,6 @@ export default function EnvCombatScreen() {
+     {
+       mechanicType: ENV_MECHANIC_TYPE.ATTACK_FAIL,
+       title: tGm('envCombat.tiles.attackFail.title', locale),
+-      subtitle: tGm('envCombat.tiles.attackFail.subtitle', locale),
+       badge: null,
+     },
+   ];
+@@ -584,26 +582,14 @@ export default function EnvCombatScreen() {
+               if (!tile) return <View key={`empty-base-${cIdx}`} style={styles.emptyCell} />;
+               const meta = MECHANIC_TILE_META[tile.mechanicType];
+               return (
+-                <TouchableOpacity
++                <AdminTile
+                   key={tile.mechanicType}
+                   testID={`env-tile-${tile.mechanicType}`}
+-                  style={styles.cardCell}
+-                  activeOpacity={0.8}
++                  iconName={meta.icon}
++                  label={tile.title}
++                  badge={tile.badge}
+                   onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
+-                >
+-                  <View style={styles.cardHero}>
+-                    <MaterialCommunityIcons name={meta.icon} size={34} color="#f0e68c" />
+-                    {tile.badge ? (
+-                      <View style={styles.cardLiveBadge}>
+-                        <Text style={styles.cardLiveBadgeText}>{tile.badge}</Text>
+-                      </View>
+-                    ) : null}
+-                  </View>
+-                  <View style={styles.cardBody}>
+-                    <Text style={styles.cardTitle} numberOfLines={2}>{tile.title}</Text>
+-                    <Text style={styles.cardDesc} numberOfLines={3}>{tile.subtitle}</Text>
+-                  </View>
+-                </TouchableOpacity>
++                />
+               );
+             })}
+           </View>
+@@ -636,16 +622,13 @@ export default function EnvCombatScreen() {
+ 
+               if (cell.type === 'newFolder') {
+                 return (
+-                  <TouchableOpacity
++                  <AdminTile
+                     key="create-folder-cell"
+                     testID="env-create-folder-tile"
+-                    style={styles.createCell}
+-                    activeOpacity={0.75}
++                    iconName="folder-plus-outline"
++                    label={tGm('envCombat.newFolderBtn', locale)}
+                     onPress={() => setFolderModal({ mode: 'create', name: '', description: '' })}
+-                  >
+-                    <MaterialCommunityIcons name="folder-plus-outline" size={40} color="#5a5a5a" />
+-                    <Text style={styles.createLabel}>{tGm('envCombat.newFolderBtn', locale)}</Text>
+-                  </TouchableOpacity>
++                  />
+                 );
+               }
+ 
+@@ -655,55 +638,22 @@ export default function EnvCombatScreen() {
+               const nestedCount = isFolder ? countPresetsInFolder(entries, entry.id) : 0;
+ 
+               return (
+-                <TouchableOpacity
++                <AdminTile
+                   key={entry.id}
+                   testID={`env-saved-${entry.id}`}
+-                  style={styles.cardCell}
+-                  activeOpacity={0.82}
++                  iconName={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
++                  iconColor={isFolder ? '#8a6d1d' : '#333333'}
++                  label={entry.name}
++                  detail={isFolder
++                    ? formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })
++                    : formatPresetFormulaBadge(entry, locale)}
+                   onPress={() => {
+-                    if (isFolder) {
+-                      setCurrentFolderId(entry.id);
+-                    } else {
+-                      handleApplySavedPreset(entry);
+-                    }
++                    if (isFolder) setCurrentFolderId(entry.id);
++                    else handleApplySavedPreset(entry);
+                   }}
+-                >
+-                  <View style={[styles.cardHero, isFolder && styles.cardHeroHub]}>
+-                    <MaterialCommunityIcons
+-                      name={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
+-                      size={34}
+-                      color="#f0e68c"
+-                    />
+-                    <TouchableOpacity
+-                      ref={(r) => { menuRefs.current[entry.id] = r; }}
+-                      style={[styles.cardActionButton, localStyles.savedCardMenuButton]}
+-                      onPress={(e) => {
+-                        e?.stopPropagation?.();
+-                        openEntryMenu(entry);
+-                      }}
+-                    >
+-                      <MaterialCommunityIcons name="dots-vertical" size={18} color="#f0e68c" />
+-                    </TouchableOpacity>
+-                  </View>
+-
+-                  <View style={styles.cardBody}>
+-                    <Text style={styles.cardTitle} numberOfLines={2}>{entry.name}</Text>
+-                    {entry.description ? (
+-                      <Text style={styles.cardDesc} numberOfLines={2}>{entry.description}</Text>
+-                    ) : null}
+-                    <View style={{ marginTop: 'auto', paddingTop: 6 }}>
+-                      {isFolder ? (
+-                        <Text style={styles.cardMeta}>
+-                          {formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })}
+-                        </Text>
+-                      ) : (
+-                        <IconText style={styles.cardMeta}>
+-                          {formatPresetFormulaBadge(entry, locale)}
+-                        </IconText>
+-                      )}
+-                    </View>
+-                  </View>
+-                </TouchableOpacity>
++                  actionRef={(r) => { menuRefs.current[entry.id] = r; }}
++                  onActionPress={() => openEntryMenu(entry)}
++                />
+               );
+             })}
+           </View>
+@@ -1025,8 +975,8 @@ const localStyles = StyleSheet.create({
+     paddingVertical: 4,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#272c33',
++    borderColor: ADMIN_MODAL_PALETTE.border,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   pillActive: {
+     borderColor: '#f0e68c',
+@@ -1095,13 +1045,6 @@ const localStyles = StyleSheet.create({
+     fontSize: 12,
+     fontWeight: '700',
+   },
+-  savedCardMenuButton: {
+-    top: 4,
+-    right: 4,
+-    bottom: undefined,
+-    backgroundColor: 'rgba(36,36,36,0.88)',
+-    borderColor: '#d4af37',
+-  },
+   emptyHint: {
+     color: '#9ca3af',
+     fontSize: 12,
+@@ -1116,10 +1059,10 @@ const localStyles = StyleSheet.create({
+   },
+   menuPopup: {
+     position: 'absolute',
+-    backgroundColor: '#1f2328',
+-    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
++    borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: 'rgba(240, 230, 140, 0.45)',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+     paddingVertical: 4,
+     elevation: 8,
+   },
+@@ -1131,12 +1074,12 @@ const localStyles = StyleSheet.create({
+     paddingVertical: 9,
+   },
+   menuItemText: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+   },
+   modalBackdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.75)',
++    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 16,
+@@ -1144,30 +1087,30 @@ const localStyles = StyleSheet.create({
+   modalCard: {
+     width: '100%',
+     maxWidth: 420,
+-    backgroundColor: '#1f2328',
+-    borderRadius: 5,
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
++    borderRadius: 8,
+     borderWidth: 1,
+-    borderColor: 'rgba(240, 230, 140, 0.45)',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+     padding: 16,
+     gap: 8,
+   },
+   modalTitle: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 16,
+     fontWeight: '700',
+     marginBottom: 4,
+   },
+   inputLabel: {
+-    color: '#d1d5db',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   textInput: {
+-    backgroundColor: '#272c33',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    color: '#f9fafb',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     paddingHorizontal: 10,
+     paddingVertical: 8,
+@@ -1183,11 +1126,11 @@ const localStyles = StyleSheet.create({
+     paddingVertical: 8,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#272c33',
++    borderColor: ADMIN_MODAL_PALETTE.border,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   cancelBtnText: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+@@ -1195,10 +1138,10 @@ const localStyles = StyleSheet.create({
+     paddingHorizontal: 14,
+     paddingVertical: 8,
+     borderRadius: 5,
+-    backgroundColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   saveBtnText: {
+-    color: '#111827',
++    color: ADMIN_MODAL_PALETTE.accentText,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+@@ -1209,11 +1152,11 @@ const localStyles = StyleSheet.create({
+     paddingVertical: 9,
+     paddingHorizontal: 10,
+     borderRadius: 5,
+-    backgroundColor: '#272c33',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     marginBottom: 4,
+   },
+   folderPickText: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+   },
+ });
+diff --git a/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js b/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
+index b008ece..a62992b 100644
+--- a/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
++++ b/components/screens/EnvCombatScreen/modals/EnvMechanicModal.js
+@@ -16,6 +16,7 @@ import {
+ import { MaterialCommunityIcons } from '@expo/vector-icons';
+ import { useLocale } from '../../../../i18n/locale';
+ import IconText from '../../../lootTrade/LootTradeIconText';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import { ENV_MECHANIC_TYPE } from '../../../../domain/envCombatPresets';
+ import {
+   ATTACK_FAIL_OUTCOMES,
+@@ -680,7 +681,7 @@ export default function EnvMechanicModal({
+                           thumbColor={explodeRepairable ? '#f0e68c' : '#fca5a5'}
+                         />
+                       </View>
+-                      <Text style={[styles.hintText, !explodeRepairable && { color: '#fca5a5' }]}>
++                      <Text style={[styles.hintText, !explodeRepairable && { color: ADMIN_MODAL_PALETTE.danger }]}>
+                         {tGm(explodeRepairable ? 'envCombat.attackFail.repairableYesHint' : 'envCombat.attackFail.repairableNoHint', locale)}
+                       </Text>
+                     </View>
+@@ -808,8 +809,8 @@ export default function EnvMechanicModal({
+               style={styles.secondaryBtn}
+               onPress={() => setSavePanelOpen((v) => !v)}
+             >
+-              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color="#f0e68c" />
+-              <Text style={[styles.secondaryBtnText, { color: '#f0e68c' }]}>
++              <MaterialCommunityIcons name="bookmark-plus-outline" size={16} color={ADMIN_MODAL_PALETTE.accent} />
++              <Text style={[styles.secondaryBtnText, { color: ADMIN_MODAL_PALETTE.text }]}>
+                 {tGm('envCombat.presetModal.saveAsTileBtn', locale)}
+               </Text>
+             </TouchableOpacity>
+@@ -830,7 +831,7 @@ export default function EnvMechanicModal({
+ const styles = StyleSheet.create({
+   backdrop: {
+     flex: 1,
+-    backgroundColor: 'rgba(0,0,0,0.78)',
++    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 12,
+@@ -839,10 +840,10 @@ const styles = StyleSheet.create({
+     width: '100%',
+     maxWidth: 640,
+     maxHeight: '92%',
+-    backgroundColor: '#1f2328',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: 'rgba(240, 230, 140, 0.42)',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+     padding: 14,
+   },
+   headerRow: {
+@@ -851,10 +852,10 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingBottom: 8,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#374151',
++    borderBottomColor: ADMIN_MODAL_PALETTE.border,
+   },
+   title: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 17,
+     fontWeight: '700',
+     flex: 1,
+@@ -873,15 +874,15 @@ const styles = StyleSheet.create({
+     gap: 7,
+   },
+   optionCard: {
+-    backgroundColor: '#272c33',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#374151',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+     padding: 10,
+   },
+   optionCardActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: 'rgba(240, 230, 140, 0.1)',
++    borderColor: ADMIN_MODAL_PALETTE.border,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   optionHeader: {
+     flexDirection: 'row',
+@@ -890,34 +891,34 @@ const styles = StyleSheet.create({
+     marginBottom: 3,
+   },
+   optionTitle: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+     flex: 1,
+   },
+   optionTitleActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+   },
+   optionDesc: {
+-    color: '#9ca3af',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     lineHeight: 16,
+   },
+   blockBox: {
+-    backgroundColor: '#181b20',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#374151',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+     padding: 10,
+     gap: 7,
+   },
+   sectionLabel: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   fieldLabel: {
+-    color: '#d1d5db',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+   },
+   chipsRow: {
+@@ -931,35 +932,35 @@ const styles = StyleSheet.create({
+     paddingVertical: 6,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#272c33',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   chipActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   chipText: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   chipTextActive: {
+-    color: '#111827',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+   },
+   diceBtn: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: 5,
+-    backgroundColor: '#374151',
+-    borderColor: '#6b7280',
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     borderWidth: 1,
+     borderRadius: 5,
+     paddingHorizontal: 10,
+     paddingVertical: 6,
+   },
+   diceBtnText: {
+-    color: '#ffffff',
++    color: ADMIN_MODAL_PALETTE.accentText,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+@@ -978,36 +979,36 @@ const styles = StyleSheet.create({
+     width: 30,
+     height: 30,
+     borderRadius: 5,
+-    backgroundColor: '#272c33',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   stepBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 17,
+     fontWeight: '700',
+   },
+   stepValue: {
+-    color: '#ffffff',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 15,
+     fontWeight: '700',
+     minWidth: 28,
+     textAlign: 'center',
+   },
+   rolledInfo: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   robotHint: {
+-    color: '#60a5fa',
++    color: '#1d4ed8',
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   hintText: {
+-    color: '#9ca3af',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+     lineHeight: 16,
+   },
+@@ -1022,15 +1023,15 @@ const styles = StyleSheet.create({
+     justifyContent: 'space-between',
+     paddingVertical: 3,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#272c33',
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
+   previewName: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   previewVal: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+   },
+   inlineBtnsRow: {
+@@ -1048,24 +1049,24 @@ const styles = StyleSheet.create({
+     backgroundColor: 'rgba(239,68,68,0.1)',
+   },
+   ghostDangerText: {
+-    color: '#fca5a5',
++    color: ADMIN_MODAL_PALETTE.danger,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   savePresetBox: {
+-    backgroundColor: '#181b20',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+     padding: 10,
+     gap: 8,
+   },
+   input: {
+-    backgroundColor: '#272c33',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    color: '#f9fafb',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     paddingHorizontal: 10,
+     paddingVertical: 8,
+@@ -1076,7 +1077,7 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     paddingTop: 10,
+     borderTopWidth: 1,
+-    borderTopColor: '#374151',
++    borderTopColor: ADMIN_MODAL_PALETTE.border,
+     gap: 8,
+   },
+   secondaryBtn: {
+@@ -1087,11 +1088,11 @@ const styles = StyleSheet.create({
+     paddingVertical: 9,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4b5563',
+-    backgroundColor: '#272c33',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   secondaryBtnText: {
+-    color: '#e5e7eb',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+@@ -1099,10 +1100,10 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 16,
+     paddingVertical: 9,
+     borderRadius: 5,
+-    backgroundColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   primaryBtnText: {
+-    color: '#111827',
++    color: ADMIN_MODAL_PALETTE.accentText,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+diff --git a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+index 579ab87..3cddf1f 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerCatalogModal.js
+@@ -1,4 +1,5 @@
+ import React, { useState, useMemo, useEffect } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -491,7 +492,7 @@ const localStyles = StyleSheet.create({
+     flex: 1,
+     justifyContent: 'center',
+     alignItems: 'center',
+-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
++    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
+     paddingHorizontal: 28,
+     paddingVertical: 36,
+   },
+@@ -500,17 +501,17 @@ const localStyles = StyleSheet.create({
+     maxWidth: 680,
+     height: '80%',
+     maxHeight: 720,
+-    backgroundColor: '#1f1f1f',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1.5,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingVertical: 22,
+     paddingHorizontal: 24,
+   },
+   title: {
+     fontSize: 20,
+     fontWeight: '700',
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     marginBottom: 14,
+     textAlign: 'center',
+     paddingHorizontal: 8,
+@@ -521,12 +522,12 @@ const localStyles = StyleSheet.create({
+     paddingVertical: 5,
+     paddingHorizontal: 11,
+     borderRadius: 5,
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+   },
+   backButtonText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+@@ -540,8 +541,8 @@ const localStyles = StyleSheet.create({
+     minWidth: 0,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    backgroundColor: '#2a2a2a',
+-    color: '#f0f0f0',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
++    color: ADMIN_MODAL_PALETTE.text,
+     borderRadius: 5,
+     paddingHorizontal: 12,
+     paddingVertical: 10,
+@@ -554,13 +555,13 @@ const localStyles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#666666',
+-    backgroundColor: '#2e2e2e',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     alignItems: 'center',
+     justifyContent: 'center',
+   },
+   filterIcon: {
+     fontSize: 20,
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+   },
+   filterBadge: {
+     position: 'absolute',
+@@ -574,7 +575,7 @@ const localStyles = StyleSheet.create({
+     justifyContent: 'center',
+     paddingHorizontal: 3,
+     borderWidth: 1,
+-    borderColor: '#1f1f1f',
++    borderColor: ADMIN_MODAL_PALETTE.border,
+   },
+   filterBadgeText: {
+     color: '#1a1a1a',
+@@ -583,14 +584,14 @@ const localStyles = StyleSheet.create({
+   },
+   listDivider: {
+     height: 1,
+-    backgroundColor: '#3d3d3d',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceMuted,
+     marginVertical: 6,
+   },
+   itemContainer: {
+     paddingVertical: 12,
+     paddingHorizontal: 8,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#333333',
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+     justifyContent: 'space-between',
+@@ -608,7 +609,7 @@ const localStyles = StyleSheet.create({
+   itemName: {
+     fontSize: 15,
+     fontWeight: '600',
+-    color: '#ededed',
++    color: ADMIN_MODAL_PALETTE.text,
+     paddingRight: 8,
+   },
+   itemType: {
+@@ -617,29 +618,29 @@ const localStyles = StyleSheet.create({
+   },
+   itemBasics: {
+     fontSize: 12,
+-    color: '#a8a8a8',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     marginTop: 2,
+   },
+   emptyText: {
+     textAlign: 'center',
+     marginVertical: 24,
+-    color: '#9e9e9e',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+   },
+   chooseBtn: {
+-    backgroundColor: '#3a3a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingHorizontal: 14,
+     paddingVertical: 8,
+     borderRadius: 5,
+   },
+   chooseBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   feedbackBanner: {
+-    backgroundColor: '#2d2a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+     borderColor: '#d4af37',
+     borderRadius: 5,
+@@ -648,13 +649,13 @@ const localStyles = StyleSheet.create({
+     marginBottom: 10,
+   },
+   feedbackText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   closeButton: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#777777',
+     paddingVertical: 12,
+@@ -663,7 +664,7 @@ const localStyles = StyleSheet.create({
+     alignItems: 'center',
+   },
+   closeButtonText: {
+-    color: '#e0e0e0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+     fontSize: 15,
+   },
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 1044410..c307dd4 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -1,4 +1,5 @@
+ import React, { useState, useEffect, useMemo } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -531,7 +532,7 @@ const ContainerFormModal = ({
+                         {uKey === QUANTITY_UNIT.CD ? (
+                           <CdIcon size={38} />
+                         ) : uKey === QUANTITY_UNIT.D20 ? (
+-                          <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
++                          <MaterialCommunityIcons name="dice-d20" size={32} color={ADMIN_MODAL_PALETTE.text} />
+                         ) : (
+                           <Text style={[styles.unitSegText, active && styles.unitSegTextActive]}>
+                             {tLootTrade('itemConfig.unitPcs')}
+@@ -594,15 +595,15 @@ const styles = StyleSheet.create({
+     width: '90%',
+     maxWidth: 520,
+     maxHeight: '84%',
+-    backgroundColor: '#1f1f1f',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1.5,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingHorizontal: 24,
+     paddingVertical: 22,
+   },
+   title: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 18,
+     fontWeight: '700',
+     textAlign: 'center',
+@@ -611,20 +612,20 @@ const styles = StyleSheet.create({
+   scroll: { flexGrow: 0 },
+   scrollContent: { paddingBottom: 10 },
+   label: {
+-    color: '#e8e8e8',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 12,
+     marginBottom: 6,
+   },
+   input: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 5,
+     paddingHorizontal: 12,
+     paddingVertical: 10,
+-    color: '#f2f2f2',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+   },
+   multilineInput: {
+@@ -637,7 +638,7 @@ const styles = StyleSheet.create({
+     paddingVertical: 6,
+   },
+   hintText: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+     marginTop: 4,
+     lineHeight: 16,
+@@ -653,23 +654,23 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   roomChipActive: {
+-    backgroundColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.accent,
+     borderColor: '#d4af37',
+   },
+   roomChipName: {
+-    color: '#f0f0f0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   roomChipCode: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+   },
+   roomChipTextActive: {
+-    color: '#1a1a1a',
++    color: ADMIN_MODAL_PALETTE.accentText,
+   },
+   selectedHubPills: {
+     flexDirection: 'row',
+@@ -681,27 +682,27 @@ const styles = StyleSheet.create({
+     flexDirection: 'row',
+     alignItems: 'center',
+     gap: 6,
+-    backgroundColor: '#3a3a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     borderRadius: 5,
+     paddingHorizontal: 10,
+     paddingVertical: 5,
+   },
+   selectedHubPillText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+   selectedHubPillRemove: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   hubComboRow: {
+     flexDirection: 'row',
+     alignItems: 'stretch',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 5,
+@@ -738,7 +739,7 @@ const styles = StyleSheet.create({
+   hubComboInput: {
+     paddingHorizontal: 12,
+     paddingVertical: 10,
+-    color: '#f2f2f2',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     backgroundColor: 'transparent',
+   },
+@@ -748,17 +749,17 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+     borderLeftWidth: 1,
+     borderLeftColor: '#484848',
+-    backgroundColor: '#252525',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   hubDropdownToggleText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   quickSuggestBar: {
+     marginTop: 5,
+     alignSelf: 'flex-start',
+-    backgroundColor: '#33311b',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+     borderColor: '#d4af37',
+     borderRadius: 5,
+@@ -766,13 +767,13 @@ const styles = StyleSheet.create({
+     paddingVertical: 5,
+   },
+   quickSuggestText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   hubDropdownMenu: {
+     marginTop: 5,
+-    backgroundColor: '#242424',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+     borderRadius: 5,
+@@ -782,7 +783,7 @@ const styles = StyleSheet.create({
+     maxHeight: 170,
+   },
+   hubDropdownEmpty: {
+-    color: '#9e9e9e',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     paddingHorizontal: 12,
+     paddingVertical: 10,
+@@ -795,37 +796,37 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 12,
+     paddingVertical: 9,
+     borderBottomWidth: 1,
+-    borderBottomColor: '#323232',
++    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
+   },
+   hubDropdownItemSuggested: {
+-    backgroundColor: '#2f2d1c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   hubDropdownItemSelected: {
+-    backgroundColor: '#3a3a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   hubDropdownItemText: {
+-    color: '#eaeaea',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+     flex: 1,
+     marginRight: 8,
+   },
+   hubDropdownItemTextHighlight: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+   },
+   hubDropdownItemMark: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   hubDropdownCreateItem: {
+     paddingHorizontal: 12,
+     paddingVertical: 10,
+-    backgroundColor: '#2b2b1d',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   hubDropdownCreateText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+   },
+@@ -837,7 +838,7 @@ const styles = StyleSheet.create({
+     marginVertical: 4,
+   },
+   stepBtn: {
+-    backgroundColor: '#2e2e2e',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     width: 40,
+     height: 40,
+     borderRadius: 5,
+@@ -847,19 +848,19 @@ const styles = StyleSheet.create({
+     borderColor: '#666666',
+   },
+   stepBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 20,
+     fontWeight: '700',
+   },
+   counterInput: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#777777',
+     borderRadius: 5,
+     width: 108,
+     height: 40,
+     textAlign: 'center',
+-    color: '#f5f5f5',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 18,
+     fontWeight: '700',
+   },
+@@ -878,7 +879,7 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     justifyContent: 'center',
+     alignItems: 'center',
+     overflow: 'hidden',
+@@ -887,16 +888,16 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 9,
+   },
+   unitSegActive: {
+-    backgroundColor: '#3a3a1e',
+-    borderColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   unitSegText: {
+-    color: '#dcdcdc',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   unitSegTextActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+   },
+   footer: {
+     flexDirection: 'row',
+@@ -911,20 +912,20 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+   },
+   saveBtn: {
+-    backgroundColor: '#3a3a1e',
+-    borderColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   saveBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 15,
+     fontWeight: '700',
+   },
+   cancelBtn: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderColor: '#777777',
+   },
+   cancelBtnText: {
+-    color: '#d4d4d4',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 15,
+     fontWeight: '600',
+   },
+diff --git a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+index 64fa6bf..0f675fe 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js
+@@ -1,4 +1,5 @@
+ import React, { useState, useEffect } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -215,7 +216,7 @@ const ContainerItemConfigModal = ({
+                       {uKey === QUANTITY_UNIT.CD ? (
+                         <CdIcon size={38} />
+                       ) : uKey === QUANTITY_UNIT.D20 ? (
+-                        <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
++                        <MaterialCommunityIcons name="dice-d20" size={32} color={ADMIN_MODAL_PALETTE.text} />
+                       ) : (
+                         <Text style={[styles.unitBtnText, active && styles.unitBtnTextActive]}>
+                           {tLootTrade('itemConfig.unitPcs')}
+@@ -299,22 +300,22 @@ const styles = StyleSheet.create({
+   card: {
+     width: '90%',
+     maxWidth: 460,
+-    backgroundColor: '#1f1f1f',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1.5,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingHorizontal: 24,
+     paddingVertical: 22,
+     alignItems: 'center',
+   },
+   subtitle: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     textTransform: 'uppercase',
+     letterSpacing: 0.6,
+   },
+   title: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 19,
+     fontWeight: '700',
+     textAlign: 'center',
+@@ -322,12 +323,12 @@ const styles = StyleSheet.create({
+     marginBottom: 14,
+   },
+   currentStockText: {
+-    color: '#d4d4d4',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     marginBottom: 4,
+   },
+   label: {
+-    color: '#e8e8e8',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 10,
+@@ -344,25 +345,25 @@ const styles = StyleSheet.create({
+     width: 42,
+     height: 42,
+     borderRadius: 5,
+-    backgroundColor: '#2e2e2e',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#666666',
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+   circleBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 22,
+     fontWeight: '700',
+   },
+   countInput: {
+     width: 110,
+     height: 42,
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#777777',
+     borderRadius: 5,
+-    color: '#f5f5f5',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 22,
+     fontWeight: '700',
+     textAlign: 'center',
+@@ -372,12 +373,12 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 14,
+     paddingVertical: 7,
+     borderRadius: 5,
+-    backgroundColor: '#2d2a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+     borderColor: '#d4af37',
+   },
+   packFormulaText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+     textAlign: 'center',
+@@ -395,7 +396,7 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#5a5a5a',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     justifyContent: 'center',
+     alignItems: 'center',
+     overflow: 'hidden',
+@@ -404,19 +405,19 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 9,
+   },
+   unitBtnActive: {
+-    backgroundColor: '#3a3a1e',
+-    borderColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   unitBtnText: {
+-    color: '#e0e0e0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   unitBtnTextActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+   },
+   hint: {
+-    color: '#b0b0b0',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+     textAlign: 'center',
+     marginTop: 7,
+@@ -431,7 +432,7 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+   },
+   smallStepBtn: {
+-    backgroundColor: '#2e2e2e',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     paddingHorizontal: 8,
+     paddingVertical: 7,
+     borderRadius: 5,
+@@ -439,24 +440,24 @@ const styles = StyleSheet.create({
+     borderColor: '#666666',
+   },
+   smallStepText: {
+-    color: '#e8e8e8',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   markupInput: {
+     width: 78,
+     height: 38,
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#777777',
+     borderRadius: 5,
+-    color: '#f5f5f5',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 16,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   previewPrice: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+     marginTop: 7,
+@@ -476,20 +477,20 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+   },
+   saveBtn: {
+-    backgroundColor: '#3a3a1e',
+-    borderColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   saveBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 15,
+     fontWeight: '700',
+   },
+   cancelBtn: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderColor: '#777777',
+   },
+   cancelBtnText: {
+-    color: '#d4d4d4',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 15,
+     fontWeight: '600',
+   },
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+index 2d829e0..ebb7830 100644
+--- a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -1,4 +1,5 @@
+ import React, { useMemo } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -71,7 +72,7 @@ const HubChildPickerModal = ({
+                         <MaterialCommunityIcons
+                           name={isMerch ? 'sack' : 'treasure-chest'}
+                           size={18}
+-                          color="#f0e68c"
++                          color={ADMIN_MODAL_PALETTE.accent}
+                         />
+                         <Text style={styles.rowName}>{item.name}</Text>
+                       </View>
+@@ -116,21 +117,21 @@ const styles = StyleSheet.create({
+     width: '90%',
+     maxWidth: 560,
+     maxHeight: '80%',
+-    backgroundColor: '#1f1f1f',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1.5,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingHorizontal: 24,
+     paddingVertical: 22,
+   },
+   title: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 18,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   hint: {
+-    color: '#b0b0b0',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     textAlign: 'center',
+     marginTop: 4,
+@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
+     paddingVertical: 4,
+   },
+   emptyText: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 13,
+     textAlign: 'center',
+     paddingVertical: 24,
+@@ -158,8 +159,8 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 13,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#484848',
+-    backgroundColor: '#2a2a2a',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   rowInfo: {
+     flex: 1,
+@@ -170,32 +171,32 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   rowName: {
+-    color: '#f0f0f0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+     flexShrink: 1,
+   },
+   rowMeta: {
+-    color: '#b5b5b5',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 12,
+     marginTop: 3,
+   },
+   addBtn: {
+-    backgroundColor: '#3a3a1e',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+     borderWidth: 1,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     borderRadius: 5,
+     paddingHorizontal: 13,
+     paddingVertical: 8,
+   },
+   addBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '700',
+   },
+   closeBtn: {
+     marginTop: 16,
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+     borderColor: '#777777',
+     borderRadius: 5,
+@@ -203,7 +204,7 @@ const styles = StyleSheet.create({
+     alignItems: 'center',
+   },
+   closeBtnText: {
+-    color: '#e0e0e0',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+diff --git a/components/screens/LootTradeScreen/modals/IssueContainerModal.js b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+index f59ebf2..3257d05 100644
+--- a/components/screens/LootTradeScreen/modals/IssueContainerModal.js
++++ b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+@@ -1,4 +1,5 @@
+ import React, { useState, useEffect, useMemo } from 'react';
++import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
+ import {
+   Modal,
+   View,
+@@ -149,7 +150,7 @@ const IssueContainerModal = ({
+               <MaterialCommunityIcons
+                 name={targetType === 'room' ? 'radiobox-marked' : 'radiobox-blank'}
+                 size={20}
+-                color={targetType === 'room' ? '#f0e68c' : '#9ca3af'}
++                color={targetType === 'room' ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
+               />
+               <Text style={styles.optionTitle}>{tLootTrade('issueModal.wholeRoom')}</Text>
+             </View>
+@@ -169,7 +170,7 @@ const IssueContainerModal = ({
+               <MaterialCommunityIcons
+                 name={targetType === 'character' ? 'radiobox-marked' : 'radiobox-blank'}
+                 size={20}
+-                color={targetType === 'character' ? '#f0e68c' : '#9ca3af'}
++                color={targetType === 'character' ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
+               />
+               <Text style={styles.optionTitle}>{tLootTrade('issueModal.singleCharacter')}</Text>
+             </View>
+@@ -233,21 +234,21 @@ const styles = StyleSheet.create({
+     width: '90%',
+     maxWidth: 460,
+     maxHeight: '82%',
+-    backgroundColor: '#1f1f1f',
++    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+     borderRadius: 5,
+     borderWidth: 1.5,
+-    borderColor: '#f0e68c',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+     paddingHorizontal: 24,
+     paddingVertical: 22,
+   },
+   title: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 18,
+     fontWeight: '700',
+     textAlign: 'center',
+   },
+   roomSub: {
+-    color: '#cccccc',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     textAlign: 'center',
+     marginTop: 4,
+@@ -268,23 +269,23 @@ const styles = StyleSheet.create({
+     borderRadius: 5,
+     borderWidth: 1,
+     borderColor: '#555555',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+   },
+   roomChipActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#3a3a1e',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   roomChipText: {
+-    color: '#dddddd',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 12,
+     fontWeight: '600',
+   },
+   roomChipTextActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+   },
+   sectionTitle: {
+-    color: '#e8e8e8',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '700',
+     marginBottom: 9,
+@@ -292,14 +293,14 @@ const styles = StyleSheet.create({
+   optionCard: {
+     borderWidth: 1,
+     borderColor: '#555555',
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderRadius: 5,
+     padding: 13,
+     marginBottom: 10,
+   },
+   optionCardActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#333120',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   optionRow: {
+     flexDirection: 'row',
+@@ -307,12 +308,12 @@ const styles = StyleSheet.create({
+     gap: 8,
+   },
+   optionTitle: {
+-    color: '#f2f2f2',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 14,
+     fontWeight: '700',
+   },
+   optionHint: {
+-    color: '#a8a8a8',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+     marginTop: 4,
+     marginLeft: 28,
+@@ -336,13 +337,13 @@ const styles = StyleSheet.create({
+     paddingHorizontal: 13,
+     borderRadius: 5,
+     borderWidth: 1,
+-    borderColor: '#4d4d4d',
+-    backgroundColor: '#2a2a2a',
++    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     marginBottom: 6,
+   },
+   charRowActive: {
+-    borderColor: '#f0e68c',
+-    backgroundColor: '#363320',
++    borderColor: ADMIN_MODAL_PALETTE.accent,
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+   },
+   dot: {
+     width: 9,
+@@ -353,16 +354,16 @@ const styles = StyleSheet.create({
+   dotOffline: { backgroundColor: '#777777' },
+   charName: {
+     flex: 1,
+-    color: '#e8e8e8',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 13,
+     fontWeight: '600',
+   },
+   charNameActive: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontWeight: '700',
+   },
+   charStatus: {
+-    color: '#a3a3a3',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 11,
+   },
+   footer: {
+@@ -378,20 +379,20 @@ const styles = StyleSheet.create({
+     borderWidth: 1,
+   },
+   confirmBtn: {
+-    backgroundColor: '#3a3a1e',
+-    borderColor: '#f0e68c',
++    backgroundColor: ADMIN_MODAL_PALETTE.selected,
++    borderColor: ADMIN_MODAL_PALETTE.accent,
+   },
+   confirmBtnText: {
+-    color: '#f0e68c',
++    color: ADMIN_MODAL_PALETTE.text,
+     fontSize: 15,
+     fontWeight: '700',
+   },
+   cancelBtn: {
+-    backgroundColor: '#2a2a2a',
++    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderColor: '#777777',
+   },
+   cancelBtnText: {
+-    color: '#d4d4d4',
++    color: ADMIN_MODAL_PALETTE.mutedText,
+     fontSize: 15,
+     fontWeight: '600',
+   },
+diff --git a/modules/fallout/gm/gmI18n.js b/modules/fallout/gm/gmI18n.js
+index 20491fd..26e613b 100644
+--- a/modules/fallout/gm/gmI18n.js
++++ b/modules/fallout/gm/gmI18n.js
+@@ -220,21 +220,17 @@ export const GM_DICTIONARIES = {
+       tiles: {
+         weather: {
+           title: 'Погода',
+-          subtitle: 'Жара, холод, пыльная буря, туман, рад-шторм, кислотный дождь',
+           activeBadge: 'Активно: {count}',
+         },
+         radiation: {
+           title: 'Радиация',
+-          subtitle: 'Облучение среды или зоны с учётом СУ брони и иммунитетов',
+         },
+         injury: {
+           title: 'Увечье',
+-          subtitle: 'Травмы конечностей и узлов роботов (ручной выбор или d20)',
+           activeBadge: 'Увечий: {count}',
+         },
+         attackFail: {
+           title: 'Провал атаки',
+-          subtitle: 'Потеря патронов, клин, поломка, взрыв оружия, рикошет, потеря оружия',
+         },
+       },
+       valueMode: {
+@@ -632,21 +628,17 @@ export const GM_DICTIONARIES = {
+       tiles: {
+         weather: {
+           title: 'Weather',
+-          subtitle: 'Heat, cold, dust storm, fog, rad-storm, acid rain',
+           activeBadge: 'Active: {count}',
+         },
+         radiation: {
+           title: 'Radiation',
+-          subtitle: 'Ambient or targeted exposure with armor Rad DR and immunities',
+         },
+         injury: {
+           title: 'Injury',
+-          subtitle: 'Limb & robot chassis injuries (manual pick or d20 roll)',
+           activeBadge: 'Injuries: {count}',
+         },
+         attackFail: {
+           title: 'Attack Failure',
+-          subtitle: 'Ammo loss, jam, weapon break, weapon explosion, ricochet, drop weapon',
+         },
+       },
+       valueMode: {
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 517d67d..5f1b5a3 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "484"
++  "baseline": "485"
+ }

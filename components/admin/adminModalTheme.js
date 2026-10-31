@@ -1,0 +1,16 @@
+export const ADMIN_MODAL_PALETTE = Object.freeze({
+  backdrop: 'rgba(0,0,0,0.56)',
+  surface: '#f4f4f4',
+  surfaceRaised: '#ffffff',
+  surfaceMuted: '#e9e9e9',
+  accent: '#111111',
+  accentText: '#ffffff',
+  text: '#111111',
+  mutedText: '#555555',
+  border: '#333333',
+  borderMuted: '#b7b7b7',
+  selected: '#e8f0fb',
+  selectedBorder: '#111111',
+  gold: '#d4af37',
+  danger: '#b42318',
+});

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import {
   Modal,
   View,
@@ -215,7 +216,7 @@ const ContainerItemConfigModal = ({
                       {uKey === QUANTITY_UNIT.CD ? (
                         <CdIcon size={38} />
                       ) : uKey === QUANTITY_UNIT.D20 ? (
-                        <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
+                        <MaterialCommunityIcons name="dice-d20" size={32} color={ADMIN_MODAL_PALETTE.text} />
                       ) : (
                         <Text style={[styles.unitBtnText, active && styles.unitBtnTextActive]}>
                           {tLootTrade('itemConfig.unitPcs')}
@@ -299,22 +300,22 @@ const styles = StyleSheet.create({
   card: {
     width: '90%',
     maxWidth: 460,
-    backgroundColor: '#1f1f1f',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     paddingHorizontal: 24,
     paddingVertical: 22,
     alignItems: 'center',
   },
   subtitle: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 19,
     fontWeight: '700',
     textAlign: 'center',
@@ -322,12 +323,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   currentStockText: {
-    color: '#d4d4d4',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     marginBottom: 4,
   },
   label: {
-    color: '#e8e8e8',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 10,
@@ -344,25 +345,25 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 5,
-    backgroundColor: '#2e2e2e',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#666666',
     justifyContent: 'center',
     alignItems: 'center',
   },
   circleBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 22,
     fontWeight: '700',
   },
   countInput: {
     width: 110,
     height: 42,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
-    color: '#f5f5f5',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 22,
     fontWeight: '700',
     textAlign: 'center',
@@ -372,12 +373,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 5,
-    backgroundColor: '#2d2a1e',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
     borderWidth: 1,
     borderColor: '#d4af37',
   },
   packFormulaText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
@@ -395,7 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -404,19 +405,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
   },
   unitBtnActive: {
-    backgroundColor: '#3a3a1e',
-    borderColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
   },
   unitBtnText: {
-    color: '#e0e0e0',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },
   unitBtnTextActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
   },
   hint: {
-    color: '#b0b0b0',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     textAlign: 'center',
     marginTop: 7,
@@ -431,7 +432,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   smallStepBtn: {
-    backgroundColor: '#2e2e2e',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     paddingHorizontal: 8,
     paddingVertical: 7,
     borderRadius: 5,
@@ -439,24 +440,24 @@ const styles = StyleSheet.create({
     borderColor: '#666666',
   },
   smallStepText: {
-    color: '#e8e8e8',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   markupInput: {
     width: 78,
     height: 38,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
-    color: '#f5f5f5',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
   },
   previewPrice: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 7,
@@ -476,20 +477,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   saveBtn: {
-    backgroundColor: '#3a3a1e',
-    borderColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
   },
   saveBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 15,
     fontWeight: '700',
   },
   cancelBtn: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderColor: '#777777',
   },
   cancelBtnText: {
-    color: '#d4d4d4',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 15,
     fontWeight: '600',
   },

@@ -220,21 +220,17 @@ export const GM_DICTIONARIES = {
       tiles: {
         weather: {
           title: 'Погода',
-          subtitle: 'Жара, холод, пыльная буря, туман, рад-шторм, кислотный дождь',
           activeBadge: 'Активно: {count}',
         },
         radiation: {
           title: 'Радиация',
-          subtitle: 'Облучение среды или зоны с учётом СУ брони и иммунитетов',
         },
         injury: {
           title: 'Увечье',
-          subtitle: 'Травмы конечностей и узлов роботов (ручной выбор или d20)',
           activeBadge: 'Увечий: {count}',
         },
         attackFail: {
           title: 'Провал атаки',
-          subtitle: 'Потеря патронов, клин, поломка, взрыв оружия, рикошет, потеря оружия',
         },
       },
       valueMode: {
@@ -632,21 +628,17 @@ export const GM_DICTIONARIES = {
       tiles: {
         weather: {
           title: 'Weather',
-          subtitle: 'Heat, cold, dust storm, fog, rad-storm, acid rain',
           activeBadge: 'Active: {count}',
         },
         radiation: {
           title: 'Radiation',
-          subtitle: 'Ambient or targeted exposure with armor Rad DR and immunities',
         },
         injury: {
           title: 'Injury',
-          subtitle: 'Limb & robot chassis injuries (manual pick or d20 roll)',
           activeBadge: 'Injuries: {count}',
         },
         attackFail: {
           title: 'Attack Failure',
-          subtitle: 'Ammo loss, jam, weapon break, weapon explosion, ricochet, drop weapon',
         },
       },
       valueMode: {

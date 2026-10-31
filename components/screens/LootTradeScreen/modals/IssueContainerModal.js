@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import {
   Modal,
   View,
@@ -149,7 +150,7 @@ const IssueContainerModal = ({
               <MaterialCommunityIcons
                 name={targetType === 'room' ? 'radiobox-marked' : 'radiobox-blank'}
                 size={20}
-                color={targetType === 'room' ? '#f0e68c' : '#9ca3af'}
+                color={targetType === 'room' ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
               />
               <Text style={styles.optionTitle}>{tLootTrade('issueModal.wholeRoom')}</Text>
             </View>
@@ -169,7 +170,7 @@ const IssueContainerModal = ({
               <MaterialCommunityIcons
                 name={targetType === 'character' ? 'radiobox-marked' : 'radiobox-blank'}
                 size={20}
-                color={targetType === 'character' ? '#f0e68c' : '#9ca3af'}
+                color={targetType === 'character' ? ADMIN_MODAL_PALETTE.accent : ADMIN_MODAL_PALETTE.mutedText}
               />
               <Text style={styles.optionTitle}>{tLootTrade('issueModal.singleCharacter')}</Text>
             </View>
@@ -233,21 +234,21 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 460,
     maxHeight: '82%',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     paddingHorizontal: 24,
     paddingVertical: 22,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
   },
   roomSub: {
-    color: '#cccccc',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 4,
@@ -268,23 +269,23 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#555555',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   roomChipActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#3a3a1e',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   roomChipText: {
-    color: '#dddddd',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   roomChipTextActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   sectionTitle: {
-    color: '#e8e8e8',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 9,
@@ -292,14 +293,14 @@ const styles = StyleSheet.create({
   optionCard: {
     borderWidth: 1,
     borderColor: '#555555',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     padding: 13,
     marginBottom: 10,
   },
   optionCardActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#333120',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   optionRow: {
     flexDirection: 'row',
@@ -307,12 +308,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   optionTitle: {
-    color: '#f2f2f2',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },
   optionHint: {
-    color: '#a8a8a8',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     marginTop: 4,
     marginLeft: 28,
@@ -336,13 +337,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 13,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4d4d4d',
-    backgroundColor: '#2a2a2a',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     marginBottom: 6,
   },
   charRowActive: {
-    borderColor: '#f0e68c',
-    backgroundColor: '#363320',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   dot: {
     width: 9,
@@ -353,16 +354,16 @@ const styles = StyleSheet.create({
   dotOffline: { backgroundColor: '#777777' },
   charName: {
     flex: 1,
-    color: '#e8e8e8',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
   charNameActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   charStatus: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
   },
   footer: {
@@ -378,20 +379,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   confirmBtn: {
-    backgroundColor: '#3a3a1e',
-    borderColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
   },
   confirmBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 15,
     fontWeight: '700',
   },
   cancelBtn: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderColor: '#777777',
   },
   cancelBtnText: {
-    color: '#d4d4d4',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 15,
     fontWeight: '600',
   },

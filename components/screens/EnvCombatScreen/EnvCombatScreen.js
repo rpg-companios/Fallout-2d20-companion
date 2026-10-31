@@ -51,6 +51,8 @@ import { FEATURE_IDS, guardAdminAction } from '../../../src/premium/adminAccessG
 import styles from '../../../styles/LootTradeScreen.styles';
 import homeStyles from '../../../styles/HomeScreen.styles';
 import IconText from '../../lootTrade/LootTradeIconText';
+import AdminTile from '../../admin/AdminTile';
+import { ADMIN_MODAL_PALETTE } from '../../admin/adminModalTheme';
 import EnvMechanicModal from './modals/EnvMechanicModal';
 
 const NUM_COLS = 3;
@@ -400,7 +402,6 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.WEATHER,
       title: tGm('envCombat.tiles.weather.title', locale),
-      subtitle: tGm('envCombat.tiles.weather.subtitle', locale),
       badge: roomHazardCounts.weather > 0
         ? formatGm(tGm('envCombat.tiles.weather.activeBadge', locale), { count: roomHazardCounts.weather })
         : null,
@@ -408,13 +409,11 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.RADIATION,
       title: tGm('envCombat.tiles.radiation.title', locale),
-      subtitle: tGm('envCombat.tiles.radiation.subtitle', locale),
       badge: null,
     },
     {
       mechanicType: ENV_MECHANIC_TYPE.INJURY,
       title: tGm('envCombat.tiles.injury.title', locale),
-      subtitle: tGm('envCombat.tiles.injury.subtitle', locale),
       badge: roomHazardCounts.injuries > 0
         ? formatGm(tGm('envCombat.tiles.injury.activeBadge', locale), { count: roomHazardCounts.injuries })
         : null,
@@ -422,7 +421,6 @@ export default function EnvCombatScreen() {
     {
       mechanicType: ENV_MECHANIC_TYPE.ATTACK_FAIL,
       title: tGm('envCombat.tiles.attackFail.title', locale),
-      subtitle: tGm('envCombat.tiles.attackFail.subtitle', locale),
       badge: null,
     },
   ];
@@ -584,26 +582,14 @@ export default function EnvCombatScreen() {
               if (!tile) return <View key={`empty-base-${cIdx}`} style={styles.emptyCell} />;
               const meta = MECHANIC_TILE_META[tile.mechanicType];
               return (
-                <TouchableOpacity
+                <AdminTile
                   key={tile.mechanicType}
                   testID={`env-tile-${tile.mechanicType}`}
-                  style={styles.cardCell}
-                  activeOpacity={0.8}
+                  iconName={meta.icon}
+                  label={tile.title}
+                  badge={tile.badge}
                   onPress={() => setActiveMechanic({ mechanicType: tile.mechanicType })}
-                >
-                  <View style={styles.cardHero}>
-                    <MaterialCommunityIcons name={meta.icon} size={34} color="#f0e68c" />
-                    {tile.badge ? (
-                      <View style={styles.cardLiveBadge}>
-                        <Text style={styles.cardLiveBadgeText}>{tile.badge}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>{tile.title}</Text>
-                    <Text style={styles.cardDesc} numberOfLines={3}>{tile.subtitle}</Text>
-                  </View>
-                </TouchableOpacity>
+                />
               );
             })}
           </View>
@@ -636,16 +622,13 @@ export default function EnvCombatScreen() {
 
               if (cell.type === 'newFolder') {
                 return (
-                  <TouchableOpacity
+                  <AdminTile
                     key="create-folder-cell"
                     testID="env-create-folder-tile"
-                    style={styles.createCell}
-                    activeOpacity={0.75}
+                    iconName="folder-plus-outline"
+                    label={tGm('envCombat.newFolderBtn', locale)}
                     onPress={() => setFolderModal({ mode: 'create', name: '', description: '' })}
-                  >
-                    <MaterialCommunityIcons name="folder-plus-outline" size={40} color="#5a5a5a" />
-                    <Text style={styles.createLabel}>{tGm('envCombat.newFolderBtn', locale)}</Text>
-                  </TouchableOpacity>
+                  />
                 );
               }
 
@@ -655,55 +638,22 @@ export default function EnvCombatScreen() {
               const nestedCount = isFolder ? countPresetsInFolder(entries, entry.id) : 0;
 
               return (
-                <TouchableOpacity
+                <AdminTile
                   key={entry.id}
                   testID={`env-saved-${entry.id}`}
-                  style={styles.cardCell}
-                  activeOpacity={0.82}
+                  iconName={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
+                  iconColor={isFolder ? '#8a6d1d' : '#333333'}
+                  label={entry.name}
+                  detail={isFolder
+                    ? formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })
+                    : formatPresetFormulaBadge(entry, locale)}
                   onPress={() => {
-                    if (isFolder) {
-                      setCurrentFolderId(entry.id);
-                    } else {
-                      handleApplySavedPreset(entry);
-                    }
+                    if (isFolder) setCurrentFolderId(entry.id);
+                    else handleApplySavedPreset(entry);
                   }}
-                >
-                  <View style={[styles.cardHero, isFolder && styles.cardHeroHub]}>
-                    <MaterialCommunityIcons
-                      name={isFolder ? 'folder-outline' : (meta?.icon || 'bookmark-outline')}
-                      size={34}
-                      color="#f0e68c"
-                    />
-                    <TouchableOpacity
-                      ref={(r) => { menuRefs.current[entry.id] = r; }}
-                      style={[styles.cardActionButton, localStyles.savedCardMenuButton]}
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        openEntryMenu(entry);
-                      }}
-                    >
-                      <MaterialCommunityIcons name="dots-vertical" size={18} color="#f0e68c" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.cardBody}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>{entry.name}</Text>
-                    {entry.description ? (
-                      <Text style={styles.cardDesc} numberOfLines={2}>{entry.description}</Text>
-                    ) : null}
-                    <View style={{ marginTop: 'auto', paddingTop: 6 }}>
-                      {isFolder ? (
-                        <Text style={styles.cardMeta}>
-                          {formatGm(tGm('envCombat.folderBadge', locale), { count: nestedCount })}
-                        </Text>
-                      ) : (
-                        <IconText style={styles.cardMeta}>
-                          {formatPresetFormulaBadge(entry, locale)}
-                        </IconText>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
+                  actionRef={(r) => { menuRefs.current[entry.id] = r; }}
+                  onActionPress={() => openEntryMenu(entry)}
+                />
               );
             })}
           </View>
@@ -1025,8 +975,8 @@ const localStyles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   pillActive: {
     borderColor: '#f0e68c',
@@ -1095,13 +1045,6 @@ const localStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  savedCardMenuButton: {
-    top: 4,
-    right: 4,
-    bottom: undefined,
-    backgroundColor: 'rgba(36,36,36,0.88)',
-    borderColor: '#d4af37',
-  },
   emptyHint: {
     color: '#9ca3af',
     fontSize: 12,
@@ -1116,10 +1059,10 @@ const localStyles = StyleSheet.create({
   },
   menuPopup: {
     position: 'absolute',
-    backgroundColor: '#1f2328',
-    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.45)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     paddingVertical: 4,
     elevation: 8,
   },
@@ -1131,12 +1074,12 @@ const localStyles = StyleSheet.create({
     paddingVertical: 9,
   },
   menuItemText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.75)',
+    backgroundColor: ADMIN_MODAL_PALETTE.backdrop,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
@@ -1144,30 +1087,30 @@ const localStyles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#1f2328',
-    borderRadius: 5,
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(240, 230, 140, 0.45)',
+    borderColor: ADMIN_MODAL_PALETTE.border,
     padding: 16,
     gap: 8,
   },
   modalTitle: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   inputLabel: {
-    color: '#d1d5db',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '600',
   },
   textInput: {
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    color: '#f9fafb',
+    borderColor: ADMIN_MODAL_PALETTE.borderMuted,
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     paddingHorizontal: 10,
     paddingVertical: 8,
@@ -1183,11 +1126,11 @@ const localStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#4b5563',
-    backgroundColor: '#272c33',
+    borderColor: ADMIN_MODAL_PALETTE.border,
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   cancelBtnText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1195,10 +1138,10 @@ const localStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 5,
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
   },
   saveBtnText: {
-    color: '#111827',
+    color: ADMIN_MODAL_PALETTE.accentText,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -1209,11 +1152,11 @@ const localStyles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 10,
     borderRadius: 5,
-    backgroundColor: '#272c33',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     marginBottom: 4,
   },
   folderPickText: {
-    color: '#e5e7eb',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
   },
 });
