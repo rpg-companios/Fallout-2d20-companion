@@ -28,6 +28,7 @@ import { AppState } from 'react-native';
 import useCharacterStore from '../../../src/store/characterStore';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
 import { advanceRealMinutes, fatigueHpLossFromEvents } from './survival';
+import { getWeatherSurvivalMultipliers } from '../gm/gmEnvCombat';
 
 const TICK_INTERVAL_MS = 30_000;
 const MAX_REAL_MINUTES_PER_TICK = 5;
@@ -49,13 +50,33 @@ const SurvivalClock = () => {
       if (!settings.getSettingValue('survivalModeEnabled')) return;
 
       const store = useCharacterStore.getState();
-      const survival = store.stateExtensions?.survival ?? null;
-      if (!survival) return;
-
       const course = settings.getSettingValue('survivalTimeCourseMinutes');
       if (!(course > 0)) return; // страховка: домен бросает на неположительном курсе
-      const result = advanceRealMinutes(survival, elapsedRealMinutes, course);
-      store.setStateExtension('survival', result.state);
+
+      if (elapsedRealMinutes > 0 && typeof store.advanceEffectsByGameHours === 'function') {
+        store.advanceEffectsByGameHours(elapsedRealMinutes / course);
+      }
+
+      const survival = useCharacterStore.getState().stateExtensions?.survival ?? null;
+      if (!survival) return;
+
+      const currentStore = useCharacterStore.getState();
+      const weatherRates = getWeatherSurvivalMultipliers(currentStore.effects);
+      const perkRates = currentStore.perkBonuses?.ladderAccRates || null;
+      const ladderAccRates = weatherRates
+        ? {
+            food: (perkRates?.food ?? 1) * (weatherRates.food ?? 1),
+            water: (perkRates?.water ?? 1) * (weatherRates.water ?? 1),
+            sleep: perkRates?.sleep ?? 1,
+          }
+        : (perkRates || undefined);
+      const result = advanceRealMinutes(
+        survival,
+        elapsedRealMinutes,
+        course,
+        ladderAccRates ? { ladderAccRates } : {},
+      );
+      useCharacterStore.getState().setStateExtension('survival', result.state);
 
       // Патч 232: потеря текущих ОЗ от усталости за прошедшие игровые часы.
       const hpLoss = fatigueHpLossFromEvents(result.events);

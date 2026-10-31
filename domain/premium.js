@@ -23,6 +23,7 @@ export const FEATURE_IDS = Object.freeze({
   ADMIN_ACCESS: 'adminAccess',
   GM_CAMPAIGNS: 'gmCampaigns',
   GM_LOOT_TRADE: 'gmLootTrade',
+  GM_ENV_COMBAT: 'gmEnvCombat',
 });
 
 /** Все премиальные фичи раздела «Админ», открываемые лицензией Мастера. */
@@ -30,6 +31,7 @@ export const ADMIN_FEATURE_IDS = Object.freeze([
   FEATURE_IDS.ADMIN_ACCESS,
   FEATURE_IDS.GM_CAMPAIGNS,
   FEATURE_IDS.GM_LOOT_TRADE,
+  FEATURE_IDS.GM_ENV_COMBAT,
 ]);
 
 /** Код ошибки при попытке вызвать механику Мастера без активной лицензии. */
@@ -178,6 +180,7 @@ registerFeatures([
   { id: FEATURE_IDS.ADMIN_ACCESS, premium: true, group: 'admin' },
   { id: FEATURE_IDS.GM_CAMPAIGNS, premium: true, group: 'admin' },
   { id: FEATURE_IDS.GM_LOOT_TRADE, premium: true, group: 'admin' },
+  { id: FEATURE_IDS.GM_ENV_COMBAT, premium: true, group: 'admin' },
 ]);
 
 /** Доступен ли сам вход в раздел Мастера («Админ»). */
@@ -193,6 +196,11 @@ export function isGmCampaignsLicensed() {
 /** Доступен ли раздел «Добыча/Торговля» и выдача локаций/сундуков/торговцев. */
 export function isGmLootTradeLicensed() {
   return isAdminLicensed() && isFeatureAvailable(FEATURE_IDS.GM_LOOT_TRADE);
+}
+
+/** Доступен ли раздел «Окружающая среда/бой» и его эффекты/пресеты. */
+export function isGmEnvCombatLicensed() {
+  return isAdminLicensed() && isFeatureAvailable(FEATURE_IDS.GM_ENV_COMBAT);
 }
 
 /**

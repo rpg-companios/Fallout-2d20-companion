@@ -598,6 +598,42 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        case MESSAGE.PEER_ASSIST: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.issuePeerAssist({
+            code: canonical,
+            clientId,
+            payload,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          sendEnvelope(
+            ws,
+            MESSAGE.GM_DIRECTIVE_STATE,
+            {
+              directive: result.directive,
+              directives: result.directives,
+              requestId: payload.requestId || null,
+            },
+            canonical,
+            clientId,
+          );
+          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE, {
+            ...result.directive,
+          });
+          broadcastToRoom(result.room, clientId, MESSAGE.GM_DIRECTIVE_STATE, {
+            directive: result.directive,
+            directives: result.directives,
+          });
+          break;
+        }
+
         case MESSAGE.SESSION_OPEN: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) {

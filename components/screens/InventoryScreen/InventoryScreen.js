@@ -56,6 +56,19 @@ import { isAmmoWeapon, rollWeaponDurability, repairWeaponDurability } from '../.
 import { salvageItem } from '../../../modules/fallout/salvage/operations';
 import { salvageButtonForItem } from '../../../modules/fallout/salvage/subline';
 import { buildSalvageReport } from './logic/salvageResultReport';
+import db from '../../../db';
+import useRoomStore from '../../../src/room/roomStore';
+import { effectsDictToLegacyArray, syncTimedEffectsToStore } from '../../../src/store/effectsSync';
+import FirstAidAndPeerModal from '../../gm/FirstAidAndPeerModal';
+import {
+  isFirstAidCapableItem,
+  isReusableMedicalTool,
+  rollFirstAidBoost,
+  stabilizeInjuryInEffectsArray,
+} from '../../../modules/fallout/gm/gmEnvCombat';
+import { formatGm, tGm } from '../../../modules/fallout/gm/gmI18n';
+
+const EMPTY_ROOM_NEIGHBORS = Object.freeze([]);
 
 const PARAM_FIELDS = [
   'damage', 'fireRate', 'physicalDamageRating', 'energyDamageRating', 'radiationDamageRating',
@@ -160,6 +173,7 @@ const InventoryScreen = () => {
   // 413/414: цель ремонта для RepairModal ({storeItemId}|{equippedSlot}, name);
   // «Починить» — прежнее мгновенное действие (3 экшна ниже).
   const [repairTarget, setRepairTarget] = useState(null);
+  const [firstAidModalState, setFirstAidModalState] = useState(null);
   const repairWeapon = useCharacterStore((state) => state.repairWeapon);
   const repairPowerArmorPieceAt = useCharacterStore((s) => s.repairPowerArmorPieceAt);
   const repairPowerArmorStack = useCharacterStore((s) => s.repairPowerArmorStack);
@@ -445,9 +459,110 @@ const InventoryScreen = () => {
     spendCurrency(amount);
   };
 
+  const executeSelfConsumableFinish = (consumableItem, itemName, radiationRequestedAmount, useFirstAid = false) => {
+    const reusableTool = isReusableMedicalTool(consumableItem);
+    const result = reusableTool
+      ? { healAmount: 0, radiationAmount: 0, timedResult: { added: [], expired: [] } }
+      : applyConsumableFull(consumableItem, { radiationRequestedAmount });
+    const extraLines = [];
+
+    if (useFirstAid && isFirstAidCapableItem(consumableItem)) {
+      const storeNow = useCharacterStore.getState();
+      const fa = rollFirstAidBoost(storeNow, { targetIsRobot: isRobot });
+      if (fa.bonusHp > 0) {
+        storeNow.healCharacter(fa.bonusHp);
+      }
+      extraLines.push(fa.reportLine);
+    }
+
+    if (isFirstAidCapableItem(consumableItem)) {
+      const storeNow = useCharacterStore.getState();
+      const stab = stabilizeInjuryInEffectsArray(effectsDictToLegacyArray(storeNow.effects));
+      if (stab.stabilizedZoneKey) {
+        syncTimedEffectsToStore(stab.effects, storeNow);
+        extraLines.push(formatGm(tGm('envCombat.firstAid.injuryStabilized'), {
+          zone: stab.stabilizedZoneLabel || stab.stabilizedZoneKey,
+        }));
+      }
+    }
+
+    const report = buildConsumableResultReport({ itemName, ...result });
+    const fullMessage = extraLines.length > 0
+      ? [report.message, ...extraLines].filter(Boolean).join('\n')
+      : report.message;
+    showAlert(report.title, fullMessage);
+    if (!reusableTool) {
+      handleRemoveItem(consumableItem, 1);
+    }
+  };
+
+  const handleConfirmSelfFirstAid = ({ useFirstAid }) => {
+    const pending = firstAidModalState;
+    setFirstAidModalState(null);
+    if (!pending?.item) return;
+    executeSelfConsumableFinish(pending.item, pending.itemName, pending.radiationRequestedAmount, useFirstAid);
+  };
+
+  const handleConfirmOtherAssist = async ({ targetNeighbor, useFirstAid, stabilizeInjuryZone }) => {
+    const pending = firstAidModalState;
+    setFirstAidModalState(null);
+    if (!pending?.item) return;
+    const consumableItem = pending.item;
+    const itemName = pending.itemName;
+    const reusableTool = isReusableMedicalTool(consumableItem);
+
+    let firstAidBonusHp = 0;
+    let firstAidReportLine = '';
+    if (useFirstAid && isFirstAidCapableItem(consumableItem)) {
+      const targetIsRobot = targetNeighbor?.snapshot
+        ? Boolean(targetNeighbor.snapshot.equippedRobotSlots && Object.keys(targetNeighbor.snapshot.equippedRobotSlots).length > 0)
+          || targetNeighbor.snapshot.origin?.characterType === 'robot'
+        : consumableItem?.id === 'robot_item_repair_kit';
+      const fa = rollFirstAidBoost(useCharacterStore.getState(), { targetIsRobot });
+      firstAidBonusHp = fa.bonusHp;
+      firstAidReportLine = fa.reportLine;
+    }
+
+    if (!reusableTool) {
+      handleRemoveItem(consumableItem, 1);
+    }
+
+    if (targetNeighbor && pending.roomCode) {
+      const storeNow = useCharacterStore.getState();
+      try {
+        await useRoomStore.getState().sendPeerAssist({
+          code: pending.roomCode,
+          targetCharacterId: targetNeighbor.characterId,
+          fromCharacterName: storeNow.characterName || '—',
+          envPayload: {
+            item: consumableItem,
+            firstAidBonusHp,
+            firstAidReportLine,
+            stabilizeInjury: isFirstAidCapableItem(consumableItem),
+            stabilizeInjuryZone: stabilizeInjuryZone || null,
+          },
+        });
+      } catch (err) {
+        debugLog('peerAssist.send:failed', { message: err?.message });
+      }
+      const sentMsg = formatGm(tGm('envCombat.firstAid.peerSentToast'), {
+        item: itemName,
+        target: targetNeighbor.name || '—',
+      });
+      showAlert(itemName, firstAidReportLine ? `${sentMsg}\n${firstAidReportLine}` : sentMsg);
+      return;
+    }
+
+    const report = buildConsumableResultReport({ itemName });
+    showAlert(report.title, firstAidReportLine ? `${report.message}\n${firstAidReportLine}` : report.message);
+  };
+
   const handleApplyConsumable = (item) => {
     const consumableItem = { ...item };
     const itemName = getItemName(consumableItem);
+    const selfAllowed = canConsumeOnSelf(consumableItem, fitCharacter)
+      || (isFirstAidCapableItem(consumableItem) && (!isRobot || consumableItem.id === 'robot_item_repair_kit'));
+    const otherAllowed = canConsumeOnOther(consumableItem, fitCharacter) || isFirstAidCapableItem(consumableItem);
 
     debugLog('consumable.screen.start', {
       itemName,
@@ -458,16 +573,24 @@ const InventoryScreen = () => {
     });
 
     const applyToSelf = async () => {
-      if (!canConsumeOnSelf(consumableItem, fitCharacter)) {
+      if (!selfAllowed) {
         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
         return;
       }
 
       const finish = (radiationRequestedAmount) => {
-        const result = applyConsumableFull(consumableItem, { radiationRequestedAmount });
-        const report = buildConsumableResultReport({ itemName, ...result });
-        showAlert(report.title, report.message);
-        handleRemoveItem(consumableItem, 1);
+        if (isFirstAidCapableItem(consumableItem)) {
+          setFirstAidModalState({
+            mode: 'selfFirstAid',
+            item: consumableItem,
+            itemName,
+            radiationRequestedAmount,
+            neighbors: [],
+            roomCode: null,
+          });
+          return;
+        }
+        executeSelfConsumableFinish(consumableItem, itemName, radiationRequestedAmount, false);
       };
 
       const preview = previewConsumableRadiation(consumableItem);
@@ -476,9 +599,6 @@ const InventoryScreen = () => {
         return;
       }
 
-      // Выбор из каталога: 'reroll' — перебросить, 'keep'/закрытие — оставить.
-      // На вебе раньше был window.confirm, и «Отмена» там значила «оставить»
-      // только по совпадению; теперь обе платформы дают явные кнопки.
       const choice = await showCatalogAlert('leadBellyReroll', {
         radiationAmount: preview.receivedRadiationDamage,
       });
@@ -490,22 +610,51 @@ const InventoryScreen = () => {
       }
     };
 
-    const applyToOther = () => {
-      if (!canConsumeOnOther(consumableItem, fitCharacter)) {
+    const applyToOther = async () => {
+      if (!otherAllowed) {
         showAlert(tInventory('screen.alerts.robotCannotSelfUseTitle'), tInventory('screen.alerts.robotCannotSelfUseMessage'));
         return;
       }
+      const storeNow = useCharacterStore.getState();
+      const myCharId = storeNow.currentCharacterId;
+      let roomCode = null;
+      let neighbors = [];
+      if (myCharId) {
+        try {
+          const binding = await db.getCharacterRoomBinding(myCharId);
+          if (binding?.code) {
+            roomCode = binding.code;
+            const room = useRoomStore.getState().rooms?.[binding.code];
+            if (room && Array.isArray(room.characters)) {
+              neighbors = room.characters.filter((c) => c?.characterId && c.characterId !== myCharId);
+            }
+          }
+        } catch {
+          // ignore offline
+        }
+      }
+
+      if (neighbors.length > 0 || isFirstAidCapableItem(consumableItem)) {
+        setFirstAidModalState({
+          mode: 'otherTarget',
+          item: consumableItem,
+          itemName,
+          neighbors,
+          roomCode,
+        });
+        return;
+      }
+
       const report = buildConsumableResultReport({ itemName });
       showAlert(report.title, report.message);
-      handleRemoveItem(consumableItem, 1);
+      if (!isReusableMedicalTool(consumableItem)) {
+        handleRemoveItem(consumableItem, 1);
+      }
     };
 
-    // Три варианта на обеих платформах. Раньше на вебе диалог схлопывался
-    // в window.confirm (две кнопки), где «Отмена» на самом деле означала
-    // «применить на другого» — отменить действие было нельзя.
     showCatalogAlert('applyConsumable', { itemName }).then(async (choice) => {
       if (choice === 'self') await applyToSelf();
-      else if (choice === 'other') applyToOther();
+      else if (choice === 'other') await applyToOther();
     });
   };
   
@@ -1593,12 +1742,17 @@ const InventoryScreen = () => {
     // при настройке качества или износа; кнопка окна — при повреждении).
     const showItemDurability = Boolean(
       (localizedDisplayItem?.itemType === 'weapon' || localizedDisplayItem?.itemType === 'armor')
-      && (randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
-      && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)),
+      && (
+        item?.forceBroken
+        || item?.unrepairable
+        || ((randomWeaponQualityEnabled || weaponDurabilityLossEnabled)
+          && (localizedDisplayItem?.itemType === 'armor' || isAmmoWeapon(localizedDisplayItem)))
+      ),
     );
     const weaponDurabilityValue = item.durabilityTracked ? Number(item.durability) : 100;
     const showItemRepair = Boolean(
       (item.itemType === 'weapon' || item.itemType === 'armor')
+      && !item.unrepairable
       && item.durabilityTracked && Number(item.durability) < 100,
     );
     // Слово владельца 424: редкость в свойствах оружия/брони (и СБ).
@@ -1611,12 +1765,13 @@ const InventoryScreen = () => {
     // Слово владельца 414: «если материалов нет, кнопка ремонта не
     // активна» (донор тоже делает кнопку активной).
     const repairAffordable = repairAffordableFor(item.id);
-    const isEquippable = item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor';
+    const isEquippable = !item.unrepairable && (item.itemType === 'weapon' || item.itemType === 'armor' || item.itemType === 'clothing' || item.itemType === 'powerArmor');
     const isConsumable =
       item.itemType === 'chem' || item.itemType === 'chems'
       || item.itemType === 'drinks' || item.itemType === 'food'
       || item.itemType === 'robotConsumable'
-      || item.healAmount != null;
+      || item.healAmount != null
+      || isFirstAidCapableItem(item);
 
     // Нерабочее встроенное оружие (ракетница/гранатомёт до ОС Mk II): строка
     // помечается, пока драйвер не применён (флаг mk2Installed).
@@ -1754,7 +1909,8 @@ const InventoryScreen = () => {
           )}
           {isConsumable && !item.isEquipped
             && (canConsumeOnSelf(localizedDisplayItem, fitCharacter)
-                || canConsumeOnOther(localizedDisplayItem, fitCharacter)) && (
+                || canConsumeOnOther(localizedDisplayItem, fitCharacter)
+                || isFirstAidCapableItem(localizedDisplayItem)) && (
               <TouchableOpacity 
                   style={[styles.actionButton, styles.applyButton]} 
                   onPress={() => handleApplyConsumable(localizedDisplayItem)}>
@@ -1783,6 +1939,11 @@ const InventoryScreen = () => {
           )}
           {showCardRarity && (
             <Text style={styles.itemSubText}>{tInventory('screen.labels.rarity')}: {cardRarity}</Text>
+          )}
+          {item.unrepairable === true && (
+            <Text style={[styles.itemSubText, { color: '#f87171', fontWeight: '700' }]}>
+              {tGm('envCombat.weaponBadges.unrepairable')}
+            </Text>
           )}
           {item.temporaryRepair === true && (
             <Text style={[styles.itemSubText, { color: '#e8a33d' }]}>
@@ -1980,10 +2141,20 @@ const InventoryScreen = () => {
           caps={currency}
           onConfirmBuy={handleConfirmBuy}
         />
+        <FirstAidAndPeerModal
+          visible={firstAidModalState != null}
+          mode={firstAidModalState?.mode}
+          item={firstAidModalState?.item}
+          storeState={firstAidModalState ? useCharacterStore.getState() : null}
+          neighbors={firstAidModalState?.neighbors || EMPTY_ROOM_NEIGHBORS}
+          onClose={() => setFirstAidModalState(null)}
+          onConfirmSelf={handleConfirmSelfFirstAid}
+          onConfirmOther={handleConfirmOtherAssist}
+        />
 
       </SafeAreaView>
     </ImageBackground>
   );
 };
 
-export default InventoryScreen; 
+export default InventoryScreen;

@@ -152,6 +152,18 @@ interface RoomStoreState {
     targetType?: 'room' | 'character';
     targetCharacterId?: string | null;
     targetCharacterIds?: string[];
+    envPayload?: Record<string, unknown> | null;
+  }) => Promise<{
+    directive: RoomDirectiveEntry;
+    directives: RoomDirectiveEntry[];
+  }>;
+  sendPeerAssist: (input: {
+    code: string;
+    directiveId?: string;
+    targetCharacterId: string;
+    fromCharacterName?: string;
+    note?: string;
+    envPayload: Record<string, unknown>;
   }) => Promise<{
     directive: RoomDirectiveEntry;
     directives: RoomDirectiveEntry[];
@@ -809,8 +821,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
       targetType = 'room',
       targetCharacterId = null,
       targetCharacterIds,
+      envPayload = null,
     }) => {
-      assertAdminFeature(FEATURE_IDS.GM_CAMPAIGNS);
+      assertAdminFeature(FEATURE_IDS.ADMIN_ACCESS);
       const response = await sendRequest(
         ROOM_MESSAGE.GM_DIRECTIVE,
         {
@@ -822,8 +835,35 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           targetType,
           ...(targetCharacterId ? { targetCharacterId } : {}),
           ...(Array.isArray(targetCharacterIds) ? { targetCharacterIds } : {}),
+          ...(envPayload ? { envPayload } : {}),
           ...(directiveId ? { directiveId } : {}),
           ...(ownerToken ? { ownerToken } : {}),
+        },
+        code,
+      );
+      return {
+        directive: response.payload?.directive as RoomDirectiveEntry,
+        directives: (response.payload?.directives || []) as RoomDirectiveEntry[],
+      };
+    },
+
+    sendPeerAssist: async ({
+      code,
+      directiveId,
+      targetCharacterId,
+      fromCharacterName = '',
+      note = '',
+      envPayload,
+    }) => {
+      const response = await sendRequest(
+        ROOM_MESSAGE.PEER_ASSIST,
+        {
+          code,
+          targetCharacterId,
+          ...(fromCharacterName ? { fromCharacterName } : {}),
+          ...(note ? { note } : {}),
+          envPayload,
+          ...(directiveId ? { directiveId } : {}),
         },
         code,
       );

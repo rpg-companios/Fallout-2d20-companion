@@ -45,7 +45,7 @@ import { getAttributeValue } from '../../domain/characterCreation';
 // МК-3 (патч 316): формула макс. ОЗ уехала в сеттинг — чтение через дверь.
 const { calculateMaxHealth } = getDerivedStatsLogic();
 import { getCurrentModuleLocale } from '../../i18n/locale';
-import { notifyConditionEvent, notifyConsumableApplied } from './stateExtensions';
+import { notifyConditionEvent, notifyConsumableApplied, notifyTimeTick } from './stateExtensions';
 
 export const CHEM_DOSE_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const ANTIBIOTIC_CHEM_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -524,7 +524,11 @@ export const createOrchestrationActions = (set, get) => {
       Math.round(hours * SCENE_RULES.SCENES_PER_GAME_HOUR),
     );
     syncTimedEffectsToStore(nextEffects, store);
-    return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+    const periodicLogs = notifyTimeTick(
+      { scenes: 0, gameMinutes: Math.max(0, Number(hours) || 0) * 60 },
+      get(),
+    );
+    return { effects: nextEffects, expired: [...normalizedCurrent.expired, ...expired], periodicLogs };
   };
 
   return {

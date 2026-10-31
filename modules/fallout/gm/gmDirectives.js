@@ -11,6 +11,11 @@ import { findEnrichedOrigin, isRobotCharacter } from '../../../domain/origins';
 import { findTraitById } from '../../../domain/traits';
 import { hasRadiationImmunity } from '../../../domain/immunities';
 import { calculateMaxHealth } from '../logic/derivedStats';
+import {
+  ENV_DIRECTIVE_KIND,
+  applyEnvCombatDirectiveToStore,
+  applyEnvCombatDirectiveToStoredRow,
+} from './gmEnvCombat';
 import { formatGm, tGm } from './gmI18n';
 
 export const GM_DIRECTIVE_KIND = Object.freeze({
@@ -67,6 +72,12 @@ export const GM_DIRECTIVE_CATALOG = Object.freeze([
 
 export const formatDirectiveBadgeLabel = (directive, locale = getCurrentLocale()) => {
   if (!directive?.kind) return '';
+  if (directive.kind.startsWith('env.weather.')) return tGm('envCombat.tiles.weather.title', locale);
+  if (directive.kind.startsWith('env.radiation.')) return tGm('envCombat.tiles.radiation.title', locale);
+  if (directive.kind.startsWith('env.injury.')) return tGm('envCombat.tiles.injury.title', locale);
+  if (directive.kind.startsWith('env.attackFail.')) return tGm('envCombat.tiles.attackFail.title', locale);
+  if (directive.kind === ENV_DIRECTIVE_KIND.TIME_ADVANCE) return tGm('envCombat.targetBar.stepScene', locale);
+  if (directive.kind === ENV_DIRECTIVE_KIND.PEER_CONSUMABLE) return directive.fromName || 'Aid';
   const amount = Number(directive.amount) || 0;
   if (directive.kind === GM_DIRECTIVE_KIND.HP_HEAL && (directive.mode === 'full' || amount <= 0)) {
     return tGm('commands.kinds.hp.heal.fullShort', locale);
@@ -158,6 +169,8 @@ export const applyDirectiveToLiveCharacterStore = (directive, useCharacterStore,
       state.setRadiation(nextRad);
       summaryLine = formatGm(tGm('commands.playerAlert.radChanged', locale), { rad: nextRad });
     }
+  } else if (kind?.startsWith('env.') || kind === ENV_DIRECTIVE_KIND.PEER_CONSUMABLE) {
+    summaryLine = applyEnvCombatDirectiveToStore(directive, state, locale);
   }
 
   return summaryLine;
@@ -229,6 +242,8 @@ export const applyDirectiveToStoredCharacterRow = (directive, row, locale = getC
       data.radiation = nextRad;
       summaryLine = formatGm(tGm('commands.playerAlert.radChanged', locale), { rad: nextRad });
     }
+  } else if (kind?.startsWith('env.') || kind === ENV_DIRECTIVE_KIND.PEER_CONSUMABLE) {
+    return applyEnvCombatDirectiveToStoredRow(directive, row, locale);
   }
 
   return {

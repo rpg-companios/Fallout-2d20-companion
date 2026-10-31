@@ -146,7 +146,7 @@ export const itemRarityFor = (canonicalId) => itemRarityIndex().get(canonicalId)
  * (hpCurrent/maxHp, в пачке или надета). null — предмет не изнашивается.
  */
 export const repairTargetFor = (item) => {
-  if (!item) return null;
+  if (!item || item.unrepairable) return null;
   if (item.itemType === 'weapon' && item.durabilityTracked) {
     return {
       kind: 'weapon',
@@ -274,6 +274,7 @@ export const donorCandidatesFor = (storeItem, exceptStoreItemId) => {
       && !entry?.installedOn
       && !entry?.equipped
       && !entry?.locked
+      && !entry?.unrepairable
       && (entry.weaponId || entry.id) === canonical)
     .map(([key]) => key);
 };

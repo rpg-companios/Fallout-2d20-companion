@@ -18,10 +18,12 @@ import {
   registerConsumableAppliedListener,
   registerStateExtension,
   registerStateMigration,
+  registerTimeTickListener,
 } from '../../../src/store/stateExtensions';
 import { createSurvivalState, withDiseaseFatigue, withoutDiseaseFatigue } from './survival';
 import { migrateSurvivalField } from './migration';
 import { survivalConsumableListener } from './operations';
+import { tickGmPeriodicEffectsForStore } from '../gm/gmEnvCombat';
 
 // Тип персонажа для фабрики: ориджин в сейве — объект с characterType,
 // при создании нового персонажа — выбранный ориджин из каталога.
@@ -90,6 +92,11 @@ registerConditionEventListener({
   kind: 'disease',
   event: 'cured',
   listener: diseaseFatigueListener,
+});
+
+registerTimeTickListener({
+  id: 'falloutGmPeriodic',
+  listener: (step, store) => tickGmPeriodicEffectsForStore(store, step),
 });
 
 export { createSurvivalState } from './survival';

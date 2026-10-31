@@ -367,11 +367,12 @@ export function advanceRealMinutes(
     state: SurvivalState,
     realMinutes: number,
     courseMinutesPerHour: number = SURVIVAL_RULES.defaultCourseMinutesPerHour,
+    options: TickOptions = {},
 ): AdvanceResult {
     if (!(courseMinutesPerHour > 0)) {
         throw new Error(`advanceRealMinutes: некорректный курс: ${courseMinutesPerHour}`);
     }
-    return advanceHours(state, realMinutes / courseMinutesPerHour);
+    return advanceHours(state, realMinutes / courseMinutesPerHour, options);
 }
 
 // Подъём шкал от еды — чисто по данным предмета (§2, §11): суп всегда

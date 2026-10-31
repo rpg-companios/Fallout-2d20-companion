@@ -17,6 +17,7 @@ import {
   isAdminLicensed,
   isFeatureAvailable,
   isGmCampaignsLicensed,
+  isGmEnvCombatLicensed,
   isGmLootTradeLicensed,
   resetEntitlementToDefault,
   setEntitlement,
@@ -37,6 +38,7 @@ export {
   createAdminLicenseError,
   isAdminLicensed,
   isGmCampaignsLicensed,
+  isGmEnvCombatLicensed,
   isGmLootTradeLicensed,
   resetEntitlementToDefault,
   setEntitlement,
@@ -123,5 +125,6 @@ export const useAdminAccess = () => {
     adminLicensed: isAdminLicensed(),
     gmCampaignsLicensed: isGmCampaignsLicensed(),
     gmLootTradeLicensed: isGmLootTradeLicensed(),
+    gmEnvCombatLicensed: isGmEnvCombatLicensed(),
   };
 };

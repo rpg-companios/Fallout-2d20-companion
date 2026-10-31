@@ -20,6 +20,7 @@ export const ROOM_MESSAGE = {
   GM_DIRECTIVE: 'gm.directive',
   GM_DIRECTIVE_ACK: 'gm.directiveAck',
   GM_DIRECTIVE_STATE: 'gm.directiveState',
+  PEER_ASSIST: 'peer.assist',
   SESSION_OPEN: 'session.open',
   SESSION_STATE: 'session.state',
   SESSION_UPDATE_RATES: 'session.updateRates',
@@ -129,6 +130,7 @@ export interface RoomSnapshotEntry {
 export interface RoomDirectiveEntry {
   directiveId: string;
   kind: string;
+  originRole?: 'gm' | 'peer';
   amount: number;
   mode?: string | null;
   note: string;
@@ -138,6 +140,7 @@ export interface RoomDirectiveEntry {
   ackedByCharacterIds: string[];
   fromClientId?: string;
   fromName?: string;
+  envPayload?: Record<string, unknown> | null;
   createdAt: number;
 }
 

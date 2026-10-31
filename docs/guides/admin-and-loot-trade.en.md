@@ -136,3 +136,29 @@ While a chest, merchant, or location is active, the Game Master has a **live con
 - after a good barter roll or Charisma check, adjust sale markup, buyback markdown, or caps **live on the fly** — either for the whole party or **personally for one specific character**;
 - toggle locks (`🔒` / `🔓`) inside an active location with instant updates on players' screens;
 - every item taken, bought, or sold and every cap spent is saved straight back into the Game Master's cards automatically.
+
+---
+
+## 6. «Environment & Combat» Tab
+
+The third Game Master tab brings together wasteland hazards, injuries, and combat complications. At the top, select the **campaign room** and **target** (*Entire Party* or a single character), and use **`+1 scene`**, **`+10 min`**, **`+1 hr`**, and **`+1 day`** to advance party time.
+
+### The 4 System Tiles
+1. **Weather** — *Extreme Heat*, *Bitter Cold*, *Dust Storm*, *Dense Fog*, *Rad-Storm*, and *Acid Rain*. Configure each weather condition separately by choosing its **effect strength** (fixed number or Combat Dice) and **duration** (*Once*, *Scenes*, *Minutes*, *Hours*, *Days*). Multi-interval effects trigger **at the end of each interval**.
+2. **Radiation** — ready-made sources (*Dirty Water*, *Ambient Zone*, *Waste Barrel*, *Rad Burst*, *Custom*) with armor protection modes (*lowest Rad DR across the body*, *specific hit location / d20*, or *direct*) and a live per-character preview (robots, ghouls, super mutants, and synths apply their natural immunities automatically).
+3. **Injury** — pick a body location manually or roll **d20**. When targeting a robot character, hit locations adapt automatically to its chassis (*optics*, *body*, *arms*, *thruster*). Active injuries apply location penalties (and torso/chassis bleeding at the end of each scene), move to **«Stabilized»** once treated, and heal completely after a full rest.
+4. **Attack Failure (Complication)** — 6 outcomes:
+   - *Ammo Loss* — spends ammunition from the weapon's reserve;
+   - *Weapon Jam* — blocks firing until the player taps **«Clear Jam»** on their weapon card;
+   - *Weapon Breakage* — drops durability to `0%`, shades the weapon card, and blocks ammo spending until repaired at a workbench;
+   - *Weapon Explosion in Hands* — sets durability to `0%`, deals blast damage to the wielder, and lets the GM choose whether the weapon is repairable (if *not*, it returns to inventory marked *«Ruined (Unrepairable)»*);
+   - *Ricochet / Friendly Fire* — hits the attacker or a room ally with location armor subtracted;
+   - *Dropped Weapon* — unequips the weapon from hands back into inventory.
+
+### Saved State Tiles & Folders
+- Inside any of the 4 tiles, tap **«Save as Tile»** and enter a **name** and **short description** to keep a ready-to-use preset card on your board for one-tap use.
+- Tap **`+ Folder`** to create named folders with descriptions (for example, *«The Glowing Sea»* or *«Corvega Plant»*), organize preset tiles via the **`⋮`** menu, and sync everything through Google Drive alongside your rooms and containers.
+
+### First Aid & Healing a Room Neighbor (for Players)
+- When applying medical or repair items (*Stimpak*, *Super Stimpak*, *Diluted Stimpak*, *Doctor's Bag*, *First Aid Kit*, *Robot Repair Kit*), players are asked: **«Use First Aid to boost the healing result? Yes / No»**. Choosing **«Yes»** rolls the skill check (**INT + Medicine** for organics or **INT + Repair** for robots) and, on success, adds **`+ (INT + Medicine/Repair)`** HP while stabilizing an active injury.
+- Choosing **«Apply → To Another»** in Inventory lets a player pick a **room neighbor** from connected teammates — healing and injury stabilization are delivered immediately to that ally.

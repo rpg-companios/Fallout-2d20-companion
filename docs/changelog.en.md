@@ -1,5 +1,12 @@
 # Changelog
 ---
+## Environment/Combat, saved state presets, and room-neighbor First Aid (patch 482)
+
+- Added the GM workspace’s third tab, **Environment/Combat**, with separate Weather, Radiation, Injury, and Attack Failure tiles, room/recipient selection, room-wide time advancement, and tabletop-only calculation.
+- Weather and radiation configure strength (a number or `{CD}`) and duration; periodic effects trigger at the end of each selected interval while respecting armor resistance and immunities. Weather conditions remain independent; robot chassis injuries can be stabilized and heal after sleep, and six attack complications are supported: ammo loss, jam, breakage, explosion, ricochet, and dropped weapon.
+- Game Masters can save named, described state tiles, organize them in folders, and sync them to Google Drive. Players can roll First Aid (`INT + Medicine/Repair`) when using medical supplies; a success adds the check value to healing. **Apply to Another** can send aid to a room neighbor with delivery acknowledgement.
+
+---
 ## Dedicated GM Workspace Navigator (`navbar2`), read-only character spoiler cards & queued GM commands (patch 481)
 
 - **Dedicated GM Navigator (`GmWorkspaceNavigator` / `navbar2`):** separated the Game Master's swipeable section navigator (`Campaigns`, `Loot/Trade`, and an extensible registry for future GM tabs) from the Player's character sheet tabs in `App.js`, never mounting player sheet screens or overwriting the local `characterStore` in GM mode.

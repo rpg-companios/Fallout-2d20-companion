@@ -89,7 +89,7 @@ import { isRobotCharacter } from '../../domain/origins';
 // в CharacterContext.
 import { createCounter, consume, restore, set as setCounter } from '../../domain/counters';
 import { selectLegacyAttributes } from './selectors.js';
-import { createStateExtensionFields } from './stateExtensions.js';
+import { createStateExtensionFields, notifyTimeTick } from './stateExtensions.js';
 import { catalogGetWeaponModById } from '../../db/catalogSource';
 import { getEquipmentCatalog } from '../../i18n/equipmentCatalog';
 import { findCatalogEntry, inferItemType } from '../../domain/resolveItem';
@@ -681,6 +681,9 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         // записи износа (untrackedWeapon). Инвентарное оружие без записи —
         // ошибка, как и раньше.
         if (!weapon && !untrackedWeapon) return { ok: false, reason: 'weapon-not-found' };
+        // Патч 482: GM-состояния оружия действуют независимо от общей настройки износа.
+        if (weapon?.jammed) return { ok: false, reason: 'jammed' };
+        if (weapon?.unrepairable || weapon?.forceBroken) return { ok: false, reason: 'broken' };
         // Износ прочности — только для предметов инвентаря.
         const trackDurability = durabilityEnabled && !!weapon;
         const trackedWeapon = trackDurability && !weapon.durabilityTracked
@@ -784,8 +787,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
 
       repairWeapon: (itemId) => {
         const item = get().items[itemId];
-        if (!item?.durabilityTracked || Number(item.durability) >= 100) return;
-        get().updateItem(itemId, repairWeaponDurability());
+        if (!item?.durabilityTracked || item.unrepairable || (Number(item.durability) >= 100 && !item.forceBroken)) return;
+        get().updateItem(itemId, { ...repairWeaponDurability(), forceBroken: false });
       },
 
       /**
@@ -796,7 +799,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         const state = get();
         const items = { ...state.items };
 
-        if (!items[itemId]) {
+        if (!items[itemId] || items[itemId].unrepairable) {
           debugLog('store.itemNotFound', { itemId });
           return;
         }
@@ -1863,7 +1866,8 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         });
 
         set((state) => ({ sceneCounter: state.sceneCounter + 1 }));
-        return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired] };
+        const periodicLogs = notifyTimeTick({ scenes: 1, gameMinutes: 0 }, get());
+        return { active: nextEffects, expired: [...normalizedCurrent.expired, ...expired], periodicLogs };
       },
 
       /**

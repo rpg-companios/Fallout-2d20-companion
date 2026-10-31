@@ -31,6 +31,8 @@ import { mechAmmoSpendForWeapon } from '../../weapons/weaponAmmoSpend';
 import styles from '../../styles/CharacterScreen.styles';
 import localStyles from '../../styles/WeaponsAndArmorScreen.styles';
 import { renderTextWithIcons } from './textUtils';
+import { formatGmPeriodicRemaining } from '../../gm/gmEnvCombat';
+import { tGm } from '../../gm/gmI18n';
 import { useLocale, useModuleLocale } from '../../../../i18n/locale';
 import { getEquipmentCatalog } from '../../../../i18n/equipmentCatalog';
 import { getConditionCatalog } from '../../../../domain/registry';
@@ -249,7 +251,12 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapo
     item => item.itemType === 'ammo' && ammoIds.includes(item.weaponId || item.id)
   );
   const totalAmmo = ammoItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-  const isBroken = durabilityLossEnabled && Number(durability) <= 0;
+  const isBroken = Boolean(
+    (durabilityLossEnabled && Number(durability) <= 0)
+    || weapon?.forceBroken
+    || weapon?.unrepairable,
+  );
+  const isJammed = Boolean(weapon?.jammed);
 
   // Универсальный механизм расхода (domain/mechAmmoSpend.js):
   // mechAmmoSpend = [безусловные условия] + [условия с запросом].
@@ -258,7 +265,7 @@ const WeaponAmmoCell = ({ weaponInstanceId, ammoId, qualities, durability, weapo
   const plan = mechAmmoSpendForWeapon(weapon || { qualities }, { available: totalAmmo });
   const needAsk = plan.asks.length > 0;
   const minNeed = needAsk ? 1 : plan.fixed;
-  const canSpend = totalAmmo >= minNeed && !isBroken;
+  const canSpend = totalAmmo >= minNeed && !isBroken && !isJammed;
 
   const doSpend = (amount) => {
     spendAmmoForWeapon({
@@ -420,18 +427,30 @@ export const EffectsPanel = ({ effects, immunities = [], extraRows = [], surviva
                     </View>
                   );
                 }
+                const timerText = effect.effectType === 'gmPeriodic'
+                  ? formatGmPeriodicRemaining(effect.gmPeriodic, moduleLocale)
+                  : effect.effectType === 'injury'
+                    ? tGm(`envCombat.injury.stages.${effect.injuryStage || 'active'}`, moduleLocale)
+                    : (effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft));
+                const displayLine = (effect.effectType === 'gmPeriodic' || effect.effectType === 'injury')
+                  ? (effect.effectLabel || effectText)
+                  : effectText;
                 return (
                   <View key={effect.id} style={localStyles.effectsPanelRow}>
                     <View style={localStyles.effectDetails}>
-                      <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
-                        {effectText}
-                      </Text>
+                      {String(displayLine).includes('{CD}')
+                        ? renderTextWithIcons(String(displayLine), [localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText])
+                        : (
+                          <Text style={[localStyles.effectText, isNegative ? localStyles.negativeEffectText : localStyles.positiveEffectText]}>
+                            {displayLine}
+                          </Text>
+                        )}
                       {effectDescription ? (
                         <Text style={localStyles.diseaseEffectDescription}>{effectDescription}</Text>
                       ) : null}
                     </View>
                     <Text style={localStyles.effectTimerText}>
-                      {effect.isPermanent ? '∞' : getEffectTimeText(effect.scenesLeft)}
+                      {timerText}
                     </Text>
                   </View>
                 );
@@ -604,7 +623,15 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
     const rawAmmoId = displayWeapon?.ammoId ?? '';
     const effectiveAmmoId = rawAmmoId && rawAmmoId !== 'ammo_anything' ? rawAmmoId : null;
     const durabilityValue = displayWeapon.durabilityTracked ? Number(displayWeapon.durability) : 100;
-    const showDurability = (randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon);
+    const isForceBroken = Boolean(
+      displayWeapon?.forceBroken
+      || displayWeapon?.unrepairable
+      || (durabilityLossEnabled && displayWeapon?.durabilityTracked && Number(durabilityValue) <= 0),
+    );
+    const isJammed = Boolean(displayWeapon?.jammed);
+    const updateItem = useCharacterStore((state) => state.updateItem);
+    const storeWeaponKey = displayWeapon?.instanceId || displayWeapon?.uniqueId || displayWeapon?.id;
+    const showDurability = ((randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon)) || isForceBroken;
 
     const stats = [
       { label: tWeaponsAndArmorScreen('weapon.fields.success'), value: `${successValue}` },
@@ -620,9 +647,15 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
     ];
   
     return (
-      <View style={[localStyles.weaponCardContainer, mk2Blocked && { opacity: 0.55 }]}>
+      <View
+        style={[
+          localStyles.weaponCardContainer,
+          mk2Blocked && { opacity: 0.55 },
+          isForceBroken && { backgroundColor: 'rgba(58, 22, 22, 0.76)', borderColor: '#ef4444', borderWidth: 1, opacity: 0.74 },
+        ]}
+      >
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { textAlign: 'center', width: '100%' }]}>{weaponName}</Text>
+          <Text style={[styles.sectionTitle, { textAlign: 'center', width: '100%' }, isForceBroken && { color: '#fca5a5' }]}>{weaponName}</Text>
           {showSourceSlot && weapon?.sourceSlot ? (
             <Text style={{ fontSize: 10, color: '#888', textAlign: 'center', width: '100%', marginTop: 2 }}>
               {tWeaponsAndArmorScreen(`robotSlot.slotNames.${weapon.sourceSlot}`) || weapon.sourceSlot}
@@ -632,6 +665,31 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
             <Text style={{ fontSize: 10, color: '#e8a33d', textAlign: 'center', width: '100%', marginTop: 2 }}>
               {tWeaponsAndArmorScreen('weapon.requiresMkII')}
             </Text>
+          ) : null}
+          {isForceBroken ? (
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#f87171', textAlign: 'center', width: '100%', marginTop: 3 }}>
+              {tGm(displayWeapon?.unrepairable ? 'envCombat.weaponBadges.unrepairable' : 'envCombat.weaponBadges.broken')}
+            </Text>
+          ) : null}
+          {isJammed ? (
+            <View style={{ alignItems: 'center', width: '100%', marginTop: 4, gap: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#fbbf24' }}>
+                {tGm('envCombat.weaponBadges.jammed')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => storeWeaponKey && updateItem(storeWeaponKey, { jammed: false })}
+                style={{
+                  backgroundColor: '#f0e68c',
+                  borderRadius: 4,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <Text style={{ color: '#111827', fontSize: 11, fontWeight: '700' }}>
+                  {tGm('envCombat.weaponBadges.clearJamBtn')}
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
         <View>
@@ -1569,14 +1627,28 @@ const WeaponsAndArmorScreen = () => {
                   : [{ weapon: null, index: 0 }]
                 ).map(({ weapon, index }) => {
                   const open = openSpoilers[index] === true;
+                  const spBroken = Boolean(
+                    weapon?.forceBroken
+                    || weapon?.unrepairable
+                    || (durabilityLossEnabled && weapon?.durabilityTracked && Number(weapon?.durability) <= 0),
+                  );
+                  const spJammed = Boolean(weapon?.jammed);
                   return (
-                    <View key={`spoiler-${index}`} style={localStyles.weaponSpoiler}>
+                    <View
+                      key={`spoiler-${index}`}
+                      style={[
+                        localStyles.weaponSpoiler,
+                        spBroken && { backgroundColor: 'rgba(58, 22, 22, 0.72)', borderColor: '#ef4444' },
+                      ]}
+                    >
                       <TouchableOpacity
                         style={localStyles.weaponSpoilerHeader}
                         onPress={() => toggleSpoiler(index)}
                       >
-                        <Text style={localStyles.weaponSpoilerTitle} numberOfLines={1}>
+                        <Text style={[localStyles.weaponSpoilerTitle, spBroken && { color: '#fca5a5' }]} numberOfLines={1}>
                           {weapon?.name || tWeaponsAndArmorScreen('weapon.notEquipped')}
+                          {spBroken ? ` [${tGm('envCombat.weaponBadges.broken')}]` : ''}
+                          {spJammed ? ` [${tGm('envCombat.weaponBadges.jammed')}]` : ''}
                         </Text>
                         <Text style={localStyles.weaponSpoilerArrow}>{open ? '▼' : '►'}</Text>
                       </TouchableOpacity>
