@@ -26,6 +26,7 @@ export const CONTAINER_KIND = Object.freeze({
   LOOT: 'loot',
   MERCHANT: 'merchant',
   HUB: 'hub',
+  TERMINAL: 'terminal',
 });
 
 export const QUANTITY_UNIT = Object.freeze({
@@ -270,7 +271,8 @@ export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
 export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
   [CONTAINER_KIND.HUB]: 0,
   [CONTAINER_KIND.LOOT]: 1,
-  [CONTAINER_KIND.MERCHANT]: 2,
+  [CONTAINER_KIND.TERMINAL]: 2,
+  [CONTAINER_KIND.MERCHANT]: 3,
 });
 
 /**
@@ -340,7 +342,7 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
   );
   const byId = new Map(
     list
-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
       .map((c) => [c.id, c]),
   );
 
@@ -368,13 +370,13 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
 
 /**
  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
- * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
+ * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
  */
 export const buildHubSessionNodes = (hub, allContainers = []) => {
   if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
   const byId = new Map(
     (Array.isArray(allContainers) ? allContainers : [])
-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
       .map((c) => [c.id, c]),
   );
   const links = normalizeHubLinks(hub.links);
@@ -396,13 +398,15 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
       buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+      difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+      lockOnFailure: child.kind === CONTAINER_KIND.TERMINAL ? Boolean(child.lockOnFailure) : false,
       characterOverrides: {},
-      items: Array.isArray(child.items)
+      items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
         ? child.items.map((entry) => ({
             ...entry,
             itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
           }))
-        : [],
+        : []),
     });
   }
   return nodes;
@@ -432,8 +436,9 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   let kind = CONTAINER_KIND.LOOT;
   if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
   else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
+  else if (raw.kind === CONTAINER_KIND.TERMINAL) kind = CONTAINER_KIND.TERMINAL;
 
-  const items = kind === CONTAINER_KIND.HUB
+  const items = kind === CONTAINER_KIND.HUB || kind === CONTAINER_KIND.TERMINAL
     ? []
     : deduplicateContainerItems(raw.items, now);
   const links = kind === CONTAINER_KIND.HUB
@@ -454,6 +459,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     roomName: String(raw.roomName || '').trim(),
     inRoot,
     description: String(raw.description || '').trim(),
+    difficulty: kind === CONTAINER_KIND.TERMINAL
+      ? clampNumber(raw.difficulty, 0, 5, 0)
+      : 0,
+    lockOnFailure: kind === CONTAINER_KIND.TERMINAL && Boolean(raw.lockOnFailure),
     caps: kind === CONTAINER_KIND.MERCHANT
       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
       : 0,

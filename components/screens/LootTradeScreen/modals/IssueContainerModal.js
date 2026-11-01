@@ -25,12 +25,14 @@ const IssueContainerModal = ({
   busy = false,
   onSelectRoom,
   onConfirmIssue,
+  roomWideOnly = false,
   onClose,
 }) => {
   useLocale();
   const [selectedRoomCode, setSelectedRoomCode] = useState('');
   const [targetType, setTargetType] = useState('room');
   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
+  const isTerminal = container?.kind === CONTAINER_KIND.TERMINAL || roomWideOnly;
 
   const candidateRooms = useMemo(() => {
     if (!container) return [];
@@ -84,16 +86,16 @@ const IssueContainerModal = ({
 
   const canSubmit = !busy
     && Boolean(selectedRoomCode)
-    && (targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
+    && (isTerminal || targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
 
   const handleConfirm = () => {
     if (!canSubmit) return;
     const pickedChar = effectiveRoomCharacters.find((c) => c.id === selectedCharacterId) || null;
     onConfirmIssue({
       roomCode: selectedRoomCode,
-      targetType,
-      targetCharacterId: targetType === 'character' ? selectedCharacterId : null,
-      targetCharacterName: targetType === 'character' ? (pickedChar?.name || null) : null,
+      targetType: isTerminal ? 'room' : targetType,
+      targetCharacterId: !isTerminal && targetType === 'character' ? selectedCharacterId : null,
+      targetCharacterName: !isTerminal && targetType === 'character' ? (pickedChar?.name || null) : null,
     });
   };
 
@@ -140,8 +142,10 @@ const IssueContainerModal = ({
             </View>
           )}
 
-          <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>
+          {!isTerminal && <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>}
 
+          {!isTerminal && (
+          <>
           <TouchableOpacity
             style={[styles.optionCard, targetType === 'room' && styles.optionCardActive]}
             onPress={() => setTargetType('room')}
@@ -201,6 +205,9 @@ const IssueContainerModal = ({
                 })
               )}
             </ScrollView>
+          )}
+
+          </>
           )}
 
           <View style={styles.footer}>

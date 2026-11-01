@@ -136,6 +136,58 @@ describe('roomServer: create/join/presence', () => {
     });
   });
 
+  it('terminal.issue и terminal.action синхронизируют комнатную доску и оператора', async () => {
+    await withServer(async (port) => {
+      const gm = makeClient(port, 'gm-terminal');
+      const operator = makeClient(port, 'player-terminal-1');
+      const observer = makeClient(port, 'player-terminal-2');
+      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault' });
+      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
+      const code = created.payload.code;
+      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
+      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await operator.send(MESSAGE.ROOM_JOIN, { code, name: 'Operator', role: 'player' });
+      await operator.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await observer.send(MESSAGE.ROOM_JOIN, { code, name: 'Observer', role: 'player' });
+      await observer.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
+      await operator.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'char-terminal-1',
+        revision: 1,
+        snapshot: { name: 'Operator', data: { characterName: 'Operator', attributes: { INT: { value: 4 } }, skills: [] } },
+      }, code);
+      await observer.sendRaw(MESSAGE.CHAR_PUBLISH, {
+        characterId: 'char-terminal-2',
+        revision: 1,
+        snapshot: { name: 'Observer', data: { characterName: 'Observer', attributes: { INT: { value: 4 } }, skills: [] } },
+      }, code);
+
+      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
+        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true },
+      }, code);
+      const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
+      expect(issued.payload.terminal).toMatchObject({ containerId: 'term-1', standaloneIssued: true, game: null });
+
+      const startReq = await operator.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'start', characterId: 'char-terminal-1',
+      }, code);
+      const started = await operator.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
+      expect(started.payload.terminal.game).toMatchObject({ operatorClientId: 'player-terminal-1', operatorCharacterId: 'char-terminal-1', status: 'playing' });
+      expect(started.payload.terminal.game.password).toBeUndefined();
+
+      const observerState = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.containerId === 'term-1' && m.payload.terminal?.game?.status === 'playing');
+      expect(observerState.payload.terminal.game.operatorClientId).toBe('player-terminal-1');
+      const blockedReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
+        containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
+      }, code);
+      const blocked = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === blockedReq);
+      expect(blocked.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
+
+      gm.close();
+      operator.close();
+      observer.close();
+    });
+  });
+
   it('peer.assist ставит лечение соседа в общую очередь, доставляет его цели и фиксирует ack', async () => {
     await withServer(async (port) => {
       const gm = makeClient(port, 'gm-peer');

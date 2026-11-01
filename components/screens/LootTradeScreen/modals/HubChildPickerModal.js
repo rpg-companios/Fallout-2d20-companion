@@ -32,7 +32,7 @@ const HubChildPickerModal = ({
       .filter((c) => (
         c
         && c.id !== hub.id
-        && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT)
+        && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind)
         && !linkedIds.has(c.id)
       ))
       .sort((a, b) => {
@@ -56,6 +56,7 @@ const HubChildPickerModal = ({
             ) : (
               candidates.map((item) => {
                 const isMerch = item.kind === CONTAINER_KIND.MERCHANT;
+                const isTerminal = item.kind === CONTAINER_KIND.TERMINAL;
                 const pieces = (item.items || []).reduce(
                   (sum, entry) => sum + (Number(entry.quantity) || 0),
                   0,
@@ -70,16 +71,18 @@ const HubChildPickerModal = ({
                     <View style={styles.rowInfo}>
                       <View style={styles.rowTitleLine}>
                         <MaterialCommunityIcons
-                          name={isMerch ? 'sack' : 'treasure-chest'}
+                          name={isTerminal ? 'console' : (isMerch ? 'sack' : 'treasure-chest')}
                           size={18}
                           color={ADMIN_MODAL_PALETTE.accent}
                         />
                         <Text style={styles.rowName}>{item.name}</Text>
                       </View>
                       <IconText style={styles.rowMeta}>
-                        {isMerch
-                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
-                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`}
+                        {isTerminal
+                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty, length: Number(item.difficulty) + 4 })}${roomSuffix}`
+                          : (isMerch
+                            ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
+                            : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`)}
                       </IconText>
                     </View>
 

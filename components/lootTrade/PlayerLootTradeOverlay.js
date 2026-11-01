@@ -36,6 +36,7 @@ import {
   grantLootEntriesToCharacter,
 } from '../../src/lootTrade/grantCharacterItems';
 import { showRawAlert } from '../alerts/alertService';
+import TerminalHackingModal from './TerminalHackingModal';
 import { debugLog } from '../../src/debug/falloutDebug';
 
 const getItemIcon = (itemType) => {
@@ -79,6 +80,8 @@ export default function PlayerLootTradeOverlay() {
   const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
+  const [terminalSelection, setTerminalSelection] = useState(null);
+  const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
 
   // Буферы обмена с торговцем
   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
@@ -151,6 +154,21 @@ export default function PlayerLootTradeOverlay() {
     }
     return null;
   }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+
+  const directTerminalContext = useMemo(() => {
+    if (isGmMode || bindings.length === 0) return null;
+    const ordered = [...bindings].sort((a, b) => {
+      if (a.characterId === currentCharacterId) return -1;
+      if (b.characterId === currentCharacterId) return 1;
+      return 0;
+    });
+    for (const bind of ordered) {
+      const states = Object.values(rooms[bind.code]?.terminalStates || {});
+      const terminalState = states.find((entry) => entry?.standaloneIssued && entry?.config?.containerId);
+      if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
+    }
+    return null;
+  }, [isGmMode, bindings, currentCharacterId, rooms]);
 
   const activeSession = matchedContext?.session || null;
   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
@@ -240,7 +258,44 @@ export default function PlayerLootTradeOverlay() {
     playerCaps,
   ]);
 
-  if (isGmMode || !matchedContext || !activeSession) return null;
+  if (isGmMode) return null;
+  if ((!matchedContext || !activeSession) && directTerminalContext) {
+    const config = directTerminalContext.terminalState.config;
+    if (currentCharacterId !== directTerminalContext.characterId) {
+      return (
+        <View style={styles.floatingBar} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.floatingPill}
+            onPress={async () => { await savesModule.loadCharacter(directTerminalContext.characterId); }}
+          >
+            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
+            <Text style={styles.floatingPillAction}>
+              {formatLootTrade(tLootTrade('player.openForBoundChar'), { charName: directTerminalContext.characterName })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    if (dismissedTerminalId === config.containerId) {
+      return (
+        <View style={styles.floatingBar} pointerEvents="box-none">
+          <TouchableOpacity style={styles.floatingPill} onPress={() => setDismissedTerminalId(null)}>
+            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
+            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return (
+      <TerminalHackingModal
+        visible
+        terminal={config}
+        roomCode={directTerminalContext.roomCode}
+        onClose={() => setDismissedTerminalId(config.containerId)}
+      />
+    );
+  }
+  if (!matchedContext || !activeSession) return null;
 
   const isMinimized = minimizedSessionId === activeSession.sessionId;
   const minimizedTitleKey = activeSession.kind === CONTAINER_KIND.HUB
@@ -332,7 +387,9 @@ export default function PlayerLootTradeOverlay() {
               ) : (
                 hubNodes.map((node) => {
                   const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+                  const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
                   const nodeLocked = Boolean(node.locked);
+                  const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
                   const piecesCount = (node.items || []).reduce(
                     (sum, entry) => sum + (Number(entry.quantity) || 0),
                     0,
@@ -346,7 +403,7 @@ export default function PlayerLootTradeOverlay() {
                       <View style={styles.lootRowInfo}>
                         <View style={styles.hubNodeTitleRow}>
                           <MaterialCommunityIcons
-                            name={nodeLocked ? 'lock' : (nodeIsMerch ? 'sack' : 'treasure-chest')}
+                            name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
                             size={19}
                             color={nodeLocked ? '#e57373' : '#f0e68c'}
                           />
@@ -365,6 +422,15 @@ export default function PlayerLootTradeOverlay() {
                         {nodeLocked ? (
                           <Text style={styles.hubLockedHintText}>
                             {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                          </Text>
+                        ) : nodeIsTerminal ? (
+                          <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
+                            {terminalState?.locked
+                              ? tLootTrade('terminal.accessDenied')
+                              : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                  difficulty: node.difficulty || 0,
+                                  length: (node.difficulty || 0) + 4,
+                                })}
                           </Text>
                         ) : nodeIsMerch ? (
                           <IconText style={styles.hubUnlockedMetaText}>
@@ -385,6 +451,25 @@ export default function PlayerLootTradeOverlay() {
                             <Text style={styles.hubLockedBadgeText}>
                               {tLootTrade('player.hubNodeLockedBadge')}
                             </Text>
+                          </View>
+                        ) : nodeIsTerminal ? (
+                          <View style={styles.terminalButtons}>
+                            <TouchableOpacity
+                              accessibilityRole="button"
+                              style={styles.terminalViewButton}
+                              onPress={() => setTerminalSelection({ node, autoStart: false })}
+                            >
+                              <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                            </TouchableOpacity>
+                            {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
+                              <TouchableOpacity
+                                accessibilityRole="button"
+                                style={styles.terminalHackButton}
+                                onPress={() => setTerminalSelection({ node, autoStart: true })}
+                              >
+                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                              </TouchableOpacity>
+                            )}
                           </View>
                         ) : (
                           <TouchableOpacity
@@ -417,6 +502,13 @@ export default function PlayerLootTradeOverlay() {
             </Text>
           </View>
         </View>
+        <TerminalHackingModal
+          visible={Boolean(terminalSelection)}
+          terminal={terminalSelection?.node}
+          roomCode={matchedContext.roomCode}
+          autoStart={Boolean(terminalSelection?.autoStart)}
+          onClose={() => setTerminalSelection(null)}
+        />
       </Modal>
     );
   }
@@ -1406,6 +1498,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  terminalButtons: { flexDirection: 'column', gap: 6, minWidth: 82 },
+  terminalViewButton: { backgroundColor: '#213028', borderWidth: 1, borderColor: '#58875d', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
+  terminalViewButtonText: { color: '#c7e1c1', fontSize: 11, fontWeight: '700' },
+  terminalHackButton: { backgroundColor: '#315331', borderWidth: 1, borderColor: '#a4cb77', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
+  terminalHackButtonText: { color: '#e1f5ca', fontSize: 11, fontWeight: '800' },
+  terminalDeniedMeta: { color: '#ff6969', fontWeight: '800' },
   lootFooter: {
     marginTop: 18,
     paddingTop: 4,

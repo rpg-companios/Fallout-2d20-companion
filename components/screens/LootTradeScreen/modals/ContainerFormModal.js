@@ -48,6 +48,7 @@ const ContainerFormModal = ({
   const effectiveKind = initialContainer?.kind || kind;
   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
   const isHub = effectiveKind === CONTAINER_KIND.HUB;
+  const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
   const initSessionKey = visible
     ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
@@ -61,6 +62,8 @@ const ContainerFormModal = ({
   const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
   const [creatingHub, setCreatingHub] = useState(false);
   const [description, setDescription] = useState('');
+  const [difficulty, setDifficulty] = useState(0);
+  const [lockOnFailure, setLockOnFailure] = useState(false);
   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
@@ -88,6 +91,8 @@ const ContainerFormModal = ({
       setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
     }
     setDescription(initialContainer?.description || '');
+    setDifficulty(Math.max(0, Math.min(5, Number(initialContainer?.difficulty) || 0)));
+    setLockOnFailure(Boolean(initialContainer?.lockOnFailure));
     setCapsCount(String(
       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
     ));
@@ -243,12 +248,14 @@ const ContainerFormModal = ({
         ...(initialContainer || {}),
         kind: isHub
           ? CONTAINER_KIND.HUB
-          : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
+          : (isTerminal ? CONTAINER_KIND.TERMINAL : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT)),
         name: cleanName,
         roomCode: primaryRoomCode,
         roomCodes: isHub ? selectedRoomCodes : [],
         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
         description: description.trim(),
+        difficulty: isTerminal ? difficulty : 0,
+        lockOnFailure: isTerminal && lockOnFailure,
         caps: resolvedCaps,
         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
@@ -263,6 +270,8 @@ const ContainerFormModal = ({
     titleKey = isEditing ? 'form.editHubTitle' : 'form.createHubTitle';
   } else if (isMerchant) {
     titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
+  } else if (isTerminal) {
+    titleKey = isEditing ? 'form.editTerminalTitle' : 'form.createTerminalTitle';
   }
 
   const trimmedHubQuery = hubQuery.trim();
@@ -488,6 +497,41 @@ const ContainerFormModal = ({
               multiline
             />
 
+            {isTerminal && (
+              <>
+                <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
+                <View style={styles.terminalDifficultyRow}>
+                  {[0, 1, 2, 3, 4, 5].map((value) => (
+                    <TouchableOpacity
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: difficulty === value }}
+                      style={[styles.terminalDifficultyChip, difficulty === value && styles.terminalDifficultyChipActive]}
+                      onPress={() => setDifficulty(value)}
+                    >
+                      <Text style={[styles.terminalDifficultyChipText, difficulty === value && styles.terminalDifficultyChipTextActive]}>
+                        {value} · {value + 4}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={styles.hintText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
+                <TouchableOpacity
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: lockOnFailure }}
+                  style={styles.terminalLockRow}
+                  onPress={() => setLockOnFailure((value) => !value)}
+                >
+                  <MaterialCommunityIcons
+                    name={lockOnFailure ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                    size={21}
+                    color={lockOnFailure ? '#e8c04b' : '#757575'}
+                  />
+                  <Text style={styles.terminalLockText}>{tLootTrade('form.terminalLockLabel')}</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
             {isMerchant && (
               <>
                 <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
@@ -618,6 +662,26 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
   },
+  terminalDifficultyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 5,
+    marginTop: 6,
+  },
+  terminalDifficultyChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#666',
+    backgroundColor: '#262626',
+  },
+  terminalDifficultyChipActive: { borderColor: '#e8c04b', backgroundColor: '#443a17' },
+  terminalDifficultyChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
+  terminalDifficultyChipTextActive: { color: '#f4d76a' },
+  terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
+  terminalLockText: { color: '#e6e0c6', flex: 1, fontSize: 14 },
   input: {
     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
