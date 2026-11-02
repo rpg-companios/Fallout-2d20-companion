@@ -1,6 +1,6 @@
 # Changelog
 ---
-## A terminal inside a location opens the hacking mini-game instead of a chest (patch 492)
+## A terminal inside a location opens the hacking mini-game instead of a chest (patch 493)
 
 **Symptom:** the GM created a terminal and linked it into a location, but players
 saw an ordinary chest and got the "open container" flow instead of the hacking
@@ -10,7 +10,7 @@ window.
 not know. On a server that has not been updated, `kind: 'terminal'` becomes
 `'loot'` and `difficulty` / `lockOnFailure` are lost. The player client therefore
 received a chest node; such a server has no `terminalStates` registry either, so
-the earlier fallback based on that registry could not help.
+the earlier registry fallback (patch 491) could not help.
 
 **Fix:**
 
@@ -29,6 +29,29 @@ the earlier fallback based on that registry could not help.
   as a one-node location instead of the unsupported `terminal.issue`;
 - restart the room server after updating `server/` to get a fully synchronized
   party-wide game; the mini-game itself is playable immediately.
+
+---
+## Environment/Combat card redesign and manual exposure effects (patch 484)
+
+- Aligned the screen header and cards with the Character and Loot/Trade sections: vector icons, matching header structure and card borders; RU/EN selection now persists in settings.
+- Radiation is configured manually as damage per tick, interval count, and interval unit (for example, 3 damage per scene for 3 scenes). Removed source categories, protection-mode selection, and GM-side outcome previews. Effects require a connected room; protection and immunity resolve on the character side.
+- Sealed armor is automatically respected by weather effects on the character. Ghouls remain radiation-immune and recover 1 HP for each 3 points of radiation damage received.
+- Injuries apply to one selected character. Injury presets save a character-neutral zone; body or chassis locations are selected/adapted for the actual target when applied, including robots.
+
+---
+## Fix opening the GM "Environment/Combat" tab (patch 483)
+
+Fixed an error when opening the GM's third tab: the screen incorrectly destructured
+`useLocale()` and passed an empty locale to the language-label formatter. It now
+reads the locale as a string and switches languages through the standard
+`setCurrentLocale` function.
+
+---
+## Environment/Combat, saved state presets, and room-neighbor First Aid (patch 482)
+
+- Added the GM workspace’s third tab, **Environment/Combat**, with separate Weather, Radiation, Injury, and Attack Failure tiles, room/recipient selection, room-wide time advancement, and tabletop-only calculation.
+- Weather and radiation configure strength (a number or `{CD}`) and duration; periodic effects trigger at the end of each selected interval while respecting armor resistance and immunities. Weather conditions remain independent; robot chassis injuries can be stabilized and heal after sleep, and six attack complications are supported: ammo loss, jam, breakage, explosion, ricochet, and dropped weapon.
+- Game Masters can save named, described state tiles, organize them in folders, and sync them to Google Drive. Players can roll First Aid (`INT + Medicine/Repair`) when using medical supplies; a success adds the check value to healing. **Apply to Another** can send aid to a room neighbor with delivery acknowledgement.
 
 ---
 ## Dedicated GM Workspace Navigator (`navbar2`), read-only character spoiler cards & queued GM commands (patch 481)

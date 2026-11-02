@@ -3,8 +3,9 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as db from '../../db';
 import { createCharacterExportPayload, parseCharacterImportPayload, sanitizeFileName } from '../../domain/characterTransfer';
-import { isGmCampaignsLicensed, isGmLootTradeLicensed } from '../../domain/premium';
+import { isGmCampaignsLicensed, isGmEnvCombatLicensed, isGmLootTradeLicensed } from '../../domain/premium';
 import { normalizeContainerEntity } from '../../domain/lootTrade';
+import { normalizeGmEnvEntry } from '../../domain/envCombatPresets';
 import { getActiveModuleId } from '../../domain/moduleLocale';
 import { syncAvatars, AVATARS_FOLDER_NAME, avatarFileName } from './avatarSync';
 import { validateAvatarDataUrl } from '../../domain/characterAvatar';
@@ -12,6 +13,7 @@ import * as avatarCache from '../../db/avatarCache';
 
 const GM_CONTAINERS_FOLDER_NAME = 'gm_containers';
 const GM_ROOMS_FOLDER_NAME = 'gm_rooms';
+const GM_ENV_ENTRIES_FOLDER_NAME = 'gm_env_entries';
 
 // Хранилище облачных сохранений — appDataFolder (скрытая папка приложения в
 // Google Drive): пользователь её НЕ видит в своём Диске, доступ есть только
@@ -372,6 +374,145 @@ const syncGmContainersInSession = async (token, moduleFolderId, { confirmDownloa
       folderId: gmFolderId,
       fileId: remote?.id,
       filename: makeRemoteGmContainerFilename(fresh),
+      payload,
+    });
+  }
+
+  return { uploaded: uploads.length, downloaded: downloadedCount };
+};
+
+// ─── Сохранённые плитки и папки «Окружающая среда/бой» (gm_env_entries) ─────
+
+const makeRemoteGmEnvEntryFilename = (entry) => {
+  const safeName = sanitizeFileName(entry?.name || 'env_preset')
+    .replace(/\.rpgc$/i, '');
+  return `${entry.id}__${safeName}.json`;
+};
+
+const findGmEnvEntriesFolderId = async (token, moduleFolderId) => {
+  const q = encodeURIComponent(
+    `mimeType='application/vnd.google-apps.folder' and trashed=false and name='${GM_ENV_ENTRIES_FOLDER_NAME}' and '${moduleFolderId}' in parents`,
+  );
+  const listResp = await driveFetch(token, `${DRIVE_API}/files?q=${q}&fields=files(id,name)&spaces=appDataFolder`);
+  const listData = await listResp.json();
+  return listData.files?.[0]?.id ?? null;
+};
+
+const getGmEnvEntriesFolderId = async (token, moduleFolderId) => {
+  const existingId = await findGmEnvEntriesFolderId(token, moduleFolderId);
+  if (existingId) return existingId;
+
+  const createResp = await driveFetch(token, `${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: GM_ENV_ENTRIES_FOLDER_NAME,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [moduleFolderId],
+    }),
+  });
+  const created = await createResp.json();
+  if (!created.id) {
+    throw new Error('Не удалось создать подпапку gm_env_entries в appDataFolder');
+  }
+  return created.id;
+};
+
+const parseGmEnvEntryCloudPayload = (rawText) => {
+  try {
+    const parsed = typeof rawText === 'string' ? JSON.parse(rawText) : rawText;
+    const body = parsed?.entry && typeof parsed.entry === 'object'
+      ? parsed.entry
+      : parsed;
+    if (!body || typeof body !== 'object' || !body.id || !body.name) {
+      return { error: 'INVALID_GM_ENV_ENTRY' };
+    }
+    return { entry: normalizeGmEnvEntry(body) };
+  } catch {
+    return { error: 'INVALID_JSON' };
+  }
+};
+
+const syncGmEnvEntriesInSession = async (token, moduleFolderId, { confirmDownload } = {}) => {
+  if (!isGmEnvCombatLicensed()) {
+    return { uploaded: 0, downloaded: 0 };
+  }
+  const localEntries = typeof db.getGmEnvEntriesList === 'function'
+    ? await db.getGmEnvEntriesList()
+    : [];
+  const existingFolderId = await findGmEnvEntriesFolderId(token, moduleFolderId);
+  if (!existingFolderId && localEntries.length === 0) {
+    return { uploaded: 0, downloaded: 0 };
+  }
+
+  const gmEnvFolderId = existingFolderId || await getGmEnvEntriesFolderId(token, moduleFolderId);
+  const remoteFiles = await listRemoteCharacterFiles(token, gmEnvFolderId);
+  const remoteById = new Map();
+  for (const file of remoteFiles) {
+    const maybeId = (file.name || '').split('__')[0];
+    if (maybeId) remoteById.set(maybeId, file);
+  }
+
+  const outdatedLocals = [];
+  const uploads = [];
+
+  for (const entry of localEntries) {
+    const remote = remoteById.get(entry.id);
+    const localUpdated = Number(entry.updatedAt || 0);
+    const remoteUpdated = remote?.modifiedTime ? new Date(remote.modifiedTime).getTime() : 0;
+    if (remote && remoteUpdated > localUpdated + 1000) {
+      outdatedLocals.push({ entry, remote });
+    } else {
+      uploads.push({ entry, remote });
+    }
+  }
+
+  let downloadedCount = 0;
+  const localIds = new Set(localEntries.map((e) => e.id));
+  const newRemoteFiles = remoteFiles.filter((file) => {
+    const maybeId = (file.name || '').split('__')[0];
+    return maybeId && !localIds.has(maybeId);
+  });
+
+  for (const file of newRemoteFiles) {
+    const raw = await downloadRemoteCharacter(token, file.id);
+    const parsed = parseGmEnvEntryCloudPayload(raw);
+    if (parsed.error || !parsed.entry) continue;
+    await db.saveGmEnvEntry(parsed.entry, { preserveUpdatedAt: true });
+    downloadedCount += 1;
+  }
+
+  if (outdatedLocals.length > 0) {
+    const shouldDownload = typeof confirmDownload === 'function'
+      ? await confirmDownload(outdatedLocals)
+      : true;
+    if (shouldDownload) {
+      for (const { remote } of outdatedLocals) {
+        const raw = await downloadRemoteCharacter(token, remote.id);
+        const parsed = parseGmEnvEntryCloudPayload(raw);
+        if (parsed.error || !parsed.entry) continue;
+        await db.saveGmEnvEntry(parsed.entry, { preserveUpdatedAt: true });
+        downloadedCount += 1;
+      }
+    } else {
+      uploads.push(...outdatedLocals);
+    }
+  }
+
+  for (const { entry, remote } of uploads) {
+    const fresh = await db.getGmEnvEntryById(entry.id);
+    if (!fresh) continue;
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_env_entry',
+      exportedAt: Date.now(),
+      entry: fresh,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmEnvFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmEnvEntryFilename(fresh),
       payload,
     });
   }
@@ -861,6 +1002,18 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
     debugLog('sync.gmContainers:failed', { message: e?.message });
   }
 
+  // Сохранённые плитки и папки «Окружающая среда/бой» (патч 482):
+  let gmEnvUploaded = 0;
+  let gmEnvDownloaded = 0;
+  try {
+    const gmEnvStats = await syncGmEnvEntriesInSession(token, folderId, { confirmDownload });
+    gmEnvUploaded = gmEnvStats.uploaded || 0;
+    gmEnvDownloaded = gmEnvStats.downloaded || 0;
+    debugLog('sync.gmEnvEntries:done', gmEnvStats);
+  } catch (e) {
+    debugLog('sync.gmEnvEntries:failed', { message: e?.message });
+  }
+
   // Аватары (задел премиум-фичы, UI пока нет): редкий синк — ровно здесь.
   // Пустой кэш → ни одного запроса; сбой аватаров не роняет синк персонажей.
   try {
@@ -871,8 +1024,8 @@ export const syncAllCharactersWithCloud = async ({ confirmDownload, onProgress }
   }
 
   report('done');
-  const totalUploaded = uploads.length + gmRoomsUploaded + gmUploaded;
-  const totalDownloaded = downloadedCount + gmRoomsDownloaded + gmDownloaded;
+  const totalUploaded = uploads.length + gmRoomsUploaded + gmUploaded + gmEnvUploaded;
+  const totalDownloaded = downloadedCount + gmRoomsDownloaded + gmDownloaded + gmEnvDownloaded;
   debugLog('sync.all:done', { uploaded: totalUploaded, downloaded: totalDownloaded });
   return { uploaded: totalUploaded, downloaded: totalDownloaded };
 };
@@ -1088,6 +1241,71 @@ export const deleteGmRoomFromCloudIfEnabled = async (folderId) => {
   } catch (e) {
     const message = e?.message || String(e);
     debugLog('sync.gmRoom.delete:failed', { folderId, message });
+    return { removed: false, reason: 'error', message };
+  }
+};
+
+// Фоновая выгрузка сохранённой плитки / папки «Окружающая среда/бой» в Google Drive.
+export const syncGmEnvEntryToCloudIfEnabled = async (entryId) => {
+  if (!ensureWeb() || !entryId || !isGmEnvCombatLicensed()) return;
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return;
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmEnvFolderId = await getGmEnvEntriesFolderId(token, moduleFolderId);
+    const remoteFiles = await listRemoteCharacterFiles(token, gmEnvFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${entryId}__`));
+    const entry = await db.getGmEnvEntryById(entryId);
+    if (!entry) return;
+
+    const payload = JSON.stringify({
+      formatVersion: 1,
+      type: 'gm_env_entry',
+      exportedAt: Date.now(),
+      entry,
+    });
+    await uploadCharacterFile({
+      token,
+      folderId: gmEnvFolderId,
+      fileId: remote?.id,
+      filename: makeRemoteGmEnvEntryFilename(entry),
+      payload,
+    });
+    debugLog('sync.gmEnvEntry.auto:done', { entryId });
+  } catch (e) {
+    debugLog('sync.gmEnvEntry.auto:failed', { entryId, message: e?.message || String(e) });
+  }
+};
+
+// Удаление сохранённой плитки / папки «Окружающая среда/бой» из Google Drive.
+export const deleteGmEnvEntryFromCloudIfEnabled = async (entryId) => {
+  if (!ensureWeb() || !entryId) return { removed: false, reason: 'not-web' };
+  if (!isGmEnvCombatLicensed()) return { removed: false, reason: 'unlicensed' };
+
+  try {
+    const configured = await isCloudSyncConfigured();
+    if (!configured) return { removed: false, reason: 'not-configured' };
+
+    await loadGoogleIdentityScript();
+    const token = await requestAccessToken();
+    const moduleFolderId = await getModuleFolderId(token);
+    const gmEnvFolderId = await findGmEnvEntriesFolderId(token, moduleFolderId);
+    if (!gmEnvFolderId) return { removed: false, reason: 'absent' };
+
+    const remoteFiles = await listRemoteCharacterFiles(token, gmEnvFolderId);
+    const remote = remoteFiles.find((file) => (file.name || '').startsWith(`${entryId}__`));
+    if (!remote) return { removed: false, reason: 'absent' };
+
+    await driveFetch(token, `${DRIVE_API}/files/${remote.id}`, { method: 'DELETE' });
+    debugLog('sync.gmEnvEntry.delete:done', { entryId, fileId: remote.id });
+    return { removed: true };
+  } catch (e) {
+    const message = e?.message || String(e);
+    debugLog('sync.gmEnvEntry.delete:failed', { entryId, message });
     return { removed: false, reason: 'error', message };
   }
 };

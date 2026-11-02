@@ -171,8 +171,11 @@ export const processPendingDirectivesForPlayer = async () => {
         const noteBlock = directive.note
           ? `\n\n${formatGm(tGm('commands.playerAlert.notePrefix', locale), { note: directive.note })}`
           : '';
+        const alertTitle = directive.originRole === 'peer' || directive.kind === 'peer.consumable'
+          ? formatGm(tGm('envCombat.firstAid.peerReceivedTitle', locale), { from: directive.fromName || '—' })
+          : formatGm(tGm('commands.playerAlert.title', locale), { character: characterName });
         showRawAlert({
-          title: formatGm(tGm('commands.playerAlert.title', locale), { character: characterName }),
+          title: alertTitle,
           message: `${summaryLine}${noteBlock}`,
         });
       }

@@ -4,21 +4,26 @@ import { Ionicons } from '@expo/vector-icons';
 import { Text, StyleSheet } from 'react-native';
 import HomeScreen from '../screens/HomeScreen/HomeScreen';
 import LootTradeScreen from '../screens/LootTradeScreen/LootTradeScreen';
+import EnvCombatScreen from '../screens/EnvCombatScreen/EnvCombatScreen';
 import { tApp } from '../../i18n/appI18n';
 
 // Отдельный навигатор пространства Мастера (navbar2):
 // - полностью изолирован от вкладок листа персонажа Игрока;
 // - сохраняет привычное горизонтальное перелистывание (swipeEnabled: true);
-// - строится по расширяемому реестру разделов Мастера (кампании, добыча/торговля
-//   и будущие экраны ведущего без пересборки игроцкого навигатора).
+// - строится по расширяемому реестру разделов Мастера (кампании, добыча/торговля,
+//   окружающая среда/бой и будущие экраны ведущего без пересборки игроцкого навигатора).
 const GmTab = createMaterialTopTabNavigator();
 
 export const GM_TAB_ROUTES = Object.freeze({
   CAMPAIGNS: 'GmCampaignsTab',
   LOOT_TRADE: 'GmLootTradeTab',
+  ENV_COMBAT: 'GmEnvCombatTab',
 });
 
-export function buildGmWorkspaceSections({ gmLootTradeLicensed = true } = {}) {
+export function buildGmWorkspaceSections({
+  gmLootTradeLicensed = true,
+  gmEnvCombatLicensed = true,
+} = {}) {
   const sections = [
     {
       name: GM_TAB_ROUTES.CAMPAIGNS,
@@ -37,17 +42,28 @@ export function buildGmWorkspaceSections({ gmLootTradeLicensed = true } = {}) {
       inactiveIcon: 'cube-outline',
     });
   }
+  if (gmEnvCombatLicensed) {
+    sections.push({
+      name: GM_TAB_ROUTES.ENV_COMBAT,
+      component: EnvCombatScreen,
+      labelKey: 'tabs.gmEnvCombat',
+      activeIcon: 'thunderstorm',
+      inactiveIcon: 'thunderstorm-outline',
+    });
+  }
   return sections;
 }
 
 export default function GmWorkspaceNavigator({
   gmLootTradeLicensed = true,
+  gmEnvCombatLicensed = true,
   campaignsLabel,
   lootTradeLabel,
+  envCombatLabel,
 }) {
   const sections = useMemo(
-    () => buildGmWorkspaceSections({ gmLootTradeLicensed }),
-    [gmLootTradeLicensed],
+    () => buildGmWorkspaceSections({ gmLootTradeLicensed, gmEnvCombatLicensed }),
+    [gmLootTradeLicensed, gmEnvCombatLicensed],
   );
 
   const iconByRoute = useMemo(
@@ -58,6 +74,7 @@ export default function GmWorkspaceNavigator({
   const resolveSectionLabel = (section) => {
     if (section.name === GM_TAB_ROUTES.CAMPAIGNS && campaignsLabel) return campaignsLabel;
     if (section.name === GM_TAB_ROUTES.LOOT_TRADE && lootTradeLabel) return lootTradeLabel;
+    if (section.name === GM_TAB_ROUTES.ENV_COMBAT && envCombatLabel) return envCombatLabel;
     return tApp(section.labelKey);
   };
 

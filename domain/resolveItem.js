@@ -132,6 +132,7 @@ const INSTANCE_FIELDS = [
   'appliedMods', 'stackKey',                  // моды и подпись стопки
   'appliedArmorModId', 'appliedUniqueArmorModId', 'appliedClothingModId',
   'durabilityTracked', 'durability', 'durabilityAmmoRemainder', 'durabilityWearRemainder',
+  'jammed', 'forceBroken', 'unrepairable',
   'equipInstanceId', 'uniqueId',              // идентификаторы экипировки
   'charges', 'hpCurrent',                     // заряд Ядерного Блока / прочность части СБ
   'sourceSlot', 'isBuiltin', 'isManipulator', 'isEquipped', // мета отображения / роботов

@@ -271,24 +271,23 @@ describe('Патч 469 — доработки «Добычи/Торговли» 
     }
   });
 
-  it('все модалки «Добычи/Торговли» используют серо-жёлтую палитру приложения, а модалка лута игрока имеет увеличенные отступы и воздух', () => {
+  it('админ-модалки «Добычи/Торговли» используют общую светлую палитру, а модалка лута игрока сохраняет увеличенные отступы', () => {
     const modalFiles = [
       'components/screens/LootTradeScreen/modals/ContainerFormModal.js',
       'components/screens/LootTradeScreen/modals/ContainerItemConfigModal.js',
       'components/screens/LootTradeScreen/modals/ContainerCatalogModal.js',
       'components/screens/LootTradeScreen/modals/IssueContainerModal.js',
-      'components/lootTrade/PlayerLootTradeOverlay.js',
+      'components/screens/LootTradeScreen/modals/HubChildPickerModal.js',
+      'components/screens/EnvCombatScreen/EnvCombatScreen.js',
+      'components/screens/EnvCombatScreen/modals/EnvMechanicModal.js',
+      'components/gm/GmCommandModal.js',
     ];
 
     for (const relPath of modalFiles) {
       const src = fs.readFileSync(path.join(repoRoot, relPath), 'utf8');
-      expect(src).toContain('#1f1f1f');
-      expect(src).toContain('#f0e68c');
-      // Никаких сине-сланцевых и ярко-зелёных цветов в новых модалках
-      expect(src).not.toContain('#111827');
-      expect(src).not.toContain('#1f2937');
-      expect(src).not.toContain('#2e7d32');
-      expect(src).not.toContain('#15803d');
+      expect(src).toContain('ADMIN_MODAL_PALETTE.surface');
+      expect(src).toContain('ADMIN_MODAL_PALETTE.accent');
+      expect(src).not.toContain("backgroundColor: '#1f1f1f'");
     }
 
     // Модалка настройки предмета использует режим пачек для патронов без выбора шт./CD/d20

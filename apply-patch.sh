@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-ARENA_BRANCH="arena/c1c60b87-fallout-2d20-companion"
+ARENA_BRANCH="arena/054e6676-fallout-2d20-companion"
 REMOTE="origin"
 
 ROOT_DIR="$(
@@ -375,6 +375,13 @@ sync_to_baseline() {
       done
     done <<<"$stale"
   fi
+
+  # 493: цель == отсечка — цепочка патчей вообще не применяется, поэтому
+  # локальный каталог patchs/ остался бы от старой версии (старый
+  # baseline.json и без файла ключевого патча). Доводим его до состояния
+  # коммита отсечки: номер отсечки и сам файл патча приходят вместе с
+  # деревом. Старые/свои файлы в patchs/ не удаляются — tar только пишет.
+  git -C "$ROOT_DIR" archive "$BASELINE_COMMIT" -- patchs | tar -x -C "$ROOT_DIR"
 }
 
 read_app_version() {

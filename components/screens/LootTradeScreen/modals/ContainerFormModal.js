@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { ADMIN_MODAL_PALETTE } from '../../../admin/adminModalTheme';
 import {
   Modal,
   View,
@@ -575,7 +576,7 @@ const ContainerFormModal = ({
                         {uKey === QUANTITY_UNIT.CD ? (
                           <CdIcon size={38} />
                         ) : uKey === QUANTITY_UNIT.D20 ? (
-                          <MaterialCommunityIcons name="dice-d20" size={32} color="#ffffff" />
+                          <MaterialCommunityIcons name="dice-d20" size={32} color={ADMIN_MODAL_PALETTE.text} />
                         ) : (
                           <Text style={[styles.unitSegText, active && styles.unitSegTextActive]}>
                             {tLootTrade('itemConfig.unitPcs')}
@@ -638,15 +639,15 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 520,
     maxHeight: '84%',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: ADMIN_MODAL_PALETTE.surface,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     paddingHorizontal: 24,
     paddingVertical: 22,
   },
   title: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
@@ -655,7 +656,7 @@ const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
   scrollContent: { paddingBottom: 10 },
   label: {
-    color: '#e8e8e8',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 12,
@@ -682,13 +683,13 @@ const styles = StyleSheet.create({
   terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
   terminalLockText: { color: '#e6e0c6', flex: 1, fontSize: 14 },
   input: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     borderRadius: 5,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#f2f2f2',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
   },
   multilineInput: {
@@ -701,7 +702,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   hintText: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
     marginTop: 4,
     lineHeight: 16,
@@ -717,23 +718,23 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   roomChipActive: {
-    backgroundColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.accent,
     borderColor: '#d4af37',
   },
   roomChipName: {
-    color: '#f0f0f0',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
   },
   roomChipCode: {
-    color: '#a3a3a3',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 11,
   },
   roomChipTextActive: {
-    color: '#1a1a1a',
+    color: ADMIN_MODAL_PALETTE.accentText,
   },
   selectedHubPills: {
     flexDirection: 'row',
@@ -745,27 +746,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#3a3a1e',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
     borderWidth: 1,
-    borderColor: '#f0e68c',
+    borderColor: ADMIN_MODAL_PALETTE.accent,
     borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   selectedHubPillText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
   },
   selectedHubPillRemove: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   hubComboRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     borderRadius: 5,
@@ -802,7 +803,7 @@ const styles = StyleSheet.create({
   hubComboInput: {
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: '#f2f2f2',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     backgroundColor: 'transparent',
   },
@@ -812,17 +813,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderLeftWidth: 1,
     borderLeftColor: '#484848',
-    backgroundColor: '#252525',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
   },
   hubDropdownToggleText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },
   quickSuggestBar: {
     marginTop: 5,
     alignSelf: 'flex-start',
-    backgroundColor: '#33311b',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
     borderWidth: 1,
     borderColor: '#d4af37',
     borderRadius: 5,
@@ -830,13 +831,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   quickSuggestText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 12,
     fontWeight: '700',
   },
   hubDropdownMenu: {
     marginTop: 5,
-    backgroundColor: '#242424',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#5a5a5a',
     borderRadius: 5,
@@ -846,7 +847,7 @@ const styles = StyleSheet.create({
     maxHeight: 170,
   },
   hubDropdownEmpty: {
-    color: '#9e9e9e',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -859,37 +860,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: '#323232',
+    borderBottomColor: ADMIN_MODAL_PALETTE.borderMuted,
   },
   hubDropdownItemSuggested: {
-    backgroundColor: '#2f2d1c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   hubDropdownItemSelected: {
-    backgroundColor: '#3a3a1e',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   hubDropdownItemText: {
-    color: '#eaeaea',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
     marginRight: 8,
   },
   hubDropdownItemTextHighlight: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontWeight: '700',
   },
   hubDropdownItemMark: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },
   hubDropdownCreateItem: {
     paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: '#2b2b1d',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
   },
   hubDropdownCreateText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -901,7 +902,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   stepBtn: {
-    backgroundColor: '#2e2e2e',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     width: 40,
     height: 40,
     borderRadius: 5,
@@ -911,19 +912,19 @@ const styles = StyleSheet.create({
     borderColor: '#666666',
   },
   stepBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 20,
     fontWeight: '700',
   },
   counterInput: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderWidth: 1,
     borderColor: '#777777',
     borderRadius: 5,
     width: 108,
     height: 40,
     textAlign: 'center',
-    color: '#f5f5f5',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 18,
     fontWeight: '700',
   },
@@ -942,7 +943,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1,
     borderColor: '#5a5a5a',
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -951,16 +952,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
   },
   unitSegActive: {
-    backgroundColor: '#3a3a1e',
-    borderColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
   },
   unitSegText: {
-    color: '#dcdcdc',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 14,
     fontWeight: '700',
   },
   unitSegTextActive: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
   },
   footer: {
     flexDirection: 'row',
@@ -975,20 +976,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   saveBtn: {
-    backgroundColor: '#3a3a1e',
-    borderColor: '#f0e68c',
+    backgroundColor: ADMIN_MODAL_PALETTE.selected,
+    borderColor: ADMIN_MODAL_PALETTE.accent,
   },
   saveBtnText: {
-    color: '#f0e68c',
+    color: ADMIN_MODAL_PALETTE.text,
     fontSize: 15,
     fontWeight: '700',
   },
   cancelBtn: {
-    backgroundColor: '#2a2a2a',
+    backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
     borderColor: '#777777',
   },
   cancelBtnText: {
-    color: '#d4d4d4',
+    color: ADMIN_MODAL_PALETTE.mutedText,
     fontSize: 15,
     fontWeight: '600',
   },

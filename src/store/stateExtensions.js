@@ -224,3 +224,29 @@ export const notifyConditionEvent = (payload, ctx) => {
   }
   return results;
 };
+
+// --- Слушатели хода игрового времени / сцен (патч 482) ---------------------
+
+const TIME_TICK_LISTENERS = new Map();
+
+export const registerTimeTickListener = (entry) => {
+  if (!entry || typeof entry !== 'object') {
+    throw new Error('[stateExtensions] Слушатель хода времени должен быть объектом');
+  }
+  if (typeof entry.id !== 'string' || !entry.id) {
+    throw new Error('[stateExtensions] Слушатель хода времени обязан иметь id');
+  }
+  if (typeof entry.listener !== 'function') {
+    throw new Error(`[stateExtensions] Слушатель "${entry.id}" обязан иметь listener`);
+  }
+  TIME_TICK_LISTENERS.set(entry.id, entry.listener);
+};
+
+export const notifyTimeTick = (step, store) => {
+  const logs = [];
+  for (const [, listener] of TIME_TICK_LISTENERS) {
+    const res = listener(step, store);
+    if (Array.isArray(res?.logs)) logs.push(...res.logs);
+  }
+  return logs;
+};

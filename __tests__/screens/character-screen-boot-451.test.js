@@ -154,7 +154,7 @@ describe('патч 451: целостность запуска приложени
 
   it('apply-patch.sh указывает на рабочую ветку и проверяет целостность node_modules', () => {
     const script = fs.readFileSync(path.join(ROOT, 'apply-patch.sh'), 'utf8');
-    expect(script).toContain('ARENA_BRANCH="arena/c1c60b87-fallout-2d20-companion"');
+    expect(script).toContain('ARENA_BRANCH="arena/054e6676-fallout-2d20-companion"');
     expect(script).toContain('deps_check()');
     expect(script).toContain('deps_check || exit 1');
   });

@@ -85,7 +85,7 @@ function App() {
   const settingsHydrated = useAppSettingsStore(selectSettingsHydrated);
   const storeUiMode = useAppSettingsStore(selectUiMode);
   const tabUiMode = useUiModeStore((s) => s.tabUiMode);
-  const { adminLicensed, gmLootTradeLicensed } = useAdminAccess();
+  const { adminLicensed, gmLootTradeLicensed, gmEnvCombatLicensed } = useAdminAccess();
   const rawIsGmMode = (tabUiMode || storeUiMode) === 'gm';
   const isGmMode = rawIsGmMode && adminLicensed;
   const locale = useLocale();
@@ -104,7 +104,7 @@ function App() {
   const moduleTabsActive = activeSettingId != null;
   const characterSheetTabsActive = !isGmMode && moduleTabsActive;
   const navTopologyKey = isGmMode
-    ? `gm-navbar2:${gmLootTradeLicensed ? 'full' : 'campaigns'}`
+    ? `gm-navbar2:${gmLootTradeLicensed ? 'loot' : 'no-loot'}:${gmEnvCombatLicensed ? 'env' : 'no-env'}`
     : (moduleTabsActive ? 'fallout' : 'empty');
 
   useEffect(() => {
@@ -245,8 +245,10 @@ function App() {
                   {isGmMode ? (
                     <GmWorkspaceNavigator
                       gmLootTradeLicensed={gmLootTradeLicensed}
+                      gmEnvCombatLicensed={gmEnvCombatLicensed}
                       campaignsLabel={tApp('tabs.gmCampaigns')}
                       lootTradeLabel={tApp('tabs.gmLootTrade')}
+                      envCombatLabel={tApp('tabs.gmEnvCombat')}
                     />
                   ) : (
                     <Tab.Navigator

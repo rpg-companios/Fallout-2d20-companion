@@ -321,6 +321,7 @@ export const applyConsumableToEffects = (item, currentEffects = []) => {
         const beforeLength = nextEffects.length;
         nextEffects = nextEffects.filter((effect) => {
             if (effect.effectKind !== 'negative') return true;
+            if (effect.effectType === 'injury' || effect.effectType === 'gmPeriodic' || effect.effectType === 'disease') return true;
             if (removeNegativeEffects.includes('all')) return false;
             const comparableNames = [effect.effectName, effect.effectLabel].filter(Boolean);
             return !comparableNames.some((value) => removeNegativeEffects.includes(value));
