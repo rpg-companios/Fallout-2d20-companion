@@ -1,8 +1,11 @@
 {
-  "version": "499",
+  "version": "500",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
+      "На остальных сложностях доска тоже стала меньше на пять слов, поэтому взлом с высоким Интеллектом и Наукой перестал быть лотереей.",
+      "Четыре скобки Науки 6 сохраняются даже на самой короткой доске; думающий игрок на пятой сложности выигрывает около 96–98 % партий.",
       "Скобки теперь двух сортов: одна убирает одно ложное слово, другая возвращает одну попытку. Одна скобка больше не делает и то, и другое сразу.",
       "Число скобок задаёт Наука на всех сложностях: 0, 1, 1, 2, 3, 3, 4 для Науки 0–6. Сложность на число скобок больше не влияет.",
       "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
@@ -43,6 +46,9 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
+      "Every other difficulty also lost five words, so hacking with a high Intellect and Science no longer feels like a lottery.",
+      "Science 6 still grants four brackets even on the shortest board; a careful player wins about 96–98% of difficulty-5 runs.",
       "Brackets now come in two kinds: one removes a single wrong word, another restores a single attempt. A bracket no longer does both at once.",
       "Science alone sets the bracket count at every difficulty: 0, 1, 1, 2, 3, 3, 4 for Science 0–6. Difficulty no longer limits it.",
       "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",

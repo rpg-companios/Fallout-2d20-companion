@@ -1,5 +1,23 @@
 # Changelog
 ---
+## The "25 − INT" board (patch 500)
+
+Owner: "with INT 10 + Science 6 I failed the hack three times in a row".
+Every difficulty lost five words:
+
+`N = max(4, 15 + 2·D − INT)`; at difficulty 5 that is **`25 − INT`** — 21
+words at INT 4 and 15 at INT 10 (previously 26 and 20). At difficulty 1 with
+INT 10 it is 7 words, at difficulty 0 — 5.
+
+The bracket guard was relaxed from `N−3` to `N−1` so that Science 6 keeps all
+four brackets even on the shortest board. Board generation got faster
+(≈20–30 ms at difficulty 5) while the ambiguity floor stays at ≥4.
+
+Measured on the real engine, INT 10, LCK 4, difficulty 5, Science 6: blind
+guessing **21% → 39%**, informed deduction **94% → 98%**, best-move play
+**100%**, **100%** after a lucky full restore. At difficulty 1 with Science 6
+informed deduction remains **100%**. Installation: `docs/patch-500-install.md`.
+
 ## Two kinds of brackets, count set by Science (patch 499)
 
 The owner clarified how the bonus table should be read: "2 words + 2 attempts"

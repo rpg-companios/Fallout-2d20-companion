@@ -37,10 +37,12 @@ const MIN_AMBIGUITY_BY_DIFFICULTY = [2, 2, 2, 2, 4, 4];
 const AMBIGUITY_TARGET_BY_DIFFICULTY = [2, 2, 2, 2, 8, 8];
 // Минимум общих букв с опорным словом = L − 3.
 const MIN_SHARED_BY_DIFFICULTY = [1, 2, 3, 4, 5, 6];
-// N при ИНТ 4: 16 + 2·D. ИНТ вычитается из базы по одному слову за очко.
-const BASE_WORDS_BY_DIFFICULTY = [16, 18, 20, 22, 24, 26];
+// Патч 500: N = 15 + 2·D − ИНТ. На сложности 5 это «25 − ИНТ»:
+// 21 слово при ИНТ 4 и 15 при ИНТ 10. База при ИНТ 4 = 11 + 2·D,
+// дальше каждое очко ИНТ убирает ровно одно слово.
+const BASE_WORDS_BY_DIFFICULTY = [11, 13, 15, 17, 19, 21];
 const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
-const BASE_WORD_COUNT = 20; // экспорт для совместимости
+const BASE_WORD_COUNT = 15; // запасной размер доски, если wordCount не передан
 const MIN_WORDS = 4;
 const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
 // Патч 499: запись «W слов + A попыток» означает W+A СКОБОК, а не эффекты
@@ -109,7 +111,8 @@ const bracketSplitFor = (science) => {
 
 // Число скобок задаёт ТОЛЬКО Наука. Сложность не ограничивает: на 1-м уровне
 // при высоких Науке + ИНТ взлом действительно лёгкий, на 5-м Наука 6 даёт
-// все 4 скобки. Предохранитель N−3 не даёт вычистить доску целиком.
+// все 4 скобки. Предохранитель N−1: с маленькой доски (D0/ИНТ 10 = 5 слов)
+// Наука 6 всё равно получает 4 скобки, но пустышки не кончаются полностью.
 const bracketCountFor = (difficulty, science, wordCount = 20) => {
   const sci = clamp(Number(science) || 0, 0, 6);
   const split = bracketSplitFor(sci);
@@ -118,7 +121,7 @@ const bracketCountFor = (difficulty, science, wordCount = 20) => {
   // difficulty сохранён в сигнатуре для совместимости вызывающих:
   // сложность больше НЕ влияет на число скобок.
   void difficulty;
-  return Math.max(0, Math.min(count, n - 3));
+  return Math.max(0, Math.min(count, n - 1));
 };
 
 // Эффект ОДНОЙ скобки: kind = 'word' -> убрать 1 ложное слово,
@@ -217,7 +220,8 @@ const skillScore = (intelligence, science) => (
 );
 const skillBonus = (intelligence, science) => skillScore(intelligence, science) - 4;
 
-// Патч 497: N = max(4, 20 + 2·D − ИНТ). ИНТ 10 на D5 -> 20 слов, ИНТ 4 -> 26.
+// Патч 500: N = max(4, 15 + 2·D − ИНТ) = «25 − ИНТ» на D5.
+// ИНТ 10 на D5 -> 15 слов, ИНТ 4 -> 21.
 const passwordWordCount = (effectiveDifficulty, intelligence) => {
   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const int = clamp(Number(intelligence) || 4, 4, 10);

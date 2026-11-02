@@ -1,4 +1,4 @@
-// Приёмочный тест патча 499: канонические 4 попытки, N = 20 + 2·D − ИНТ,
+// Приёмочный тест патча 500: канонические 4 попытки, N = 15 + 2·D − ИНТ,
 // скобки двух сортов, число скобок задаёт Наука, удача 5–20 %,
 // доска «последовательности».
 import { describe, expect, it } from 'vitest';
@@ -44,18 +44,19 @@ const rngFor = (seed) => {
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 };
 
-describe('патч 499: число слов, попытки и скобочные пары', () => {
-  it('N = max(4, 20 + 2·D − ИНТ)', () => {
-    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([16, 18, 20, 22, 24, 26]);
+describe('патч 500: число слов, попытки и скобочные пары', () => {
+  it('N = max(4, 15 + 2·D − ИНТ), на D5 это «25 − ИНТ»', () => {
+    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([11, 13, 15, 17, 19, 21]);
     for (let d = 0; d <= 5; d += 1) {
-      expect(passwordWordCount(d, 4)).toBe(16 + 2 * d);
-      expect(passwordWordCount(d, 10)).toBe(10 + 2 * d);
+      expect(passwordWordCount(d, 4)).toBe(11 + 2 * d);
+      expect(passwordWordCount(d, 10)).toBe(5 + 2 * d);
       for (let int = 4; int < 10; int += 1) {
         expect(passwordWordCount(d, int + 1)).toBeLessThan(passwordWordCount(d, int));
       }
     }
-    expect(passwordWordCount(5, 4)).toBe(26); // «26/20» владельца
-    expect(passwordWordCount(5, 10)).toBe(20);
+    expect(passwordWordCount(5, 4)).toBe(21); // «25 − ИНТ»
+    expect(passwordWordCount(5, 10)).toBe(15);
+    expect(25 - 10).toBe(passwordWordCount(5, 10));
   });
 
   it('4 попытки на всех сложностях и потолок 4', () => {
@@ -71,10 +72,10 @@ describe('патч 499: число слов, попытки и скобочны�
     expect(BRACKET_SPLIT_BY_SCIENCE).toEqual([[0, 0], [0, 0], [1, 0], [1, 1], [2, 1], [1, 2], [2, 2]]);
     expect(BRACKET_COUNT_BY_SCIENCE).toEqual([0, 1, 1, 2, 3, 3, 4]);
     expect(bracketCountFor(5, 0, 20)).toBe(0);
-    expect(bracketCountFor(0, 1, 16)).toBe(1);
+    expect(bracketCountFor(0, 1, 11)).toBe(1);
     expect(bracketCountFor(5, 6, 20)).toBe(4);
     expect(bracketCountFor(0, 6, 20)).toBe(4); // сложность НЕ ограничивает
-    expect(bracketCountFor(5, 6, 4)).toBe(1); // предохранитель N−3
+    expect(bracketCountFor(5, 6, 4)).toBe(3); // предохранитель N−1
     for (let d = 0; d <= 5; d += 1) {
       for (let sci = 0; sci <= 6; sci += 1) {
         const game = gameFor({ difficulty: d, int: 10, science: sci, luck: 10 });
@@ -117,7 +118,7 @@ describe('патч 499: число слов, попытки и скобочны�
   });
 });
 
-describe('патч 499: доска «последовательности»', () => {
+describe('патч 500: доска «последовательности»', () => {
   it('MIN_SHARED = L−3, предел подсказки из 495, пол неоднозначности поднят на D4–D5', () => {
     expect(MIN_SHARED_BY_DIFFICULTY).toEqual([1, 2, 3, 4, 5, 6]);
     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
@@ -186,12 +187,12 @@ describe('патч 499: доска «последовательности»', ()
   });
 
   it('excludeWords убирает слова прошлых досок', () => {
-    const first = buildPasswordSet({ wordLength: 9, effectiveDifficulty: 5, wordCount: 20, rng: () => 0.21 });
+    const first = buildPasswordSet({ wordLength: 9, effectiveDifficulty: 5, wordCount: 15, rng: () => 0.21 });
     const second = buildPasswordSet({
-      wordLength: 9, effectiveDifficulty: 5, wordCount: 20, rng: () => 0.22, excludeWords: first.words,
+      wordLength: 9, effectiveDifficulty: 5, wordCount: 15, rng: () => 0.22, excludeWords: first.words,
     });
     for (const word of first.words) expect(second.words).not.toContain(word);
-    expect(second.wordCount).toBe(20);
+    expect(second.wordCount).toBe(15);
   });
 
   it('Хакер снижает эффективную сложность, число слов и длину пароля', () => {
@@ -210,7 +211,7 @@ describe('патч 499: доска «последовательности»', ()
 
 // Приёмка владельца: слепой перебор невелик, думающий >= 80 % без бонусов
 // и 100 % при удачных скобках. Скобки тратятся при попытках <= 2 (USE_AT=2).
-describe('патч 499: баланс слепого перебора и вдумчивого разбора', () => {
+describe('патч 500: баланс слепого перебора и вдумчивого разбора', () => {
   const play = (game, strategy, rnd) => {
     let g = game;
     let cands = g.wordRanges.filter((w) => !w.removed).map((w) => w.word);
@@ -259,7 +260,7 @@ describe('патч 499: баланс слепого перебора и вдум
     return Math.round(100 * wins / n);
   };
 
-  it('D5: слепой <= 55 %, думающий >= 80 %, при Науке 6 думающий >= 90 %', () => {
+  it('D5: слепой <= 35 % без бонусов, <= 55 % при Науке 6, думающий >= 80 %', () => {
     const blind0 = rate(5, 0, 'blind');
     const blind6 = rate(5, 6, 'blind');
     const clever0 = rate(5, 0, 'clever');

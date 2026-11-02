@@ -1,0 +1,477 @@
+diff --git a/__tests__/room/terminal-brackets-499.test.js b/__tests__/room/terminal-brackets-500.test.js
+similarity index 95%
+rename from __tests__/room/terminal-brackets-499.test.js
+rename to __tests__/room/terminal-brackets-500.test.js
+index c295733..87af785 100644
+--- a/__tests__/room/terminal-brackets-499.test.js
++++ b/__tests__/room/terminal-brackets-500.test.js
+@@ -1,4 +1,4 @@
+-// Приёмочный тест 499: скобки двух сортов, число задаёт Наука,
++// Приёмочный тест 500: скобки двух сортов, число задаёт Наука,
+ // слепой перебор невелик, думающий выигрывает, удача даёт 100 %.
+ import { describe, expect, it } from 'vitest';
+ import {
+@@ -79,7 +79,7 @@ const rate = (d, sci, strategy, forcedFull = false, boards = 20, reps = 6) => {
+   return Math.round(100 * wins / n);
+ };
+ 
+-describe('патч 499: скобки двух сортов', () => {
++describe('патч 500: скобки двух сортов', () => {
+   it('число и состав скобок не зависят от сложности', () => {
+     for (let sci = 0; sci <= 6; sci += 1) {
+       const counts = [];
+@@ -101,8 +101,8 @@ describe('патч 499: скобки двух сортов', () => {
+     }
+   });
+ 
+-  it('на сложности 5 при Науке 6 слепой <= 40 %, думающий >= 85 %', () => {
+-    expect(rate(5, 6, 'blind')).toBeLessThanOrEqual(40);
++  it('на сложности 5 при Науке 6 слепой <= 50 %, думающий >= 85 %', () => {
++    expect(rate(5, 6, 'blind')).toBeLessThanOrEqual(50);
+     expect(rate(5, 6, 'clever')).toBeGreaterThanOrEqual(85);
+   }, 30000);
+ 
+diff --git a/__tests__/room/terminal-hacking-balance-499.test.js b/__tests__/room/terminal-hacking-balance-500.test.js
+similarity index 91%
+rename from __tests__/room/terminal-hacking-balance-499.test.js
+rename to __tests__/room/terminal-hacking-balance-500.test.js
+index 206bd97..e09c5be 100644
+--- a/__tests__/room/terminal-hacking-balance-499.test.js
++++ b/__tests__/room/terminal-hacking-balance-500.test.js
+@@ -1,4 +1,4 @@
+-// Приёмочный тест патча 499: канонические 4 попытки, N = 20 + 2·D − ИНТ,
++// Приёмочный тест патча 500: канонические 4 попытки, N = 15 + 2·D − ИНТ,
+ // скобки двух сортов, число скобок задаёт Наука, удача 5–20 %,
+ // доска «последовательности».
+ import { describe, expect, it } from 'vitest';
+@@ -44,18 +44,19 @@ const rngFor = (seed) => {
+   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+ };
+ 
+-describe('патч 499: число слов, попытки и скобочные пары', () => {
+-  it('N = max(4, 20 + 2·D − ИНТ)', () => {
+-    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([16, 18, 20, 22, 24, 26]);
++describe('патч 500: число слов, попытки и скобочные пары', () => {
++  it('N = max(4, 15 + 2·D − ИНТ), на D5 это «25 − ИНТ»', () => {
++    expect(BASE_WORDS_BY_DIFFICULTY).toEqual([11, 13, 15, 17, 19, 21]);
+     for (let d = 0; d <= 5; d += 1) {
+-      expect(passwordWordCount(d, 4)).toBe(16 + 2 * d);
+-      expect(passwordWordCount(d, 10)).toBe(10 + 2 * d);
++      expect(passwordWordCount(d, 4)).toBe(11 + 2 * d);
++      expect(passwordWordCount(d, 10)).toBe(5 + 2 * d);
+       for (let int = 4; int < 10; int += 1) {
+         expect(passwordWordCount(d, int + 1)).toBeLessThan(passwordWordCount(d, int));
+       }
+     }
+-    expect(passwordWordCount(5, 4)).toBe(26); // «26/20» владельца
+-    expect(passwordWordCount(5, 10)).toBe(20);
++    expect(passwordWordCount(5, 4)).toBe(21); // «25 − ИНТ»
++    expect(passwordWordCount(5, 10)).toBe(15);
++    expect(25 - 10).toBe(passwordWordCount(5, 10));
+   });
+ 
+   it('4 попытки на всех сложностях и потолок 4', () => {
+@@ -71,10 +72,10 @@ describe('патч 499: число слов, попытки и скобочны
+     expect(BRACKET_SPLIT_BY_SCIENCE).toEqual([[0, 0], [0, 0], [1, 0], [1, 1], [2, 1], [1, 2], [2, 2]]);
+     expect(BRACKET_COUNT_BY_SCIENCE).toEqual([0, 1, 1, 2, 3, 3, 4]);
+     expect(bracketCountFor(5, 0, 20)).toBe(0);
+-    expect(bracketCountFor(0, 1, 16)).toBe(1);
++    expect(bracketCountFor(0, 1, 11)).toBe(1);
+     expect(bracketCountFor(5, 6, 20)).toBe(4);
+     expect(bracketCountFor(0, 6, 20)).toBe(4); // сложность НЕ ограничивает
+-    expect(bracketCountFor(5, 6, 4)).toBe(1); // предохранитель N−3
++    expect(bracketCountFor(5, 6, 4)).toBe(3); // предохранитель N−1
+     for (let d = 0; d <= 5; d += 1) {
+       for (let sci = 0; sci <= 6; sci += 1) {
+         const game = gameFor({ difficulty: d, int: 10, science: sci, luck: 10 });
+@@ -117,7 +118,7 @@ describe('патч 499: число слов, попытки и скобочны
+   });
+ });
+ 
+-describe('патч 499: доска «последовательности»', () => {
++describe('патч 500: доска «последовательности»', () => {
+   it('MIN_SHARED = L−3, предел подсказки из 495, пол неоднозначности поднят на D4–D5', () => {
+     expect(MIN_SHARED_BY_DIFFICULTY).toEqual([1, 2, 3, 4, 5, 6]);
+     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
+@@ -186,12 +187,12 @@ describe('патч 499: доска «последовательности»', ()
+   });
+ 
+   it('excludeWords убирает слова прошлых досок', () => {
+-    const first = buildPasswordSet({ wordLength: 9, effectiveDifficulty: 5, wordCount: 20, rng: () => 0.21 });
++    const first = buildPasswordSet({ wordLength: 9, effectiveDifficulty: 5, wordCount: 15, rng: () => 0.21 });
+     const second = buildPasswordSet({
+-      wordLength: 9, effectiveDifficulty: 5, wordCount: 20, rng: () => 0.22, excludeWords: first.words,
++      wordLength: 9, effectiveDifficulty: 5, wordCount: 15, rng: () => 0.22, excludeWords: first.words,
+     });
+     for (const word of first.words) expect(second.words).not.toContain(word);
+-    expect(second.wordCount).toBe(20);
++    expect(second.wordCount).toBe(15);
+   });
+ 
+   it('Хакер снижает эффективную сложность, число слов и длину пароля', () => {
+@@ -210,7 +211,7 @@ describe('патч 499: доска «последовательности»', ()
+ 
+ // Приёмка владельца: слепой перебор невелик, думающий >= 80 % без бонусов
+ // и 100 % при удачных скобках. Скобки тратятся при попытках <= 2 (USE_AT=2).
+-describe('патч 499: баланс слепого перебора и вдумчивого разбора', () => {
++describe('патч 500: баланс слепого перебора и вдумчивого разбора', () => {
+   const play = (game, strategy, rnd) => {
+     let g = game;
+     let cands = g.wordRanges.filter((w) => !w.removed).map((w) => w.word);
+@@ -259,7 +260,7 @@ describe('патч 499: баланс слепого перебора и вдум
+     return Math.round(100 * wins / n);
+   };
+ 
+-  it('D5: слепой <= 55 %, думающий >= 80 %, при Науке 6 думающий >= 90 %', () => {
++  it('D5: слепой <= 35 % без бонусов, <= 55 % при Науке 6, думающий >= 80 %', () => {
+     const blind0 = rate(5, 0, 'blind');
+     const blind6 = rate(5, 6, 'blind');
+     const clever0 = rate(5, 0, 'clever');
+diff --git a/__tests__/room/terminal-hacking.test.js b/__tests__/room/terminal-hacking.test.js
+index b624360..7957155 100644
+--- a/__tests__/room/terminal-hacking.test.js
++++ b/__tests__/room/terminal-hacking.test.js
+@@ -35,9 +35,9 @@ describe('shared Fallout terminal hacking rules', () => {
+     expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
+   });
+ 
+-  // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
++  // Патч 500: N = 15 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
+   it.each([
+-    [0, 4, 16], [1, 5, 18], [2, 6, 20], [3, 7, 22], [4, 8, 24], [5, 9, 26],
++    [0, 4, 11], [1, 5, 13], [2, 6, 15], [3, 7, 17], [4, 8, 19], [5, 9, 21],
+   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
+     const game = createGame({
+       config: { ...config, difficulty, lockOnFailure: false },
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 56e4e9f..59da026 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,23 @@
+ # Changelog
+ ---
++## The "25 − INT" board (patch 500)
++
++Owner: "with INT 10 + Science 6 I failed the hack three times in a row".
++Every difficulty lost five words:
++
++`N = max(4, 15 + 2·D − INT)`; at difficulty 5 that is **`25 − INT`** — 21
++words at INT 4 and 15 at INT 10 (previously 26 and 20). At difficulty 1 with
++INT 10 it is 7 words, at difficulty 0 — 5.
++
++The bracket guard was relaxed from `N−3` to `N−1` so that Science 6 keeps all
++four brackets even on the shortest board. Board generation got faster
++(≈20–30 ms at difficulty 5) while the ambiguity floor stays at ≥4.
++
++Measured on the real engine, INT 10, LCK 4, difficulty 5, Science 6: blind
++guessing **21% → 39%**, informed deduction **94% → 98%**, best-move play
++**100%**, **100%** after a lucky full restore. At difficulty 1 with Science 6
++informed deduction remains **100%**. Installation: `docs/patch-500-install.md`.
++
+ ## Two kinds of brackets, count set by Science (patch 499)
+ 
+ The owner clarified how the bonus table should be read: "2 words + 2 attempts"
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index a6ea005..8f22b60 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,26 @@
+ # История изменений
+ 
+ ---
++## Доска «25 − ИНТ» (патч 500)
++
++Владелец: «на ИНТ 10 + Наука 6 уже третий раз взломать не могу». Доска
++уменьшена на пять слов на каждой сложности:
++
++`N = max(4, 15 + 2·D − ИНТ)`, на сложности 5 это **`25 − ИНТ`** — 21 слово
++при ИНТ 4 и 15 при ИНТ 10 (было 26 и 20). На сложности 1 при ИНТ 10 —
++7 слов, на сложности 0 — 5.
++
++Чтобы предохранитель скобок не срезал Науку 6 на короткой доске, он
++ослаблен с `N−3` до `N−1`: четыре скобки Науки 6 сохраняются на всех
++шести сложностях. Генерация досок стала быстрее (≈20–30 мс на пятой
++сложности), запас неоднозначности остаётся ≥4.
++
++Замеры на реальном движке, ИНТ 10, УДЧ 4, сложность 5, Наука 6:
++слепой перебор **21 % → 39 %**, думающий **94 % → 98 %**, лучший ход
++**100 %**, при удачном полном восстановлении **100 %**. На сложности 1
++при Науке 6 думающий по-прежнему **100 %**. Установка:
++`docs/patch-500-install.md`.
++
+ ## Скобки двух сортов, число задаёт Наука (патч 499)
+ 
+ Владелец уточнил чтение таблицы бонусов: запись «2 слова + 2 попытки»
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index ac3d458..ca57870 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -136,7 +136,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board is built from near-identical words: at least `L−3` shared letters and at most 2 matching positions, so the player must deduce the letter order. The password is picked inside the set, so neither the "most similar to everything" nor the "least similar" heuristic reveals it. Hints are capped at `3` matches for difficulty 0–2 and `2` for 3–5; at difficulty 4–5 at least four candidates survive any first wrong guess.
+-- Three stats act separately. **INT 4–10** sets board size `N = max(4, 20 + 2·difficulty − INT)`: at difficulty 5 that is 26 words at INT 4 and 20 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
++- Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The Hacker perk lowers effective difficulty by 1 (minimum 0). At difficulty 0 the terminal may be skipped under the rules; if the player still plays, the board uses large anagram families (`POST/SPOT/STOP/…`) and the password is a maximally dissimilar outlier. It is no longer underlined. Details: `docs/terminal-hacking-balance-proposal.md` and `docs/terminal-words.md`.
+ - On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
+ 
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 840a90f..afd515d 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -136,7 +136,7 @@
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска собирается из почти одинаковых слов: не менее `L−3` общих букв и не более 2 совпавших позиций, игроку нужно угадать порядок букв. Пароль выбирается внутри набора, поэтому его не выдаёт ни «самое похожее на все», ни «самое непохожее» слово. Подсказка ограничена: на сложности 0–2 максимум `3` совпадения, на 3–5 — максимум `2`; на сложностях 4–5 после любой первой ошибки остаётся не меньше четырёх кандидатов.
+-- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 20 + 2·сложность − ИНТ)`: на сложности 5 это 26 слов при ИНТ 4 и 20 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
++- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Перк «Хакер» снижает эффективную сложность на 1 (минимум 0). На сложности 0 терминал по правилам можно не проходить; если игрок всё же запускает мини-игру, доска собирается из крупных семей анаграмм (`POST/SPOT/STOP/…`), а пароль — максимально непохожее на них слово. Пароль больше не подчёркивается. Подробности — `docs/terminal-hacking-balance-proposal.md` и `docs/terminal-words.md`.
+ - На обновлённом сервере комнат партия общая: подключённые игроки видят одну доску. Если сервер ещё старой версии, окно взлома всё равно откроется, а партия пойдёт локально на устройстве игрока (в окне будет подсказка). Чтобы доска стала общей, обновите файлы `server/` и перезапустите сервис Node.js.
+ 
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index f4290ab..0a6d936 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
++
+ > **Скобки перечитаны в `docs/patch-499-install.md`.**
+ 
+ > **Интерфейс терминала уточнён в `docs/patch-498-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 8a842ae..f4ed4ab 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
++
+ > **Скобки перечитаны в `docs/patch-499-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 497** (коммит `146c3d5`, ветка
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 8002974..1b474bf 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
++
+ Патч подготовлен от состояния **версии 498** (коммит `5063158`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+new file mode 100644
+index 0000000..753460e
+--- /dev/null
++++ b/docs/patch-500-install.md
+@@ -0,0 +1,107 @@
++# Установка патча 500: доска «25 − ИНТ»
++
++Патч подготовлен от состояния **версии 499** (коммит `0840f1b`, ветка
++`arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
++патчи 493–500 цепочкой.
++
++## Что изменилось
++
++Владелец: «на ИНТ 10 + Наука 6 уже третий раз взломать не могу». Доска
++стала меньше на пять слов на каждой сложности:
++
++```
++N = max(4, 15 + 2·D − ИНТ)
++```
++
++На сложности 5 это **`25 − ИНТ`**: 21 слово при ИНТ 4 и **15 при ИНТ 10**
++(в версии 499 было 26 и 20).
++
++| Сложность | ИНТ 4 | ИНТ 8 | ИНТ 10 |
++|---|---|---|---|
++| 0 | 11 | 7 | 5 |
++| 1 | 13 | 9 | 7 |
++| 2 | 15 | 11 | 9 |
++| 3 | 17 | 13 | 11 |
++| 4 | 19 | 15 | 13 |
++| 5 | 21 | 17 | **15** |
++
++**Предохранитель скобок ослаблен** с `N−3` до `N−1`. Иначе на сложности 0
++при ИНТ 10 (5 слов) Наука 6 получала бы только 2 скобки вместо своих
++четырёх. Теперь число и состав скобок задаёт Наука на всех шести
++сложностях без исключений, а пустышки не заканчиваются полностью.
++
++Всё остальное из версии 499 не тронуто: 4 попытки с потолком 4,
++скобки двух сортов (одна скобка = один эффект), удача 5–20 % полного
++возврата к 4, доска «последовательности» из реальных слов, словарь
++12 308 слов, предел совпадений, пол неоднозначности ≥4 на D4–D5,
++фильтр центральности пароля, интерфейс из версии 498, «Хакер»,
++Programmer’s Digest и экран «О приложении».
++
++## Замеры на реальном движке (ИНТ 10, УДЧ 4)
++
++| Сложность | Наука | Было (499) | Стало (500) |
++|---|---|---|---|
++| 5 | 0, слепой / думающий | 16 % / 87 % | 27 % / 90 % |
++| 5 | 3, слепой / думающий | 22 % / 99 % | 39 % / 99 % |
++| 5 | **6, слепой / думающий** | 21 % / 94 % | **39 % / 98 %** |
++| 5 | 6, лучший ход | 99 % | **100 %** |
++| 5 | 6, удачное полное восстановление | 100 % | **100 %** |
++| 1 | 6, думающий | 100 % | **100 %** |
++| 1 | 6, слепой | 47 % | 96 % |
++
++То есть на том самом билде (ИНТ 10 + Наука 6, сложность 5) думающий игрок
++теперь выигрывает **98 %**, а с аккуратным выбором хода или удачной скобкой —
++**100 %**. Слепой перебор поднялся до 39 %, но остаётся ниже принятых ранее
++47 %. На сложности 1 при высоких ИНТ и Науке взлом остался «играючи лёгким»,
++как и задумывалось.
++
++Генерация доски стала быстрее: ≈20–30 мс на пятой сложности против ≈32–38 мс.
++Все 30 тестовых досок на каждой сложности и каждом ИНТ собираются полностью,
++запас неоднозначности на D4–D5 держится на 4–6, пароль не «центральный».
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 500
++```
++
++Если вы всё ещё на `a62ec71` со старым установщиком
++(`arena/c1c60b87-fallout-2d20-companion`), один раз переключите источник:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 500
++```
++
++`patchs/baseline.json` в ветке-источнике равен `500`, поэтому при установке
++точно до отсечки дерево приводится к коммиту патча целиком, а каталог
++`patchs/` синхронизируется (файл `patchs/500-word-count-25-minus-int.patch`
++появится и локально). `./apply-patch.sh --status` до установки может написать
++«Всё актуально» — ориентируйтесь на `public/version.json` и явно указывайте номер.
++
++После установки: `public/version.json` → `500`, `patchs/baseline.json` → `500`;
++закоммитьте изменения и **перезапустите сервис Node.js** (`server/` —
++число слов и скобки считаются сервером). Веб-сборку пересоберите.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-hacking-balance-500.test.js
++npx vitest run __tests__/room/terminal-brackets-500.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "500"'
++```
++
++### Прямой `git apply` без установщика
++
++Патч-файл не может содержать сам себя, поэтому при ручном наложении его нужно
++скопировать в `patchs/` отдельно:
++
++```bash
++git apply patchs/500-word-count-25-minus-int.patch
++cp /path/to/500-word-count-25-minus-int.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index 513705c..ee39dfc 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -2,7 +2,7 @@
+ 
+ > **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток, скобки,
+ > пакеты Науки, таблица скобок, генератор «последовательности» и приёмочные
+-> замеры — в `docs/patch-499-install.md`. История решений 496 — в
++> замеры — в `docs/patch-500-install.md`. История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+ > «сначала пароль, потом пустышки» (в 497 пароль выбирается внутри набора).
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 77826cf..c54a4b4 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "499"
++  "baseline": "500"
+ }
+diff --git a/public/version.json b/public/version.json
+index bffc1e4..796d8f5 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,11 @@
+ {
+-  "version": "499",
++  "version": "500",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
++      "На остальных сложностях доска тоже стала меньше на пять слов, поэтому взлом с высоким Интеллектом и Наукой перестал быть лотереей.",
++      "Четыре скобки Науки 6 сохраняются даже на самой короткой доске; думающий игрок на пятой сложности выигрывает около 96–98 % партий.",
+       "Скобки теперь двух сортов: одна убирает одно ложное слово, другая возвращает одну попытку. Одна скобка больше не делает и то, и другое сразу.",
+       "Число скобок задаёт Наука на всех сложностях: 0, 1, 1, 2, 3, 3, 4 для Науки 0–6. Сложность на число скобок больше не влияет.",
+       "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
+@@ -43,6 +46,9 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
++      "Every other difficulty also lost five words, so hacking with a high Intellect and Science no longer feels like a lottery.",
++      "Science 6 still grants four brackets even on the shortest board; a careful player wins about 96–98% of difficulty-5 runs.",
+       "Brackets now come in two kinds: one removes a single wrong word, another restores a single attempt. A bracket no longer does both at once.",
+       "Science alone sets the bracket count at every difficulty: 0, 1, 1, 2, 3, 3, 4 for Science 0–6. Difficulty no longer limits it.",
+       "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index f343e34..fffc8c6 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -37,10 +37,12 @@ const MIN_AMBIGUITY_BY_DIFFICULTY = [2, 2, 2, 2, 4, 4];
+ const AMBIGUITY_TARGET_BY_DIFFICULTY = [2, 2, 2, 2, 8, 8];
+ // Минимум общих букв с опорным словом = L − 3.
+ const MIN_SHARED_BY_DIFFICULTY = [1, 2, 3, 4, 5, 6];
+-// N при ИНТ 4: 16 + 2·D. ИНТ вычитается из базы по одному слову за очко.
+-const BASE_WORDS_BY_DIFFICULTY = [16, 18, 20, 22, 24, 26];
++// Патч 500: N = 15 + 2·D − ИНТ. На сложности 5 это «25 − ИНТ»:
++// 21 слово при ИНТ 4 и 15 при ИНТ 10. База при ИНТ 4 = 11 + 2·D,
++// дальше каждое очко ИНТ убирает ровно одно слово.
++const BASE_WORDS_BY_DIFFICULTY = [11, 13, 15, 17, 19, 21];
+ const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
+-const BASE_WORD_COUNT = 20; // экспорт для совместимости
++const BASE_WORD_COUNT = 15; // запасной размер доски, если wordCount не передан
+ const MIN_WORDS = 4;
+ const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
+ // Патч 499: запись «W слов + A попыток» означает W+A СКОБОК, а не эффекты
+@@ -109,7 +111,8 @@ const bracketSplitFor = (science) => {
+ 
+ // Число скобок задаёт ТОЛЬКО Наука. Сложность не ограничивает: на 1-м уровне
+ // при высоких Науке + ИНТ взлом действительно лёгкий, на 5-м Наука 6 даёт
+-// все 4 скобки. Предохранитель N−3 не даёт вычистить доску целиком.
++// все 4 скобки. Предохранитель N−1: с маленькой доски (D0/ИНТ 10 = 5 слов)
++// Наука 6 всё равно получает 4 скобки, но пустышки не кончаются полностью.
+ const bracketCountFor = (difficulty, science, wordCount = 20) => {
+   const sci = clamp(Number(science) || 0, 0, 6);
+   const split = bracketSplitFor(sci);
+@@ -118,7 +121,7 @@ const bracketCountFor = (difficulty, science, wordCount = 20) => {
+   // difficulty сохранён в сигнатуре для совместимости вызывающих:
+   // сложность больше НЕ влияет на число скобок.
+   void difficulty;
+-  return Math.max(0, Math.min(count, n - 3));
++  return Math.max(0, Math.min(count, n - 1));
+ };
+ 
+ // Эффект ОДНОЙ скобки: kind = 'word' -> убрать 1 ложное слово,
+@@ -217,7 +220,8 @@ const skillScore = (intelligence, science) => (
+ );
+ const skillBonus = (intelligence, science) => skillScore(intelligence, science) - 4;
+ 
+-// Патч 497: N = max(4, 20 + 2·D − ИНТ). ИНТ 10 на D5 -> 20 слов, ИНТ 4 -> 26.
++// Патч 500: N = max(4, 15 + 2·D − ИНТ) = «25 − ИНТ» на D5.
++// ИНТ 10 на D5 -> 15 слов, ИНТ 4 -> 21.
+ const passwordWordCount = (effectiveDifficulty, intelligence) => {
+   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
+   const int = clamp(Number(intelligence) || 4, 4, 10);

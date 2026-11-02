@@ -35,9 +35,9 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
   });
 
-  // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
+  // Патч 500: N = 15 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
   it.each([
-    [0, 4, 16], [1, 5, 18], [2, 6, 20], [3, 7, 22], [4, 8, 24], [5, 9, 26],
+    [0, 4, 11], [1, 5, 13], [2, 6, 15], [3, 7, 17], [4, 8, 19], [5, 9, 21],
   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
       config: { ...config, difficulty, lockOnFailure: false },
