@@ -5,7 +5,8 @@
     "createLoot": "Create\nContainer",
     "createMerchant": "Create\nMerchant",
     "createHub": "Create\nLocation",
-    "syncCloud": "Cloud sync"
+    "syncCloud": "Cloud sync",
+    "createTerminal": "Hacking terminal"
   },
   "card": {
     "lootBadge": "Loot",
@@ -25,7 +26,8 @@
     "duplicate": "Duplicate",
     "edit": "Edit",
     "delete": "Delete",
-    "copySuffix": "copy"
+    "copySuffix": "copy",
+    "terminalDifficulty": "Difficulty {difficulty} · {length}-letter password"
   },
   "form": {
     "createLootTitle": "New Loot Container",
@@ -57,7 +59,12 @@
     "save": "Save",
     "cancel": "Cancel",
     "validationName": "Please enter a name.",
-    "validationRoom": "Please select a room."
+    "validationRoom": "Please select a room.",
+    "createTerminalTitle": "Create hacking terminal",
+    "editTerminalTitle": "Terminal settings",
+    "terminalDifficultyLabel": "Difficulty · password length",
+    "terminalDifficultyHint": "Hacker reduces effective difficulty by its rank. At difficulty 0, the correct word is underlined.",
+    "terminalLockLabel": "Lock the terminal after all attempts are failed"
   },
   "detail": {
     "backToList": "← Back to containers",
@@ -222,5 +229,35 @@
     "shortfallAccept": "Accept {have} {CAP}",
     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
     "tradeSuccess": "Trade completed!"
+  },
+  "terminal": {
+    "title": "Terminal",
+    "localMode": "This room server does not support a shared hack — the game runs locally on this device.",
+    "hack": "Hack",
+    "ready": "SYSTEM READY FOR INPUT",
+    "failed": "ATTEMPTS EXHAUSTED",
+    "accessDenied": "ACCESS DENIED",
+    "accessGranted": "ACCESS GRANTED",
+    "terminalLockedHint": "This terminal is locked for the whole room. The GM can unlock it in the card settings.",
+    "selectCharacter": "Select a character and connect it to the room first.",
+    "viewOnly": "Another player is already hacking. You can only watch.",
+    "actionFailed": "The terminal action could not be completed.",
+    "guessWord": "Password guess",
+    "guessHint": "Tap an active underlined word to test it.",
+    "bracketCombo": "Bracket combination",
+    "bracketHint": "Tap the highlighted combination to apply its effect.",
+    "attempts": "Attempts",
+    "operator": "Operator",
+    "spectator": "An operator has already been selected. You are watching only.",
+    "digestPrompt": "Use Programmer’s Digest to avoid lockout and gain one more attempt?",
+    "digestUse": "Use magazine",
+    "digestDecline": "Decline",
+    "waitingOperator": "The terminal operator must choose.",
+    "likeness": "Letters matching by position",
+    "view": "View",
+    "locked": "LOCKED",
+    "available": "AVAILABLE",
+    "unlock": "Unlock",
+    "openTerminal": "Open terminal"
   }
 }

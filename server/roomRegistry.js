@@ -15,6 +15,11 @@ const {
   applyAtomicLootTake,
   applyAtomicTradeCommit,
 } = require('./lootTradeSession');
+const {
+  normalizeTerminalConfig,
+  publicGameState,
+  applyGameAction,
+} = require('./terminalHacking');
 
 const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
 
@@ -45,6 +50,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     members: new Map(), // clientId -> { clientId, name, role, ws }
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
+    terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
     directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
     createdAt: now(),
@@ -73,8 +79,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       fromName: entry.fromName,
     })),
     activeSession: room.activeSession || null,
+    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [id, {
+      containerId: id,
+      config: entry.config,
+      locked: Boolean(entry.locked),
+      standaloneIssued: Boolean(entry.standaloneIssued),
+      game: publicGameState(entry.game),
+      updatedAt: entry.updatedAt,
+    }])),
     lastClosedSession: room.lastClosedSession || null,
     directives: cloneDirectives(room.directives),
+    // Признак обновлённого сервера: клиент включает синхронизированную игру,
+    // а при отсутствии поля запускает мини-игру локально (старый сервер комнат
+    // не знает terminal.issue/terminal.action и превращал терминал в сундук).
+    capabilities: { terminalHacking: true },
   });
 
   const countOwnedRooms = (ownerClientId) => (
@@ -277,6 +295,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = normalized;
+    syncTerminalNodes(room, normalized);
     room.lastClosedSession = null;
     return { room, session: normalized };
   };
@@ -291,7 +310,112 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (result.error) return result;
     ensureOwnerMemberWs(room, clientId, ws);
     room.activeSession = result.session;
+    syncTerminalNodes(room, result.session);
     return { room, session: result.session };
+  };
+
+  const syncTerminalNodes = (room, session) => {
+    if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
+    for (const node of session.nodes) {
+      if (node?.kind !== 'terminal') continue;
+      const config = normalizeTerminalConfig({
+        containerId: node.containerId,
+        name: node.name,
+        description: node.description,
+        difficulty: node.difficulty,
+        lockOnFailure: node.lockOnFailure,
+      });
+      if (!config.containerId || !config.name) continue;
+      const previous = room.terminalStates.get(config.containerId);
+      const changed = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
+      room.terminalStates.set(config.containerId, previous
+        ? { ...previous, config, game: changed ? null : previous.game, updatedAt: now() }
+        : { config, locked: false, standaloneIssued: false, game: null, updatedAt: now() });
+    }
+  };
+
+  const terminalPublic = (terminalId, entry) => ({
+    containerId: terminalId,
+    config: entry.config,
+    locked: Boolean(entry.locked),
+    standaloneIssued: Boolean(entry.standaloneIssued),
+    game: publicGameState(entry.game),
+    updatedAt: entry.updatedAt,
+  });
+
+  /** Зарегистрировать доступный терминал в комнате (только владелец комнаты). */
+  const issueTerminal = ({ code, clientId, config: rawConfig, ownerToken = null, ws = null }) => {
+    const room = rooms.get(code);
+    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
+    const config = normalizeTerminalConfig(rawConfig);
+    if (!config.containerId || !config.name) return { error: ERROR_CODE.BAD_MESSAGE };
+    ensureOwnerMemberWs(room, clientId, ws);
+    const previous = room.terminalStates.get(config.containerId);
+    const configChanged = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
+    const entry = previous
+      ? { ...previous, config, standaloneIssued: true, game: configChanged ? null : previous.game, updatedAt: now() }
+      : { config, locked: false, standaloneIssued: true, game: null, updatedAt: now() };
+    room.terminalStates.set(config.containerId, entry);
+    return { room, terminal: terminalPublic(config.containerId, entry) };
+  };
+
+  /** Выполнить синхронизированное действие терминала. */
+  const terminalAction = ({ code, clientId, characterId, containerId, action, value, ownerToken = null, ws = null }) => {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
+    const id = String(containerId || '').trim();
+    const entry = room.terminalStates.get(id);
+    if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
+    if (action === 'unlock' || action === 'reset') {
+      rebindOwnerIfTokenMatches(room, clientId, ownerToken);
+      if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
+      entry.locked = false;
+      entry.game = null;
+      entry.updatedAt = now();
+      return { room, terminal: terminalPublic(id, entry) };
+    }
+    const member = room.members.get(clientId);
+    if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
+    const charId = String(characterId || '').trim();
+    const published = room.lastSnapshots.get(charId);
+    if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
+    if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
+    if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
+      return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+    }
+    const snapshot = published.snapshot?.data || published.snapshot || {};
+    const result = applyGameAction({
+      game: entry.game || entry.config,
+      action,
+      clientId,
+      characterId: charId,
+      characterSnapshot: snapshot,
+      value,
+      now: now(),
+    });
+    if (result.error) return { error: ERROR_CODE[result.error] || result.error };
+    entry.game = result.game;
+    if (entry.game?.status === 'locked') entry.locked = true;
+    if (result.usedDigest) {
+      const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
+      const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
+        ? nextSnapshot.data
+        : nextSnapshot;
+      const used = new Set(Array.isArray(snapshotData.usedMagazineEffects) ? snapshotData.usedMagazineEffects : []);
+      used.add('mag_programmers_digest');
+      snapshotData.usedMagazineEffects = [...used];
+      snapshotData.terminalHacking = { ...(snapshotData.terminalHacking || {}), hasProgrammersDigest: true, digestUsed: true };
+      room.lastSnapshots.set(charId, {
+        ...published,
+        snapshot: nextSnapshot,
+        revision: published.revision + 1,
+        updatedAt: now(),
+      });
+    }
+    entry.updatedAt = now();
+    return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
   };
 
   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
@@ -556,6 +680,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     getState,
     openSession,
     updateSession,
+    issueTerminal,
+    terminalAction,
     closeSession,
     playerCloseSession,
     lootTake,

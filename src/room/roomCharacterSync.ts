@@ -8,6 +8,7 @@
 //   соединения с комнатой И присутствием мастера (role === 'gm') в сети этой комнаты.
 
 import { debugLog } from '../debug/falloutDebug';
+import useCharacterStore from '../store/characterStore';
 import useRoomStore, { type RoomStateEntry } from './roomStore';
 import type { RoomConnectionStatus } from './roomClient';
 import type { RoomSnapshotEntry } from './roomProtocol';
@@ -125,6 +126,26 @@ export const buildLocalCharacterRoomSnapshot = async (
       // Отсутствие аватара не мешает публикации персонажа.
     }
     const updatedAt = Number(row.updatedAt ?? row.updated_at) || Date.now();
+    const savedData = row.data && typeof row.data === 'object' ? row.data as Record<string, any> : {};
+    const store = useCharacterStore.getState();
+    const liveState = store.currentCharacterId === characterId ? store : null;
+    const itemSources = [liveState?.items, savedData.items, savedData.equipment?.items].filter(Boolean);
+    const itemEntries = itemSources.flatMap((items: any) => (
+      Array.isArray(items)
+        ? items.map((item: any, index: number) => [String(item?.id || index), item] as const)
+        : Object.entries(items || {})
+    ));
+    const hasProgrammersDigest = (itemEntries as Array<readonly [string, any]>).some(([key, item]) => (
+      key === 'mag_programmers_digest'
+      || item?.itemId === 'mag_programmers_digest'
+      || item?.catalogId === 'mag_programmers_digest'
+      || item?.id === 'mag_programmers_digest'
+      || item?.snapshot?.id === 'mag_programmers_digest'
+    ));
+    const usedMagazineEffects = [...new Set([
+      ...(Array.isArray(savedData.usedMagazineEffects) ? savedData.usedMagazineEffects : []),
+      ...(Array.isArray(liveState?.usedMagazineEffects) ? liveState.usedMagazineEffects : []),
+    ])];
     return {
       characterId: String(row.id),
       name: String(row.name || '—'),
@@ -132,7 +153,15 @@ export const buildLocalCharacterRoomSnapshot = async (
       originName: row.originName ?? row.origin_name ?? null,
       updatedAt,
       avatarDataUrl,
-      data: row.data,
+      data: {
+        ...savedData,
+        usedMagazineEffects,
+        terminalHacking: {
+          ...(savedData.terminalHacking || {}),
+          hasProgrammersDigest,
+          digestUsed: usedMagazineEffects.includes('mag_programmers_digest'),
+        },
+      },
     };
   } catch (error) {
     debugLog('room.buildSnapshot:failed', {

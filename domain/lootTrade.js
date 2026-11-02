@@ -26,6 +26,93 @@ export const CONTAINER_KIND = Object.freeze({
   LOOT: 'loot',
   MERCHANT: 'merchant',
   HUB: 'hub',
+  TERMINAL: 'terminal',
+});
+
+/**
+ * Маркер терминала внутри узла локации.
+ *
+ * `normalizeHubSessionNode()` на сервере (особенно на ещё не обновлённом)
+ * собирает узел заново и выбрасывает все неизвестные поля: `kind: 'terminal'`
+ * превращается в `'loot'`, а `difficulty`/`lockOnFailure` теряются. Из-за этого
+ * игрок видел терминал как обычный сундук. `lockLabel` — единственное поле,
+ * которое сервер сохраняет как есть и которое не показывается для незапертых
+ * узлов, поэтому конфигурация терминала едет в нём. Клиент и обновлённый
+ * сервер умеют восстановить из маркера настоящий тип узла.
+ * Формат обязан совпадать с `server/terminalHacking.js` (CJS-копия).
+ */
+export const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
+
+export const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
+  `${TERMINAL_NODE_MARKER}${JSON.stringify({
+    v: 1,
+    d: Math.max(0, Math.min(5, Math.floor(Number(difficulty) || 0))),
+    f: lockOnFailure ? 1 : 0,
+    l: String(label || ''),
+  })}`
+);
+
+export const decodeTerminalNodeMarker = (value) => {
+  const raw = String(value || '');
+  if (!raw.startsWith(TERMINAL_NODE_MARKER)) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(TERMINAL_NODE_MARKER.length));
+    if (!parsed || parsed.v !== 1) return null;
+    return {
+      difficulty: Math.max(0, Math.min(5, Math.floor(Number(parsed.d) || 0))),
+      lockOnFailure: Boolean(parsed.f),
+      label: String(parsed.l || ''),
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const withTerminalNodeMarker = (node) => ({
+  ...node,
+  lockLabel: encodeTerminalNodeMarker({
+    difficulty: node?.difficulty,
+    lockOnFailure: node?.lockOnFailure,
+    label: node?.lockLabel,
+  }),
+});
+
+/** Восстанавливает узел терминала даже если сервер понизил его до сундука. */
+export const resolveTerminalSessionNode = (node) => {
+  if (!node) return { node, isTerminal: false, marker: null };
+  const marker = decodeTerminalNodeMarker(node.lockLabel);
+  if (node.kind === CONTAINER_KIND.TERMINAL) {
+    return {
+      node: marker ? { ...node, lockLabel: marker.label } : node,
+      isTerminal: true,
+      marker,
+    };
+  }
+  if (!marker) return { node, isTerminal: false, marker: null };
+  return {
+    node: {
+      ...node,
+      kind: CONTAINER_KIND.TERMINAL,
+      difficulty: marker.difficulty,
+      lockOnFailure: marker.lockOnFailure,
+      lockLabel: marker.label,
+    },
+    isTerminal: true,
+    marker,
+  };
+};
+
+/** Отдельный терминал, выданный без локации (старый сервер не знает terminal.issue). */
+export const buildStandaloneTerminalSessionNode = (container, { locked = false, lockLabel = '' } = {}) => withTerminalNodeMarker({
+  containerId: container?.id,
+  kind: CONTAINER_KIND.TERMINAL,
+  name: container?.name || '',
+  description: container?.description || '',
+  locked,
+  lockLabel,
+  difficulty: container?.difficulty || 0,
+  lockOnFailure: Boolean(container?.lockOnFailure),
+  items: [],
 });
 
 export const QUANTITY_UNIT = Object.freeze({
@@ -270,7 +357,8 @@ export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
 export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
   [CONTAINER_KIND.HUB]: 0,
   [CONTAINER_KIND.LOOT]: 1,
-  [CONTAINER_KIND.MERCHANT]: 2,
+  [CONTAINER_KIND.TERMINAL]: 2,
+  [CONTAINER_KIND.MERCHANT]: 3,
 });
 
 /**
@@ -340,7 +428,7 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
   );
   const byId = new Map(
     list
-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
       .map((c) => [c.id, c]),
   );
 
@@ -368,13 +456,13 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
 
 /**
  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
- * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
+ * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
  */
 export const buildHubSessionNodes = (hub, allContainers = []) => {
   if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
   const byId = new Map(
     (Array.isArray(allContainers) ? allContainers : [])
-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
+      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
       .map((c) => [c.id, c]),
   );
   const links = normalizeHubLinks(hub.links);
@@ -382,7 +470,7 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
   for (const link of links) {
     const child = byId.get(link.containerId);
     if (!child) continue;
-    nodes.push({
+    const node = {
       containerId: child.id,
       kind: child.kind,
       name: child.name,
@@ -396,14 +484,18 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
       buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
         : DEFAULT_BUY_DEPRECIATION_PERCENT,
+      difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
+      lockOnFailure: child.kind === CONTAINER_KIND.TERMINAL ? Boolean(child.lockOnFailure) : false,
       characterOverrides: {},
-      items: Array.isArray(child.items)
+      items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
         ? child.items.map((entry) => ({
             ...entry,
             itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
           }))
-        : [],
-    });
+        : []),
+    };
+    // Маркер переживает нормализацию узла на старом сервере комнат.
+    nodes.push(child.kind === CONTAINER_KIND.TERMINAL ? withTerminalNodeMarker(node) : node);
   }
   return nodes;
 };
@@ -432,8 +524,9 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
   let kind = CONTAINER_KIND.LOOT;
   if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
   else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
+  else if (raw.kind === CONTAINER_KIND.TERMINAL) kind = CONTAINER_KIND.TERMINAL;
 
-  const items = kind === CONTAINER_KIND.HUB
+  const items = kind === CONTAINER_KIND.HUB || kind === CONTAINER_KIND.TERMINAL
     ? []
     : deduplicateContainerItems(raw.items, now);
   const links = kind === CONTAINER_KIND.HUB
@@ -454,6 +547,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
     roomName: String(raw.roomName || '').trim(),
     inRoot,
     description: String(raw.description || '').trim(),
+    difficulty: kind === CONTAINER_KIND.TERMINAL
+      ? clampNumber(raw.difficulty, 0, 5, 0)
+      : 0,
+    lockOnFailure: kind === CONTAINER_KIND.TERMINAL && Boolean(raw.lockOnFailure),
     caps: kind === CONTAINER_KIND.MERCHANT
       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
       : 0,

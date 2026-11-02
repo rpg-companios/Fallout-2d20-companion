@@ -6,6 +6,7 @@
 // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
 
 const { ERROR_CODE } = require('./protocol');
+const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 
 const clampNumber = (val, min, max, fallback = 0) => {
   const num = Number(val);
@@ -128,14 +129,20 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
   const containerId = String(raw.containerId || raw.id || '').trim();
   if (!containerId) return null;
-  const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
-  const items = normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+  // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
+  // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
+  const marker = decodeTerminalNodeMarker(raw.lockLabel);
+  const explicitTerminal = raw.kind === 'terminal';
+  const kind = raw.kind === 'merchant' ? 'merchant' : (explicitTerminal || marker ? 'terminal' : 'loot');
+  const items = kind === 'terminal' ? [] : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
   return {
     containerId,
     kind,
-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
+    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : (kind === 'terminal' ? 'Терминал' : 'Контейнер')),
     description: String(raw.description || '').trim(),
     locked: Boolean(raw.locked),
+    // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
+    // старый сервер, и просто скрывается при отрисовке.
     lockLabel: String(raw.lockLabel || '').trim(),
     caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
     saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
@@ -143,6 +150,14 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+    difficulty: kind === 'terminal'
+      ? (marker && !explicitTerminal
+          ? marker.difficulty
+          : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+      : 0,
+    lockOnFailure: kind === 'terminal' && (marker && !explicitTerminal
+      ? marker.lockOnFailure
+      : Boolean(raw.lockOnFailure)),
     items,
   };
 };
@@ -189,16 +204,18 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
   if (raw.kind === 'merchant') kind = 'merchant';
   else if (raw.kind === 'hub') kind = 'hub';
 
-  const targetType = raw.targetType === 'character' ? 'character' : 'room';
-  const targetCharacterId = targetType === 'character' && raw.targetCharacterId
-    ? String(raw.targetCharacterId)
-    : null;
-  if (targetType === 'character' && !targetCharacterId) return null;
-
+  let targetType = raw.targetType === 'character' ? 'character' : 'room';
   const items = kind === 'hub'
     ? []
     : normalizeSessionItemsList(raw.items, now, 0);
   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
+  // Терминальные игры всегда общие для всей комнаты, даже если мастер передал
+  // локацию с терминалом как персональную раздачу.
+  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal')) targetType = 'room';
+  const targetCharacterId = targetType === 'character' && raw.targetCharacterId
+    ? String(raw.targetCharacterId)
+    : null;
+  if (targetType === 'character' && !targetCharacterId) return null;
   const closedByClientIds = Array.isArray(raw.closedByClientIds)
     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
     : [];
@@ -222,6 +239,8 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
+    difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
+    lockOnFailure: kind === 'terminal' && Boolean(raw.lockOnFailure),
     items,
     nodes,
     closedByClientIds,
@@ -403,11 +422,27 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         if (payload.nodeDescription !== undefined) {
           targetNode.description = String(payload.nodeDescription || '').trim();
         }
+        if (targetNode.kind === 'terminal') {
+          if (payload.nodeDifficulty !== undefined) {
+            targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
+          }
+          if (payload.nodeLockOnFailure !== undefined) {
+            targetNode.lockOnFailure = Boolean(payload.nodeLockOnFailure);
+          }
+        }
         if (payload.locked !== undefined) {
           targetNode.locked = Boolean(payload.locked);
         }
         if (payload.lockLabel !== undefined) {
           targetNode.lockLabel = String(payload.lockLabel || '').trim();
+        }
+        if (targetNode.kind === 'terminal') {
+          const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
+          targetNode.lockLabel = encodeTerminalNodeMarker({
+            difficulty: targetNode.difficulty,
+            lockOnFailure: targetNode.lockOnFailure,
+            label: previousMarker ? previousMarker.label : targetNode.lockLabel,
+          });
         }
         if (Array.isArray(payload.nodeItems)) {
           targetNode.items = normalizeSessionItemsList(payload.nodeItems, now, 0);

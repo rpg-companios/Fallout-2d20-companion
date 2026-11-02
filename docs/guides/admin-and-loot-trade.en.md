@@ -131,6 +131,12 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
 - Players can step into any unlocked chest or shop, close that nested window to return to the location list, or minimize the whole location. The outer location window stays open for the party until the Game Master closes the scene.
 - The Game Master can put a **Lock (`🔒`)** on any chest or shop in a location and write a note (such as *«Lockpick — Difficulty 2»* or *«Requires Overseer's Key»*). Players see the locked entry and its requirement in the list, but cannot peek inside until they overcome the obstacle in play and the Game Master flips the lock to **«Unlocked» (`🔓`)**.
 
+#### Terminals & the Hacking Mini-Game
+- Tap **«Create terminal»** to set a name and description, choose a difficulty of `0–5` (password length `4–9`) and optionally lock the terminal after a failed hack.
+- A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+- In the hacking window the player picks words and bracket combos: the password must be guessed within 4 attempts using letter «likeness» hints. With lockout enabled, a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine in the inventory grants one more attempt.
+- On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
+
 ### Live Scene Controls for the Game Master
 While a chest, merchant, or location is active, the Game Master has a **live control panel** inside the card:
 - after a good barter roll or Charisma check, adjust sale markup, buyback markdown, or caps **live on the fly** — either for the whole party or **personally for one specific character**;

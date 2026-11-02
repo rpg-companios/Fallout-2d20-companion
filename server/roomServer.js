@@ -312,6 +312,18 @@ const attachRoomWebSocketServer = (httpServer, {
     return out;
   };
 
+  const broadcastTerminalStates = (room, exceptClientId = null) => {
+    if (!room) return;
+    const state = registry.getState(room.code);
+    const terminals = Object.values(state?.terminalStates || {});
+    for (const terminal of terminals) {
+      for (const member of room.members.values()) {
+        if (member.clientId === exceptClientId || !member.ws) continue;
+        sendEnvelope(member.ws, MESSAGE.TERMINAL_STATE, { terminal }, room.code, member.clientId);
+      }
+    }
+  };
+
   const broadcastSessionState = (room, exceptClientId, basePayload) => {
     for (const member of room.members.values()) {
       if (member.clientId === exceptClientId || !member.ws) continue;
@@ -598,6 +610,64 @@ const attachRoomWebSocketServer = (httpServer, {
           break;
         }
 
+        case MESSAGE.TERMINAL_ISSUE: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.issueTerminal({
+            code: canonical,
+            clientId,
+            config: payload.config,
+            ownerToken: payload.ownerToken || null,
+            ws,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          ws.meta.rooms.add(canonical);
+          const statePayload = { terminal: result.terminal, requestId: payload.requestId || null };
+          sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
+          break;
+        }
+
+        case MESSAGE.TERMINAL_ACTION: {
+          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+          if (!canonical) {
+            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
+            break;
+          }
+          const result = registry.terminalAction({
+            code: canonical,
+            clientId,
+            characterId: payload.characterId,
+            containerId: payload.containerId,
+            action: payload.action,
+            value: payload.value,
+            ownerToken: payload.ownerToken || null,
+            ws,
+          });
+          if (result.error) {
+            sendError(ws, clientId, result.error, payload.requestId, canonical);
+            break;
+          }
+          ws.meta.rooms.add(canonical);
+          const statePayload = {
+            terminal: result.terminal,
+            usedDigest: result.usedDigest || false,
+            requestId: payload.requestId || null,
+          };
+          sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
+          broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, {
+            terminal: result.terminal,
+            usedDigest: result.usedDigest || false,
+          });
+          break;
+        }
+
         case MESSAGE.SESSION_OPEN: {
           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
           if (!canonical) {
@@ -629,6 +699,7 @@ const attachRoomWebSocketServer = (httpServer, {
           broadcastSessionState(result.room, clientId, {
             session: result.session,
           });
+          broadcastTerminalStates(result.room);
           break;
         }
 
@@ -663,6 +734,7 @@ const attachRoomWebSocketServer = (httpServer, {
           broadcastSessionState(result.room, clientId, {
             session: result.session,
           });
+          broadcastTerminalStates(result.room);
           break;
         }
 

@@ -381,6 +381,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
       dormantNoticeFingerprint: null,
       // Per-character journal: tagged skills whose one-time starting reward was issued.
       rewardedSkills: [],
+      usedMagazineEffects: [],
       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
       // sourceSlot и т.п.) — «живые» предметы лежат в items (equipped: true),
       // этот список их дополняет (Шаг 3 миграции из CharacterContext).
@@ -406,6 +407,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        * Выбранные перки: массивом или функцией от предыдущего (Шаг 8а;
        * функциональный апдейтер — обязательное требование к сеттерам).
        */
+      setUsedMagazineEffects: (updater) => {
+        const prev = get().usedMagazineEffects || [];
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        set({ usedMagazineEffects: [...new Set((next || []).map((id) => String(id || '').trim()).filter(Boolean))] });
+      },
+
+      markMagazineEffectUsed: (effectId) => {
+        const id = String(effectId || '').trim();
+        if (!id) return;
+        const current = get().usedMagazineEffects || [];
+        if (!current.includes(id)) set({ usedMagazineEffects: [...current, id] });
+      },
+
       setSelectedPerks: (updater) => {
         const prev = get().selectedPerks || [];
         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
@@ -1391,7 +1405,11 @@ const useCharacterStore = create(withDerivedCascade(devtools(
        */
       loadFromLegacyData: (legacyData) => {
         const normalizedState = normalizeForStore(legacyData);
-        set({ ...normalizedState, selectedPerks: legacyData?.selectedPerks || [] });
+        set({
+          ...normalizedState,
+          selectedPerks: legacyData?.selectedPerks || [],
+          usedMagazineEffects: Array.isArray(legacyData?.usedMagazineEffects) ? legacyData.usedMagazineEffects : [],
+        });
         get().recalculatePerkBonuses();
         get().recalculateAll();
       },
@@ -1983,6 +2001,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
           currentCharacterId: null,
           isSaved: false,
           selectedPerks: legacyDefaults?.selectedPerks || [],
+          usedMagazineEffects: legacyDefaults?.usedMagazineEffects || [],
           rewardedSkills: legacyDefaults?.rewardedSkills || [],
           perkBonuses: {},
           derivedStats: {},
@@ -2037,6 +2056,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
         items: state.items,
         effects: state.effects,
         selectedPerks: state.selectedPerks,
+        usedMagazineEffects: state.usedMagazineEffects || [],
         rewardedSkills: state.rewardedSkills,
         robot: state.robot,
         stateExtensions: state.stateExtensions,

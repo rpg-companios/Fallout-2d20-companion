@@ -1,0 +1,4000 @@
+diff --git a/__tests__/lootTrade/local-terminal-game.test.js b/__tests__/lootTrade/local-terminal-game.test.js
+new file mode 100644
+index 0000000..aa7bcc8
+--- /dev/null
++++ b/__tests__/lootTrade/local-terminal-game.test.js
+@@ -0,0 +1,74 @@
++import { describe, expect, it } from 'vitest';
++import {
++  applyLocalTerminalAction,
++  buildLocalCharacterSnapshot,
++  initialLocalTerminalState,
++} from '../../components/lootTrade/localTerminalGame.js';
++
++const terminal = {
++  containerId: 'term-1',
++  name: 'Vault console',
++  description: '',
++  difficulty: 2,
++  lockOnFailure: true,
++};
++const characterSnapshot = buildLocalCharacterSnapshot({
++  characterName: 'Оператор',
++  attributes: { INT: { value: 6 } },
++  skills: [],
++  items: { digest: { itemId: 'mag_programmers_digest' } },
++});
++const ctx = { terminal, characterId: 'char-1', characterSnapshot, now: 1000, rng: () => 0 };
++
++const start = () => applyLocalTerminalAction(initialLocalTerminalState(), 'start', undefined, ctx);
++
++describe('local terminal mini-game fallback', () => {
++  it('starts a real board without a room-server terminal protocol', () => {
++    const state = start();
++    expect(state.error).toBeNull();
++    expect(state.view.status).toBe('playing');
++    expect(state.view.board).toHaveLength(408);
++    expect(state.view.wordRanges.length).toBeGreaterThan(0);
++    expect(state.view.wordRanges[0].word).toHaveLength(6);
++    expect(state.view.password).toBeUndefined();
++    expect(state.game.password).toBeTruthy();
++    expect(state.view.operatorName).toBe('Оператор');
++  });
++
++  it('decrements attempts on a wrong guess and grants access on the password', () => {
++    let state = start();
++    const wrong = state.game.wordRanges.find((entry) => !entry.isPassword);
++    state = applyLocalTerminalAction(state, 'guess', wrong.id, ctx);
++    expect(state.error).toBeNull();
++    expect(state.view.attempts).toBe(3);
++    expect(state.view.guesses).toEqual([{ word: wrong.word, likeness: expect.any(Number) }]);
++
++    const passwordRange = state.game.wordRanges.find((entry) => entry.isPassword);
++    state = applyLocalTerminalAction(state, 'guess', passwordRange.id, ctx);
++    expect(state.view.status).toBe('won');
++    expect(state.view.result).toBe('ACCESS GRANTED');
++  });
++
++  it('offers the Programmer’s Digest before locking the terminal', () => {
++    let state = start();
++    for (let i = 0; i < 4; i += 1) {
++      const dud = state.game.wordRanges.find((entry) => !entry.isPassword && !entry.removed && !entry.guessed);
++      state = applyLocalTerminalAction(state, 'guess', dud.id, ctx);
++    }
++    expect(state.view.status).toBe('pendingDigest');
++    state = applyLocalTerminalAction(state, 'useDigest', undefined, ctx);
++    expect(state.usedDigest).toBe(true);
++    expect(state.view.status).toBe('playing');
++    expect(state.view.attempts).toBe(1);
++  });
++
++  it('keeps the board after an invalid guess and starts a fresh game on hack', () => {
++    let state = start();
++    state = applyLocalTerminalAction(state, 'guess', 'does-not-exist', ctx);
++    expect(state.error).toBe('TERMINAL_INVALID_GUESS');
++    expect(state.view.status).toBe('playing');
++    const fresh = start();
++    expect(fresh.view.status).toBe('playing');
++    expect(fresh.view.revision).toBe(1);
++  });
++});
+diff --git a/__tests__/lootTrade/player-location-hooks-repro.test.js b/__tests__/lootTrade/player-location-hooks-repro.test.js
+new file mode 100644
+index 0000000..2feb899
+--- /dev/null
++++ b/__tests__/lootTrade/player-location-hooks-repro.test.js
+@@ -0,0 +1,213 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    Image: mk('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId,
++    autoStart,
++  }),
++}));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++import { encodeTerminalNodeMarker } from '../../domain/lootTrade.js';
++
++describe('player opening a GM-issued location', () => {
++  beforeEach(() => {
++    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++    useCharacterStore.setState({ currentCharacterId: 'player-char', characterName: 'Player', items: [], currency: 0 });
++    useRoomStore.setState({
++      clientId: 'player-client',
++      status: 'online',
++      rooms: {
++        ROOM1: {
++          joined: true,
++          members: [{ clientId: 'player-client', role: 'player' }],
++          activeSession: null,
++          terminalStates: {},
++        },
++      },
++    });
++  });
++
++  it('renders the room location with a linked terminal without changing hook order', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++      await Promise.resolve();
++    });
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            activeSession: {
++              sessionId: 'session-1',
++              kind: 'hub',
++              name: 'Vault',
++              targetType: 'room',
++              nodes: [{
++                containerId: 'terminal-1',
++                kind: 'terminal',
++                name: 'Vault terminal',
++                difficulty: 3,
++                lockOnFailure: false,
++                items: [],
++              }],
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    await act(async () => renderer.unmount());
++  });
++
++  it('treats a room-registered terminal as a terminal even if a stale session calls it loot', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++      await Promise.resolve();
++    });
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            terminalStates: {
++              'terminal-1': {
++                containerId: 'terminal-1',
++                config: {
++                  containerId: 'terminal-1',
++                  name: 'Vault terminal',
++                  difficulty: 3,
++                  lockOnFailure: false,
++                },
++                locked: false,
++                game: null,
++              },
++            },
++            activeSession: {
++              sessionId: 'session-stale-kind',
++              kind: 'hub',
++              name: 'Vault',
++              targetType: 'room',
++              nodes: [{
++                containerId: 'terminal-1',
++                kind: 'loot',
++                name: 'Vault terminal',
++                difficulty: 0,
++                items: [],
++              }],
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    const hackButton = renderer.root.findByProps({ testID: 'terminal-hack-button' });
++    await act(async () => hackButton.props.onPress());
++    expect(renderer.root.findByType('TerminalHackingModal').props).toMatchObject({
++      containerId: 'terminal-1',
++      autoStart: true,
++    });
++    await act(async () => renderer.unmount());
++  });
++
++  it('opens the hacking modal for a terminal downgraded to loot by a legacy room server', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++      await Promise.resolve();
++    });
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            // Ни capabilities, ни terminalStates: сервер старой версии.
++            terminalStates: {},
++            activeSession: {
++              sessionId: 'session-legacy-server',
++              kind: 'hub',
++              name: 'Vault',
++              targetType: 'room',
++              nodes: [{
++                containerId: 'terminal-1',
++                kind: 'loot',
++                name: 'Vault terminal',
++                description: '',
++                locked: false,
++                lockLabel: encodeTerminalNodeMarker({ difficulty: 3, lockOnFailure: true }),
++                difficulty: 0,
++                items: [],
++              }],
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    expect(renderer.root.findAllByProps({ name: 'treasure-chest' })).toHaveLength(0);
++    expect(renderer.root.findAllByProps({ testID: 'terminal-hack-button' }).length).toBeGreaterThan(0);
++    expect(renderer.root.findAllByProps({ testID: 'terminal-view-button' }).length).toBeGreaterThan(0);
++    const hackButton = renderer.root.findByProps({ testID: 'terminal-hack-button' });
++    await act(async () => hackButton.props.onPress());
++    expect(renderer.root.findByType('TerminalHackingModal').props).toMatchObject({
++      containerId: 'terminal-1',
++      autoStart: true,
++    });
++    await act(async () => renderer.unmount());
++  });
++
++});
+diff --git a/__tests__/lootTrade/terminal-container.test.js b/__tests__/lootTrade/terminal-container.test.js
+new file mode 100644
+index 0000000..bf7e2c0
+--- /dev/null
++++ b/__tests__/lootTrade/terminal-container.test.js
+@@ -0,0 +1,69 @@
++import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
++import {
++  CONTAINER_KIND,
++  buildHubSessionNodes,
++  getHubIdsContainingChild,
++  isContainerVisibleOnRoot,
++  normalizeContainerEntity,
++  sortContainersForRoot,
++} from '../../domain/lootTrade.js';
++
++describe('terminal cards in loot/trade locations', () => {
++  it('normalizes terminal settings without inventing inventory rows', () => {
++    const terminal = normalizeContainerEntity({
++      id: 'term-1',
++      kind: 'terminal',
++      name: 'Vault console',
++      description: 'Power is intermittent.',
++      difficulty: 5,
++      lockOnFailure: true,
++      items: [{ entryId: 'should-not-exist', quantity: 99 }],
++    });
++    expect(terminal).toMatchObject({
++      id: 'term-1',
++      kind: CONTAINER_KIND.TERMINAL,
++      difficulty: 5,
++      lockOnFailure: true,
++      items: [],
++    });
++    expect(normalizeContainerEntity({ kind: 'terminal', difficulty: 99 }).difficulty).toBe(5);
++  });
++
++  it('mounts the hacking modal only after selection, as a sibling of the location modal', () => {
++    const source = fs.readFileSync(
++      path.resolve(process.cwd(), 'components/lootTrade/PlayerLootTradeOverlay.js'),
++      'utf8',
++    );
++    const hubStart = source.indexOf('if (isHubSession && !viewTarget)');
++    const hubEnd = source.indexOf('const returnToHubList', hubStart);
++    const hubBlock = source.slice(hubStart, hubEnd);
++    const outerModalClose = hubBlock.indexOf('</Modal>');
++    const hackingModalOpen = hubBlock.indexOf('<TerminalHackingModal');
++    expect(outerModalClose).toBeGreaterThan(0);
++    expect(hackingModalOpen).toBeGreaterThan(outerModalClose);
++    expect(hubBlock.slice(0, outerModalClose)).not.toContain('<TerminalHackingModal');
++    expect(hubBlock.slice(outerModalClose)).toContain('{terminalSelection ? (');
++  });
++
++  it('can be linked in a location and included in its room-wide nodes', () => {
++    const terminal = normalizeContainerEntity({
++      id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
++    });
++    const hub = normalizeContainerEntity({
++      id: 'hub-1', kind: 'hub', name: 'Vault', roomCode: 'GM-AAAAAA',
++      links: [{ containerId: 'term-1', locked: false }],
++    });
++    expect(getHubIdsContainingChild('term-1', [hub, terminal])).toEqual(['hub-1']);
++    expect(isContainerVisibleOnRoot(terminal, [hub, terminal])).toBe(false);
++    expect(buildHubSessionNodes(hub, [hub, terminal])).toMatchObject([{
++      containerId: 'term-1',
++      kind: 'terminal',
++      difficulty: 3,
++      lockOnFailure: true,
++      items: [],
++    }]);
++    expect(sortContainersForRoot([terminal, hub]).map((entry) => entry.id)).toEqual(['hub-1', 'term-1']);
++  });
++});
+diff --git a/__tests__/lootTrade/terminal-modal-local-fallback.test.js b/__tests__/lootTrade/terminal-modal-local-fallback.test.js
+new file mode 100644
+index 0000000..dc9da4f
+--- /dev/null
++++ b/__tests__/lootTrade/terminal-modal-local-fallback.test.js
+@@ -0,0 +1,92 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: { create: (styles) => styles, flatten: (styles) => styles || {} },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    Pressable: mk('Pressable'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    Animated: {
++      Value: class {
++        constructor(value) { this.value = value; }
++        setValue() {}
++        interpolate() { return 0; }
++      },
++      timing: () => ({ start: () => {} }),
++      View: mk('Animated.View'),
++    },
++    useWindowDimensions: () => ({ width: 900, height: 700 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/room/roomCharacterSync', () => ({
++  pushSavedCharacterToBoundRoomIfAny: vi.fn(async () => true),
++}));
++
++import TerminalHackingModal from '../../components/lootTrade/TerminalHackingModal';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++
++const terminal = {
++  containerId: 'term-1',
++  name: 'Vault console',
++  description: '',
++  difficulty: 2,
++  lockOnFailure: false,
++};
++
++describe('terminal hacking modal on a legacy room server', () => {
++  beforeEach(() => {
++    useCharacterStore.setState({
++      currentCharacterId: 'char-1',
++      characterName: 'Оператор',
++      attributes: { INT: { value: 6 } },
++      skills: [],
++      items: {},
++      selectedPerks: [],
++      usedMagazineEffects: [],
++    });
++    // Нет capabilities и нет terminalStates — сервер старой версии.
++    useRoomStore.setState({
++      clientId: 'client-1',
++      rooms: { ROOM1: { terminalStates: {}, activeSession: null } },
++    });
++  });
++
++  it('opens the mini-game in a modal and starts a board without terminal.action', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(
++        <TerminalHackingModal
++          visible
++          terminal={terminal}
++          roomCode="ROOM1"
++          autoStart
++          onClose={() => {}}
++        />,
++      );
++      await Promise.resolve();
++    });
++    expect(renderer.root.findByType('Modal')).toBeTruthy();
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    const words = renderer.root.findAllByType('Pressable');
++    expect(words.length).toBeGreaterThan(5);
++    // Доска реально сгенерирована: в окне есть счётчик попыток.
++    const texts = renderer.root.findAllByType('Text').map((node) => String(node.props.children ?? ''));
++    expect(texts.some((text) => text.includes('4'))).toBe(true);
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/lootTrade/terminal-node-marker.test.js b/__tests__/lootTrade/terminal-node-marker.test.js
+new file mode 100644
+index 0000000..3d03743
+--- /dev/null
++++ b/__tests__/lootTrade/terminal-node-marker.test.js
+@@ -0,0 +1,115 @@
++import { describe, expect, it } from 'vitest';
++import {
++  CONTAINER_KIND,
++  buildHubSessionNodes,
++  buildStandaloneTerminalSessionNode,
++  decodeTerminalNodeMarker,
++  encodeTerminalNodeMarker,
++  normalizeContainerEntity,
++  resolveTerminalSessionNode,
++} from '../../domain/lootTrade.js';
++import { normalizeActiveSession, applySessionUpdate } from '../../server/lootTradeSession.js';
++import { decodeTerminalNodeMarker as serverDecodeMarker } from '../../server/terminalHacking.js';
++
++const terminal = normalizeContainerEntity({
++  id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
++});
++const hub = normalizeContainerEntity({
++  id: 'hub-1', kind: 'hub', name: 'Vault', roomCode: 'GM-AAAAAA',
++  links: [{ containerId: 'term-1', locked: false, lockLabel: 'Доступ запрещён' }],
++});
++
++/** Точная копия нормализации узла из сервера версии 481 (до патча 487). */
++const legacyServerNode = (node) => ({
++  containerId: node.containerId,
++  kind: 'loot',
++  name: node.name,
++  description: node.description,
++  locked: Boolean(node.locked),
++  lockLabel: String(node.lockLabel || '').trim(),
++  caps: 0,
++  saleMarkupPercent: 0,
++  buyDepreciationPercent: 50,
++  characterOverrides: {},
++  items: [],
++});
++
++describe('terminal node marker survives a legacy room server', () => {
++  it('is attached to hub session nodes and keeps the original lock label', () => {
++    const [node] = buildHubSessionNodes(hub, [hub, terminal]);
++    expect(node.kind).toBe(CONTAINER_KIND.TERMINAL);
++    expect(decodeTerminalNodeMarker(node.lockLabel)).toMatchObject({
++      difficulty: 3,
++      lockOnFailure: true,
++      label: 'Доступ запрещён',
++    });
++    // CJS-копия на сервере понимает тот же формат.
++    expect(serverDecodeMarker(node.lockLabel)).toEqual(decodeTerminalNodeMarker(node.lockLabel));
++  });
++
++  it('restores a terminal after the old server downgraded it to a chest', () => {
++    const [node] = buildHubSessionNodes(hub, [hub, terminal]);
++    const stale = legacyServerNode(node);
++    const resolved = resolveTerminalSessionNode(stale);
++    expect(resolved.isTerminal).toBe(true);
++    expect(resolved.node).toMatchObject({
++      kind: CONTAINER_KIND.TERMINAL,
++      difficulty: 3,
++      lockOnFailure: true,
++      lockLabel: 'Доступ запрещён',
++    });
++    expect(resolved.node.lockLabel).not.toContain('F2D20-TERM:');
++  });
++
++  it('upgrades a marker-only node on the new server and keeps the marker', () => {
++    const [node] = buildHubSessionNodes(hub, [hub, terminal]);
++    const stale = legacyServerNode(node);
++    const session = normalizeActiveSession({
++      kind: 'hub',
++      name: 'Vault',
++      targetType: 'character',
++      targetCharacterId: 'char-1',
++      nodes: [stale],
++    }, 1000);
++    expect(session.nodes[0]).toMatchObject({
++      kind: 'terminal',
++      difficulty: 3,
++      lockOnFailure: true,
++    });
++    expect(serverDecodeMarker(session.nodes[0].lockLabel)).toBeTruthy();
++    expect(session.targetType).toBe('room');
++  });
++
++  it('refreshes the marker when the GM changes terminal settings live', () => {
++    const session = normalizeActiveSession({
++      kind: 'hub',
++      name: 'Vault',
++      targetType: 'room',
++      nodes: [buildStandaloneTerminalSessionNode(terminal)],
++    }, 1000);
++    const updated = applySessionUpdate(session, {
++      sessionId: session.sessionId,
++      nodeContainerId: terminal.id,
++      nodeDifficulty: 5,
++      nodeLockOnFailure: false,
++    }, 2000);
++    expect(updated.session.nodes[0]).toMatchObject({
++      kind: 'terminal',
++      difficulty: 5,
++      lockOnFailure: false,
++    });
++    expect(decodeTerminalNodeMarker(updated.session.nodes[0].lockLabel)).toMatchObject({
++      difficulty: 5,
++      lockOnFailure: false,
++    });
++  });
++
++  it('ignores malformed markers on ordinary loot nodes', () => {
++    const node = { containerId: 'chest-1', kind: 'loot', name: 'Chest', items: [] };
++    expect(decodeTerminalNodeMarker(node.lockLabel)).toBeNull();
++    expect(resolveTerminalSessionNode({ ...node, lockLabel: 'F2D20-TERM:{bad json}' })).toMatchObject({
++      isTerminal: false,
++    });
++    expect(resolveTerminalSessionNode({ ...node, lockLabel: encodeTerminalNodeMarker({ difficulty: 2 }) }).node.difficulty).toBe(2);
++  });
++});
+diff --git a/__tests__/room/room-server.integration.test.js b/__tests__/room/room-server.integration.test.js
+index 30d5f43..35bfde4 100644
+--- a/__tests__/room/room-server.integration.test.js
++++ b/__tests__/room/room-server.integration.test.js
+@@ -79,6 +79,7 @@ describe('roomServer: create/join/presence', () => {
+       const joinReq = await player.send(MESSAGE.ROOM_JOIN, { code: created.payload.code, name: 'Иван' });
+       const state = await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE && m.payload.requestId === joinReq);
+       expect(state.payload.members).toEqual([{ clientId: 'player-1', name: 'Иван', role: 'player' }]);
++      expect(state.payload.capabilities).toMatchObject({ terminalHacking: true });
+ 
+       // Мастер входит как gm и видит игрока в списке.
+       await gm.send(MESSAGE.ROOM_JOIN, { code: created.payload.code, name: 'GM', role: 'gm' });
+@@ -136,6 +137,58 @@ describe('roomServer: create/join/presence', () => {
+     });
+   });
+ 
++  it('terminal.issue и terminal.action синхронизируют комнатную доску и оператора', async () => {
++    await withServer(async (port) => {
++      const gm = makeClient(port, 'gm-terminal');
++      const operator = makeClient(port, 'player-terminal-1');
++      const observer = makeClient(port, 'player-terminal-2');
++      const createReq = await gm.send(MESSAGE.ROOM_CREATE, { name: 'Vault' });
++      const created = await gm.waitFor((m) => m.type === MESSAGE.ROOM_CREATED && m.payload.requestId === createReq);
++      const code = created.payload.code;
++      await gm.send(MESSAGE.ROOM_JOIN, { code, name: 'GM', role: 'gm' });
++      await gm.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await operator.send(MESSAGE.ROOM_JOIN, { code, name: 'Operator', role: 'player' });
++      await operator.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await observer.send(MESSAGE.ROOM_JOIN, { code, name: 'Observer', role: 'player' });
++      await observer.waitFor((m) => m.type === MESSAGE.ROOM_STATE);
++      await operator.sendRaw(MESSAGE.CHAR_PUBLISH, {
++        characterId: 'char-terminal-1',
++        revision: 1,
++        snapshot: { name: 'Operator', data: { characterName: 'Operator', attributes: { INT: { value: 4 } }, skills: [] } },
++      }, code);
++      await observer.sendRaw(MESSAGE.CHAR_PUBLISH, {
++        characterId: 'char-terminal-2',
++        revision: 1,
++        snapshot: { name: 'Observer', data: { characterName: 'Observer', attributes: { INT: { value: 4 } }, skills: [] } },
++      }, code);
++
++      const issueReq = await gm.send(MESSAGE.TERMINAL_ISSUE, {
++        config: { containerId: 'term-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true },
++      }, code);
++      const issued = await gm.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === issueReq);
++      expect(issued.payload.terminal).toMatchObject({ containerId: 'term-1', standaloneIssued: true, game: null });
++
++      const startReq = await operator.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: 'term-1', action: 'start', characterId: 'char-terminal-1',
++      }, code);
++      const started = await operator.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.requestId === startReq);
++      expect(started.payload.terminal.game).toMatchObject({ operatorClientId: 'player-terminal-1', operatorCharacterId: 'char-terminal-1', status: 'playing' });
++      expect(started.payload.terminal.game.password).toBeUndefined();
++
++      const observerState = await observer.waitFor((m) => m.type === MESSAGE.TERMINAL_STATE && m.payload.terminal?.containerId === 'term-1' && m.payload.terminal?.game?.status === 'playing');
++      expect(observerState.payload.terminal.game.operatorClientId).toBe('player-terminal-1');
++      const blockedReq = await observer.send(MESSAGE.TERMINAL_ACTION, {
++        containerId: 'term-1', action: 'start', characterId: 'char-terminal-2',
++      }, code);
++      const blocked = await observer.waitFor((m) => m.type === MESSAGE.ERROR && m.payload.requestId === blockedReq);
++      expect(blocked.payload.code).toBe('TERMINAL_ALREADY_ACTIVE');
++
++      gm.close();
++      operator.close();
++      observer.close();
++    });
++  });
++
+   it('ошибки: комната не найдена, чужая директива, неизвестный тип', async () => {
+     await withServer(async (port) => {
+       const gm = makeClient(port, 'gm-1');
+diff --git a/__tests__/room/terminal-hacking.test.js b/__tests__/room/terminal-hacking.test.js
+new file mode 100644
+index 0000000..eaf6bc8
+--- /dev/null
++++ b/__tests__/room/terminal-hacking.test.js
+@@ -0,0 +1,264 @@
++import { describe, expect, it } from 'vitest';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  applyGameAction,
++  createGame,
++  publicGameState,
++  recoveryChancePercent,
++} from '../../server/terminalHacking.js';
++
++const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true };
++const noRandomness = () => 0;
++
++describe('shared Fallout terminal hacking rules', () => {
++  it('uses the agreed recovery probability checkpoints and clamp', () => {
++    expect(recoveryChancePercent(4, 0)).toBe(0);
++    expect(recoveryChancePercent(4, 3)).toBe(10);
++    expect(recoveryChancePercent(10, 6)).toBe(80);
++    expect(recoveryChancePercent(1, 0)).toBe(0);
++    expect(recoveryChancePercent(12, 10)).toBe(80);
++  });
++
++  it.each([
++    [0, 4], [1, 5], [2, 6], [3, 7], [4, 8], [5, 9],
++  ])('difficulty %s creates a %s-letter password', (difficulty, wordLength) => {
++    const game = createGame({
++      config: { ...config, difficulty, lockOnFailure: false },
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: { attributes: { INT: { value: 4 } }, skills: [] },
++      now: 100,
++      rng: noRandomness,
++    });
++    expect(game.wordLength).toBe(wordLength);
++    expect(game.password).toHaveLength(wordLength);
++    expect(game.wordRanges).toHaveLength(12);
++  });
++
++  it('Hacker rank reduces effective difficulty dynamically and difficulty zero marks the password', () => {
++    const snapshot = {
++      attributes: { INT: { value: 8 } },
++      selectedPerks: [{ id: 'hacker', rank: 1 }, { id: 'hacker', rank: 3 }],
++      skills: [],
++    };
++    const game = createGame({
++      config: { ...config, difficulty: 5 },
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: snapshot,
++      now: 100,
++      rng: noRandomness,
++    });
++    expect(game.effectiveDifficulty).toBe(2);
++    expect(game.wordLength).toBe(6);
++    const easy = createGame({
++      config: { ...config, difficulty: 2 },
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: { ...snapshot, selectedPerks: [{ id: 'hacker', rank: 8 }] },
++      now: 101,
++      rng: noRandomness,
++    });
++    expect(easy.effectiveDifficulty).toBe(0);
++    expect(easy.wordLength).toBe(4);
++    const publicState = publicGameState(easy);
++    expect(publicState.wordRanges.filter((entry) => entry.isPassword)).toHaveLength(1);
++    expect(publicState.password).toBeUndefined();
++  });
++
++  it('rolls at most one attempt-restoring bracket per board and restores all attempts', () => {
++    const game = createGame({
++      config: { ...config, difficulty: 0 },
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: { attributes: { INT: { value: 10 } }, skills: [{ id: 'science', value: 6 }] },
++      now: 100,
++      rng: noRandomness,
++    });
++    const recoveryBrackets = game.bracketRanges.filter((entry) => entry.recovery);
++    expect(recoveryBrackets).toHaveLength(1);
++    expect(publicGameState(game).bracketRanges.every((entry) => !('recovery' in entry))).toBe(true);
++    let next = { ...game, attempts: 1 };
++    const result = applyGameAction({
++      game: next,
++      action: 'bracket',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot: {},
++      value: recoveryBrackets[0].id,
++      now: 101,
++      rng: noRandomness,
++    });
++    next = result.game;
++    expect(next.attempts).toBe(4);
++    expect(next.bracketRanges.filter((entry) => entry.recovery)).toHaveLength(1);
++    expect(next.bracketRanges.find((entry) => entry.id === recoveryBrackets[0].id).used).toBe(true);
++  });
++
++  it('offers Programmer’s Digest only once per character and grants one extra attempt', () => {
++    const characterSnapshot = {
++      items: { mag_programmers_digest: { id: 'mag_programmers_digest', quantity: 1 } },
++      usedMagazineEffects: [],
++    };
++    const game = createGame({
++      config,
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot,
++      now: 100,
++      rng: noRandomness,
++    });
++    expect(game.digestEligible).toBe(true);
++    const wrong = game.wordRanges.find((entry) => entry.word !== game.password);
++    const pending = applyGameAction({
++      game: { ...game, attempts: 1 },
++      action: 'guess',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot,
++      value: wrong.id,
++      now: 101,
++      rng: noRandomness,
++    }).game;
++    expect(pending.status).toBe('pendingDigest');
++    const used = applyGameAction({
++      game: pending,
++      action: 'useDigest',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot,
++      now: 102,
++    });
++    expect(used.usedDigest).toBe(true);
++    expect(used.game).toMatchObject({ status: 'playing', attempts: 1, digestUsed: true });
++
++    const usedSnapshot = { ...characterSnapshot, usedMagazineEffects: ['mag_programmers_digest'] };
++    const nextBoard = createGame({
++      config,
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: usedSnapshot,
++      now: 103,
++      rng: noRandomness,
++    });
++    expect(nextBoard.digestEligible).toBe(false);
++  });
++
++  it('sets Access Granted on success, and locks with Access Denied after the last failure', () => {
++    const base = createGame({
++      config,
++      operatorClientId: 'player-1',
++      operatorCharacterId: 'char-1',
++      characterSnapshot: {},
++      now: 100,
++      rng: noRandomness,
++    });
++    const win = applyGameAction({
++      game: base,
++      action: 'guess',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot: {},
++      value: base.wordRanges.find((entry) => entry.word === base.password).id,
++      now: 101,
++      rng: noRandomness,
++    }).game;
++    expect(win.status).toBe('won');
++    expect(win.result).toBe('ACCESS GRANTED');
++    expect(win.scrollUp).toBe(true);
++
++    let failed = { ...base, attempts: 1, digestEligible: false };
++    const wrong = failed.wordRanges.find((entry) => entry.word !== failed.password);
++    failed = applyGameAction({
++      game: failed,
++      action: 'guess',
++      clientId: 'player-1',
++      characterId: 'char-1',
++      characterSnapshot: {},
++      value: wrong.id,
++      now: 102,
++      rng: noRandomness,
++    }).game;
++    expect(failed.status).toBe('locked');
++    expect(failed.result).toBe('ACCESS DENIED');
++  });
++
++  it('registers location terminals as room-wide games without replacing the active location session', () => {
++    const registry = createRoomRegistry();
++    const { room } = registry.createRoom({ clientId: 'gm-location' });
++    const opened = registry.openSession({
++      code: room.code,
++      clientId: 'gm-location',
++      session: {
++        containerId: 'vault-room',
++        kind: 'hub',
++        name: 'Vault',
++        targetType: 'character',
++        targetCharacterId: 'only-one-player',
++        nodes: [{
++          containerId: 'terminal-in-vault',
++          kind: 'terminal',
++          name: 'Control terminal',
++          difficulty: 4,
++          lockOnFailure: true,
++          items: [],
++        }],
++      },
++    });
++    expect(opened.session.targetType).toBe('room');
++    expect(opened.session.nodes[0]).toMatchObject({ kind: 'terminal', difficulty: 4, lockOnFailure: true });
++    expect(registry.getState(room.code).terminalStates['terminal-in-vault']).toMatchObject({
++      standaloneIssued: false,
++      config: { difficulty: 4, lockOnFailure: true },
++      game: null,
++    });
++    expect(registry.getState(room.code).activeSession.kind).toBe('hub');
++  });
++
++  it('shares the operator and board through the room registry, and permits GM unlock', () => {
++    const registry = createRoomRegistry();
++    const { room } = registry.createRoom({ clientId: 'gm-1' });
++    registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'p1', name: 'Player one', role: 'player' });
++    registry.joinRoom({ code: room.code, clientId: 'p2', name: 'Player two', role: 'player' });
++    registry.putSnapshot({
++      code: room.code,
++      characterId: 'char-1',
++      revision: 1,
++      fromClientId: 'p1',
++      snapshot: { characterName: 'Operator', data: { attributes: { INT: { value: 4 } }, skills: [] } },
++    });
++    registry.putSnapshot({
++      code: room.code,
++      characterId: 'char-2',
++      revision: 1,
++      fromClientId: 'p2',
++      snapshot: { characterName: 'Watcher', data: { attributes: { INT: { value: 4 } }, skills: [] } },
++    });
++    expect(registry.issueTerminal({ code: room.code, clientId: 'gm-1', config }).error).toBeUndefined();
++    const started = registry.terminalAction({
++      code: room.code,
++      clientId: 'p1',
++      characterId: 'char-1',
++      containerId: config.containerId,
++      action: 'start',
++    });
++    expect(started.terminal.game.operatorClientId).toBe('p1');
++    expect(started.terminal.game.password).toBeUndefined();
++    const watcherAction = registry.terminalAction({
++      code: room.code,
++      clientId: 'p2',
++      characterId: 'char-2',
++      containerId: config.containerId,
++      action: 'guess',
++      value: started.terminal.game.wordRanges[0].id,
++    });
++    expect(watcherAction.error).toBe('TERMINAL_VIEW_ONLY');
++    expect(registry.terminalAction({
++      code: room.code,
++      clientId: 'gm-1',
++      containerId: config.containerId,
++      action: 'unlock',
++    }).terminal.game).toBeNull();
++  });
++});
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index 44b0194..c80c176 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -28,6 +28,7 @@ import {
+   computeMerchantBuybackPriceFromPlayer,
+   computeMerchantSellPriceToPlayer,
+   getEffectiveMerchantRates,
++  resolveTerminalSessionNode,
+ } from '../../domain/lootTrade';
+ import { describeItemBasics } from '../../domain/itemBasics';
+ import {
+@@ -36,6 +37,7 @@ import {
+   grantLootEntriesToCharacter,
+ } from '../../src/lootTrade/grantCharacterItems';
+ import { showRawAlert } from '../alerts/alertService';
++import TerminalHackingModal from './TerminalHackingModal';
+ import { debugLog } from '../../src/debug/falloutDebug';
+ 
+ const getItemIcon = (itemType) => {
+@@ -79,6 +81,8 @@ export default function PlayerLootTradeOverlay() {
+   const [selectedHubNodeId, setSelectedHubNodeId] = useState(null);
+   const [busy, setBusy] = useState(false);
+   const [mobileTab, setMobileTab] = useState('merchant'); // 'player' | 'merchant'
++  const [terminalSelection, setTerminalSelection] = useState(null);
++  const [dismissedTerminalId, setDismissedTerminalId] = useState(null);
+ 
+   // Буферы обмена с торговцем
+   const [buyBuffer, setBuyBuffer] = useState({}); // { [entryId]: qty }
+@@ -152,6 +156,21 @@ export default function PlayerLootTradeOverlay() {
+     return null;
+   }, [isGmMode, bindings, rooms, currentCharacterId, closedSessionIds, myClientId]);
+ 
++  const directTerminalContext = useMemo(() => {
++    if (isGmMode || bindings.length === 0) return null;
++    const ordered = [...bindings].sort((a, b) => {
++      if (a.characterId === currentCharacterId) return -1;
++      if (b.characterId === currentCharacterId) return 1;
++      return 0;
++    });
++    for (const bind of ordered) {
++      const states = Object.values(rooms[bind.code]?.terminalStates || {});
++      const terminalState = states.find((entry) => entry?.standaloneIssued && entry?.config?.containerId);
++      if (terminalState) return { roomCode: bind.code, characterId: bind.characterId, characterName: bind.name, terminalState };
++    }
++    return null;
++  }, [isGmMode, bindings, currentCharacterId, rooms]);
++
+   const activeSession = matchedContext?.session || null;
+   const isHubSession = activeSession?.kind === CONTAINER_KIND.HUB;
+ 
+@@ -160,6 +179,9 @@ export default function PlayerLootTradeOverlay() {
+     const found = (activeSession?.nodes || []).find(
+       (n) => n.containerId === selectedHubNodeId && !n.locked,
+     );
++    // Терминал никогда не должен попадать в сценарий «открыть сундук»:
++    // возвращаем игрока к списку локации, где он откроет мини-игру.
++    if (found && resolveTerminalSessionNode(found).isTerminal) return null;
+     return found || null;
+   }, [isHubSession, activeSession?.nodes, selectedHubNodeId]);
+ 
+@@ -240,7 +262,44 @@ export default function PlayerLootTradeOverlay() {
+     playerCaps,
+   ]);
+ 
+-  if (isGmMode || !matchedContext || !activeSession) return null;
++  if (isGmMode) return null;
++  if ((!matchedContext || !activeSession) && directTerminalContext) {
++    const config = directTerminalContext.terminalState.config;
++    if (currentCharacterId !== directTerminalContext.characterId) {
++      return (
++        <View style={styles.floatingBar} pointerEvents="box-none">
++          <TouchableOpacity
++            style={styles.floatingPill}
++            onPress={async () => { await savesModule.loadCharacter(directTerminalContext.characterId); }}
++          >
++            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
++            <Text style={styles.floatingPillAction}>
++              {formatLootTrade(tLootTrade('player.openForBoundChar'), { charName: directTerminalContext.characterName })}
++            </Text>
++          </TouchableOpacity>
++        </View>
++      );
++    }
++    if (dismissedTerminalId === config.containerId) {
++      return (
++        <View style={styles.floatingBar} pointerEvents="box-none">
++          <TouchableOpacity style={styles.floatingPill} onPress={() => setDismissedTerminalId(null)}>
++            <Text style={styles.floatingPillTitle}>{config.name || tLootTrade('terminal.title')}</Text>
++            <Text style={styles.floatingPillAction}>{tLootTrade('terminal.openTerminal')}</Text>
++          </TouchableOpacity>
++        </View>
++      );
++    }
++    return (
++      <TerminalHackingModal
++        visible
++        terminal={config}
++        roomCode={directTerminalContext.roomCode}
++        onClose={() => setDismissedTerminalId(config.containerId)}
++      />
++    );
++  }
++  if (!matchedContext || !activeSession) return null;
+ 
+   const isMinimized = minimizedSessionId === activeSession.sessionId;
+   const minimizedTitleKey = activeSession.kind === CONTAINER_KIND.HUB
+@@ -293,131 +352,183 @@ export default function PlayerLootTradeOverlay() {
+   if (isHubSession && !viewTarget) {
+     const hubNodes = activeSession.nodes || [];
+     return (
+-      <Modal
+-        visible
+-        transparent
+-        animationType="slide"
+-        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+-      >
+-        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+-          <View style={styles.lootModalCard}>
+-            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+-              <View style={styles.modalTitleRow}>
+-                <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
+-                <Text style={styles.modalTitle}>{activeSession.name}</Text>
+-              </View>
+-              <View style={styles.headerActionsRow}>
+-                {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
+-                <TouchableOpacity
+-                  style={styles.minimizeBtn}
+-                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+-                >
+-                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+-                </TouchableOpacity>
++      <>
++        <Modal
++          visible
++          transparent
++          animationType="slide"
++          onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
++        >
++          <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
++            <View style={styles.lootModalCard}>
++              <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
++                <View style={styles.modalTitleRow}>
++                  <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
++                  <Text style={styles.modalTitle}>{activeSession.name}</Text>
++                </View>
++                <View style={styles.headerActionsRow}>
++                  {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
++                  <TouchableOpacity
++                    style={styles.minimizeBtn}
++                    onPress={() => setMinimizedSessionId(activeSession.sessionId)}
++                  >
++                    <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
++                  </TouchableOpacity>
++                </View>
+               </View>
+-            </View>
+-
+-            {Boolean(activeSession.description) && (
+-              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+-                {activeSession.description}
+-              </IconText>
+-            )}
+-
+-            <ScrollView
+-              style={styles.lootScroll}
+-              contentContainerStyle={styles.lootScrollContent}
+-            >
+-              {hubNodes.length === 0 ? (
+-                <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+-              ) : (
+-                hubNodes.map((node) => {
+-                  const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+-                  const nodeLocked = Boolean(node.locked);
+-                  const piecesCount = (node.items || []).reduce(
+-                    (sum, entry) => sum + (Number(entry.quantity) || 0),
+-                    0,
+-                  );
+ 
+-                  return (
+-                    <View
+-                      key={node.containerId}
+-                      style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
+-                    >
+-                      <View style={styles.lootRowInfo}>
+-                        <View style={styles.hubNodeTitleRow}>
+-                          <MaterialCommunityIcons
+-                            name={nodeLocked ? 'lock' : (nodeIsMerch ? 'sack' : 'treasure-chest')}
+-                            size={19}
+-                            color={nodeLocked ? '#e57373' : '#f0e68c'}
+-                          />
+-                          <Text style={[
+-                            styles.lootRowTitle,
+-                            nodeLocked && styles.hubNodeTitleLocked,
+-                          ]}>
+-                            {node.name}
+-                          </Text>
+-                        </View>
++              {Boolean(activeSession.description) && (
++                <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
++                  {activeSession.description}
++                </IconText>
++              )}
+ 
+-                        {Boolean(node.description) && (
+-                          <IconText style={styles.lootRowSub}>{node.description}</IconText>
+-                        )}
++              <ScrollView
++                style={styles.lootScroll}
++                contentContainerStyle={styles.lootScrollContent}
++              >
++                {hubNodes.length === 0 ? (
++                  <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
++                ) : (
++                  hubNodes.map((rawNode) => {
++                    // Старый сервер комнат собирает узел заново и понижает
++                    // `kind: 'terminal'` до 'loot'. Маркер в lockLabel и реестр
++                    // терминалов комнаты восстанавливают настоящий тип узла.
++                    const { node, isTerminal: markedTerminal } = resolveTerminalSessionNode(rawNode);
++                    const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
++                    const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
++                    const nodeIsTerminal = markedTerminal || Boolean(terminalState);
++                    const terminalForSelection = {
++                      ...node,
++                      ...(terminalState?.config || {}),
++                      kind: CONTAINER_KIND.TERMINAL,
++                    };
++                    const nodeLocked = Boolean(node.locked);
++                    const piecesCount = (node.items || []).reduce(
++                      (sum, entry) => sum + (Number(entry.quantity) || 0),
++                      0,
++                    );
++
++                    return (
++                      <View
++                        key={node.containerId}
++                        style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
++                      >
++                        <View style={styles.lootRowInfo}>
++                          <View style={styles.hubNodeTitleRow}>
++                            <MaterialCommunityIcons
++                              name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
++                              size={19}
++                              color={nodeLocked ? '#e57373' : '#f0e68c'}
++                            />
++                            <Text style={[
++                              styles.lootRowTitle,
++                              nodeLocked && styles.hubNodeTitleLocked,
++                            ]}>
++                              {node.name}
++                            </Text>
++                          </View>
+ 
+-                        {nodeLocked ? (
+-                          <Text style={styles.hubLockedHintText}>
+-                            {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+-                          </Text>
+-                        ) : nodeIsMerch ? (
+-                          <IconText style={styles.hubUnlockedMetaText}>
+-                            {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
+-                          </IconText>
+-                        ) : (
+-                          <Text style={styles.hubUnlockedMetaText}>
+-                            {piecesCount > 0
+-                              ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
+-                              : tLootTrade('player.hubNodeEmptyLoot')}
+-                          </Text>
+-                        )}
+-                      </View>
++                          {Boolean(node.description) && (
++                            <IconText style={styles.lootRowSub}>{node.description}</IconText>
++                          )}
+ 
+-                      <View style={styles.lootRowBtns}>
+-                        {nodeLocked ? (
+-                          <View style={styles.hubLockedBadge}>
+-                            <Text style={styles.hubLockedBadgeText}>
+-                              {tLootTrade('player.hubNodeLockedBadge')}
++                          {nodeLocked ? (
++                            <Text style={styles.hubLockedHintText}>
++                              {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                             </Text>
+-                          </View>
+-                        ) : (
+-                          <TouchableOpacity
+-                            style={styles.takeAllRowBtn}
+-                            onPress={() => {
+-                              setBuyBuffer({});
+-                              setSellBuffer({});
+-                              setMobileTab('merchant');
+-                              setSelectedHubNodeId(node.containerId);
+-                            }}
+-                          >
+-                            <Text style={styles.takeAllRowBtnText}>
+-                              {tLootTrade(
+-                                nodeIsMerch
+-                                  ? 'player.hubNodeOpenMerchant'
+-                                  : 'player.hubNodeOpenLoot',
+-                              )}
++                          ) : nodeIsTerminal ? (
++                            <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
++                              {terminalState?.locked
++                                ? tLootTrade('terminal.accessDenied')
++                                : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
++                                    difficulty: terminalForSelection.difficulty || 0,
++                                    length: (terminalForSelection.difficulty || 0) + 4,
++                                  })}
+                             </Text>
+-                          </TouchableOpacity>
+-                        )}
++                          ) : nodeIsMerch ? (
++                            <IconText style={styles.hubUnlockedMetaText}>
++                              {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
++                            </IconText>
++                          ) : (
++                            <Text style={styles.hubUnlockedMetaText}>
++                              {piecesCount > 0
++                                ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
++                                : tLootTrade('player.hubNodeEmptyLoot')}
++                            </Text>
++                          )}
++                        </View>
++
++                        <View style={styles.lootRowBtns}>
++                          {nodeLocked ? (
++                            <View style={styles.hubLockedBadge}>
++                              <Text style={styles.hubLockedBadgeText}>
++                                {tLootTrade('player.hubNodeLockedBadge')}
++                              </Text>
++                            </View>
++                          ) : nodeIsTerminal ? (
++                            <View style={styles.terminalButtons}>
++                              <TouchableOpacity
++                                accessibilityRole="button"
++                                testID="terminal-view-button"
++                                style={styles.terminalViewButton}
++                                onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
++                              >
++                                <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
++                              </TouchableOpacity>
++                              {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
++                                <TouchableOpacity
++                                  accessibilityRole="button"
++                                  testID="terminal-hack-button"
++                                  style={styles.terminalHackButton}
++                                  onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
++                                >
++                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                </TouchableOpacity>
++                              )}
++                            </View>
++                          ) : (
++                            <TouchableOpacity
++                              style={styles.takeAllRowBtn}
++                              onPress={() => {
++                                setBuyBuffer({});
++                                setSellBuffer({});
++                                setMobileTab('merchant');
++                                setSelectedHubNodeId(node.containerId);
++                              }}
++                            >
++                              <Text style={styles.takeAllRowBtnText}>
++                                {tLootTrade(
++                                  nodeIsMerch
++                                    ? 'player.hubNodeOpenMerchant'
++                                    : 'player.hubNodeOpenLoot',
++                                )}
++                              </Text>
++                            </TouchableOpacity>
++                          )}
++                        </View>
+                       </View>
+-                    </View>
+-                  );
+-                })
+-              )}
+-            </ScrollView>
++                    );
++                  })
++                )}
++              </ScrollView>
+ 
+-            <Text style={styles.hubMasterClosesHint}>
+-              {tLootTrade('player.hubMasterClosesHint')}
+-            </Text>
++              <Text style={styles.hubMasterClosesHint}>
++                {tLootTrade('player.hubMasterClosesHint')}
++              </Text>
++            </View>
+           </View>
+-        </View>
+-      </Modal>
++        </Modal>
++        {terminalSelection ? (
++          <TerminalHackingModal
++            visible
++            terminal={terminalSelection.node}
++            roomCode={matchedContext.roomCode}
++            autoStart={Boolean(terminalSelection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        ) : null}
++      </>
+     );
+   }
+ 
+@@ -1406,6 +1517,12 @@ const styles = StyleSheet.create({
+     fontSize: 12,
+     fontWeight: '700',
+   },
++  terminalButtons: { flexDirection: 'column', gap: 6, minWidth: 82 },
++  terminalViewButton: { backgroundColor: '#213028', borderWidth: 1, borderColor: '#58875d', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
++  terminalViewButtonText: { color: '#c7e1c1', fontSize: 11, fontWeight: '700' },
++  terminalHackButton: { backgroundColor: '#315331', borderWidth: 1, borderColor: '#a4cb77', paddingHorizontal: 9, paddingVertical: 7, borderRadius: 4, alignItems: 'center' },
++  terminalHackButtonText: { color: '#e1f5ca', fontSize: 11, fontWeight: '800' },
++  terminalDeniedMeta: { color: '#ff6969', fontWeight: '800' },
+   lootFooter: {
+     marginTop: 18,
+     paddingTop: 4,
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+new file mode 100644
+index 0000000..e6e3bab
+--- /dev/null
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -0,0 +1,367 @@
++import React, { useEffect, useMemo, useRef, useState } from 'react';
++import {
++  Animated,
++  Modal,
++  Pressable,
++  ScrollView,
++  StyleSheet,
++  Text,
++  TouchableOpacity,
++  View,
++} from 'react-native';
++import { MaterialCommunityIcons } from '@expo/vector-icons';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore, { roomHasTerminalProtocol } from '../../src/room/roomStore';
++import {
++  initialLocalTerminalState,
++  applyLocalTerminalAction,
++  buildLocalCharacterSnapshot,
++} from './localTerminalGame';
++import { pushSavedCharacterToBoundRoomIfAny } from '../../src/room/roomCharacterSync';
++import { useLocale } from '../../i18n/locale';
++import { tLootTrade, formatLootTrade } from '../screens/LootTradeScreen/logic/lootTradeI18n';
++import { showRawAlert } from '../alerts/alertService';
++
++const COLUMN_WIDTH = 12;
++const ATTEMPTS_MAX = 4;
++
++const TerminalHackingModal = ({
++  visible,
++  terminal,
++  roomCode,
++  autoStart = false,
++  ownerToken,
++  onClose,
++}) => {
++  useLocale();
++  const characterId = useCharacterStore((state) => state.currentCharacterId);
++  const characterName = useCharacterStore((state) => state.characterName);
++  const markMagazineEffectUsed = useCharacterStore((state) => state.markMagazineEffectUsed);
++  const rooms = useRoomStore((state) => state.rooms);
++  const myClientId = useRoomStore((state) => state.clientId);
++  const [busy, setBusy] = useState(false);
++  const [localState, setLocalState] = useState(initialLocalTerminalState);
++  const lastAutoStartKey = useRef('');
++  const scrollAnim = useRef(new Animated.Value(0)).current;
++
++  const terminalState = rooms?.[roomCode]?.terminalStates?.[terminal?.containerId]
++    || (terminal?.containerId ? { containerId: terminal.containerId, game: null, locked: false } : null);
++  // Обновлённый сервер присылает capabilities.terminalHacking. Старый сервер
++  // (или офлайн-комната) не поддерживает протокол терминалов — играем локально.
++  const localMode = !roomHasTerminalProtocol(rooms?.[roomCode]);
++  const game = localMode ? localState.view : (terminalState?.game || null);
++  const isOperator = localMode ? true : Boolean(
++    game
++    && game.operatorClientId === myClientId
++    && game.operatorCharacterId === characterId,
++  );
++  const isSpectator = localMode ? false : Boolean(game && ['playing', 'pendingDigest'].includes(game.status) && !isOperator);
++  const canHack = Boolean(characterId && (localMode || roomCode) && !terminalState?.locked);
++
++  useEffect(() => {
++    if (!visible || !autoStart || !terminal?.containerId || (!roomCode && !localMode) || !characterId) return;
++    if (['playing', 'pendingDigest'].includes(game?.status)) return;
++    const key = `${roomCode}:${terminal.containerId}:${characterId}`;
++    if (lastAutoStartKey.current === key) return;
++    lastAutoStartKey.current = key;
++    void doAction('start');
++  // State intentionally tracks the terminal's latest game revision.
++  // eslint-disable-next-line react-hooks/exhaustive-deps
++  }, [visible, autoStart, terminal?.containerId, roomCode, characterId, game?.status]);
++
++  useEffect(() => {
++    if (game?.status === 'won' && game.scrollUp) {
++      scrollAnim.setValue(0);
++      Animated.timing(scrollAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
++    } else {
++      scrollAnim.setValue(0);
++    }
++  }, [game?.revision, game?.status, scrollAnim]);
++
++  const wordsByStart = useMemo(() => new Map((game?.wordRanges || []).map((word) => [word.start, word])), [game?.wordRanges]);
++  const bracketsByStart = useMemo(() => new Map((game?.bracketRanges || []).map((bracket) => [bracket.start, bracket])), [game?.bracketRanges]);
++
++  const doAction = async (action, value) => {
++    if (busy || !terminal?.containerId || (!roomCode && !localMode)) return;
++    if (['start', 'guess', 'bracket', 'useDigest', 'declineDigest'].includes(action) && !characterId) {
++      showRawAlert({ title: tLootTrade('terminal.selectCharacter') });
++      return;
++    }
++    if (localMode) {
++      const snapshot = buildLocalCharacterSnapshot(useCharacterStore.getState());
++      const next = applyLocalTerminalAction(localState, action, value, {
++        terminal: terminalState?.config || terminal,
++        characterId,
++        characterSnapshot: snapshot,
++      });
++      setLocalState(next);
++      if (action === 'useDigest' && next.usedDigest) {
++        markMagazineEffectUsed?.('mag_programmers_digest');
++      }
++      if (next.error && next.error !== 'TERMINAL_INVALID_GUESS') {
++        showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++      }
++      return;
++    }
++    setBusy(true);
++    try {
++      const updated = await useRoomStore.getState().actOnTerminal({
++        code: roomCode,
++        containerId: terminal.containerId,
++        action,
++        characterId: characterId || undefined,
++        value,
++        ownerToken,
++      });
++      if (action === 'useDigest' && updated?.game?.digestUsed) {
++        markMagazineEffectUsed?.('mag_programmers_digest');
++        if (characterId) {
++          setTimeout(() => { void pushSavedCharacterToBoundRoomIfAny(characterId); }, 100);
++        }
++      }
++    } catch (error) {
++      const code = error?.code || error?.message;
++      if (code === 'TERMINAL_VIEW_ONLY') showRawAlert({ title: tLootTrade('terminal.viewOnly') });
++      else if (code === 'TERMINAL_LOCKED') showRawAlert({ title: tLootTrade('terminal.accessDenied') });
++      else if (code !== 'ROOM_TIMEOUT') showRawAlert({ title: tLootTrade('terminal.actionFailed') });
++    } finally {
++      setBusy(false);
++    }
++  };
++
++  const renderLine = (columnIndex, lineIndex) => {
++    const startIndex = (columnIndex * 17 + lineIndex) * COLUMN_WIDTH;
++    const endIndex = startIndex + COLUMN_WIDTH;
++    const chunks = [];
++    let index = startIndex;
++    while (index < endIndex) {
++      const word = wordsByStart.get(index);
++      if (word) {
++        chunks.push({ kind: 'word', item: word, key: word.id });
++        index = word.end;
++        continue;
++      }
++      const bracket = bracketsByStart.get(index);
++      if (bracket) {
++        chunks.push({ kind: 'bracket', item: bracket, key: bracket.id });
++        index = bracket.end;
++        continue;
++      }
++      chunks.push({ kind: 'junk', text: game?.board?.[index] || '.', key: `cell-${index}` });
++      index += 1;
++    }
++    return (
++      <View key={`${columnIndex}-${lineIndex}`} style={styles.codeLine}>
++        {chunks.map((chunk) => {
++          if (chunk.kind === 'word') {
++            const removed = Boolean(chunk.item.removed || chunk.item.guessed);
++            const content = removed ? '·'.repeat(chunk.item.word.length) : chunk.item.word;
++            const common = [styles.codeText, styles.wordText, !removed && styles.wordActive, removed && styles.removedText, chunk.item.isPassword && styles.passwordHint];
++            return (
++              <Pressable
++                key={chunk.key}
++                disabled={!isOperator || busy || removed || game?.status !== 'playing'}
++                accessibilityRole="button"
++                accessibilityLabel={`${tLootTrade('terminal.guessWord')}: ${chunk.item.word}`}
++                accessibilityHint={tLootTrade('terminal.guessHint')}
++                onPress={() => doAction('guess', chunk.item.id)}
++              >
++                <Text style={common}>{content}</Text>
++              </Pressable>
++            );
++          }
++          if (chunk.kind === 'bracket') {
++            const used = Boolean(chunk.item.used);
++            return (
++              <Pressable
++                key={chunk.key}
++                disabled={!isOperator || busy || used || game?.status !== 'playing'}
++                accessibilityRole="button"
++                accessibilityLabel={`${tLootTrade('terminal.bracketCombo')}: ${chunk.item.text}`}
++                accessibilityHint={tLootTrade('terminal.bracketHint')}
++                onPress={() => doAction('bracket', chunk.item.id)}
++              >
++                <Text style={[styles.codeText, styles.bracketText, used && styles.removedText]}>
++                  {used ? ' '.repeat(chunk.item.text.length) : chunk.item.text}
++                </Text>
++              </Pressable>
++            );
++          }
++          return <Text key={chunk.key} style={[styles.codeText, styles.junkText]}>{chunk.text}</Text>;
++        })}
++      </View>
++    );
++  };
++
++  const renderColumn = (columnIndex) => (
++    <View key={`column-${columnIndex}`} style={styles.codeColumn}>
++      {Array.from({ length: 17 }, (_, lineIndex) => renderLine(columnIndex, lineIndex))}
++    </View>
++  );
++
++  const statusLabel = game?.status === 'locked'
++    ? tLootTrade('terminal.accessDenied')
++    : (game?.status === 'won' ? tLootTrade('terminal.accessGranted') : null);
++
++  return (
++    <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
++      <View style={styles.backdrop}>
++        <View style={styles.window}>
++          <View style={styles.header}>
++            <View style={styles.heading}>
++              <MaterialCommunityIcons name="console" size={22} color="#93d17a" />
++              <Text numberOfLines={1} style={styles.title}>{terminal?.name || terminalState?.config?.name || tLootTrade('terminal.title')}</Text>
++            </View>
++            <TouchableOpacity accessibilityRole="button" accessibilityLabel={tLootTrade('player.close')} style={styles.closeButton} onPress={onClose}>
++              <MaterialCommunityIcons name="close" size={20} color="#bdc8b7" />
++            </TouchableOpacity>
++          </View>
++
++          {(terminal?.description || terminalState?.config?.description) ? (
++            <Text style={styles.description}>{terminal?.description || terminalState?.config?.description}</Text>
++          ) : null}
++
++          {localMode ? <Text style={styles.localModeHint}>{tLootTrade('terminal.localMode')}</Text> : null}
++
++          {terminalState?.locked || game?.status === 'locked' ? (
++            <View style={styles.accessPanel}>
++              <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.accessDenied')}</Text>
++              <Text style={styles.statusHint}>{tLootTrade('terminal.terminalLockedHint')}</Text>
++            </View>
++          ) : game?.status === 'won' ? (
++            <View style={styles.successPanel}>
++              <Animated.View style={[styles.wonBoard, { transform: [{ translateY: scrollAnim.interpolate({ inputRange: [0, 1], outputRange: [0, -92] }) }] }]}>
++                <View style={styles.codeBoard}>
++                  {renderColumn(0)}
++                  {renderColumn(1)}
++                </View>
++              </Animated.View>
++              <Text accessibilityRole="alert" style={styles.accessGranted}>{tLootTrade('terminal.accessGranted')}</Text>
++            </View>
++          ) : !game || game.status === 'failed' ? (
++            <View style={styles.idlePanel}>
++              <Text style={styles.idleText}>{game?.status === 'failed' ? tLootTrade('terminal.failed') : tLootTrade('terminal.ready')}</Text>
++              <Text style={styles.statusHint}>
++                {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
++                  difficulty: terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0,
++                  length: (terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0) + 4,
++                })}
++              </Text>
++              {canHack && (
++                <TouchableOpacity disabled={busy} style={[styles.primaryButton, busy && styles.disabledButton]} onPress={() => doAction('start')}>
++                  <Text style={styles.primaryButtonText}>{tLootTrade('terminal.hack')}</Text>
++                </TouchableOpacity>
++              )}
++            </View>
++          ) : (
++            <>
++              <View style={styles.statusRow}>
++                <View>
++                  <Text style={styles.statusLabel}>{tLootTrade('terminal.attempts')}</Text>
++                  <View style={styles.attemptDots}>
++                    {Array.from({ length: ATTEMPTS_MAX }, (_, index) => (
++                      <View key={index} style={[styles.attemptDot, index < (game.attempts || 0) && styles.attemptDotOn]} />
++                    ))}
++                    <Text style={styles.attemptCount}>{game.attempts} / {game.maxAttempts || ATTEMPTS_MAX}</Text>
++                  </View>
++                </View>
++                <View style={styles.operatorBox}>
++                  <Text style={styles.statusLabel}>{tLootTrade('terminal.operator')}</Text>
++                  <Text style={styles.operatorName} numberOfLines={1}>{game.operatorName || characterName || '—'}</Text>
++                </View>
++              </View>
++
++              {isSpectator && <Text style={styles.spectatorNotice}>{tLootTrade('terminal.spectator')}</Text>}
++              {game.status === 'pendingDigest' && game.digestEligible ? (
++                <View style={styles.digestPanel}>
++                  <Text style={styles.digestPrompt}>{tLootTrade('terminal.digestPrompt')}</Text>
++                  {isOperator ? (
++                    <View style={styles.digestActions}>
++                      <TouchableOpacity disabled={busy} style={styles.digestUseButton} onPress={() => doAction('useDigest')}>
++                        <Text style={styles.digestUseText}>{tLootTrade('terminal.digestUse')}</Text>
++                      </TouchableOpacity>
++                      <TouchableOpacity disabled={busy} style={styles.digestDeclineButton} onPress={() => doAction('declineDigest')}>
++                        <Text style={styles.digestDeclineText}>{tLootTrade('terminal.digestDecline')}</Text>
++                      </TouchableOpacity>
++                    </View>
++                  ) : <Text style={styles.statusHint}>{tLootTrade('terminal.waitingOperator')}</Text>}
++                </View>
++              ) : null}
++
++              <ScrollView style={styles.codeScroll} contentContainerStyle={styles.codeBoard}>
++                {renderColumn(0)}
++                {renderColumn(1)}
++              </ScrollView>
++
++              {game.guesses?.length > 0 && (
++                <View style={styles.guessesPanel}>
++                  <Text style={styles.statusLabel}>{tLootTrade('terminal.likeness')}</Text>
++                  <View style={styles.guessesRow}>
++                    {game.guesses.map((guess, index) => (
++                      <Text key={`${guess.word}-${index}`} style={styles.guessText}>{`${guess.word}: ${guess.likeness}`}</Text>
++                    ))}
++                  </View>
++                </View>
++              )}
++              {statusLabel ? <Text style={styles.statusLabel}>{statusLabel}</Text> : null}
++            </>
++          )}
++        </View>
++      </View>
++    </Modal>
++  );
++};
++
++const styles = StyleSheet.create({
++  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.82)', justifyContent: 'center', alignItems: 'center', padding: 12 },
++  window: { width: '100%', maxWidth: 760, maxHeight: '94%', backgroundColor: '#08110b', borderColor: '#42784a', borderWidth: 1.5, borderRadius: 6, padding: 14, shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 18 },
++  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderColor: '#29482d', paddingBottom: 9, marginBottom: 8 },
++  heading: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1 },
++  title: { color: '#c8efb8', fontSize: 17, fontWeight: '800', flex: 1, fontFamily: 'monospace' },
++  closeButton: { padding: 5, marginLeft: 8 },
++  description: { color: '#9db197', fontSize: 13, marginBottom: 8 },
++  localModeHint: { color: '#d8c27d', fontSize: 11, marginBottom: 8, textAlign: 'center' },
++  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: '#203923' },
++  statusLabel: { color: '#8da38b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'monospace' },
++  attemptDots: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
++  attemptDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 1, borderColor: '#507052' },
++  attemptDotOn: { backgroundColor: '#a5dc88', borderColor: '#d0f2b7' },
++  attemptCount: { color: '#c9ddb9', fontSize: 12, marginLeft: 4, fontFamily: 'monospace' },
++  operatorBox: { alignItems: 'flex-end', maxWidth: '48%' },
++  operatorName: { color: '#d2e7c7', fontSize: 12, marginTop: 5, fontFamily: 'monospace' },
++  spectatorNotice: { color: '#f1d77b', backgroundColor: '#292712', borderRadius: 4, padding: 7, marginTop: 8, fontSize: 12, textAlign: 'center' },
++  codeScroll: { maxHeight: 405, marginTop: 10, borderWidth: 1, borderColor: '#1b3822', backgroundColor: '#030805' },
++  codeBoard: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingVertical: 8, gap: 6 },
++  codeColumn: { flex: 1 },
++  codeLine: { height: 18, flexDirection: 'row', alignItems: 'center', flexWrap: 'nowrap' },
++  codeText: { fontFamily: 'monospace', fontSize: 11, lineHeight: 17 },
++  wordText: { fontWeight: '700', textDecorationLine: 'underline', textDecorationColor: '#98d97e' },
++  wordActive: { color: '#c4efa5', backgroundColor: 'rgba(106,155,67,0.2)' },
++  passwordHint: { textDecorationLine: 'underline', textDecorationStyle: 'double', color: '#fff0a3' },
++  bracketText: { color: '#67d8dc', backgroundColor: 'rgba(44,145,150,0.2)', fontWeight: '800' },
++  junkText: { color: '#536b53' },
++  removedText: { color: '#263527', textDecorationLine: 'none' },
++  guessesPanel: { paddingTop: 8 },
++  guessesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
++  guessText: { color: '#c8d4b1', fontFamily: 'monospace', fontSize: 12, backgroundColor: '#18231a', paddingHorizontal: 6, paddingVertical: 3 },
++  accessPanel: { minHeight: 190, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
++  successPanel: { minHeight: 250, alignItems: 'center', overflow: 'hidden', marginTop: 8 },
++  wonBoard: { width: '100%' },
++  accessDenied: { color: '#ff4b4b', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#f00', textShadowRadius: 12 },
++  accessGranted: { color: '#a9f07d', fontFamily: 'monospace', fontSize: 25, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#5dff43', textShadowRadius: 12 },
++  statusHint: { color: '#97a392', fontSize: 12, textAlign: 'center', marginTop: 8 },
++  idlePanel: { paddingVertical: 22, alignItems: 'center' },
++  idleText: { color: '#b2c9a5', fontFamily: 'monospace', fontSize: 15, fontWeight: '700' },
++  primaryButton: { backgroundColor: '#335a30', borderColor: '#88bf70', borderWidth: 1, borderRadius: 4, paddingHorizontal: 24, paddingVertical: 11, marginTop: 18 },
++  primaryButtonText: { color: '#edffe4', fontFamily: 'monospace', fontWeight: '800' },
++  disabledButton: { opacity: 0.55 },
++  digestPanel: { marginTop: 10, padding: 10, borderWidth: 1, borderColor: '#89733e', backgroundColor: '#292516' },
++  digestPrompt: { color: '#f0d68d', fontSize: 13, fontWeight: '700', textAlign: 'center' },
++  digestActions: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 9 },
++  digestUseButton: { borderWidth: 1, borderColor: '#a9d982', padding: 8, borderRadius: 4 },
++  digestUseText: { color: '#c4eba0', fontWeight: '700', fontSize: 12 },
++  digestDeclineButton: { borderWidth: 1, borderColor: '#a16d68', padding: 8, borderRadius: 4 },
++  digestDeclineText: { color: '#efaaa5', fontWeight: '700', fontSize: 12 },
++});
++
++export default TerminalHackingModal;
+diff --git a/components/lootTrade/localTerminalGame.js b/components/lootTrade/localTerminalGame.js
+new file mode 100644
+index 0000000..df82907
+--- /dev/null
++++ b/components/lootTrade/localTerminalGame.js
+@@ -0,0 +1,80 @@
++import engine from '../../server/terminalHacking';
++
++/**
++ * Локальный резерв мини-игры взлома.
++ *
++ * Правила и генерация доски берутся из того же чистого модуля, который
++ * использует сервер комнат (`server/terminalHacking.js` — без node-зависимостей).
++ * Это нужно, когда сервер ещё не обновлён: он не знает terminal.issue/action,
++ * поэтому клиент ведёт партию сам, но терминал всё равно открывается модалкой,
++ * а не превращается в сундук с добычей.
++ */
++export const LOCAL_TERMINAL_OPERATOR = 'local-terminal-player';
++
++export const buildLocalCharacterSnapshot = (state = {}) => ({
++  characterName: state.characterName || '',
++  attributes: state.attributes || {},
++  skills: state.skills || {},
++  selectedSkills: state.selectedSkills || [],
++  selectedPerks: state.selectedPerks || [],
++  usedMagazineEffects: state.usedMagazineEffects || [],
++  items: state.items || {},
++  terminalHacking: state.terminalHacking || {},
++});
++
++const pack = (game, extra = {}) => ({
++  game,
++  view: game ? engine.publicGameState(game) : null,
++  usedDigest: false,
++  error: null,
++  ...extra,
++});
++
++export const initialLocalTerminalState = () => pack(null);
++
++export const applyLocalTerminalAction = (state, action, value, ctx = {}) => {
++  const {
++    terminal,
++    characterId,
++    characterSnapshot,
++    now = Date.now(),
++    rng = Math.random,
++  } = ctx;
++  let game = state?.game || null;
++  const config = engine.normalizeTerminalConfig({
++    containerId: terminal?.containerId || terminal?.id,
++    name: terminal?.name,
++    description: terminal?.description,
++    difficulty: terminal?.difficulty,
++    lockOnFailure: terminal?.lockOnFailure,
++  });
++
++  if (action === 'start' || (!game && ['guess', 'bracket'].includes(action))) {
++    game = engine.createGame({
++      config,
++      operatorClientId: LOCAL_TERMINAL_OPERATOR,
++      operatorCharacterId: characterId || 'local',
++      characterSnapshot,
++      now,
++      rng,
++    });
++    game.operatorName = characterSnapshot?.characterName || '';
++    if (action === 'start') return pack(game);
++  }
++  if (!game) return pack(null, { error: 'TERMINAL_NOT_ISSUED' });
++
++  const result = engine.applyGameAction({
++    game,
++    action,
++    clientId: LOCAL_TERMINAL_OPERATOR,
++    characterId: characterId || 'local',
++    characterSnapshot,
++    value,
++    now,
++    rng,
++  });
++  if (result.error) return pack(game, { error: result.error });
++  return pack(result.game, { usedDigest: Boolean(result.usedDigest) });
++};
++
++export default applyLocalTerminalAction;
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index da992cd..05c83d5 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -24,7 +24,7 @@ import { getLocaleLabel } from '../HomeScreen/logic/localeLabel';
+ import { tHomeScreen } from '../HomeScreen/logic/homeScreenI18n';
+ import { tLootTrade, formatLootTrade } from './logic/lootTradeI18n';
+ import useAppSettingsStore from '../../../src/store/appSettingsStore';
+-import useRoomStore from '../../../src/room/roomStore';
++import useRoomStore, { roomSupportsTerminalProtocol } from '../../../src/room/roomStore';
+ import useUiModeStore from '../../../src/room/uiModeStore';
+ import { formatRoomCodeForDisplay } from '../../../src/room/roomCode';
+ import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
+@@ -34,6 +34,8 @@ import {
+   addOrMergeContainerItem,
+   analyzeHubDeletion,
+   buildHubSessionNodes,
++  buildStandaloneTerminalSessionNode,
++  decodeTerminalNodeMarker,
+   computeMerchantSellPriceToPlayer,
+   getEffectiveMerchantRates,
+   getHubIdsContainingChild,
+@@ -122,6 +124,7 @@ const ContainerCardCell = ({
+ }) => {
+   const isMerchant = container.kind === CONTAINER_KIND.MERCHANT;
+   const isHub = container.kind === CONTAINER_KIND.HUB;
++  const isTerminal = container.kind === CONTAINER_KIND.TERMINAL;
+   const menuBtnRef = useRef(null);
+   const [menuPos, setMenuPos] = useState(null);
+ 
+@@ -182,7 +185,7 @@ const ContainerCardCell = ({
+   const hubLockedCount = (container.links || []).filter((l) => l.locked).length;
+   const heroIconName = isHub
+     ? 'map-marker-multiple'
+-    : (isMerchant ? 'sack' : 'treasure-chest');
++    : (isTerminal ? 'console' : (isMerchant ? 'sack' : 'treasure-chest'));
+ 
+   return (
+     <TouchableOpacity
+@@ -243,6 +246,10 @@ const ContainerCardCell = ({
+               </Text>
+             )}
+           </>
++        ) : isTerminal ? (
++          <Text style={styles.cardMeta} numberOfLines={1}>
++            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty, length: container.difficulty + 4 })}
++          </Text>
+         ) : (
+           <>
+             <Text style={styles.cardMeta} numberOfLines={1}>
+@@ -444,6 +451,12 @@ export default function LootTradeScreen() {
+     () => containers.find((c) => c.id === activeContainerId) || null,
+     [containers, activeContainerId],
+   );
++  const activeTerminalStates = useMemo(() => {
++    if (activeContainer?.kind !== CONTAINER_KIND.TERMINAL) return [];
++    return Object.entries(roomRooms || {})
++      .map(([code, room]) => ({ code, terminal: room?.terminalStates?.[activeContainer.id] }))
++      .filter((entry) => entry.terminal);
++  }, [activeContainer?.id, activeContainer?.kind, roomRooms]);
+ 
+   useEffect(() => {
+     if (!loading && activeContainerId && !containers.some((c) => c.id === activeContainerId)) {
+@@ -581,6 +594,49 @@ export default function LootTradeScreen() {
+ 
+     // 1. Если этот контейнер/торговец/локация прямо сейчас выданы напрямую — транслируем во все комнаты выдачи
+     const liveEntries = getActiveLiveEntriesForContainer(saved);
++    if (saved.kind === CONTAINER_KIND.TERMINAL) {
++      for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
++        const registered = Boolean(roomEntry?.terminalStates?.[saved.id]);
++        const liveSession = roomEntry?.activeSession;
++        const terminalNode = liveSession?.kind === CONTAINER_KIND.HUB
++          ? (liveSession.nodes || []).find((n) => n.containerId === saved.id)
++          : null;
++        if (!registered && !terminalNode) continue;
++        try {
++          await ensureGmRoomConnected(liveCode);
++          if (registered && roomSupportsTerminalProtocol(liveCode)) {
++            await useRoomStore.getState().issueTerminal({
++              code: liveCode,
++              ownerToken: roomByCode[liveCode]?.ownerToken,
++              config: {
++                containerId: saved.id,
++                name: saved.name,
++                description: saved.description,
++                difficulty: saved.difficulty,
++                lockOnFailure: saved.lockOnFailure,
++              },
++            });
++          } else if (terminalNode) {
++            // Старый сервер: обновляем узел локации вместе с маркером, чтобы
++            // игрок не получил «сундук» после правки настроек терминала.
++            await useRoomStore.getState().updateRoomSessionRates({
++              code: liveCode,
++              sessionId: liveSession.sessionId,
++              nodes: (liveSession.nodes || []).map((n) => (
++                n.containerId === saved.id
++                  ? buildStandaloneTerminalSessionNode(saved, {
++                      locked: n.locked,
++                      lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
++                    })
++                  : n
++              )),
++            });
++          }
++        } catch (e) {
++          debugLog('lootTrade.terminalConfigSync:failed', { message: e?.message });
++        }
++      }
++    }
+     for (const { roomCode: liveCode, session: live } of liveEntries) {
+       try {
+         if (saved.kind === CONTAINER_KIND.HUB) {
+@@ -628,6 +684,10 @@ export default function LootTradeScreen() {
+               nodeName: saved.name,
+               nodeDescription: saved.description,
+               nodeItems: saved.items,
++              ...(saved.kind === CONTAINER_KIND.TERMINAL ? {
++                nodeDifficulty: saved.difficulty,
++                nodeLockOnFailure: saved.lockOnFailure,
++              } : {}),
+               ...(saved.kind === CONTAINER_KIND.MERCHANT ? {
+                 caps: saved.caps,
+                 saleMarkupPercent: saved.saleMarkupPercent,
+@@ -981,25 +1041,59 @@ export default function LootTradeScreen() {
+       const freshSource = (await db.getGmContainerById(issueTargetContainer.id)) || issueTargetContainer;
+       const freshAllContainers = await db.getGmContainersList();
+       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
+-      await useRoomStore.getState().openRoomSession({
+-        code: effectiveRoomCode,
+-        ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+-        session: {
+-          containerId: freshSource.id,
+-          kind: freshSource.kind,
+-          name: freshSource.name,
+-          description: freshSource.description,
+-          targetType,
+-          targetCharacterId,
+-          targetCharacterName,
+-          caps: freshSource.caps,
+-          saleMarkupPercent: freshSource.saleMarkupPercent,
+-          buyDepreciationPercent: freshSource.buyDepreciationPercent,
+-          characterOverrides: {},
+-          items: isHub ? [] : freshSource.items,
+-          ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
+-        },
+-      });
++      const terminalProtocol = roomSupportsTerminalProtocol(effectiveRoomCode);
++      if (freshSource.kind === CONTAINER_KIND.TERMINAL && terminalProtocol) {
++        await useRoomStore.getState().issueTerminal({
++          code: effectiveRoomCode,
++          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
++          config: {
++            containerId: freshSource.id,
++            name: freshSource.name,
++            description: freshSource.description,
++            difficulty: freshSource.difficulty,
++            lockOnFailure: freshSource.lockOnFailure,
++          },
++        });
++      } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
++        // Сервер комнат ещё не обновлён: terminal.issue он не поддерживает.
++        // Выдаём одиночный терминал как локацию с одним узлом — маркер в
++        // lockLabel переживёт серверную нормализацию и игрок откроет модалку.
++        await useRoomStore.getState().openRoomSession({
++          code: effectiveRoomCode,
++          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
++          session: {
++            containerId: freshSource.id,
++            kind: CONTAINER_KIND.HUB,
++            name: freshSource.name,
++            description: freshSource.description,
++            targetType,
++            targetCharacterId,
++            targetCharacterName,
++            items: [],
++            nodes: [buildStandaloneTerminalSessionNode(freshSource)],
++          },
++        });
++      } else {
++        await useRoomStore.getState().openRoomSession({
++          code: effectiveRoomCode,
++          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
++          session: {
++            containerId: freshSource.id,
++            kind: freshSource.kind,
++            name: freshSource.name,
++            description: freshSource.description,
++            targetType,
++            targetCharacterId,
++            targetCharacterName,
++            caps: freshSource.caps,
++            saleMarkupPercent: freshSource.saleMarkupPercent,
++            buyDepreciationPercent: freshSource.buyDepreciationPercent,
++            characterOverrides: {},
++            items: isHub ? [] : freshSource.items,
++            ...(isHub ? { nodes: buildHubSessionNodes(freshSource, freshAllContainers || containers) } : {}),
++          },
++        });
++      }
+       setIssueTargetContainer(null);
+       setRateScopeCharId(null);
+     } catch (error) {
+@@ -1329,6 +1423,7 @@ export default function LootTradeScreen() {
+     { type: 'createHub', id: '__create_hub__' },
+     { type: 'createLoot', id: '__create_loot__' },
+     { type: 'createMerchant', id: '__create_merchant__' },
++    { type: 'createTerminal', id: '__create_terminal__' },
+     ...rootVisibleContainers.map((c) => ({ type: 'container', ...c })),
+   ];
+ 
+@@ -1472,6 +1567,16 @@ export default function LootTradeScreen() {
+                         />
+                       );
+                     }
++                    if (cell.type === 'createTerminal') {
++                      return (
++                        <ActionCell
++                          key={cell.id}
++                          iconName="console"
++                          label={tLootTrade('actions.createTerminal')}
++                          onPress={() => setFormModal({ kind: CONTAINER_KIND.TERMINAL, initialContainer: null })}
++                        />
++                      );
++                    }
+                     if (cell.type === 'empty') {
+                       return <View key={cell.id} style={styles.emptyCell} />;
+                     }
+@@ -1591,7 +1696,7 @@ export default function LootTradeScreen() {
+                 name={
+                   activeContainer.kind === CONTAINER_KIND.HUB
+                     ? 'map-marker-multiple'
+-                    : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest')
++                    : (activeContainer.kind === CONTAINER_KIND.TERMINAL ? 'console' : (activeContainer.kind === CONTAINER_KIND.MERCHANT ? 'sack' : 'treasure-chest'))
+                 }
+                 size={22}
+                 color="#f0e68c"
+@@ -1617,6 +1722,38 @@ export default function LootTradeScreen() {
+               <Text style={styles.detailDescText}>{activeContainer.description}</Text>
+             )}
+ 
++            {activeContainer.kind === CONTAINER_KIND.TERMINAL && (
++              <View style={styles.terminalAdminPanel}>
++                <Text style={styles.terminalAdminText}>
++                  {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
++                    difficulty: activeContainer.difficulty,
++                    length: activeContainer.difficulty + 4,
++                  })}
++                  {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
++                </Text>
++                {activeTerminalStates.map(({ code, terminal }) => (
++                  <View key={code} style={styles.terminalAdminStateRow}>
++                    <Text style={styles.terminalAdminText}>
++                      {`${formatSingleRoomName(code)} · ${terminal.locked ? tLootTrade('terminal.locked') : tLootTrade('terminal.available')}`}
++                    </Text>
++                    {terminal.locked && (
++                      <TouchableOpacity
++                        style={styles.terminalUnlockButton}
++                        onPress={() => useRoomStore.getState().actOnTerminal({
++                          code,
++                          containerId: activeContainer.id,
++                          action: 'unlock',
++                          ownerToken: roomByCode[code]?.ownerToken,
++                        }).catch(() => showRawAlert({ title: tLootTrade('issueModal.issueFailed') }))}
++                      >
++                        <Text style={styles.terminalUnlockButtonText}>{tLootTrade('terminal.unlock')}</Text>
++                      </TouchableOpacity>
++                    )}
++                  </View>
++                ))}
++              </View>
++            )}
++
+             {activeContainer.kind === CONTAINER_KIND.MERCHANT && (
+               <View style={styles.detailRatesRow}>
+                 <IconText style={styles.detailRateBadge}>
+@@ -1868,7 +2005,7 @@ export default function LootTradeScreen() {
+                             <View style={styles.itemRowMain}>
+                               <View style={styles.itemRowTitleLine}>
+                                 <MaterialCommunityIcons
+-                                  name={childIsMerch ? 'sack' : 'treasure-chest'}
++                                  name={child.kind === CONTAINER_KIND.TERMINAL ? 'console' : (childIsMerch ? 'sack' : 'treasure-chest')}
+                                   size={18}
+                                   color="#2b2b2b"
+                                 />
+@@ -1958,6 +2095,10 @@ export default function LootTradeScreen() {
+                 )}
+               </ScrollView>
+             </>
++          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? (
++            <View style={styles.terminalAdminPanel}>
++              <Text style={styles.terminalAdminText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
++            </View>
+           ) : (
+             <>
+               <TouchableOpacity
+@@ -2117,6 +2258,7 @@ export default function LootTradeScreen() {
+           void ensureGmRoomConnected(code).catch(() => {});
+         }}
+         onConfirmIssue={handleConfirmIssue}
++        roomWideOnly={issueTargetContainer?.kind === CONTAINER_KIND.TERMINAL || (issueTargetContainer?.kind === CONTAINER_KIND.HUB && buildHubSessionNodes(issueTargetContainer, containers).some((node) => node.kind === CONTAINER_KIND.TERMINAL))}
+         onClose={() => setIssueTargetContainer(null)}
+       />
+ 
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 1044410..eb9b005 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -47,6 +47,7 @@ const ContainerFormModal = ({
+   const effectiveKind = initialContainer?.kind || kind;
+   const isMerchant = effectiveKind === CONTAINER_KIND.MERCHANT;
+   const isHub = effectiveKind === CONTAINER_KIND.HUB;
++  const isTerminal = effectiveKind === CONTAINER_KIND.TERMINAL;
+   const isEditing = Boolean(initialContainer?.id && !initialContainer?.__isDuplicateDraft);
+   const initSessionKey = visible
+     ? `${effectiveKind}:${initialContainer?.id || 'new'}:${initialContainer?.__isDuplicateDraft ? 'dup' : 'std'}`
+@@ -60,6 +61,8 @@ const ContainerFormModal = ({
+   const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
+   const [creatingHub, setCreatingHub] = useState(false);
+   const [description, setDescription] = useState('');
++  const [difficulty, setDifficulty] = useState(0);
++  const [lockOnFailure, setLockOnFailure] = useState(false);
+   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+   const [saleMarkup, setSaleMarkup] = useState(String(DEFAULT_SALE_MARKUP_PERCENT));
+@@ -87,6 +90,8 @@ const ContainerFormModal = ({
+       setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
+     }
+     setDescription(initialContainer?.description || '');
++    setDifficulty(Math.max(0, Math.min(5, Number(initialContainer?.difficulty) || 0)));
++    setLockOnFailure(Boolean(initialContainer?.lockOnFailure));
+     setCapsCount(String(
+       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
+     ));
+@@ -242,12 +247,14 @@ const ContainerFormModal = ({
+         ...(initialContainer || {}),
+         kind: isHub
+           ? CONTAINER_KIND.HUB
+-          : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT),
++          : (isTerminal ? CONTAINER_KIND.TERMINAL : (isMerchant ? CONTAINER_KIND.MERCHANT : CONTAINER_KIND.LOOT)),
+         name: cleanName,
+         roomCode: primaryRoomCode,
+         roomCodes: isHub ? selectedRoomCodes : [],
+         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
+         description: description.trim(),
++        difficulty: isTerminal ? difficulty : 0,
++        lockOnFailure: isTerminal && lockOnFailure,
+         caps: resolvedCaps,
+         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+         buyDepreciationPercent: isMerchant ? normalizeBuyDepreciationPercent(buyDepreciation, 50) : 50,
+@@ -262,6 +269,8 @@ const ContainerFormModal = ({
+     titleKey = isEditing ? 'form.editHubTitle' : 'form.createHubTitle';
+   } else if (isMerchant) {
+     titleKey = isEditing ? 'form.editMerchantTitle' : 'form.createMerchantTitle';
++  } else if (isTerminal) {
++    titleKey = isEditing ? 'form.editTerminalTitle' : 'form.createTerminalTitle';
+   }
+ 
+   const trimmedHubQuery = hubQuery.trim();
+@@ -487,6 +496,41 @@ const ContainerFormModal = ({
+               multiline
+             />
+ 
++            {isTerminal && (
++              <>
++                <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
++                <View style={styles.terminalDifficultyRow}>
++                  {[0, 1, 2, 3, 4, 5].map((value) => (
++                    <TouchableOpacity
++                      key={value}
++                      accessibilityRole="button"
++                      accessibilityState={{ selected: difficulty === value }}
++                      style={[styles.terminalDifficultyChip, difficulty === value && styles.terminalDifficultyChipActive]}
++                      onPress={() => setDifficulty(value)}
++                    >
++                      <Text style={[styles.terminalDifficultyChipText, difficulty === value && styles.terminalDifficultyChipTextActive]}>
++                        {value} · {value + 4}
++                      </Text>
++                    </TouchableOpacity>
++                  ))}
++                </View>
++                <Text style={styles.hintText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
++                <TouchableOpacity
++                  accessibilityRole="checkbox"
++                  accessibilityState={{ checked: lockOnFailure }}
++                  style={styles.terminalLockRow}
++                  onPress={() => setLockOnFailure((value) => !value)}
++                >
++                  <MaterialCommunityIcons
++                    name={lockOnFailure ? 'checkbox-marked' : 'checkbox-blank-outline'}
++                    size={21}
++                    color={lockOnFailure ? '#e8c04b' : '#757575'}
++                  />
++                  <Text style={styles.terminalLockText}>{tLootTrade('form.terminalLockLabel')}</Text>
++                </TouchableOpacity>
++              </>
++            )}
++
+             {isMerchant && (
+               <>
+                 <IconText style={styles.label}>{tLootTrade('form.merchantCapsLabel')}</IconText>
+@@ -617,6 +661,26 @@ const styles = StyleSheet.create({
+     marginTop: 12,
+     marginBottom: 6,
+   },
++  terminalDifficultyRow: {
++    flexDirection: 'row',
++    justifyContent: 'space-between',
++    gap: 5,
++    marginTop: 6,
++  },
++  terminalDifficultyChip: {
++    flex: 1,
++    alignItems: 'center',
++    paddingVertical: 10,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#666',
++    backgroundColor: '#262626',
++  },
++  terminalDifficultyChipActive: { borderColor: '#e8c04b', backgroundColor: '#443a17' },
++  terminalDifficultyChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
++  terminalDifficultyChipTextActive: { color: '#f4d76a' },
++  terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
++  terminalLockText: { color: '#e6e0c6', flex: 1, fontSize: 14 },
+   input: {
+     backgroundColor: '#2a2a2a',
+     borderWidth: 1,
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+index 2d829e0..e0a7f7d 100644
+--- a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -31,7 +31,7 @@ const HubChildPickerModal = ({
+       .filter((c) => (
+         c
+         && c.id !== hub.id
+-        && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT)
++        && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind)
+         && !linkedIds.has(c.id)
+       ))
+       .sort((a, b) => {
+@@ -55,6 +55,7 @@ const HubChildPickerModal = ({
+             ) : (
+               candidates.map((item) => {
+                 const isMerch = item.kind === CONTAINER_KIND.MERCHANT;
++                const isTerminal = item.kind === CONTAINER_KIND.TERMINAL;
+                 const pieces = (item.items || []).reduce(
+                   (sum, entry) => sum + (Number(entry.quantity) || 0),
+                   0,
+@@ -69,16 +70,18 @@ const HubChildPickerModal = ({
+                     <View style={styles.rowInfo}>
+                       <View style={styles.rowTitleLine}>
+                         <MaterialCommunityIcons
+-                          name={isMerch ? 'sack' : 'treasure-chest'}
++                          name={isTerminal ? 'console' : (isMerch ? 'sack' : 'treasure-chest')}
+                           size={18}
+                           color="#f0e68c"
+                         />
+                         <Text style={styles.rowName}>{item.name}</Text>
+                       </View>
+                       <IconText style={styles.rowMeta}>
+-                        {isMerch
+-                          ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
+-                          : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`}
++                        {isTerminal
++                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty, length: Number(item.difficulty) + 4 })}${roomSuffix}`
++                          : (isMerch
++                            ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
++                            : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`)}
+                       </IconText>
+                     </View>
+ 
+diff --git a/components/screens/LootTradeScreen/modals/IssueContainerModal.js b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+index f59ebf2..6b5af1a 100644
+--- a/components/screens/LootTradeScreen/modals/IssueContainerModal.js
++++ b/components/screens/LootTradeScreen/modals/IssueContainerModal.js
+@@ -24,12 +24,14 @@ const IssueContainerModal = ({
+   busy = false,
+   onSelectRoom,
+   onConfirmIssue,
++  roomWideOnly = false,
+   onClose,
+ }) => {
+   useLocale();
+   const [selectedRoomCode, setSelectedRoomCode] = useState('');
+   const [targetType, setTargetType] = useState('room');
+   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
++  const isTerminal = container?.kind === CONTAINER_KIND.TERMINAL || roomWideOnly;
+ 
+   const candidateRooms = useMemo(() => {
+     if (!container) return [];
+@@ -83,16 +85,16 @@ const IssueContainerModal = ({
+ 
+   const canSubmit = !busy
+     && Boolean(selectedRoomCode)
+-    && (targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
++    && (isTerminal || targetType === 'room' || (targetType === 'character' && Boolean(selectedCharacterId)));
+ 
+   const handleConfirm = () => {
+     if (!canSubmit) return;
+     const pickedChar = effectiveRoomCharacters.find((c) => c.id === selectedCharacterId) || null;
+     onConfirmIssue({
+       roomCode: selectedRoomCode,
+-      targetType,
+-      targetCharacterId: targetType === 'character' ? selectedCharacterId : null,
+-      targetCharacterName: targetType === 'character' ? (pickedChar?.name || null) : null,
++      targetType: isTerminal ? 'room' : targetType,
++      targetCharacterId: !isTerminal && targetType === 'character' ? selectedCharacterId : null,
++      targetCharacterName: !isTerminal && targetType === 'character' ? (pickedChar?.name || null) : null,
+     });
+   };
+ 
+@@ -139,8 +141,10 @@ const IssueContainerModal = ({
+             </View>
+           )}
+ 
+-          <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>
++          {!isTerminal && <Text style={styles.sectionTitle}>{tLootTrade('issueModal.targetTitle')}</Text>}
+ 
++          {!isTerminal && (
++          <>
+           <TouchableOpacity
+             style={[styles.optionCard, targetType === 'room' && styles.optionCardActive]}
+             onPress={() => setTargetType('room')}
+@@ -202,6 +206,9 @@ const IssueContainerModal = ({
+             </ScrollView>
+           )}
+ 
++          </>
++          )}
++
+           <View style={styles.footer}>
+             <TouchableOpacity
+               style={[styles.btn, styles.confirmBtn, !canSubmit && styles.btnDisabled]}
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index b387970..8671122 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,4 +1,35 @@
+ # Changelog
++---
++## A terminal inside a location opens the hacking mini-game instead of a chest (patch 492)
++
++**Symptom:** the GM created a terminal and linked it into a location, but players
++saw an ordinary chest and got the "open container" flow instead of the hacking
++window.
++
++**Cause:** the room server rebuilds every location node and drops fields it does
++not know. On a server that has not been updated, `kind: 'terminal'` becomes
++`'loot'` and `difficulty` / `lockOnFailure` are lost. The player client therefore
++received a chest node; such a server has no `terminalStates` registry either, so
++the earlier fallback based on that registry could not help.
++
++**Fix:**
++
++- the terminal configuration is duplicated into the node's `lockLabel` as a
++  compact marker — that field survives server normalization and is not rendered
++  for unlocked nodes; `domain/lootTrade.js` and `server/terminalHacking.js`
++  share the exact same format;
++- `PlayerLootTradeOverlay` restores the node kind from the marker (and still from
++  the room registry), shows the `console` icon, difficulty and View / Hack
++  buttons; the mini-game mounts as a separate modal next to the location window;
++- the updated server restores `kind: 'terminal'` from the marker, keeps the
++  difficulty on live edits and advertises `capabilities.terminalHacking`;
++- on a legacy server the client runs the very same mini-game locally
++  (`components/lootTrade/localTerminalGame.js` reuses the pure
++  `server/terminalHacking.js` engine), and the GM issues a standalone terminal
++  as a one-node location instead of the unsupported `terminal.issue`;
++- restart the room server after updating `server/` to get a fully synchronized
++  party-wide game; the mini-game itself is playable immediately.
++
+ ---
+ ## Dedicated GM Workspace Navigator (`navbar2`), read-only character spoiler cards & queued GM commands (patch 481)
+ 
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index cf5f74a..633d9b7 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,5 +1,35 @@
+ # История изменений
+ 
++---
++## Терминал в локации открывает мини-игру взлома, а не сундук (патч 492)
++
++**Симптом:** Мастер создавал терминал и добавлял его в локацию, а игрок видел
++на его месте обычный сундук и попадал в сценарий «открыть контейнер» вместо окна
++взлома.
++
++**Причина:** сервер комнат при выдаче локации заново собирает каждый узел и
++выбрасывает неизвестные ему поля. Пока сервер не обновлён, `kind: 'terminal'`
++превращается в `'loot'`, а `difficulty` / `lockOnFailure` теряются. Клиент игрока
++получал узел сундука; реестр `terminalStates` на таком сервере тоже отсутствует,
++поэтому прежняя попытка восстановить терминал по реестру не срабатывала.
++
++**Что сделано:**
++
++- конфигурация терминала дублируется в `lockLabel` узла компактным маркером —
++  это поле сервер сохраняет как есть и не показывает для незапертых узлов;
++  `domain/lootTrade.js` и `server/terminalHacking.js` кодируют/читают один формат;
++- `PlayerLootTradeOverlay` восстанавливает тип узла из маркера (и по-прежнему из
++  реестра комнаты), рисует иконку `console`, сложность и кнопки «Обзор» /
++  «Взлом»; мини-игра монтируется отдельной модалкой рядом с окном локации;
++- обновлённый сервер восстанавливает `kind: 'terminal'` из маркера, сохраняет
++  сложность при живых правках и сообщает клиентам `capabilities.terminalHacking`;
++- если сервер старой версии, клиент запускает ту же самую мини-игру локально
++  (`components/lootTrade/localTerminalGame.js` использует чистый движок
++  `server/terminalHacking.js`), а Мастер выдаёт одиночный терминал как локацию с
++  одним узлом вместо недоступного `terminal.issue`;
++- для полной синхронизации партии между игроками сервер комнат всё равно нужно
++  перезапустить после обновления файлов (`server/`), но играть можно сразу.
++
+ ---
+ ## Отдельный навигатор Мастера (`navbar2`), readonly-карточки персонажей со спойлерами и команды Мастера с очередью доставки (патч 481)
+ 
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index a916069..62367a0 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -131,6 +131,12 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - Players can step into any unlocked chest or shop, close that nested window to return to the location list, or minimize the whole location. The outer location window stays open for the party until the Game Master closes the scene.
+ - The Game Master can put a **Lock (`🔒`)** on any chest or shop in a location and write a note (such as *«Lockpick — Difficulty 2»* or *«Requires Overseer's Key»*). Players see the locked entry and its requirement in the list, but cannot peek inside until they overcome the obstacle in play and the Game Master flips the lock to **«Unlocked» (`🔓`)**.
+ 
++#### Terminals & the Hacking Mini-Game
++- Tap **«Create terminal»** to set a name and description, choose a difficulty of `0–5` (password length `4–9`) and optionally lock the terminal after a failed hack.
++- A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
++- In the hacking window the player picks words and bracket combos: the password must be guessed within 4 attempts using letter «likeness» hints. With lockout enabled, a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine in the inventory grants one more attempt.
++- On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
++
+ ### Live Scene Controls for the Game Master
+ While a chest, merchant, or location is active, the Game Master has a **live control panel** inside the card:
+ - after a good barter roll or Charisma check, adjust sale markup, buyback markdown, or caps **live on the fly** — either for the whole party or **personally for one specific character**;
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 0699039..d6134a5 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -131,6 +131,12 @@
+ - Игрок может заходить в открытые сундуки и лавки локации, закрывать их и возвращаться обратно к списку локации. Само внешнее окно локации у игроков не имеет кнопки полного закрытия (только «Свернуть») и остаётся доступным всей группе, пока ведущий сам не завершит сцену.
+ - Любой сундук или лавку в локации ведущий может пометить **замком (`🔒`)** и подписать условие (например: *«Взлом — сложность 2»* или *«Нужен ключ смотрителя»*). Запертая строка видна игрокам в списке локации с подписью, но заглянуть внутрь нельзя, пока персонаж не справится с замком в игре и ведущий не переключит замок в положение **«Открыто» (`🔓`)**.
+ 
++#### Терминал и мини-игра взлома
++- Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `0–5` (длина пароля `4–9` символов) и при желании включите блокировку терминала после провала.
++- Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
++- В окне взлома игрок выбирает слова и скобочные комбинации: за 4 попытки нужно угадать пароль, сравнивая «сходство» букв. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а журнал *Programmer’s Digest* из инвентаря даёт ещё одну попытку.
++- На обновлённом сервере комнат партия общая: подключённые игроки видят одну доску. Если сервер ещё старой версии, окно взлома всё равно откроется, а партия пойдёт локально на устройстве игрока (в окне будет подсказка). Чтобы доска стала общей, обновите файлы `server/` и перезапустите сервис Node.js.
++
+ ### Живое управление для ведущего прямо во время сцены
+ Пока сундук, торговец или локация выданы игрокам, внутри карточки у ведущего открыта **живая панель управления**:
+ - если персонаж удачно поторговался или прошёл проверку Харизмы, ведущий может **прямо на ходу** сдвинуть процент наценки или скупки — как для всей группы сразу, так и **персонально для одного конкретного персонажа**;
+diff --git a/domain/lootTrade.js b/domain/lootTrade.js
+index fbae777..de76601 100644
+--- a/domain/lootTrade.js
++++ b/domain/lootTrade.js
+@@ -26,6 +26,93 @@ export const CONTAINER_KIND = Object.freeze({
+   LOOT: 'loot',
+   MERCHANT: 'merchant',
+   HUB: 'hub',
++  TERMINAL: 'terminal',
++});
++
++/**
++ * Маркер терминала внутри узла локации.
++ *
++ * `normalizeHubSessionNode()` на сервере (особенно на ещё не обновлённом)
++ * собирает узел заново и выбрасывает все неизвестные поля: `kind: 'terminal'`
++ * превращается в `'loot'`, а `difficulty`/`lockOnFailure` теряются. Из-за этого
++ * игрок видел терминал как обычный сундук. `lockLabel` — единственное поле,
++ * которое сервер сохраняет как есть и которое не показывается для незапертых
++ * узлов, поэтому конфигурация терминала едет в нём. Клиент и обновлённый
++ * сервер умеют восстановить из маркера настоящий тип узла.
++ * Формат обязан совпадать с `server/terminalHacking.js` (CJS-копия).
++ */
++export const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
++
++export const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
++  `${TERMINAL_NODE_MARKER}${JSON.stringify({
++    v: 1,
++    d: Math.max(0, Math.min(5, Math.floor(Number(difficulty) || 0))),
++    f: lockOnFailure ? 1 : 0,
++    l: String(label || ''),
++  })}`
++);
++
++export const decodeTerminalNodeMarker = (value) => {
++  const raw = String(value || '');
++  if (!raw.startsWith(TERMINAL_NODE_MARKER)) return null;
++  try {
++    const parsed = JSON.parse(raw.slice(TERMINAL_NODE_MARKER.length));
++    if (!parsed || parsed.v !== 1) return null;
++    return {
++      difficulty: Math.max(0, Math.min(5, Math.floor(Number(parsed.d) || 0))),
++      lockOnFailure: Boolean(parsed.f),
++      label: String(parsed.l || ''),
++    };
++  } catch {
++    return null;
++  }
++};
++
++export const withTerminalNodeMarker = (node) => ({
++  ...node,
++  lockLabel: encodeTerminalNodeMarker({
++    difficulty: node?.difficulty,
++    lockOnFailure: node?.lockOnFailure,
++    label: node?.lockLabel,
++  }),
++});
++
++/** Восстанавливает узел терминала даже если сервер понизил его до сундука. */
++export const resolveTerminalSessionNode = (node) => {
++  if (!node) return { node, isTerminal: false, marker: null };
++  const marker = decodeTerminalNodeMarker(node.lockLabel);
++  if (node.kind === CONTAINER_KIND.TERMINAL) {
++    return {
++      node: marker ? { ...node, lockLabel: marker.label } : node,
++      isTerminal: true,
++      marker,
++    };
++  }
++  if (!marker) return { node, isTerminal: false, marker: null };
++  return {
++    node: {
++      ...node,
++      kind: CONTAINER_KIND.TERMINAL,
++      difficulty: marker.difficulty,
++      lockOnFailure: marker.lockOnFailure,
++      lockLabel: marker.label,
++    },
++    isTerminal: true,
++    marker,
++  };
++};
++
++/** Отдельный терминал, выданный без локации (старый сервер не знает terminal.issue). */
++export const buildStandaloneTerminalSessionNode = (container, { locked = false, lockLabel = '' } = {}) => withTerminalNodeMarker({
++  containerId: container?.id,
++  kind: CONTAINER_KIND.TERMINAL,
++  name: container?.name || '',
++  description: container?.description || '',
++  locked,
++  lockLabel,
++  difficulty: container?.difficulty || 0,
++  lockOnFailure: Boolean(container?.lockOnFailure),
++  items: [],
+ });
+ 
+ export const QUANTITY_UNIT = Object.freeze({
+@@ -270,7 +357,8 @@ export const normalizeRoomCodes = (rawRoomCodes, fallbackRoomCode = '') => {
+ export const CONTAINER_KIND_SORT_ORDER = Object.freeze({
+   [CONTAINER_KIND.HUB]: 0,
+   [CONTAINER_KIND.LOOT]: 1,
+-  [CONTAINER_KIND.MERCHANT]: 2,
++  [CONTAINER_KIND.TERMINAL]: 2,
++  [CONTAINER_KIND.MERCHANT]: 3,
+ });
+ 
+ /**
+@@ -340,7 +428,7 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
+   );
+   const byId = new Map(
+     list
+-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
++      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
+       .map((c) => [c.id, c]),
+   );
+ 
+@@ -368,13 +456,13 @@ export const analyzeHubDeletion = (hubId, allContainers = []) => {
+ 
+ /**
+  * Собирает живые узлы выдачи для локации ('hub') из списка карточек Мастера.
+- * Строго один уровень вложенности: внутрь попадают только 'loot' и 'merchant'.
++ * Строго один уровень вложенности: внутрь попадают loot, merchant и terminal.
+  */
+ export const buildHubSessionNodes = (hub, allContainers = []) => {
+   if (!hub || hub.kind !== CONTAINER_KIND.HUB) return [];
+   const byId = new Map(
+     (Array.isArray(allContainers) ? allContainers : [])
+-      .filter((c) => c && (c.kind === CONTAINER_KIND.LOOT || c.kind === CONTAINER_KIND.MERCHANT))
++      .filter((c) => c && [CONTAINER_KIND.LOOT, CONTAINER_KIND.MERCHANT, CONTAINER_KIND.TERMINAL].includes(c.kind))
+       .map((c) => [c.id, c]),
+   );
+   const links = normalizeHubLinks(hub.links);
+@@ -382,7 +470,7 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+   for (const link of links) {
+     const child = byId.get(link.containerId);
+     if (!child) continue;
+-    nodes.push({
++    const node = {
+       containerId: child.id,
+       kind: child.kind,
+       name: child.name,
+@@ -396,14 +484,18 @@ export const buildHubSessionNodes = (hub, allContainers = []) => {
+       buyDepreciationPercent: child.kind === CONTAINER_KIND.MERCHANT
+         ? normalizeBuyDepreciationPercent(child.buyDepreciationPercent, DEFAULT_BUY_DEPRECIATION_PERCENT)
+         : DEFAULT_BUY_DEPRECIATION_PERCENT,
++      difficulty: child.kind === CONTAINER_KIND.TERMINAL ? child.difficulty : 0,
++      lockOnFailure: child.kind === CONTAINER_KIND.TERMINAL ? Boolean(child.lockOnFailure) : false,
+       characterOverrides: {},
+-      items: Array.isArray(child.items)
++      items: child.kind === CONTAINER_KIND.TERMINAL ? [] : (Array.isArray(child.items)
+         ? child.items.map((entry) => ({
+             ...entry,
+             itemSnapshot: entry.itemSnapshot ? { ...entry.itemSnapshot } : null,
+           }))
+-        : [],
+-    });
++        : []),
++    };
++    // Маркер переживает нормализацию узла на старом сервере комнат.
++    nodes.push(child.kind === CONTAINER_KIND.TERMINAL ? withTerminalNodeMarker(node) : node);
+   }
+   return nodes;
+ };
+@@ -432,8 +524,9 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+   let kind = CONTAINER_KIND.LOOT;
+   if (raw.kind === CONTAINER_KIND.MERCHANT) kind = CONTAINER_KIND.MERCHANT;
+   else if (raw.kind === CONTAINER_KIND.HUB) kind = CONTAINER_KIND.HUB;
++  else if (raw.kind === CONTAINER_KIND.TERMINAL) kind = CONTAINER_KIND.TERMINAL;
+ 
+-  const items = kind === CONTAINER_KIND.HUB
++  const items = kind === CONTAINER_KIND.HUB || kind === CONTAINER_KIND.TERMINAL
+     ? []
+     : deduplicateContainerItems(raw.items, now);
+   const links = kind === CONTAINER_KIND.HUB
+@@ -454,6 +547,10 @@ export const normalizeContainerEntity = (raw = {}, now = Date.now()) => {
+     roomName: String(raw.roomName || '').trim(),
+     inRoot,
+     description: String(raw.description || '').trim(),
++    difficulty: kind === CONTAINER_KIND.TERMINAL
++      ? clampNumber(raw.difficulty, 0, 5, 0)
++      : 0,
++    lockOnFailure: kind === CONTAINER_KIND.TERMINAL && Boolean(raw.lockOnFailure),
+     caps: kind === CONTAINER_KIND.MERCHANT
+       ? normalizeCapsAmount(raw.caps, DEFAULT_MERCHANT_CAPS)
+       : 0,
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index ddb9878..ef91166 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -5,7 +5,8 @@
+     "createLoot": "Create\nContainer",
+     "createMerchant": "Create\nMerchant",
+     "createHub": "Create\nLocation",
+-    "syncCloud": "Cloud sync"
++    "syncCloud": "Cloud sync",
++    "createTerminal": "Hacking terminal"
+   },
+   "card": {
+     "lootBadge": "Loot",
+@@ -25,7 +26,8 @@
+     "duplicate": "Duplicate",
+     "edit": "Edit",
+     "delete": "Delete",
+-    "copySuffix": "copy"
++    "copySuffix": "copy",
++    "terminalDifficulty": "Difficulty {difficulty} · {length}-letter password"
+   },
+   "form": {
+     "createLootTitle": "New Loot Container",
+@@ -57,7 +59,12 @@
+     "save": "Save",
+     "cancel": "Cancel",
+     "validationName": "Please enter a name.",
+-    "validationRoom": "Please select a room."
++    "validationRoom": "Please select a room.",
++    "createTerminalTitle": "Create hacking terminal",
++    "editTerminalTitle": "Terminal settings",
++    "terminalDifficultyLabel": "Difficulty · password length",
++    "terminalDifficultyHint": "Hacker reduces effective difficulty by its rank. At difficulty 0, the correct word is underlined.",
++    "terminalLockLabel": "Lock the terminal after all attempts are failed"
+   },
+   "detail": {
+     "backToList": "← Back to containers",
+@@ -222,5 +229,35 @@
+     "shortfallAccept": "Accept {have} {CAP}",
+     "stockChangedError": "Merchant stock changed (another player completed a trade). Please review your buffer and try again.",
+     "tradeSuccess": "Trade completed!"
++  },
++  "terminal": {
++    "title": "Terminal",
++    "localMode": "This room server does not support a shared hack — the game runs locally on this device.",
++    "hack": "Hack",
++    "ready": "SYSTEM READY FOR INPUT",
++    "failed": "ATTEMPTS EXHAUSTED",
++    "accessDenied": "ACCESS DENIED",
++    "accessGranted": "ACCESS GRANTED",
++    "terminalLockedHint": "This terminal is locked for the whole room. The GM can unlock it in the card settings.",
++    "selectCharacter": "Select a character and connect it to the room first.",
++    "viewOnly": "Another player is already hacking. You can only watch.",
++    "actionFailed": "The terminal action could not be completed.",
++    "guessWord": "Password guess",
++    "guessHint": "Tap an active underlined word to test it.",
++    "bracketCombo": "Bracket combination",
++    "bracketHint": "Tap the highlighted combination to apply its effect.",
++    "attempts": "Attempts",
++    "operator": "Operator",
++    "spectator": "An operator has already been selected. You are watching only.",
++    "digestPrompt": "Use Programmer’s Digest to avoid lockout and gain one more attempt?",
++    "digestUse": "Use magazine",
++    "digestDecline": "Decline",
++    "waitingOperator": "The terminal operator must choose.",
++    "likeness": "Letters matching by position",
++    "view": "View",
++    "locked": "LOCKED",
++    "available": "AVAILABLE",
++    "unlock": "Unlock",
++    "openTerminal": "Open terminal"
+   }
+ }
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index 85b303b..a0c8cc8 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -5,7 +5,8 @@
+     "createLoot": "Создать\nконтейнер",
+     "createMerchant": "Создать\nторговца",
+     "createHub": "Создать\nлокацию",
+-    "syncCloud": "Синхронизация с облаком"
++    "syncCloud": "Синхронизация с облаком",
++    "createTerminal": "Терминал взлома"
+   },
+   "card": {
+     "lootBadge": "Добыча",
+@@ -25,7 +26,8 @@
+     "duplicate": "Дублировать",
+     "edit": "Изменить",
+     "delete": "Удалить",
+-    "copySuffix": "копия"
++    "copySuffix": "копия",
++    "terminalDifficulty": "Сложность {difficulty} · пароль {length} букв"
+   },
+   "form": {
+     "createLootTitle": "Новый контейнер добычи",
+@@ -57,7 +59,12 @@
+     "save": "Сохранить",
+     "cancel": "Отмена",
+     "validationName": "Укажите имя контейнера или торговца.",
+-    "validationRoom": "Выберите комнату."
++    "validationRoom": "Выберите комнату.",
++    "createTerminalTitle": "Создать терминал взлома",
++    "editTerminalTitle": "Настройки терминала",
++    "terminalDifficultyLabel": "Сложность · длина пароля",
++    "terminalDifficultyHint": "Хакер снижает эффективную сложность на свой ранг. При сложности 0 правильное слово подчёркнуто.",
++    "terminalLockLabel": "Заблокировать терминал после провала всех попыток"
+   },
+   "detail": {
+     "backToList": "← К списку контейнеров",
+@@ -222,5 +229,35 @@
+     "shortfallAccept": "Согласиться на {have} {CAP}",
+     "stockChangedError": "Остаток товаров у торговца изменился (другой игрок успел совершить сделку). Проверьте буфер и повторите.",
+     "tradeSuccess": "Сделка успешно завершена!"
++  },
++  "terminal": {
++    "title": "Терминал",
++    "localMode": "Сервер комнат не поддерживает общий взлом — партия идёт локально на этом устройстве.",
++    "hack": "Взломать",
++    "ready": "СИСТЕМА ОЖИДАЕТ ВВОДА",
++    "failed": "ПОПЫТКИ ИСЧЕРПАНЫ",
++    "accessDenied": "ДОСТУП ЗАПРЕЩЁН",
++    "accessGranted": "ДОСТУП РАЗРЕШЁН",
++    "terminalLockedHint": "Терминал заблокирован для всей комнаты. Мастер может разблокировать его в настройках карточки.",
++    "selectCharacter": "Сначала выберите персонажа и подключите его к комнате.",
++    "viewOnly": "Взлом уже выполняет другой игрок. Вы можете только смотреть.",
++    "actionFailed": "Не удалось выполнить действие терминала.",
++    "guessWord": "Попытка пароля",
++    "guessHint": "Нажмите активное подчёркнутое слово, чтобы проверить его.",
++    "bracketCombo": "Скобочная комбинация",
++    "bracketHint": "Нажмите выделенную комбинацию, чтобы применить её эффект.",
++    "attempts": "Попытки",
++    "operator": "Оператор",
++    "spectator": "Оператор уже выбран. Вы можете только наблюдать.",
++    "digestPrompt": "Использовать эффект «Дайджеста программиста», чтобы избежать блокировки и получить ещё одну попытку?",
++    "digestUse": "Использовать журнал",
++    "digestDecline": "Отказаться",
++    "waitingOperator": "Решение принимает оператор терминала.",
++    "likeness": "Совпадение букв по позиции",
++    "view": "Смотреть",
++    "locked": "ЗАБЛОКИРОВАН",
++    "available": "ДОСТУПЕН",
++    "unlock": "Разблокировать",
++    "openTerminal": "Открыть терминал"
+   }
+ }
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 26aea43..2c01340 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "428"
++  "baseline": "492"
+ }
+diff --git a/public/version.json b/public/version.json
+index d6067f1..393f338 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,11 @@
+ {
+-  "version": "481",
++  "version": "492",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Терминал в локации больше не превращается в сундук: при нажатии открывается окно взлома с мини-игрой, даже если сервер комнат ещё не обновлён.",
++      "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
++      "Исправлена ошибка при открытии игроком локации: окно взлома монтируется отдельно и только после выбора терминала.",
+       "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
+       "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
+       "Категория «Самодельное снаряжение»: предметы из загруженных наборов собраны в отдельной категории со своими подразделами по типам оружия, робо-оружию и боеприпасам, а также доступны в лавке и окне модификации оружия.",
+@@ -13,6 +16,9 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "A terminal inside a location no longer turns into a chest: tapping it opens the hacking mini-game in a modal, even if the room server has not been updated yet.",
++      "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
++      "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
+       "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
+       "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
+       "«Homebrew Equipment» category: items from loaded packs appear in their own category with subsections by weapon type, robot weapons, and ammo, and are available in the shop and weapon modification window.",
+diff --git a/server/lootTradeSession.js b/server/lootTradeSession.js
+index 6fcc792..827d104 100644
+--- a/server/lootTradeSession.js
++++ b/server/lootTradeSession.js
+@@ -6,6 +6,7 @@
+ // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
+ 
+ const { ERROR_CODE } = require('./protocol');
++const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
+ 
+ const clampNumber = (val, min, max, fallback = 0) => {
+   const num = Number(val);
+@@ -128,14 +129,20 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+   if (!raw || typeof raw !== 'object') return null;
+   const containerId = String(raw.containerId || raw.id || '').trim();
+   if (!containerId) return null;
+-  const kind = raw.kind === 'merchant' ? 'merchant' : 'loot';
+-  const items = normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
++  // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
++  // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
++  const marker = decodeTerminalNodeMarker(raw.lockLabel);
++  const explicitTerminal = raw.kind === 'terminal';
++  const kind = raw.kind === 'merchant' ? 'merchant' : (explicitTerminal || marker ? 'terminal' : 'loot');
++  const items = kind === 'terminal' ? [] : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
+   return {
+     containerId,
+     kind,
+-    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : 'Контейнер'),
++    name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : (kind === 'terminal' ? 'Терминал' : 'Контейнер')),
+     description: String(raw.description || '').trim(),
+     locked: Boolean(raw.locked),
++    // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
++    // старый сервер, и просто скрывается при отрисовке.
+     lockLabel: String(raw.lockLabel || '').trim(),
+     caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
+     saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
+@@ -143,6 +150,14 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
+       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
+       : 50,
+     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
++    difficulty: kind === 'terminal'
++      ? (marker && !explicitTerminal
++          ? marker.difficulty
++          : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
++      : 0,
++    lockOnFailure: kind === 'terminal' && (marker && !explicitTerminal
++      ? marker.lockOnFailure
++      : Boolean(raw.lockOnFailure)),
+     items,
+   };
+ };
+@@ -189,16 +204,18 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+   if (raw.kind === 'merchant') kind = 'merchant';
+   else if (raw.kind === 'hub') kind = 'hub';
+ 
+-  const targetType = raw.targetType === 'character' ? 'character' : 'room';
+-  const targetCharacterId = targetType === 'character' && raw.targetCharacterId
+-    ? String(raw.targetCharacterId)
+-    : null;
+-  if (targetType === 'character' && !targetCharacterId) return null;
+-
++  let targetType = raw.targetType === 'character' ? 'character' : 'room';
+   const items = kind === 'hub'
+     ? []
+     : normalizeSessionItemsList(raw.items, now, 0);
+   const nodes = kind === 'hub' ? normalizeHubSessionNodes(raw.nodes, now) : [];
++  // Терминальные игры всегда общие для всей комнаты, даже если мастер передал
++  // локацию с терминалом как персональную раздачу.
++  if (kind === 'hub' && nodes.some((node) => node.kind === 'terminal')) targetType = 'room';
++  const targetCharacterId = targetType === 'character' && raw.targetCharacterId
++    ? String(raw.targetCharacterId)
++    : null;
++  if (targetType === 'character' && !targetCharacterId) return null;
+   const closedByClientIds = Array.isArray(raw.closedByClientIds)
+     ? [...new Set(raw.closedByClientIds.map((id) => String(id || '')).filter(Boolean))]
+     : [];
+@@ -222,6 +239,8 @@ const normalizeActiveSession = (raw, now = Date.now()) => {
+       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
+       : 50,
+     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
++    difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
++    lockOnFailure: kind === 'terminal' && Boolean(raw.lockOnFailure),
+     items,
+     nodes,
+     closedByClientIds,
+@@ -403,12 +422,28 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
+         if (payload.nodeDescription !== undefined) {
+           targetNode.description = String(payload.nodeDescription || '').trim();
+         }
++        if (targetNode.kind === 'terminal') {
++          if (payload.nodeDifficulty !== undefined) {
++            targetNode.difficulty = Math.max(0, Math.min(5, Math.floor(Number(payload.nodeDifficulty) || 0)));
++          }
++          if (payload.nodeLockOnFailure !== undefined) {
++            targetNode.lockOnFailure = Boolean(payload.nodeLockOnFailure);
++          }
++        }
+         if (payload.locked !== undefined) {
+           targetNode.locked = Boolean(payload.locked);
+         }
+         if (payload.lockLabel !== undefined) {
+           targetNode.lockLabel = String(payload.lockLabel || '').trim();
+         }
++        if (targetNode.kind === 'terminal') {
++          const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
++          targetNode.lockLabel = encodeTerminalNodeMarker({
++            difficulty: targetNode.difficulty,
++            lockOnFailure: targetNode.lockOnFailure,
++            label: previousMarker ? previousMarker.label : targetNode.lockLabel,
++          });
++        }
+         if (Array.isArray(payload.nodeItems)) {
+           targetNode.items = normalizeSessionItemsList(payload.nodeItems, now, 0);
+         }
+diff --git a/server/protocol.js b/server/protocol.js
+index 9ec476a..7fb385a 100644
+--- a/server/protocol.js
++++ b/server/protocol.js
+@@ -31,6 +31,9 @@ const MESSAGE = Object.freeze({
+   SESSION_PLAYER_CLOSE: 'session.playerClose',
+   SESSION_LOOT_TAKE: 'session.lootTake',
+   SESSION_TRADE_COMMIT: 'session.tradeCommit',
++  TERMINAL_ISSUE: 'terminal.issue',
++  TERMINAL_ACTION: 'terminal.action',
++  TERMINAL_STATE: 'terminal.state',
+   ERROR: 'error',
+ });
+ 
+@@ -49,6 +52,16 @@ const ERROR_CODE = Object.freeze({
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
++  TERMINAL_NOT_ISSUED: 'TERMINAL_NOT_ISSUED',
++  TERMINAL_LOCKED: 'TERMINAL_LOCKED',
++  TERMINAL_VIEW_ONLY: 'TERMINAL_VIEW_ONLY',
++  TERMINAL_ALREADY_ACTIVE: 'TERMINAL_ALREADY_ACTIVE',
++  TERMINAL_NOT_ACTIVE: 'TERMINAL_NOT_ACTIVE',
++  TERMINAL_INVALID_GUESS: 'TERMINAL_INVALID_GUESS',
++  TERMINAL_INVALID_BRACKET: 'TERMINAL_INVALID_BRACKET',
++  TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
++  TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
++  TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
+ });
+ 
+ const LIMITS = Object.freeze({
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index cf4a106..4a40d4a 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -15,6 +15,11 @@ const {
+   applyAtomicLootTake,
+   applyAtomicTradeCommit,
+ } = require('./lootTradeSession');
++const {
++  normalizeTerminalConfig,
++  publicGameState,
++  applyGameAction,
++} = require('./terminalHacking');
+ 
+ const newOwnerToken = () => crypto.randomBytes(16).toString('hex');
+ 
+@@ -45,6 +50,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     members: new Map(), // clientId -> { clientId, name, role, ws }
+     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
+     activeSession: null, // открытый контейнер добычи или торговец
++    terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
+     directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
+     createdAt: now(),
+@@ -73,8 +79,20 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+       fromName: entry.fromName,
+     })),
+     activeSession: room.activeSession || null,
++    terminalStates: Object.fromEntries([...room.terminalStates.entries()].map(([id, entry]) => [id, {
++      containerId: id,
++      config: entry.config,
++      locked: Boolean(entry.locked),
++      standaloneIssued: Boolean(entry.standaloneIssued),
++      game: publicGameState(entry.game),
++      updatedAt: entry.updatedAt,
++    }])),
+     lastClosedSession: room.lastClosedSession || null,
+     directives: cloneDirectives(room.directives),
++    // Признак обновлённого сервера: клиент включает синхронизированную игру,
++    // а при отсутствии поля запускает мини-игру локально (старый сервер комнат
++    // не знает terminal.issue/terminal.action и превращал терминал в сундук).
++    capabilities: { terminalHacking: true },
+   });
+ 
+   const countOwnedRooms = (ownerClientId) => (
+@@ -277,6 +295,7 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (!normalized) return { error: ERROR_CODE.BAD_MESSAGE };
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = normalized;
++    syncTerminalNodes(room, normalized);
+     room.lastClosedSession = null;
+     return { room, session: normalized };
+   };
+@@ -291,9 +310,114 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (result.error) return result;
+     ensureOwnerMemberWs(room, clientId, ws);
+     room.activeSession = result.session;
++    syncTerminalNodes(room, result.session);
+     return { room, session: result.session };
+   };
+ 
++  const syncTerminalNodes = (room, session) => {
++    if (!room || session?.kind !== 'hub' || !Array.isArray(session.nodes)) return;
++    for (const node of session.nodes) {
++      if (node?.kind !== 'terminal') continue;
++      const config = normalizeTerminalConfig({
++        containerId: node.containerId,
++        name: node.name,
++        description: node.description,
++        difficulty: node.difficulty,
++        lockOnFailure: node.lockOnFailure,
++      });
++      if (!config.containerId || !config.name) continue;
++      const previous = room.terminalStates.get(config.containerId);
++      const changed = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
++      room.terminalStates.set(config.containerId, previous
++        ? { ...previous, config, game: changed ? null : previous.game, updatedAt: now() }
++        : { config, locked: false, standaloneIssued: false, game: null, updatedAt: now() });
++    }
++  };
++
++  const terminalPublic = (terminalId, entry) => ({
++    containerId: terminalId,
++    config: entry.config,
++    locked: Boolean(entry.locked),
++    standaloneIssued: Boolean(entry.standaloneIssued),
++    game: publicGameState(entry.game),
++    updatedAt: entry.updatedAt,
++  });
++
++  /** Зарегистрировать доступный терминал в комнате (только владелец комнаты). */
++  const issueTerminal = ({ code, clientId, config: rawConfig, ownerToken = null, ws = null }) => {
++    const room = rooms.get(code);
++    if (!room) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++    if (!isOwner(code, clientId)) return { error: ERROR_CODE.NOT_ROOM_OWNER };
++    const config = normalizeTerminalConfig(rawConfig);
++    if (!config.containerId || !config.name) return { error: ERROR_CODE.BAD_MESSAGE };
++    ensureOwnerMemberWs(room, clientId, ws);
++    const previous = room.terminalStates.get(config.containerId);
++    const configChanged = previous && JSON.stringify(previous.config) !== JSON.stringify(config);
++    const entry = previous
++      ? { ...previous, config, standaloneIssued: true, game: configChanged ? null : previous.game, updatedAt: now() }
++      : { config, locked: false, standaloneIssued: true, game: null, updatedAt: now() };
++    room.terminalStates.set(config.containerId, entry);
++    return { room, terminal: terminalPublic(config.containerId, entry) };
++  };
++
++  /** Выполнить синхронизированное действие терминала. */
++  const terminalAction = ({ code, clientId, characterId, containerId, action, value, ownerToken = null, ws = null }) => {
++    const room = rooms.get(code);
++    if (!room || !room.members.has(clientId)) return { error: ERROR_CODE.ROOM_NOT_FOUND };
++    const id = String(containerId || '').trim();
++    const entry = room.terminalStates.get(id);
++    if (!entry) return { error: ERROR_CODE.TERMINAL_NOT_ISSUED };
++    if (action === 'unlock' || action === 'reset') {
++      rebindOwnerIfTokenMatches(room, clientId, ownerToken);
++      if (!isOwner(code, clientId)) return { error: ERROR_CODE.TERMINAL_GM_ONLY };
++      entry.locked = false;
++      entry.game = null;
++      entry.updatedAt = now();
++      return { room, terminal: terminalPublic(id, entry) };
++    }
++    const member = room.members.get(clientId);
++    if (member?.role !== 'player') return { error: ERROR_CODE.TERMINAL_VIEW_ONLY };
++    const charId = String(characterId || '').trim();
++    const published = room.lastSnapshots.get(charId);
++    if (!charId || !published || published.fromClientId !== clientId) return { error: ERROR_CODE.SESSION_FORBIDDEN };
++    if (entry.locked || entry.game?.status === 'locked') return { error: ERROR_CODE.TERMINAL_LOCKED };
++    if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
++      return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
++    }
++    const snapshot = published.snapshot?.data || published.snapshot || {};
++    const result = applyGameAction({
++      game: entry.game || entry.config,
++      action,
++      clientId,
++      characterId: charId,
++      characterSnapshot: snapshot,
++      value,
++      now: now(),
++    });
++    if (result.error) return { error: ERROR_CODE[result.error] || result.error };
++    entry.game = result.game;
++    if (entry.game?.status === 'locked') entry.locked = true;
++    if (result.usedDigest) {
++      const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));
++      const snapshotData = nextSnapshot.data && typeof nextSnapshot.data === 'object'
++        ? nextSnapshot.data
++        : nextSnapshot;
++      const used = new Set(Array.isArray(snapshotData.usedMagazineEffects) ? snapshotData.usedMagazineEffects : []);
++      used.add('mag_programmers_digest');
++      snapshotData.usedMagazineEffects = [...used];
++      snapshotData.terminalHacking = { ...(snapshotData.terminalHacking || {}), hasProgrammersDigest: true, digestUsed: true };
++      room.lastSnapshots.set(charId, {
++        ...published,
++        snapshot: nextSnapshot,
++        revision: published.revision + 1,
++        updatedAt: now(),
++      });
++    }
++    entry.updatedAt = now();
++    return { room, terminal: terminalPublic(id, entry), usedDigest: Boolean(result.usedDigest) };
++  };
++
+   /** Закрыть активную раздачу/торговлю в комнате (только владелец). */
+   const closeSession = ({ code, clientId, sessionId = null, ownerToken = null, ws = null }) => {
+     const room = rooms.get(code);
+@@ -556,6 +680,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     getState,
+     openSession,
+     updateSession,
++    issueTerminal,
++    terminalAction,
+     closeSession,
+     playerCloseSession,
+     lootTake,
+diff --git a/server/roomServer.js b/server/roomServer.js
+index d65208b..1f6e82b 100644
+--- a/server/roomServer.js
++++ b/server/roomServer.js
+@@ -312,6 +312,18 @@ const attachRoomWebSocketServer = (httpServer, {
+     return out;
+   };
+ 
++  const broadcastTerminalStates = (room, exceptClientId = null) => {
++    if (!room) return;
++    const state = registry.getState(room.code);
++    const terminals = Object.values(state?.terminalStates || {});
++    for (const terminal of terminals) {
++      for (const member of room.members.values()) {
++        if (member.clientId === exceptClientId || !member.ws) continue;
++        sendEnvelope(member.ws, MESSAGE.TERMINAL_STATE, { terminal }, room.code, member.clientId);
++      }
++    }
++  };
++
+   const broadcastSessionState = (room, exceptClientId, basePayload) => {
+     for (const member of room.members.values()) {
+       if (member.clientId === exceptClientId || !member.ws) continue;
+@@ -598,6 +610,64 @@ const attachRoomWebSocketServer = (httpServer, {
+           break;
+         }
+ 
++        case MESSAGE.TERMINAL_ISSUE: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.issueTerminal({
++            code: canonical,
++            clientId,
++            config: payload.config,
++            ownerToken: payload.ownerToken || null,
++            ws,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          ws.meta.rooms.add(canonical);
++          const statePayload = { terminal: result.terminal, requestId: payload.requestId || null };
++          sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, { terminal: result.terminal });
++          break;
++        }
++
++        case MESSAGE.TERMINAL_ACTION: {
++          const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
++          if (!canonical) {
++            sendError(ws, clientId, ERROR_CODE.ROOM_NOT_FOUND, payload.requestId);
++            break;
++          }
++          const result = registry.terminalAction({
++            code: canonical,
++            clientId,
++            characterId: payload.characterId,
++            containerId: payload.containerId,
++            action: payload.action,
++            value: payload.value,
++            ownerToken: payload.ownerToken || null,
++            ws,
++          });
++          if (result.error) {
++            sendError(ws, clientId, result.error, payload.requestId, canonical);
++            break;
++          }
++          ws.meta.rooms.add(canonical);
++          const statePayload = {
++            terminal: result.terminal,
++            usedDigest: result.usedDigest || false,
++            requestId: payload.requestId || null,
++          };
++          sendEnvelope(ws, MESSAGE.TERMINAL_STATE, statePayload, canonical, clientId);
++          broadcastToRoom(result.room, clientId, MESSAGE.TERMINAL_STATE, {
++            terminal: result.terminal,
++            usedDigest: result.usedDigest || false,
++          });
++          break;
++        }
++
+         case MESSAGE.SESSION_OPEN: {
+           const canonical = toCanonicalRoomCode(roomCode || payload.code || '');
+           if (!canonical) {
+@@ -629,6 +699,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           broadcastSessionState(result.room, clientId, {
+             session: result.session,
+           });
++          broadcastTerminalStates(result.room);
+           break;
+         }
+ 
+@@ -663,6 +734,7 @@ const attachRoomWebSocketServer = (httpServer, {
+           broadcastSessionState(result.room, clientId, {
+             session: result.session,
+           });
++          broadcastTerminalStates(result.room);
+           break;
+         }
+ 
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+new file mode 100644
+index 0000000..af0c5ac
+--- /dev/null
++++ b/server/terminalHacking.js
+@@ -0,0 +1,320 @@
++'use strict';
++
++// Server-authoritative rules and board generation for shared terminal hacking.
++const WORDS_BY_LENGTH = {
++  4: ['ATOM', 'BOMB', 'CODE', 'DATA', 'DOOR', 'EXIT', 'FUEL', 'GAME', 'HACK', 'LOCK', 'MINE', 'PASS', 'RAID', 'SAFE', 'SHIP', 'VAULT'],
++  5: ['ABOUT', 'AGENT', 'ALERT', 'ALONE', 'ARMOR', 'AWAIT', 'BLAST', 'BRAIN', 'CABLE', 'CLEAN', 'COVER', 'CRASH', 'DREAM', 'EARTH', 'FIGHT', 'FOUND', 'GHOST', 'GUARD', 'LASER', 'POWER', 'RADIO', 'ROBOT', 'SCORE', 'SHARE', 'SHELL', 'SHOCK', 'SPACE', 'SPELL', 'SWEET', 'TRUST', 'WATER', 'WORLD'],
++  6: ['ACCESS', 'ACTION', 'ACTIVE', 'AFRAID', 'ANIMAL', 'ANSWER', 'ARREST', 'BEFORE', 'BOTTLE', 'BRIDGE', 'BUTTON', 'CHARGE', 'CHOICE', 'DAMAGE', 'DANGER', 'DOCTOR', 'ENERGY', 'ENGINE', 'FAMILY', 'FUTURE', 'GARDEN', 'HAMMER', 'HIDDEN', 'INSIDE', 'JUNGLE', 'LETTER', 'MARKET', 'MASTER', 'MEMORY', 'MUTANT', 'OBJECT', 'OPTION', 'ORANGE', 'OUTPUT', 'PEOPLE', 'PLANET', 'POCKET', 'REPAIR', 'RETURN', 'SCREEN', 'SECRET', 'SILVER', 'SYSTEM', 'TARGET', 'TUNNEL', 'WEAPON'],
++  7: ['ABILITY', 'ACCOUNT', 'AGAINST', 'ANOTHER', 'BATTERY', 'BROTHER', 'CAPTAIN', 'CIRCUIT', 'COMMAND', 'CONTROL', 'DANGER', 'DEFENSE', 'DIAMOND', 'DISPLAY', 'EVACUATE', 'EXPLODE', 'FACTORY', 'FREEDOM', 'GUNFIRE', 'HEALTHY', 'HISTORY', 'HUNTERS', 'IMPROVE', 'JOURNAL', 'LEATHER', 'LIBRARY', 'MACHINE', 'MISSION', 'MONSTER', 'NOTHING', 'NUCLEAR', 'OFFICER', 'PASSAGE', 'PATTERN', 'PROGRAM', 'PROTECT', 'QUALITY', 'SCIENCE', 'STORAGE', 'STRANGE', 'SUCCESS', 'SUPPORT', 'SURVIVE', 'WEATHER'],
++  8: ['ASSEMBLY', 'ATTACKER', 'BACKPACK', 'BUILDING', 'COMPUTER', 'CONFLICT', 'CREATURE', 'CULTURAL', 'DAUGHTER', 'DISASTER', 'EQUIPPED', 'EVERYONE', 'EXPLOSION', 'FIGHTING', 'FUNCTION', 'HOSPITAL', 'INDUSTRY', 'INFINITE', 'LANGUAGE', 'MATERIAL', 'MEDICINE', 'MILITARY', 'MOUNTAIN', 'MURDERED', 'NATIONAL', 'OPERATOR', 'PASSWORD', 'PERSONAL', 'PHYSICAL', 'POSSIBLE', 'PRESERVE', 'PROTOCOL', 'QUANTITY', 'RADIATION', 'RESEARCH', 'SECURITY', 'SENTENCE', 'SHELTERS', 'SOLUTION', 'SURVIVAL', 'TOGETHER', 'TREASURE', 'UNIVERSE', 'VALUABLE', 'WASTELAND'],
++  9: ['ABANDONED', 'ACCURACY', 'ADVENTURE', 'AFTERLIFE', 'AGREEMENT', 'ATTENTION', 'BEGINNING', 'BLUEPRINT', 'BULLETPROOF', 'CHEMISTRY', 'COMMUNITY', 'DANGEROUS', 'DEADLIEST', 'DETERMINE', 'DIFFICULTY', 'DIRECTION', 'EDUCATION', 'ELECTRICAL', 'EMERGENCY', 'EXPERIENCE', 'EXPLOSIVE', 'FORTUNATE', 'GENERATOR', 'IMPORTANT', 'INVENTORY', 'KNOWLEDGE', 'LABORATORY', 'LANDSCAPE', 'MACHINERY', 'MUTATIONS', 'NECESSARY', 'ORDINANCE', 'PERMISSION', 'PRESIDENT', 'PRODUCTION', 'RADIATION', 'RECOMMEND', 'REINFORCE', 'SCIENTIST', 'TECHNIQUE', 'TREATMENT', 'WONDERFUL'],
++};
++
++const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
++const randomInt = (max, rng = Math.random) => Math.floor(rng() * max);
++const normalizeTerminalConfig = (raw = {}) => ({
++  containerId: String(raw.containerId || raw.id || '').trim(),
++  name: String(raw.name || '').trim(),
++  description: String(raw.description || '').trim(),
++  difficulty: clamp(Math.floor(Number(raw.difficulty) || 0), 0, 5),
++  lockOnFailure: Boolean(raw.lockOnFailure),
++});
++
++// CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
++// Старые серверы комнат понижали `kind: 'terminal'` узла локации до 'loot' и
++// теряли difficulty/lockOnFailure; lockLabel при этом сохранялся. Обновлённый
++// сервер восстанавливает терминал из маркера, а клиент — даже если сервер
++// вообще не обновлялся (локальная мини-игра).
++const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
++const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
++  `${TERMINAL_NODE_MARKER}${JSON.stringify({
++    v: 1,
++    d: clamp(Math.floor(Number(difficulty) || 0), 0, 5),
++    f: lockOnFailure ? 1 : 0,
++    l: String(label || ''),
++  })}`
++);
++const decodeTerminalNodeMarker = (value) => {
++  const raw = String(value || '');
++  if (!raw.startsWith(TERMINAL_NODE_MARKER)) return null;
++  try {
++    const parsed = JSON.parse(raw.slice(TERMINAL_NODE_MARKER.length));
++    if (!parsed || parsed.v !== 1) return null;
++    return {
++      difficulty: clamp(Math.floor(Number(parsed.d) || 0), 0, 5),
++      lockOnFailure: Boolean(parsed.f),
++      label: String(parsed.l || ''),
++    };
++  } catch {
++    return null;
++  }
++};
++
++const recoveryChancePercent = (intelligence, science) => clamp(
++  10 * ((Number(intelligence) || 0) - 4) + (10 / 3) * (Number(science) || 0),
++  0,
++  80,
++);
++
++const toNumber = (entry) => Number(typeof entry === 'object'
++  ? (entry?.value ?? entry?.base ?? entry?.total ?? entry?.rank)
++  : entry) || 0;
++const readAttribute = (snapshot, id) => {
++  const attrs = snapshot?.attributes || {};
++  const keys = { INT: ['INT', 'int', 'intelligence'], SCI: ['SCI', 'science', 'Science'] }[id];
++  for (const key of keys) if (attrs[key] !== undefined) return toNumber(attrs[key]);
++  if (Array.isArray(attrs)) {
++    const found = attrs.find((x) => String(x?.id || x?.key || '').toUpperCase() === id);
++    if (found) return toNumber(found);
++  }
++  return 0;
++};
++const scienceRank = (snapshot) => {
++  const skills = snapshot?.skills || {};
++  if (Array.isArray(skills)) {
++    const found = skills.find((x) => /^(science|наука)$/i.test(String(x?.id || x?.name || '')));
++    return Math.max(0, Math.floor(toNumber(found?.rank !== undefined ? found.rank : found)));
++  }
++  for (const key of ['science', 'Science', 'SCIENCE', 'Наука', 'наука']) {
++    if (skills[key] !== undefined) return Math.max(0, Math.floor(toNumber(skills[key])));
++  }
++  const selected = Array.isArray(snapshot?.selectedSkills) ? snapshot.selectedSkills : [];
++  const selectedScience = selected.find((x) => /^(science|наука)$/i.test(String(typeof x === 'string' ? x : x?.id || x?.name || '')));
++  return Math.max(0, Math.floor(toNumber(selectedScience?.rank !== undefined ? selectedScience.rank : selectedScience)));
++};
++const rankOfPerk = (snapshot, id) => (Array.isArray(snapshot?.selectedPerks) ? snapshot.selectedPerks : [])
++  .reduce((rank, entry) => {
++    const entryId = typeof entry === 'string' ? entry : (entry?.id || entry?.perkId);
++    if (entryId !== id) return rank;
++    return Math.max(rank, Math.max(1, Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 1)));
++  }, 0);
++
++const characterStats = (snapshot) => ({
++  intelligence: readAttribute(snapshot, 'INT'),
++  science: scienceRank(snapshot),
++  hackerRank: rankOfPerk(snapshot, 'hacker'),
++  digestUsed: Boolean(snapshot?.terminalHacking?.digestUsed)
++    || (Array.isArray(snapshot?.usedMagazineEffects) ? snapshot.usedMagazineEffects : []).includes('mag_programmers_digest'),
++  hasDigest: Boolean(snapshot?.terminalHacking?.hasProgrammersDigest) || Object.entries(snapshot?.items || {}).some(([key, item]) => (
++    key === 'mag_programmers_digest'
++    || item?.itemId === 'mag_programmers_digest'
++    || item?.catalogId === 'mag_programmers_digest'
++    || item?.id === 'mag_programmers_digest'
++    || item?.snapshot?.id === 'mag_programmers_digest'
++  )),
++});
++
++const shuffle = (items, rng) => {
++  const result = [...items];
++  for (let i = result.length - 1; i > 0; i -= 1) {
++    const j = randomInt(i + 1, rng);
++    [result[i], result[j]] = [result[j], result[i]];
++  }
++  return result;
++};
++
++const createGame = ({ config, operatorClientId, operatorCharacterId, characterSnapshot, now = Date.now(), rng = Math.random }) => {
++  const difficulty = config.difficulty;
++  const stats = characterStats(characterSnapshot);
++  const effectiveDifficulty = Math.max(0, difficulty - stats.hackerRank);
++  const wordLength = effectiveDifficulty + 4;
++  const wordPool = [...new Set(WORDS_BY_LENGTH[wordLength].filter((word) => word.length === wordLength))];
++  const chosen = shuffle(wordPool, rng).slice(0, 12);
++  const passwordIndex = randomInt(chosen.length, rng);
++  const columns = 2;
++  const rowsPerColumn = 17;
++  const width = 12;
++  const glyphs = '!@#$%^&*()_+-=[]{}<>?/\\|:;,.~';
++  const board = Array.from({ length: columns * rowsPerColumn * width }, () => glyphs[randomInt(glyphs.length, rng)]);
++  const wordRanges = [];
++  const occupied = new Set();
++  for (const word of chosen) {
++    const candidates = shuffle(Array.from({ length: board.length / width }, (_, row) => row), rng);
++    let start = -1;
++    for (const row of candidates) {
++      const rowStart = row * width;
++      const col = randomInt(width - word.length + 1, rng);
++      const proposed = rowStart + col;
++      let valid = true;
++      for (let i = 0; i < word.length; i += 1) if (occupied.has(proposed + i)) valid = false;
++      if (valid) { start = proposed; break; }
++    }
++    if (start < 0) continue;
++    for (let i = 0; i < word.length; i += 1) {
++      board[start + i] = word[i];
++      occupied.add(start + i);
++    }
++    wordRanges.push({ id: `word_${now}_${start}`, word, start, end: start + word.length, removed: false, guessed: false, isPassword: chosen[passwordIndex] === word });
++  }
++  const brackets = [];
++  const bracketPairs = ['()', '[]', '{}', '<>'];
++  const bracketCount = 4 + randomInt(4, rng);
++  for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
++    const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
++    const length = 3 + randomInt(6, rng);
++    const preferredRow = randomInt(board.length / width, rng);
++    let start = -1;
++    const candidateWidth = width - length + 1;
++    for (let rowOffset = 0; rowOffset < board.length / width && start < 0; rowOffset += 1) {
++      const row = (preferredRow + rowOffset) % (board.length / width);
++      const preferredCol = randomInt(candidateWidth, rng);
++      for (let colOffset = 0; colOffset < candidateWidth; colOffset += 1) {
++        const candidate = row * width + ((preferredCol + colOffset) % candidateWidth);
++        let free = true;
++        for (let i = 0; i < length; i += 1) if (occupied.has(candidate + i)) free = false;
++        if (free) { start = candidate; break; }
++      }
++    }
++    if (start < 0) break;
++    board[start] = pair[0];
++    board[start + length - 1] = pair[1];
++    for (let i = 1; i < length - 1; i += 1) board[start + i] = ['@', '#', '$', '%', '&', '*', '+', '-', '/', ':', ';', '?'][randomInt(12, rng)];
++    for (let i = 0; i < length; i += 1) occupied.add(start + i);
++    brackets.push({ id: `bracket_${now}_${start}`, start, end: start + length, text: board.slice(start, start + length).join(''), used: false, recovery: false });
++  }
++  const hasRecovery = rng() * 100 < recoveryChancePercent(stats.intelligence, stats.science);
++  if (hasRecovery && brackets.length > 0) brackets[randomInt(brackets.length, rng)].recovery = true;
++  const safeWordRanges = wordRanges.length ? wordRanges : [];
++  const safePassword = safeWordRanges.find((entry) => entry.isPassword)?.word || chosen[0];
++  return {
++    containerId: config.containerId,
++    name: config.name,
++    description: config.description,
++    difficulty,
++    lockOnFailure: config.lockOnFailure,
++    status: 'playing',
++    operatorClientId,
++    operatorCharacterId,
++    operatorName: '',
++    intelligence: stats.intelligence,
++    science: stats.science,
++    effectiveDifficulty,
++    wordLength,
++    attempts: 4,
++    maxAttempts: 4,
++    board: board.join(''),
++    wordRanges: safeWordRanges,
++    password: safePassword,
++    bracketRanges: brackets,
++    guesses: [],
++    result: '',
++    scrollUp: false,
++    digestEligible: Boolean(stats.hasDigest && !stats.digestUsed),
++    digestUsed: false,
++    recoveryChancePercent: recoveryChancePercent(stats.intelligence, stats.science),
++    createdAt: now,
++    updatedAt: now,
++    revision: 1,
++  };
++};
++
++const publicGameState = (game) => {
++  if (!game) return null;
++  const { password, operatorClientId, digestEligible, ...rest } = game;
++  return {
++    ...rest,
++    operatorClientId,
++    digestEligible: game.status === 'pendingDigest' && digestEligible,
++    bracketRanges: (game.bracketRanges || []).map(({ recovery, ...bracket }) => bracket),
++    wordRanges: (game.wordRanges || []).map(({ isPassword, ...word }) => ({
++      ...word,
++      ...(game.effectiveDifficulty === 0 && isPassword ? { isPassword: true } : {}),
++    })),
++  };
++};
++
++const failGame = (game, { now }) => {
++  if (game.attempts > 0) return game;
++  if (game.lockOnFailure && game.digestEligible && !game.digestUsed) {
++    return { ...game, status: 'pendingDigest', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
++  }
++  if (game.lockOnFailure) {
++    return { ...game, status: 'locked', result: 'ACCESS DENIED', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
++  }
++  return { ...game, status: 'failed', result: '', scrollUp: false, updatedAt: now, revision: game.revision + 1 };
++};
++
++const applyGameAction = ({ game, action, clientId, characterId, characterSnapshot, value, now = Date.now(), rng = Math.random }) => {
++  if (!game) return { error: 'TERMINAL_NOT_ISSUED' };
++  if (action === 'unlock' || action === 'reset') return { error: 'TERMINAL_GM_ONLY' };
++  if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
++  if (action === 'start') {
++    if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
++    const stats = characterStats(characterSnapshot);
++    const effectiveDifficulty = Math.max(0, game.difficulty - stats.hackerRank);
++    const fresh = createGame({
++      config: game,
++      operatorClientId: clientId,
++      operatorCharacterId: characterId,
++      characterSnapshot,
++      now,
++      rng,
++    });
++    fresh.operatorName = String(characterSnapshot?.characterName || characterSnapshot?.name || '');
++    return { game: fresh };
++  }
++  if (game.status === 'pendingDigest') {
++    if (game.operatorClientId !== clientId || game.operatorCharacterId !== characterId) return { error: 'TERMINAL_VIEW_ONLY' };
++    if (action === 'useDigest') {
++      if (!game.digestEligible || game.digestUsed || !characterStats(characterSnapshot).hasDigest) return { error: 'TERMINAL_DIGEST_UNAVAILABLE' };
++      return { game: { ...game, status: 'playing', attempts: 1, digestEligible: false, digestUsed: true, result: 'DIGEST USED', updatedAt: now, revision: game.revision + 1 }, usedDigest: true };
++    }
++    if (action === 'declineDigest') {
++      const status = game.lockOnFailure ? 'locked' : 'failed';
++      return { game: { ...game, status, digestEligible: false, result: status === 'locked' ? 'ACCESS DENIED' : '', updatedAt: now, revision: game.revision + 1 } };
++    }
++    return { error: 'TERMINAL_DIGEST_DECISION_REQUIRED' };
++  }
++  if (game.status !== 'playing') return { error: 'TERMINAL_NOT_ACTIVE' };
++  if (game.operatorClientId !== clientId || game.operatorCharacterId !== characterId) return { error: 'TERMINAL_VIEW_ONLY' };
++  if (action === 'guess') {
++    const range = game.wordRanges.find((entry) => entry.id === value || entry.word === String(value).toUpperCase());
++    if (!range || range.removed || range.guessed) return { error: 'TERMINAL_INVALID_GUESS' };
++    if (range.word === game.password) {
++      return { game: { ...game, status: 'won', result: 'ACCESS GRANTED', scrollUp: true, updatedAt: now, revision: game.revision + 1, wordRanges: game.wordRanges.map((entry) => ({ ...entry, removed: true })) } };
++    }
++    const likeness = [...range.word].reduce((total, letter, index) => total + (letter === game.password[index] ? 1 : 0), 0);
++    const next = {
++      ...game,
++      attempts: Math.max(0, game.attempts - 1),
++      guesses: [...game.guesses, { word: range.word, likeness }],
++      wordRanges: game.wordRanges.map((entry) => entry.id === range.id ? { ...entry, guessed: true, removed: true } : entry),
++      updatedAt: now,
++      revision: game.revision + 1,
++    };
++    return { game: failGame(next, { now }) };
++  }
++  if (action === 'bracket') {
++    const bracket = game.bracketRanges.find((entry) => entry.id === value);
++    if (!bracket || bracket.used) return { error: 'TERMINAL_INVALID_BRACKET' };
++    let next = { ...game, bracketRanges: game.bracketRanges.map((entry) => entry.id === bracket.id ? { ...entry, used: true } : entry) };
++    if (bracket.recovery) {
++      next = { ...next, attempts: next.maxAttempts };
++      next.result = 'ATTEMPTS RESTORED';
++    } else {
++      const duds = next.wordRanges.filter((entry) => !entry.isPassword && !entry.removed);
++      if (duds.length) {
++        const dud = duds[randomInt(duds.length, rng)];
++        next.wordRanges = next.wordRanges.map((entry) => entry.id === dud.id ? { ...entry, removed: true } : entry);
++      }
++      next.result = 'DUD REMOVED';
++    }
++    next.updatedAt = now;
++    next.revision += 1;
++    return { game: next };
++  }
++  return { error: 'BAD_MESSAGE' };
++};
++
++module.exports = {
++  WORDS_BY_LENGTH,
++  TERMINAL_NODE_MARKER,
++  encodeTerminalNodeMarker,
++  decodeTerminalNodeMarker,
++  normalizeTerminalConfig,
++  recoveryChancePercent,
++  characterStats,
++  createGame,
++  publicGameState,
++  applyGameAction,
++};
+diff --git a/src/room/roomCharacterSync.ts b/src/room/roomCharacterSync.ts
+index 5842fa0..87ff561 100644
+--- a/src/room/roomCharacterSync.ts
++++ b/src/room/roomCharacterSync.ts
+@@ -8,6 +8,7 @@
+ //   соединения с комнатой И присутствием мастера (role === 'gm') в сети этой комнаты.
+ 
+ import { debugLog } from '../debug/falloutDebug';
++import useCharacterStore from '../store/characterStore';
+ import useRoomStore, { type RoomStateEntry } from './roomStore';
+ import type { RoomConnectionStatus } from './roomClient';
+ import type { RoomSnapshotEntry } from './roomProtocol';
+@@ -125,6 +126,26 @@ export const buildLocalCharacterRoomSnapshot = async (
+       // Отсутствие аватара не мешает публикации персонажа.
+     }
+     const updatedAt = Number(row.updatedAt ?? row.updated_at) || Date.now();
++    const savedData = row.data && typeof row.data === 'object' ? row.data as Record<string, any> : {};
++    const store = useCharacterStore.getState();
++    const liveState = store.currentCharacterId === characterId ? store : null;
++    const itemSources = [liveState?.items, savedData.items, savedData.equipment?.items].filter(Boolean);
++    const itemEntries = itemSources.flatMap((items: any) => (
++      Array.isArray(items)
++        ? items.map((item: any, index: number) => [String(item?.id || index), item] as const)
++        : Object.entries(items || {})
++    ));
++    const hasProgrammersDigest = (itemEntries as Array<readonly [string, any]>).some(([key, item]) => (
++      key === 'mag_programmers_digest'
++      || item?.itemId === 'mag_programmers_digest'
++      || item?.catalogId === 'mag_programmers_digest'
++      || item?.id === 'mag_programmers_digest'
++      || item?.snapshot?.id === 'mag_programmers_digest'
++    ));
++    const usedMagazineEffects = [...new Set([
++      ...(Array.isArray(savedData.usedMagazineEffects) ? savedData.usedMagazineEffects : []),
++      ...(Array.isArray(liveState?.usedMagazineEffects) ? liveState.usedMagazineEffects : []),
++    ])];
+     return {
+       characterId: String(row.id),
+       name: String(row.name || '—'),
+@@ -132,7 +153,15 @@ export const buildLocalCharacterRoomSnapshot = async (
+       originName: row.originName ?? row.origin_name ?? null,
+       updatedAt,
+       avatarDataUrl,
+-      data: row.data,
++      data: {
++        ...savedData,
++        usedMagazineEffects,
++        terminalHacking: {
++          ...(savedData.terminalHacking || {}),
++          hasProgrammersDigest,
++          digestUsed: usedMagazineEffects.includes('mag_programmers_digest'),
++        },
++      },
+     };
+   } catch (error) {
+     debugLog('room.buildSnapshot:failed', {
+diff --git a/src/room/roomProtocol.ts b/src/room/roomProtocol.ts
+index 8d812d3..3d27ab6 100644
+--- a/src/room/roomProtocol.ts
++++ b/src/room/roomProtocol.ts
+@@ -27,6 +27,9 @@ export const ROOM_MESSAGE = {
+   SESSION_PLAYER_CLOSE: 'session.playerClose',
+   SESSION_LOOT_TAKE: 'session.lootTake',
+   SESSION_TRADE_COMMIT: 'session.tradeCommit',
++  TERMINAL_ISSUE: 'terminal.issue',
++  TERMINAL_ACTION: 'terminal.action',
++  TERMINAL_STATE: 'terminal.state',
+   ERROR: 'error',
+ } as const;
+ 
+@@ -45,6 +48,16 @@ export const ROOM_ERROR = {
+   TRADE_STOCK_CHANGED: 'TRADE_STOCK_CHANGED',
+   TRADE_NOT_ENOUGH_PLAYER_CAPS: 'TRADE_NOT_ENOUGH_PLAYER_CAPS',
+   TRADE_NOT_ENOUGH_MERCHANT_CAPS: 'TRADE_NOT_ENOUGH_MERCHANT_CAPS',
++  TERMINAL_NOT_ISSUED: 'TERMINAL_NOT_ISSUED',
++  TERMINAL_LOCKED: 'TERMINAL_LOCKED',
++  TERMINAL_VIEW_ONLY: 'TERMINAL_VIEW_ONLY',
++  TERMINAL_ALREADY_ACTIVE: 'TERMINAL_ALREADY_ACTIVE',
++  TERMINAL_NOT_ACTIVE: 'TERMINAL_NOT_ACTIVE',
++  TERMINAL_INVALID_GUESS: 'TERMINAL_INVALID_GUESS',
++  TERMINAL_INVALID_BRACKET: 'TERMINAL_INVALID_BRACKET',
++  TERMINAL_DIGEST_UNAVAILABLE: 'TERMINAL_DIGEST_UNAVAILABLE',
++  TERMINAL_DIGEST_DECISION_REQUIRED: 'TERMINAL_DIGEST_DECISION_REQUIRED',
++  TERMINAL_GM_ONLY: 'TERMINAL_GM_ONLY',
+ } as const;
+ 
+ export interface ActiveLootTradeItem {
+diff --git a/src/room/roomStore.ts b/src/room/roomStore.ts
+index 80379f7..c998bad 100644
+--- a/src/room/roomStore.ts
++++ b/src/room/roomStore.ts
+@@ -34,7 +34,10 @@ export interface RoomStateEntry {
+   joined?: boolean;
+   snapshots?: Record<string, RoomSnapshotEntry>;
+   activeSession?: ActiveLootTradeSession | null;
++  terminalStates?: Record<string, any>;
+   directives?: RoomDirectiveEntry[];
++  /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
++  capabilities?: Record<string, boolean>;
+ }
+ 
+ interface CreateRoomResult {
+@@ -49,7 +52,9 @@ interface JoinRoomResult {
+   members: RoomMember[];
+   snapshots: RoomSnapshotEntry[];
+   activeSession?: ActiveLootTradeSession | null;
++  terminalStates?: Record<string, any>;
+   directives?: RoomDirectiveEntry[];
++  capabilities?: Record<string, boolean>;
+ }
+ 
+ interface RoomStoreState {
+@@ -81,6 +86,8 @@ interface RoomStoreState {
+     code: string;
+     characterId: string;
+   }) => Promise<void>;
++  issueTerminal: (input: { code: string; config: Record<string, unknown>; ownerToken?: string }) => Promise<any>;
++  actOnTerminal: (input: { code: string; containerId: string; action: string; characterId?: string; value?: string; ownerToken?: string }) => Promise<any>;
+   openRoomSession: (input: {
+     code: string;
+     session: Record<string, unknown>;
+@@ -104,6 +111,8 @@ interface RoomStoreState {
+     nodeName?: string;
+     nodeDescription?: string;
+     nodeItems?: unknown[];
++    nodeDifficulty?: number;
++    nodeLockOnFailure?: boolean;
+     locked?: boolean;
+     lockLabel?: string;
+   }) => Promise<ActiveLootTradeSession>;
+@@ -348,6 +357,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+     ) {
+       applySessionEnvelopeToStore(message);
+     }
++    if (message.type === ROOM_MESSAGE.TERMINAL_STATE) {
++      const code = message.roomCode;
++      const terminal = message.payload?.terminal;
++      const current = code ? get().rooms[code] : null;
++      if (code && current && terminal?.containerId) {
++        set({ rooms: {
++          ...get().rooms,
++          [code]: {
++            ...current,
++            terminalStates: {
++              ...(current.terminalStates || {}),
++              [terminal.containerId]: terminal,
++            },
++          },
++        } });
++      }
++    }
+     if (
+       message.type === ROOM_MESSAGE.GM_DIRECTIVE
+       || message.type === ROOM_MESSAGE.GM_DIRECTIVE_STATE
+@@ -513,7 +539,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+             joined: Boolean(prev?.joined && requestedCode),
+             snapshots: prev?.snapshots || {},
+             activeSession: prev?.activeSession ?? null,
++            terminalStates: prev?.terminalStates || {},
+             directives: prev?.directives || [],
++            capabilities: prev?.capabilities || {},
+           },
+         },
+       });
+@@ -533,7 +561,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           members: existing.members,
+           snapshots: Object.values(existing.snapshots || {}),
+           activeSession: existing.activeSession ?? null,
++          terminalStates: existing.terminalStates || {},
+           directives: existing.directives || [],
++          capabilities: existing.capabilities || {},
+         };
+       }
+       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
+@@ -545,9 +575,15 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+         const payloadRooms = response.payload;
+         const snapshotsMap = snapshotsArrayToMap(payloadRooms.snapshots);
+         const activeSession = (payloadRooms.activeSession as ActiveLootTradeSession | null) ?? null;
++        const terminalStates = payloadRooms.terminalStates && typeof payloadRooms.terminalStates === 'object'
++          ? payloadRooms.terminalStates as Record<string, any>
++          : {};
+         const directives = Array.isArray(payloadRooms.directives)
+           ? (payloadRooms.directives as RoomDirectiveEntry[])
+           : [];
++        const capabilities = payloadRooms.capabilities && typeof payloadRooms.capabilities === 'object'
++          ? payloadRooms.capabilities as Record<string, boolean>
++          : {};
+         const lastClosedEntry = payloadRooms.lastClosedSession as {
+           session?: ActiveLootTradeSession | null;
+           closedReason?: string | null;
+@@ -563,7 +599,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+               joined: true,
+               snapshots: snapshotsMap,
+               activeSession,
++              terminalStates,
+               directives,
++              capabilities,
+             },
+           },
+         });
+@@ -610,7 +648,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+           members: payloadRooms.members || [],
+           snapshots: Object.values(snapshotsMap),
+           activeSession,
++          terminalStates,
+           directives,
++          capabilities,
+         };
+       } finally {
+         joiningCodes.delete(code);
+@@ -683,6 +723,23 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
+       }
+     },
+ 
++    issueTerminal: async ({ code, config, ownerToken }) => {
++      assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
++      const payload: Record<string, unknown> = { code, config };
++      if (ownerToken) payload.ownerToken = ownerToken;
++      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ISSUE, payload, code);
++      return response.payload?.terminal;
++    },
++
++    actOnTerminal: async ({ code, containerId, action, characterId, value, ownerToken }) => {
++      const payload: Record<string, unknown> = { code, containerId, action };
++      if (characterId) payload.characterId = characterId;
++      if (value) payload.value = value;
++      if (ownerToken) payload.ownerToken = ownerToken;
++      const response = await sendRequest(ROOM_MESSAGE.TERMINAL_ACTION, payload, code);
++      return response.payload?.terminal;
++    },
++
+     openRoomSession: async ({ code, session, ownerToken }) => {
+       assertAdminFeature(FEATURE_IDS.GM_LOOT_TRADE);
+       const reqPayload: Record<string, unknown> = { code, session };
+@@ -855,3 +912,18 @@ export default useRoomStore;
+ 
+ export const selectRoomStatus = (state: RoomStoreState) => state.status;
+ export const selectRooms = (state: RoomStoreState) => state.rooms;
++
++/**
++ * Сервер комнат старой версии не имеет протокола terminal.issue/action.
++ * В этом случае клиент запускает мини-игру локально, чтобы терминал всё равно
++ * открывался в модалке, а не превращался в сундук.
++ */
++export const roomHasTerminalProtocol = (room?: RoomStateEntry | null): boolean => (
++  room?.capabilities?.terminalHacking === true
++  // Реестр terminalStates присылает только обновлённый сервер.
++  || Object.keys(room?.terminalStates || {}).length > 0
++);
++
++export const roomSupportsTerminalProtocol = (code: string): boolean => (
++  roomHasTerminalProtocol(useRoomStore.getState().rooms?.[code])
++);
+diff --git a/src/saves/characterSaves.js b/src/saves/characterSaves.js
+index 1de3126..39251ab 100644
+--- a/src/saves/characterSaves.js
++++ b/src/saves/characterSaves.js
+@@ -324,6 +324,7 @@ export const buildSnapshot = () => {
+     attributesSaved: state.attributesSaved,
+     skillsSaved: state.skillsSaved,
+     selectedPerks: state.selectedPerks,
++    usedMagazineEffects: state.usedMagazineEffects || [],
+     conditions: state.conditions,
+     chemDosesLog: state.chemDosesLog,
+     sceneRiskStates: state.sceneRiskStates,
+diff --git a/src/saves/saveSnapshot.ts b/src/saves/saveSnapshot.ts
+index f08f19b..64a24b4 100644
+--- a/src/saves/saveSnapshot.ts
++++ b/src/saves/saveSnapshot.ts
+@@ -132,5 +132,6 @@ export const CHARACTER_SAVE_KEYS = [
+   'rewardedSkills',
+   'sceneRiskStates',
+   'lastDiseaseResistAt',
++  'usedMagazineEffects',
+   'schemaVersion',
+ ] as const;
+diff --git a/src/store/characterActions.ts b/src/store/characterActions.ts
+index a65d503..f45051d 100644
+--- a/src/store/characterActions.ts
++++ b/src/store/characterActions.ts
+@@ -109,6 +109,7 @@ export interface CharacterActions {
+   setChemDosesLog: UpdaterSetter<CharacterPersistedData['chemDosesLog']>;
+   setLastDiseaseResistAt: UpdaterSetter<number | null>;
+   setSceneRiskStates: UpdaterSetter<CharacterPersistedData['sceneRiskStates']>;
++  setUsedMagazineEffects: UpdaterSetter<string[]>;
+   setEquipment: UpdaterSetter<EquipmentKit | null>;
+   setEquippedWeapons: UpdaterSetter<CharacterPersistedData['equippedWeapons']>;
+   setEquippedArmor: UpdaterSetter<EquippedArmor>;
+@@ -155,6 +156,7 @@ export interface CharacterActions {
+   reducePersistentDiseaseRanks: (amount: number) => { healed: boolean; diseasesLeft: number };
+   resistDisease: (conditionId: string) => ResistDiseaseOutcome;
+   applyDiseaseExposureEvent: (eventId: string) => Record<string, unknown> | null;
++  markMagazineEffectUsed: (effectId: string) => void;
+ 
+   // ── Силовая броня: таймер расхода блока (§5.3/§5.4) ──
+   tickPowerArmorCore: (tickMs: number) => void;
+@@ -309,6 +311,7 @@ export const SETTER_UPDATER_KEYS = [
+   'setChemDosesLog',
+   'setLastDiseaseResistAt',
+   'setSceneRiskStates',
++  'setUsedMagazineEffects',
+   'setEquipment',
+   'setEquippedWeapons',
+   'setEquippedArmor',
+@@ -350,6 +353,7 @@ export const NAMED_OP_KEYS = [
+   'reducePersistentDiseaseRanks',
+   'resistDisease',
+   'applyDiseaseExposureEvent',
++  'markMagazineEffectUsed',
+   'tickPowerArmorCore',
+   'resetCharacter',
+   'resetCharacterStore',
+diff --git a/src/store/characterState.ts b/src/store/characterState.ts
+index 102440d..6db4ed2 100644
+--- a/src/store/characterState.ts
++++ b/src/store/characterState.ts
+@@ -127,6 +127,8 @@ export interface CharacterPersistedData {
+   selectedPerks: SelectedPerkRecord[];
+   /** Tagged-навыки, чья стартовая награда уже выдана. */
+   rewardedSkills: string[];
++  /** Одноразовые эффекты журналов, уже использованные персонажем. */
++  usedMagazineEffects: string[];
+   robot: RobotState;
+   /** Поля расширений сеттингов ({ survival } у Fallout и т.д.), патч 209. */
+   stateExtensions: Record<string, unknown>;
+@@ -191,6 +193,7 @@ export const CHARACTER_PERSISTED_KEYS = [
+   'effects',
+   'selectedPerks',
+   'rewardedSkills',
++  'usedMagazineEffects',
+   'robot',
+   'stateExtensions',
+   'equipment',
+diff --git a/src/store/characterStore.js b/src/store/characterStore.js
+index bafe812..9d901b0 100644
+--- a/src/store/characterStore.js
++++ b/src/store/characterStore.js
+@@ -381,6 +381,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+       dormantNoticeFingerprint: null,
+       // Per-character journal: tagged skills whose one-time starting reward was issued.
+       rewardedSkills: [],
++      usedMagazineEffects: [],
+       // Надетое оружие персонажа: МЕТАДАННЫЕ (встроенные кулаки/манипуляторы,
+       // sourceSlot и т.п.) — «живые» предметы лежат в items (equipped: true),
+       // этот список их дополняет (Шаг 3 миграции из CharacterContext).
+@@ -406,6 +407,19 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+        * Выбранные перки: массивом или функцией от предыдущего (Шаг 8а;
+        * функциональный апдейтер — обязательное требование к сеттерам).
+        */
++      setUsedMagazineEffects: (updater) => {
++        const prev = get().usedMagazineEffects || [];
++        const next = typeof updater === 'function' ? updater(prev) : updater;
++        set({ usedMagazineEffects: [...new Set((next || []).map((id) => String(id || '').trim()).filter(Boolean))] });
++      },
++
++      markMagazineEffectUsed: (effectId) => {
++        const id = String(effectId || '').trim();
++        if (!id) return;
++        const current = get().usedMagazineEffects || [];
++        if (!current.includes(id)) set({ usedMagazineEffects: [...current, id] });
++      },
++
+       setSelectedPerks: (updater) => {
+         const prev = get().selectedPerks || [];
+         const next = typeof updater === 'function' ? (updater(prev) || []) : (updater || []);
+@@ -1391,7 +1405,11 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+        */
+       loadFromLegacyData: (legacyData) => {
+         const normalizedState = normalizeForStore(legacyData);
+-        set({ ...normalizedState, selectedPerks: legacyData?.selectedPerks || [] });
++        set({
++          ...normalizedState,
++          selectedPerks: legacyData?.selectedPerks || [],
++          usedMagazineEffects: Array.isArray(legacyData?.usedMagazineEffects) ? legacyData.usedMagazineEffects : [],
++        });
+         get().recalculatePerkBonuses();
+         get().recalculateAll();
+       },
+@@ -1983,6 +2001,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+           currentCharacterId: null,
+           isSaved: false,
+           selectedPerks: legacyDefaults?.selectedPerks || [],
++          usedMagazineEffects: legacyDefaults?.usedMagazineEffects || [],
+           rewardedSkills: legacyDefaults?.rewardedSkills || [],
+           perkBonuses: {},
+           derivedStats: {},
+@@ -2037,6 +2056,7 @@ const useCharacterStore = create(withDerivedCascade(devtools(
+         items: state.items,
+         effects: state.effects,
+         selectedPerks: state.selectedPerks,
++        usedMagazineEffects: state.usedMagazineEffects || [],
+         rewardedSkills: state.rewardedSkills,
+         robot: state.robot,
+         stateExtensions: state.stateExtensions,
+diff --git a/styles/LootTradeScreen.styles.js b/styles/LootTradeScreen.styles.js
+index c2bf402..c691522 100644
+--- a/styles/LootTradeScreen.styles.js
++++ b/styles/LootTradeScreen.styles.js
+@@ -738,6 +738,19 @@ const styles = StyleSheet.create({
+     paddingVertical: 11,
+     alignItems: 'center',
+   },
++  terminalAdminPanel: {
++    marginTop: 12,
++    padding: 12,
++    borderRadius: 5,
++    borderWidth: 1,
++    borderColor: '#686039',
++    backgroundColor: '#24231e',
++    gap: 8,
++  },
++  terminalAdminText: { color: '#d8d2b8', fontSize: 13 },
++  terminalAdminStateRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
++  terminalUnlockButton: { borderWidth: 1, borderColor: '#e8c04b', borderRadius: 4, paddingHorizontal: 10, paddingVertical: 6 },
++  terminalUnlockButtonText: { color: '#f4d76a', fontSize: 12, fontWeight: '700' },
+   movePickerCancelText: {
+     color: '#e0e0e0',
+     fontSize: 14,
