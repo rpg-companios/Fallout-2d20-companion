@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   CONTAINER_KIND,
   buildHubSessionNodes,
@@ -27,6 +29,22 @@ describe('terminal cards in loot/trade locations', () => {
       items: [],
     });
     expect(normalizeContainerEntity({ kind: 'terminal', difficulty: 99 }).difficulty).toBe(5);
+  });
+
+  it('mounts the hacking modal only after selection, as a sibling of the location modal', () => {
+    const source = fs.readFileSync(
+      path.resolve(process.cwd(), 'components/lootTrade/PlayerLootTradeOverlay.js'),
+      'utf8',
+    );
+    const hubStart = source.indexOf('if (isHubSession && !viewTarget)');
+    const hubEnd = source.indexOf('const returnToHubList', hubStart);
+    const hubBlock = source.slice(hubStart, hubEnd);
+    const outerModalClose = hubBlock.indexOf('</Modal>');
+    const hackingModalOpen = hubBlock.indexOf('<TerminalHackingModal');
+    expect(outerModalClose).toBeGreaterThan(0);
+    expect(hackingModalOpen).toBeGreaterThan(outerModalClose);
+    expect(hubBlock.slice(0, outerModalClose)).not.toContain('<TerminalHackingModal');
+    expect(hubBlock.slice(outerModalClose)).toContain('{terminalSelection ? (');
   });
 
   it('can be linked in a location and included in its room-wide nodes', () => {

@@ -348,168 +348,172 @@ export default function PlayerLootTradeOverlay() {
   if (isHubSession && !viewTarget) {
     const hubNodes = activeSession.nodes || [];
     return (
-      <Modal
-        visible
-        transparent
-        animationType="slide"
-        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
-      >
-        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
-          <View style={styles.lootModalCard}>
-            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
-              <View style={styles.modalTitleRow}>
-                <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
-                <Text style={styles.modalTitle}>{activeSession.name}</Text>
+      <>
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+        >
+          <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+            <View style={styles.lootModalCard}>
+              <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+                <View style={styles.modalTitleRow}>
+                  <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
+                  <Text style={styles.modalTitle}>{activeSession.name}</Text>
+                </View>
+                <View style={styles.headerActionsRow}>
+                  {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
+                  <TouchableOpacity
+                    style={styles.minimizeBtn}
+                    onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+                  >
+                    <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.headerActionsRow}>
-                {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
-                <TouchableOpacity
-                  style={styles.minimizeBtn}
-                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
-                >
-                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            {Boolean(activeSession.description) && (
-              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
-                {activeSession.description}
-              </IconText>
-            )}
+              {Boolean(activeSession.description) && (
+                <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+                  {activeSession.description}
+                </IconText>
+              )}
 
-            <ScrollView
-              style={styles.lootScroll}
-              contentContainerStyle={styles.lootScrollContent}
-            >
-              {hubNodes.length === 0 ? (
-                <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
-              ) : (
-                hubNodes.map((node) => {
-                  const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
-                  const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
-                  const nodeLocked = Boolean(node.locked);
-                  const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
-                  const piecesCount = (node.items || []).reduce(
-                    (sum, entry) => sum + (Number(entry.quantity) || 0),
-                    0,
-                  );
+              <ScrollView
+                style={styles.lootScroll}
+                contentContainerStyle={styles.lootScrollContent}
+              >
+                {hubNodes.length === 0 ? (
+                  <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+                ) : (
+                  hubNodes.map((node) => {
+                    const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
+                    const nodeLocked = Boolean(node.locked);
+                    const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
+                    const piecesCount = (node.items || []).reduce(
+                      (sum, entry) => sum + (Number(entry.quantity) || 0),
+                      0,
+                    );
 
-                  return (
-                    <View
-                      key={node.containerId}
-                      style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
-                    >
-                      <View style={styles.lootRowInfo}>
-                        <View style={styles.hubNodeTitleRow}>
-                          <MaterialCommunityIcons
-                            name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
-                            size={19}
-                            color={nodeLocked ? '#e57373' : '#f0e68c'}
-                          />
-                          <Text style={[
-                            styles.lootRowTitle,
-                            nodeLocked && styles.hubNodeTitleLocked,
-                          ]}>
-                            {node.name}
-                          </Text>
+                    return (
+                      <View
+                        key={node.containerId}
+                        style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
+                      >
+                        <View style={styles.lootRowInfo}>
+                          <View style={styles.hubNodeTitleRow}>
+                            <MaterialCommunityIcons
+                              name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
+                              size={19}
+                              color={nodeLocked ? '#e57373' : '#f0e68c'}
+                            />
+                            <Text style={[
+                              styles.lootRowTitle,
+                              nodeLocked && styles.hubNodeTitleLocked,
+                            ]}>
+                              {node.name}
+                            </Text>
+                          </View>
+
+                          {Boolean(node.description) && (
+                            <IconText style={styles.lootRowSub}>{node.description}</IconText>
+                          )}
+
+                          {nodeLocked ? (
+                            <Text style={styles.hubLockedHintText}>
+                              {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                            </Text>
+                          ) : nodeIsTerminal ? (
+                            <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
+                              {terminalState?.locked
+                                ? tLootTrade('terminal.accessDenied')
+                                : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                    difficulty: node.difficulty || 0,
+                                    length: (node.difficulty || 0) + 4,
+                                  })}
+                            </Text>
+                          ) : nodeIsMerch ? (
+                            <IconText style={styles.hubUnlockedMetaText}>
+                              {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
+                            </IconText>
+                          ) : (
+                            <Text style={styles.hubUnlockedMetaText}>
+                              {piecesCount > 0
+                                ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
+                                : tLootTrade('player.hubNodeEmptyLoot')}
+                            </Text>
+                          )}
                         </View>
 
-                        {Boolean(node.description) && (
-                          <IconText style={styles.lootRowSub}>{node.description}</IconText>
-                        )}
-
-                        {nodeLocked ? (
-                          <Text style={styles.hubLockedHintText}>
-                            {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
-                          </Text>
-                        ) : nodeIsTerminal ? (
-                          <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
-                            {terminalState?.locked
-                              ? tLootTrade('terminal.accessDenied')
-                              : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
-                                  difficulty: node.difficulty || 0,
-                                  length: (node.difficulty || 0) + 4,
-                                })}
-                          </Text>
-                        ) : nodeIsMerch ? (
-                          <IconText style={styles.hubUnlockedMetaText}>
-                            {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
-                          </IconText>
-                        ) : (
-                          <Text style={styles.hubUnlockedMetaText}>
-                            {piecesCount > 0
-                              ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
-                              : tLootTrade('player.hubNodeEmptyLoot')}
-                          </Text>
-                        )}
-                      </View>
-
-                      <View style={styles.lootRowBtns}>
-                        {nodeLocked ? (
-                          <View style={styles.hubLockedBadge}>
-                            <Text style={styles.hubLockedBadgeText}>
-                              {tLootTrade('player.hubNodeLockedBadge')}
-                            </Text>
-                          </View>
-                        ) : nodeIsTerminal ? (
-                          <View style={styles.terminalButtons}>
-                            <TouchableOpacity
-                              accessibilityRole="button"
-                              style={styles.terminalViewButton}
-                              onPress={() => setTerminalSelection({ node, autoStart: false })}
-                            >
-                              <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
-                            </TouchableOpacity>
-                            {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
+                        <View style={styles.lootRowBtns}>
+                          {nodeLocked ? (
+                            <View style={styles.hubLockedBadge}>
+                              <Text style={styles.hubLockedBadgeText}>
+                                {tLootTrade('player.hubNodeLockedBadge')}
+                              </Text>
+                            </View>
+                          ) : nodeIsTerminal ? (
+                            <View style={styles.terminalButtons}>
                               <TouchableOpacity
                                 accessibilityRole="button"
-                                style={styles.terminalHackButton}
-                                onPress={() => setTerminalSelection({ node, autoStart: true })}
+                                style={styles.terminalViewButton}
+                                onPress={() => setTerminalSelection({ node, autoStart: false })}
                               >
-                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
-                            )}
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={styles.takeAllRowBtn}
-                            onPress={() => {
-                              setBuyBuffer({});
-                              setSellBuffer({});
-                              setMobileTab('merchant');
-                              setSelectedHubNodeId(node.containerId);
-                            }}
-                          >
-                            <Text style={styles.takeAllRowBtnText}>
-                              {tLootTrade(
-                                nodeIsMerch
-                                  ? 'player.hubNodeOpenMerchant'
-                                  : 'player.hubNodeOpenLoot',
+                              {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
+                                <TouchableOpacity
+                                  accessibilityRole="button"
+                                  style={styles.terminalHackButton}
+                                  onPress={() => setTerminalSelection({ node, autoStart: true })}
+                                >
+                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                </TouchableOpacity>
                               )}
-                            </Text>
-                          </TouchableOpacity>
-                        )}
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.takeAllRowBtn}
+                              onPress={() => {
+                                setBuyBuffer({});
+                                setSellBuffer({});
+                                setMobileTab('merchant');
+                                setSelectedHubNodeId(node.containerId);
+                              }}
+                            >
+                              <Text style={styles.takeAllRowBtnText}>
+                                {tLootTrade(
+                                  nodeIsMerch
+                                    ? 'player.hubNodeOpenMerchant'
+                                    : 'player.hubNodeOpenLoot',
+                                )}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
+                    );
+                  })
+                )}
+              </ScrollView>
 
-            <Text style={styles.hubMasterClosesHint}>
-              {tLootTrade('player.hubMasterClosesHint')}
-            </Text>
+              <Text style={styles.hubMasterClosesHint}>
+                {tLootTrade('player.hubMasterClosesHint')}
+              </Text>
+            </View>
           </View>
-        </View>
-        <TerminalHackingModal
-          visible={Boolean(terminalSelection)}
-          terminal={terminalSelection?.node}
-          roomCode={matchedContext.roomCode}
-          autoStart={Boolean(terminalSelection?.autoStart)}
-          onClose={() => setTerminalSelection(null)}
-        />
-      </Modal>
+        </Modal>
+        {terminalSelection ? (
+          <TerminalHackingModal
+            visible
+            terminal={terminalSelection.node}
+            roomCode={matchedContext.roomCode}
+            autoStart={Boolean(terminalSelection.autoStart)}
+            onClose={() => setTerminalSelection(null)}
+          />
+        ) : null}
+      </>
     );
   }
 

@@ -1,0 +1,391 @@
+diff --git a/__tests__/lootTrade/terminal-container.test.js b/__tests__/lootTrade/terminal-container.test.js
+index 64163b2..bf7e2c0 100644
+--- a/__tests__/lootTrade/terminal-container.test.js
++++ b/__tests__/lootTrade/terminal-container.test.js
+@@ -1,4 +1,6 @@
+ import { describe, expect, it } from 'vitest';
++import fs from 'node:fs';
++import path from 'node:path';
+ import {
+   CONTAINER_KIND,
+   buildHubSessionNodes,
+@@ -29,6 +31,22 @@ describe('terminal cards in loot/trade locations', () => {
+     expect(normalizeContainerEntity({ kind: 'terminal', difficulty: 99 }).difficulty).toBe(5);
+   });
+ 
++  it('mounts the hacking modal only after selection, as a sibling of the location modal', () => {
++    const source = fs.readFileSync(
++      path.resolve(process.cwd(), 'components/lootTrade/PlayerLootTradeOverlay.js'),
++      'utf8',
++    );
++    const hubStart = source.indexOf('if (isHubSession && !viewTarget)');
++    const hubEnd = source.indexOf('const returnToHubList', hubStart);
++    const hubBlock = source.slice(hubStart, hubEnd);
++    const outerModalClose = hubBlock.indexOf('</Modal>');
++    const hackingModalOpen = hubBlock.indexOf('<TerminalHackingModal');
++    expect(outerModalClose).toBeGreaterThan(0);
++    expect(hackingModalOpen).toBeGreaterThan(outerModalClose);
++    expect(hubBlock.slice(0, outerModalClose)).not.toContain('<TerminalHackingModal');
++    expect(hubBlock.slice(outerModalClose)).toContain('{terminalSelection ? (');
++  });
++
+   it('can be linked in a location and included in its room-wide nodes', () => {
+     const terminal = normalizeContainerEntity({
+       id: 'term-1', kind: 'terminal', name: 'Vault console', difficulty: 3, lockOnFailure: true,
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index ca3251a..bd180e3 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -348,168 +348,172 @@ export default function PlayerLootTradeOverlay() {
+   if (isHubSession && !viewTarget) {
+     const hubNodes = activeSession.nodes || [];
+     return (
+-      <Modal
+-        visible
+-        transparent
+-        animationType="slide"
+-        onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
+-      >
+-        <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
+-          <View style={styles.lootModalCard}>
+-            <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
+-              <View style={styles.modalTitleRow}>
+-                <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
+-                <Text style={styles.modalTitle}>{activeSession.name}</Text>
+-              </View>
+-              <View style={styles.headerActionsRow}>
+-                {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
+-                <TouchableOpacity
+-                  style={styles.minimizeBtn}
+-                  onPress={() => setMinimizedSessionId(activeSession.sessionId)}
+-                >
+-                  <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
+-                </TouchableOpacity>
++      <>
++        <Modal
++          visible
++          transparent
++          animationType="slide"
++          onRequestClose={() => setMinimizedSessionId(activeSession.sessionId)}
++        >
++          <View style={[styles.lootModalBackdrop, isWideLayout && styles.backdropWide]}>
++            <View style={styles.lootModalCard}>
++              <View style={[styles.modalHeader, styles.lootHeaderSpacing]}>
++                <View style={styles.modalTitleRow}>
++                  <MaterialCommunityIcons name="map-marker-multiple" size={24} color="#f0e68c" />
++                  <Text style={styles.modalTitle}>{activeSession.name}</Text>
++                </View>
++                <View style={styles.headerActionsRow}>
++                  {/* У внешнего окна Локации у игрока ТОЛЬКО «Свернуть» — «Закрыть» нет */}
++                  <TouchableOpacity
++                    style={styles.minimizeBtn}
++                    onPress={() => setMinimizedSessionId(activeSession.sessionId)}
++                  >
++                    <Text style={styles.minimizeBtnText}>{tLootTrade('player.minimize')}</Text>
++                  </TouchableOpacity>
++                </View>
+               </View>
+-            </View>
+ 
+-            {Boolean(activeSession.description) && (
+-              <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
+-                {activeSession.description}
+-              </IconText>
+-            )}
+-
+-            <ScrollView
+-              style={styles.lootScroll}
+-              contentContainerStyle={styles.lootScrollContent}
+-            >
+-              {hubNodes.length === 0 ? (
+-                <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
+-              ) : (
+-                hubNodes.map((node) => {
+-                  const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+-                  const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
+-                  const nodeLocked = Boolean(node.locked);
+-                  const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
+-                  const piecesCount = (node.items || []).reduce(
+-                    (sum, entry) => sum + (Number(entry.quantity) || 0),
+-                    0,
+-                  );
+-
+-                  return (
+-                    <View
+-                      key={node.containerId}
+-                      style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
+-                    >
+-                      <View style={styles.lootRowInfo}>
+-                        <View style={styles.hubNodeTitleRow}>
+-                          <MaterialCommunityIcons
+-                            name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
+-                            size={19}
+-                            color={nodeLocked ? '#e57373' : '#f0e68c'}
+-                          />
+-                          <Text style={[
+-                            styles.lootRowTitle,
+-                            nodeLocked && styles.hubNodeTitleLocked,
+-                          ]}>
+-                            {node.name}
+-                          </Text>
+-                        </View>
++              {Boolean(activeSession.description) && (
++                <IconText style={[styles.modalDesc, styles.lootDescSpacing]}>
++                  {activeSession.description}
++                </IconText>
++              )}
+ 
+-                        {Boolean(node.description) && (
+-                          <IconText style={styles.lootRowSub}>{node.description}</IconText>
+-                        )}
++              <ScrollView
++                style={styles.lootScroll}
++                contentContainerStyle={styles.lootScrollContent}
++              >
++                {hubNodes.length === 0 ? (
++                  <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
++                ) : (
++                  hubNodes.map((node) => {
++                    const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
++                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
++                    const nodeLocked = Boolean(node.locked);
++                    const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
++                    const piecesCount = (node.items || []).reduce(
++                      (sum, entry) => sum + (Number(entry.quantity) || 0),
++                      0,
++                    );
++
++                    return (
++                      <View
++                        key={node.containerId}
++                        style={[styles.lootRow, nodeLocked && styles.hubNodeRowLocked]}
++                      >
++                        <View style={styles.lootRowInfo}>
++                          <View style={styles.hubNodeTitleRow}>
++                            <MaterialCommunityIcons
++                              name={nodeLocked ? 'lock' : (nodeIsTerminal ? 'console' : (nodeIsMerch ? 'sack' : 'treasure-chest'))}
++                              size={19}
++                              color={nodeLocked ? '#e57373' : '#f0e68c'}
++                            />
++                            <Text style={[
++                              styles.lootRowTitle,
++                              nodeLocked && styles.hubNodeTitleLocked,
++                            ]}>
++                              {node.name}
++                            </Text>
++                          </View>
+ 
+-                        {nodeLocked ? (
+-                          <Text style={styles.hubLockedHintText}>
+-                            {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+-                          </Text>
+-                        ) : nodeIsTerminal ? (
+-                          <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
+-                            {terminalState?.locked
+-                              ? tLootTrade('terminal.accessDenied')
+-                              : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+-                                  difficulty: node.difficulty || 0,
+-                                  length: (node.difficulty || 0) + 4,
+-                                })}
+-                          </Text>
+-                        ) : nodeIsMerch ? (
+-                          <IconText style={styles.hubUnlockedMetaText}>
+-                            {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
+-                          </IconText>
+-                        ) : (
+-                          <Text style={styles.hubUnlockedMetaText}>
+-                            {piecesCount > 0
+-                              ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
+-                              : tLootTrade('player.hubNodeEmptyLoot')}
+-                          </Text>
+-                        )}
+-                      </View>
++                          {Boolean(node.description) && (
++                            <IconText style={styles.lootRowSub}>{node.description}</IconText>
++                          )}
+ 
+-                      <View style={styles.lootRowBtns}>
+-                        {nodeLocked ? (
+-                          <View style={styles.hubLockedBadge}>
+-                            <Text style={styles.hubLockedBadgeText}>
+-                              {tLootTrade('player.hubNodeLockedBadge')}
++                          {nodeLocked ? (
++                            <Text style={styles.hubLockedHintText}>
++                              {node.lockLabel || tLootTrade('player.hubNodeLockedDefaultHint')}
+                             </Text>
+-                          </View>
+-                        ) : nodeIsTerminal ? (
+-                          <View style={styles.terminalButtons}>
+-                            <TouchableOpacity
+-                              accessibilityRole="button"
+-                              style={styles.terminalViewButton}
+-                              onPress={() => setTerminalSelection({ node, autoStart: false })}
+-                            >
+-                              <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+-                            </TouchableOpacity>
+-                            {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
++                          ) : nodeIsTerminal ? (
++                            <Text style={[styles.hubUnlockedMetaText, terminalState?.locked && styles.terminalDeniedMeta]}>
++                              {terminalState?.locked
++                                ? tLootTrade('terminal.accessDenied')
++                                : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
++                                    difficulty: node.difficulty || 0,
++                                    length: (node.difficulty || 0) + 4,
++                                  })}
++                            </Text>
++                          ) : nodeIsMerch ? (
++                            <IconText style={styles.hubUnlockedMetaText}>
++                              {`${formatLootTrade(tLootTrade('player.merchantCaps'), { caps: node.caps || 0 })} • ${formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })}`}
++                            </IconText>
++                          ) : (
++                            <Text style={styles.hubUnlockedMetaText}>
++                              {piecesCount > 0
++                                ? formatLootTrade(tLootTrade('player.hubNodeItemsCount'), { count: piecesCount })
++                                : tLootTrade('player.hubNodeEmptyLoot')}
++                            </Text>
++                          )}
++                        </View>
++
++                        <View style={styles.lootRowBtns}>
++                          {nodeLocked ? (
++                            <View style={styles.hubLockedBadge}>
++                              <Text style={styles.hubLockedBadgeText}>
++                                {tLootTrade('player.hubNodeLockedBadge')}
++                              </Text>
++                            </View>
++                          ) : nodeIsTerminal ? (
++                            <View style={styles.terminalButtons}>
+                               <TouchableOpacity
+                                 accessibilityRole="button"
+-                                style={styles.terminalHackButton}
+-                                onPress={() => setTerminalSelection({ node, autoStart: true })}
++                                style={styles.terminalViewButton}
++                                onPress={() => setTerminalSelection({ node, autoStart: false })}
+                               >
+-                                <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                               </TouchableOpacity>
+-                            )}
+-                          </View>
+-                        ) : (
+-                          <TouchableOpacity
+-                            style={styles.takeAllRowBtn}
+-                            onPress={() => {
+-                              setBuyBuffer({});
+-                              setSellBuffer({});
+-                              setMobileTab('merchant');
+-                              setSelectedHubNodeId(node.containerId);
+-                            }}
+-                          >
+-                            <Text style={styles.takeAllRowBtnText}>
+-                              {tLootTrade(
+-                                nodeIsMerch
+-                                  ? 'player.hubNodeOpenMerchant'
+-                                  : 'player.hubNodeOpenLoot',
++                              {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
++                                <TouchableOpacity
++                                  accessibilityRole="button"
++                                  style={styles.terminalHackButton}
++                                  onPress={() => setTerminalSelection({ node, autoStart: true })}
++                                >
++                                  <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
++                                </TouchableOpacity>
+                               )}
+-                            </Text>
+-                          </TouchableOpacity>
+-                        )}
++                            </View>
++                          ) : (
++                            <TouchableOpacity
++                              style={styles.takeAllRowBtn}
++                              onPress={() => {
++                                setBuyBuffer({});
++                                setSellBuffer({});
++                                setMobileTab('merchant');
++                                setSelectedHubNodeId(node.containerId);
++                              }}
++                            >
++                              <Text style={styles.takeAllRowBtnText}>
++                                {tLootTrade(
++                                  nodeIsMerch
++                                    ? 'player.hubNodeOpenMerchant'
++                                    : 'player.hubNodeOpenLoot',
++                                )}
++                              </Text>
++                            </TouchableOpacity>
++                          )}
++                        </View>
+                       </View>
+-                    </View>
+-                  );
+-                })
+-              )}
+-            </ScrollView>
++                    );
++                  })
++                )}
++              </ScrollView>
+ 
+-            <Text style={styles.hubMasterClosesHint}>
+-              {tLootTrade('player.hubMasterClosesHint')}
+-            </Text>
++              <Text style={styles.hubMasterClosesHint}>
++                {tLootTrade('player.hubMasterClosesHint')}
++              </Text>
++            </View>
+           </View>
+-        </View>
+-        <TerminalHackingModal
+-          visible={Boolean(terminalSelection)}
+-          terminal={terminalSelection?.node}
+-          roomCode={matchedContext.roomCode}
+-          autoStart={Boolean(terminalSelection?.autoStart)}
+-          onClose={() => setTerminalSelection(null)}
+-        />
+-      </Modal>
++        </Modal>
++        {terminalSelection ? (
++          <TerminalHackingModal
++            visible
++            terminal={terminalSelection.node}
++            roomCode={matchedContext.roomCode}
++            autoStart={Boolean(terminalSelection.autoStart)}
++            onClose={() => setTerminalSelection(null)}
++          />
++        ) : null}
++      </>
+     );
+   }
+ 
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index f78a5c8..e7d1a7c 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "486"
++  "baseline": "487"
+ }
+diff --git a/public/version.json b/public/version.json
+index 51aed35..051783d 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "487",
++  "version": "488",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
+       "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
+       "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
+       "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
+@@ -14,6 +15,7 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
+       "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
+       "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
+       "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
