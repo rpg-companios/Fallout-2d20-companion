@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createRoomRegistry } from '../../server/roomRegistry.js';
 import {
   applyGameAction,
+  bracketEffectFor,
   createGame,
   publicGameState,
   recoveryChancePercent,
@@ -11,20 +12,27 @@ const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
-  // Патч 495: вероятность восстановления зависит только от Удачи (LCK 4..10),
-  // минимальный шанс 10 %, максимальный 80 %.
-  it('uses the agreed luck-based recovery probability checkpoints and clamp', () => {
-    expect(recoveryChancePercent(4)).toBe(10);
+  // Патч 496: справочная вероятность «не пустышка» берётся из таблицы d20.
+  it('uses the agreed d20 luck checkpoints and clamp', () => {
+    expect(recoveryChancePercent(4)).toBe(25);
     expect(recoveryChancePercent(7)).toBe(45);
-    expect(recoveryChancePercent(10)).toBe(80);
-    expect(recoveryChancePercent(1)).toBe(10);
-    expect(recoveryChancePercent(12)).toBe(80);
-    expect(recoveryChancePercent(0)).toBe(10);
+    expect(recoveryChancePercent(10)).toBe(75);
+    expect(recoveryChancePercent(1)).toBe(25);
+    expect(recoveryChancePercent(12)).toBe(75);
+    expect(recoveryChancePercent(0)).toBe(25);
+    // d20: 1..F = полный сброс, F+1..P = +1 попытка, остальное = пустышка.
+    expect(bracketEffectFor(4, 1)).toBe('reset');
+    expect(bracketEffectFor(4, 3)).toBe('attempt');
+    expect(bracketEffectFor(4, 9)).toBe('dud');
+    expect(bracketEffectFor(10, 4)).toBe('reset');
+    expect(bracketEffectFor(10, 12)).toBe('attempt');
+    expect(bracketEffectFor(10, 18)).toBe('dud');
+    expect(bracketEffectFor(10, 2, true)).toBe('attempt');
   });
 
-  // Патч 495: база доски — 20 слов на любой сложности, длина = d + 4.
+  // Патч 496: база доски зависит от сложности, длина = d + 4.
   it.each([
-    [0, 4, 20], [1, 5, 20], [2, 6, 20], [3, 7, 20], [4, 8, 20], [5, 9, 20],
+    [0, 4, 8], [1, 5, 10], [2, 6, 12], [3, 7, 14], [4, 8, 17], [5, 9, 20],
   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
       config: { ...config, difficulty, lockOnFailure: false },
@@ -73,50 +81,55 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(publicState.password).toBeUndefined();
   });
 
-  it('rolls attempt-restoring brackets only with Science >= 4 and adds one attempt', () => {
-    const game = createGame({
-      config: { ...config, difficulty: 0 },
-      operatorClientId: 'player-1',
-      operatorCharacterId: 'char-1',
-      characterSnapshot: {
-        attributes: { INT: { value: 10 }, LCK: { value: 10 } },
-        skills: [{ id: 'science', value: 6 }],
-      },
-      now: 100,
-      rng: noRandomness,
-    });
-    const recoveryBrackets = game.bracketRanges.filter((entry) => entry.recovery);
-    expect(recoveryBrackets.length).toBeGreaterThanOrEqual(1);
-    expect(recoveryBrackets.length).toBeLessThanOrEqual(2);
-    expect(game.bracketRanges.length).toBe(9); // 2 + Наука 6 + синергия ИНТ>=8
-    expect(game.restoreSlots).toBe(recoveryBrackets.length);
-    expect(publicGameState(game).bracketRanges.every((entry) => !('recovery' in entry))).toBe(true);
+  it('rolls bracket effects with d20 and allows a full reset only once', () => {
+    const snapshot = {
+      attributes: { INT: { value: 10 }, LCK: { value: 10 } },
+      skills: [{ id: 'science', value: 6 }],
+    };
+    let game = null;
+    for (let k = 1; k <= 60 && !game; k += 1) {
+      const candidate = createGame({
+        config: { ...config, difficulty: 5 },
+        operatorClientId: 'player-1',
+        operatorCharacterId: 'char-1',
+        characterSnapshot: snapshot,
+        now: 100,
+        rng: () => k / 61,
+      });
+      if (candidate.bracketRanges.some((entry) => entry.effect === 'reset')) game = candidate;
+    }
+    expect(game).not.toBeNull();
+    expect(game.bracketRanges).toHaveLength(3);
+    expect(game.bracketRanges.filter((entry) => entry.effect === 'reset')).toHaveLength(1);
+    expect(publicGameState(game).bracketRanges.every((entry) => !('effect' in entry) && !('recovery' in entry))).toBe(true);
+
     let next = { ...game, attempts: 1 };
-    const result = applyGameAction({
-      game: next,
-      action: 'bracket',
-      clientId: 'player-1',
-      characterId: 'char-1',
-      characterSnapshot: {},
-      value: recoveryBrackets[0].id,
-      now: 101,
-      rng: noRandomness,
-    });
-    next = result.game;
-    expect(next.attempts).toBe(2); // была 1 -> +1, а не полный сброс до 4
-    expect(next.bracketRanges.filter((entry) => entry.recovery).length)
-      .toBe(recoveryBrackets.length);
-    expect(next.bracketRanges.find((entry) => entry.id === recoveryBrackets[0].id).used).toBe(true);
+    for (const bracket of [...game.bracketRanges]) {
+      next = applyGameAction({
+        game: next,
+        action: 'bracket',
+        clientId: 'player-1',
+        characterId: 'char-1',
+        characterSnapshot: {},
+        value: bracket.id,
+        now: 101,
+        rng: noRandomness,
+      }).game;
+    }
+    expect(next.resetUsed).toBe(true);
+    expect(next.bonusAttempts).toBeGreaterThanOrEqual(next.maxAttempts);
+    expect(next.attempts).toBe(1 + next.bonusAttempts);
+    expect(next.bracketRanges.every((entry) => entry.used)).toBe(true);
 
     const noScience = createGame({
-      config: { ...config, difficulty: 0 },
+      config: { ...config, difficulty: 5 },
       operatorClientId: 'player-1',
       operatorCharacterId: 'char-1',
       characterSnapshot: { attributes: { INT: { value: 10 }, LCK: { value: 10 } }, skills: [] },
       now: 100,
       rng: noRandomness,
     });
-    expect(noScience.bracketRanges.filter((entry) => entry.recovery)).toHaveLength(0);
+    expect(noScience.bracketRanges).toHaveLength(0);
   });
 
   it('offers Programmer’s Digest only once per character and grants one extra attempt', () => {

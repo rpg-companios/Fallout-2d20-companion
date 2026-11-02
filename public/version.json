@@ -1,8 +1,14 @@
 {
-  "version": "495",
+  "version": "496",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "новое «Саммари v2» взлома. Число слов зависит от сложности и ИНТ: N = max(пол, база сложности − (ИНТ − 4)); на сложности 5 это 20 слов при ИНТ 4 и 14 при ИНТ 10.",
+      "Попыток теперь 4 на сложностях 0–2 и 3 на сложностях 3–5. Скобочные пары — единственные подсказки: их число задаёт Наука (не больше 3 и не больше N−3), а эффект определяет бросок d20 по Удаче.",
+      "Эффекты скобок: удалить пустышку, +1 попытка или полный сброс (один раз за терминал, повтор даёт +1). Сходство букв N/M узнаётся только тратой попытки; очки удачи не расходуются.",
+      "Доска собирается из трёх буквенных групп (похожие / смешанные / непохожие), без кластеров с общим префиксом: ABS*, ABSENT, ABUSES больше не выдают пароль одной догадкой. Пароль больше не «самое центральное» слово.",
+      "Баланс: бездумный перебор выигрывает примерно в 20–35 % партий на сложности 5, вдумчивый разбор по подсказкам — в 85–100 %, а удачный полный сброс доводит шанс думающего игрока до 100 %.",
+      "В окне взлома показывается снижение сложности перком Хакер и результат нажатой скобки; точки попыток теперь растут вместе с бонусами.",
       "Словарь мини-игры собран из настоящих английских слов: шесть файлов по длине, всего 12 308 слов; соседние терминалы больше не повторяют одни и те же варианты.",
       "Взлом разделён на три рычага: ИНТ (4–10) задаёт число слов на доске (20 → 12), Наука (0–6) добавляет скобочные комбинации и с 4-го уровня открывает восстановление попыток, Удача (4–10) определяет шанс появления такой комбинации (10–80 %).",
       "На сложности 0 доска собирается из семей настоящих анаграмм (POST/SPOT/STOP…), а пароль — слово-выброс, почти не имеющее с ними общих букв; правильное слово больше не подчёркивается.",
@@ -25,6 +31,12 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "new hacking balance summary v2. Board size depends on difficulty and INT: N = max(floor, difficulty base − (INT − 4)); at difficulty 5 that is 20 words at INT 4 and 14 at INT 10.",
+      "Attempts are now 4 at difficulty 0–2 and 3 at difficulty 3–5. Bracket pairs are the only hints: Science sets their count (max 3, max N−3) and a d20 roll set by Luck decides the effect.",
+      "Bracket effects: remove a dud, +1 attempt, or a full reset (once per terminal; a repeat gives +1). Letter likeness N/M is learned only by spending an attempt; luck points are never spent.",
+      "Boards are built from three letter groups (similar / mixed / dissimilar) with no shared-prefix clusters: ABSURD, ABSENT, ABUSES no longer give the password away in one guess. The password is no longer the most 'central' word.",
+      "Balance: blind guessing wins about 20–35% of difficulty-5 runs, a player who tracks the patterns wins 85–100%, and a lucky full reset takes the thinking player to 100%.",
+      "The hacking window now shows the Hacker perk's difficulty reduction and the result of each bracket; attempt dots grow with bonus attempts.",
       "The hacking word list is now built from real English words: six files by word length, 12,308 words total, so consecutive terminals no longer repeat the same candidates.",
       "Hacking uses three separate levers: INT (4–10) sets the board size (20 → 12 words), Science (0–6) adds bracket combinations and unlocks attempt recovery at rank 4, and Luck (4–10) sets the chance that such a combination appears (10–80%).",
       "At difficulty 0 the board is built from real anagram families (POST/SPOT/STOP…) while the password is a maximal outlier; the correct word is no longer underlined.",

@@ -63,7 +63,7 @@
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
     "terminalDifficultyLabel": "Difficulty · password length",
-    "terminalDifficultyHint": "Hacker lowers the effective difficulty by 1 (minimum 0). Difficulty sets the password length and the hint limit; at difficulty 0 the terminal may be skipped under the rules. INT (4–10) reduces the board from 20 to 12 words. Science (0–6) adds bracket combinations and, from rank 4, unlocks attempt recovery. Luck (4–10) sets the chance that such a combination appears. Luck points are not spent while hacking.",
+    "terminalDifficultyHint": "Hacker lowers the effective difficulty by 1 per rank (minimum 0). Board size: N = max(floor, difficulty base − (INT − 4)); at difficulty 5 that is 20 words at INT 4 and 14 at INT 10. Attempts: 4 at difficulty 0–2 and 3 at difficulty 3–5. Bracket pairs are the only hints: their count depends on Science and difficulty (max 3), and a d20 roll set by LCK decides the effect — remove a dud, +1 attempt, or a full reset (once per terminal). Letter likeness is learned only by spending an attempt. Luck points are never spent while hacking.",
     "terminalLockLabel": "Lock the terminal after all attempts are failed"
   },
   "detail": {
@@ -258,6 +258,10 @@
     "locked": "LOCKED",
     "available": "AVAILABLE",
     "unlock": "Unlock",
-    "openTerminal": "Open terminal"
+    "openTerminal": "Open terminal",
+    "hackerReduced": "Hacker: difficulty {difficulty} → {effective}",
+    "dudRemoved": "Dud removed",
+    "attemptRestored": "Restored +1 attempt",
+    "attemptsReset": "All attempts restored"
   }
 }

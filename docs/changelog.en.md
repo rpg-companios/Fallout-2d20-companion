@@ -1,5 +1,30 @@
 # Changelog
 ---
+## Hacking summary v2: brackets are the hints (patch 496)
+
+**Owner's accepted rules.** A bracket pair *is* a hint; there are no separate
+free likeness checks. `N/M` likeness is learned only by spending an attempt.
+Brackets have three effects: remove a dud, `+1` attempt, or a full reset (once
+per terminal; a repeat gives `+1`).
+
+| Value | Formula |
+|---|---|
+| Board size | `N = max(floor[d], base[d] − (INT − 4))`, bases `8/10/12/14/17/20`, floors `4/5/6/7/9/10` |
+| Attempts | `T = 4 − floor(d/3)` → 4 at `d0..d2`, 3 at `d3..d5` |
+| Bracket pairs | `P = max(0, min(1 + floor(Science/2) − floor(d/3), 3, N − 3))` |
+| Pair effect | `d20` by LCK: `1..F` reset, `F+1..P` `+1` attempt, rest = dud |
+
+The `d20` bounds for LCK 4…10 are `[1,5] [1,6] [2,7] [2,9] [3,10] [3,12] [4,15]`.
+The likeness cap stays `3/3/3/2/2/2` from patch 495 — it is what gives the
+thinking player 80 %+. Boards use three letter groups with no `ABS*` prefix
+clusters, and the password is no longer the most "central" word. The hacking
+window now shows the Hacker perk's difficulty reduction and each bracket's
+result.
+
+Measured on the real engine at difficulty 5: blind guessing **20–35 %**,
+informed deduction **85–100 %**, and **100 %** after a lucky full reset.
+Details and installation: `docs/patch-496-install.md`.
+
 ## Own word list, three stats and the About screen (patch 495)
 
 **At the owner's request.** The hacking dictionary is now our own compilation
