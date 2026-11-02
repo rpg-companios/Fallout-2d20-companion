@@ -1,5 +1,25 @@
 # Changelog
 ---
+## Two kinds of brackets, count set by Science (patch 499)
+
+The owner clarified how the bonus table should be read: "2 words + 2 attempts"
+means **four brackets** — two remove one wrong word each, two give +1 attempt
+each. A single bracket does exactly one effect; combined packages are gone.
+Science 1 gives one bracket whose kind is a coin flip; Science 4 gives three
+brackets ("2 words + 1 attempt"), Science 5 gives three ("1 word + 2 attempts").
+
+**Science alone sets the bracket count**: `0, 1, 1, 2, 3, 3, 4` for Science
+0–6, at all six difficulties. The per-difficulty table `4/4/3/3/2/2` no
+longer caps it. At difficulty 1 with INT 10 and Science 6 the hack is indeed
+easy, while at difficulty 5 Science 6 still grants all four brackets. The
+bracket kind remains hidden until clicked, as in Fallout.
+
+Measured on the real engine (INT 10, LCK 4): difficulty 5 at Science 6 —
+blind guessing **21%**, informed deduction **94%**, **100%** after a lucky
+full restore; difficulty 1 at Science 6 — informed deduction **100%**.
+Word count `N = max(4, 20 + 2·D − INT)` is unchanged: 26 words at INT 4 and
+20 at INT 10 on difficulty 5. Installation: `docs/patch-499-install.md`.
+
 ## Cleaner terminal UI (patch 498)
 
 At the owner's request, redundant information was removed from the interface:

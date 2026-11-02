@@ -43,9 +43,17 @@ const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
 const BASE_WORD_COUNT = 20; // экспорт для совместимости
 const MIN_WORDS = 4;
 const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
-const BRACKETS_BY_DIFFICULTY = [4, 4, 3, 3, 2, 2];
-const SCIENCE_PACKS = { 2: [1, 0], 3: [1, 1], 4: [2, 1], 5: [1, 2], 6: [2, 2] };
-const SCI5_MONO = false;    // true: Наука 5 = (2 слова, 2 попытки)
+// Патч 499: запись «W слов + A попыток» означает W+A СКОБОК, а не эффекты
+// одной скобки. W скобок убирают по одному ложному слову, A скобок дают
+// по +1 попытке. Одна скобка = ровно один эффект. Число скобок задаёт Наука
+// на ВСЕХ сложностях (таблица сложности 497 больше не ограничивает).
+// Наука:      0     1        2      3      4      5      6
+// словных:    0   монетка    1      1      2      1      2
+// ходовых:    0   монетка    0      1      1      2      2
+// всего:      0     1        1      2      3      3      4
+const BRACKET_SPLIT_BY_SCIENCE = [[0, 0], [0, 0], [1, 0], [1, 1], [2, 1], [1, 2], [2, 2]];
+const BRACKET_COUNT_BY_SCIENCE = [0, 1, 1, 2, 3, 3, 4];
+const SCI5_MONO = false;    // true: Наука 5 = 2 словных + 2 ходовых скобки
 const SCI1_WORD_CHANCE = 0.5;
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -92,35 +100,39 @@ const decodeTerminalNodeMarker = (value) => {
 const luckRestoreChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10) - 4);
 const recoveryChancePercent = (luck) => Math.round(luckRestoreChance(luck) * 100);
 
-// Число скобочных пар: Наука 0 -> нет, иначе таблица по сложности.
-// Предохранитель N−3 не даёт вычистить доску целиком.
-const bracketCountFor = (difficulty, science, wordCount = 20) => {
-  const tier = clamp(Math.floor(Number(difficulty) || 0), 0, 5);
+// Состав скобок по Науке: [сколько убирают слово, сколько дают попытку].
+const bracketSplitFor = (science) => {
   const sci = clamp(Number(science) || 0, 0, 6);
-  if (sci === 0) return 0;
-  const n = Math.max(4, Math.floor(Number(wordCount) || 20));
-  return Math.max(0, Math.min(BRACKETS_BY_DIFFICULTY[tier], n - 3));
+  if (sci === 5 && SCI5_MONO) return [2, 2];
+  return BRACKET_SPLIT_BY_SCIENCE[sci];
 };
 
-// Эффект одной скобки. Возвращает { words, attempts, full }.
-// При Удаче восстанавливаются ВСЕ 4 попытки; на Науке >=2 «словесная» часть
-// пакета остаётся, на Науке 1 удача заменяет весь эффект (слов не убираем).
-// Ограничения «только один раз за терминал» больше нет: шанс на КАЖДУЮ пару,
-// но попытки никогда не превышают 4.
-const bracketEffectFor = (science, luck, rng = Math.random) => {
+// Число скобок задаёт ТОЛЬКО Наука. Сложность не ограничивает: на 1-м уровне
+// при высоких Науке + ИНТ взлом действительно лёгкий, на 5-м Наука 6 даёт
+// все 4 скобки. Предохранитель N−3 не даёт вычистить доску целиком.
+const bracketCountFor = (difficulty, science, wordCount = 20) => {
   const sci = clamp(Number(science) || 0, 0, 6);
-  if (sci === 0) return { words: 0, attempts: 0, full: false };
-  let words;
-  let attempts;
-  if (sci === 1) {
-    if (rng() < SCI1_WORD_CHANCE) { words = 1; attempts = 0; } else { words = 0; attempts = 1; }
-  } else {
-    const pack = (sci === 5 && SCI5_MONO) ? [2, 2] : SCIENCE_PACKS[sci];
-    [words, attempts] = pack;
-  }
+  const split = bracketSplitFor(sci);
+  const count = sci === 1 ? 1 : split[0] + split[1];
+  const n = Math.max(4, Math.floor(Number(wordCount) || 20));
+  // difficulty сохранён в сигнатуре для совместимости вызывающих:
+  // сложность больше НЕ влияет на число скобок.
+  void difficulty;
+  return Math.max(0, Math.min(count, n - 3));
+};
+
+// Эффект ОДНОЙ скобки: kind = 'word' -> убрать 1 ложное слово,
+// kind = 'attempt' -> +1 попытка. При Удаче возвращаются ВСЕ 4 попытки;
+// на Науке >=2 «словесная» скобка всё равно убирает слово, на Науке 1 удача
+// заменяет весь эффект. Попытки никогда не превышают 4.
+const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
+  const sci = clamp(Number(science) || 0, 0, 6);
+  if (sci === 0) return { words: 0, attempts: 0, full: false, kind: 'none' };
   const full = rng() < luckRestoreChance(luck);
-  if (full && sci === 1) words = 0;
-  return { words, attempts: full ? 0 : attempts, full };
+  const replaced = full && sci === 1;
+  const words = !replaced && kind === 'word' ? 1 : 0;
+  const attempts = !replaced && kind === 'attempt' ? 1 : 0;
+  return { words, attempts: full ? 0 : attempts, full, kind };
 };
 
 const toNumber = (entry) => Number(typeof entry === 'object'
@@ -485,11 +497,21 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
   }
   const brackets = [];
   const bracketPairs = ['()', '[]', '{}', '<>'];
-  // Патч 497: число пар по сложности, эффект каждой — детерминированный
-  // пакет Науки плюс独立的 бросок Удачи на полное восстановление.
+  // Патч 499: сорта скобок определяются Наукой, число — тоже Наукой.
+  // Наука 1 — одна скобка, её сорт выбирается монеткой; остальные сорта
+  // перемешиваются по доске, чтобы нельзя было угадать по позиции.
+  const split = bracketSplitFor(stats.science);
+  let kinds;
+  if (stats.science === 1) {
+    kinds = [rng() < SCI1_WORD_CHANCE ? 'word' : 'attempt'];
+  } else {
+    kinds = [...Array(split[0]).fill('word'), ...Array(split[1]).fill('attempt')];
+  }
+  kinds = shuffle(kinds, rng);
   const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
-    const effect = bracketEffectFor(stats.science, stats.luck, rng);
+    const kind = kinds[groupIndex] || 'word';
+    const effect = bracketEffectFor(stats.science, stats.luck, rng, kind);
     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
     const length = 3 + randomInt(6, rng);
     const preferredRow = randomInt(board.length / width, rng);
@@ -519,6 +541,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
       effect,
       // Поле сохранено для старых клиентов; факт определяет `effect`.
       recovery: effect.full || effect.attempts > 0,
+      kind,
     });
   }
   const recoveryChance = recoveryChancePercent(stats.luck);
@@ -545,7 +568,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     likenessCap: selection.likenessCap,
     minAmbiguity: selection.minAmbiguity,
     centralityRank: selection.centralityRank,
-    sciencePack: SCIENCE_PACKS[stats.science] || null,
+    bracketSplit: bracketSplitFor(stats.science),
     attempts: attemptsForDifficulty(effectiveDifficulty),
     maxAttempts: attemptsForDifficulty(effectiveDifficulty),
     bonusAttempts: 0,
@@ -576,7 +599,7 @@ const publicGameState = (game) => {
     operatorClientId,
     digestEligible: game.status === 'pendingDigest' && digestEligible,
     // Эффект скобки игрок узнаёт только после нажатия — как в Fallout 3.
-    bracketRanges: (game.bracketRanges || []).map(({ recovery, effect, ...bracket }) => bracket),
+    bracketRanges: (game.bracketRanges || []).map(({ recovery, effect, kind, ...bracket }) => bracket),
     // Патч 495: подчёркивания пароля на d=0 больше нет — игрок, который
     // всё-таки решил сыграть, ищет «слово не из семейки». Сложность 0 по
     // правилам можно не проходить: Мастер просто открывает терминал.
@@ -689,9 +712,10 @@ module.exports = {
   MIN_AMBIGUITY_BY_DIFFICULTY,
   AMBIGUITY_TARGET_BY_DIFFICULTY,
   MIN_SHARED_BY_DIFFICULTY,
-  BRACKETS_BY_DIFFICULTY,
-  SCIENCE_PACKS,
+  BRACKET_SPLIT_BY_SCIENCE,
+  BRACKET_COUNT_BY_SCIENCE,
   SCI5_MONO,
+  bracketSplitFor,
   bracketCountFor,
   bracketEffectFor,
   luckRestoreChance,
