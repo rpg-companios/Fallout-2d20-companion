@@ -19,18 +19,34 @@ const WORDS_BY_LENGTH = {
   get 9() { return getWordsByLength(9); },
 };
 
-// Патч 495: три характеристики — три разных рычага.
-//   Сложность 0..5: длина пароля 4+d, потолок подсказки, порог похожести.
-//   ИНТ 4..10:      сколько слов на доске (20 -> 12).
-//   Наука 0..6:     сколько скобочных комбинаций; с 4 открывает восстановление.
-//   Удача 4..10:    шанс появления комбинации «+1 попытка» (10..80 %, не ноль).
+// Патч 497: «последовательность» владельца + канонические 4 попытки.
+//   N = max(4, 20 + 2·D − ИНТ): на D5 это 26 слов при ИНТ 4 и 20 при ИНТ 10.
+//   L = 4 + D. Попыток всегда 4, потолок 4; скобки выше 4 не поднимают.
+//   Наука 0 -> скобок нет; иначе число пар {0:4,1:4,2:3,3:3,4:2,5:2}.
+//   Пакеты Науки детерминированы: (слов убрать, попыток вернуть).
+//   Удача 4..10 -> шанс 5..20 % полного восстановления на КАЖДУЮ скобку.
+//   Слова: РЕАЛЬНЫЕ, «почти одинаковые» — не менее L−3 общих букв с опорным
+//   словом и не более 2 совпавших позиций. Пароль выбирается ВНУТРИ набора,
+//   чтобы он не был «самым центральным» словом (дыра, закрытая ещё в 496).
 // Очки удачи (luckPoints) в мини-игре не тратятся и кодом не трогаются.
 const MAX_LIKENESS_BY_DIFFICULTY = [3, 3, 3, 2, 2, 2];
-const MIN_AMBIGUITY_BY_DIFFICULTY = [3, 3, 3, 3, 3, 4];
-const MIN_SHARED_BY_DIFFICULTY = [1, 2, 3, 3, 4, 4];
-const BASE_WORD_COUNT = 20;
-const MIN_WORDS = 6;
-const MAX_ATTEMPTS = 4;
+// Жёсткий пол: сколько кандидатов обязано остаться после ЛЮБОГО первого хода.
+const MIN_AMBIGUITY_BY_DIFFICULTY = [2, 2, 2, 2, 4, 4];
+// Цель для градиентного ремонта: на D4–D5 поднята, чтобы думающий игрок
+// опустился с ~95 % до 85–90 %, оставшись выше 80 %+.
+const AMBIGUITY_TARGET_BY_DIFFICULTY = [2, 2, 2, 2, 8, 8];
+// Минимум общих букв с опорным словом = L − 3.
+const MIN_SHARED_BY_DIFFICULTY = [1, 2, 3, 4, 5, 6];
+// N при ИНТ 4: 16 + 2·D. ИНТ вычитается из базы по одному слову за очко.
+const BASE_WORDS_BY_DIFFICULTY = [16, 18, 20, 22, 24, 26];
+const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
+const BASE_WORD_COUNT = 20; // экспорт для совместимости
+const MIN_WORDS = 4;
+const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
+const BRACKETS_BY_DIFFICULTY = [4, 4, 3, 3, 2, 2];
+const SCIENCE_PACKS = { 2: [1, 0], 3: [1, 1], 4: [2, 1], 5: [1, 2], 6: [2, 2] };
+const SCI5_MONO = false;    // true: Наука 5 = (2 слова, 2 попытки)
+const SCI1_WORD_CHANCE = 0.5;
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const randomInt = (max, rng = Math.random) => Math.floor(rng() * max);
@@ -72,18 +88,39 @@ const decodeTerminalNodeMarker = (value) => {
   }
 };
 
-// Удача 4..10 -> 10..80 %; шанс никогда не равен нулю.
-const recoveryChancePercent = (luck) => clamp(
-  10 + (clamp(Number(luck) || 4, 4, 10) - 4) * (70 / 6),
-  10,
-  80,
-);
+// Шанс полного восстановления попыток при использовании ОДНОЙ скобки.
+const luckRestoreChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10) - 4);
+const recoveryChancePercent = (luck) => Math.round(luckRestoreChance(luck) * 100);
 
-// Скобочные комбинации: 2 + Наука, плюс «синергия» при ИНТ >= 8 и Науке >= 4.
-const bracketCountFor = (intelligence, science) => {
+// Число скобочных пар: Наука 0 -> нет, иначе таблица по сложности.
+// Предохранитель N−3 не даёт вычистить доску целиком.
+const bracketCountFor = (difficulty, science, wordCount = 20) => {
+  const tier = clamp(Math.floor(Number(difficulty) || 0), 0, 5);
   const sci = clamp(Number(science) || 0, 0, 6);
-  const synergy = (Number(intelligence) || 4) >= 8 && sci >= 4 ? 1 : 0;
-  return 2 + sci + synergy;
+  if (sci === 0) return 0;
+  const n = Math.max(4, Math.floor(Number(wordCount) || 20));
+  return Math.max(0, Math.min(BRACKETS_BY_DIFFICULTY[tier], n - 3));
+};
+
+// Эффект одной скобки. Возвращает { words, attempts, full }.
+// При Удаче восстанавливаются ВСЕ 4 попытки; на Науке >=2 «словесная» часть
+// пакета остаётся, на Науке 1 удача заменяет весь эффект (слов не убираем).
+// Ограничения «только один раз за терминал» больше нет: шанс на КАЖДУЮ пару,
+// но попытки никогда не превышают 4.
+const bracketEffectFor = (science, luck, rng = Math.random) => {
+  const sci = clamp(Number(science) || 0, 0, 6);
+  if (sci === 0) return { words: 0, attempts: 0, full: false };
+  let words;
+  let attempts;
+  if (sci === 1) {
+    if (rng() < SCI1_WORD_CHANCE) { words = 1; attempts = 0; } else { words = 0; attempts = 1; }
+  } else {
+    const pack = (sci === 5 && SCI5_MONO) ? [2, 2] : SCIENCE_PACKS[sci];
+    [words, attempts] = pack;
+  }
+  const full = rng() < luckRestoreChance(luck);
+  if (full && sci === 1) words = 0;
+  return { words, attempts: full ? 0 : attempts, full };
 };
 
 const toNumber = (entry) => Number(typeof entry === 'object'
@@ -168,12 +205,15 @@ const skillScore = (intelligence, science) => (
 );
 const skillBonus = (intelligence, science) => skillScore(intelligence, science) - 4;
 
-// ИНТ 4..10 -> 20, 19, 17, 16, 15, 13, 12 слов на доске. Ни сложность, ни
-// Наука на число слов не влияют: Наука прореживает доску уже во время взлома.
+// Патч 497: N = max(4, 20 + 2·D − ИНТ). ИНТ 10 на D5 -> 20 слов, ИНТ 4 -> 26.
 const passwordWordCount = (effectiveDifficulty, intelligence) => {
+  const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const int = clamp(Number(intelligence) || 4, 4, 10);
-  return Math.max(MIN_WORDS, BASE_WORD_COUNT - Math.round((int - 4) * (4 / 3)));
+  return Math.max(MIN_WORDS_BY_DIFFICULTY[tier], BASE_WORDS_BY_DIFFICULTY[tier] - (int - 4));
 };
+
+// Канон: 4 попытки на всех шести сложностях.
+const attemptsForDifficulty = () => MAX_ATTEMPTS;
 
 // Свой ГПСЧ: даже если вызывающий передал вырожденный rng () => 0 (тесты),
 // перебор вариантов не зацикливается и остаётся воспроизводимым.
@@ -186,287 +226,224 @@ const seededRng = (rng) => {
 };
 
 /**
- * Собирает набор слов для доски.
+ * Патч 497: доска «последовательности».
  *
- * Порядок ровно тот, который согласован с владельцем: сначала из словаря
- * нужной длины СЛУЧАЙНО выбирается СЕКРЕТНОЕ СЛОВО, затем ИЗ ТОГО ЖЕ СЛОВАРЯ
- * подбираются пустышки с разной степенью сходства (likeness) с паролем.
+ * D=0 — особый лёгкий режим: пустышки набираются из настоящих анаграммных
+ * семей (POST/SPOT/STOP/POTS), а пароль — «выброс», почти не делящий с ними
+ * букв. Игрок просто ищет самое непохожее слово.
+ *
+ * D>=1 — сначала из словаря берётся СЛУЧАЙНОЕ ОПОРНОЕ слово; из того же
+ * словаря подбираются реальные слова-«родственники» с не менее L−3 общими
+ * буквами и не более чем 2 совпавшими позициями (те же буквы, другой порядок).
+ * Пароль выбирается ВНУТРИ уже собранного набора из наименее «центральных»
+ * членов: так он не выдаёт себя как слово, похожее на все остальные.
  *
  * Ограничения:
- *   - подсказка не выше потолка сложности (на d=5 не бывает 4/9);
- *   - после любой первой неверной попытки остаётся >= MIN_AMBIGUITY кандидатов;
- *   - пустышки похожи на пароль по набору букв (кроме d=0, см. ниже);
- *   - в наборе представлены разные значения подсказки 0..cap.
+ *   - подсказка не выше потолка сложности (на D4–D5 не бывает 3+/L);
+ *   - после ЛЮБОГО первого неверного хода остаётся >= MIN_AMBIGUITY кандидатов
+ *     (на D4–D5 пол поднят до 4, цель ремонта — 8);
+ *   - ни один двухбуквенный префикс не повторяется больше двух раз;
+ *   - представлены разные значения подсказки.
  *
- * d=0 — особый лёгкий режим: пустышки набираются из тесных анаграммных семей
- * (POST/SPOT/STOP/TOPS...), а пароль — «выброс», почти не делящий с ними букв.
- * Порядок «пароль -> пустышки» сохраняется и здесь: пароль выбирается первым,
- * затем подбираются семьи, максимально на него не похожие.
- *
- * Матрица попарных совпадений строится только для выбранных ~20 слов, а не для
- * всего словаря (12 тыс. слов), поэтому генерация остаётся быстрой.
+ * Матрица попарных совпадений считается только для выбранных ~26 слов.
  */
 const buildPasswordSet = ({ wordLength, effectiveDifficulty, wordCount, rng = Math.random, excludeWords = [] }) => {
   const tier = clamp(Math.floor(Number(effectiveDifficulty) || 0), 0, 5);
   const likenessCap = MAX_LIKENESS_BY_DIFFICULTY[tier];
-  const targetAmbiguity = MIN_AMBIGUITY_BY_DIFFICULTY[tier];
-  const wanted = clamp(Math.floor(Number(wordCount) || BASE_WORD_COUNT), 2, 24);
+  const floor = MIN_AMBIGUITY_BY_DIFFICULTY[tier];
+  const target = AMBIGUITY_TARGET_BY_DIFFICULTY[tier];
+  const minShared = MIN_SHARED_BY_DIFFICULTY[tier];
+  const wanted = clamp(Math.floor(Number(wordCount) || BASE_WORD_COUNT), 2, 32);
   const excluded = new Set((Array.isArray(excludeWords) ? excludeWords : []).map((word) => String(word).toUpperCase()));
   const pool = [...new Set((getWordsByLength(wordLength) || []).filter((word) => (
     word.length === wordLength && !excluded.has(word)
   )))];
   const internal = seededRng(rng);
 
-  // Настоящие анаграммные семьи (одинаковый набор букв) нужны только d=0.
-  const families = new Map();
+  // Сколько кандидатов остаётся после неверного хода; weak — число «слабых»
+  // ходов, дающих градиент для жадного ремонта.
+  const evaluate = (set, password) => {
+    let minCandidates = 99;
+    let weak = 0;
+    let sum = 0;
+    let n = 0;
+    const hintKinds = new Set();
+    for (const guess of set) {
+      if (guess === password) continue;
+      const hint = positionalLikeness(guess, password);
+      hintKinds.add(hint);
+      let candidates = 0;
+      for (const word of set) if (word !== guess && positionalLikeness(guess, word) === hint) candidates += 1;
+      minCandidates = Math.min(minCandidates, candidates);
+      if (candidates < target) weak += 1;
+      sum += candidates;
+      n += 1;
+    }
+    const score = Math.min(minCandidates, target) * 1000 - weak * 100
+      + hintKinds.size * 50 + sum / Math.max(n, 1);
+    return { minCandidates, weak, score, hintKinds: hintKinds.size };
+  };
+  const centralityRank = (set, password) => {
+    const sums = set.map((x) => set.reduce((total, w) => total + (w === x ? 0 : sharedLetters(x, w)), 0));
+    const own = sums[set.indexOf(password)];
+    return sums.filter((value) => value > own).length + 1;
+  };
+  const prefixAllowed = (set, position, word) => {
+    const prefix = word.slice(0, 2);
+    return set.filter((x, index) => index !== position && x.slice(0, 2) === prefix).length < 2;
+  };
+  const resultOf = (set, password, metrics) => ({
+    words: set,
+    password,
+    likenessCap,
+    minAmbiguity: metrics.minCandidates,
+    minShared: Math.min(...set.filter((w) => w !== password).map((w) => sharedLetters(w, password))),
+    centralityRank: centralityRank(set, password),
+    wordCount: set.length,
+  });
+
+  // ---- D=0: анаграммные семьи + пароль-выброс --------------------------------
   if (tier === 0) {
+    const families = new Map();
     for (const word of pool) {
       const key = [...word].sort().join('');
       if (!families.has(key)) families.set(key, []);
       families.get(key).push(word);
     }
-  }
-
-  const evaluate = (set, password) => {
-    let minCandidates = 99;
-    let minAfterTwo = 99;
-    let weakGuesses = 0;
-    let maxHint = 0;
-    let minShared = 99;
-    let sharedSum = 0;
-    const hintKinds = new Set();
-    let decoys = 0;
-    for (const word of set) {
-      if (word === password) continue;
-      const hint = positionalLikeness(word, password);
-      const common = sharedLetters(word, password);
-      maxHint = Math.max(maxHint, hint);
-      minShared = Math.min(minShared, common);
-      sharedSum += common;
-      hintKinds.add(hint);
-      decoys += 1;
-    }
-    for (const guess of set) {
-      if (guess === password) continue;
-      const hint = positionalLikeness(guess, password);
-      const candidates = set.filter((word) => (
-        word !== guess && positionalLikeness(guess, word) === hint
-      ));
-      minCandidates = Math.min(minCandidates, candidates.length);
-      if (candidates.length < targetAmbiguity) weakGuesses += 1;
-      for (const second of candidates) {
-        if (second === password) continue;
-        const secondHint = positionalLikeness(second, password);
-        let survivors = 0;
-        for (const word of candidates) {
-          if (word !== second && positionalLikeness(second, word) === secondHint) survivors += 1;
-        }
-        minAfterTwo = Math.min(minAfterTwo, survivors);
-      }
-    }
-    if (minAfterTwo === 99) minAfterTwo = 9;
-    // weakGuesses даёт градиент даже когда «заменить один плохой guess» ещё
-    // не поднимает общий минимум: иначе жадный поиск не может починить доску,
-    // где сразу несколько слов оставляют по 2 кандидата.
-    const score = Math.min(minCandidates, targetAmbiguity) * 10000
-      - weakGuesses * 5000
-      + (maxHint >= Math.min(2, likenessCap) ? 3000 : maxHint * 500)
-      + minAfterTwo * 300
-      + hintKinds.size * 100
-      + minShared * 10
-      + sharedSum / Math.max(decoys, 1);
-    return { minCandidates, minAfterTwo, weakGuesses, maxHint, minShared, score };
-  };
-
-  let best = null;
-  const shuffledPool = shuffle(pool, internal);
-  for (let pass = 0; pass < 10 && pool.length > wanted; pass += 1) {
-    const password = shuffledPool[pass % shuffledPool.length];
-    let candidates;
-    if (tier === 0) {
-      // Берём КРУПНЫЕ анаграммные семьи, максимально непохожие на пароль:
-      // на доске должно быть «очень много слов-анаграмм», а пароль — выброс.
+    const shuffled = shuffle(pool, internal);
+    let best = null;
+    for (let pass = 0; pass < 24; pass += 1) {
+      const password = shuffled[pass % shuffled.length];
       const groups = [];
       for (const group of families.values()) {
         if (group.length < 2 || group.includes(password)) continue;
-        // <= 2: оставляем слова, у которых одна общая буква всё-таки стоит
-        // на своём месте, иначе все подсказки выродятся в «0/4».
         if (group.some((word) => sharedLetters(word, password) > 2)) continue;
         groups.push(group);
       }
-      if (!groups.length) continue;
       groups.sort((a, b) => b.length - a.length);
-      const chosenGroups = [];
-      let collected = 0;
-      for (const group of groups) {
-        if (collected >= wanted - 1) break;
-        chosenGroups.push(group);
-        collected += group.length;
-      }
-      candidates = shuffle(chosenGroups, internal)
-        .flatMap((group) => shuffle(group, internal))
-        .filter((word) => word !== password && positionalLikeness(word, password) <= 1);
-    } else {
-      const minShared = MIN_SHARED_BY_DIFFICULTY[tier];
-      candidates = pool.filter((word) => (
-        word !== password
-        && sharedLetters(word, password) >= minShared
-        && positionalLikeness(word, password) <= likenessCap
-      ));
-    }
-    if (candidates.length < wanted - 1) continue;
-
-    // Разная степень сходства: по одному слову из каждого значения подсказки,
-    // затем добор случайными. Слово с максимальной подсказкой обязательно.
-    const buckets = new Map();
-    for (const word of candidates) {
-      const hint = positionalLikeness(word, password);
-      if (!buckets.has(hint)) buckets.set(hint, []);
-      buckets.get(hint).push(word);
-    }
-    const shuffledBuckets = new Map(
-      [...buckets].map(([hint, list]) => [hint, shuffle(list, internal)]),
-    );
-    const loud = shuffledBuckets.get(likenessCap) || [];
-    const spare = shuffle(candidates, internal);
-    let local = null;
-    for (let attempt = 0; attempt < 5; attempt += 1) {
       const decoys = [];
-      const offset = randomInt(wanted, internal);
-      for (let round = 0; decoys.length < wanted - 1; round += 1) {
-        let added = 0;
-        for (const list of shuffledBuckets.values()) {
-          const index = (round + offset) % Math.max(list.length, 1);
-          if (round < list.length && decoys.length < wanted - 1) {
-            const candidate = list[index];
-            if (!decoys.includes(candidate)) { decoys.push(candidate); added += 1; }
-          }
+      const prefixes = new Map([[password.slice(0, 2), 1]]);
+      for (const group of shuffle(groups, internal)) {
+        for (const word of shuffle(group, internal)) {
+          if (decoys.length >= wanted - 1) break;
+          if (positionalLikeness(word, password) > 1) continue;
+          const prefix = word.slice(0, 2);
+          if ((prefixes.get(prefix) || 0) >= 2) continue;
+          prefixes.set(prefix, (prefixes.get(prefix) || 0) + 1);
+          decoys.push(word);
         }
-        if (!added) break;
-      }
-      const filler = attempt === 0 ? spare : shuffle(candidates, internal);
-      for (const candidate of filler) {
         if (decoys.length >= wanted - 1) break;
-        if (!decoys.includes(candidate)) decoys.push(candidate);
       }
-      if (decoys.length < wanted - 1) break;
-      if (loud.length && !decoys.includes(loud[0])) decoys[decoys.length - 1] = loud[0];
-      // Разная степень сходства: если набор подобрался весь с одной
-      // подсказкой, принудительно добавляем слово с другим значением.
-      const hintsInSet = new Set(decoys.map((word) => positionalLikeness(word, password)));
-      if (hintsInSet.size < 2) {
-        for (const [hint, list] of shuffledBuckets) {
-          if (hintsInSet.has(hint)) continue;
-          const replacement = list.find((word) => !decoys.includes(word));
-          if (replacement) {
-            decoys[decoys.length - 1] = replacement;
-            hintsInSet.add(hint);
-            break;
-          }
-        }
-      }
+      if (decoys.length < wanted - 1) continue;
       const set = [password, ...decoys];
       const metrics = evaluate(set, password);
-      if (!local || metrics.score > local.metrics.score) local = { set, password, metrics };
+      if (!best || metrics.score > best.metrics.score) best = { set, password, metrics };
+      if (metrics.minCandidates >= floor && metrics.hintKinds >= 2) break;
     }
-    if (!local) continue;
-
-    // Локальное улучшение: заменяем пустышек на запасных, пока растёт запас
-    // кандидатов после первой подсказки (главная защита от «угадал за два»).
-    const replacements = shuffle(candidates.filter((word) => !local.set.includes(word)), internal).slice(0, 6);
-    for (let sweep = 0; sweep < 1; sweep += 1) {
-      let improved = false;
-      for (let position = 1; position < local.set.length; position += 1) {
-        for (const candidate of replacements) {
-          if (local.set.includes(candidate)) continue;
-          const trial = [...local.set];
-          trial[position] = candidate;
-          const metrics = evaluate(trial, local.password);
-          if (metrics.score > local.metrics.score) {
-            local = { ...local, set: trial, metrics };
-            improved = true;
-          }
-        }
-      }
-      if (!improved) break;
-    }
-    if (!best || local.metrics.score > best.metrics.score) best = local;
-    if (best.metrics.minCandidates >= targetAmbiguity
-      && best.metrics.minAfterTwo >= 2
-      && best.metrics.maxHint <= likenessCap) break;
-  }
-
-  // Финальная полировка: даже если оптимизация свела все подсказки к одному
-  // значению, на доске должны присутствовать РАЗНЫЕ степени сходства.
-  if (best) {
-    const present = new Set(
-      best.set.filter((word) => word !== best.password)
-        .map((word) => positionalLikeness(word, best.password)),
-    );
-    if (present.size < 2) {
-      const missing = Array.from({ length: likenessCap + 1 }, (_, index) => index)
-        .find((hint) => !present.has(hint));
-      const replacement = pool.find((word) => (
-        word !== best.password
-        && !best.set.includes(word)
-        && positionalLikeness(word, best.password) === missing
+    if (best) return resultOf(best.set, best.password, best.metrics);
+  } else {
+    // ---- D>=1: кластер почти одинаковых слов, пароль внутри набора -----------
+    const anchors = shuffle(pool, internal);
+    let fallback = null;
+    for (let pass = 0; pass < 30 && pool.length > wanted; pass += 1) {
+      const anchor = anchors[pass % anchors.length];
+      const candidates = pool.filter((word) => (
+        sharedLetters(word, anchor) >= minShared
+        && positionalLikeness(word, anchor) <= likenessCap
       ));
-      if (replacement) {
-        const trial = [...best.set];
-        trial[trial.length - 1] = replacement;
-        best = { ...best, set: trial, metrics: evaluate(trial, best.password) };
+      if (candidates.length < wanted) continue;
+      candidates.sort((a, b) => sharedLetters(b, anchor) - sharedLetters(a, anchor));
+      const ordered = [
+        ...shuffle(candidates.slice(0, 110), internal),
+        ...shuffle(candidates.slice(110), internal),
+      ];
+      const set = [];
+      const prefixes = new Map();
+      for (const word of ordered) {
+        if (set.length >= wanted) break;
+        const prefix = word.slice(0, 2);
+        if ((prefixes.get(prefix) || 0) >= 2) continue;
+        prefixes.set(prefix, (prefixes.get(prefix) || 0) + 1);
+        set.push(word);
       }
-    }
-  }
+      if (set.length !== wanted) continue;
+      const sums = set.map((x) => set.reduce((total, w) => total + (w === x ? 0 : sharedLetters(x, w)), 0));
+      const byCentrality = set.map((word, index) => ({ word, sum: sums[index] })).sort((a, b) => a.sum - b.sum);
+      // Пароль берём из СЕРЕДИНЫ распределения центральности: не «самый
+      // похожий на всех» и не «самый непохожий», иначе его выдаёт обратная
+      // эвристика. Небольшой разброс сохраняет случайность выбора.
+      const middle = clamp(
+        Math.floor(wanted / 2) + randomInt(3, internal) - 1,
+        0,
+        Math.max(0, byCentrality.length - 1),
+      );
+      const password = byCentrality[middle].word;
 
-  // Редкий случай (короткая доска при ИНТ 10): запас кандидатов просел ниже
-  // порога. Догоняем его дополнительными заменами по более широкому пулу —
-  // иначе первая подсказка может сузить доску до двух слов.
-  if (best && best.metrics.minCandidates < Math.max(3, targetAmbiguity)) {
-    const password = best.password;
-    const poolForFix = getWordsByLength(wordLength).filter((word) => (
-      word !== password && !excluded.has(word)
-      && positionalLikeness(word, password) <= likenessCap
-      && (tier === 0 || sharedLetters(word, password) >= MIN_SHARED_BY_DIFFICULTY[tier])
-    ));
-    const wide = shuffle(poolForFix.filter((word) => !best.set.includes(word)), internal).slice(0, 48);
-    for (let sweep = 0; sweep < 3 && best.metrics.minCandidates < Math.max(3, targetAmbiguity); sweep += 1) {
-      let improved = false;
-      for (let position = 1; position < best.set.length; position += 1) {
-        for (const candidate of wide) {
-          if (best.set.includes(candidate)) continue;
-          const trial = [...best.set];
-          trial[position] = candidate;
-          const metrics = evaluate(trial, password);
-          if (metrics.score > best.metrics.score) {
-            best = { ...best, set: trial, metrics };
-            improved = true;
+      // Предел подсказки считается относительно ПАРОЛЯ, а не опорного слова.
+      let current = set.filter((word) => word === password || positionalLikeness(word, password) <= likenessCap);
+      for (const word of ordered) {
+        if (current.length >= wanted) break;
+        if (current.includes(word) || positionalLikeness(word, password) > likenessCap) continue;
+        if (!prefixAllowed(current, -1, word)) continue;
+        current.push(word);
+      }
+      if (current.length !== wanted) continue;
+
+      let metrics = evaluate(current, password);
+      const replacements = ordered.filter((word) => (
+        !current.includes(word) && positionalLikeness(word, password) <= likenessCap
+      )).slice(0, 80);
+      for (let sweep = 0; sweep < 14 && metrics.weak > 0; sweep += 1) {
+        let improved = false;
+        for (let position = 0; position < current.length; position += 1) {
+          if (current[position] === password) continue;
+          for (const word of shuffle(replacements, internal).slice(0, 26)) {
+            if (current.includes(word) || !prefixAllowed(current, position, word)) continue;
+            const trial = [...current];
+            trial[position] = word;
+            const candidate = evaluate(trial, password);
+            if (candidate.score > metrics.score) {
+              current = trial; metrics = candidate; improved = true; break;
+            }
+          }
+          if (improved) break;
+        }
+        if (!improved) break;
+      }
+
+      // Разные значения подсказки: если свелось к одному, добавляем другое.
+      if (metrics.hintKinds < 2) {
+        const present = new Set(current.filter((w) => w !== password).map((w) => positionalLikeness(w, password)));
+        const missing = Array.from({ length: likenessCap + 1 }, (_, i) => i).find((h) => !present.has(h));
+        const replacement = replacements.find((word) => positionalLikeness(word, password) === missing);
+        if (replacement !== undefined) {
+          const position = current.findIndex((w, i) => i > 0 && w !== password);
+          if (position > 0 && prefixAllowed(current, position, replacement)) {
+            const trial = [...current]; trial[position] = replacement;
+            const candidate = evaluate(trial, password);
+            if (candidate.minCandidates >= floor) { current = trial; metrics = candidate; }
           }
         }
       }
-      if (!improved) break;
+
+      const rank = centralityRank(current, password);
+      if (rank <= 3) continue;
+      if (metrics.minCandidates < floor) {
+        if (!fallback || metrics.score > fallback.metrics.score) fallback = { set: current, password, metrics };
+        continue;
+      }
+      return resultOf(current, password, metrics);
     }
+    if (fallback) return resultOf(fallback.set, fallback.password, fallback.metrics);
   }
 
-  // Вырожденный словарь/параметры: всё равно отдаём корректную доску.
-  if (!best) {
-    const password = pool[0] || 'WORD';
-    const compatible = shuffle(
-      pool.filter((word) => word !== password && positionalLikeness(word, password) <= likenessCap),
-      internal,
-    );
-    const set = [password, ...compatible].slice(0, wanted);
-    best = { set, password, metrics: evaluate(set, password) };
-  }
-
-  return {
-    words: best.set,
-    password: best.password,
-    likenessCap,
-    minAmbiguity: best.metrics.minCandidates,
-    minShared: best.metrics.minShared,
-    wordCount: best.set.length,
-  };
+  // Вырожденный словарь: всё равно отдаём корректную доску.
+  const password = pool[0] || 'WORD';
+  const compatible = shuffle(pool.filter((word) => (
+    word !== password && positionalLikeness(word, password) <= likenessCap
+  )), internal);
+  const set = [password, ...compatible].slice(0, wanted);
+  return resultOf(set, password, evaluate(set, password));
 };
 
 const createGame = ({ config, operatorClientId, operatorCharacterId, characterSnapshot, now = Date.now(), rng = Math.random, excludeWords = [] }) => {
@@ -508,8 +485,11 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
   }
   const brackets = [];
   const bracketPairs = ['()', '[]', '{}', '<>'];
-  const bracketCount = bracketCountFor(stats.intelligence, stats.science);
+  // Патч 497: число пар по сложности, эффект каждой — детерминированный
+  // пакет Науки плюс独立的 бросок Удачи на полное восстановление.
+  const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
+    const effect = bracketEffectFor(stats.science, stats.luck, rng);
     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
     const length = 3 + randomInt(6, rng);
     const preferredRow = randomInt(board.length / width, rng);
@@ -530,22 +510,18 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     board[start + length - 1] = pair[1];
     for (let i = 1; i < length - 1; i += 1) board[start + i] = ['@', '#', '$', '%', '&', '*', '+', '-', '/', ':', ';', '?'][randomInt(12, rng)];
     for (let i = 0; i < length; i += 1) occupied.add(start + i);
-    brackets.push({ id: `bracket_${now}_${start}`, start, end: start + length, text: board.slice(start, start + length).join(''), used: false, recovery: false });
+    brackets.push({
+      id: `bracket_${now}_${start}`,
+      start,
+      end: start + length,
+      text: board.slice(start, start + length).join(''),
+      used: false,
+      effect,
+      // Поле сохранено для старых клиентов; факт определяет `effect`.
+      recovery: effect.full || effect.attempts > 0,
+    });
   }
-  // Восстанавливающие комбинации возможны только с Науки 4. Их появление
-  // определяет Удача: первый слот с шансом p, второй — при УДЧ >= 9 с p/2.
   const recoveryChance = recoveryChancePercent(stats.luck);
-  let restoreSlots = 0;
-  if (stats.science >= 4) {
-    if (rng() * 100 < recoveryChance) restoreSlots += 1;
-    if (stats.luck >= 9 && rng() * 100 < recoveryChance / 2) restoreSlots += 1;
-  }
-  restoreSlots = Math.min(restoreSlots, brackets.length);
-  if (restoreSlots > 0) {
-    const indices = shuffle(Array.from({ length: brackets.length }, (_, index) => index), rng)
-      .slice(0, restoreSlots);
-    for (const index of indices) brackets[index].recovery = true;
-  }
   const safeWordRanges = wordRanges.length ? wordRanges : [];
   const safePassword = safeWordRanges.find((entry) => entry.isPassword)?.word || password;
   return {
@@ -568,10 +544,14 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     wordCount: safeWordRanges.length,
     likenessCap: selection.likenessCap,
     minAmbiguity: selection.minAmbiguity,
-    attempts: MAX_ATTEMPTS,
-    maxAttempts: MAX_ATTEMPTS,
+    centralityRank: selection.centralityRank,
+    sciencePack: SCIENCE_PACKS[stats.science] || null,
+    attempts: attemptsForDifficulty(effectiveDifficulty),
+    maxAttempts: attemptsForDifficulty(effectiveDifficulty),
+    bonusAttempts: 0,
+    resetUsed: false,
     bracketCount,
-    restoreSlots,
+    restoreSlots: 0,
     board: board.join(''),
     wordRanges: safeWordRanges,
     password: safePassword,
@@ -595,7 +575,8 @@ const publicGameState = (game) => {
     ...rest,
     operatorClientId,
     digestEligible: game.status === 'pendingDigest' && digestEligible,
-    bracketRanges: (game.bracketRanges || []).map(({ recovery, ...bracket }) => bracket),
+    // Эффект скобки игрок узнаёт только после нажатия — как в Fallout 3.
+    bracketRanges: (game.bracketRanges || []).map(({ recovery, effect, ...bracket }) => bracket),
     // Патч 495: подчёркивания пароля на d=0 больше нет — игрок, который
     // всё-таки решил сыграть, ищет «слово не из семейки». Сложность 0 по
     // правилам можно не проходить: Мастер просто открывает терминал.
@@ -669,18 +650,27 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
     const bracket = game.bracketRanges.find((entry) => entry.id === value);
     if (!bracket || bracket.used) return { error: 'TERMINAL_INVALID_BRACKET' };
     let next = { ...game, bracketRanges: game.bracketRanges.map((entry) => entry.id === bracket.id ? { ...entry, used: true } : entry) };
-    if (bracket.recovery) {
-      // Щедрый бонус: +1 попытка, но не больше исходного максимума.
-      next = { ...next, attempts: Math.min(next.maxAttempts, next.attempts + 1) };
-      next.result = 'ATTEMPTS RESTORED';
-    } else {
+    // Патч 497: пакет Науки + удача. Попытки НИКОГДА не выше 4.
+    const effect = bracket.effect || { words: 0, attempts: 0, full: Boolean(bracket.recovery) };
+    for (let i = 0; i < (effect.words || 0); i += 1) {
       const duds = next.wordRanges.filter((entry) => !entry.isPassword && !entry.removed);
       if (duds.length) {
         const dud = duds[randomInt(duds.length, rng)];
         next.wordRanges = next.wordRanges.map((entry) => entry.id === dud.id ? { ...entry, removed: true } : entry);
       }
+    }
+    const before = next.attempts;
+    if (effect.full) {
+      next.attempts = next.maxAttempts;
+      next.resetUsed = true;
+      next.result = 'ATTEMPTS RESET';
+    } else if (effect.attempts > 0) {
+      next.attempts = Math.min(next.maxAttempts, next.attempts + effect.attempts);
+      next.result = 'ATTEMPT RESTORED';
+    } else {
       next.result = 'DUD REMOVED';
     }
+    next.bonusAttempts = (next.bonusAttempts || 0) + Math.max(0, next.attempts - before);
     next.updatedAt = now;
     next.revision += 1;
     return { game: next };
@@ -693,8 +683,19 @@ module.exports = {
   BASE_WORD_COUNT,
   MIN_WORDS,
   MAX_ATTEMPTS,
+  BASE_WORDS_BY_DIFFICULTY,
+  MIN_WORDS_BY_DIFFICULTY,
+  MAX_LIKENESS_BY_DIFFICULTY,
+  MIN_AMBIGUITY_BY_DIFFICULTY,
+  AMBIGUITY_TARGET_BY_DIFFICULTY,
   MIN_SHARED_BY_DIFFICULTY,
+  BRACKETS_BY_DIFFICULTY,
+  SCIENCE_PACKS,
+  SCI5_MONO,
   bracketCountFor,
+  bracketEffectFor,
+  luckRestoreChance,
+  attemptsForDifficulty,
   TERMINAL_NODE_MARKER,
   encodeTerminalNodeMarker,
   decodeTerminalNodeMarker,

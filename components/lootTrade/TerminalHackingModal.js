@@ -202,6 +202,11 @@ const TerminalHackingModal = ({
   const statusLabel = game?.status === 'locked'
     ? tLootTrade('terminal.accessDenied')
     : (game?.status === 'won' ? tLootTrade('terminal.accessGranted') : null);
+  // Патч 496: эффект скобки игрок узнаёт только после нажатия.
+  const resultLabel = game?.result === 'DUD REMOVED' ? tLootTrade('terminal.dudRemoved')
+    : game?.result === 'ATTEMPT RESTORED' ? tLootTrade('terminal.attemptRestored')
+      : game?.result === 'ATTEMPTS RESET' ? tLootTrade('terminal.attemptsReset') : null;
+  const shownAttempts = Math.max(game?.attempts || 0, game?.maxAttempts || ATTEMPTS_MAX);
 
   return (
     <Modal visible={Boolean(visible)} transparent animationType="fade" onRequestClose={onClose}>
@@ -259,11 +264,19 @@ const TerminalHackingModal = ({
                 <View>
                   <Text style={styles.statusLabel}>{tLootTrade('terminal.attempts')}</Text>
                   <View style={styles.attemptDots}>
-                    {Array.from({ length: ATTEMPTS_MAX }, (_, index) => (
+                    {Array.from({ length: shownAttempts }, (_, index) => (
                       <View key={index} style={[styles.attemptDot, index < (game.attempts || 0) && styles.attemptDotOn]} />
                     ))}
                     <Text style={styles.attemptCount}>{game.attempts} / {game.maxAttempts || ATTEMPTS_MAX}</Text>
                   </View>
+                  {game.difficulty !== game.effectiveDifficulty && (
+                    <Text style={styles.hackerHint}>
+                      {formatLootTrade(tLootTrade('terminal.hackerReduced'), {
+                        difficulty: game.difficulty,
+                        effective: game.effectiveDifficulty,
+                      })}
+                    </Text>
+                  )}
                 </View>
                 <View style={styles.operatorBox}>
                   <Text style={styles.statusLabel}>{tLootTrade('terminal.operator')}</Text>
@@ -304,6 +317,7 @@ const TerminalHackingModal = ({
                 </View>
               )}
               {statusLabel ? <Text style={styles.statusLabel}>{statusLabel}</Text> : null}
+              {resultLabel ? <Text style={styles.resultLabel}>{resultLabel}</Text> : null}
             </>
           )}
         </View>
@@ -350,6 +364,8 @@ const styles = StyleSheet.create({
   accessDenied: { color: '#ff4b4b', fontFamily: 'monospace', fontSize: 24, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#f00', textShadowRadius: 12 },
   accessGranted: { color: '#a9f07d', fontFamily: 'monospace', fontSize: 25, fontWeight: '900', letterSpacing: 2, textAlign: 'center', textShadowColor: '#5dff43', textShadowRadius: 12 },
   statusHint: { color: '#97a392', fontSize: 12, textAlign: 'center', marginTop: 8 },
+  hackerHint: { color: '#a5dc88', fontSize: 11, marginTop: 5, fontFamily: 'monospace' },
+  resultLabel: { color: '#e2c477', fontSize: 12, marginTop: 6, letterSpacing: 1, fontFamily: 'monospace' },
   idlePanel: { paddingVertical: 22, alignItems: 'center' },
   idleText: { color: '#b2c9a5', fontFamily: 'monospace', fontSize: 15, fontWeight: '700' },
   primaryButton: { backgroundColor: '#335a30', borderColor: '#88bf70', borderWidth: 1, borderRadius: 4, paddingHorizontal: 24, paddingVertical: 11, marginTop: 18 },
