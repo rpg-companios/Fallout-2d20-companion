@@ -63,7 +63,7 @@
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
     "terminalDifficultyLabel": "Difficulty · password length",
-    "terminalDifficultyHint": "Hacker reduces effective difficulty by its rank. At difficulty 0, the correct word is underlined.",
+    "terminalDifficultyHint": "Hacker reduces effective difficulty by its rank. At difficulty 0, the correct word is underlined. Higher difficulty limits the number of matching letters in a hint; INT + Science (4–16) shrink the word list, but a very hard terminal stays hard.",
     "terminalLockLabel": "Lock the terminal after all attempts are failed"
   },
   "detail": {
@@ -254,6 +254,7 @@
     "digestDecline": "Decline",
     "waitingOperator": "The terminal operator must choose.",
     "likeness": "Letters matching by position",
+    "balanceHint": "{words} words · hint ≤ {cap}/{length} · INT+Science {score}/16",
     "view": "View",
     "locked": "LOCKED",
     "available": "AVAILABLE",

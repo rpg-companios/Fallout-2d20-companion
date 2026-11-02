@@ -135,6 +135,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
 - Tap **«Create terminal»** to set a name and description, choose a difficulty of `0–5` (password length `4–9`) and optionally lock the terminal after a failed hack.
 - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
 - In the hacking window the player picks words and bracket combos: the password must be guessed within 4 attempts using letter «likeness» hints. With lockout enabled, a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine in the inventory grants one more attempt.
+- Board words are similar (shared letters in different positions) and hints are capped: at most `3` matches at difficulty 0–2 and at most `2` at difficulty 3–5. Higher `INT + Science` (`4–16`) leaves fewer words to sift through, but a difficulty-5 terminal still shows 12–13. The Hacker perk lowers effective difficulty; at difficulty 0 the correct word is underlined. Details: `docs/patch-494-terminal-balance.md`.
 - On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
 
 ### Live Scene Controls for the Game Master

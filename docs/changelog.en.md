@@ -1,5 +1,27 @@
 # Changelog
 ---
+## Terminal hacking is harder and fairer now (patch 494)
+
+**Symptom:** at difficulty 5 with INT 4 and Science 0, a player got a `4/9`
+hint from the first word and guessed the password on the second attempt. The
+board used random words, and character stats never changed the word count.
+
+**Fix** (following the [Fallout 3 hacking rules](https://fallout.fandom.com/wiki/Hacking_(Fallout_3)), adapted to INT 4–10 and Science 0–6):
+
+- the numeric hint is capped by difficulty: `3/4` on easy, `3/6` on average,
+  `2/8` and `2/9` on hard — `4/9` and higher can no longer appear;
+- all candidate words are similar (shared letter sets, different positions),
+  with anagram families added to the 4- and 5-letter dictionaries;
+- the generator rejects boards where one hint leaves only 1–2 candidates:
+  at least 3 words survive any first guess (4 at difficulty 5);
+- `INT + Science` (`4…16`) shrinks the word list: 12 → 6 at difficulty 0,
+  13 → 12 at difficulty 5 — maximum skill still keeps a very hard terminal
+  hard. The existing chance of an attempt-restoring bracket is unchanged;
+- the hacking window shows «N words · hint ≤ K/M · INT+Science S/16».
+
+Thresholds, rationale and tunable constants: `docs/patch-494-terminal-balance.md`.
+
+---
 ## A terminal inside a location opens the hacking mini-game instead of a chest (patch 493)
 
 **Symptom:** the GM created a terminal and linked it into a location, but players

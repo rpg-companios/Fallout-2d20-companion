@@ -1,8 +1,9 @@
 {
-  "version": "493",
+  "version": "494",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Взлом терминалов стал сложнее: подсказка ограничена (на сложности 5 — не больше 2 совпадений из 9), слова на доске похожи, а ИНТ + Наука уменьшают число вариантов.",
       "Терминал в локации больше не превращается в сундук: при нажатии открывается окно взлома с мини-игрой, даже если сервер комнат ещё не обновлён.",
       "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
       "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
@@ -19,6 +20,7 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Terminal hacking is harder now: hints are capped (at difficulty 5 — at most 2 of 9 matching letters), words on the board are similar, and INT + Science shrink the candidate list.",
       "A terminal inside a location no longer turns into a chest: tapping it opens the hacking mini-game in a modal, even if the room server has not been updated yet.",
       "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",
       "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",

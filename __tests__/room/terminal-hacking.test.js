@@ -19,9 +19,11 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(recoveryChancePercent(12, 10)).toBe(80);
   });
 
+  // Патч 494: очень сложный терминал (5) всегда держит 13 слов — как в
+  // Fallout 3, где Very Hard не сокращает список даже при Науке 100.
   it.each([
-    [0, 4], [1, 5], [2, 6], [3, 7], [4, 8], [5, 9],
-  ])('difficulty %s creates a %s-letter password', (difficulty, wordLength) => {
+    [0, 4, 12], [1, 5, 12], [2, 6, 12], [3, 7, 12], [4, 8, 12], [5, 9, 13],
+  ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
       config: { ...config, difficulty, lockOnFailure: false },
       operatorClientId: 'player-1',
@@ -32,7 +34,8 @@ describe('shared Fallout terminal hacking rules', () => {
     });
     expect(game.wordLength).toBe(wordLength);
     expect(game.password).toHaveLength(wordLength);
-    expect(game.wordRanges).toHaveLength(12);
+    expect(game.wordRanges).toHaveLength(wordCount);
+    expect(game.wordCount).toBe(wordCount);
   });
 
   it('Hacker rank reduces effective difficulty dynamically and difficulty zero marks the password', () => {
