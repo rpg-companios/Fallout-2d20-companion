@@ -1,0 +1,563 @@
+diff --git a/__tests__/lootTrade/terminal-ui-cleanup-498.test.js b/__tests__/lootTrade/terminal-ui-cleanup-498.test.js
+new file mode 100644
+index 0000000..8080405
+--- /dev/null
++++ b/__tests__/lootTrade/terminal-ui-cleanup-498.test.js
+@@ -0,0 +1,94 @@
++// Приёмочный тест 498: форма терминала показывает только сложность,
++// сложность 0 недоступна вручную, служебные подсказки убраны.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { createGame } from '../../server/terminalHacking.js';
++
++const ROOT = fileURLToPath(new URL('../../', import.meta.url));
++const read = (rel) => readFileSync(path.join(ROOT, rel), 'utf8');
++const json = (rel) => JSON.parse(read(rel));
++
++const FORM = read('components/screens/LootTradeScreen/modals/ContainerFormModal.js');
++const MODAL = read('components/lootTrade/TerminalHackingModal.js');
++const SCREEN = read('components/screens/LootTradeScreen/LootTradeScreen.js');
++const OVERLAY = read('components/lootTrade/PlayerLootTradeOverlay.js');
++const PICKER = read('components/screens/LootTradeScreen/modals/HubChildPickerModal.js');
++const RU = json('i18n/ru-RU/screens/lootTrade/screen.json');
++const EN = json('i18n/en-EN/screens/lootTrade/screen.json');
++
++describe('патч 498: только сложность, без длин пароля', () => {
++  it('в словарях карточки нет {length}, заголовок формы — просто «Сложность»', () => {
++    expect(RU.card.terminalDifficulty).toBe('Сложность {difficulty}');
++    expect(EN.card.terminalDifficulty).toBe('Difficulty {difficulty}');
++    expect(RU.form.terminalDifficultyLabel).toBe('Сложность');
++    expect(EN.form.terminalDifficultyLabel).toBe('Difficulty');
++    for (const dict of [RU, EN]) {
++      expect(dict.form.terminalDifficultyHint).toBeUndefined();
++      expect(dict.terminal.localMode).toBeUndefined();
++    }
++  });
++
++  it('ни один вызов карточки не передаёт length', () => {
++    for (const source of [SCREEN, MODAL, OVERLAY, PICKER]) {
++      expect(source).not.toMatch(/length:\s*(Number\()?[^}]*difficulty/);
++      expect(source).not.toContain('length: container.difficulty + 4');
++      expect(source).not.toContain('length: activeContainer.difficulty + 4');
++    }
++  });
++
++  it('чипы показывают только число сложности и начинаются с 1', () => {
++    expect(FORM).toContain('{[1, 2, 3, 4, 5].map((value) => (');
++    expect(FORM).not.toContain('{[0, 1, 2, 3, 4, 5].map');
++    expect(FORM).not.toContain('{value} · {value + 4}');
++    expect(FORM).toContain('useState(1)');
++    expect(FORM).toContain('Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1))');
++    expect(FORM).toContain("difficulty: isTerminal ? Math.max(1, difficulty) : 0");
++  });
++});
++
++describe('патч 498: служебные тексты и читаемый цвет', () => {
++  it('длинная подсказка не выводится ни в форме, ни в админ-панели', () => {
++    expect(FORM).not.toContain('terminalDifficultyHint');
++    expect(SCREEN).not.toContain('terminalDifficultyHint');
++    expect(SCREEN).toContain('activeContainer.kind === CONTAINER_KIND.TERMINAL ? null');
++  });
++
++  it('строка про локальный режим убрана из модалки', () => {
++    expect(MODAL).not.toContain("tLootTrade('terminal.localMode')");
++    expect(MODAL).not.toContain('localModeHint');
++    // Сама логика локального резерва сохранена.
++    expect(MODAL).toContain('const localMode = !roomHasTerminalProtocol');
++  });
++
++  it('фразы про блокировку больше не жёлтые/кремовые', () => {
++    expect(FORM).toContain("terminalLockText: { color: '#222222'");
++    expect(FORM).not.toContain("terminalLockText: { color: '#e6e0c6'");
++    expect(FORM).toContain("color={lockOnFailure ? '#222222' : '#757575'}");
++    expect(FORM).not.toContain("color={lockOnFailure ? '#e8c04b'");
++  });
++});
++
++describe('патч 498: сложность 0 доступна только игроку с «Хакером»', () => {
++  it('форма не даёт выбрать 0, но движок всё ещё считает эффективную 0', () => {
++    expect(FORM).not.toContain('{[0, 1, 2, 3, 4, 5].map');
++    const snapshot = {
++      attributes: { INT: { value: 10 }, LCK: { value: 4 } },
++      skills: [],
++      selectedPerks: [{ id: 'hacker', rank: 1 }],
++    };
++    const game = createGame({
++      config: { containerId: 't', difficulty: 1 },
++      operatorClientId: 'p',
++      operatorCharacterId: 'c',
++      characterSnapshot: snapshot,
++      now: 100,
++      rng: () => 0.42,
++    });
++    expect(game.difficulty).toBe(1);
++    expect(game.effectiveDifficulty).toBe(0);
++    expect(game.wordLength).toBe(4);
++    expect(game.attempts).toBe(4);
++  });
++});
+diff --git a/__tests__/screens/about-app-495.test.js b/__tests__/screens/about-app-495.test.js
+index aa6ac26..ef398b1 100644
+--- a/__tests__/screens/about-app-495.test.js
++++ b/__tests__/screens/about-app-495.test.js
+@@ -85,14 +85,18 @@ describe('патч 495: окно «О приложении»', () => {
+   });
+ });
+ 
+-describe('патч 495: строка с внутренними порогами убрана из мини-игры', () => {
+-  it('в модалке и словарях нет balanceHint', () => {
++describe('патч 495 / 498: в мини-игре нет служебных подсказок', () => {
++  it('нет balanceHint, длинной подсказки и строки про локальный режим', () => {
++    for (const dict of [RU_LOOT, EN_LOOT]) {
++      expect(dict.terminal.balanceHint).toBeUndefined();
++      expect(dict.form.terminalDifficultyHint).toBeUndefined();
++      expect(dict.terminal.localMode).toBeUndefined();
++      expect(dict.card.terminalDifficulty).not.toContain('{length}');
++      expect(dict.card.terminalDifficulty).toContain('{difficulty}');
++    }
+     expect(MODAL).not.toContain('balanceHint');
+-    expect(RU_LOOT.terminal.balanceHint).toBeUndefined();
+-    expect(EN_LOOT.terminal.balanceHint).toBeUndefined();
+-    expect(RU_LOOT.form.terminalDifficultyHint).toContain('ИНТ');
+-    expect(EN_LOOT.form.terminalDifficultyHint).toContain('Luck');
+-    // Наследие патча 494: в EN-подсказке не должно быть запрещённого «caps».
+-    expect(EN_LOOT.form.terminalDifficultyHint).not.toMatch(/\bcaps\b|\bCD\b/i);
++    expect(MODAL).not.toContain('terminal.localMode');
++    expect(MODAL).not.toContain('terminalDifficultyHint');
++    expect(MODAL).not.toContain('localModeHint');
+   });
+ });
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index c80c176..b86d5a7 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -443,7 +443,6 @@ export default function PlayerLootTradeOverlay() {
+                                 ? tLootTrade('terminal.accessDenied')
+                                 : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                                     difficulty: terminalForSelection.difficulty || 0,
+-                                    length: (terminalForSelection.difficulty || 0) + 4,
+                                   })}
+                             </Text>
+                           ) : nodeIsMerch ? (
+diff --git a/components/lootTrade/TerminalHackingModal.js b/components/lootTrade/TerminalHackingModal.js
+index d1e013d..bb53277 100644
+--- a/components/lootTrade/TerminalHackingModal.js
++++ b/components/lootTrade/TerminalHackingModal.js
+@@ -226,8 +226,6 @@ const TerminalHackingModal = ({
+             <Text style={styles.description}>{terminal?.description || terminalState?.config?.description}</Text>
+           ) : null}
+ 
+-          {localMode ? <Text style={styles.localModeHint}>{tLootTrade('terminal.localMode')}</Text> : null}
+-
+           {terminalState?.locked || game?.status === 'locked' ? (
+             <View style={styles.accessPanel}>
+               <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.accessDenied')}</Text>
+@@ -249,7 +247,6 @@ const TerminalHackingModal = ({
+               <Text style={styles.statusHint}>
+                 {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                   difficulty: terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0,
+-                  length: (terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0) + 4,
+                 })}
+               </Text>
+               {canHack && (
+@@ -334,7 +331,6 @@ const styles = StyleSheet.create({
+   title: { color: '#c8efb8', fontSize: 17, fontWeight: '800', flex: 1, fontFamily: 'monospace' },
+   closeButton: { padding: 5, marginLeft: 8 },
+   description: { color: '#9db197', fontSize: 13, marginBottom: 8 },
+-  localModeHint: { color: '#d8c27d', fontSize: 11, marginBottom: 8, textAlign: 'center' },
+   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: '#203923' },
+   statusLabel: { color: '#8da38b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'monospace' },
+   attemptDots: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
+diff --git a/components/screens/LootTradeScreen/LootTradeScreen.js b/components/screens/LootTradeScreen/LootTradeScreen.js
+index 05c83d5..6bc0e43 100644
+--- a/components/screens/LootTradeScreen/LootTradeScreen.js
++++ b/components/screens/LootTradeScreen/LootTradeScreen.js
+@@ -248,7 +248,7 @@ const ContainerCardCell = ({
+           </>
+         ) : isTerminal ? (
+           <Text style={styles.cardMeta} numberOfLines={1}>
+-            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty, length: container.difficulty + 4 })}
++            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty })}
+           </Text>
+         ) : (
+           <>
+@@ -1727,7 +1727,6 @@ export default function LootTradeScreen() {
+                 <Text style={styles.terminalAdminText}>
+                   {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
+                     difficulty: activeContainer.difficulty,
+-                    length: activeContainer.difficulty + 4,
+                   })}
+                   {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
+                 </Text>
+@@ -2095,11 +2094,7 @@ export default function LootTradeScreen() {
+                 )}
+               </ScrollView>
+             </>
+-          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? (
+-            <View style={styles.terminalAdminPanel}>
+-              <Text style={styles.terminalAdminText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
+-            </View>
+-          ) : (
++          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? null : (
+             <>
+               <TouchableOpacity
+                 style={styles.addItemPrimaryBtn}
+diff --git a/components/screens/LootTradeScreen/modals/ContainerFormModal.js b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+index 00f928a..33540d4 100644
+--- a/components/screens/LootTradeScreen/modals/ContainerFormModal.js
++++ b/components/screens/LootTradeScreen/modals/ContainerFormModal.js
+@@ -62,7 +62,9 @@ const ContainerFormModal = ({
+   const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
+   const [creatingHub, setCreatingHub] = useState(false);
+   const [description, setDescription] = useState('');
+-  const [difficulty, setDifficulty] = useState(0);
++  // Сложность 0 вручную не создаётся: она возникает только у игрока с «Хакером»,
++  // когда тот снижает сложность 1 до 0. Минимум в форме — 1.
++  const [difficulty, setDifficulty] = useState(1);
+   const [lockOnFailure, setLockOnFailure] = useState(false);
+   const [capsCount, setCapsCount] = useState(String(DEFAULT_MERCHANT_CAPS));
+   const [capsUnit, setCapsUnit] = useState(QUANTITY_UNIT.PCS);
+@@ -91,7 +93,7 @@ const ContainerFormModal = ({
+       setSelectedHubIds(Array.isArray(initialLinkedHubIds) ? [...initialLinkedHubIds] : []);
+     }
+     setDescription(initialContainer?.description || '');
+-    setDifficulty(Math.max(0, Math.min(5, Number(initialContainer?.difficulty) || 0)));
++    setDifficulty(Math.max(1, Math.min(5, Number(initialContainer?.difficulty) || 1)));
+     setLockOnFailure(Boolean(initialContainer?.lockOnFailure));
+     setCapsCount(String(
+       initialContainer?.caps !== undefined ? initialContainer.caps : DEFAULT_MERCHANT_CAPS,
+@@ -254,7 +256,7 @@ const ContainerFormModal = ({
+         roomCodes: isHub ? selectedRoomCodes : [],
+         roomName: isHub ? (roomRecord?.name || initialContainer?.roomName || primaryRoomCode) : '',
+         description: description.trim(),
+-        difficulty: isTerminal ? difficulty : 0,
++        difficulty: isTerminal ? Math.max(1, difficulty) : 0,
+         lockOnFailure: isTerminal && lockOnFailure,
+         caps: resolvedCaps,
+         saleMarkupPercent: isMerchant ? normalizeSaleMarkupPercent(saleMarkup, 0) : 0,
+@@ -501,7 +503,7 @@ const ContainerFormModal = ({
+               <>
+                 <Text style={styles.label}>{tLootTrade('form.terminalDifficultyLabel')}</Text>
+                 <View style={styles.terminalDifficultyRow}>
+-                  {[0, 1, 2, 3, 4, 5].map((value) => (
++                  {[1, 2, 3, 4, 5].map((value) => (
+                     <TouchableOpacity
+                       key={value}
+                       accessibilityRole="button"
+@@ -510,12 +512,11 @@ const ContainerFormModal = ({
+                       onPress={() => setDifficulty(value)}
+                     >
+                       <Text style={[styles.terminalDifficultyChipText, difficulty === value && styles.terminalDifficultyChipTextActive]}>
+-                        {value} · {value + 4}
++                        {value}
+                       </Text>
+                     </TouchableOpacity>
+                   ))}
+                 </View>
+-                <Text style={styles.hintText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
+                 <TouchableOpacity
+                   accessibilityRole="checkbox"
+                   accessibilityState={{ checked: lockOnFailure }}
+@@ -525,7 +526,7 @@ const ContainerFormModal = ({
+                   <MaterialCommunityIcons
+                     name={lockOnFailure ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                     size={21}
+-                    color={lockOnFailure ? '#e8c04b' : '#757575'}
++                    color={lockOnFailure ? '#222222' : '#757575'}
+                   />
+                   <Text style={styles.terminalLockText}>{tLootTrade('form.terminalLockLabel')}</Text>
+                 </TouchableOpacity>
+@@ -681,7 +682,7 @@ const styles = StyleSheet.create({
+   terminalDifficultyChipText: { color: '#aaa', fontSize: 12, fontWeight: '700' },
+   terminalDifficultyChipTextActive: { color: '#f4d76a' },
+   terminalLockRow: { flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 12, paddingVertical: 6 },
+-  terminalLockText: { color: '#e6e0c6', flex: 1, fontSize: 14 },
++  terminalLockText: { color: '#222222', flex: 1, fontSize: 14 },
+   input: {
+     backgroundColor: ADMIN_MODAL_PALETTE.surfaceRaised,
+     borderWidth: 1,
+diff --git a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+index 19aaff6..42e1917 100644
+--- a/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
++++ b/components/screens/LootTradeScreen/modals/HubChildPickerModal.js
+@@ -79,7 +79,7 @@ const HubChildPickerModal = ({
+                       </View>
+                       <IconText style={styles.rowMeta}>
+                         {isTerminal
+-                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty, length: Number(item.difficulty) + 4 })}${roomSuffix}`
++                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty })}${roomSuffix}`
+                           : (isMerch
+                             ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
+                             : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`)}
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 90e420d..0ad40b5 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,25 @@
+ # Changelog
+ ---
++## Cleaner terminal UI (patch 498)
++
++At the owner's request, redundant information was removed from the interface:
++
++- terminal cards and the hacking window show **only the difficulty** — no
++  "N-letter password" text and no `0·4, 1·5, … 5·9` chip labels;
++- the "This room server does not support a shared hack…" line is gone from
++  the hacking window (the local fallback logic itself is unchanged);
++- the long internal hint about Hacker, attempts, word count, Science and Luck
++  was removed from both the form and the admin panel.
++
++**Difficulty `0` can no longer be set manually.** The form offers `1–5` only;
++effective difficulty 0 still appears on the player side when the Hacker perk
++lowers a level-1 terminal. Covered by a test: the engine returns
++`effectiveDifficulty: 0` and a four-letter password.
++
++The "lock the terminal after all attempts fail" label and its checkbox are now
++dark grey (`#222222`) instead of creamy yellow, so they read on the light grey
++form background. Installation: `docs/patch-498-install.md`.
++
+ ## Canonical four attempts and the "sequence" board (patch 497)
+ 
+ **Accepted by the owner.** Attempts are 4 again at every difficulty (ceiling 4);
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index aa0ed87..1815ef0 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,26 @@
+ # История изменений
+ 
+ ---
++## Чистый интерфейс терминала (патч 498)
++
++По просьбе владельца убраны лишние сведения из интерфейса:
++
++- карточка и окно взлома показывают **только сложность** — больше нет
++  «пароль N букв» и перечисления `0·4, 1·5, … 5·9`;
++- из окна взлома убрана строка «Сервер комнат не поддерживает общий взлом…»
++  (сама логика локального резерва сохранена);
++- из формы и админ-панели убрана длинная служебная подсказка про Хакера,
++  попытки, число слов, Науку и Удачу.
++
++**Сложность `0` вручную создать нельзя.** В форме доступны только `1–5`;
++нулевая эффективная сложность по-прежнему возникает на стороне игрока,
++когда перк «Хакер» снижает сложность `1`. Проверено тестом: движок отдаёт
++`effectiveDifficulty: 0` и четырёхбуквенный пароль.
++
++Подпись «Заблокировать терминал после провала всех попыток» и галочка
++стали тёмно-серыми (`#222222`) вместо кремово-жёлтых — на светло-сером
++фоне формы они читаются. Установка: `docs/patch-498-install.md`.
++
+ ## Канонические 4 попытки и доска «последовательности» (патч 497)
+ 
+ **Принято владельцем.** Попыток снова 4 на всех сложностях (потолок 4);
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index c676399..64902ab 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -132,7 +132,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - The Game Master can put a **Lock (`🔒`)** on any chest or shop in a location and write a note (such as *«Lockpick — Difficulty 2»* or *«Requires Overseer's Key»*). Players see the locked entry and its requirement in the list, but cannot peek inside until they overcome the obstacle in play and the Game Master flips the lock to **«Unlocked» (`🔓`)**.
+ 
+ #### Terminals & the Hacking Mini-Game
+-- Tap **«Create terminal»** to set a name and description, choose a difficulty of `0–5` (password length `4–9`) and optionally lock the terminal after a failed hack.
++- Tap **«Create terminal»** to set a name and description, choose a difficulty of `1–5` and optionally lock the terminal after a failed hack. Difficulty `0` cannot be set manually: it only appears for a player with the **Hacker** perk lowering a level-1 terminal.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board is built from near-identical words: at least `L−3` shared letters and at most 2 matching positions, so the player must deduce the letter order. The password is picked inside the set, so neither the "most similar to everything" nor the "least similar" heuristic reveals it. Hints are capped at `3` matches for difficulty 0–2 and `2` for 3–5; at difficulty 4–5 at least four candidates survive any first wrong guess.
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 27f0cf5..72d903f 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -132,7 +132,7 @@
+ - Любой сундук или лавку в локации ведущий может пометить **замком (`🔒`)** и подписать условие (например: *«Взлом — сложность 2»* или *«Нужен ключ смотрителя»*). Запертая строка видна игрокам в списке локации с подписью, но заглянуть внутрь нельзя, пока персонаж не справится с замком в игре и ведущий не переключит замок в положение **«Открыто» (`🔓`)**.
+ 
+ #### Терминал и мини-игра взлома
+-- Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `0–5` (длина пароля `4–9` символов) и при желании включите блокировку терминала после провала.
++- Нажмите **«Создать терминал»**, задайте имя и описание, выберите сложность `1–5` и при желании включите блокировку терминала после провала. Сложность `0` вручную задать нельзя: она возникает только у игрока с перком **Хакер**, когда тот снижает сложность `1`.
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска собирается из почти одинаковых слов: не менее `L−3` общих букв и не более 2 совпавших позиций, игроку нужно угадать порядок букв. Пароль выбирается внутри набора, поэтому его не выдаёт ни «самое похожее на все», ни «самое непохожее» слово. Подсказка ограничена: на сложности 0–2 максимум `3` совпадения, на 3–5 — максимум `2`; на сложностях 4–5 после любой первой ошибки остаётся не меньше четырёх кандидатов.
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index c4ab4fe..b1f6ead 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Интерфейс терминала уточнён в `docs/patch-498-install.md`.**
++
+ Патч подготовлен от состояния **версии 496** (коммит `f0769a4`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+new file mode 100644
+index 0000000..9fdbed4
+--- /dev/null
++++ b/docs/patch-498-install.md
+@@ -0,0 +1,67 @@
++# Установка патча 498: чистый интерфейс терминала
++
++Патч подготовлен от состояния **версии 497** (коммит `146c3d5`, ветка
++`arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
++патчи 493–498 цепочкой.
++
++## Что изменилось ровно по просьбе владельца
++
++| Было | Стало |
++|---|---|
++| «Сложность 3 · пароль 7 букв» в карточке, окне взлома и списке вложений | «Сложность 3» |
++| Чипы формы `0 · 4`, `1 · 5`, … `5 · 9` и подпись «Сложность · длина пароля» | Чипы `1`, `2`, `3`, `4`, `5`, подпись «Сложность» |
++| «Сервер комнат не поддерживает общий взлом — партия идёт локально на этом устройстве» | Строки нет; локальный резерв работает молча |
++| Длинная подсказка про Хакера, 4 попытки, `N = 20 + 2·D − ИНТ`, Науку и Удачу в форме и админ-панели | Подсказки нет |
++| Сложность `0` можно было выбрать в форме | В форме только `1–5`; `0` остаётся **эффективной** сложностью у игрока с «Хакером», когда он снижает `1` |
++| Фраза «Заблокировать терминал после провала всех попыток» кремово-жёлтая (`#e6e0c6`) на светло-серой форме | Тёмно-серая (`#222222`); галочка чекбокса тоже тёмно-серая |
++
++Механика взлома **не менялась**: 4 попытки, `N = max(4, 20 + 2·D − ИНТ)`,
++пакеты Науки, удача 5–20 %, доска «последовательности», словарь
++12 308 слов, экран «О приложении» и все проверки 497 на месте.
++Изменены только строки, условия выбора сложности в UI и цвет подписи.
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 498
++```
++
++Если вы всё ещё на `a62ec71` со старым установщиком
++(`arena/c1c60b87-fallout-2d20-companion`), один раз переключите источник:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 498
++```
++
++`patchs/baseline.json` в ветке-источнике равен `498`, поэтому при установке
++точно до отсечки дерево приводится к коммиту патча целиком, а каталог
++`patchs/` синхронизируется (файл `patchs/498-terminal-ui-cleanup.patch`
++появится и локально). `./apply-patch.sh --status` до установки может написать
++«Всё актуально» — ориентируйтесь на `public/version.json` и явно указывайте номер.
++
++После установки: `public/version.json` → `498`, `patchs/baseline.json` → `498`;
++закоммитьте изменения. Перезапуск сервиса Node.js для этого патча **не нужен**
++(серверные правила не менялись), но обновлённую веб-сборку следует пересобрать.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/lootTrade/terminal-ui-cleanup-498.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "498"'
++```
++
++### Прямой `git apply` без установщика
++
++Патч-файл не может содержать сам себя, поэтому при ручном наложении его нужно
++скопировать в `patchs/` отдельно:
++
++```bash
++git apply patchs/498-terminal-ui-cleanup.patch
++cp /path/to/498-terminal-ui-cleanup.patch patchs/
++```
+diff --git a/i18n/en-EN/screens/lootTrade/screen.json b/i18n/en-EN/screens/lootTrade/screen.json
+index 8623c20..b99760f 100644
+--- a/i18n/en-EN/screens/lootTrade/screen.json
++++ b/i18n/en-EN/screens/lootTrade/screen.json
+@@ -27,7 +27,7 @@
+     "edit": "Edit",
+     "delete": "Delete",
+     "copySuffix": "copy",
+-    "terminalDifficulty": "Difficulty {difficulty} · {length}-letter password"
++    "terminalDifficulty": "Difficulty {difficulty}"
+   },
+   "form": {
+     "createLootTitle": "New Loot Container",
+@@ -62,8 +62,7 @@
+     "validationRoom": "Please select a room.",
+     "createTerminalTitle": "Create hacking terminal",
+     "editTerminalTitle": "Terminal settings",
+-    "terminalDifficultyLabel": "Difficulty · password length",
+-    "terminalDifficultyHint": "Hacker lowers the effective difficulty by 1 per rank (minimum 0). Attempts are always 4 and brackets never raise them above 4. Word count is 20 + 2·difficulty − INT (at difficulty 5 that is 26 words at INT 4 and 20 at INT 10). Words share letters but differ in order; the hint shows only the number of matching positions. Science 0–6 sets the number of bracket pairs and their effect (remove words / restore an attempt); Luck 4–10 gives a 5–20% chance of a full restore on each bracket. Luck points are never spent while hacking.",
++    "terminalDifficultyLabel": "Difficulty",
+     "terminalLockLabel": "Lock the terminal after all attempts are failed"
+   },
+   "detail": {
+@@ -232,7 +231,6 @@
+   },
+   "terminal": {
+     "title": "Terminal",
+-    "localMode": "This room server does not support a shared hack — the game runs locally on this device.",
+     "hack": "Hack",
+     "ready": "SYSTEM READY FOR INPUT",
+     "failed": "ATTEMPTS EXHAUSTED",
+diff --git a/i18n/ru-RU/screens/lootTrade/screen.json b/i18n/ru-RU/screens/lootTrade/screen.json
+index f3360d5..b7169c0 100644
+--- a/i18n/ru-RU/screens/lootTrade/screen.json
++++ b/i18n/ru-RU/screens/lootTrade/screen.json
+@@ -27,7 +27,7 @@
+     "edit": "Изменить",
+     "delete": "Удалить",
+     "copySuffix": "копия",
+-    "terminalDifficulty": "Сложность {difficulty} · пароль {length} букв"
++    "terminalDifficulty": "Сложность {difficulty}"
+   },
+   "form": {
+     "createLootTitle": "Новый контейнер добычи",
+@@ -62,8 +62,7 @@
+     "validationRoom": "Выберите комнату.",
+     "createTerminalTitle": "Создать терминал взлома",
+     "editTerminalTitle": "Настройки терминала",
+-    "terminalDifficultyLabel": "Сложность · длина пароля",
+-    "terminalDifficultyHint": "Хакер снижает эффективную сложность на 1 за ранг (минимум 0). Попыток всегда 4, скобки не поднимают их выше 4. Число слов: 20 + 2·сложность − ИНТ (на сложности 5 это 26 слов при ИНТ 4 и 20 при ИНТ 10). Слова похожи по набору букв, но отличаются порядком; подсказка показывает только число совпавших позиций. Наука 0–6 задаёт число скобочных пар и их эффект (убрать слова / вернуть попытку), Удача 4–10 даёт 5–20 % шанс полного восстановления на каждую скобку. Очки удачи при взломе не расходуются.",
++    "terminalDifficultyLabel": "Сложность",
+     "terminalLockLabel": "Заблокировать терминал после провала всех попыток"
+   },
+   "detail": {
+@@ -232,7 +231,6 @@
+   },
+   "terminal": {
+     "title": "Терминал",
+-    "localMode": "Сервер комнат не поддерживает общий взлом — партия идёт локально на этом устройстве.",
+     "hack": "Взломать",
+     "ready": "СИСТЕМА ОЖИДАЕТ ВВОДА",
+     "failed": "ПОПЫТКИ ИСЧЕРПАНЫ",
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index d872958..9c65b3f 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "497"
++  "baseline": "498"
+ }
+diff --git a/public/version.json b/public/version.json
+index c144e60..5055365 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,11 @@
+ {
+-  "version": "497",
++  "version": "498",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
++      "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
++      "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
+       "Четыре попытки на терминале снова канонические на всех шести сложностях. Скобки возвращают попытки, но никогда не поднимают их выше четырёх.",
+       "Доска стала больше: число слов считается как 20 + 2·сложность − ИНТ. На пятой сложности это 26 слов при ИНТ 4 и 20 при ИНТ 10 — бонусы скобок больше не съедают доску.",
+       "Слова на доске теперь почти одинаковые: те же буквы в другом порядке, отличаются парой букв. Пароль выбирается внутри набора, поэтому его нельзя найти простым «похоже на все остальные».",
+@@ -37,6 +40,9 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
++      "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
++      "The terminal lockout label is now dark grey and readable on the light form background.",
+       "Four attempts are canonical again at every difficulty. Brackets restore attempts but never raise them above four.",
+       "Boards are larger: word count is 20 + 2·difficulty − INT. At difficulty 5 that is 26 words at INT 4 and 20 at INT 10, so bracket bonuses no longer eat the board.",
+       "Board words are now near-identical: the same letters in a different order, differing by a couple of letters. The password is picked inside the set, so it cannot be found by simply looking for the word similar to all others.",

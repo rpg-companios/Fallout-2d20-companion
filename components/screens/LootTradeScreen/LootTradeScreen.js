@@ -248,7 +248,7 @@ const ContainerCardCell = ({
           </>
         ) : isTerminal ? (
           <Text style={styles.cardMeta} numberOfLines={1}>
-            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty, length: container.difficulty + 4 })}
+            {formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: container.difficulty })}
           </Text>
         ) : (
           <>
@@ -1727,7 +1727,6 @@ export default function LootTradeScreen() {
                 <Text style={styles.terminalAdminText}>
                   {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
                     difficulty: activeContainer.difficulty,
-                    length: activeContainer.difficulty + 4,
                   })}
                   {activeContainer.lockOnFailure ? ` · ${tLootTrade('form.terminalLockLabel')}` : ''}
                 </Text>
@@ -2095,11 +2094,7 @@ export default function LootTradeScreen() {
                 )}
               </ScrollView>
             </>
-          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? (
-            <View style={styles.terminalAdminPanel}>
-              <Text style={styles.terminalAdminText}>{tLootTrade('form.terminalDifficultyHint')}</Text>
-            </View>
-          ) : (
+          ) : activeContainer.kind === CONTAINER_KIND.TERMINAL ? null : (
             <>
               <TouchableOpacity
                 style={styles.addItemPrimaryBtn}

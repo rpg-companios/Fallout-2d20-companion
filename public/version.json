@@ -1,8 +1,11 @@
 {
-  "version": "497",
+  "version": "498",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
+      "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
+      "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
       "Четыре попытки на терминале снова канонические на всех шести сложностях. Скобки возвращают попытки, но никогда не поднимают их выше четырёх.",
       "Доска стала больше: число слов считается как 20 + 2·сложность − ИНТ. На пятой сложности это 26 слов при ИНТ 4 и 20 при ИНТ 10 — бонусы скобок больше не съедают доску.",
       "Слова на доске теперь почти одинаковые: те же буквы в другом порядке, отличаются парой букв. Пароль выбирается внутри набора, поэтому его нельзя найти простым «похоже на все остальные».",
@@ -37,6 +40,9 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
+      "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
+      "The terminal lockout label is now dark grey and readable on the light form background.",
       "Four attempts are canonical again at every difficulty. Brackets restore attempts but never raise them above four.",
       "Boards are larger: word count is 20 + 2·difficulty − INT. At difficulty 5 that is 26 words at INT 4 and 20 at INT 10, so bracket bonuses no longer eat the board.",
       "Board words are now near-identical: the same letters in a different order, differing by a couple of letters. The password is picked inside the set, so it cannot be found by simply looking for the word similar to all others.",

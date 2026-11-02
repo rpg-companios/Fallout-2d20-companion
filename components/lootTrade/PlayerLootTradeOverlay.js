@@ -443,7 +443,6 @@ export default function PlayerLootTradeOverlay() {
                                 ? tLootTrade('terminal.accessDenied')
                                 : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
                                     difficulty: terminalForSelection.difficulty || 0,
-                                    length: (terminalForSelection.difficulty || 0) + 4,
                                   })}
                             </Text>
                           ) : nodeIsMerch ? (

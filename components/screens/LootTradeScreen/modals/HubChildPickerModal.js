@@ -79,7 +79,7 @@ const HubChildPickerModal = ({
                       </View>
                       <IconText style={styles.rowMeta}>
                         {isTerminal
-                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty, length: Number(item.difficulty) + 4 })}${roomSuffix}`
+                          ? `${formatLootTrade(tLootTrade('card.terminalDifficulty'), { difficulty: item.difficulty })}${roomSuffix}`
                           : (isMerch
                             ? `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })} • ${formatLootTrade(tLootTrade('card.capsCount'), { caps: item.caps })}${roomSuffix}`
                             : `${formatLootTrade(tLootTrade('card.itemsCount'), { count: pieces })}${roomSuffix}`)}

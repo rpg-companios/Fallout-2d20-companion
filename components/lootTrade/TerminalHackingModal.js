@@ -226,8 +226,6 @@ const TerminalHackingModal = ({
             <Text style={styles.description}>{terminal?.description || terminalState?.config?.description}</Text>
           ) : null}
 
-          {localMode ? <Text style={styles.localModeHint}>{tLootTrade('terminal.localMode')}</Text> : null}
-
           {terminalState?.locked || game?.status === 'locked' ? (
             <View style={styles.accessPanel}>
               <Text accessibilityRole="alert" style={styles.accessDenied}>{tLootTrade('terminal.accessDenied')}</Text>
@@ -249,7 +247,6 @@ const TerminalHackingModal = ({
               <Text style={styles.statusHint}>
                 {formatLootTrade(tLootTrade('card.terminalDifficulty'), {
                   difficulty: terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0,
-                  length: (terminalState?.config?.difficulty ?? terminal?.difficulty ?? 0) + 4,
                 })}
               </Text>
               {canHack && (
@@ -334,7 +331,6 @@ const styles = StyleSheet.create({
   title: { color: '#c8efb8', fontSize: 17, fontWeight: '800', flex: 1, fontFamily: 'monospace' },
   closeButton: { padding: 5, marginLeft: 8 },
   description: { color: '#9db197', fontSize: 13, marginBottom: 8 },
-  localModeHint: { color: '#d8c27d', fontSize: 11, marginBottom: 8, textAlign: 'center' },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: '#203923' },
   statusLabel: { color: '#8da38b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'monospace' },
   attemptDots: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },

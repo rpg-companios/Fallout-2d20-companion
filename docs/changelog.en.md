@@ -1,5 +1,25 @@
 # Changelog
 ---
+## Cleaner terminal UI (patch 498)
+
+At the owner's request, redundant information was removed from the interface:
+
+- terminal cards and the hacking window show **only the difficulty** — no
+  "N-letter password" text and no `0·4, 1·5, … 5·9` chip labels;
+- the "This room server does not support a shared hack…" line is gone from
+  the hacking window (the local fallback logic itself is unchanged);
+- the long internal hint about Hacker, attempts, word count, Science and Luck
+  was removed from both the form and the admin panel.
+
+**Difficulty `0` can no longer be set manually.** The form offers `1–5` only;
+effective difficulty 0 still appears on the player side when the Hacker perk
+lowers a level-1 terminal. Covered by a test: the engine returns
+`effectiveDifficulty: 0` and a four-letter password.
+
+The "lock the terminal after all attempts fail" label and its checkbox are now
+dark grey (`#222222`) instead of creamy yellow, so they read on the light grey
+form background. Installation: `docs/patch-498-install.md`.
+
 ## Canonical four attempts and the "sequence" board (patch 497)
 
 **Accepted by the owner.** Attempts are 4 again at every difficulty (ceiling 4);
