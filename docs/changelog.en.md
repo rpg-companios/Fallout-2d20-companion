@@ -1,5 +1,30 @@
 # Changelog
 ---
+## Export saves are read at any nesting depth (patch 502)
+
+The owner sent a fragment of a real save (`format: rpg-companion-character`,
+`character.data.attributes`, INT 10, LCK 10, Science 6) and reported that a
+difficulty-5 terminal still showed 21 words.
+
+Patch 501 unwrapped exactly one `data` envelope (the `CHAR_PUBLISH` shape). An
+export file keeps the sheet one level deeper, under `character.data`, so when
+that object (or a JSON string of it) was published to the room, attributes were
+not found and fell back to 4 again: `25 − 4 = 21`.
+
+`normalizeCharacterSnapshot()` now walks the `data`, `character`,
+`characterData`, `payload`, `snapshot` and `save` envelopes up to 12 layers,
+parses JSON strings at any level, picks the deepest layer holding
+`attributes`/`skills`, and preserves service fields from outer envelopes
+(`terminalHacking`, `equipment`). The operator name is set in `createGame()`,
+not only in `applyGameAction()`.
+
+Every delivery shape was tested: the bare sheet, `CHAR_PUBLISH` with the sheet,
+`CHAR_PUBLISH` with the whole export file, a JSON string, a double envelope and
+the `character` node alone. All give INT 10 / LCK 10 / Science 6 → **15 words,
+4 brackets, 20% attempt recovery**. Board sizing is unchanged.
+
+Installation: `docs/patch-502-install.md`.
+
 ## Character stats are read from the sheet (patch 501)
 
 Owner: "Why do I see 21 words on a difficulty-5 terminal at INT 10? Isn't

@@ -138,34 +138,58 @@ const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
   return { words, attempts: full ? 0 : attempts, full, kind };
 };
 
-// Патч 501. Лист персонажа приходит во взлом в трёх обличьях:
+// Патч 501/502. Лист персонажа приходит во взлом в нескольких обличьях:
 //   1) живой стор приложения:  attributes: { INT: { base, total } },
 //                              skills:     { SCIENCE: { base, total } };
-//   2)legacy-сохранение из БД: attributes: [{ name: 'INT', value: 10 }],
+//   2) сохранение из БД:       attributes: [{ name: 'INT', value: 10 }],
 //                              skills:     [{ name: 'SCIENCE', value: 6 }];
-//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <liст из п.2> }.
-// Раньше readAttribute понимал только словарь и массив с полями id/key, поэтому
-// у опубликованного персонажа ИНТ и УДЧ не находились вовсе и молча падали на 4:
-// на сложности 5 доска собиралась как 25−4=21 слово вместо 25−10=15. Наука
-// читалась верно (по полю name), отчего число скобок выглядело правильным, а
-// доска — нет. Теперь все три формы приводятся к одному виду до подсчёта доски.
+//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <лист из п.2> };
+//   4) файл экспорта «rpg-companion-character»:
+//        { format, version, exportedAt, character: { id, name, data: <лист> } };
+//   5) любая комбинация этих обёрток, в том числе строковый JSON внутри `data`.
+// Патч 501 снимал ровно один конверт `data`. Если в комнату публиковался весь
+// файл экспорта, атрибуты оставались в `character.data`, ИНТ снова падал на 4
+// и доска собиралась как 25−4=21 слово. Патч 502 ищет лист на любой глубине.
+const ENVELOPE_KEYS = ['data', 'character', 'characterData', 'payload', 'snapshot', 'save'];
+const MAX_SNAPSHOT_LAYERS = 12;
 const parseObject = (value) => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return value;
-};
-const normalizeCharacterSnapshot = (snapshot) => {
-  const outer = parseObject(snapshot) || {};
-  let data = outer.data;
-  if (typeof data === 'string') {
-    try { data = JSON.parse(data); } catch { data = null; }
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try { return parseObject(JSON.parse(value)); } catch { return null; }
   }
-  const inner = parseObject(data);
-  if (!inner) return outer;
-  return {
-    ...outer,
-    ...inner,
-    characterName: inner.characterName || outer.characterName || outer.name || '',
-  };
+  return typeof value === 'object' && !Array.isArray(value) ? value : null;
+};
+const isCharacterSheet = (obj) => Boolean(obj && (
+  obj.attributes !== undefined || obj.skills !== undefined
+  || obj.selectedPerks !== undefined || obj.usedMagazineEffects !== undefined
+  || obj.terminalHacking !== undefined
+));
+/**
+ * Снимает любое количество конвертов (CHAR_PUBLISH, файл экспорта, строковый
+ * JSON) и возвращает плоский лист персонажа. Служебные поля внешних обёрток
+ * (`terminalHacking` из CHAR_PUBLISH, `equipment` из сохранения) сохраняются.
+ */
+const normalizeCharacterSnapshot = (snapshot) => {
+  const root = parseObject(snapshot) || {};
+  const layers = [root];
+  const seen = new Set([root]);
+  for (let i = 0; i < layers.length && layers.length < MAX_SNAPSHOT_LAYERS; i += 1) {
+    for (const key of ENVELOPE_KEYS) {
+      const child = parseObject(layers[i]?.[key]);
+      if (child && !seen.has(child)) {
+        seen.add(child);
+        layers.push(child);
+      }
+    }
+  }
+  // Лист — самый глубокий слой, где реально есть характеристики или навыки.
+  const sheet = [...layers].reverse().find(isCharacterSheet) || root;
+  const merged = {};
+  for (const layer of layers) Object.assign(merged, layer);
+  Object.assign(merged, sheet); // поля листа главнее одноимённых полей конверта
+  const name = layers.map((layer) => layer.characterName).find(Boolean)
+    || layers.map((layer) => layer.name).find(Boolean) || '';
+  return { ...merged, characterName: String(name || '') };
 };
 
 const ATTRIBUTE_ALIASES = {
@@ -622,7 +646,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
     status: 'playing',
     operatorClientId,
     operatorCharacterId,
-    operatorName: '',
+    operatorName: String(normalizeCharacterSnapshot(characterSnapshot).characterName || ''),
     intelligence: stats.intelligence,
     science: stats.science,
     luck: stats.luck,

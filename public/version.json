@@ -1,8 +1,10 @@
 {
-  "version": "501",
+  "version": "502",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Исправлен взлом после импорта персонажа из файла: лист персонажа теперь находится в сейве любой вложенности, поэтому при Интеллекте 10 и Удаче 10 на пятой сложности будет 15 слов и 20 % шанс возврата попыток.",
+      "Имя персонажа в окне взлома больше не пропадает при запуске партии напрямую.",
       "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
       "Наука, Удача и перк «Хакер» тоже берутся из листа персонажа: число скобок, шанс восстановления попыток и снижение сложности больше не сбрасываются к значениям новичка.",
       "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
@@ -48,6 +50,8 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Fixed hacking after importing a character from a file: the sheet is now found at any nesting depth, so Intellect 10 and Luck 10 give 15 words and a 20% attempt-recovery chance at difficulty 5.",
+      "The character name no longer disappears from the hacking window when a round is started directly.",
       "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
       "Science, Luck and the Hacker perk also come from the character sheet: bracket counts, attempt-recovery odds and difficulty reduction no longer fall back to beginner values.",
       "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
