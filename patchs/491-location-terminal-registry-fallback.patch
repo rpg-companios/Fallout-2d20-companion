@@ -1,0 +1,142 @@
+diff --git a/__tests__/lootTrade/player-location-hooks-repro.test.js b/__tests__/lootTrade/player-location-hooks-repro.test.js
+index 40d8dfc..0477dcf 100644
+--- a/__tests__/lootTrade/player-location-hooks-repro.test.js
++++ b/__tests__/lootTrade/player-location-hooks-repro.test.js
+@@ -41,6 +41,12 @@ vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
+ }));
+ vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
+ vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
++  default: ({ terminal, autoStart }) => React.createElement('TerminalHackingModal', {
++    containerId: terminal?.containerId,
++    autoStart,
++  }),
++}));
+ 
+ import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
+ import useCharacterStore from '../../src/store/characterStore';
+@@ -99,4 +105,58 @@ describe('player opening a GM-issued location', () => {
+     expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
+     await act(async () => renderer.unmount());
+   });
++
++  it('treats a room-registered terminal as a terminal even if a stale session calls it loot', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++      await Promise.resolve();
++    });
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            terminalStates: {
++              'terminal-1': {
++                containerId: 'terminal-1',
++                config: {
++                  containerId: 'terminal-1',
++                  name: 'Vault terminal',
++                  difficulty: 3,
++                  lockOnFailure: false,
++                },
++                locked: false,
++                game: null,
++              },
++            },
++            activeSession: {
++              sessionId: 'session-stale-kind',
++              kind: 'hub',
++              name: 'Vault',
++              targetType: 'room',
++              nodes: [{
++                containerId: 'terminal-1',
++                kind: 'loot',
++                name: 'Vault terminal',
++                difficulty: 0,
++                items: [],
++              }],
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    const hackButton = renderer.root.findByProps({ testID: 'terminal-hack-button' });
++    await act(async () => hackButton.props.onPress());
++    expect(renderer.root.findByType('TerminalHackingModal').props).toMatchObject({
++      containerId: 'terminal-1',
++      autoStart: true,
++    });
++    await act(async () => renderer.unmount());
++  });
+ });
+diff --git a/components/lootTrade/PlayerLootTradeOverlay.js b/components/lootTrade/PlayerLootTradeOverlay.js
+index bd180e3..c4ef546 100644
+--- a/components/lootTrade/PlayerLootTradeOverlay.js
++++ b/components/lootTrade/PlayerLootTradeOverlay.js
+@@ -388,9 +388,15 @@ export default function PlayerLootTradeOverlay() {
+                 ) : (
+                   hubNodes.map((node) => {
+                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
+-                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
+-                    const nodeLocked = Boolean(node.locked);
+                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
++                    // The room's terminal registry is authoritative. If an older or
++                    // partially updated session serialized this child as loot, do not
++                    // send the player into the empty-container flow.
++                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL || Boolean(terminalState);
++                    const terminalForSelection = terminalState?.config
++                      ? { ...node, ...terminalState.config, kind: CONTAINER_KIND.TERMINAL }
++                      : { ...node, kind: CONTAINER_KIND.TERMINAL };
++                    const nodeLocked = Boolean(node.locked);
+                     const piecesCount = (node.items || []).reduce(
+                       (sum, entry) => sum + (Number(entry.quantity) || 0),
+                       0,
+@@ -457,16 +463,18 @@ export default function PlayerLootTradeOverlay() {
+                             <View style={styles.terminalButtons}>
+                               <TouchableOpacity
+                                 accessibilityRole="button"
++                                testID="terminal-view-button"
+                                 style={styles.terminalViewButton}
+-                                onPress={() => setTerminalSelection({ node, autoStart: false })}
++                                onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
+                               >
+                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
+                               </TouchableOpacity>
+                               {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
+                                 <TouchableOpacity
+                                   accessibilityRole="button"
++                                  testID="terminal-hack-button"
+                                   style={styles.terminalHackButton}
+-                                  onPress={() => setTerminalSelection({ node, autoStart: true })}
++                                  onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
+                                 >
+                                   <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
+                                 </TouchableOpacity>
+diff --git a/public/version.json b/public/version.json
+index 89147fa..416f907 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "490",
++  "version": "491",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
+       "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
+       "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
+       "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
+@@ -17,6 +18,7 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",
+       "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",
+       "App errors now display the React component stack to help identify the source of a crash.",
+       "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",

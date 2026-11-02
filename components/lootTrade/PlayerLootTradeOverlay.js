@@ -388,9 +388,15 @@ export default function PlayerLootTradeOverlay() {
                 ) : (
                   hubNodes.map((node) => {
                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
-                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL;
-                    const nodeLocked = Boolean(node.locked);
                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
+                    // The room's terminal registry is authoritative. If an older or
+                    // partially updated session serialized this child as loot, do not
+                    // send the player into the empty-container flow.
+                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL || Boolean(terminalState);
+                    const terminalForSelection = terminalState?.config
+                      ? { ...node, ...terminalState.config, kind: CONTAINER_KIND.TERMINAL }
+                      : { ...node, kind: CONTAINER_KIND.TERMINAL };
+                    const nodeLocked = Boolean(node.locked);
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
                       0,
@@ -457,16 +463,18 @@ export default function PlayerLootTradeOverlay() {
                             <View style={styles.terminalButtons}>
                               <TouchableOpacity
                                 accessibilityRole="button"
+                                testID="terminal-view-button"
                                 style={styles.terminalViewButton}
-                                onPress={() => setTerminalSelection({ node, autoStart: false })}
+                                onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: false })}
                               >
                                 <Text style={styles.terminalViewButtonText}>{tLootTrade('terminal.view')}</Text>
                               </TouchableOpacity>
                               {!terminalState?.locked && !['playing', 'pendingDigest', 'won'].includes(terminalState?.game?.status) && (
                                 <TouchableOpacity
                                   accessibilityRole="button"
+                                  testID="terminal-hack-button"
                                   style={styles.terminalHackButton}
-                                  onPress={() => setTerminalSelection({ node, autoStart: true })}
+                                  onPress={() => setTerminalSelection({ node: terminalForSelection, autoStart: true })}
                                 >
                                   <Text style={styles.terminalHackButtonText}>{tLootTrade('terminal.hack')}</Text>
                                 </TouchableOpacity>

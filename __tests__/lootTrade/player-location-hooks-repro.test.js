@@ -41,6 +41,12 @@ vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
 }));
 vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
 vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
+vi.mock('../../components/lootTrade/TerminalHackingModal', () => ({
+  default: ({ terminal, autoStart }) => React.createElement('TerminalHackingModal', {
+    containerId: terminal?.containerId,
+    autoStart,
+  }),
+}));
 
 import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
 import useCharacterStore from '../../src/store/characterStore';
@@ -97,6 +103,60 @@ describe('player opening a GM-issued location', () => {
       await Promise.resolve();
     });
     expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
+    await act(async () => renderer.unmount());
+  });
+
+  it('treats a room-registered terminal as a terminal even if a stale session calls it loot', async () => {
+    let renderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      useRoomStore.setState((state) => ({
+        rooms: {
+          ...state.rooms,
+          ROOM1: {
+            ...state.rooms.ROOM1,
+            terminalStates: {
+              'terminal-1': {
+                containerId: 'terminal-1',
+                config: {
+                  containerId: 'terminal-1',
+                  name: 'Vault terminal',
+                  difficulty: 3,
+                  lockOnFailure: false,
+                },
+                locked: false,
+                game: null,
+              },
+            },
+            activeSession: {
+              sessionId: 'session-stale-kind',
+              kind: 'hub',
+              name: 'Vault',
+              targetType: 'room',
+              nodes: [{
+                containerId: 'terminal-1',
+                kind: 'loot',
+                name: 'Vault terminal',
+                difficulty: 0,
+                items: [],
+              }],
+            },
+          },
+        },
+      }));
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
+    const hackButton = renderer.root.findByProps({ testID: 'terminal-hack-button' });
+    await act(async () => hackButton.props.onPress());
+    expect(renderer.root.findByType('TerminalHackingModal').props).toMatchObject({
+      containerId: 'terminal-1',
+      autoStart: true,
+    });
     await act(async () => renderer.unmount());
   });
 });

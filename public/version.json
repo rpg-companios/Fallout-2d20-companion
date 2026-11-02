@@ -1,8 +1,9 @@
 {
-  "version": "490",
+  "version": "491",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
       "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
       "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
       "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
@@ -17,6 +18,7 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",
       "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",
       "App errors now display the React component stack to help identify the source of a crash.",
       "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
