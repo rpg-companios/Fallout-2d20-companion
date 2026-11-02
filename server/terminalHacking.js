@@ -138,54 +138,116 @@ const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
   return { words, attempts: full ? 0 : attempts, full, kind };
 };
 
-const toNumber = (entry) => Number(typeof entry === 'object'
-  ? (entry?.value ?? entry?.base ?? entry?.total ?? entry?.rank)
-  : entry) || 0;
-const readAttribute = (snapshot, id) => {
-  const attrs = snapshot?.attributes || {};
-  const keys = { INT: ['INT', 'int', 'intelligence'], SCI: ['SCI', 'science', 'Science'], LCK: ['LCK', 'lck', 'luck'] }[id];
-  for (const key of keys) if (attrs[key] !== undefined) return toNumber(attrs[key]);
-  if (Array.isArray(attrs)) {
-    const found = attrs.find((x) => String(x?.id || x?.key || '').toUpperCase() === id);
-    if (found) return toNumber(found);
+// Патч 501. Лист персонажа приходит во взлом в трёх обличьях:
+//   1) живой стор приложения:  attributes: { INT: { base, total } },
+//                              skills:     { SCIENCE: { base, total } };
+//   2)legacy-сохранение из БД: attributes: [{ name: 'INT', value: 10 }],
+//                              skills:     [{ name: 'SCIENCE', value: 6 }];
+//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <liст из п.2> }.
+// Раньше readAttribute понимал только словарь и массив с полями id/key, поэтому
+// у опубликованного персонажа ИНТ и УДЧ не находились вовсе и молча падали на 4:
+// на сложности 5 доска собиралась как 25−4=21 слово вместо 25−10=15. Наука
+// читалась верно (по полю name), отчего число скобок выглядело правильным, а
+// доска — нет. Теперь все три формы приводятся к одному виду до подсчёта доски.
+const parseObject = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value;
+};
+const normalizeCharacterSnapshot = (snapshot) => {
+  const outer = parseObject(snapshot) || {};
+  let data = outer.data;
+  if (typeof data === 'string') {
+    try { data = JSON.parse(data); } catch { data = null; }
   }
-  return 0;
+  const inner = parseObject(data);
+  if (!inner) return outer;
+  return {
+    ...outer,
+    ...inner,
+    characterName: inner.characterName || outer.characterName || outer.name || '',
+  };
+};
+
+const ATTRIBUTE_ALIASES = {
+  INT: ['INT', 'INTELLIGENCE', 'ИНТ', 'ИНТЕЛЛЕКТ'],
+  LCK: ['LCK', 'LUCK', 'УДЧ', 'УДАЧА'],
+  SCI: ['SCI', 'SCIENCE', 'НАУКА'],
+};
+const nameOf = (entry) => String(
+  typeof entry === 'string' ? entry : (entry?.name ?? entry?.id ?? entry?.key ?? entry?.attr ?? entry?.attribute ?? ''),
+).trim().toUpperCase();
+const toNumber = (entry) => {
+  if (entry === null || entry === undefined) return 0;
+  if (typeof entry === 'object') {
+    return Number(entry.value ?? entry.total ?? entry.base ?? entry.rank ?? entry.ranks ?? entry.count) || 0;
+  }
+  return Number(entry) || 0;
+};
+// Словарь { INT: {…} } и массив [{ name: 'INT', value: 10 }] -> единый список.
+const namedEntries = (collection) => {
+  if (!collection) return [];
+  if (Array.isArray(collection)) return collection;
+  if (typeof collection !== 'object') return [];
+  return Object.entries(collection).map(([key, value]) => (
+    value && typeof value === 'object' ? { ...value, name: value.name ?? key } : { name: key, value }
+  ));
+};
+const readAttribute = (snapshot, id) => {
+  const attrs = normalizeCharacterSnapshot(snapshot).attributes;
+  const aliases = ATTRIBUTE_ALIASES[id] || [id];
+  const found = namedEntries(attrs).find((entry) => aliases.includes(nameOf(entry)));
+  return found ? toNumber(found) : 0;
 };
 const scienceRank = (snapshot) => {
-  const skills = snapshot?.skills || {};
-  if (Array.isArray(skills)) {
-    const found = skills.find((x) => /^(science|наука)$/i.test(String(x?.id || x?.name || '')));
-    return Math.max(0, Math.floor(toNumber(found?.rank !== undefined ? found.rank : found)));
-  }
-  for (const key of ['science', 'Science', 'SCIENCE', 'Наука', 'наука']) {
-    if (skills[key] !== undefined) return Math.max(0, Math.floor(toNumber(skills[key])));
-  }
-  const selected = Array.isArray(snapshot?.selectedSkills) ? snapshot.selectedSkills : [];
-  const selectedScience = selected.find((x) => /^(science|наука)$/i.test(String(typeof x === 'string' ? x : x?.id || x?.name || '')));
-  return Math.max(0, Math.floor(toNumber(selectedScience?.rank !== undefined ? selectedScience.rank : selectedScience)));
+  const source = normalizeCharacterSnapshot(snapshot);
+  const aliases = ATTRIBUTE_ALIASES.SCI;
+  const found = namedEntries(source.skills).find((entry) => aliases.includes(nameOf(entry)));
+  if (found) return clamp(Math.floor(toNumber(found)), 0, 6);
+  const selected = Array.isArray(source.selectedSkills) ? source.selectedSkills : [];
+  const selectedScience = selected.find((entry) => aliases.includes(nameOf(entry)));
+  return clamp(Math.floor(toNumber(selectedScience)), 0, 6);
 };
-const rankOfPerk = (snapshot, id) => (Array.isArray(snapshot?.selectedPerks) ? snapshot.selectedPerks : [])
-  .reduce((rank, entry) => {
-    const entryId = typeof entry === 'string' ? entry : (entry?.id || entry?.perkId);
-    if (entryId !== id) return rank;
-    return Math.max(rank, Math.max(1, Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 1)));
-  }, 0);
+const rankOfPerk = (snapshot, id) => {
+  const selected = normalizeCharacterSnapshot(snapshot).selectedPerks;
+  const perks = Array.isArray(selected) ? selected : [];
+  const matches = perks.filter((entry) => {
+    const entryId = typeof entry === 'string' ? entry : (entry?.id ?? entry?.perkId ?? entry?.name ?? entry?.key);
+    return String(entryId).toLowerCase() === id;
+  });
+  if (!matches.length) return 0;
+  // Явный ранг из тестов/старых клиентов имеет приоритет; иначе ранг равен числу
+  // взятых копий перка (в сохранении это [{ perkId, index }, …]).
+  const explicit = matches
+    .map((entry) => Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 0))
+    .filter((rank) => rank > 0);
+  return explicit.length ? Math.max(...explicit) : matches.length;
+};
+const inventoryEntries = (source) => [source.items, source.equipment?.items, source.inventory]
+  .flatMap((bucket) => {
+    if (!bucket) return [];
+    if (Array.isArray(bucket)) return bucket.map((item, index) => [String(item?.id ?? index), item]);
+    if (typeof bucket === 'object') return Object.entries(bucket);
+    return [];
+  });
 
-const characterStats = (snapshot) => ({
-  intelligence: clamp(readAttribute(snapshot, 'INT') || 4, 4, 10),
-  science: clamp(scienceRank(snapshot), 0, 6),
-  luck: clamp(readAttribute(snapshot, 'LCK') || 4, 4, 10),
-  hackerRank: rankOfPerk(snapshot, 'hacker'),
-  digestUsed: Boolean(snapshot?.terminalHacking?.digestUsed)
-    || (Array.isArray(snapshot?.usedMagazineEffects) ? snapshot.usedMagazineEffects : []).includes('mag_programmers_digest'),
-  hasDigest: Boolean(snapshot?.terminalHacking?.hasProgrammersDigest) || Object.entries(snapshot?.items || {}).some(([key, item]) => (
-    key === 'mag_programmers_digest'
-    || item?.itemId === 'mag_programmers_digest'
-    || item?.catalogId === 'mag_programmers_digest'
-    || item?.id === 'mag_programmers_digest'
-    || item?.snapshot?.id === 'mag_programmers_digest'
-  )),
-});
+const characterStats = (snapshot) => {
+  const source = normalizeCharacterSnapshot(snapshot);
+  return {
+    intelligence: clamp(readAttribute(source, 'INT') || 4, 4, 10),
+    science: clamp(scienceRank(source), 0, 6),
+    luck: clamp(readAttribute(source, 'LCK') || 4, 4, 10),
+    hackerRank: rankOfPerk(source, 'hacker'),
+    digestUsed: Boolean(source.terminalHacking?.digestUsed)
+      || (Array.isArray(source.usedMagazineEffects) ? source.usedMagazineEffects : []).includes('mag_programmers_digest'),
+    hasDigest: Boolean(source.terminalHacking?.hasProgrammersDigest) || inventoryEntries(source).some(([key, item]) => (
+      key === 'mag_programmers_digest'
+      || item?.itemId === 'mag_programmers_digest'
+      || item?.catalogId === 'mag_programmers_digest'
+      || item?.id === 'mag_programmers_digest'
+      || item?.snapshot?.id === 'mag_programmers_digest'
+    )),
+  };
+};
 
 const shuffle = (items, rng) => {
   const result = [...items];
@@ -628,8 +690,6 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
   if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
   if (action === 'start') {
     if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
-    const stats = characterStats(characterSnapshot);
-    const effectiveDifficulty = Math.max(0, game.difficulty - stats.hackerRank);
     const fresh = createGame({
       config: game,
       operatorClientId: clientId,
@@ -639,7 +699,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
       rng,
       excludeWords,
     });
-    fresh.operatorName = String(characterSnapshot?.characterName || characterSnapshot?.name || '');
+    fresh.operatorName = String(normalizeCharacterSnapshot(characterSnapshot).characterName || '');
     return { game: fresh };
   }
   if (game.status === 'pendingDigest') {
@@ -736,6 +796,7 @@ module.exports = {
   sharedLetters,
   buildPasswordSet,
   characterStats,
+  normalizeCharacterSnapshot,
   createGame,
   publicGameState,
   applyGameAction,

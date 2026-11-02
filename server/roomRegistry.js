@@ -397,7 +397,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
     }
-    const snapshot = published.snapshot?.data || published.snapshot || {};
+    // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
+    // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
+    // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
+    const snapshot = published.snapshot || {};
     const result = applyGameAction({
       game: entry.game || entry.config,
       action,

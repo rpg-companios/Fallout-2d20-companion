@@ -1,5 +1,26 @@
 # Changelog
 ---
+## Character stats are read from the sheet (patch 501)
+
+Owner: "Why do I see 21 words on a difficulty-5 terminal at INT 10? Isn't
+25-10 = 15?" The `25 − INT` formula was correct; reading the character sheet
+was not.
+
+The published room envelope stores the save under `data`, and a save keeps
+attributes and skills as `[{ name: 'INT', value: 10 }]` arrays. The engine only
+understood a `{ INT: { value } }` dictionary or an array with `id`/`key`, so INT
+and LCK were not found and silently fell back to 4: `25 − 4 = 21`. Science was
+matched by `name`, so four brackets at Science 6 looked correct and hid the bug.
+
+The snapshot is now normalized before the board is built: the `data` wrapper
+(including JSON strings) is unwrapped, and the live store, legacy saves and
+older test shapes all read the same way. INT, LCK, Science, Hacker
+(`[{ perkId, index }]`) and the *Programmer's Digest* inside `equipment.items`
+are covered. The room registry passes the whole envelope so the operator name
+survives too. Board sizing is unchanged: 15 words at INT 10 and 21 at INT 4.
+
+Installation: `docs/patch-501-install.md`.
+
 ## The "25 − INT" board (patch 500)
 
 Owner: "with INT 10 + Science 6 I failed the hack three times in a row".

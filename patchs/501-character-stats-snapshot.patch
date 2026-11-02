@@ -1,0 +1,757 @@
+diff --git a/__tests__/room/terminal-character-stats-501.test.js b/__tests__/room/terminal-character-stats-501.test.js
+new file mode 100644
+index 0000000..369bd05
+--- /dev/null
++++ b/__tests__/room/terminal-character-stats-501.test.js
+@@ -0,0 +1,184 @@
++// Приёмочный тест 501: «Почему при ИНТ 10 я вижу 21 слово на терминале
++// 5 сложности? Если 25−10 = 15?».
++//
++// Причина была не в формуле, а в чтении листа персонажа. Сетевой конверт
++// CHAR_PUBLISH кладёт сохранение персонажа в поле `data`, а сохранение
++// хранит атрибуты и навыки legacy-массивами `[{ name: 'INT', value: 10 }]`.
++// Движок умел читать только словарь `{ INT: { value } }` и массив с полями
++// `id`/`key`, поэтому ИНТ и УДЧ не находились и молча падали на 4:
++// 25 − 4 = 21. Наука читалась по полю `name`, поэтому 4 скобки при Науке 6
++// выглядели правильно и маскировали ошибку.
++import { describe, expect, it } from 'vitest';
++import {
++  characterStats,
++  createGame,
++  normalizeCharacterSnapshot,
++  passwordWordCount,
++} from '../../server/terminalHacking.js';
++import { createRoomRegistry } from '../../server/roomRegistry.js';
++import {
++  applyLocalTerminalAction,
++  buildLocalCharacterSnapshot,
++  initialLocalTerminalState,
++} from '../../components/lootTrade/localTerminalGame.js';
++
++// Ровно тот формат, который buildLocalCharacterRoomSnapshot()/public/CHAR_PUBLISH
++// отправляет в комнату: обёртка персонажа + legacy-лист внутри `data`.
++const publishedSnapshot = (overrides = {}) => ({
++  characterId: 'char-1',
++  name: 'Оператор',
++  level: 7,
++  originName: 'vault_dweller',
++  updatedAt: 1000,
++  avatarDataUrl: null,
++  data: {
++    characterName: 'Оператор',
++    level: 7,
++    attributes: [
++      { name: 'STR', value: 4 }, { name: 'PER', value: 6 }, { name: 'END', value: 5 },
++      { name: 'CHA', value: 4 }, { name: 'INT', value: 10 }, { name: 'AGI', value: 7 },
++      { name: 'LCK', value: 8 },
++    ],
++    skills: [
++      { name: 'SCIENCE', value: 6 }, { name: 'REPAIR', value: 3 },
++      { name: 'LOCKPICK', value: 0 },
++    ],
++    selectedPerks: [],
++    usedMagazineEffects: [],
++    equipment: { items: [] },
++    terminalHacking: { hasProgrammersDigest: false, digestUsed: false },
++    ...overrides,
++  },
++});
++
++const config = { containerId: 'term-5', name: 'Сетевой терминал', difficulty: 5 };
++const noRandomness = () => 0.42;
++const gameFor = (snapshot, difficulty = 5) => createGame({
++  config: { ...config, difficulty },
++  operatorClientId: 'player-1',
++  operatorCharacterId: 'char-1',
++  characterSnapshot: snapshot,
++  now: 100,
++  rng: noRandomness,
++});
++
++describe('501: лист персонажа читается из сетевого снапшота, а не подменяется четвёркой', () => {
++  it('снимает конверт CHAR_PUBLISH и читает ИНТ 10, Науку 6, УДЧ 8', () => {
++    expect(normalizeCharacterSnapshot(publishedSnapshot()).attributes[4]).toEqual({ name: 'INT', value: 10 });
++    expect(characterStats(publishedSnapshot())).toMatchObject({
++      intelligence: 10,
++      science: 6,
++      luck: 8,
++      hackerRank: 0,
++    });
++  });
++
++  it('на сложности 5 при ИНТ 10 доска — 15 слов, а не 21', () => {
++    const game = gameFor(publishedSnapshot());
++    expect(game.intelligence).toBe(10);
++    expect(game.wordCount).toBe(15);
++    expect(game.wordRanges).toHaveLength(15);
++    expect(game.wordCount).toBe(passwordWordCount(5, 10));
++    expect(game.bracketRanges).toHaveLength(4);
++    expect(game.recoveryChancePercent).toBe(15);
++    expect(game.attempts).toBe(4);
++  });
++
++  it('сохраняет каноническую формулу: ИНТ 4 на сложности 5 даёт 21 слово', () => {
++    const snapshot = publishedSnapshot();
++    snapshot.data.attributes = snapshot.data.attributes.map((attr) => (
++      attr.name === 'INT' ? { ...attr, value: 4 } : attr
++    ));
++    const game = gameFor(snapshot);
++    expect(game.intelligence).toBe(4);
++    expect(game.wordCount).toBe(21);
++    expect(game.wordCount).toBe(passwordWordCount(5, 4));
++  });
++
++  it('через реестр комнаты: опубликованный персонаж запускает доску из 15 слов', () => {
++    const registry = createRoomRegistry();
++    const { room } = registry.createRoom({ clientId: 'gm-1' });
++    registry.joinRoom({ code: room.code, clientId: 'gm-1', name: 'GM', role: 'gm' });
++    registry.joinRoom({ code: room.code, clientId: 'player-1', name: 'Оператор', role: 'player' });
++    registry.putSnapshot({
++      code: room.code,
++      characterId: 'char-1',
++      revision: 1,
++      fromClientId: 'player-1',
++      snapshot: publishedSnapshot(),
++    });
++    expect(registry.issueTerminal({ code: room.code, clientId: 'gm-1', config }).error).toBeUndefined();
++    const started = registry.terminalAction({
++      code: room.code, clientId: 'player-1', characterId: 'char-1',
++      containerId: config.containerId, action: 'start',
++    });
++    expect(started.error).toBeUndefined();
++    expect(started.terminal.game.intelligence).toBe(10);
++    expect(started.terminal.game.science).toBe(6);
++    expect(started.terminal.game.luck).toBe(8);
++    expect(started.terminal.game.wordCount).toBe(15);
++    expect(started.terminal.game.wordRanges).toHaveLength(15);
++    expect(started.terminal.game.operatorName).toBe('Оператор');
++    expect(started.terminal.game.password).toBeUndefined();
++  });
++
++  it('перк «Хакер» из сохранения [{ perkId, index }] снижает сложность 5 → 4', () => {
++    const snapshot = publishedSnapshot({ selectedPerks: [{ perkId: 'hacker', index: 0 }] });
++    const game = gameFor(snapshot);
++    expect(characterStats(snapshot).hackerRank).toBe(1);
++    expect(game.effectiveDifficulty).toBe(4);
++    expect(game.wordLength).toBe(8);
++    expect(game.wordCount).toBe(passwordWordCount(4, 10));
++  });
++
++  it('Programmer’s Digest находится в equipment.items опубликованного листа', () => {
++    const snapshot = publishedSnapshot({
++      equipment: { items: [{ id: 'mag_programmers_digest', itemId: 'mag_programmers_digest' }] },
++      terminalHacking: { hasProgrammersDigest: true, digestUsed: false },
++    });
++    expect(characterStats(snapshot).hasDigest).toBe(true);
++    expect(gameFor(snapshot).digestEligible).toBe(true);
++  });
++
++  it('понимает и строковый data, и legacy-массив без обёртки, и живой стор', () => {
++    const data = publishedSnapshot().data;
++    expect(characterStats({ data: JSON.stringify(data) }).intelligence).toBe(10);
++    expect(characterStats(data).intelligence).toBe(10);
++    // Нормализованный стор приложения: словарь { INT: { base, total } }.
++    expect(characterStats({
++      attributes: { INT: { base: 10, total: 10 }, LCK: { base: 9, total: 9 } },
++      skills: { SCIENCE: { base: 5, total: 5 } },
++      selectedPerks: [{ perkId: 'hacker', index: 0 }],
++    })).toMatchObject({ intelligence: 10, science: 5, luck: 9, hackerRank: 1 });
++    // Прежний формат тестов движка остаётся рабочим.
++    expect(characterStats({
++      attributes: { INT: { value: 10 }, LCK: { value: 4 } },
++      skills: [{ id: 'science', rank: 6 }],
++      selectedPerks: [{ id: 'hacker', rank: 1 }],
++    })).toMatchObject({ intelligence: 10, science: 6, luck: 4, hackerRank: 1 });
++    // Навыки/атрибуты в нижнем регистре и русские названия тоже читаются.
++    expect(characterStats({ attributes: [{ name: 'int', value: 9 }], skills: [{ name: 'наука', value: 3 }] }))
++      .toMatchObject({ intelligence: 9, science: 3 });
++  });
++
++  it('локальный резерв мини-игры тоже собирает 15 слов из состояния стора', () => {
++    const state = buildLocalCharacterSnapshot({
++      characterName: 'Оператор',
++      attributes: { INT: { base: 10, total: 10 }, LCK: { base: 8, total: 8 } },
++      skills: { SCIENCE: { base: 6, total: 6 } },
++      selectedPerks: [],
++      items: {},
++    });
++    const started = applyLocalTerminalAction(initialLocalTerminalState(), 'start', undefined, {
++      terminal: config,
++      characterId: 'char-1',
++      characterSnapshot: state,
++      now: 100,
++      rng: noRandomness,
++    });
++    expect(started.error).toBeNull();
++    expect(started.game.intelligence).toBe(10);
++    expect(started.game.wordCount).toBe(15);
++    expect(started.view.wordRanges).toHaveLength(15);
++  });
++});
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 59da026..2302489 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,26 @@
+ # Changelog
+ ---
++## Character stats are read from the sheet (patch 501)
++
++Owner: "Why do I see 21 words on a difficulty-5 terminal at INT 10? Isn't
++25-10 = 15?" The `25 − INT` formula was correct; reading the character sheet
++was not.
++
++The published room envelope stores the save under `data`, and a save keeps
++attributes and skills as `[{ name: 'INT', value: 10 }]` arrays. The engine only
++understood a `{ INT: { value } }` dictionary or an array with `id`/`key`, so INT
++and LCK were not found and silently fell back to 4: `25 − 4 = 21`. Science was
++matched by `name`, so four brackets at Science 6 looked correct and hid the bug.
++
++The snapshot is now normalized before the board is built: the `data` wrapper
++(including JSON strings) is unwrapped, and the live store, legacy saves and
++older test shapes all read the same way. INT, LCK, Science, Hacker
++(`[{ perkId, index }]`) and the *Programmer's Digest* inside `equipment.items`
++are covered. The room registry passes the whole envelope so the operator name
++survives too. Board sizing is unchanged: 15 words at INT 10 and 21 at INT 4.
++
++Installation: `docs/patch-501-install.md`.
++
+ ## The "25 − INT" board (patch 500)
+ 
+ Owner: "with INT 10 + Science 6 I failed the hack three times in a row".
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 8f22b60..e1578a2 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,28 @@
+ # История изменений
+ 
+ ---
++## Характеристики берутся из листа персонажа (патч 501)
++
++Владелец: «Почему при инт 10, я вижу 21 слово на терминале 5 сложности?
++Если 25-10 = 15????». Формула `25 − ИНТ` была верна — ошибка была в чтении
++листа персонажа.
++
++Сетевой конверт публикации кладёт сохранение в поле `data`, а сохранение
++хранит атрибуты и навыки массивами `[{ name: 'INT', value: 10 }]`. Движок
++умел читать только словарь `{ INT: { value } }` и массив с полями `id`/`key`,
++поэтому ИНТ и УДЧ не находились и молча подменялись четвёркой: `25 − 4 = 21`.
++Наука читалась по полю `name`, поэтому четыре скобки при Науке 6 выглядели
++правильно и маскировали ошибку.
++
++Теперь перед расчётом доски снапшот приводится к одному виду: снимается
++обёртка `data` (включая строковый JSON), одинаково читаются живой стор,
++legacy-сохранение и старые тестовые формы. Проверены ИНТ, УДЧ, Наука,
++«Хакер» (`[{ perkId, index }]`) и *Programmer’s Digest* в `equipment.items`.
++Реестр комнаты передаёт движку весь конверт, поэтому имя оператора тоже
++сохраняется. Формула доски не менялась: 15 слов при ИНТ 10 и 21 при ИНТ 4.
++
++Установка: `docs/patch-501-install.md`.
++
+ ## Доска «25 − ИНТ» (патч 500)
+ 
+ Владелец: «на ИНТ 10 + Наука 6 уже третий раз взломать не могу». Доска
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index ca57870..3150d41 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -137,6 +137,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board is built from near-identical words: at least `L−3` shared letters and at most 2 matching positions, so the player must deduce the letter order. The password is picked inside the set, so neither the "most similar to everything" nor the "least similar" heuristic reveals it. Hints are capped at `3` matches for difficulty 0–2 and `2` for 3–5; at difficulty 4–5 at least four candidates survive any first wrong guess.
+ - Three stats act separately. **INT 4–10** sets board size `N = max(4, 15 + 2·difficulty − INT)`: at difficulty 5 that is "25 − INT", i.e. 21 words at INT 4 and 15 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
++- The board, brackets and recovery odds use the **character sheet** bound to the room: INT, Science, Luck and the Hacker perk are read from both the published save and the local store. If a difficulty-5 board has 21 words, the sheet has INT 4 rather than 10; INT 10 gives 15 words.
+ - The Hacker perk lowers effective difficulty by 1 (minimum 0). At difficulty 0 the terminal may be skipped under the rules; if the player still plays, the board uses large anagram families (`POST/SPOT/STOP/…`) and the password is a maximally dissimilar outlier. It is no longer underlined. Details: `docs/terminal-hacking-balance-proposal.md` and `docs/terminal-words.md`.
+ - On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
+ 
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index afd515d..959a7a2 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -137,6 +137,7 @@
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска собирается из почти одинаковых слов: не менее `L−3` общих букв и не более 2 совпавших позиций, игроку нужно угадать порядок букв. Пароль выбирается внутри набора, поэтому его не выдаёт ни «самое похожее на все», ни «самое непохожее» слово. Подсказка ограничена: на сложности 0–2 максимум `3` совпадения, на 3–5 — максимум `2`; на сложностях 4–5 после любой первой ошибки остаётся не меньше четырёх кандидатов.
+ - Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 15 + 2·сложность − ИНТ)`: на сложности 5 это «25 − ИНТ», то есть 21 слово при ИНТ 4 и 15 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
++- Доска, скобки и шанс восстановления считаются по **листу персонажа**, который привязан к комнате: ИНТ, Наука, Удача и перк «Хакер» читаются и из сетевого сохранения, и из локального стора. Если число слов на пятой сложности равно 21, значит ИНТ в листе равен 4, а не 10; при ИНТ 10 должно быть 15 слов.
+ - Перк «Хакер» снижает эффективную сложность на 1 (минимум 0). На сложности 0 терминал по правилам можно не проходить; если игрок всё же запускает мини-игру, доска собирается из крупных семей анаграмм (`POST/SPOT/STOP/…`), а пароль — максимально непохожее на них слово. Пароль больше не подчёркивается. Подробности — `docs/terminal-hacking-balance-proposal.md` и `docs/terminal-words.md`.
+ - На обновлённом сервере комнат партия общая: подключённые игроки видят одну доску. Если сервер ещё старой версии, окно взлома всё равно откроется, а партия пойдёт локально на устройстве игрока (в окне будет подсказка). Чтобы доска стала общей, обновите файлы `server/` и перезапустите сервис Node.js.
+ 
+diff --git a/docs/patch-496-install.md b/docs/patch-496-install.md
+index 57b8031..e9a8495 100644
+--- a/docs/patch-496-install.md
++++ b/docs/patch-496-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 496: «Саммари v2» взлома терминалов
+ 
++> **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
++
+ > **Патч 497 заменил этот баланс.** Актуальные правила — `docs/patch-497-install.md`.
+ 
+ Патч подготовлен от состояния **версии 495** (коммит `76aced2`, ветка
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index 0a6d936..21f240a 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
++
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+ 
+ > **Скобки перечитаны в `docs/patch-499-install.md`.**
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index f4ed4ab..1f76d6d 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
++
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+ 
+ > **Скобки перечитаны в `docs/patch-499-install.md`.**
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+index 1b474bf..1a187eb 100644
+--- a/docs/patch-499-install.md
++++ b/docs/patch-499-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 499: скобки двух сортов, число задаёт Наука
+ 
++> **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
++
+ > **Число слов пересмотрено в `docs/patch-500-install.md` («25 − ИНТ»).**
+ 
+ Патч подготовлен от состояния **версии 498** (коммит `5063158`, ветка
+diff --git a/docs/patch-500-install.md b/docs/patch-500-install.md
+index 753460e..2bf5884 100644
+--- a/docs/patch-500-install.md
++++ b/docs/patch-500-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 500: доска «25 − ИНТ»
+ 
++> **Чтение характеристик листа персонажа исправлено в `docs/patch-501-install.md`.**
++
+ Патч подготовлен от состояния **версии 499** (коммит `0840f1b`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-501-install.md b/docs/patch-501-install.md
+new file mode 100644
+index 0000000..206a2ba
+--- /dev/null
++++ b/docs/patch-501-install.md
+@@ -0,0 +1,158 @@
++# Установка патча 501: характеристики берутся из листа персонажа
++
++Патч подготовлен от состояния **версии 500** (коммит `98ab994`, ветка
++`arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
++патчи 493–501 цепочкой.
++
++## Вопрос и ответ
++
++> «Почему при инт 10, я вижу 21 слово на терминале 5 сложности?
++> Если 25-10 = 15????»
++
++Формула из версии 500 верна: `N = max(4, 15 + 2·D − ИНТ)`, на сложности 5
++это `25 − ИНТ`, то есть **15 слов при ИНТ 10** и 21 при ИНТ 4. Ошибка была
++не в арифметике, а в том, откуда движок брал сам ИНТ.
++
++Сетевой конверт публикации персонажа (`CHAR_PUBLISH`) устроен так:
++
++```js
++{
++  characterId: 'char-1',
++  name: 'Оператор',
++  level: 7,
++  data: {                          // <- сохранение персонажа из БД
++    attributes: [                  // <- legacy-массив, а не словарь
++      { name: 'INT', value: 10 },
++      { name: 'LCK', value: 8 },
++      …
++    ],
++    skills: [ { name: 'SCIENCE', value: 6 }, … ],
++    selectedPerks: [ { perkId: 'hacker', index: 0 } ],
++    equipment: { items: [ … ] }
++  }
++}
++```
++
++`server/roomRegistry.js` снимал обёртку `data` и отдавал в движок только её
++содержимое. А `readAttribute()` в `server/terminalHacking.js` умел читать
++лишь словарь `{ INT: { value: 10 } }` и массив записей с полями `id`/`key`.
++У реального сохранения записи выглядят как `{ name, value }`, поэтому ИНТ и
++УДЧ не находились вовсе и молча подменялись четвёркой:
++
++```
++clamp(readAttribute(snapshot, 'INT') || 4, 4, 10)  ->  4
++passwordWordCount(5, 4) = 25 − 4 = 21 слово
++```
++
++Наука при этом искалась по полю `name`, поэтому **Наука 6 давала свои четыре
++скобки и выглядела исправной** — именно поэтому несоответствие было таким
++незаметным. Из‑за той же ошибки Удача всегда считалась равной 4 (шанс полного
++возврата попыток 5 % вместо положенных 5–20 %), а «Хакер» не снижал
++сложность в сетевой партии.
++
++## Что исправлено
++
++| Было (500) | Стало (501) |
++|---|---|
++| Сетевой лист: ИНТ 4, УДЧ 4, «Хакер» 0 | ИНТ 10, УДЧ 8, «Хакер» 1 |
++| Доска на D5 при ИНТ 10: **21 слово** | **15 слов** |
++| Шанс полного возврата при УДЧ 8: 5 % | 15 % |
++| Имя оператора в сетевой партии терялось | Берётся из конверта |
++
++Изменения только в чтении снапшота, баланс не тронут:
++
++- `server/terminalHacking.js` — перед расчётом доски снапшот приводится к
++  одному виду функцией `normalizeCharacterSnapshot()` (она экспортируется для
++  тестов). Снимается обёртка `data`, в том числе строковый JSON; атрибуты и
++  навыки одинаково читаются из живого стора (`{ INT: { base, total } }`), из
++  legacy-сохранения (`[{ name, value }]`) и из прежних тестовых форм
++  (`{ INT: { value } }`, `[{ id: 'science', rank: 6 }]`). Ключи сравниваются
++  без регистра, поддерживаются `INTELLIGENCE`/`ИНТ`, `LUCK`/`УДЧ`,
++  `SCIENCE`/`НАУКА`.
++- Ранг «Хакера» теперь считается и для записей вида `[{ perkId, index }]`:
++  если явного `rank` нет, ранг равен числу взятых копий перка.
++- *Programmer’s Digest* ищется не только в `items`, но и в
++  `equipment.items` / `inventory` — то есть в настоящем сохранении.
++- `server/roomRegistry.js` передаёт движку весь опубликованный конверт, а не
++  только `data`: имя оператора (`name`) больше не теряется, а обёртку снимает
++  сам движок.
++- Формула `25 − ИНТ`, 4 попытки, скобки по Науке, удача, словарь из
++  12 308 слов, интерфейс без служебных строк, «О приложении» и все правила
++  496–500 остаются без изменений.
++
++## Регрессионная приёмка
++
++Новый файл `__tests__/room/terminal-character-stats-501.test.js` (8 тестов)
++проверяет весь путь «сохранение → публикация → реестр комнаты → доска»:
++
++- `characterStats()` на реальном конверте: ИНТ 10, Наука 6, УДЧ 8;
++- `createGame()` на D5: **15 слов**, 4 скобки, 15 % возврата, 4 попытки;
++- контроль формулы: при ИНТ 4 по‑прежнему 21 слово;
++- через `createRoomRegistry()`: доска из 15 слов, оператор «Оператор»;
++- перк «Хакер» из `[{ perkId, index }]` снижает D5 → D4;
++- *Programmer’s Digest* в `equipment.items`;
++- строковый `data`, legacy-массив без обёртки, живой стор и старые формы;
++- локальный резерв мини‑игры без сервера тоже даёт 15 слов.
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 501
++```
++
++Если вы всё ещё на `a62ec71` со старым установщиком
++(`arena/c1c60b87-fallout-2d20-companion`), один раз переключите источник:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 501
++```
++
++`patchs/baseline.json` в ветке‑источнике равен `501`, поэтому при установке
++точно до отсечки дерево приводится к коммиту патча целиком, а каталог
++`patchs/` синхронизируется (файл `patchs/501-character-stats-snapshot.patch`
++появится и локально). `./apply-patch.sh --status` до установки может написать
++«Всё актуально» — ориентируйтесь на `public/version.json` и явно указывайте номер.
++
++После установки: `public/version.json` → `501`, `patchs/baseline.json` → `501`;
++закоммитьте изменения и **перезапустите сервис Node.js** (`server/` —
++характеристики и доска считаются сервером). Веб‑сборку пересоберите.
++Уже начатые партии нужно запустить заново (`Сброс` у Мастера), поскольку
++доска 500 была сгенерирована с неверным ИНТ.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-character-stats-501.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "501"'
++```
++
++Быстрая проверка на живом сервере (должно получиться 15):
++
++```bash
++node -e "
++const e = require('./server/terminalHacking.js');
++const snap = { name: 'Оператор', data: {
++  attributes: [{ name: 'INT', value: 10 }, { name: 'LCK', value: 8 }],
++  skills: [{ name: 'SCIENCE', value: 6 }], selectedPerks: [] } };
++const g = e.createGame({ config: { containerId: 't', name: 'T', difficulty: 5 },
++  operatorClientId: 'p', operatorCharacterId: 'c', characterSnapshot: snap,
++  now: 100, rng: () => 0.42 });
++console.log('ИНТ', g.intelligence, '| слов', g.wordCount, '| скобок', g.bracketRanges.length);
++"
++```
++
++### Прямой `git apply` без установщика
++
++Патч‑файл не может содержать сам себя, поэтому при ручном наложении его нужно
++скопировать в `patchs/` отдельно:
++
++```bash
++git apply patchs/501-character-stats-snapshot.patch
++cp /path/to/501-character-stats-snapshot.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index ee39dfc..32ea688 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -2,7 +2,8 @@
+ 
+ > **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток, скобки,
+ > пакеты Науки, таблица скобок, генератор «последовательности» и приёмочные
+-> замеры — в `docs/patch-500-install.md`. История решений 496 — в
++> замеры — в `docs/patch-500-install.md`, чтение характеристик листа
++> персонажа — в `docs/patch-501-install.md`. История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+ > «сначала пароль, потом пустышки» (в 497 пароль выбирается внутри набора).
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index c54a4b4..c180089 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "500"
++  "baseline": "501"
+ }
+diff --git a/public/version.json b/public/version.json
+index 796d8f5..236f65e 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,10 @@
+ {
+-  "version": "500",
++  "version": "501",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
++      "Наука, Удача и перк «Хакер» тоже берутся из листа персонажа: число скобок, шанс восстановления попыток и снижение сложности больше не сбрасываются к значениям новичка.",
+       "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
+       "На остальных сложностях доска тоже стала меньше на пять слов, поэтому взлом с высоким Интеллектом и Наукой перестал быть лотереей.",
+       "Четыре скобки Науки 6 сохраняются даже на самой короткой доске; думающий игрок на пятой сложности выигрывает около 96–98 % партий.",
+@@ -46,6 +48,8 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
++      "Science, Luck and the Hacker perk also come from the character sheet: bracket counts, attempt-recovery odds and difficulty reduction no longer fall back to beginner values.",
+       "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
+       "Every other difficulty also lost five words, so hacking with a high Intellect and Science no longer feels like a lottery.",
+       "Science 6 still grants four brackets even on the shortest board; a careful player wins about 96–98% of difficulty-5 runs.",
+diff --git a/server/roomRegistry.js b/server/roomRegistry.js
+index 3f45952..b9970e2 100644
+--- a/server/roomRegistry.js
++++ b/server/roomRegistry.js
+@@ -397,7 +397,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits =
+     if (action === 'start' && ['playing', 'pendingDigest', 'won'].includes(entry.game?.status)) {
+       return { error: ERROR_CODE.TERMINAL_ALREADY_ACTIVE };
+     }
+-    const snapshot = published.snapshot?.data || published.snapshot || {};
++    // Патч 501: передаём весь опубликованный конверт. Движок сам снимает
++    // обёртку data и понимает legacy-массивы [{ name, value }] из сохранения;
++    // так не теряется имя персонажа из внешней части CHAR_PUBLISH.
++    const snapshot = published.snapshot || {};
+     const result = applyGameAction({
+       game: entry.game || entry.config,
+       action,
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index fffc8c6..45a9933 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -138,54 +138,116 @@ const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
+   return { words, attempts: full ? 0 : attempts, full, kind };
+ };
+ 
+-const toNumber = (entry) => Number(typeof entry === 'object'
+-  ? (entry?.value ?? entry?.base ?? entry?.total ?? entry?.rank)
+-  : entry) || 0;
+-const readAttribute = (snapshot, id) => {
+-  const attrs = snapshot?.attributes || {};
+-  const keys = { INT: ['INT', 'int', 'intelligence'], SCI: ['SCI', 'science', 'Science'], LCK: ['LCK', 'lck', 'luck'] }[id];
+-  for (const key of keys) if (attrs[key] !== undefined) return toNumber(attrs[key]);
+-  if (Array.isArray(attrs)) {
+-    const found = attrs.find((x) => String(x?.id || x?.key || '').toUpperCase() === id);
+-    if (found) return toNumber(found);
+-  }
+-  return 0;
++// Патч 501. Лист персонажа приходит во взлом в трёх обличьях:
++//   1) живой стор приложения:  attributes: { INT: { base, total } },
++//                              skills:     { SCIENCE: { base, total } };
++//   2)legacy-сохранение из БД: attributes: [{ name: 'INT', value: 10 }],
++//                              skills:     [{ name: 'SCIENCE', value: 6 }];
++//   3) сетевой конверт CHAR_PUBLISH: { characterId, name, data: <liст из п.2> }.
++// Раньше readAttribute понимал только словарь и массив с полями id/key, поэтому
++// у опубликованного персонажа ИНТ и УДЧ не находились вовсе и молча падали на 4:
++// на сложности 5 доска собиралась как 25−4=21 слово вместо 25−10=15. Наука
++// читалась верно (по полю name), отчего число скобок выглядело правильным, а
++// доска — нет. Теперь все три формы приводятся к одному виду до подсчёта доски.
++const parseObject = (value) => {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
++  return value;
+ };
+-const scienceRank = (snapshot) => {
+-  const skills = snapshot?.skills || {};
+-  if (Array.isArray(skills)) {
+-    const found = skills.find((x) => /^(science|наука)$/i.test(String(x?.id || x?.name || '')));
+-    return Math.max(0, Math.floor(toNumber(found?.rank !== undefined ? found.rank : found)));
++const normalizeCharacterSnapshot = (snapshot) => {
++  const outer = parseObject(snapshot) || {};
++  let data = outer.data;
++  if (typeof data === 'string') {
++    try { data = JSON.parse(data); } catch { data = null; }
+   }
+-  for (const key of ['science', 'Science', 'SCIENCE', 'Наука', 'наука']) {
+-    if (skills[key] !== undefined) return Math.max(0, Math.floor(toNumber(skills[key])));
++  const inner = parseObject(data);
++  if (!inner) return outer;
++  return {
++    ...outer,
++    ...inner,
++    characterName: inner.characterName || outer.characterName || outer.name || '',
++  };
++};
++
++const ATTRIBUTE_ALIASES = {
++  INT: ['INT', 'INTELLIGENCE', 'ИНТ', 'ИНТЕЛЛЕКТ'],
++  LCK: ['LCK', 'LUCK', 'УДЧ', 'УДАЧА'],
++  SCI: ['SCI', 'SCIENCE', 'НАУКА'],
++};
++const nameOf = (entry) => String(
++  typeof entry === 'string' ? entry : (entry?.name ?? entry?.id ?? entry?.key ?? entry?.attr ?? entry?.attribute ?? ''),
++).trim().toUpperCase();
++const toNumber = (entry) => {
++  if (entry === null || entry === undefined) return 0;
++  if (typeof entry === 'object') {
++    return Number(entry.value ?? entry.total ?? entry.base ?? entry.rank ?? entry.ranks ?? entry.count) || 0;
+   }
+-  const selected = Array.isArray(snapshot?.selectedSkills) ? snapshot.selectedSkills : [];
+-  const selectedScience = selected.find((x) => /^(science|наука)$/i.test(String(typeof x === 'string' ? x : x?.id || x?.name || '')));
+-  return Math.max(0, Math.floor(toNumber(selectedScience?.rank !== undefined ? selectedScience.rank : selectedScience)));
++  return Number(entry) || 0;
++};
++// Словарь { INT: {…} } и массив [{ name: 'INT', value: 10 }] -> единый список.
++const namedEntries = (collection) => {
++  if (!collection) return [];
++  if (Array.isArray(collection)) return collection;
++  if (typeof collection !== 'object') return [];
++  return Object.entries(collection).map(([key, value]) => (
++    value && typeof value === 'object' ? { ...value, name: value.name ?? key } : { name: key, value }
++  ));
++};
++const readAttribute = (snapshot, id) => {
++  const attrs = normalizeCharacterSnapshot(snapshot).attributes;
++  const aliases = ATTRIBUTE_ALIASES[id] || [id];
++  const found = namedEntries(attrs).find((entry) => aliases.includes(nameOf(entry)));
++  return found ? toNumber(found) : 0;
++};
++const scienceRank = (snapshot) => {
++  const source = normalizeCharacterSnapshot(snapshot);
++  const aliases = ATTRIBUTE_ALIASES.SCI;
++  const found = namedEntries(source.skills).find((entry) => aliases.includes(nameOf(entry)));
++  if (found) return clamp(Math.floor(toNumber(found)), 0, 6);
++  const selected = Array.isArray(source.selectedSkills) ? source.selectedSkills : [];
++  const selectedScience = selected.find((entry) => aliases.includes(nameOf(entry)));
++  return clamp(Math.floor(toNumber(selectedScience)), 0, 6);
++};
++const rankOfPerk = (snapshot, id) => {
++  const selected = normalizeCharacterSnapshot(snapshot).selectedPerks;
++  const perks = Array.isArray(selected) ? selected : [];
++  const matches = perks.filter((entry) => {
++    const entryId = typeof entry === 'string' ? entry : (entry?.id ?? entry?.perkId ?? entry?.name ?? entry?.key);
++    return String(entryId).toLowerCase() === id;
++  });
++  if (!matches.length) return 0;
++  // Явный ранг из тестов/старых клиентов имеет приоритет; иначе ранг равен числу
++  // взятых копий перка (в сохранении это [{ perkId, index }, …]).
++  const explicit = matches
++    .map((entry) => Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 0))
++    .filter((rank) => rank > 0);
++  return explicit.length ? Math.max(...explicit) : matches.length;
++};
++const inventoryEntries = (source) => [source.items, source.equipment?.items, source.inventory]
++  .flatMap((bucket) => {
++    if (!bucket) return [];
++    if (Array.isArray(bucket)) return bucket.map((item, index) => [String(item?.id ?? index), item]);
++    if (typeof bucket === 'object') return Object.entries(bucket);
++    return [];
++  });
++
++const characterStats = (snapshot) => {
++  const source = normalizeCharacterSnapshot(snapshot);
++  return {
++    intelligence: clamp(readAttribute(source, 'INT') || 4, 4, 10),
++    science: clamp(scienceRank(source), 0, 6),
++    luck: clamp(readAttribute(source, 'LCK') || 4, 4, 10),
++    hackerRank: rankOfPerk(source, 'hacker'),
++    digestUsed: Boolean(source.terminalHacking?.digestUsed)
++      || (Array.isArray(source.usedMagazineEffects) ? source.usedMagazineEffects : []).includes('mag_programmers_digest'),
++    hasDigest: Boolean(source.terminalHacking?.hasProgrammersDigest) || inventoryEntries(source).some(([key, item]) => (
++      key === 'mag_programmers_digest'
++      || item?.itemId === 'mag_programmers_digest'
++      || item?.catalogId === 'mag_programmers_digest'
++      || item?.id === 'mag_programmers_digest'
++      || item?.snapshot?.id === 'mag_programmers_digest'
++    )),
++  };
+ };
+-const rankOfPerk = (snapshot, id) => (Array.isArray(snapshot?.selectedPerks) ? snapshot.selectedPerks : [])
+-  .reduce((rank, entry) => {
+-    const entryId = typeof entry === 'string' ? entry : (entry?.id || entry?.perkId);
+-    if (entryId !== id) return rank;
+-    return Math.max(rank, Math.max(1, Math.floor(Number(entry?.rank ?? entry?.ranks ?? entry?.count) || 1)));
+-  }, 0);
+-
+-const characterStats = (snapshot) => ({
+-  intelligence: clamp(readAttribute(snapshot, 'INT') || 4, 4, 10),
+-  science: clamp(scienceRank(snapshot), 0, 6),
+-  luck: clamp(readAttribute(snapshot, 'LCK') || 4, 4, 10),
+-  hackerRank: rankOfPerk(snapshot, 'hacker'),
+-  digestUsed: Boolean(snapshot?.terminalHacking?.digestUsed)
+-    || (Array.isArray(snapshot?.usedMagazineEffects) ? snapshot.usedMagazineEffects : []).includes('mag_programmers_digest'),
+-  hasDigest: Boolean(snapshot?.terminalHacking?.hasProgrammersDigest) || Object.entries(snapshot?.items || {}).some(([key, item]) => (
+-    key === 'mag_programmers_digest'
+-    || item?.itemId === 'mag_programmers_digest'
+-    || item?.catalogId === 'mag_programmers_digest'
+-    || item?.id === 'mag_programmers_digest'
+-    || item?.snapshot?.id === 'mag_programmers_digest'
+-  )),
+-});
+ 
+ const shuffle = (items, rng) => {
+   const result = [...items];
+@@ -628,8 +690,6 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
+   if (game.status === 'locked') return { error: 'TERMINAL_LOCKED' };
+   if (action === 'start') {
+     if (game.status === 'won') return { error: 'TERMINAL_ALREADY_ACTIVE' };
+-    const stats = characterStats(characterSnapshot);
+-    const effectiveDifficulty = Math.max(0, game.difficulty - stats.hackerRank);
+     const fresh = createGame({
+       config: game,
+       operatorClientId: clientId,
+@@ -639,7 +699,7 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
+       rng,
+       excludeWords,
+     });
+-    fresh.operatorName = String(characterSnapshot?.characterName || characterSnapshot?.name || '');
++    fresh.operatorName = String(normalizeCharacterSnapshot(characterSnapshot).characterName || '');
+     return { game: fresh };
+   }
+   if (game.status === 'pendingDigest') {
+@@ -736,6 +796,7 @@ module.exports = {
+   sharedLetters,
+   buildPasswordSet,
+   characterStats,
++  normalizeCharacterSnapshot,
+   createGame,
+   publicGameState,
+   applyGameAction,

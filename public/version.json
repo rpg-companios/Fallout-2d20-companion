@@ -1,8 +1,10 @@
 {
-  "version": "500",
+  "version": "501",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Исправлен взлом терминалов: характеристики из листа персонажа теперь читаются и в общей комнате, и без сервера. При Интеллекте 10 на пятой сложности доска содержит 15 слов, а не 21.",
+      "Наука, Удача и перк «Хакер» тоже берутся из листа персонажа: число скобок, шанс восстановления попыток и снижение сложности больше не сбрасываются к значениям новичка.",
       "На пятой сложности число слов теперь «25 минус ИНТ»: 15 слов при ИНТ 10 и 21 при ИНТ 4 вместо прежних 20 и 26.",
       "На остальных сложностях доска тоже стала меньше на пять слов, поэтому взлом с высоким Интеллектом и Наукой перестал быть лотереей.",
       "Четыре скобки Науки 6 сохраняются даже на самой короткой доске; думающий игрок на пятой сложности выигрывает около 96–98 % партий.",
@@ -46,6 +48,8 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Fixed terminal hacking: character stats are now read from the character sheet both in a shared room and without a server. At Intellect 10 a difficulty-5 board has 15 words, not 21.",
+      "Science, Luck and the Hacker perk also come from the character sheet: bracket counts, attempt-recovery odds and difficulty reduction no longer fall back to beginner values.",
       "At difficulty 5 the board is now \"25 minus INT\": 15 words at INT 10 and 21 at INT 4 instead of 20 and 26.",
       "Every other difficulty also lost five words, so hacking with a high Intellect and Science no longer feels like a lottery.",
       "Science 6 still grants four brackets even on the shortest board; a careful player wins about 96–98% of difficulty-5 runs.",
