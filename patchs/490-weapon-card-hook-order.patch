@@ -1,0 +1,84 @@
+diff --git a/__tests__/equipment/weapon-card-hook-order-490.test.js b/__tests__/equipment/weapon-card-hook-order-490.test.js
+new file mode 100644
+index 0000000..03c315e
+--- /dev/null
++++ b/__tests__/equipment/weapon-card-hook-order-490.test.js
+@@ -0,0 +1,33 @@
++// ПРИЁМОЧНЫЙ (патч 490): при создании персонажа пустые слоты оружия
++// сначала показываются без weapon, затем комплект заполняет их. WeaponCard
++// обязан вызывать одни и те же хуки в обоих рендерах.
++import { describe, expect, it } from 'vitest';
++import { readFileSync } from 'node:fs';
++
++const SRC = 'modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js';
++const source = readFileSync(SRC, 'utf8');
++const start = source.indexOf('export const WeaponCard =');
++const end = source.indexOf('\n\nconst findLocalizedWeapon', start);
++const component = source.slice(start, end);
++
++describe('ПРИЁМОЧНЫЙ (патч 490): WeaponCard сохраняет порядок хуков для пустого слота', () => {
++  it('все хуки WeaponCard вызываются до раннего возврата пустого слота', () => {
++    const emptySlotReturn = component.indexOf('if (!weapon) {');
++    expect(start).toBeGreaterThanOrEqual(0);
++    expect(end).toBeGreaterThan(start);
++    expect(emptySlotReturn).toBeGreaterThanOrEqual(0);
++
++    const hookCalls = [...component.matchAll(/\b(?:useCharacterStore|useAppSettingsStore|useMemo)\s*\(/g)];
++    expect(hookCalls.length).toBeGreaterThan(0);
++    for (const hook of hookCalls) {
++      expect(hook.index, 'hook должен стоять до if (!weapon)').toBeLessThan(emptySlotReturn);
++    }
++  });
++
++  it('updateItem selector доступен и для пустой карточки, и после выбора оружия', () => {
++    const emptySlotReturn = component.indexOf('if (!weapon) {');
++    const updateItemSelector = component.indexOf('const updateItem = useCharacterStore((state) => state.updateItem);');
++    expect(updateItemSelector).toBeGreaterThanOrEqual(0);
++    expect(updateItemSelector).toBeLessThan(emptySlotReturn);
++  });
++});
+diff --git a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+index 92307cb..286fd72 100644
+--- a/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
++++ b/modules/fallout/screens/WeaponsAndArmorScreen/WeaponsAndArmorScreen.js
+@@ -542,6 +542,9 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
+     // ОС Mk II (драйвер применяется в инвентаре, флаг — в robot-срезе стора).
+     // Хук ВЫЗЫВАЕТСЯ БЕЗУСЛОВНО (Правила хуков): до раннего return пустого слота.
+     const mk2Installed = useCharacterStore((state) => state.robot?.mk2Installed === true);
++    // Keep every hook above the empty-slot return: kits replace empty weapon
++    // slots with populated weapons as character creation progresses.
++    const updateItem = useCharacterStore((state) => state.updateItem);
+     if (!weapon) {
+       return (
+         <View style={localStyles.weaponCardContainer}>
+@@ -629,7 +632,6 @@ export const WeaponCard = ({ weapon, onModifyWeapon, meleeBonus = 0, showSourceS
+       || (durabilityLossEnabled && displayWeapon?.durabilityTracked && Number(durabilityValue) <= 0),
+     );
+     const isJammed = Boolean(displayWeapon?.jammed);
+-    const updateItem = useCharacterStore((state) => state.updateItem);
+     const storeWeaponKey = displayWeapon?.instanceId || displayWeapon?.uniqueId || displayWeapon?.id;
+     const showDurability = ((randomWeaponQualityEnabled || durabilityLossEnabled) && isAmmoWeapon(displayWeapon)) || isForceBroken;
+ 
+diff --git a/public/version.json b/public/version.json
+index 150fe70..89147fa 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "489",
++  "version": "490",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
+       "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
+       "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
+       "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
+@@ -16,6 +17,7 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",
+       "App errors now display the React component stack to help identify the source of a crash.",
+       "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
+       "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
