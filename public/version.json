@@ -1,8 +1,9 @@
 {
-  "version": "488",
+  "version": "489",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
       "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
       "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
       "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
@@ -15,6 +16,7 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "App errors now display the React component stack to help identify the source of a crash.",
       "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
       "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
       "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",

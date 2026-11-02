@@ -1,0 +1,197 @@
+diff --git a/__tests__/lootTrade/player-location-hooks-repro.test.js b/__tests__/lootTrade/player-location-hooks-repro.test.js
+new file mode 100644
+index 0000000..40d8dfc
+--- /dev/null
++++ b/__tests__/lootTrade/player-location-hooks-repro.test.js
+@@ -0,0 +1,102 @@
++import React, { act } from 'react';
++import TestRenderer from 'react-test-renderer';
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++
++globalThis.IS_REACT_ACT_ENVIRONMENT = true;
++
++vi.mock('react-native', () => {
++  const mk = (tag) => ({ children, ...props }) => React.createElement(tag, props, children);
++  return {
++    Platform: { OS: 'web' },
++    StyleSheet: {
++      create: (styles) => styles,
++      flatten: (styles) => (Array.isArray(styles) ? Object.assign({}, ...styles.filter(Boolean)) : styles || {}),
++    },
++    Modal: ({ visible, children, ...props }) => (visible ? React.createElement('Modal', props, children) : null),
++    View: mk('View'),
++    Text: mk('Text'),
++    TextInput: mk('TextInput'),
++    TouchableOpacity: mk('TouchableOpacity'),
++    ScrollView: mk('ScrollView'),
++    Image: mk('Image'),
++    useWindowDimensions: () => ({ width: 420, height: 800 }),
++  };
++});
++
++vi.mock('@expo/vector-icons', () => ({
++  MaterialCommunityIcons: ({ name, ...props }) => React.createElement('MaterialCommunityIcons', { name, ...props }),
++}));
++
++vi.mock('../../db', () => ({
++  getCharacterRoomBindings: vi.fn(async () => [{ character_id: 'player-char', code: 'ROOM1' }]),
++  getCharactersList: vi.fn(async () => [{ id: 'player-char', name: 'Player' }]),
++}));
++
++vi.mock('../../components/alerts/alertService', () => ({ showRawAlert: vi.fn() }));
++vi.mock('../../src/saves/characterSaves', () => ({ loadCharacter: vi.fn(async () => true) }));
++vi.mock('../../src/lootTrade/grantCharacterItems', () => ({
++  applyCommittedMerchantTradeToCharacter: vi.fn(),
++  getSellablePlayerInventoryItems: vi.fn(() => []),
++  grantLootEntriesToCharacter: vi.fn(),
++}));
++vi.mock('../../modules/fallout/assets/backgrounds/caps.png', () => ({ default: 'caps.png' }));
++vi.mock('../../assets/CD.png', () => ({ default: 'cd.png' }));
++
++import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOverlay';
++import useCharacterStore from '../../src/store/characterStore';
++import useRoomStore from '../../src/room/roomStore';
++import useUiModeStore from '../../src/room/uiModeStore';
++
++describe('player opening a GM-issued location', () => {
++  beforeEach(() => {
++    useUiModeStore.setState({ tabUiMode: 'user', gmInspectingCharacter: false });
++    useCharacterStore.setState({ currentCharacterId: 'player-char', characterName: 'Player', items: [], currency: 0 });
++    useRoomStore.setState({
++      clientId: 'player-client',
++      status: 'online',
++      rooms: {
++        ROOM1: {
++          joined: true,
++          members: [{ clientId: 'player-client', role: 'player' }],
++          activeSession: null,
++          terminalStates: {},
++        },
++      },
++    });
++  });
++
++  it('renders the room location with a linked terminal without changing hook order', async () => {
++    let renderer;
++    await act(async () => {
++      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
++      await Promise.resolve();
++    });
++    await act(async () => {
++      useRoomStore.setState((state) => ({
++        rooms: {
++          ...state.rooms,
++          ROOM1: {
++            ...state.rooms.ROOM1,
++            activeSession: {
++              sessionId: 'session-1',
++              kind: 'hub',
++              name: 'Vault',
++              targetType: 'room',
++              nodes: [{
++                containerId: 'terminal-1',
++                kind: 'terminal',
++                name: 'Vault terminal',
++                difficulty: 3,
++                lockOnFailure: false,
++                items: [],
++              }],
++            },
++          },
++        },
++      }));
++      await Promise.resolve();
++    });
++    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
++    await act(async () => renderer.unmount());
++  });
++});
+diff --git a/__tests__/screens/app-error-diagnostics.test.js b/__tests__/screens/app-error-diagnostics.test.js
+new file mode 100644
+index 0000000..528b3ee
+--- /dev/null
++++ b/__tests__/screens/app-error-diagnostics.test.js
+@@ -0,0 +1,13 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import { describe, expect, it } from 'vitest';
++
++describe('App Error diagnostics', () => {
++  it('renders the React component stack with the caught error', () => {
++    const source = fs.readFileSync(path.resolve(process.cwd(), 'index.js'), 'utf8');
++    expect(source).toContain('info?.componentStack');
++    expect(source).toContain('this.state.componentStack || this.state.errorStack');
++    expect(source).toContain('<ScrollView');
++    expect(source).toContain('selectable');
++  });
++});
+diff --git a/index.js b/index.js
+index 2b05496..389eb9d 100644
+--- a/index.js
++++ b/index.js
+@@ -2,7 +2,7 @@ import 'expo-font';
+ import * as Font from 'expo-font';
+ import { registerRootComponent } from 'expo';
+ import React from 'react';
+-import { Platform, View, Text } from 'react-native';
++import { Platform, View, Text, ScrollView } from 'react-native';
+ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
+ 
+ import { setupRichText } from './modules/fallout/screens/WeaponsAndArmorScreen/textUtils';
+@@ -94,20 +94,30 @@ import App from './App';
+ class ErrorBoundary extends React.Component {
+   constructor(props) {
+     super(props);
+-    this.state = { hasError: false, error: null };
++    this.state = { hasError: false, error: null, componentStack: '', errorStack: '' };
+   }
+   static getDerivedStateFromError(error) {
+     return { hasError: true, error };
+   }
+   componentDidCatch(error, info) {
+-    debugLog('app.crash', { error, info });
++    const componentStack = String(info?.componentStack || '').trim();
++    const errorStack = String(error?.stack || '');
++    this.setState({ componentStack, errorStack });
++    debugLog('app.crash', { error: errorStack || String(error), componentStack });
+   }
+   render() {
+     if (this.state.hasError) {
+       return (
+         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a', padding: 20 }}>
+           <Text style={{ color: '#ff4444', fontSize: 16, marginBottom: 10 }}>App Error</Text>
+-          <Text style={{ color: '#ffffff', fontSize: 12 }}>{String(this.state.error)}</Text>
++          <Text selectable style={{ color: '#ffffff', fontSize: 12 }}>{String(this.state.error)}</Text>
++          {(this.state.componentStack || this.state.errorStack) ? (
++            <ScrollView style={{ width: '100%', maxWidth: 720, maxHeight: '65%', marginTop: 12 }}>
++              <Text selectable style={{ color: '#c5c5c5', fontSize: 10, fontFamily: 'monospace' }}>
++                {this.state.componentStack || this.state.errorStack}
++              </Text>
++            </ScrollView>
++          ) : null}
+         </View>
+       );
+     }
+diff --git a/public/version.json b/public/version.json
+index 051783d..150fe70 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,9 @@
+ {
+-  "version": "488",
++  "version": "489",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
+       "Исправлена ошибка при открытии игроком локации: окно взлома теперь монтируется отдельно и только после выбора терминала.",
+       "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
+       "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
+@@ -15,6 +16,7 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "App errors now display the React component stack to help identify the source of a crash.",
+       "Fixed an error when a player opens a location: the hacking window now mounts separately and only after a terminal is selected.",
+       "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
+       "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
