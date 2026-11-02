@@ -99,6 +99,10 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     }])),
     lastClosedSession: room.lastClosedSession || null,
     directives: cloneDirectives(room.directives),
+    // Признак обновлённого сервера: клиент включает синхронизированную игру,
+    // а при отсутствии поля запускает мини-игру локально (старый сервер комнат
+    // не знает terminal.issue/terminal.action и превращал терминал в сундук).
+    capabilities: { terminalHacking: true },
   });
 
   const countOwnedRooms = (ownerClientId) => (

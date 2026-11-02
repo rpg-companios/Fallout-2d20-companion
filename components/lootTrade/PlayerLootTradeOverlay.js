@@ -28,6 +28,7 @@ import {
   computeMerchantBuybackPriceFromPlayer,
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
+  resolveTerminalSessionNode,
 } from '../../domain/lootTrade';
 import { describeItemBasics } from '../../domain/itemBasics';
 import {
@@ -178,6 +179,9 @@ export default function PlayerLootTradeOverlay() {
     const found = (activeSession?.nodes || []).find(
       (n) => n.containerId === selectedHubNodeId && !n.locked,
     );
+    // Терминал никогда не должен попадать в сценарий «открыть сундук»:
+    // возвращаем игрока к списку локации, где он откроет мини-игру.
+    if (found && resolveTerminalSessionNode(found).isTerminal) return null;
     return found || null;
   }, [isHubSession, activeSession?.nodes, selectedHubNodeId]);
 
@@ -386,16 +390,19 @@ export default function PlayerLootTradeOverlay() {
                 {hubNodes.length === 0 ? (
                   <Text style={styles.emptyText}>{tLootTrade('player.hubEmpty')}</Text>
                 ) : (
-                  hubNodes.map((node) => {
+                  hubNodes.map((rawNode) => {
+                    // Старый сервер комнат собирает узел заново и понижает
+                    // `kind: 'terminal'` до 'loot'. Маркер в lockLabel и реестр
+                    // терминалов комнаты восстанавливают настоящий тип узла.
+                    const { node, isTerminal: markedTerminal } = resolveTerminalSessionNode(rawNode);
                     const nodeIsMerch = node.kind === CONTAINER_KIND.MERCHANT;
                     const terminalState = rooms?.[matchedContext.roomCode]?.terminalStates?.[node.containerId];
-                    // The room's terminal registry is authoritative. If an older or
-                    // partially updated session serialized this child as loot, do not
-                    // send the player into the empty-container flow.
-                    const nodeIsTerminal = node.kind === CONTAINER_KIND.TERMINAL || Boolean(terminalState);
-                    const terminalForSelection = terminalState?.config
-                      ? { ...node, ...terminalState.config, kind: CONTAINER_KIND.TERMINAL }
-                      : { ...node, kind: CONTAINER_KIND.TERMINAL };
+                    const nodeIsTerminal = markedTerminal || Boolean(terminalState);
+                    const terminalForSelection = {
+                      ...node,
+                      ...(terminalState?.config || {}),
+                      kind: CONTAINER_KIND.TERMINAL,
+                    };
                     const nodeLocked = Boolean(node.locked);
                     const piecesCount = (node.items || []).reduce(
                       (sum, entry) => sum + (Number(entry.quantity) || 0),
@@ -435,8 +442,8 @@ export default function PlayerLootTradeOverlay() {
                               {terminalState?.locked
                                 ? tLootTrade('terminal.accessDenied')
                                 : formatLootTrade(tLootTrade('card.terminalDifficulty'), {
-                                    difficulty: node.difficulty || 0,
-                                    length: (node.difficulty || 0) + 4,
+                                    difficulty: terminalForSelection.difficulty || 0,
+                                    length: (terminalForSelection.difficulty || 0) + 4,
                                   })}
                             </Text>
                           ) : nodeIsMerch ? (

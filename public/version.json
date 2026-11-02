@@ -1,8 +1,9 @@
 {
-  "version": "491",
+  "version": "493",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Терминал в локации больше не превращается в сундук: при нажатии открывается окно взлома с мини-игрой, даже если сервер комнат ещё не обновлён.",
       "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
       "Исправлена ошибка порядка хуков в карточке оружия: выбор комплекта снаряжения при создании персонажа больше не вызывает сбой React.",
       "При ошибке приложения теперь отображается стек компонентов React, чтобы быстрее находить источник сбоя.",
@@ -18,6 +19,7 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "A terminal inside a location no longer turns into a chest: tapping it opens the hacking mini-game in a modal, even if the room server has not been updated yet.",
       "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",
       "Fixed a hook-order error in weapon cards: choosing an equipment kit during character creation no longer triggers a React crash.",
       "App errors now display the React component stack to help identify the source of a crash.",

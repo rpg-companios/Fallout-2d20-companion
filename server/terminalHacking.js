@@ -20,6 +20,36 @@ const normalizeTerminalConfig = (raw = {}) => ({
   lockOnFailure: Boolean(raw.lockOnFailure),
 });
 
+// CJS-копия маркера из domain/lootTrade.js: формат должен совпадать побайтово.
+// Старые серверы комнат понижали `kind: 'terminal'` узла локации до 'loot' и
+// теряли difficulty/lockOnFailure; lockLabel при этом сохранялся. Обновлённый
+// сервер восстанавливает терминал из маркера, а клиент — даже если сервер
+// вообще не обновлялся (локальная мини-игра).
+const TERMINAL_NODE_MARKER = 'F2D20-TERM:';
+const encodeTerminalNodeMarker = ({ difficulty = 0, lockOnFailure = false, label = '' } = {}) => (
+  `${TERMINAL_NODE_MARKER}${JSON.stringify({
+    v: 1,
+    d: clamp(Math.floor(Number(difficulty) || 0), 0, 5),
+    f: lockOnFailure ? 1 : 0,
+    l: String(label || ''),
+  })}`
+);
+const decodeTerminalNodeMarker = (value) => {
+  const raw = String(value || '');
+  if (!raw.startsWith(TERMINAL_NODE_MARKER)) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(TERMINAL_NODE_MARKER.length));
+    if (!parsed || parsed.v !== 1) return null;
+    return {
+      difficulty: clamp(Math.floor(Number(parsed.d) || 0), 0, 5),
+      lockOnFailure: Boolean(parsed.f),
+      label: String(parsed.l || ''),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const recoveryChancePercent = (intelligence, science) => clamp(
   10 * ((Number(intelligence) || 0) - 4) + (10 / 3) * (Number(science) || 0),
   0,
@@ -278,6 +308,9 @@ const applyGameAction = ({ game, action, clientId, characterId, characterSnapsho
 
 module.exports = {
   WORDS_BY_LENGTH,
+  TERMINAL_NODE_MARKER,
+  encodeTerminalNodeMarker,
+  decodeTerminalNodeMarker,
   normalizeTerminalConfig,
   recoveryChancePercent,
   characterStats,

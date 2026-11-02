@@ -79,6 +79,7 @@ describe('roomServer: create/join/presence', () => {
       const joinReq = await player.send(MESSAGE.ROOM_JOIN, { code: created.payload.code, name: 'Иван' });
       const state = await player.waitFor((m) => m.type === MESSAGE.ROOM_STATE && m.payload.requestId === joinReq);
       expect(state.payload.members).toEqual([{ clientId: 'player-1', name: 'Иван', role: 'player' }]);
+      expect(state.payload.capabilities).toMatchObject({ terminalHacking: true });
 
       // Мастер входит как gm и видит игрока в списке.
       await gm.send(MESSAGE.ROOM_JOIN, { code: created.payload.code, name: 'GM', role: 'gm' });

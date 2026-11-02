@@ -24,7 +24,7 @@ import { getLocaleLabel } from '../HomeScreen/logic/localeLabel';
 import { tHomeScreen } from '../HomeScreen/logic/homeScreenI18n';
 import { tLootTrade, formatLootTrade } from './logic/lootTradeI18n';
 import useAppSettingsStore from '../../../src/store/appSettingsStore';
-import useRoomStore from '../../../src/room/roomStore';
+import useRoomStore, { roomSupportsTerminalProtocol } from '../../../src/room/roomStore';
 import useUiModeStore from '../../../src/room/uiModeStore';
 import { formatRoomCodeForDisplay } from '../../../src/room/roomCode';
 import { buildGmRoomCharacterCards } from '../../../src/room/roomCharacterSync';
@@ -34,6 +34,8 @@ import {
   addOrMergeContainerItem,
   analyzeHubDeletion,
   buildHubSessionNodes,
+  buildStandaloneTerminalSessionNode,
+  decodeTerminalNodeMarker,
   computeMerchantSellPriceToPlayer,
   getEffectiveMerchantRates,
   getHubIdsContainingChild,
@@ -594,20 +596,42 @@ export default function LootTradeScreen() {
     const liveEntries = getActiveLiveEntriesForContainer(saved);
     if (saved.kind === CONTAINER_KIND.TERMINAL) {
       for (const [liveCode, roomEntry] of Object.entries(roomRooms || {})) {
-        if (!roomEntry?.terminalStates?.[saved.id]) continue;
+        const registered = Boolean(roomEntry?.terminalStates?.[saved.id]);
+        const liveSession = roomEntry?.activeSession;
+        const terminalNode = liveSession?.kind === CONTAINER_KIND.HUB
+          ? (liveSession.nodes || []).find((n) => n.containerId === saved.id)
+          : null;
+        if (!registered && !terminalNode) continue;
         try {
           await ensureGmRoomConnected(liveCode);
-          await useRoomStore.getState().issueTerminal({
-            code: liveCode,
-            ownerToken: roomByCode[liveCode]?.ownerToken,
-            config: {
-              containerId: saved.id,
-              name: saved.name,
-              description: saved.description,
-              difficulty: saved.difficulty,
-              lockOnFailure: saved.lockOnFailure,
-            },
-          });
+          if (registered && roomSupportsTerminalProtocol(liveCode)) {
+            await useRoomStore.getState().issueTerminal({
+              code: liveCode,
+              ownerToken: roomByCode[liveCode]?.ownerToken,
+              config: {
+                containerId: saved.id,
+                name: saved.name,
+                description: saved.description,
+                difficulty: saved.difficulty,
+                lockOnFailure: saved.lockOnFailure,
+              },
+            });
+          } else if (terminalNode) {
+            // Старый сервер: обновляем узел локации вместе с маркером, чтобы
+            // игрок не получил «сундук» после правки настроек терминала.
+            await useRoomStore.getState().updateRoomSessionRates({
+              code: liveCode,
+              sessionId: liveSession.sessionId,
+              nodes: (liveSession.nodes || []).map((n) => (
+                n.containerId === saved.id
+                  ? buildStandaloneTerminalSessionNode(saved, {
+                      locked: n.locked,
+                      lockLabel: decodeTerminalNodeMarker(n.lockLabel)?.label || n.lockLabel,
+                    })
+                  : n
+              )),
+            });
+          }
         } catch (e) {
           debugLog('lootTrade.terminalConfigSync:failed', { message: e?.message });
         }
@@ -1017,7 +1041,8 @@ export default function LootTradeScreen() {
       const freshSource = (await db.getGmContainerById(issueTargetContainer.id)) || issueTargetContainer;
       const freshAllContainers = await db.getGmContainersList();
       const isHub = freshSource.kind === CONTAINER_KIND.HUB;
-      if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+      const terminalProtocol = roomSupportsTerminalProtocol(effectiveRoomCode);
+      if (freshSource.kind === CONTAINER_KIND.TERMINAL && terminalProtocol) {
         await useRoomStore.getState().issueTerminal({
           code: effectiveRoomCode,
           ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
@@ -1027,6 +1052,25 @@ export default function LootTradeScreen() {
             description: freshSource.description,
             difficulty: freshSource.difficulty,
             lockOnFailure: freshSource.lockOnFailure,
+          },
+        });
+      } else if (freshSource.kind === CONTAINER_KIND.TERMINAL) {
+        // Сервер комнат ещё не обновлён: terminal.issue он не поддерживает.
+        // Выдаём одиночный терминал как локацию с одним узлом — маркер в
+        // lockLabel переживёт серверную нормализацию и игрок откроет модалку.
+        await useRoomStore.getState().openRoomSession({
+          code: effectiveRoomCode,
+          ownerToken: roomByCode[effectiveRoomCode]?.ownerToken,
+          session: {
+            containerId: freshSource.id,
+            kind: CONTAINER_KIND.HUB,
+            name: freshSource.name,
+            description: freshSource.description,
+            targetType,
+            targetCharacterId,
+            targetCharacterName,
+            items: [],
+            nodes: [buildStandaloneTerminalSessionNode(freshSource)],
           },
         });
       } else {

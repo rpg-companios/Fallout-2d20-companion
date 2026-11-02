@@ -1,5 +1,36 @@
 # Changelog
 ---
+## A terminal inside a location opens the hacking mini-game instead of a chest (patch 493)
+
+**Symptom:** the GM created a terminal and linked it into a location, but players
+saw an ordinary chest and got the "open container" flow instead of the hacking
+window.
+
+**Cause:** the room server rebuilds every location node and drops fields it does
+not know. On a server that has not been updated, `kind: 'terminal'` becomes
+`'loot'` and `difficulty` / `lockOnFailure` are lost. The player client therefore
+received a chest node; such a server has no `terminalStates` registry either, so
+the earlier registry fallback (patch 491) could not help.
+
+**Fix:**
+
+- the terminal configuration is duplicated into the node's `lockLabel` as a
+  compact marker — that field survives server normalization and is not rendered
+  for unlocked nodes; `domain/lootTrade.js` and `server/terminalHacking.js`
+  share the exact same format;
+- `PlayerLootTradeOverlay` restores the node kind from the marker (and still from
+  the room registry), shows the `console` icon, difficulty and View / Hack
+  buttons; the mini-game mounts as a separate modal next to the location window;
+- the updated server restores `kind: 'terminal'` from the marker, keeps the
+  difficulty on live edits and advertises `capabilities.terminalHacking`;
+- on a legacy server the client runs the very same mini-game locally
+  (`components/lootTrade/localTerminalGame.js` reuses the pure
+  `server/terminalHacking.js` engine), and the GM issues a standalone terminal
+  as a one-node location instead of the unsupported `terminal.issue`;
+- restart the room server after updating `server/` to get a fully synchronized
+  party-wide game; the mini-game itself is playable immediately.
+
+---
 ## Environment/Combat card redesign and manual exposure effects (patch 484)
 
 - Aligned the screen header and cards with the Character and Loot/Trade sections: vector icons, matching header structure and card borders; RU/EN selection now persists in settings.

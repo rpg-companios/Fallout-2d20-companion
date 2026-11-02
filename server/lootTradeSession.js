@@ -6,6 +6,7 @@
 // без сборки фронтенда. Формулы цен 1-в-1 совпадают с domain/lootTrade.js (проверяется тестом).
 
 const { ERROR_CODE } = require('./protocol');
+const { encodeTerminalNodeMarker, decodeTerminalNodeMarker } = require('./terminalHacking');
 
 const clampNumber = (val, min, max, fallback = 0) => {
   const num = Number(val);
@@ -128,7 +129,11 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
   if (!raw || typeof raw !== 'object') return null;
   const containerId = String(raw.containerId || raw.id || '').trim();
   if (!containerId) return null;
-  const kind = raw.kind === 'merchant' ? 'merchant' : (raw.kind === 'terminal' ? 'terminal' : 'loot');
+  // Маркер в lockLabel переживает нормализацию узла на старом сервере: даже
+  // если kind уже понижен до 'loot', восстанавливаем терминал и его настройки.
+  const marker = decodeTerminalNodeMarker(raw.lockLabel);
+  const explicitTerminal = raw.kind === 'terminal';
+  const kind = raw.kind === 'merchant' ? 'merchant' : (explicitTerminal || marker ? 'terminal' : 'loot');
   const items = kind === 'terminal' ? [] : normalizeSessionItemsList(raw.items, now, nodeIdx * 1000);
   return {
     containerId,
@@ -136,6 +141,8 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
     name: String(raw.name || '').trim() || (kind === 'merchant' ? 'Торговец' : (kind === 'terminal' ? 'Терминал' : 'Контейнер')),
     description: String(raw.description || '').trim(),
     locked: Boolean(raw.locked),
+    // Маркер оставляем в узле: он нужен клиенту, если сессия пройдёт через
+    // старый сервер, и просто скрывается при отрисовке.
     lockLabel: String(raw.lockLabel || '').trim(),
     caps: kind === 'merchant' ? normalizeCapsAmount(raw.caps, 0) : 0,
     saleMarkupPercent: kind === 'merchant' ? normalizeSaleMarkupPercent(raw.saleMarkupPercent, 0) : 0,
@@ -143,8 +150,14 @@ const normalizeHubSessionNode = (raw, now = Date.now(), nodeIdx = 0) => {
       ? normalizeBuyDepreciationPercent(raw.buyDepreciationPercent, 50)
       : 50,
     characterOverrides: kind === 'merchant' ? normalizeCharacterOverrides(raw.characterOverrides) : {},
-    difficulty: kind === 'terminal' ? Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))) : 0,
-    lockOnFailure: kind === 'terminal' && Boolean(raw.lockOnFailure),
+    difficulty: kind === 'terminal'
+      ? (marker && !explicitTerminal
+          ? marker.difficulty
+          : Math.max(0, Math.min(5, Math.floor(Number(raw.difficulty) || 0))))
+      : 0,
+    lockOnFailure: kind === 'terminal' && (marker && !explicitTerminal
+      ? marker.lockOnFailure
+      : Boolean(raw.lockOnFailure)),
     items,
   };
 };
@@ -422,6 +435,14 @@ const applySessionUpdate = (session, payload = {}, now = Date.now()) => {
         }
         if (payload.lockLabel !== undefined) {
           targetNode.lockLabel = String(payload.lockLabel || '').trim();
+        }
+        if (targetNode.kind === 'terminal') {
+          const previousMarker = decodeTerminalNodeMarker(targetNode.lockLabel);
+          targetNode.lockLabel = encodeTerminalNodeMarker({
+            difficulty: targetNode.difficulty,
+            lockOnFailure: targetNode.lockOnFailure,
+            label: previousMarker ? previousMarker.label : targetNode.lockLabel,
+          });
         }
         if (Array.isArray(payload.nodeItems)) {
           targetNode.items = normalizeSessionItemsList(payload.nodeItems, now, 0);

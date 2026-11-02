@@ -52,6 +52,7 @@ import PlayerLootTradeOverlay from '../../components/lootTrade/PlayerLootTradeOv
 import useCharacterStore from '../../src/store/characterStore';
 import useRoomStore from '../../src/room/roomStore';
 import useUiModeStore from '../../src/room/uiModeStore';
+import { encodeTerminalNodeMarker } from '../../domain/lootTrade.js';
 
 describe('player opening a GM-issued location', () => {
   beforeEach(() => {
@@ -159,4 +160,54 @@ describe('player opening a GM-issued location', () => {
     });
     await act(async () => renderer.unmount());
   });
+
+  it('opens the hacking modal for a terminal downgraded to loot by a legacy room server', async () => {
+    let renderer;
+    await act(async () => {
+      renderer = TestRenderer.create(<PlayerLootTradeOverlay />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      useRoomStore.setState((state) => ({
+        rooms: {
+          ...state.rooms,
+          ROOM1: {
+            ...state.rooms.ROOM1,
+            // Ни capabilities, ни terminalStates: сервер старой версии.
+            terminalStates: {},
+            activeSession: {
+              sessionId: 'session-legacy-server',
+              kind: 'hub',
+              name: 'Vault',
+              targetType: 'room',
+              nodes: [{
+                containerId: 'terminal-1',
+                kind: 'loot',
+                name: 'Vault terminal',
+                description: '',
+                locked: false,
+                lockLabel: encodeTerminalNodeMarker({ difficulty: 3, lockOnFailure: true }),
+                difficulty: 0,
+                items: [],
+              }],
+            },
+          },
+        },
+      }));
+      await Promise.resolve();
+    });
+
+    expect(renderer.root.findByProps({ name: 'console' })).toBeTruthy();
+    expect(renderer.root.findAllByProps({ name: 'treasure-chest' })).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ testID: 'terminal-hack-button' }).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByProps({ testID: 'terminal-view-button' }).length).toBeGreaterThan(0);
+    const hackButton = renderer.root.findByProps({ testID: 'terminal-hack-button' });
+    await act(async () => hackButton.props.onPress());
+    expect(renderer.root.findByType('TerminalHackingModal').props).toMatchObject({
+      containerId: 'terminal-1',
+      autoStart: true,
+    });
+    await act(async () => renderer.unmount());
+  });
+
 });

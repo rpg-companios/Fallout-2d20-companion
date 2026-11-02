@@ -36,6 +36,8 @@ export interface RoomStateEntry {
   activeSession?: ActiveLootTradeSession | null;
   terminalStates?: Record<string, any>;
   directives?: RoomDirectiveEntry[];
+  /** Возможности сервера комнат (присутствуют только у обновлённого сервера). */
+  capabilities?: Record<string, boolean>;
 }
 
 interface CreateRoomResult {
@@ -52,6 +54,7 @@ interface JoinRoomResult {
   activeSession?: ActiveLootTradeSession | null;
   terminalStates?: Record<string, any>;
   directives?: RoomDirectiveEntry[];
+  capabilities?: Record<string, boolean>;
 }
 
 interface RoomStoreState {
@@ -550,6 +553,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
             activeSession: prev?.activeSession ?? null,
             terminalStates: prev?.terminalStates || {},
             directives: prev?.directives || [],
+            capabilities: prev?.capabilities || {},
           },
         },
       });
@@ -571,6 +575,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           activeSession: existing.activeSession ?? null,
           terminalStates: existing.terminalStates || {},
           directives: existing.directives || [],
+          capabilities: existing.capabilities || {},
         };
       }
       if (joiningCodes.has(code)) throw new Error('ROOM_JOIN_IN_PROGRESS');
@@ -588,6 +593,9 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
         const directives = Array.isArray(payloadRooms.directives)
           ? (payloadRooms.directives as RoomDirectiveEntry[])
           : [];
+        const capabilities = payloadRooms.capabilities && typeof payloadRooms.capabilities === 'object'
+          ? payloadRooms.capabilities as Record<string, boolean>
+          : {};
         const lastClosedEntry = payloadRooms.lastClosedSession as {
           session?: ActiveLootTradeSession | null;
           closedReason?: string | null;
@@ -605,6 +613,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
               activeSession,
               terminalStates,
               directives,
+              capabilities,
             },
           },
         });
@@ -653,6 +662,7 @@ export const useRoomStore = create<RoomStoreState>((set, get) => {
           activeSession,
           terminalStates,
           directives,
+          capabilities,
         };
       } finally {
         joiningCodes.delete(code);
@@ -942,3 +952,18 @@ export default useRoomStore;
 
 export const selectRoomStatus = (state: RoomStoreState) => state.status;
 export const selectRooms = (state: RoomStoreState) => state.rooms;
+
+/**
+ * Сервер комнат старой версии не имеет протокола terminal.issue/action.
+ * В этом случае клиент запускает мини-игру локально, чтобы терминал всё равно
+ * открывался в модалке, а не превращался в сундук.
+ */
+export const roomHasTerminalProtocol = (room?: RoomStateEntry | null): boolean => (
+  room?.capabilities?.terminalHacking === true
+  // Реестр terminalStates присылает только обновлённый сервер.
+  || Object.keys(room?.terminalStates || {}).length > 0
+);
+
+export const roomSupportsTerminalProtocol = (code: string): boolean => (
+  roomHasTerminalProtocol(useRoomStore.getState().rooms?.[code])
+);
