@@ -1,8 +1,9 @@
 {
-  "version": "481",
+  "version": "487",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Взлом терминалов: создавайте терминалы с паролями разной длины, взламывайте их вместе с комнатой и размещайте в локациях; попытки и результаты синхронизируются, Programmer’s Digest учитывается в листе персонажа.",
       "Свой портрет персонажа: на листе персонажа можно выбрать собственное изображение вместо стандартной иллюстрации происхождения или вернуть исходное; портрет сохраняется локально и синхронизируется с Google Drive.",
       "Раздел «Собственное снаряжение» в Настройках: загружайте JSON-наборы предметов из Кузницы предметов и при необходимости удаляйте их вместе со следами в сохранениях.",
       "Категория «Самодельное снаряжение»: предметы из загруженных наборов собраны в отдельной категории со своими подразделами по типам оружия, робо-оружию и боеприпасам, а также доступны в лавке и окне модификации оружия.",
@@ -13,6 +14,7 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Terminal hacking: create terminals with passwords of varying lengths, hack them together as a room, and place them in locations; attempts and outcomes stay synchronized, and Programmer’s Digest is tracked on the character sheet.",
       "Custom character portrait: on the character sheet you can choose your own image instead of the default origin artwork or reset it back; the portrait is saved locally and synced with Google Drive.",
       "«Own equipment» section in Settings: load JSON content packs from the Item Forge and, when needed, delete a pack along with its items across character saves.",
       "«Homebrew Equipment» category: items from loaded packs appear in their own category with subsections by weapon type, robot weapons, and ammo, and are available in the shop and weapon modification window.",
