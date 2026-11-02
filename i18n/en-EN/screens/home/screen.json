@@ -218,7 +218,18 @@
   "about": {
     "description": "Positronium is a tabletop RPG character manager: create, store, edit, import/export, and sync characters to the cloud.",
     "privacyPolicy": "Privacy policy",
-    "termsOfService": "Terms of service"
+    "termsOfService": "Terms of service",
+    "unofficialTitle": "Unofficial fan project",
+    "unofficial": "This application is an unofficial, fan-made project created by enthusiasts without the involvement of the rights holders. All trademarks, names, characters, setting elements, imagery and other intellectual property, including Fallout, remain the property of their respective owners, including Bethesda Softworks LLC, ZeniMax Media Inc., Microsoft Corporation and Modiphius Entertainment Ltd. This project is not endorsed, sponsored by, or affiliated with those parties, and no rights in the intellectual property are granted to the user.",
+    "engineTitle": "Engine code and data",
+    "engine": "The application engine is distributed under the GNU Affero General Public License (AGPL). Game data, word lists and reference materials are compiled independently by community contributors.",
+    "creditsTitle": "Credits and licences",
+    "creditsIntro": "The terminal hacking word list is compiled using the following works. The notices are reproduced verbatim as required by their distribution terms.",
+    "creditEowl": "Word list: English Open Word List (EOWL) v1.1.2, derived from the UK Advanced Cryptics Dictionary v1.6; distributed in brianburton/fallout_terminal_hack_game (BSD 3-Clause).",
+    "licenseUkacd": "UK Advanced Cryptics Dictionary Licensing Information:\n\nCopyright © J Ross Beresford 1993-1999. All Rights Reserved. The\nfollowing restriction is placed on the use of this publication: if the\nUK Advanced Cryptics Dictionary is used in a software package or\nredistributed in any form, the copyright notice must be prominently\ndisplayed and the text of this document must be included verbatim.\n\nThere are no other restrictions: I would like to see the list\ndistributed as widely as possible.",
+    "creditEsdb": "Recognizability filter: English Speller Database (ESDB, formerly SCOWL) size ≤ 35, en-wl/wordlist repository.",
+    "licenseEsdb": "Copyright 2000-2026 by Kevin Atkinson\n\nPermission to use, copy, modify, distribute, and sell any part of the English\nSpeller Database (ESDB, previously known as SCOWLv2), or word lists\ncreated from it, is hereby granted without fee, provided that the above\ncopyright notice appears in all copies and that both the above copyright\nnotice and this notice appear in supporting documentation.  Kevin Atkinson\nmakes no representations about the suitability of this database for any\npurpose.  It is provided \"as is\" without express or implied warranty.",
+    "creditBrian": "The Google frequency list and materials derived from it are not used in the build."
   },
   "gameSetting": {
     "title": "Game setting",

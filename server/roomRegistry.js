@@ -51,6 +51,8 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
     lastSnapshots: new Map(), // characterId -> { characterId, revision, snapshot, fromClientId, fromName, updatedAt }
     activeSession: null, // открытый контейнер добычи или торговец
     terminalStates: new Map(), // общая мини-игра по containerId, не блокирует activeSession
+    // Патч 495: слова последних досок, чтобы соседние терминалы не повторялись.
+    recentTerminalWords: [],
     lastClosedSession: null, // { session, closedReason, closedAt } — для сверки Мастера после реконнекта
     directives: [], // очередь команд Мастера с подтверждением доставки (ack по characterId)
     createdAt: now(),
@@ -404,9 +406,15 @@ const createRoomRegistry = ({ now = () => Date.now(), rng = undefined, limits = 
       characterSnapshot: snapshot,
       value,
       now: now(),
+      excludeWords: room.recentTerminalWords || [],
     });
     if (result.error) return { error: ERROR_CODE[result.error] || result.error };
     entry.game = result.game;
+    if (action === 'start' && Array.isArray(entry.game?.wordRanges)) {
+      // Держим слова последних трёх досок (по 12–20 слов каждая).
+      const fresh = entry.game.wordRanges.map((range) => range.word);
+      room.recentTerminalWords = [...fresh, ...(room.recentTerminalWords || [])].slice(0, 60);
+    }
     if (entry.game?.status === 'locked') entry.locked = true;
     if (result.usedDigest) {
       const nextSnapshot = JSON.parse(JSON.stringify(published.snapshot || {}));

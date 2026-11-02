@@ -281,6 +281,19 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: '#f0e68c', fontSize: 18, fontWeight: '700', marginBottom: 10 },
   infoText: { color: '#e5e7eb', fontSize: 14, lineHeight: 20 },
+  // 495: «О приложении» — дисклеймер, AGPL и дословные лицензии словаря.
+  aboutModal: { maxWidth: 620, maxHeight: '88%' },
+  aboutScroll: { maxHeight: '72%' },
+  aboutScrollContent: { paddingBottom: 8 },
+  aboutSectionTitle: {
+    color: '#f0e68c', fontSize: 14, fontWeight: '700',
+    marginTop: 14, marginBottom: 6,
+  },
+  aboutSmall: { color: '#cbd5e1', fontSize: 12, lineHeight: 17, marginBottom: 6 },
+  aboutLegal: {
+    color: '#a7b6c4', fontSize: 11, lineHeight: 15, fontFamily: 'monospace',
+    backgroundColor: '#0b1220', borderRadius: 6, padding: 8, marginBottom: 10,
+  },
   // 389: диагностика установки PWA
   diagBlock: { width: '100%', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#ddd' },
   diagTitle: { fontSize: 13, fontWeight: '700', color: '#333', marginBottom: 4 },

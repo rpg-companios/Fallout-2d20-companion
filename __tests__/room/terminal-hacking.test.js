@@ -11,17 +11,21 @@ const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
-  it('uses the agreed recovery probability checkpoints and clamp', () => {
-    expect(recoveryChancePercent(4, 0)).toBe(0);
-    expect(recoveryChancePercent(4, 3)).toBe(10);
-    expect(recoveryChancePercent(10, 6)).toBe(80);
-    expect(recoveryChancePercent(1, 0)).toBe(0);
-    expect(recoveryChancePercent(12, 10)).toBe(80);
+  // Патч 495: вероятность восстановления зависит только от Удачи (LCK 4..10),
+  // минимальный шанс 10 %, максимальный 80 %.
+  it('uses the agreed luck-based recovery probability checkpoints and clamp', () => {
+    expect(recoveryChancePercent(4)).toBe(10);
+    expect(recoveryChancePercent(7)).toBe(45);
+    expect(recoveryChancePercent(10)).toBe(80);
+    expect(recoveryChancePercent(1)).toBe(10);
+    expect(recoveryChancePercent(12)).toBe(80);
+    expect(recoveryChancePercent(0)).toBe(10);
   });
 
+  // Патч 495: база доски — 20 слов на любой сложности, длина = d + 4.
   it.each([
-    [0, 4], [1, 5], [2, 6], [3, 7], [4, 8], [5, 9],
-  ])('difficulty %s creates a %s-letter password', (difficulty, wordLength) => {
+    [0, 4, 20], [1, 5, 20], [2, 6, 20], [3, 7, 20], [4, 8, 20], [5, 9, 20],
+  ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
       config: { ...config, difficulty, lockOnFailure: false },
       operatorClientId: 'player-1',
@@ -32,10 +36,11 @@ describe('shared Fallout terminal hacking rules', () => {
     });
     expect(game.wordLength).toBe(wordLength);
     expect(game.password).toHaveLength(wordLength);
-    expect(game.wordRanges).toHaveLength(12);
+    expect(game.wordRanges).toHaveLength(wordCount);
+    expect(game.wordCount).toBe(wordCount);
   });
 
-  it('Hacker rank reduces effective difficulty dynamically and difficulty zero marks the password', () => {
+  it('Hacker rank reduces effective difficulty dynamically and difficulty zero never leaks the password', () => {
     const snapshot = {
       attributes: { INT: { value: 8 } },
       selectedPerks: [{ id: 'hacker', rank: 1 }, { id: 'hacker', rank: 3 }],
@@ -62,21 +67,29 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(easy.effectiveDifficulty).toBe(0);
     expect(easy.wordLength).toBe(4);
     const publicState = publicGameState(easy);
-    expect(publicState.wordRanges.filter((entry) => entry.isPassword)).toHaveLength(1);
+    // Патч 495: подчёркивания больше нет — d=0 решается поиском «выброса»
+    // среди анаграммных семей; пароль клиенту не передаётся.
+    expect(publicState.wordRanges.filter((entry) => entry.isPassword)).toHaveLength(0);
     expect(publicState.password).toBeUndefined();
   });
 
-  it('rolls at most one attempt-restoring bracket per board and restores all attempts', () => {
+  it('rolls attempt-restoring brackets only with Science >= 4 and adds one attempt', () => {
     const game = createGame({
       config: { ...config, difficulty: 0 },
       operatorClientId: 'player-1',
       operatorCharacterId: 'char-1',
-      characterSnapshot: { attributes: { INT: { value: 10 } }, skills: [{ id: 'science', value: 6 }] },
+      characterSnapshot: {
+        attributes: { INT: { value: 10 }, LCK: { value: 10 } },
+        skills: [{ id: 'science', value: 6 }],
+      },
       now: 100,
       rng: noRandomness,
     });
     const recoveryBrackets = game.bracketRanges.filter((entry) => entry.recovery);
-    expect(recoveryBrackets).toHaveLength(1);
+    expect(recoveryBrackets.length).toBeGreaterThanOrEqual(1);
+    expect(recoveryBrackets.length).toBeLessThanOrEqual(2);
+    expect(game.bracketRanges.length).toBe(9); // 2 + Наука 6 + синергия ИНТ>=8
+    expect(game.restoreSlots).toBe(recoveryBrackets.length);
     expect(publicGameState(game).bracketRanges.every((entry) => !('recovery' in entry))).toBe(true);
     let next = { ...game, attempts: 1 };
     const result = applyGameAction({
@@ -90,9 +103,20 @@ describe('shared Fallout terminal hacking rules', () => {
       rng: noRandomness,
     });
     next = result.game;
-    expect(next.attempts).toBe(4);
-    expect(next.bracketRanges.filter((entry) => entry.recovery)).toHaveLength(1);
+    expect(next.attempts).toBe(2); // была 1 -> +1, а не полный сброс до 4
+    expect(next.bracketRanges.filter((entry) => entry.recovery).length)
+      .toBe(recoveryBrackets.length);
     expect(next.bracketRanges.find((entry) => entry.id === recoveryBrackets[0].id).used).toBe(true);
+
+    const noScience = createGame({
+      config: { ...config, difficulty: 0 },
+      operatorClientId: 'player-1',
+      operatorCharacterId: 'char-1',
+      characterSnapshot: { attributes: { INT: { value: 10 }, LCK: { value: 10 } }, skills: [] },
+      now: 100,
+      rng: noRandomness,
+    });
+    expect(noScience.bracketRanges.filter((entry) => entry.recovery)).toHaveLength(0);
   });
 
   it('offers Programmer’s Digest only once per character and grants one extra attempt', () => {

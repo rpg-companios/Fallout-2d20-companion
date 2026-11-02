@@ -63,7 +63,7 @@
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
     "terminalDifficultyLabel": "Difficulty · password length",
-    "terminalDifficultyHint": "Hacker reduces effective difficulty by its rank. At difficulty 0, the correct word is underlined.",
+    "terminalDifficultyHint": "Hacker lowers the effective difficulty by 1 (minimum 0). Difficulty sets the password length and the hint limit; at difficulty 0 the terminal may be skipped under the rules. INT (4–10) reduces the board from 20 to 12 words. Science (0–6) adds bracket combinations and, from rank 4, unlocks attempt recovery. Luck (4–10) sets the chance that such a combination appears. Luck points are not spent while hacking.",
     "terminalLockLabel": "Lock the terminal after all attempts are failed"
   },
   "detail": {

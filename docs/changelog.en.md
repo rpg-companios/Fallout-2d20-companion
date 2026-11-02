@@ -1,5 +1,69 @@
 # Changelog
 ---
+## Own word list, three stats and the About screen (patch 495)
+
+**At the owner's request.** The hacking dictionary is now our own compilation
+from EOWL (UKACD) and ESDB/SCOWL — both permit commercial use with a notice.
+The Google frequency list, which carries a non-commercial LDC caveat, was
+removed from the build entirely. Result: six per-length files
+(`server/terminalWords/words-4.json … words-9.json`), **12,308 real words**
+instead of the previous 34–64 per length, so consecutive terminals no longer
+repeat the same candidates. Generator: `scripts/build-terminal-words.mjs`,
+notes: `docs/terminal-words.md`.
+
+**Three separate levers:**
+
+| Stat | Effect |
+|---|---|
+| INT 4–10 | board size: `20 → 12` words (20, 19, 17, 16, 15, 13, 12) |
+| Science 0–6 | `2 → 8` bracket combinations; +1 when INT ≥ 8 and Science ≥ 4; recovery combinations unlock at Science 4 |
+| Luck 4–10 | chance of a recovery combination appearing, `10 → 80 %`, never zero |
+| Luck points | never spent while hacking; spending them before/after is a table decision by the GM |
+
+A recovery combination grants **+1 attempt** (not a full reset to four) and
+cannot appear below Science 4. Other brackets remove exactly one dud each.
+
+**Word selection.** A secret word is picked at random from the dictionary of
+the required length, then duds with varying likeness are drawn from that same
+dictionary. Hints are limited to `3/3/3/2/2/2`, and at least 3 candidates
+survive any first wrong guess (4 at difficulty 5). At difficulty 0 the board
+uses large real anagram families (`POST/SPOT/STOP/TOPS/POTS …`) with a
+maximally dissimilar outlier as the password; it is no longer underlined.
+Words from the last three boards of a room are excluded from the next one.
+
+**UI.** The internal thresholds line («N words · hint ≤ K/M · INT+Science
+S/16») was removed from the hacking window. «About app» now carries a formal
+unofficial-fan disclaimer naming Bethesda Softworks, ZeniMax Media, Microsoft
+and Modiphius Entertainment, states that the engine is distributed under the
+**GNU Affero General Public License (AGPL)** with data compiled by community
+contributors, and reproduces the **UKACD and ESDB notices verbatim** as their
+licences require.
+
+Details: `docs/patch-495-install.md`, `docs/terminal-hacking-balance-proposal.md`,
+`docs/terminal-words.md`, `scripts/terminal-words/LICENSES.md`.
+
+## Terminal hacking is harder and fairer now (patch 494)
+
+**Symptom:** at difficulty 5 with INT 4 and Science 0, a player got a `4/9`
+hint from the first word and guessed the password on the second attempt. The
+board used random words, and character stats never changed the word count.
+
+**Fix** (following the [Fallout 3 hacking rules](https://fallout.fandom.com/wiki/Hacking_(Fallout_3)), adapted to INT 4–10 and Science 0–6):
+
+- the numeric hint is capped by difficulty: `3/4` on easy, `3/6` on average,
+  `2/8` and `2/9` on hard — `4/9` and higher can no longer appear;
+- all candidate words are similar (shared letter sets, different positions),
+  with anagram families added to the 4- and 5-letter dictionaries;
+- the generator rejects boards where one hint leaves only 1–2 candidates:
+  at least 3 words survive any first guess (4 at difficulty 5);
+- `INT + Science` (`4…16`) shrinks the word list: 12 → 6 at difficulty 0,
+  13 → 12 at difficulty 5 — maximum skill still keeps a very hard terminal
+  hard. The existing chance of an attempt-restoring bracket is unchanged;
+- the hacking window shows «N words · hint ≤ K/M · INT+Science S/16».
+
+Thresholds, rationale and tunable constants: `docs/patch-494-terminal-balance.md`.
+
+---
 ## A terminal inside a location opens the hacking mini-game instead of a chest (patch 493)
 
 **Symptom:** the GM created a terminal and linked it into a location, but players

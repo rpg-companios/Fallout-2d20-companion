@@ -1,5 +1,9 @@
 # Установка патча 493: терминал в локации открывает мини-игру
 
+> Актуальная версия — патч **495** (собственный словарь, ИНТ/Наука/Удача,
+> окно «О приложении»). Установка: `./apply-patch.sh 495`, описание:
+> `docs/patch-495-install.md`. История: 494 — `docs/patch-494-terminal-balance.md`.
+
 Патч подготовлен **от коммита `a62ec7109b50ad720641a4fdeb48f1de865d8742`**
 (`main`, версия 491, уже установлены патчи 482 и 488–491). Проверено:
 `git apply --check patchs/493-terminal-hacking-on-main-491.patch` проходит на
@@ -15,10 +19,10 @@
 ```bash
 git fetch origin arena/054e6676-fallout-2d20-companion
 sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
-./apply-patch.sh 493
+./apply-patch.sh 495
 ```
 
-`patchs/baseline.json` в ветке-источнике равен `493`, поэтому установщик работает
+`patchs/baseline.json` в ветке-источнике равен `495`, поэтому установщик работает
 в режиме отсечки: за один шаг он приводит всё дерево к состоянию коммита,
 в котором добавлен `patchs/493-terminal-hacking-on-main-491.patch`. Никакие
 промежуточные патчи поверх не накладываются, а файлы «Окружающая среда/бой»
@@ -28,7 +32,7 @@ sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-comp
 
 `./apply-patch.sh --status` до установки может написать «Всё актуально»: старые
 патчи из цепочки уже перекрыты содержимым `a62ec71`. Ориентируйтесь на версию в
-`public/version.json` (`491`) и просто запускайте `./apply-patch.sh 493`.
+`public/version.json` (`491`) и просто запускайте `./apply-patch.sh 495`.
 
 После установки:
 
