@@ -27,7 +27,7 @@
     "edit": "Edit",
     "delete": "Delete",
     "copySuffix": "copy",
-    "terminalDifficulty": "Difficulty {difficulty} · {length}-letter password"
+    "terminalDifficulty": "Difficulty {difficulty}"
   },
   "form": {
     "createLootTitle": "New Loot Container",
@@ -62,8 +62,7 @@
     "validationRoom": "Please select a room.",
     "createTerminalTitle": "Create hacking terminal",
     "editTerminalTitle": "Terminal settings",
-    "terminalDifficultyLabel": "Difficulty · password length",
-    "terminalDifficultyHint": "Hacker lowers the effective difficulty by 1 per rank (minimum 0). Attempts are always 4 and brackets never raise them above 4. Word count is 20 + 2·difficulty − INT (at difficulty 5 that is 26 words at INT 4 and 20 at INT 10). Words share letters but differ in order; the hint shows only the number of matching positions. Science 0–6 sets the number of bracket pairs and their effect (remove words / restore an attempt); Luck 4–10 gives a 5–20% chance of a full restore on each bracket. Luck points are never spent while hacking.",
+    "terminalDifficultyLabel": "Difficulty",
     "terminalLockLabel": "Lock the terminal after all attempts are failed"
   },
   "detail": {
@@ -232,7 +231,6 @@
   },
   "terminal": {
     "title": "Terminal",
-    "localMode": "This room server does not support a shared hack — the game runs locally on this device.",
     "hack": "Hack",
     "ready": "SYSTEM READY FOR INPUT",
     "failed": "ATTEMPTS EXHAUSTED",

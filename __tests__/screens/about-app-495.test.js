@@ -85,14 +85,18 @@ describe('патч 495: окно «О приложении»', () => {
   });
 });
 
-describe('патч 495: строка с внутренними порогами убрана из мини-игры', () => {
-  it('в модалке и словарях нет balanceHint', () => {
+describe('патч 495 / 498: в мини-игре нет служебных подсказок', () => {
+  it('нет balanceHint, длинной подсказки и строки про локальный режим', () => {
+    for (const dict of [RU_LOOT, EN_LOOT]) {
+      expect(dict.terminal.balanceHint).toBeUndefined();
+      expect(dict.form.terminalDifficultyHint).toBeUndefined();
+      expect(dict.terminal.localMode).toBeUndefined();
+      expect(dict.card.terminalDifficulty).not.toContain('{length}');
+      expect(dict.card.terminalDifficulty).toContain('{difficulty}');
+    }
     expect(MODAL).not.toContain('balanceHint');
-    expect(RU_LOOT.terminal.balanceHint).toBeUndefined();
-    expect(EN_LOOT.terminal.balanceHint).toBeUndefined();
-    expect(RU_LOOT.form.terminalDifficultyHint).toContain('ИНТ');
-    expect(EN_LOOT.form.terminalDifficultyHint).toContain('Luck');
-    // Наследие патча 494: в EN-подсказке не должно быть запрещённого «caps».
-    expect(EN_LOOT.form.terminalDifficultyHint).not.toMatch(/\bcaps\b|\bCD\b/i);
+    expect(MODAL).not.toContain('terminal.localMode');
+    expect(MODAL).not.toContain('terminalDifficultyHint');
+    expect(MODAL).not.toContain('localModeHint');
   });
 });
