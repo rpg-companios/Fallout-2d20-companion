@@ -1,0 +1,750 @@
+diff --git a/__tests__/room/terminal-brackets-499.test.js b/__tests__/room/terminal-brackets-499.test.js
+new file mode 100644
+index 0000000..c295733
+--- /dev/null
++++ b/__tests__/room/terminal-brackets-499.test.js
+@@ -0,0 +1,116 @@
++// Приёмочный тест 499: скобки двух сортов, число задаёт Наука,
++// слепой перебор невелик, думающий выигрывает, удача даёт 100 %.
++import { describe, expect, it } from 'vitest';
++import {
++  BRACKET_COUNT_BY_SCIENCE,
++  applyGameAction,
++  bracketSplitFor,
++  createGame,
++  positionalLikeness,
++} from '../../server/terminalHacking.js';
++
++const snapshot = (int, sci, luck) => ({
++  attributes: { INT: { value: int }, LCK: { value: luck } },
++  skills: [{ id: 'science', rank: sci }],
++});
++const gameFor = (d, int, sci, luck, seed) => createGame({
++  config: { containerId: 't', difficulty: d, lockOnFailure: false },
++  operatorClientId: 'p', operatorCharacterId: 'c',
++  characterSnapshot: snapshot(int, sci, luck), now: 100, rng: () => seed,
++});
++const rngFor = (seed) => {
++  let s = seed >>> 0;
++  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
++};
++
++const play = (game, strategy, rnd) => {
++  let g = game;
++  let cands = g.wordRanges.filter((w) => !w.removed).map((w) => w.word);
++  const ids = [...g.bracketRanges].map((b) => b.id);
++  for (let step = 0; step < 28; step += 1) {
++    if (g.status !== 'playing') break;
++    const unused = ids.filter((id) => !g.bracketRanges.find((x) => x.id === id).used);
++    if (unused.length && g.attempts <= 2) {
++      const r = applyGameAction({
++        game: g, action: 'bracket', clientId: 'p', characterId: 'c',
++        characterSnapshot: {}, value: unused[0], now: 101 + step, rng: rnd,
++      });
++      if (!r.error) g = r.game;
++    }
++    const live = new Set(cands);
++    const available = g.wordRanges.filter((w) => !w.removed && live.has(w.word));
++    if (!available.length) break;
++    let chosen = available[Math.floor(rnd() * available.length)];
++    if (strategy === 'clever') {
++      const list = cands.filter((w) => available.some((a) => a.word === w));
++      chosen = available.find((a) => a.word === list[Math.floor(rnd() * list.length)]) || available[0];
++    }
++    const r = applyGameAction({
++      game: g, action: 'guess', clientId: 'p', characterId: 'c',
++      characterSnapshot: {}, value: chosen.id, now: 200 + step, rng: rnd,
++    });
++    if (r.error) break;
++    g = r.game;
++    if (strategy === 'clever') {
++      const last = g.guesses[g.guesses.length - 1];
++      if (last) cands = cands.filter((w) => w !== chosen.word && positionalLikeness(chosen.word, w) === last.likeness);
++    }
++  }
++  return g.status === 'won';
++};
++const rate = (d, sci, strategy, forcedFull = false, boards = 20, reps = 6) => {
++  let wins = 0, n = 0;
++  for (let k = 1; k <= boards; k += 1) {
++    let g = gameFor(d, 10, sci, 4, k / (boards + 1));
++    if (forcedFull) {
++      g = {
++        ...g,
++        bracketRanges: g.bracketRanges.map((b) => ({
++          ...b,
++          effect: { words: b.kind === 'word' ? 1 : 0, attempts: 0, full: true, kind: b.kind },
++        })),
++      };
++    }
++    for (let x = 0; x < reps; x += 1) {
++      if (play(g, strategy, rngFor(k * 7919 + x * 104729))) wins += 1;
++      n += 1;
++    }
++  }
++  return Math.round(100 * wins / n);
++};
++
++describe('патч 499: скобки двух сортов', () => {
++  it('число и состав скобок не зависят от сложности', () => {
++    for (let sci = 0; sci <= 6; sci += 1) {
++      const counts = [];
++      for (let d = 0; d <= 5; d += 1) {
++        const g = gameFor(d, 10, sci, 4, 0.42);
++        counts.push(g.bracketRanges.length);
++        const split = bracketSplitFor(sci);
++        if (sci !== 1) {
++          expect(g.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(split[0]);
++          expect(g.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(split[1]);
++        }
++        // Одна скобка = один эффект (до удачи).
++        for (const b of g.bracketRanges) {
++          expect(b.effect.words + b.effect.attempts).toBeLessThanOrEqual(1);
++        }
++      }
++      expect(new Set(counts).size).toBe(1);
++      expect(counts[0]).toBe(BRACKET_COUNT_BY_SCIENCE[sci]);
++    }
++  });
++
++  it('на сложности 5 при Науке 6 слепой <= 40 %, думающий >= 85 %', () => {
++    expect(rate(5, 6, 'blind')).toBeLessThanOrEqual(40);
++    expect(rate(5, 6, 'clever')).toBeGreaterThanOrEqual(85);
++  }, 30000);
++
++  it('удачное полное восстановление доводит думающего до 100 %', () => {
++    expect(rate(5, 6, 'clever', true)).toBe(100);
++  }, 30000);
++
++  it('на сложности 1 при Науке 6 + ИНТ 10 взлом лёгкий для думающего', () => {
++    expect(rate(1, 6, 'clever')).toBeGreaterThanOrEqual(95);
++  }, 30000);
++});
+diff --git a/__tests__/room/terminal-hacking-balance-497.test.js b/__tests__/room/terminal-hacking-balance-499.test.js
+similarity index 82%
+rename from __tests__/room/terminal-hacking-balance-497.test.js
+rename to __tests__/room/terminal-hacking-balance-499.test.js
+index 450c45b..206bd97 100644
+--- a/__tests__/room/terminal-hacking-balance-497.test.js
++++ b/__tests__/room/terminal-hacking-balance-499.test.js
+@@ -1,15 +1,17 @@
+-// Приёмочный тест патча 497: канонические 4 попытки, N = 20 + 2·D − ИНТ,
+-// детерминированные пакеты Науки, удача 5–20 %, доска «последовательности».
++// Приёмочный тест патча 499: канонические 4 попытки, N = 20 + 2·D − ИНТ,
++// скобки двух сортов, число скобок задаёт Наука, удача 5–20 %,
++// доска «последовательности».
+ import { describe, expect, it } from 'vitest';
+ import { getWordsByLength } from '../../server/terminalWords/index.js';
+ import {
+   AMBIGUITY_TARGET_BY_DIFFICULTY,
+   BASE_WORDS_BY_DIFFICULTY,
+-  BRACKETS_BY_DIFFICULTY,
++  BRACKET_SPLIT_BY_SCIENCE,
++  BRACKET_COUNT_BY_SCIENCE,
+   MAX_LIKENESS_BY_DIFFICULTY,
+   MIN_AMBIGUITY_BY_DIFFICULTY,
+   MIN_SHARED_BY_DIFFICULTY,
+-  SCIENCE_PACKS,
++  bracketSplitFor,
+   applyGameAction,
+   attemptsForDifficulty,
+   bracketCountFor,
+@@ -42,7 +44,7 @@ const rngFor = (seed) => {
+   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+ };
+ 
+-describe('патч 497: число слов, попытки и скобочные пары', () => {
++describe('патч 499: число слов, попытки и скобочные пары', () => {
+   it('N = max(4, 20 + 2·D − ИНТ)', () => {
+     expect(BASE_WORDS_BY_DIFFICULTY).toEqual([16, 18, 20, 22, 24, 26]);
+     for (let d = 0; d <= 5; d += 1) {
+@@ -65,27 +67,34 @@ describe('патч 497: число слов, попытки и скобочны
+     }
+   });
+ 
+-  it('число скобок по сложности, Наука 0 — без скобок', () => {
+-    expect(BRACKETS_BY_DIFFICULTY).toEqual([4, 4, 3, 3, 2, 2]);
++  it('число скобок задаёт Наука на ВСЕХ сложностях', () => {
++    expect(BRACKET_SPLIT_BY_SCIENCE).toEqual([[0, 0], [0, 0], [1, 0], [1, 1], [2, 1], [1, 2], [2, 2]]);
++    expect(BRACKET_COUNT_BY_SCIENCE).toEqual([0, 1, 1, 2, 3, 3, 4]);
+     expect(bracketCountFor(5, 0, 20)).toBe(0);
+-    expect(bracketCountFor(0, 1, 16)).toBe(4);
+-    expect(bracketCountFor(5, 6, 20)).toBe(2);
++    expect(bracketCountFor(0, 1, 16)).toBe(1);
++    expect(bracketCountFor(5, 6, 20)).toBe(4);
++    expect(bracketCountFor(0, 6, 20)).toBe(4); // сложность НЕ ограничивает
+     expect(bracketCountFor(5, 6, 4)).toBe(1); // предохранитель N−3
+     for (let d = 0; d <= 5; d += 1) {
+-      const game = gameFor({ difficulty: d, int: 10, science: 6, luck: 10 });
+-      expect(game.bracketRanges).toHaveLength(BRACKETS_BY_DIFFICULTY[d]);
+-      const noScience = gameFor({ difficulty: d, int: 10, science: 0, luck: 10 });
+-      expect(noScience.bracketRanges).toHaveLength(0);
++      for (let sci = 0; sci <= 6; sci += 1) {
++        const game = gameFor({ difficulty: d, int: 10, science: sci, luck: 10 });
++        expect(game.bracketRanges, `D${d} Наука ${sci}`).toHaveLength(BRACKET_COUNT_BY_SCIENCE[sci]);
++        const split = bracketSplitFor(sci);
++        if (sci !== 1) {
++          expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(split[0]);
++          expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(split[1]);
++        }
++      }
+     }
+   });
+ 
+-  it('пакеты Науки детерминированы, удача восстанавливает к 4', () => {
+-    expect(SCIENCE_PACKS).toEqual({ 2: [1, 0], 3: [1, 1], 4: [2, 1], 5: [1, 2], 6: [2, 2] });
+-    expect(bracketEffectFor(6, 10, () => 0.99)).toEqual({ words: 2, attempts: 2, full: false });
+-    expect(bracketEffectFor(6, 10, () => 0)).toEqual({ words: 2, attempts: 0, full: true });
+-    expect(bracketEffectFor(2, 4, () => 0)).toEqual({ words: 1, attempts: 0, full: true });
+-    expect(bracketEffectFor(1, 4, () => 0)).toEqual({ words: 0, attempts: 0, full: true });
+-    // Попытки никогда не превышают 4, даже если подряд применены обе скобки.
++  it('одна скобка = один эффект; удача восстанавливает к 4', () => {
++    expect(bracketEffectFor(6, 10, () => 0.99, 'word')).toEqual({ words: 1, attempts: 0, full: false, kind: 'word' });
++    expect(bracketEffectFor(6, 10, () => 0.99, 'attempt')).toEqual({ words: 0, attempts: 1, full: false, kind: 'attempt' });
++    expect(bracketEffectFor(6, 10, () => 0, 'word')).toEqual({ words: 1, attempts: 0, full: true, kind: 'word' });
++    expect(bracketEffectFor(2, 4, () => 0, 'word')).toEqual({ words: 1, attempts: 0, full: true, kind: 'word' });
++    expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
++    // Попытки никогда не превышают 4, даже если применены все 4 скобки подряд.
+     const game = gameFor({ difficulty: 5, int: 10, science: 6, luck: 10, seed: 0 });
+     let next = { ...game, attempts: 1 };
+     for (const bracket of game.bracketRanges) {
+@@ -96,7 +105,9 @@ describe('патч 497: число слов, попытки и скобочны
+     }
+     expect(next.attempts).toBe(4);
+     expect(next.attempts).toBeLessThanOrEqual(next.maxAttempts);
+-    expect(publicGameState(next).bracketRanges.every((b) => !('effect' in b) && !('recovery' in b))).toBe(true);
++    expect(publicGameState(next).bracketRanges.every((b) => (
++      !('effect' in b) && !('recovery' in b) && !('kind' in b)
++    ))).toBe(true);
+   });
+ 
+   it('справочная сумма ИНТ + Наука остаётся в границах 4..16', () => {
+@@ -106,7 +117,7 @@ describe('патч 497: число слов, попытки и скобочны
+   });
+ });
+ 
+-describe('патч 497: доска «последовательности»', () => {
++describe('патч 499: доска «последовательности»', () => {
+   it('MIN_SHARED = L−3, предел подсказки из 495, пол неоднозначности поднят на D4–D5', () => {
+     expect(MIN_SHARED_BY_DIFFICULTY).toEqual([1, 2, 3, 4, 5, 6]);
+     expect(MAX_LIKENESS_BY_DIFFICULTY).toEqual([3, 3, 3, 2, 2, 2]);
+@@ -199,7 +210,7 @@ describe('патч 497: доска «последовательности»', ()
+ 
+ // Приёмка владельца: слепой перебор невелик, думающий >= 80 % без бонусов
+ // и 100 % при удачных скобках. Скобки тратятся при попытках <= 2 (USE_AT=2).
+-describe('патч 497: баланс слепого перебора и вдумчивого разбора', () => {
++describe('патч 499: баланс слепого перебора и вдумчивого разбора', () => {
+   const play = (game, strategy, rnd) => {
+     let g = game;
+     let cands = g.wordRanges.filter((w) => !w.removed).map((w) => w.word);
+@@ -248,7 +259,7 @@ describe('патч 497: баланс слепого перебора и вдум
+     return Math.round(100 * wins / n);
+   };
+ 
+-  it('D5: слепой <= 55 %, думающий >= 80 %, при Науке 6 думающий 100 %', () => {
++  it('D5: слепой <= 55 %, думающий >= 80 %, при Науке 6 думающий >= 90 %', () => {
+     const blind0 = rate(5, 0, 'blind');
+     const blind6 = rate(5, 6, 'blind');
+     const clever0 = rate(5, 0, 'clever');
+@@ -256,7 +267,7 @@ describe('патч 497: баланс слепого перебора и вдум
+     expect(blind0).toBeLessThanOrEqual(35);
+     expect(blind6).toBeLessThanOrEqual(55);
+     expect(clever0).toBeGreaterThanOrEqual(80);
+-    expect(clever6).toBeGreaterThanOrEqual(95);
++    expect(clever6).toBeGreaterThanOrEqual(90);
+   }, 30000);
+ 
+   it('D4: думающий остаётся в полосе 80–98 % без бонусов', () => {
+diff --git a/__tests__/room/terminal-hacking.test.js b/__tests__/room/terminal-hacking.test.js
+index d1464c9..b624360 100644
+--- a/__tests__/room/terminal-hacking.test.js
++++ b/__tests__/room/terminal-hacking.test.js
+@@ -13,8 +13,9 @@ const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty:
+ const noRandomness = () => 0;
+ 
+ describe('shared Fallout terminal hacking rules', () => {
+-  // Патч 497: удача 4..10 даёт 5..20 % полного восстановления на скобку.
+-  it('uses the agreed luck checkpoints and deterministic Science packages', () => {
++  // Патч 499: удача 4..10 даёт 5..20 % полного восстановления на скобку,
++  // одна скобка делает ровно ОДИН эффект.
++  it('uses the agreed luck checkpoints and single-effect brackets', () => {
+     expect(recoveryChancePercent(4)).toBe(5);
+     expect(recoveryChancePercent(7)).toBe(13);
+     expect(recoveryChancePercent(10)).toBe(20);
+@@ -22,13 +23,16 @@ describe('shared Fallout terminal hacking rules', () => {
+     expect(recoveryChancePercent(12)).toBe(20);
+     expect(luckRestoreChance(4)).toBeCloseTo(0.05);
+     expect(luckRestoreChance(10)).toBeCloseTo(0.2);
+-    // Наука 6: (2 слова, 2 попытки); rng=()=>0 гарантирует удачу.
+-    expect(bracketEffectFor(6, 10, () => 0)).toEqual({ words: 2, attempts: 0, full: true });
+-    // rng=()=>0.99 — удачи нет, пакет остаётся целиком.
+-    expect(bracketEffectFor(6, 10, () => 0.99)).toEqual({ words: 2, attempts: 2, full: false });
+-    expect(bracketEffectFor(0, 10, () => 0)).toEqual({ words: 0, attempts: 0, full: false });
+-    // Наука 1: 50/50 слово или попытка; удача заменяет весь эффект.
+-    expect(bracketEffectFor(1, 4, () => 0)).toEqual({ words: 0, attempts: 0, full: true });
++    // rng=()=>0.99 — удачи нет: словная скобка убирает 1 слово,
++    // ходовая даёт +1 попытку, и никогда обе сразу.
++    expect(bracketEffectFor(6, 10, () => 0.99, 'word')).toEqual({ words: 1, attempts: 0, full: false, kind: 'word' });
++    expect(bracketEffectFor(6, 10, () => 0.99, 'attempt')).toEqual({ words: 0, attempts: 1, full: false, kind: 'attempt' });
++    // rng=()=>0 — удача: возврат к 4; словная часть на Науке >=2 остаётся.
++    expect(bracketEffectFor(6, 10, () => 0, 'word')).toEqual({ words: 1, attempts: 0, full: true, kind: 'word' });
++    expect(bracketEffectFor(6, 10, () => 0, 'attempt')).toEqual({ words: 0, attempts: 0, full: true, kind: 'attempt' });
++    expect(bracketEffectFor(0, 10, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: false, kind: 'none' });
++    // Наука 1: удача заменяет весь эффект (слов не убираем).
++    expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
+   });
+ 
+   // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
+@@ -84,7 +88,7 @@ describe('shared Fallout terminal hacking rules', () => {
+     expect(publicState.password).toBeUndefined();
+   });
+ 
+-  it('Science packages are deterministic and a full restore never exceeds 4 attempts', () => {
++  it('Science sets the bracket count on every difficulty and a full restore never exceeds 4', () => {
+     const snapshot = {
+       attributes: { INT: { value: 10 }, LCK: { value: 10 } },
+       skills: [{ id: 'science', value: 6 }],
+@@ -97,12 +101,17 @@ describe('shared Fallout terminal hacking rules', () => {
+       now: 100,
+       rng: noRandomness,
+     });
+-    expect(game.bracketRanges).toHaveLength(2); // таблица скобок: D5 -> 2
++    expect(game.bracketRanges).toHaveLength(4); // Наука 6 -> 4 скобки на ЛЮБОЙ сложности
++    expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(2);
++    expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(2);
+     for (const bracket of game.bracketRanges) {
+-      expect(bracket.effect.words).toBe(2);
+       expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
++      expect(bracket.effect.words).toBe(bracket.kind === 'word' ? 1 : 0);
++      expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
+     }
+-    expect(publicGameState(game).bracketRanges.every((entry) => !('effect' in entry) && !('recovery' in entry))).toBe(true);
++    expect(publicGameState(game).bracketRanges.every((entry) => (
++      !('effect' in entry) && !('recovery' in entry) && !('kind' in entry)
++    ))).toBe(true);
+ 
+     let next = { ...game, attempts: 1 };
+     for (const bracket of game.bracketRanges) {
+diff --git a/docs/changelog.en.md b/docs/changelog.en.md
+index 0ad40b5..56e4e9f 100644
+--- a/docs/changelog.en.md
++++ b/docs/changelog.en.md
+@@ -1,5 +1,25 @@
+ # Changelog
+ ---
++## Two kinds of brackets, count set by Science (patch 499)
++
++The owner clarified how the bonus table should be read: "2 words + 2 attempts"
++means **four brackets** — two remove one wrong word each, two give +1 attempt
++each. A single bracket does exactly one effect; combined packages are gone.
++Science 1 gives one bracket whose kind is a coin flip; Science 4 gives three
++brackets ("2 words + 1 attempt"), Science 5 gives three ("1 word + 2 attempts").
++
++**Science alone sets the bracket count**: `0, 1, 1, 2, 3, 3, 4` for Science
++0–6, at all six difficulties. The per-difficulty table `4/4/3/3/2/2` no
++longer caps it. At difficulty 1 with INT 10 and Science 6 the hack is indeed
++easy, while at difficulty 5 Science 6 still grants all four brackets. The
++bracket kind remains hidden until clicked, as in Fallout.
++
++Measured on the real engine (INT 10, LCK 4): difficulty 5 at Science 6 —
++blind guessing **21%**, informed deduction **94%**, **100%** after a lucky
++full restore; difficulty 1 at Science 6 — informed deduction **100%**.
++Word count `N = max(4, 20 + 2·D − INT)` is unchanged: 26 words at INT 4 and
++20 at INT 10 on difficulty 5. Installation: `docs/patch-499-install.md`.
++
+ ## Cleaner terminal UI (patch 498)
+ 
+ At the owner's request, redundant information was removed from the interface:
+diff --git a/docs/changelog.ru.md b/docs/changelog.ru.md
+index 1815ef0..a6ea005 100644
+--- a/docs/changelog.ru.md
++++ b/docs/changelog.ru.md
+@@ -1,6 +1,26 @@
+ # История изменений
+ 
+ ---
++## Скобки двух сортов, число задаёт Наука (патч 499)
++
++Владелец уточнил чтение таблицы бонусов: запись «2 слова + 2 попытки»
++означает **четыре скобки** — две убирают по одному ложному слову, две дают
++по +1 попытке. Одна скобка делает ровно один эффект; совмещённых пакетов
++больше нет. Наука 1 — одна скобка, её сорт выбирается монеткой; Наука 4 —
++три скобки «2 слова + 1 попытка», Наука 5 — три скобки «1 слово + 2 попытки».
++
++**Число скобок задаёт только Наука**: `0, 1, 1, 2, 3, 3, 4` для Науки 0–6,
++на всех шести сложностях. Таблица сложности `4/4/3/3/2/2` из предыдущей
++версии больше не ограничивает. Так на сложности 1 при ИНТ 10 и Науке 6
++взлом действительно лёгкий, а на сложности 5 Наука 6 даёт все четыре скобки.
++Сорт скобки по-прежнему скрыт до нажатия, как в Fallout.
++
++Замеры на реальном движке (ИНТ 10, УДЧ 4): сложность 5 при Науке 6 —
++слепой перебор **21 %**, думающий **94 %**, при удачном полном
++восстановлении **100 %**; сложность 1 при Науке 6 — думающий **100 %**.
++Число слов `N = max(4, 20 + 2·D − ИНТ)` не менялось: на сложности 5 это
++26 слов при ИНТ 4 и 20 при ИНТ 10. Установка: `docs/patch-499-install.md`.
++
+ ## Чистый интерфейс терминала (патч 498)
+ 
+ По просьбе владельца убраны лишние сведения из интерфейса:
+diff --git a/docs/guides/admin-and-loot-trade.en.md b/docs/guides/admin-and-loot-trade.en.md
+index 64902ab..ac3d458 100644
+--- a/docs/guides/admin-and-loot-trade.en.md
++++ b/docs/guides/admin-and-loot-trade.en.md
+@@ -136,7 +136,7 @@ Issued cards display an active **«ISSUED»** badge for the Game Master.
+ - A terminal can be issued on its own or linked into a **Location**. Inside a location it is shown with a console icon (never as a chest) and opens the hacking window through the **«View»** and **«Hack»** buttons.
+ - In the hacking window the player picks words and bracket combos: likeness `N/M` is learned only by spending an attempt. Attempts are always **4** at every difficulty, brackets never raise them above 4, and a full reset returns exactly to 4. With lockout enabled a failed run locks the terminal for the whole room, while a *Programmer’s Digest* magazine grants one more attempt.
+ - The dictionary holds 12,308 real English words in six per-length files, so consecutive terminals no longer reuse the same candidates. At difficulty 1–5 the board is built from near-identical words: at least `L−3` shared letters and at most 2 matching positions, so the player must deduce the letter order. The password is picked inside the set, so neither the "most similar to everything" nor the "least similar" heuristic reveals it. Hints are capped at `3` matches for difficulty 0–2 and `2` for 3–5; at difficulty 4–5 at least four candidates survive any first wrong guess.
+-- Three stats act separately. **INT 4–10** sets board size `N = max(4, 20 + 2·difficulty − INT)`: at difficulty 5 that is 26 words at INT 4 and 20 at INT 10. **Science 0–6** sets the number of bracket pairs (none at Science 0; otherwise 4/4/3/3/2/2 by difficulty) and their effect: remove words, restore an attempt, or both. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
++- Three stats act separately. **INT 4–10** sets board size `N = max(4, 20 + 2·difficulty − INT)`: at difficulty 5 that is 26 words at INT 4 and 20 at INT 10. **Science 0–6** sets the number of brackets at every difficulty — `0, 1, 1, 2, 3, 3, 4`. Brackets come in two kinds: some remove one wrong word, others restore one attempt; a single bracket does exactly one effect. At Science 6 there are four brackets: two for words and two for attempts. **Luck 4–10** gives a 5–20% chance of a full attempt restore on each bracket. **Luck points** are never spent while hacking — writing them off before or after and declaring the terminal solved is a GM table decision.
+ - The Hacker perk lowers effective difficulty by 1 (minimum 0). At difficulty 0 the terminal may be skipped under the rules; if the player still plays, the board uses large anagram families (`POST/SPOT/STOP/…`) and the password is a maximally dissimilar outlier. It is no longer underlined. Details: `docs/terminal-hacking-balance-proposal.md` and `docs/terminal-words.md`.
+ - On an updated room server the board is shared by every connected player. If the server is still on the old version, the hacking window still opens and the round runs locally on that player's device (the window shows a hint). Update `server/` and restart the Node.js service to get a shared board.
+ 
+diff --git a/docs/guides/admin-and-loot-trade.ru.md b/docs/guides/admin-and-loot-trade.ru.md
+index 72d903f..840a90f 100644
+--- a/docs/guides/admin-and-loot-trade.ru.md
++++ b/docs/guides/admin-and-loot-trade.ru.md
+@@ -136,7 +136,7 @@
+ - Терминал можно выдать отдельно или прикрепить к **Локации**. Внутри локации он отображается иконкой консоли (а не сундука) и открывает окно взлома кнопками **«Обзор»** и **«Взломать»**.
+ - В окне взлома игрок выбирает слова и скобочные комбинации: сходство `N/M` можно узнать только потратив попытку. Попыток всегда **4** на всех сложностях, скобки не поднимают их выше 4, а полный сброс возвращает ровно к 4. При неудаче с включённой блокировкой терминал закрывается для всей комнаты, а *Programmer’s Digest* даёт ещё одну попытку.
+ - Словарь мини-игры — 12 308 реальных английских слов в шести файлах по длине; два-три терминала подряд больше не получают одни и те же варианты. На сложностях 1–5 доска собирается из почти одинаковых слов: не менее `L−3` общих букв и не более 2 совпавших позиций, игроку нужно угадать порядок букв. Пароль выбирается внутри набора, поэтому его не выдаёт ни «самое похожее на все», ни «самое непохожее» слово. Подсказка ограничена: на сложности 0–2 максимум `3` совпадения, на 3–5 — максимум `2`; на сложностях 4–5 после любой первой ошибки остаётся не меньше четырёх кандидатов.
+-- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 20 + 2·сложность − ИНТ)`: на сложности 5 это 26 слов при ИНТ 4 и 20 при ИНТ 10. **Наука 0–6** задаёт число скобочных пар (при Науке 0 их нет; дальше 4/4/3/3/2/2 по сложностям) и их эффект: убрать слова, вернуть попытку или и то и другое. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
++- Три характеристики работают раздельно. **ИНТ 4–10** задаёт число слов `N = max(4, 20 + 2·сложность − ИНТ)`: на сложности 5 это 26 слов при ИНТ 4 и 20 при ИНТ 10. **Наука 0–6** задаёт число скобок на любой сложности — `0, 1, 1, 2, 3, 3, 4`. Скобки бывают двух сортов: одни убирают по одному ложному слову, другие возвращают по одной попытке; одна скобка делает ровно один эффект. На Науке 6 это четыре скобки: две на слова и две на попытки. **Удача 4–10** даёт 5–20 % шанс полного восстановления попыток на каждую скобку. **Очки удачи** при взломе не тратятся: списать их до или после и объявить терминал пройденным — игровое решение Мастера.
+ - Перк «Хакер» снижает эффективную сложность на 1 (минимум 0). На сложности 0 терминал по правилам можно не проходить; если игрок всё же запускает мини-игру, доска собирается из крупных семей анаграмм (`POST/SPOT/STOP/…`), а пароль — максимально непохожее на них слово. Пароль больше не подчёркивается. Подробности — `docs/terminal-hacking-balance-proposal.md` и `docs/terminal-words.md`.
+ - На обновлённом сервере комнат партия общая: подключённые игроки видят одну доску. Если сервер ещё старой версии, окно взлома всё равно откроется, а партия пойдёт локально на устройстве игрока (в окне будет подсказка). Чтобы доска стала общей, обновите файлы `server/` и перезапустите сервис Node.js.
+ 
+diff --git a/docs/patch-497-install.md b/docs/patch-497-install.md
+index b1f6ead..f4290ab 100644
+--- a/docs/patch-497-install.md
++++ b/docs/patch-497-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 497: канонические 4 попытки и доска «последовательности»
+ 
++> **Скобки перечитаны в `docs/patch-499-install.md`.**
++
+ > **Интерфейс терминала уточнён в `docs/patch-498-install.md`.**
+ 
+ Патч подготовлен от состояния **версии 496** (коммит `f0769a4`, ветка
+diff --git a/docs/patch-498-install.md b/docs/patch-498-install.md
+index 9fdbed4..8a842ae 100644
+--- a/docs/patch-498-install.md
++++ b/docs/patch-498-install.md
+@@ -1,5 +1,7 @@
+ # Установка патча 498: чистый интерфейс терминала
+ 
++> **Скобки перечитаны в `docs/patch-499-install.md`.**
++
+ Патч подготовлен от состояния **версии 497** (коммит `146c3d5`, ветка
+ `arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
+ `a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
+diff --git a/docs/patch-499-install.md b/docs/patch-499-install.md
+new file mode 100644
+index 0000000..8002974
+--- /dev/null
++++ b/docs/patch-499-install.md
+@@ -0,0 +1,104 @@
++# Установка патча 499: скобки двух сортов, число задаёт Наука
++
++Патч подготовлен от состояния **версии 498** (коммит `5063158`, ветка
++`arena/054e6676-fallout-2d20-companion`). Он применим и к чистому `main`
++`a62ec7109b50ad720641a4fdeb48f1de865d8742` — тогда установщик подтянет
++патчи 493–499 цепочкой.
++
++## Как теперь читать таблицу бонусов
++
++Запись «W слов + A попыток» означает **W + A скобок**, а не эффекты одной
++скобки. Одна скобка делает ровно одно: либо убирает **одно** ложное слово,
++либо даёт **+1 попытку**. Сорт скрыт до нажатия, как в Fallout.
++
++| Наука | Скобок «убрать слово» | Скобок «вернуть попытку» | Всего скобок |
++|---|---|---|---|
++| 0 | 0 | 0 | **0** |
++| 1 | 1 или 0 (монетка 50/50) | 0 или 1 | **1** |
++| 2 | 1 | 0 | **1** |
++| 3 | 1 | 1 | **2** |
++| 4 | 2 | 1 | **3** |
++| 5 | 1 | 2 | **3** |
++| 6 | 2 | 2 | **4** |
++
++Именно это имелось в виду под «на 6 науке 4 скобки, 2 дают ходы, а 2 убирают
++ложные слова» и под «при 3 скобках — или 2 ошибки и 1 восстановление, или
++2 восстановления и 1 ошибка» (Наука 4 и Наука 5).
++
++**Число скобок задаёт только Наука на всех шести сложностях**: `0, 1, 1, 2, 3, 3, 4`.
++Таблица сложности `4/4/3/3/2/2`, которая в версии 497 ограничивала число пар,
++больше не применяется. На сложности 1 при ИНТ 10 и Науке 6 взлом лёгкий,
++на сложности 5 Наука 6 всё равно даёт четыре скобки. Предохранитель `N−3`
++остался: скобки не могут вычистить доску целиком.
++
++**Удача 4–10** даёт 5–20 % шанс полного возврата к 4 попыткам на каждую
++скобку. На Науке ≥2 словная скобка при удаче всё равно убирает слово;
++на Науке 1 удача заменяет весь эффект. Попытки никогда не выше 4.
++
++## Что НЕ менялось
++
++- `N = max(4, 20 + 2·D − ИНТ)`: на сложности 5 это 26 слов при ИНТ 4
++  и 20 при ИНТ 10 — та самая «база 26 минус прокачка ИНТ»;
++- длина `L = 4 + D`, 4 попытки, доска «последовательности», словарь
++  12 308 реальных слов, экран «О приложении», модалка терминала,
++  Programmer’s Digest и интерфейс из версии 498.
++
++## Замеры на реальном движке (ИНТ 10, УДЧ 4)
++
++| Сложность | Наука | Скобок | Слепой перебор | Думающий | При полном восстановлении |
++|---|---|---|---|---|---|
++| 1 | 0 | 0 | 32 % | 96 % | — |
++| 1 | 6 | 4 (2+2) | 47 % | **100 %** | 100 % |
++| 5 | 0 | 0 | 16 % | 87 % | — |
++| 5 | 3 | 2 (1+1) | 22 % | 99 % | 100 % |
++| 5 | 6 | 4 (2+2) | **21 %** | **94 %** | **100 %** |
++
++Разделение эффектов убрало прежнюю щедрость: в версии 498 Наука 6 на пятой
++сложности поднимала слепой перебор до 46 %, теперь — 21 %. Думающий игрок
++остаётся выше 80 %+, а удачное восстановление даёт 100 %.
++
++## Через `apply-patch.sh` (основной способ)
++
++```bash
++./apply-patch.sh 499
++```
++
++Если вы всё ещё на `a62ec71` со старым установщиком
++(`arena/c1c60b87-fallout-2d20-companion`), один раз переключите источник:
++
++```bash
++git fetch origin arena/054e6676-fallout-2d20-companion
++sed -i 's|arena/c1c60b87-fallout-2d20-companion|arena/054e6676-fallout-2d20-companion|' apply-patch.sh
++./apply-patch.sh 499
++```
++
++`patchs/baseline.json` в ветке-источнике равен `499`, поэтому при установке
++точно до отсечки дерево приводится к коммиту патча целиком, а каталог
++`patchs/` синхронизируется (файл `patchs/499-brackets-by-science.patch`
++появится и локально). `./apply-patch.sh --status` до установки может написать
++«Всё актуально» — ориентируйтесь на `public/version.json` и явно указывайте номер.
++
++После установки: `public/version.json` → `499`, `patchs/baseline.json` → `499`;
++закоммитьте изменения и **перезапустите сервис Node.js** (`server/` — правила
++скобок исполняются сервером). Веб-сборку пересоберите.
++
++## Проверка
++
++```bash
++npm run typecheck
++npx vitest run __tests__/room/terminal-brackets-499.test.js
++npx vitest run __tests__/room/terminal-hacking-balance-499.test.js
++npx vitest run
++CI=1 EXPO_NO_TELEMETRY=1 NODE_ENV=production npm run build
++curl -s http://localhost:5000/version.json | grep '"version": "499"'
++```
++
++### Прямой `git apply` без установщика
++
++Патч-файл не может содержать сам себя, поэтому при ручном наложении его нужно
++скопировать в `patchs/` отдельно:
++
++```bash
++git apply patchs/499-brackets-by-science.patch
++cp /path/to/499-brackets-by-science.patch patchs/
++```
+diff --git a/docs/terminal-hacking-balance-proposal.md b/docs/terminal-hacking-balance-proposal.md
+index c3e7c43..513705c 100644
+--- a/docs/terminal-hacking-balance-proposal.md
++++ b/docs/terminal-hacking-balance-proposal.md
+@@ -1,8 +1,8 @@
+ # Правила взлома терминалов (патч 495, **историческая спецификация**)
+ 
+-> **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток,
++> **Патчи 496 и 497 изменили баланс.** Актуальные формулы `N`, число попыток, скобки,
+ > пакеты Науки, таблица скобок, генератор «последовательности» и приёмочные
+-> замеры — в `docs/patch-497-install.md`. История решений 496 — в
++> замеры — в `docs/patch-499-install.md`. История решений 496 — в
+ > `docs/patch-496-install.md`. Ниже сохранена спецификация 495 как история:
+ > она действует только в части словаря, экрана «О приложении» и порядка
+ > «сначала пароль, потом пустышки» (в 497 пароль выбирается внутри набора).
+diff --git a/patchs/baseline.json b/patchs/baseline.json
+index 9c65b3f..77826cf 100644
+--- a/patchs/baseline.json
++++ b/patchs/baseline.json
+@@ -1,3 +1,3 @@
+ {
+-  "baseline": "498"
++  "baseline": "499"
+ }
+diff --git a/public/version.json b/public/version.json
+index 5055365..bffc1e4 100644
+--- a/public/version.json
++++ b/public/version.json
+@@ -1,8 +1,11 @@
+ {
+-  "version": "498",
++  "version": "499",
+   "release": 4,
+   "notes": {
+     "ru-RU": [
++      "Скобки теперь двух сортов: одна убирает одно ложное слово, другая возвращает одну попытку. Одна скобка больше не делает и то, и другое сразу.",
++      "Число скобок задаёт Наука на всех сложностях: 0, 1, 1, 2, 3, 3, 4 для Науки 0–6. Сложность на число скобок больше не влияет.",
++      "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
+       "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
+       "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
+       "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
+@@ -40,6 +43,9 @@
+       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
+     ],
+     "en-EN": [
++      "Brackets now come in two kinds: one removes a single wrong word, another restores a single attempt. A bracket no longer does both at once.",
++      "Science alone sets the bracket count at every difficulty: 0, 1, 1, 2, 3, 3, 4 for Science 0–6. Difficulty no longer limits it.",
++      "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
+       "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
+       "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
+       "The terminal lockout label is now dark grey and readable on the light form background.",
+diff --git a/server/terminalHacking.js b/server/terminalHacking.js
+index d9d4d31..f343e34 100644
+--- a/server/terminalHacking.js
++++ b/server/terminalHacking.js
+@@ -43,9 +43,17 @@ const MIN_WORDS_BY_DIFFICULTY = [4, 4, 4, 4, 4, 4];
+ const BASE_WORD_COUNT = 20; // экспорт для совместимости
+ const MIN_WORDS = 4;
+ const MAX_ATTEMPTS = 4;     // канон: 4 попытки на любой сложности
+-const BRACKETS_BY_DIFFICULTY = [4, 4, 3, 3, 2, 2];
+-const SCIENCE_PACKS = { 2: [1, 0], 3: [1, 1], 4: [2, 1], 5: [1, 2], 6: [2, 2] };
+-const SCI5_MONO = false;    // true: Наука 5 = (2 слова, 2 попытки)
++// Патч 499: запись «W слов + A попыток» означает W+A СКОБОК, а не эффекты
++// одной скобки. W скобок убирают по одному ложному слову, A скобок дают
++// по +1 попытке. Одна скобка = ровно один эффект. Число скобок задаёт Наука
++// на ВСЕХ сложностях (таблица сложности 497 больше не ограничивает).
++// Наука:      0     1        2      3      4      5      6
++// словных:    0   монетка    1      1      2      1      2
++// ходовых:    0   монетка    0      1      1      2      2
++// всего:      0     1        1      2      3      3      4
++const BRACKET_SPLIT_BY_SCIENCE = [[0, 0], [0, 0], [1, 0], [1, 1], [2, 1], [1, 2], [2, 2]];
++const BRACKET_COUNT_BY_SCIENCE = [0, 1, 1, 2, 3, 3, 4];
++const SCI5_MONO = false;    // true: Наука 5 = 2 словных + 2 ходовых скобки
+ const SCI1_WORD_CHANCE = 0.5;
+ 
+ const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+@@ -92,35 +100,39 @@ const decodeTerminalNodeMarker = (value) => {
+ const luckRestoreChance = (luck) => 0.05 + 0.025 * (clamp(Number(luck) || 4, 4, 10) - 4);
+ const recoveryChancePercent = (luck) => Math.round(luckRestoreChance(luck) * 100);
+ 
+-// Число скобочных пар: Наука 0 -> нет, иначе таблица по сложности.
+-// Предохранитель N−3 не даёт вычистить доску целиком.
++// Состав скобок по Науке: [сколько убирают слово, сколько дают попытку].
++const bracketSplitFor = (science) => {
++  const sci = clamp(Number(science) || 0, 0, 6);
++  if (sci === 5 && SCI5_MONO) return [2, 2];
++  return BRACKET_SPLIT_BY_SCIENCE[sci];
++};
++
++// Число скобок задаёт ТОЛЬКО Наука. Сложность не ограничивает: на 1-м уровне
++// при высоких Науке + ИНТ взлом действительно лёгкий, на 5-м Наука 6 даёт
++// все 4 скобки. Предохранитель N−3 не даёт вычистить доску целиком.
+ const bracketCountFor = (difficulty, science, wordCount = 20) => {
+-  const tier = clamp(Math.floor(Number(difficulty) || 0), 0, 5);
+   const sci = clamp(Number(science) || 0, 0, 6);
+-  if (sci === 0) return 0;
++  const split = bracketSplitFor(sci);
++  const count = sci === 1 ? 1 : split[0] + split[1];
+   const n = Math.max(4, Math.floor(Number(wordCount) || 20));
+-  return Math.max(0, Math.min(BRACKETS_BY_DIFFICULTY[tier], n - 3));
++  // difficulty сохранён в сигнатуре для совместимости вызывающих:
++  // сложность больше НЕ влияет на число скобок.
++  void difficulty;
++  return Math.max(0, Math.min(count, n - 3));
+ };
+ 
+-// Эффект одной скобки. Возвращает { words, attempts, full }.
+-// При Удаче восстанавливаются ВСЕ 4 попытки; на Науке >=2 «словесная» часть
+-// пакета остаётся, на Науке 1 удача заменяет весь эффект (слов не убираем).
+-// Ограничения «только один раз за терминал» больше нет: шанс на КАЖДУЮ пару,
+-// но попытки никогда не превышают 4.
+-const bracketEffectFor = (science, luck, rng = Math.random) => {
++// Эффект ОДНОЙ скобки: kind = 'word' -> убрать 1 ложное слово,
++// kind = 'attempt' -> +1 попытка. При Удаче возвращаются ВСЕ 4 попытки;
++// на Науке >=2 «словесная» скобка всё равно убирает слово, на Науке 1 удача
++// заменяет весь эффект. Попытки никогда не превышают 4.
++const bracketEffectFor = (science, luck, rng = Math.random, kind = 'word') => {
+   const sci = clamp(Number(science) || 0, 0, 6);
+-  if (sci === 0) return { words: 0, attempts: 0, full: false };
+-  let words;
+-  let attempts;
+-  if (sci === 1) {
+-    if (rng() < SCI1_WORD_CHANCE) { words = 1; attempts = 0; } else { words = 0; attempts = 1; }
+-  } else {
+-    const pack = (sci === 5 && SCI5_MONO) ? [2, 2] : SCIENCE_PACKS[sci];
+-    [words, attempts] = pack;
+-  }
++  if (sci === 0) return { words: 0, attempts: 0, full: false, kind: 'none' };
+   const full = rng() < luckRestoreChance(luck);
+-  if (full && sci === 1) words = 0;
+-  return { words, attempts: full ? 0 : attempts, full };
++  const replaced = full && sci === 1;
++  const words = !replaced && kind === 'word' ? 1 : 0;
++  const attempts = !replaced && kind === 'attempt' ? 1 : 0;
++  return { words, attempts: full ? 0 : attempts, full, kind };
+ };
+ 
+ const toNumber = (entry) => Number(typeof entry === 'object'
+@@ -485,11 +497,21 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+   }
+   const brackets = [];
+   const bracketPairs = ['()', '[]', '{}', '<>'];
+-  // Патч 497: число пар по сложности, эффект каждой — детерминированный
+-  // пакет Науки плюс独立的 бросок Удачи на полное восстановление.
++  // Патч 499: сорта скобок определяются Наукой, число — тоже Наукой.
++  // Наука 1 — одна скобка, её сорт выбирается монеткой; остальные сорта
++  // перемешиваются по доске, чтобы нельзя было угадать по позиции.
++  const split = bracketSplitFor(stats.science);
++  let kinds;
++  if (stats.science === 1) {
++    kinds = [rng() < SCI1_WORD_CHANCE ? 'word' : 'attempt'];
++  } else {
++    kinds = [...Array(split[0]).fill('word'), ...Array(split[1]).fill('attempt')];
++  }
++  kinds = shuffle(kinds, rng);
+   const bracketCount = bracketCountFor(effectiveDifficulty, stats.science, chosen.length);
+   for (let groupIndex = 0; groupIndex < bracketCount; groupIndex += 1) {
+-    const effect = bracketEffectFor(stats.science, stats.luck, rng);
++    const kind = kinds[groupIndex] || 'word';
++    const effect = bracketEffectFor(stats.science, stats.luck, rng, kind);
+     const pair = bracketPairs[randomInt(bracketPairs.length, rng)];
+     const length = 3 + randomInt(6, rng);
+     const preferredRow = randomInt(board.length / width, rng);
+@@ -519,6 +541,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+       effect,
+       // Поле сохранено для старых клиентов; факт определяет `effect`.
+       recovery: effect.full || effect.attempts > 0,
++      kind,
+     });
+   }
+   const recoveryChance = recoveryChancePercent(stats.luck);
+@@ -545,7 +568,7 @@ const createGame = ({ config, operatorClientId, operatorCharacterId, characterSn
+     likenessCap: selection.likenessCap,
+     minAmbiguity: selection.minAmbiguity,
+     centralityRank: selection.centralityRank,
+-    sciencePack: SCIENCE_PACKS[stats.science] || null,
++    bracketSplit: bracketSplitFor(stats.science),
+     attempts: attemptsForDifficulty(effectiveDifficulty),
+     maxAttempts: attemptsForDifficulty(effectiveDifficulty),
+     bonusAttempts: 0,
+@@ -576,7 +599,7 @@ const publicGameState = (game) => {
+     operatorClientId,
+     digestEligible: game.status === 'pendingDigest' && digestEligible,
+     // Эффект скобки игрок узнаёт только после нажатия — как в Fallout 3.
+-    bracketRanges: (game.bracketRanges || []).map(({ recovery, effect, ...bracket }) => bracket),
++    bracketRanges: (game.bracketRanges || []).map(({ recovery, effect, kind, ...bracket }) => bracket),
+     // Патч 495: подчёркивания пароля на d=0 больше нет — игрок, который
+     // всё-таки решил сыграть, ищет «слово не из семейки». Сложность 0 по
+     // правилам можно не проходить: Мастер просто открывает терминал.
+@@ -689,9 +712,10 @@ module.exports = {
+   MIN_AMBIGUITY_BY_DIFFICULTY,
+   AMBIGUITY_TARGET_BY_DIFFICULTY,
+   MIN_SHARED_BY_DIFFICULTY,
+-  BRACKETS_BY_DIFFICULTY,
+-  SCIENCE_PACKS,
++  BRACKET_SPLIT_BY_SCIENCE,
++  BRACKET_COUNT_BY_SCIENCE,
+   SCI5_MONO,
++  bracketSplitFor,
+   bracketCountFor,
+   bracketEffectFor,
+   luckRestoreChance,

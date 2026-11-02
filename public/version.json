@@ -1,8 +1,11 @@
 {
-  "version": "498",
+  "version": "499",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Скобки теперь двух сортов: одна убирает одно ложное слово, другая возвращает одну попытку. Одна скобка больше не делает и то, и другое сразу.",
+      "Число скобок задаёт Наука на всех сложностях: 0, 1, 1, 2, 3, 3, 4 для Науки 0–6. Сложность на число скобок больше не влияет.",
+      "На сложности 1 при высоких Науке и Интеллекте взлом становится лёгким, как и задумывалось; на сложности 5 Наука 6 даёт четыре скобки, а слепой перебор остаётся около 21 %.",
       "В карточке и окне терминала теперь показывается только сложность — без длины пароля и служебных пояснений.",
       "Сложность терминала задаётся от 1 до 5. Нулевая сложность доступна только игроку с перком «Хакер», когда он снижает единицу.",
       "Подпись о блокировке терминала после провала попыток стала тёмно-серой и читается на светлом фоне формы.",
@@ -40,6 +43,9 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "Brackets now come in two kinds: one removes a single wrong word, another restores a single attempt. A bracket no longer does both at once.",
+      "Science alone sets the bracket count at every difficulty: 0, 1, 1, 2, 3, 3, 4 for Science 0–6. Difficulty no longer limits it.",
+      "At difficulty 1 a high Science and Intellect make hacking easy as intended; at difficulty 5 Science 6 gives four brackets while blind guessing stays around 21%.",
       "Terminal cards and the hacking window now show only the difficulty, without password length or internal hints.",
       "Terminal difficulty is chosen from 1 to 5. Difficulty 0 is only reachable by a player with the Hacker perk lowering a level-1 terminal.",
       "The terminal lockout label is now dark grey and readable on the light form background.",

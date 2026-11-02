@@ -13,8 +13,9 @@ const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
-  // Патч 497: удача 4..10 даёт 5..20 % полного восстановления на скобку.
-  it('uses the agreed luck checkpoints and deterministic Science packages', () => {
+  // Патч 499: удача 4..10 даёт 5..20 % полного восстановления на скобку,
+  // одна скобка делает ровно ОДИН эффект.
+  it('uses the agreed luck checkpoints and single-effect brackets', () => {
     expect(recoveryChancePercent(4)).toBe(5);
     expect(recoveryChancePercent(7)).toBe(13);
     expect(recoveryChancePercent(10)).toBe(20);
@@ -22,13 +23,16 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(recoveryChancePercent(12)).toBe(20);
     expect(luckRestoreChance(4)).toBeCloseTo(0.05);
     expect(luckRestoreChance(10)).toBeCloseTo(0.2);
-    // Наука 6: (2 слова, 2 попытки); rng=()=>0 гарантирует удачу.
-    expect(bracketEffectFor(6, 10, () => 0)).toEqual({ words: 2, attempts: 0, full: true });
-    // rng=()=>0.99 — удачи нет, пакет остаётся целиком.
-    expect(bracketEffectFor(6, 10, () => 0.99)).toEqual({ words: 2, attempts: 2, full: false });
-    expect(bracketEffectFor(0, 10, () => 0)).toEqual({ words: 0, attempts: 0, full: false });
-    // Наука 1: 50/50 слово или попытка; удача заменяет весь эффект.
-    expect(bracketEffectFor(1, 4, () => 0)).toEqual({ words: 0, attempts: 0, full: true });
+    // rng=()=>0.99 — удачи нет: словная скобка убирает 1 слово,
+    // ходовая даёт +1 попытку, и никогда обе сразу.
+    expect(bracketEffectFor(6, 10, () => 0.99, 'word')).toEqual({ words: 1, attempts: 0, full: false, kind: 'word' });
+    expect(bracketEffectFor(6, 10, () => 0.99, 'attempt')).toEqual({ words: 0, attempts: 1, full: false, kind: 'attempt' });
+    // rng=()=>0 — удача: возврат к 4; словная часть на Науке >=2 остаётся.
+    expect(bracketEffectFor(6, 10, () => 0, 'word')).toEqual({ words: 1, attempts: 0, full: true, kind: 'word' });
+    expect(bracketEffectFor(6, 10, () => 0, 'attempt')).toEqual({ words: 0, attempts: 0, full: true, kind: 'attempt' });
+    expect(bracketEffectFor(0, 10, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: false, kind: 'none' });
+    // Наука 1: удача заменяет весь эффект (слов не убираем).
+    expect(bracketEffectFor(1, 4, () => 0, 'word')).toEqual({ words: 0, attempts: 0, full: true, kind: 'word' });
   });
 
   // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
@@ -84,7 +88,7 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(publicState.password).toBeUndefined();
   });
 
-  it('Science packages are deterministic and a full restore never exceeds 4 attempts', () => {
+  it('Science sets the bracket count on every difficulty and a full restore never exceeds 4', () => {
     const snapshot = {
       attributes: { INT: { value: 10 }, LCK: { value: 10 } },
       skills: [{ id: 'science', value: 6 }],
@@ -97,12 +101,17 @@ describe('shared Fallout terminal hacking rules', () => {
       now: 100,
       rng: noRandomness,
     });
-    expect(game.bracketRanges).toHaveLength(2); // таблица скобок: D5 -> 2
+    expect(game.bracketRanges).toHaveLength(4); // Наука 6 -> 4 скобки на ЛЮБОЙ сложности
+    expect(game.bracketRanges.filter((b) => b.kind === 'word')).toHaveLength(2);
+    expect(game.bracketRanges.filter((b) => b.kind === 'attempt')).toHaveLength(2);
     for (const bracket of game.bracketRanges) {
-      expect(bracket.effect.words).toBe(2);
       expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
+      expect(bracket.effect.words).toBe(bracket.kind === 'word' ? 1 : 0);
+      expect(bracket.effect.words + bracket.effect.attempts).toBeLessThanOrEqual(1);
     }
-    expect(publicGameState(game).bracketRanges.every((entry) => !('effect' in entry) && !('recovery' in entry))).toBe(true);
+    expect(publicGameState(game).bracketRanges.every((entry) => (
+      !('effect' in entry) && !('recovery' in entry) && !('kind' in entry)
+    ))).toBe(true);
 
     let next = { ...game, attempts: 1 };
     for (const bracket of game.bracketRanges) {
