@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "description": "Словарь мини-игры взлома: EOWL ∩ ESDB/SCOWL (size <= 35), один файл на длину слова.",
+  "wordLengths": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "totalWords": 12308,
+  "byLength": {
+    "4": 1405,
+    "5": 1902,
+    "6": 2478,
+    "7": 2387,
+    "8": 2171,
+    "9": 1965
+  },
+  "sources": {
+    "words": "scripts/terminal-words/eowl-words.txt (EOWL v1.1.2 / UKACD v1.6)",
+    "commonWordsFilter": "scripts/terminal-words/scowl-common-35.txt (ESDB/SCOWL, size <= 35)",
+    "filter": "scripts/terminal-words/filter.json"
+  },
+  "license": "scripts/terminal-words/LICENSES.md (уведомление UKACD включать при распространении)",
+  "format": "массив слов в верхнем регистре, отсортирован по алфавиту",
+  "generatedBy": "node scripts/build-terminal-words.mjs"
+}

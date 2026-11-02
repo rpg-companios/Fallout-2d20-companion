@@ -1847,20 +1847,37 @@ export default function HomeScreen({ navigation }) {
         </Pressable>
       </Modal>
 
+      {/* Патч 495: окно «О приложении» — неофициальный статус, AGPL и
+          дословные уведомления UKACD / ESDB (требование лицензий словаря).
+          ScrollView нужен, чтобы юридические тексты не обрезались на телефоне. */}
       <Modal visible={aboutVisible} transparent animationType="slide" onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalBackdropCenter}>
-          <View style={styles.infoModal}>
+          <View style={[styles.infoModal, styles.aboutModal]}>
             <Text style={styles.infoTitle}>{tHomeScreen('menu.about')}</Text>
-            <Text style={styles.infoText}>
-              {tHomeScreen('about.description'
-              )}
-            </Text>
-            <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('privacy'); }}>
-              <Text style={styles.linkText}>{tHomeScreen('about.privacyPolicy')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('terms'); }}>
-              <Text style={styles.linkText}>{tHomeScreen('about.termsOfService')}</Text>
-            </TouchableOpacity>
+            <ScrollView style={styles.aboutScroll} contentContainerStyle={styles.aboutScrollContent}>
+              <Text style={styles.infoText}>{tHomeScreen('about.description')}</Text>
+
+              <Text style={styles.aboutSectionTitle}>{tHomeScreen('about.unofficialTitle')}</Text>
+              <Text style={styles.infoText}>{tHomeScreen('about.unofficial')}</Text>
+
+              <Text style={styles.aboutSectionTitle}>{tHomeScreen('about.engineTitle')}</Text>
+              <Text style={styles.infoText}>{tHomeScreen('about.engine')}</Text>
+
+              <Text style={styles.aboutSectionTitle}>{tHomeScreen('about.creditsTitle')}</Text>
+              <Text style={styles.infoText}>{tHomeScreen('about.creditsIntro')}</Text>
+              <Text style={styles.aboutSmall}>{tHomeScreen('about.creditEowl')}</Text>
+              <Text style={styles.aboutLegal}>{tHomeScreen('about.licenseUkacd')}</Text>
+              <Text style={styles.aboutSmall}>{tHomeScreen('about.creditEsdb')}</Text>
+              <Text style={styles.aboutLegal}>{tHomeScreen('about.licenseEsdb')}</Text>
+              <Text style={styles.aboutSmall}>{tHomeScreen('about.creditBrian')}</Text>
+
+              <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('privacy'); }}>
+                <Text style={styles.linkText}>{tHomeScreen('about.privacyPolicy')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setAboutVisible(false); setLegalDoc('terms'); }}>
+                <Text style={styles.linkText}>{tHomeScreen('about.termsOfService')}</Text>
+              </TouchableOpacity>
+            </ScrollView>
             <TouchableOpacity style={styles.modalCloseButton} onPress={() => setAboutVisible(false)}>
               <Text style={styles.modalCloseButtonText}>{tHomeScreen('buttons.ok')}</Text>
             </TouchableOpacity>

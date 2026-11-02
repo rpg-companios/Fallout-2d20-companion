@@ -1,8 +1,13 @@
 {
-  "version": "494",
+  "version": "495",
   "release": 4,
   "notes": {
     "ru-RU": [
+      "Словарь мини-игры собран из настоящих английских слов: шесть файлов по длине, всего 12 308 слов; соседние терминалы больше не повторяют одни и те же варианты.",
+      "Взлом разделён на три рычага: ИНТ (4–10) задаёт число слов на доске (20 → 12), Наука (0–6) добавляет скобочные комбинации и с 4-го уровня открывает восстановление попыток, Удача (4–10) определяет шанс появления такой комбинации (10–80 %).",
+      "На сложности 0 доска собирается из семей настоящих анаграмм (POST/SPOT/STOP…), а пароль — слово-выброс, почти не имеющее с ними общих букв; правильное слово больше не подчёркивается.",
+      "Из окна взлома убрана служебная строка с внутренними порогами; в «О приложении» добавлены неофициальный статус проекта, права правообладателей, AGPL и дословные лицензии словарей.",
+      "Скобка восстановления теперь даёт +1 попытку (не полный сброс до четырёх), а очки удачи при взломе не расходуются.",
       "Взлом терминалов стал сложнее: подсказка ограничена (на сложности 5 — не больше 2 совпадений из 9), слова на доске похожи, а ИНТ + Наука уменьшают число вариантов.",
       "Терминал в локации больше не превращается в сундук: при нажатии открывается окно взлома с мини-игрой, даже если сервер комнат ещё не обновлён.",
       "Терминал внутри локации теперь распознаётся по серверному реестру комнаты даже при устаревшем типе узла; игрок открывает взлом, а не пустой контейнер.",
@@ -20,6 +25,11 @@
       "Иконки меню, вкладок и карточек загружаются с высоким приоритетом без задержек, а при выходе новой версии браузер сам подхватывает обновление без ручной очистки кэша."
     ],
     "en-EN": [
+      "The hacking word list is now built from real English words: six files by word length, 12,308 words total, so consecutive terminals no longer repeat the same candidates.",
+      "Hacking uses three separate levers: INT (4–10) sets the board size (20 → 12 words), Science (0–6) adds bracket combinations and unlocks attempt recovery at rank 4, and Luck (4–10) sets the chance that such a combination appears (10–80%).",
+      "At difficulty 0 the board is built from real anagram families (POST/SPOT/STOP…) while the password is a maximal outlier; the correct word is no longer underlined.",
+      "The internal thresholds line was removed from the hacking window; «About» now states the unofficial fan status, rights holders, the AGPL engine licence and verbatim word-list licences.",
+      "A recovery bracket now grants +1 attempt instead of resetting all four, and luck points are never spent while hacking.",
       "Terminal hacking is harder now: hints are capped (at difficulty 5 — at most 2 of 9 matching letters), words on the board are similar, and INT + Science shrink the candidate list.",
       "A terminal inside a location no longer turns into a chest: tapping it opens the hacking mini-game in a modal, even if the room server has not been updated yet.",
       "A terminal inside a location is now recognized from the room registry even if the session node has a stale kind, so players open the hacking game instead of an empty container.",

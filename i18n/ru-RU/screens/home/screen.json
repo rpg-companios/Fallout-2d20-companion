@@ -218,7 +218,18 @@
   "about": {
     "description": "Positronium — менеджер персонажей для настольных ролевых игр: создание, хранение, редактирование, импорт/экспорт и облачная синхронизация.",
     "privacyPolicy": "Политика конфиденциальности",
-    "termsOfService": "Условия использования"
+    "termsOfService": "Условия использования",
+    "unofficialTitle": "Неофициальный фанатский проект",
+    "unofficial": "Настоящее приложение является неофициальным фанатским проектом и создано энтузиастами без участия правообладателей. Все товарные знаки, наименования, персонажи, элементы сеттинга, изображения и иные объекты интеллектуальной собственности, включая Fallout, принадлежат соответствующим правообладателям, в том числе Bethesda Softworks LLC, ZeniMax Media Inc., Microsoft Corporation и Modiphius Entertainment Ltd. Проект не одобрен, не спонсируется и не связан с указанными лицами; использование материалов не предоставляет пользователю каких-либо прав на объекты интеллектуальной собственности.",
+    "engineTitle": "Исходный код и данные",
+    "engine": "Программный код движка распространяется на условиях GNU Affero General Public License (AGPL). Игровые данные, словари, справочные материалы подготовлены участниками сообщества самостоятельно.",
+    "creditsTitle": "Благодарности и лицензии",
+    "creditsIntro": "Словарь мини-игры взлома терминалов составлен с использованием следующих работ. Уведомления приведены дословно, как того требуют условия их распространения.",
+    "creditEowl": "Список слов: English Open Word List (EOWL) v1.1.2, производная UK Advanced Cryptics Dictionary v1.6; файл распространён в репозитории brianburton/fallout_terminal_hack_game (BSD 3-Clause).",
+    "licenseUkacd": "UK Advanced Cryptics Dictionary Licensing Information:\n\nCopyright © J Ross Beresford 1993-1999. All Rights Reserved. The\nfollowing restriction is placed on the use of this publication: if the\nUK Advanced Cryptics Dictionary is used in a software package or\nredistributed in any form, the copyright notice must be prominently\ndisplayed and the text of this document must be included verbatim.\n\nThere are no other restrictions: I would like to see the list\ndistributed as widely as possible.",
+    "creditEsdb": "Фильтр узнаваемости: English Speller Database (ESDB, ранее SCOWL) размера ≤ 35, репозиторий en-wl/wordlist.",
+    "licenseEsdb": "Copyright 2000-2026 by Kevin Atkinson\n\nPermission to use, copy, modify, distribute, and sell any part of the English\nSpeller Database (ESDB, previously known as SCOWLv2), or word lists\ncreated from it, is hereby granted without fee, provided that the above\ncopyright notice appears in all copies and that both the above copyright\nnotice and this notice appear in supporting documentation.  Kevin Atkinson\nmakes no representations about the suitability of this database for any\npurpose.  It is provided \"as is\" without express or implied warranty.",
+    "creditBrian": "Частотный список Google и производные от него материалы в сборке не используются."
   },
   "gameSetting": {
     "title": "Игровой сеттинг",

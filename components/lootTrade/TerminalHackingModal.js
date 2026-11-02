@@ -271,17 +271,6 @@ const TerminalHackingModal = ({
                 </View>
               </View>
 
-              {game.likenessCap !== undefined ? (
-                <Text style={styles.balanceHint}>
-                  {formatLootTrade(tLootTrade('terminal.balanceHint'), {
-                    words: game.wordCount ?? game.wordRanges?.length ?? 12,
-                    cap: game.likenessCap,
-                    length: game.wordLength ?? game.wordRanges?.[0]?.word?.length ?? 4,
-                    score: game.skillScore ?? 4,
-                  })}
-                </Text>
-              ) : null}
-
               {isSpectator && <Text style={styles.spectatorNotice}>{tLootTrade('terminal.spectator')}</Text>}
               {game.status === 'pendingDigest' && game.digestEligible ? (
                 <View style={styles.digestPanel}>
@@ -332,7 +321,6 @@ const styles = StyleSheet.create({
   closeButton: { padding: 5, marginLeft: 8 },
   description: { color: '#9db197', fontSize: 13, marginBottom: 8 },
   localModeHint: { color: '#d8c27d', fontSize: 11, marginBottom: 8, textAlign: 'center' },
-  balanceHint: { color: '#7f9b7c', fontSize: 10, marginTop: 7, fontFamily: 'monospace' },
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderColor: '#203923' },
   statusLabel: { color: '#8da38b', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', fontFamily: 'monospace' },
   attemptDots: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
