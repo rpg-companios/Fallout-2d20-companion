@@ -6,33 +6,34 @@ import {
   createGame,
   publicGameState,
   recoveryChancePercent,
+  luckRestoreChance,
 } from '../../server/terminalHacking.js';
 
 const config = { containerId: 'terminal-1', name: 'Vault terminal', difficulty: 2, lockOnFailure: true };
 const noRandomness = () => 0;
 
 describe('shared Fallout terminal hacking rules', () => {
-  // Патч 496: справочная вероятность «не пустышка» берётся из таблицы d20.
-  it('uses the agreed d20 luck checkpoints and clamp', () => {
-    expect(recoveryChancePercent(4)).toBe(25);
-    expect(recoveryChancePercent(7)).toBe(45);
-    expect(recoveryChancePercent(10)).toBe(75);
-    expect(recoveryChancePercent(1)).toBe(25);
-    expect(recoveryChancePercent(12)).toBe(75);
-    expect(recoveryChancePercent(0)).toBe(25);
-    // d20: 1..F = полный сброс, F+1..P = +1 попытка, остальное = пустышка.
-    expect(bracketEffectFor(4, 1)).toBe('reset');
-    expect(bracketEffectFor(4, 3)).toBe('attempt');
-    expect(bracketEffectFor(4, 9)).toBe('dud');
-    expect(bracketEffectFor(10, 4)).toBe('reset');
-    expect(bracketEffectFor(10, 12)).toBe('attempt');
-    expect(bracketEffectFor(10, 18)).toBe('dud');
-    expect(bracketEffectFor(10, 2, true)).toBe('attempt');
+  // Патч 497: удача 4..10 даёт 5..20 % полного восстановления на скобку.
+  it('uses the agreed luck checkpoints and deterministic Science packages', () => {
+    expect(recoveryChancePercent(4)).toBe(5);
+    expect(recoveryChancePercent(7)).toBe(13);
+    expect(recoveryChancePercent(10)).toBe(20);
+    expect(recoveryChancePercent(1)).toBe(5);
+    expect(recoveryChancePercent(12)).toBe(20);
+    expect(luckRestoreChance(4)).toBeCloseTo(0.05);
+    expect(luckRestoreChance(10)).toBeCloseTo(0.2);
+    // Наука 6: (2 слова, 2 попытки); rng=()=>0 гарантирует удачу.
+    expect(bracketEffectFor(6, 10, () => 0)).toEqual({ words: 2, attempts: 0, full: true });
+    // rng=()=>0.99 — удачи нет, пакет остаётся целиком.
+    expect(bracketEffectFor(6, 10, () => 0.99)).toEqual({ words: 2, attempts: 2, full: false });
+    expect(bracketEffectFor(0, 10, () => 0)).toEqual({ words: 0, attempts: 0, full: false });
+    // Наука 1: 50/50 слово или попытка; удача заменяет весь эффект.
+    expect(bracketEffectFor(1, 4, () => 0)).toEqual({ words: 0, attempts: 0, full: true });
   });
 
-  // Патч 496: база доски зависит от сложности, длина = d + 4.
+  // Патч 497: N = 20 + 2·D − ИНТ, L = 4 + D; 4 попытки на любой сложности.
   it.each([
-    [0, 4, 8], [1, 5, 10], [2, 6, 12], [3, 7, 14], [4, 8, 17], [5, 9, 20],
+    [0, 4, 16], [1, 5, 18], [2, 6, 20], [3, 7, 22], [4, 8, 24], [5, 9, 26],
   ])('difficulty %s creates a %s-letter password', (difficulty, wordLength, wordCount) => {
     const game = createGame({
       config: { ...config, difficulty, lockOnFailure: false },
@@ -46,6 +47,8 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(game.password).toHaveLength(wordLength);
     expect(game.wordRanges).toHaveLength(wordCount);
     expect(game.wordCount).toBe(wordCount);
+    expect(game.attempts).toBe(4);
+    expect(game.maxAttempts).toBe(4);
   });
 
   it('Hacker rank reduces effective difficulty dynamically and difficulty zero never leaks the password', () => {
@@ -81,30 +84,28 @@ describe('shared Fallout terminal hacking rules', () => {
     expect(publicState.password).toBeUndefined();
   });
 
-  it('rolls bracket effects with d20 and allows a full reset only once', () => {
+  it('Science packages are deterministic and a full restore never exceeds 4 attempts', () => {
     const snapshot = {
       attributes: { INT: { value: 10 }, LCK: { value: 10 } },
       skills: [{ id: 'science', value: 6 }],
     };
-    let game = null;
-    for (let k = 1; k <= 60 && !game; k += 1) {
-      const candidate = createGame({
-        config: { ...config, difficulty: 5 },
-        operatorClientId: 'player-1',
-        operatorCharacterId: 'char-1',
-        characterSnapshot: snapshot,
-        now: 100,
-        rng: () => k / 61,
-      });
-      if (candidate.bracketRanges.some((entry) => entry.effect === 'reset')) game = candidate;
+    const game = createGame({
+      config: { ...config, difficulty: 5 },
+      operatorClientId: 'player-1',
+      operatorCharacterId: 'char-1',
+      characterSnapshot: snapshot,
+      now: 100,
+      rng: noRandomness,
+    });
+    expect(game.bracketRanges).toHaveLength(2); // таблица скобок: D5 -> 2
+    for (const bracket of game.bracketRanges) {
+      expect(bracket.effect.words).toBe(2);
+      expect(bracket.effect.full).toBe(true); // rng=()=>0 -> удача
     }
-    expect(game).not.toBeNull();
-    expect(game.bracketRanges).toHaveLength(3);
-    expect(game.bracketRanges.filter((entry) => entry.effect === 'reset')).toHaveLength(1);
     expect(publicGameState(game).bracketRanges.every((entry) => !('effect' in entry) && !('recovery' in entry))).toBe(true);
 
     let next = { ...game, attempts: 1 };
-    for (const bracket of [...game.bracketRanges]) {
+    for (const bracket of game.bracketRanges) {
       next = applyGameAction({
         game: next,
         action: 'bracket',
@@ -117,8 +118,8 @@ describe('shared Fallout terminal hacking rules', () => {
       }).game;
     }
     expect(next.resetUsed).toBe(true);
-    expect(next.bonusAttempts).toBeGreaterThanOrEqual(next.maxAttempts);
-    expect(next.attempts).toBe(1 + next.bonusAttempts);
+    expect(next.attempts).toBe(4); // полный сброс возвращает К 4, а не +4
+    expect(next.attempts).toBeLessThanOrEqual(next.maxAttempts);
     expect(next.bracketRanges.every((entry) => entry.used)).toBe(true);
 
     const noScience = createGame({

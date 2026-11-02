@@ -1,5 +1,30 @@
 # Changelog
 ---
+## Canonical four attempts and the "sequence" board (patch 497)
+
+**Accepted by the owner.** Attempts are 4 again at every difficulty (ceiling 4);
+a full reset returns **to 4** instead of adding another set. Word count is
+`N = max(4, 20 + 2·D − INT)`: at difficulty 5 that is **26 words at INT 4 and
+20 at INT 10** — the board grew so bracket bonuses no longer eat it.
+
+**Words.** At D≥1 the board is built from real words sharing at least `L−3`
+letters and at most 2 matching positions: guessing the *sequence* replaces
+grouping by the *number* of shared letters. The password is picked **inside**
+the set, from the middle of the similarity distribution — otherwise the
+"most central word" heuristic (or its mirror) gives it away. D0 keeps anagram
+families (`POST/SPOT/POTS`) with a dissimilar outlier password.
+
+**Brackets.** Science 0 gives none; otherwise `{0:4, 1:4, 2:3, 3:3, 4:2, 5:2}`
+pairs. Effects are deterministic by Science (remove words / restore attempts /
+both). Luck 4–10 gives a 5–20% chance of a full restore on each bracket;
+attempts never exceed 4. Luck points are never spent.
+
+**Tension at D4–D5.** The ambiguity floor rose to 4 (repair target 8): at least
+four candidates survive any first wrong guess. Measured on the real engine:
+blind guessing **17–47%**, informed deduction **82–88%** without bonuses and
+**100%** with lucky brackets, the "most central word" heuristic **0–17%**.
+Details and installation: `docs/patch-497-install.md`.
+
 ## Hacking summary v2: brackets are the hints (patch 496)
 
 **Owner's accepted rules.** A bracket pair *is* a hint; there are no separate
